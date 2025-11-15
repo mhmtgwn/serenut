@@ -12,7 +12,9 @@ class CustomersPage extends StatefulWidget {
 class _CustomersPageState extends State<CustomersPage> {
   final CustomerService _service = CustomerService();
   List<Customer> _customers = [];
+  List<Customer> _filteredCustomers = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -25,7 +27,22 @@ class _CustomersPageState extends State<CustomersPage> {
     final customers = await _service.getAll();
     setState(() {
       _customers = customers;
+      _filteredCustomers = customers;
       _isLoading = false;
+    });
+  }
+
+  void _filterCustomers(String query) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _filteredCustomers = _customers;
+      } else {
+        _filteredCustomers = _customers.where((customer) {
+          return customer.name.toLowerCase().contains(query.toLowerCase()) ||
+              customer.phone.contains(query);
+        }).toList();
+      }
     });
   }
 
@@ -35,41 +52,62 @@ class _CustomersPageState extends State<CustomersPage> {
       appBar: AppBar(
         title: const Text('Müşteriler'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            onPressed: () {},
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFFF1F5F9),
-            ),
-          ),
           const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _customers.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.people_outline_rounded,
-                          size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Henüz müşteri yok',
-                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
+          : Column(
+              children: [
+                Padding(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _customers.length,
-                  itemBuilder: (context, index) {
-                    final customer = _customers[index];
-                    return _buildCustomerCard(customer);
-                  },
+                  child: TextField(
+                    onChanged: _filterCustomers,
+                    decoration: InputDecoration(
+                      hintText: 'Müşteri ara...',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded),
+                              onPressed: () {
+                                _filterCustomers('');
+                                FocusScope.of(context).unfocus();
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
                 ),
+                Expanded(
+                  child: _filteredCustomers.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.people_outline_rounded,
+                                  size: 80, color: Colors.grey[300]),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isEmpty
+                                    ? 'Henüz müşteri yok'
+                                    : 'Müşteri bulunamadı',
+                                style: TextStyle(
+                                    fontSize: 18, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredCustomers.length,
+                          itemBuilder: (context, index) {
+                            final customer = _filteredCustomers[index];
+                            return _buildCustomerCard(customer);
+                          },
+                        ),
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCustomerDialog(null),
         icon: const Icon(Icons.add_rounded),
