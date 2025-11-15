@@ -4,6 +4,7 @@ import '../models/customer.dart';
 import '../services/customer_service.dart';
 import '../services/order_service.dart';
 import 'customer_detail_page.dart';
+import 'add_customer_page.dart';
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key});
@@ -186,7 +187,13 @@ class _CustomersPageState extends State<CustomersPage> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCustomerDialog(null),
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddCustomerPage()),
+          );
+          if (result == true) _loadCustomers();
+        },
         icon: const Icon(Icons.add_rounded),
         label: const Text('Yeni Müşteri'),
       ),

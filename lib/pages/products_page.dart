@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/product_service.dart';
 import 'product_detail_page.dart';
+import 'add_product_page.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
@@ -54,9 +55,16 @@ class _ProductsPageState extends State<ProductsPage> {
                     return _buildProductCard(product);
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showProductDialog(null),
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddProductPage()),
+          );
+          if (result == true) _loadProducts();
+        },
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Yeni Ürün'),
       ),
     );
   }
