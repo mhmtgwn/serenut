@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/device_manager_service.dart';
 import 'device_settings_page.dart';
 
@@ -25,7 +26,13 @@ class _DevicesPageState extends State<DevicesPage> {
     setState(() => _isLoading = true);
 
     try {
+      // Önce setup'ı çalıştır (eğer aygıt yoksa ekler)
+      await _deviceManager.setupDefaultDevices();
+
+      // Sonra aygıtları yükle
       final devices = await _deviceManager.getAllDevices();
+      debugPrint('Yuklenen aygit sayisi: ${devices.length}');
+
       if (mounted) {
         setState(() {
           _devices = devices;
@@ -74,6 +81,23 @@ class _DevicesPageState extends State<DevicesPage> {
     return '$status - $connection';
   }
 
+  Future<void> _clearDevices() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('registered_devices');
+      await prefs.remove('default_printer_id');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aygitlar temizlendi, yenileniyor...')),
+        );
+        await _loadDevices();
+      }
+    } catch (e) {
+      debugPrint('Temizleme hatasi: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final internalDevices =
@@ -85,6 +109,11 @@ class _DevicesPageState extends State<DevicesPage> {
       appBar: AppBar(
         title: const Text('Aygitlar'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            onPressed: _clearDevices,
+            tooltip: 'Aygitlari Temizle',
+          ),
           IconButton(
             icon: _isLoading
                 ? const SizedBox(
