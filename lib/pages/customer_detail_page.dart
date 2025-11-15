@@ -62,15 +62,16 @@ class _CustomerDetailPageState extends State<CustomerDetailPage>
       appBar: AppBar(
         title: Text(widget.customer.name),
         actions: [
-          if (_totalDebt > 0)
-            IconButton(
-              icon: const Icon(Icons.payment_rounded),
-              onPressed: _showPaymentDialog,
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.orange.withOpacity(0.1),
-              ),
-              tooltip: 'Ödeme Al',
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet_rounded),
+            onPressed: _showPaymentDialog,
+            style: IconButton.styleFrom(
+              backgroundColor: _totalDebt > 0
+                  ? Colors.orange.withOpacity(0.1)
+                  : const Color(0xFFF1F5F9),
             ),
+            tooltip: 'Ödeme/Borç İşlemi',
+          ),
           IconButton(
             icon: const Icon(Icons.edit_rounded),
             onPressed: _showEditDialog,
@@ -491,88 +492,179 @@ class _CustomerDetailPageState extends State<CustomerDetailPage>
 
   Future<void> _showPaymentDialog() async {
     final amountController = TextEditingController();
+    final noteController = TextEditingController();
+    String type = 'payment'; // payment (ödeme) veya debt (borç)
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Ödeme Al - ${widget.customer.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Toplam Borç: ₺${_totalDebt.toStringAsFixed(2)}',
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: amountController,
-              decoration: const InputDecoration(
-                labelText: 'Ödeme Tutarı',
-                prefixText: '₺',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('İşlem - ${widget.customer.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Toplam Borç: ₺${_totalDebt.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 16)),
+              const SizedBox(height: 16),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'payment',
+                    label: Text('Ödeme Al'),
+                    icon: Icon(Icons.arrow_downward_rounded),
+                  ),
+                  ButtonSegment(
+                    value: 'debt',
+                    label: Text('Borç Ekle'),
+                    icon: Icon(Icons.arrow_upward_rounded),
+                  ),
+                ],
+                selected: {type},
+                onSelectionChanged: (Set<String> newSelection) {
+                  setDialogState(() => type = newSelection.first);
+                },
               ),
-              keyboardType: TextInputType.number,
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      amountController.text = _totalDebt.toStringAsFixed(2);
-                    },
-                    child: const Text('Tamamını Öde'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                decoration: InputDecoration(
+                  labelText: type == 'payment' ? 'Ödeme Tutarı' : 'Borç Tutarı',
+                  prefixText: '₺',
+                  prefixIcon: Icon(
+                    type == 'payment'
+                        ? Icons.arrow_downward_rounded
+                        : Icons.arrow_upward_rounded,
+                    color: type == 'payment'
+                        ? const Color(0xFF10B981)
+                        : Colors.orange,
                   ),
                 ),
+                keyboardType: TextInputType.number,
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  labelText: 'Not (Opsiyonel)',
+                  prefixIcon: Icon(Icons.note_rounded),
+                ),
+                maxLines: 2,
+              ),
+              if (type == 'payment' && _totalDebt > 0) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          amountController.text = _totalDebt.toStringAsFixed(2);
+                        },
+                        child: const Text('Tamamını Öde'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text) ?? 0;
+                if (amount <= 0) return;
+
+                if (type == 'payment') {
+                  // ÖDEME AL
+                  if (amount > _totalDebt) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Ödeme tutarı borçtan fazla olamaz!'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  final debtOrders = _orders.where((o) => o.hasDebt).toList();
+                  double remaining = amount;
+
+                  for (var order in debtOrders) {
+                    if (remaining <= 0) break;
+
+                    final payment = remaining >= order.remainingAmount
+                        ? order.remainingAmount
+                        : remaining;
+
+                    final newPaidAmount = order.paidAmount + payment;
+                    final newStatus =
+                        newPaidAmount >= order.total ? 'paid' : 'partial';
+
+                    await _orderService.updatePayment(
+                        order.id!, newPaidAmount, newStatus);
+                    remaining -= payment;
+                  }
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('₺${amount.toStringAsFixed(2)} ödeme alındı'),
+                        backgroundColor: const Color(0xFF10B981),
+                      ),
+                    );
+                    _loadData();
+                  }
+                } else {
+                  // BORÇ EKLE
+                  // Yeni bir "borç" siparişi oluştur
+                  final newOrder = Order(
+                    orderNumber:
+                        'BORC-${DateTime.now().millisecondsSinceEpoch}',
+                    customerId: widget.customer.id!,
+                    customerName: widget.customer.name,
+                    customerPhone: widget.customer.phone,
+                    total: amount,
+                    paidAmount: 0,
+                    paymentStatus: 'unpaid',
+                    status: 'delivered',
+                    paymentMethod: 'debt',
+                    notes: noteController.text.isEmpty
+                        ? 'Borç kaydı'
+                        : noteController.text,
+                    createdAt: DateTime.now().toIso8601String(),
+                  );
+
+                  await _orderService.create(newOrder, []);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('₺${amount.toStringAsFixed(2)} borç eklendi'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    _loadData();
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    type == 'payment' ? const Color(0xFF10B981) : Colors.orange,
+              ),
+              child: Text(type == 'payment' ? 'Ödeme Al' : 'Borç Ekle'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = double.tryParse(amountController.text) ?? 0;
-              if (amount > 0 && amount <= _totalDebt) {
-                // Borçlu siparişleri bul ve ödeme yap
-                final debtOrders = _orders.where((o) => o.hasDebt).toList();
-                double remaining = amount;
-
-                for (var order in debtOrders) {
-                  if (remaining <= 0) break;
-
-                  final payment = remaining >= order.remainingAmount
-                      ? order.remainingAmount
-                      : remaining;
-
-                  final newPaidAmount = order.paidAmount + payment;
-                  final newStatus =
-                      newPaidAmount >= order.total ? 'paid' : 'partial';
-
-                  await _orderService.updatePayment(
-                      order.id!, newPaidAmount, newStatus);
-                  remaining -= payment;
-                }
-
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content:
-                          Text('₺${amount.toStringAsFixed(2)} ödeme alındı'),
-                      backgroundColor: const Color(0xFF10B981),
-                    ),
-                  );
-                  _loadData();
-                }
-              }
-            },
-            child: const Text('Kaydet'),
-          ),
-        ],
       ),
     );
   }
