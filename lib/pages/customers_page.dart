@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/customer.dart';
 import '../services/customer_service.dart';
 
@@ -52,6 +53,14 @@ class _CustomersPageState extends State<CustomersPage> {
       appBar: AppBar(
         title: const Text('Müşteriler'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.contacts_rounded),
+            onPressed: _importFromContacts,
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFFF1F5F9),
+            ),
+            tooltip: 'Rehberden İçe Aktar',
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -222,6 +231,59 @@ class _CustomersPageState extends State<CustomersPage> {
     );
   }
 
+  Future<void> _importFromContacts() async {
+    if (!await FlutterContacts.requestPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rehber izni gerekli')),
+        );
+      }
+      return;
+    }
+
+    final contacts = await FlutterContacts.getContacts(withProperties: true);
+
+    if (!mounted) return;
+
+    final selected = await showDialog<List<Contact>>(
+      context: context,
+      builder: (context) => _ContactSelectionDialog(contacts: contacts),
+    );
+
+    if (selected != null && selected.isNotEmpty) {
+      int imported = 0;
+      for (var contact in selected) {
+        final phone =
+            contact.phones.isNotEmpty ? contact.phones.first.number : '';
+        if (phone.isNotEmpty) {
+          try {
+            await _service.add(Customer(
+              name: contact.displayName,
+              phone: phone.replaceAll(RegExp(r'[^\d+]'), ''),
+              address: contact.addresses.isNotEmpty
+                  ? contact.addresses.first.address
+                  : null,
+              createdAt: DateTime.now().toIso8601String(),
+            ));
+            imported++;
+          } catch (e) {
+            // Duplicate phone number, skip
+          }
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$imported müşteri içe aktarıldı'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+        _loadCustomers();
+      }
+    }
+  }
+
   Future<void> _showCustomerDialog(Customer? customer) async {
     final nameController = TextEditingController(text: customer?.name);
     final phoneController = TextEditingController(text: customer?.phone);
@@ -281,6 +343,92 @@ class _CustomersPageState extends State<CustomersPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ContactSelectionDialog extends StatefulWidget {
+  final List<Contact> contacts;
+
+  const _ContactSelectionDialog({required this.contacts});
+
+  @override
+  State<_ContactSelectionDialog> createState() =>
+      _ContactSelectionDialogState();
+}
+
+class _ContactSelectionDialogState extends State<_ContactSelectionDialog> {
+  final Set<Contact> _selected = {};
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.contacts.where((contact) {
+      if (_searchQuery.isEmpty) return true;
+      return contact.displayName
+          .toLowerCase()
+          .contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    return AlertDialog(
+      title: const Text('Rehberden Seç'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 500,
+        child: Column(
+          children: [
+            TextField(
+              decoration: const InputDecoration(
+                hintText: 'Ara...',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+            const SizedBox(height: 16),
+            Text('${_selected.length} kişi seçildi'),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final contact = filtered[index];
+                  final isSelected = _selected.contains(contact);
+                  final phone = contact.phones.isNotEmpty
+                      ? contact.phones.first.number
+                      : 'Telefon yok';
+
+                  return CheckboxListTile(
+                    title: Text(contact.displayName),
+                    subtitle: Text(phone),
+                    value: isSelected,
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked == true) {
+                          _selected.add(contact);
+                        } else {
+                          _selected.remove(contact);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal'),
+        ),
+        ElevatedButton(
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.pop(context, _selected.toList()),
+          child: const Text('İçe Aktar'),
+        ),
+      ],
     );
   }
 }

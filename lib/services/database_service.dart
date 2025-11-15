@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 class DatabaseService {
   static Database? _database;
   static const String _dbName = 'shaman_v2.db';
-  static const int _version = 1;
+  static const int _version = 2; // Borç takibi için versiyon artırıldı
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -18,6 +18,7 @@ class DatabaseService {
       path,
       version: _version,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -54,6 +55,8 @@ class DatabaseService {
         customer_name TEXT NOT NULL,
         customer_phone TEXT NOT NULL,
         total REAL NOT NULL,
+        paid_amount REAL NOT NULL DEFAULT 0,
+        payment_status TEXT NOT NULL DEFAULT 'unpaid',
         status TEXT NOT NULL DEFAULT 'pending',
         payment_method TEXT NOT NULL,
         notes TEXT,
@@ -101,5 +104,20 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_orders_status ON orders(status)');
     await db.execute('CREATE INDEX idx_orders_date ON orders(created_at)');
     await db.execute('CREATE INDEX idx_products_stock ON products(stock)');
+    await db.execute(
+        'CREATE INDEX idx_orders_payment_status ON orders(payment_status)');
+  }
+
+  static Future<void> _onUpgrade(
+      Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Borç takibi için yeni sütunlar ekleniyor
+      await db.execute(
+          'ALTER TABLE orders ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0');
+      await db.execute(
+          'ALTER TABLE orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT "unpaid"');
+      await db.execute(
+          'CREATE INDEX idx_orders_payment_status ON orders(payment_status)');
+    }
   }
 }

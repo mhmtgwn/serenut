@@ -5,8 +5,10 @@ class Order {
   final String customerName;
   final String customerPhone;
   final double total;
-  final String status; // pending, preparing, ready, delivered
-  final String paymentMethod; // cash, card
+  final double paidAmount;
+  final String paymentStatus; // 'paid', 'partial', 'unpaid'
+  final String status;
+  final String paymentMethod;
   final String? notes;
   final String createdAt;
 
@@ -17,11 +19,17 @@ class Order {
     required this.customerName,
     required this.customerPhone,
     required this.total,
+    this.paidAmount = 0,
+    this.paymentStatus = 'unpaid',
     required this.status,
     required this.paymentMethod,
     this.notes,
     required this.createdAt,
   });
+
+  double get remainingAmount => total - paidAmount;
+  bool get isFullyPaid => paidAmount >= total;
+  bool get hasDebt => paidAmount < total;
 
   Map<String, dynamic> toMap() {
     return {
@@ -31,6 +39,8 @@ class Order {
       'customer_name': customerName,
       'customer_phone': customerPhone,
       'total': total,
+      'paid_amount': paidAmount,
+      'payment_status': paymentStatus,
       'status': status,
       'payment_method': paymentMethod,
       'notes': notes,
@@ -46,6 +56,8 @@ class Order {
       customerName: map['customer_name'],
       customerPhone: map['customer_phone'],
       total: map['total'],
+      paidAmount: map['paid_amount'] ?? 0,
+      paymentStatus: map['payment_status'] ?? 'unpaid',
       status: map['status'],
       paymentMethod: map['payment_method'],
       notes: map['notes'],

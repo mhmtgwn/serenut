@@ -71,6 +71,20 @@ class OrderService {
     );
   }
 
+  Future<void> updatePayment(
+      int orderId, double paidAmount, String paymentStatus) async {
+    final db = await DatabaseService.database;
+    await db.update(
+      'orders',
+      {
+        'paid_amount': paidAmount,
+        'payment_status': paymentStatus,
+      },
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
+  }
+
   Future<void> cancel(int orderId) async {
     final db = await DatabaseService.database;
 
