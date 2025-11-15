@@ -146,7 +146,6 @@ class _CustomersPageState extends State<CustomersPage> {
                     padding: const EdgeInsets.all(16),
                     child: TextField(
                       onChanged: _filterCustomers,
-                      autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Müşteri ara...',
                         prefixIcon: const Icon(Icons.search_rounded),
@@ -368,7 +367,7 @@ class _CustomersPageState extends State<CustomersPage> {
                     ],
                   ),
                 ),
-                if (!hasDebt)
+                if (!hasDebt && !widget.selectionMode)
                   Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
               ],
             ),

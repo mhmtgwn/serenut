@@ -117,7 +117,6 @@ class _ProductsPageState extends State<ProductsPage> {
                         child: TextField(
                           controller: _searchController,
                           onChanged: (_) => _filterProducts(),
-                          autofocus: true,
                           decoration: InputDecoration(
                             hintText: 'Ürün ara...',
                             prefixIcon: const Icon(Icons.search_rounded),
