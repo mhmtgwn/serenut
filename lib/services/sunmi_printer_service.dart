@@ -1,42 +1,49 @@
-import 'package:sunmi_printer_plus/sunmi_printer_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order.dart';
 
+/// Sunmi dahili yazıcı servisi - MethodChannel ile native API kullanımı
 class SunmiPrinterService {
-  // Yazıcı durumunu kontrol et
+  // Platform kanalı
+  static const MethodChannel _channel = MethodChannel('com.sunmi.printer');
+
+  /// Yazıcı durumunu kontrol et
   Future<bool> isConnected() async {
     try {
-      return await SunmiPrinter.bindingPrinter() ?? false;
+      final result = await _channel.invokeMethod<bool>('hasPrinter');
+      return result ?? false;
     } catch (e) {
+      debugPrint('Yazıcı kontrol hatası: $e');
       return false;
     }
   }
 
-  // Yazıcı bilgilerini al
+  /// Yazıcı bilgilerini al
   Future<Map<String, dynamic>> getPrinterInfo() async {
     try {
-      final printerVersion = await SunmiPrinter.printerVersion();
-      final serialNumber = await SunmiPrinter.serialNumber();
-      final printerModal = await SunmiPrinter.printerModal();
+      final version = await _channel.invokeMethod<String>('getPrinterVersion');
+      final serial = await _channel.invokeMethod<String>('getPrinterSerialNo');
+      final model = await _channel.invokeMethod<String>('getPrinterModel');
 
       return {
-        'version': printerVersion,
-        'serial': serialNumber,
-        'model': printerModal,
+        'version': version ?? 'Bilinmiyor',
+        'serial': serial ?? 'Bilinmiyor',
+        'model': model ?? 'Sunmi',
         'connected': await isConnected(),
       };
     } catch (e) {
       return {
         'version': 'Bilinmiyor',
         'serial': 'Bilinmiyor',
-        'model': 'Bilinmiyor',
+        'model': 'Sunmi',
         'connected': false,
         'error': e.toString(),
       };
     }
   }
 
-  // Sipariş fişi yazdır
+  /// Sipariş fişi yazdır
   Future<bool> printOrderReceipt(Order order, List<OrderItem> items) async {
     try {
       final connected = await isConnected();
@@ -51,171 +58,120 @@ class SunmiPrinterService {
       final companyAddress = prefs.getString('company_address') ?? '';
       final companyTax = prefs.getString('company_tax') ?? '';
 
-      await SunmiPrinter.initPrinter();
-
       // Şirket başlığı
-      await SunmiPrinter.printText(
-        companyName,
-        style: SunmiTextStyle(
-          bold: true,
-          fontSize: 32,
-          align: SunmiPrintAlign.CENTER,
-        ),
-      );
-      await SunmiPrinter.lineWrap(1);
+      await _printText(companyName, fontSize: 36, bold: true, align: 1);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
       // Şirket bilgileri
       if (companyPhone.isNotEmpty) {
-        await SunmiPrinter.printText(
-          'Tel: $companyPhone',
-          style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-        );
+        await _printText('Tel: $companyPhone',
+            fontSize: 24, bold: false, align: 1);
       }
       if (companyAddress.isNotEmpty) {
-        await SunmiPrinter.printText(
-          companyAddress,
-          style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-        );
+        await _printText(companyAddress, fontSize: 24, bold: false, align: 1);
       }
       if (companyTax.isNotEmpty) {
-        await SunmiPrinter.printText(
-          'Vergi No: $companyTax',
-          style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-        );
+        await _printText('Vergi No: $companyTax',
+            fontSize: 24, bold: false, align: 1);
       }
 
-      await SunmiPrinter.line();
-      await SunmiPrinter.lineWrap(1);
+      await _printText('--------------------------------',
+          fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
       // Sipariş bilgileri
-      await SunmiPrinter.printText(
-        'SİPARİŞ FİŞİ',
-        style: SunmiTextStyle(
-          bold: true,
-          fontSize: 28,
-          align: SunmiPrintAlign.LEFT,
-        ),
-      );
-      await SunmiPrinter.lineWrap(1);
+      await _printText('SİPARİŞ FİŞİ', fontSize: 32, bold: true, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
-      await SunmiPrinter.printText('Sipariş No: ${order.orderNumber}');
-      await SunmiPrinter.printText('Müşteri: ${order.customerName}');
+      await _printText('Sipariş No: ${order.orderNumber}',
+          fontSize: 24, bold: false, align: 0);
+      await _printText('Müşteri: ${order.customerName}',
+          fontSize: 24, bold: false, align: 0);
       if (order.customerPhone.isNotEmpty) {
-        await SunmiPrinter.printText('Tel: ${order.customerPhone}');
+        await _printText('Tel: ${order.customerPhone}',
+            fontSize: 24, bold: false, align: 0);
       }
-      await SunmiPrinter.printText('Tarih: ${_formatDate(order.createdAt)}');
+      await _printText('Tarih: ${_formatDate(order.createdAt)}',
+          fontSize: 24, bold: false, align: 0);
 
-      await SunmiPrinter.line();
-      await SunmiPrinter.lineWrap(1);
+      await _printText('--------------------------------',
+          fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
       // Ürünler
-      await SunmiPrinter.printText(
-        'ÜRÜNLER',
-        style: SunmiTextStyle(bold: true),
-      );
-      await SunmiPrinter.lineWrap(1);
+      await _printText('ÜRÜNLER', fontSize: 28, bold: true, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
       for (var item in items) {
         // Ürün adı
-        await SunmiPrinter.printText(
-          item.productName,
-          style: SunmiTextStyle(bold: true),
-        );
+        await _printText(item.productName, fontSize: 24, bold: true, align: 0);
 
         // Miktar x Fiyat = Toplam
         final line =
             '${item.quantity} x ₺${item.price.toStringAsFixed(2)} = ₺${item.subtotal.toStringAsFixed(2)}';
-        await SunmiPrinter.printText(line);
-        await SunmiPrinter.lineWrap(1);
+        await _printText(line, fontSize: 24, bold: false, align: 0);
+        await _printText('', fontSize: 24, bold: false, align: 0);
       }
 
-      await SunmiPrinter.line();
-      await SunmiPrinter.lineWrap(1);
+      await _printText('--------------------------------',
+          fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
       // Toplam
-      await SunmiPrinter.printText(
-        'Ara Toplam: ₺${order.total.toStringAsFixed(2)}',
-        style: SunmiTextStyle(align: SunmiPrintAlign.RIGHT),
-      );
+      await _printText('Ara Toplam: ₺${order.total.toStringAsFixed(2)}',
+          fontSize: 28, bold: false, align: 2);
 
       if (order.paidAmount > 0) {
-        await SunmiPrinter.printText(
-          'Ödenen: ₺${order.paidAmount.toStringAsFixed(2)}',
-          style: SunmiTextStyle(align: SunmiPrintAlign.RIGHT),
-        );
+        await _printText('Ödenen: ₺${order.paidAmount.toStringAsFixed(2)}',
+            fontSize: 28, bold: false, align: 2);
       }
 
       if (order.remainingAmount > 0) {
-        await SunmiPrinter.printText(
-          'Kalan: ₺${order.remainingAmount.toStringAsFixed(2)}',
-          style: SunmiTextStyle(
-            bold: true,
-            align: SunmiPrintAlign.RIGHT,
-          ),
-        );
+        await _printText('Kalan: ₺${order.remainingAmount.toStringAsFixed(2)}',
+            fontSize: 28, bold: true, align: 2);
       }
 
-      await SunmiPrinter.lineWrap(1);
-      await SunmiPrinter.printText(
-        'TOPLAM: ₺${order.total.toStringAsFixed(2)}',
-        style: SunmiTextStyle(
-          bold: true,
-          fontSize: 32,
-          align: SunmiPrintAlign.RIGHT,
-        ),
-      );
+      await _printText('', fontSize: 24, bold: false, align: 0);
+      await _printText('TOPLAM: ₺${order.total.toStringAsFixed(2)}',
+          fontSize: 36, bold: true, align: 2);
 
-      await SunmiPrinter.line();
-      await SunmiPrinter.lineWrap(1);
+      await _printText('--------------------------------',
+          fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
       // Ödeme bilgisi
       final paymentText = order.paymentMethod == 'cash' ? 'NAKİT' : 'KART';
-      await SunmiPrinter.printText(
-        'Ödeme: $paymentText',
-        style: SunmiTextStyle(
-          bold: true,
-          align: SunmiPrintAlign.CENTER,
-        ),
-      );
+      await _printText('Ödeme: $paymentText',
+          fontSize: 28, bold: true, align: 1);
 
       // Durum
       final statusText = _getStatusText(order.status);
-      await SunmiPrinter.printText(
-        'Durum: $statusText',
-        style: SunmiTextStyle(
-          bold: true,
-          align: SunmiPrintAlign.CENTER,
-        ),
-      );
+      await _printText('Durum: $statusText',
+          fontSize: 28, bold: true, align: 1);
 
       // Not varsa
       if (order.notes != null && order.notes!.isNotEmpty) {
-        await SunmiPrinter.lineWrap(1);
-        await SunmiPrinter.printText('Not: ${order.notes}');
+        await _printText('', fontSize: 24, bold: false, align: 0);
+        await _printText('Not: ${order.notes}',
+            fontSize: 24, bold: false, align: 0);
       }
 
-      await SunmiPrinter.lineWrap(2);
-      await SunmiPrinter.printText(
-        'Teşekkür ederiz!',
-        style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-      );
-      await SunmiPrinter.lineWrap(1);
-      await SunmiPrinter.printText(
-        'www.shamanpos.com',
-        style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-      );
+      await _printText('', fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
+      await _printText('Teşekkür ederiz!', fontSize: 24, bold: false, align: 1);
+      await _printText('www.shamanpos.com',
+          fontSize: 24, bold: false, align: 1);
 
-      await SunmiPrinter.lineWrap(3);
-      await SunmiPrinter.cut();
+      await _printText('\n\n\n', fontSize: 24, bold: false, align: 0);
 
       return true;
     } catch (e) {
-      print('Yazdırma hatası: $e');
+      debugPrint('Yazdırma hatası: $e');
       return false;
     }
   }
 
-  // Test yazdırma
+  /// Test yazdırma
   Future<bool> printTest() async {
     try {
       final connected = await isConnected();
@@ -223,49 +179,51 @@ class SunmiPrinterService {
         throw Exception('Yazıcı bağlı değil');
       }
 
-      await SunmiPrinter.initPrinter();
+      await _printText('SHAMAN POS', fontSize: 40, bold: true, align: 1);
+      await _printText('', fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
-      await SunmiPrinter.printText(
-        'SHAMAN POS',
-        style: SunmiTextStyle(
-          bold: true,
-          fontSize: 40,
-          align: SunmiPrintAlign.CENTER,
-        ),
-      );
-      await SunmiPrinter.lineWrap(2);
+      await _printText('TEST YAZDIR', fontSize: 28, bold: false, align: 1);
+      await _printText('', fontSize: 24, bold: false, align: 0);
 
-      await SunmiPrinter.printText(
-        'TEST YAZDIR',
-        style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-      );
-      await SunmiPrinter.lineWrap(1);
+      await _printText(DateTime.now().toString(),
+          fontSize: 24, bold: false, align: 1);
 
-      await SunmiPrinter.printText(
-        DateTime.now().toString(),
-        style: SunmiTextStyle(align: SunmiPrintAlign.CENTER),
-      );
+      await _printText('', fontSize: 24, bold: false, align: 0);
+      await _printText('', fontSize: 24, bold: false, align: 0);
+      await _printText('Yazıcı çalışıyor! ✓',
+          fontSize: 28, bold: true, align: 1);
 
-      await SunmiPrinter.lineWrap(2);
-      await SunmiPrinter.printText(
-        'Yazıcı çalışıyor! ✓',
-        style: SunmiTextStyle(
-          bold: true,
-          align: SunmiPrintAlign.CENTER,
-        ),
-      );
-
-      await SunmiPrinter.lineWrap(3);
-      await SunmiPrinter.cut();
+      await _printText('\n\n\n', fontSize: 24, bold: false, align: 0);
 
       return true;
     } catch (e) {
-      print('Test yazdırma hatası: $e');
+      debugPrint('Test yazdırma hatası: $e');
       return false;
     }
   }
 
-  // Yardımcı fonksiyonlar
+  /// Metin yazdır (private helper)
+  Future<void> _printText(
+    String text, {
+    required int fontSize,
+    required bool bold,
+    required int align, // 0=left, 1=center, 2=right
+  }) async {
+    try {
+      await _channel.invokeMethod('printText', {
+        'text': text,
+        'fontSize': fontSize,
+        'bold': bold,
+        'align': align,
+      });
+    } catch (e) {
+      debugPrint('Metin yazdırma hatası: $e');
+      rethrow;
+    }
+  }
+
+  /// Yardımcı fonksiyonlar
   String _formatDate(String isoDate) {
     try {
       final date = DateTime.parse(isoDate);

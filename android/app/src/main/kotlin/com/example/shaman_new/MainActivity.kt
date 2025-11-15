@@ -88,6 +88,17 @@ class MainActivity : FlutterActivity() {
                         result.success("Bağlı değil")
                     }
                 }
+                "getPrinterModel" -> {
+                    if (sunmiPrinterConnected && sunmiPrinter != null) {
+                        try {
+                            result.success("Sunmi V2 Pro")
+                        } catch (e: Exception) {
+                            result.success("Sunmi")
+                        }
+                    } else {
+                        result.success("Bağlı değil")
+                    }
+                }
                 "printText" -> {
                     try {
                         val text = call.argument<String>("text") ?: ""
