@@ -13,7 +13,11 @@ class ProductsPage extends StatefulWidget {
 
 class _ProductsPageState extends State<ProductsPage> {
   final ProductService _service = ProductService();
+  final TextEditingController _searchController = TextEditingController();
   List<Product> _products = [];
+  List<Product> _filteredProducts = [];
+  String _selectedCategory = 'Tümü';
+  List<String> _categories = ['Tümü'];
   bool _isLoading = true;
 
   @override
@@ -22,12 +26,42 @@ class _ProductsPageState extends State<ProductsPage> {
     _loadProducts();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     final products = await _service.getAll();
+
+    // Kategorileri çıkar
+    final categorySet = <String>{'Tümü'};
+    for (var product in products) {
+      if (product.category.isNotEmpty) {
+        categorySet.add(product.category);
+      }
+    }
+
     setState(() {
       _products = products;
+      _filteredProducts = products;
+      _categories = categorySet.toList()..sort();
       _isLoading = false;
+    });
+  }
+
+  void _filterProducts() {
+    final query = _searchController.text.toLowerCase();
+
+    setState(() {
+      _filteredProducts = _products.where((product) {
+        final matchesSearch = product.name.toLowerCase().contains(query);
+        final matchesCategory = _selectedCategory == 'Tümü' ||
+            product.category == _selectedCategory;
+        return matchesSearch && matchesCategory;
+      }).toList();
     });
   }
 
@@ -41,19 +75,112 @@ class _ProductsPageState extends State<ProductsPage> {
           ? const Center(child: CircularProgressIndicator())
           : _products.isEmpty
               ? const Center(child: Text('Ürün yok'))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.75,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: _products.length,
-                  itemBuilder: (context, index) {
-                    final product = _products[index];
-                    return _buildProductCard(product);
-                  },
+              : Column(
+                  children: [
+                    // Arama Çubuğu
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Ürün ara...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _filterProducts();
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        onChanged: (_) => _filterProducts(),
+                      ),
+                    ),
+
+                    // Kategori Filtreleri
+                    SizedBox(
+                      height: 50,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _categories.length,
+                        itemBuilder: (context, index) {
+                          final category = _categories[index];
+                          final isSelected = _selectedCategory == category;
+                          final count = category == 'Tümü'
+                              ? _products.length
+                              : _products
+                                  .where((p) => p.category == category)
+                                  .length;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text('$category ($count)'),
+                              selected: isSelected,
+                              onSelected: (_) {
+                                setState(() => _selectedCategory = category);
+                                _filterProducts();
+                              },
+                              backgroundColor: Colors.grey[100],
+                              selectedColor: const Color(0xFF3B82F6),
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.grey[700],
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Ürün Listesi
+                    Expanded(
+                      child: _filteredProducts.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off_rounded,
+                                      size: 80, color: Colors.grey[300]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Ürün bulunamadı',
+                                    style: TextStyle(
+                                        fontSize: 18, color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : GridView.builder(
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.75,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                              itemCount: _filteredProducts.length,
+                              itemBuilder: (context, index) {
+                                final product = _filteredProducts[index];
+                                return _buildProductCard(product);
+                              },
+                            ),
+                    ),
+                  ],
                 ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
