@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/sunmi_printer_service.dart';
+import '../services/device_manager_service.dart';
 
 class DeviceSettingsPage extends StatefulWidget {
   const DeviceSettingsPage({super.key});
@@ -11,10 +12,12 @@ class DeviceSettingsPage extends StatefulWidget {
 
 class _DeviceSettingsPageState extends State<DeviceSettingsPage> {
   final SunmiPrinterService _printerService = SunmiPrinterService();
+  final DeviceManagerService _deviceManager = DeviceManagerService();
 
   bool _isLoading = true;
   bool _printAfterOrder = false;
   bool _showStockWarning = true;
+  List<Map<String, dynamic>> _devices = [];
   Map<String, dynamic>? _printerInfo;
 
   @override

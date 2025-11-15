@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'pages/home_page.dart';
 import 'utils/seed_data.dart';
+import 'services/device_manager_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // İlk çalıştırmada örnek veriler ekle
   await SeedData.seedIfEmpty();
+
+  // Dahili aygıtları kur
+  await DeviceManagerService().setupDefaultDevices();
 
   runApp(const MyApp());
 }
