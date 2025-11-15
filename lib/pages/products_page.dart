@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/product_service.dart';
+import 'product_detail_page.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
@@ -83,7 +84,14 @@ class _ProductsPageState extends State<ProductsPage> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _showProductDialog(product),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductDetailPage(product: product),
+              ),
+            ).then((_) => _loadProducts());
+          },
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
