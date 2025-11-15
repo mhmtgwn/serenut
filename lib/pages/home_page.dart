@@ -192,7 +192,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                                 child: Text(
                                   'BUGÜN',
-                                  style: GoogleFonts.inter(
+                                  style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white,
@@ -205,17 +205,16 @@ class _DashboardPageState extends State<DashboardPage> {
                           const SizedBox(height: 12),
                           Text(
                             DateTime.now().day.toString(),
-                            style: GoogleFonts.inter(
+                            style: GoogleFonts.poppins(
                               fontSize: 56,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               color: Colors.white,
                               height: 1,
-                              letterSpacing: -2,
                             ),
                           ),
                           Text(
                             _getMonthName(DateTime.now().month),
-                            style: GoogleFonts.inter(
+                            style: GoogleFonts.poppins(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                               color: Colors.white.withOpacity(0.9),

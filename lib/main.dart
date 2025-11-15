@@ -30,18 +30,17 @@ class MyApp extends StatelessWidget {
           background: const Color(0xFFF8FAFC),
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        textTheme: GoogleFonts.interTextTheme(),
+        textTheme: GoogleFonts.poppinsTextTheme(),
         appBarTheme: AppBarTheme(
           centerTitle: false,
           elevation: 0,
           scrolledUnderElevation: 0,
           backgroundColor: Colors.white,
           foregroundColor: const Color(0xFF1E293B),
-          titleTextStyle: GoogleFonts.inter(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
+          titleTextStyle: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
             color: const Color(0xFF1E293B),
-            letterSpacing: -0.5,
           ),
         ),
         cardTheme: CardTheme(
@@ -66,7 +65,7 @@ class MyApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            textStyle: GoogleFonts.inter(
+            textStyle: GoogleFonts.poppins(
               fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
@@ -89,7 +88,7 @@ class MyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
           ),
-          labelStyle: GoogleFonts.inter(
+          labelStyle: GoogleFonts.poppins(
             color: const Color(0xFF64748B),
             fontWeight: FontWeight.w500,
           ),

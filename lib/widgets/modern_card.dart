@@ -91,21 +91,19 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: 20),
           Text(
             title,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.poppins(
               fontSize: 13,
               color: const Color(0xFF64748B),
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.poppins(
               fontSize: 28,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: const Color(0xFF1E293B),
-              letterSpacing: -1,
             ),
           ),
         ],
