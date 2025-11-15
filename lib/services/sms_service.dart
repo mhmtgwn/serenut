@@ -1,19 +1,25 @@
-import 'package:flutter_sms/flutter_sms.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/order.dart';
 import 'database_service.dart';
 
 class SmsService {
   Future<bool> sendSms(String phone, String message, {int? orderId}) async {
     try {
-      String result = await sendSMS(
-        message: message,
-        recipients: [phone],
+      // SMS uygulamasını aç (url_launcher ile)
+      final Uri smsUri = Uri(
+        scheme: 'sms',
+        path: phone,
+        queryParameters: {'body': message},
       );
 
-      // Log kaydet
-      await _logSms(
-          phone, message, result == 'sent' ? 'sent' : 'failed', orderId);
-      return result == 'sent';
+      if (await canLaunchUrl(smsUri)) {
+        await launchUrl(smsUri);
+        await _logSms(phone, message, 'opened', orderId);
+        return true;
+      } else {
+        await _logSms(phone, message, 'failed', orderId);
+        return false;
+      }
     } catch (e) {
       await _logSms(phone, message, 'failed', orderId);
       return false;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/order.dart';
 import '../services/order_service.dart';
 import 'create_order_page.dart';
+import 'order_detail_page.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -127,7 +128,12 @@ class _OrdersPageState extends State<OrdersPage> {
           backgroundColor: _getStatusColor(order.status).withOpacity(0.2),
         ),
         onTap: () {
-          // TODO: Order detail page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderDetailPage(order: order),
+            ),
+          ).then((_) => _loadOrders());
         },
       ),
     );

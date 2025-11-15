@@ -6,7 +6,6 @@
 // @dart = 2.13
 // ignore_for_file: type=lint
 
-import 'package:flutter_sms/flutter_sms_web.dart';
 import 'package:image_picker_for_web/image_picker_for_web.dart';
 import 'package:mobile_scanner/src/web/mobile_scanner_web.dart';
 import 'package:network_info_plus/src/network_info_plus_web.dart';
@@ -17,7 +16,6 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
 void registerPlugins([final Registrar? pluginRegistrar]) {
   final Registrar registrar = pluginRegistrar ?? webPluginRegistrar;
-  FlutterSmsPlugin.registerWith(registrar);
   ImagePickerPlugin.registerWith(registrar);
   MobileScannerWeb.registerWith(registrar);
   NetworkInfoPlusWebPlugin.registerWith(registrar);
