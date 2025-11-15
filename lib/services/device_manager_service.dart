@@ -38,14 +38,20 @@ class DeviceManagerService {
 
   Future<void> setupDefaultDevices() async {
     try {
+      debugPrint('=== SETUP BASLADI ===');
       final devices = await getAllDevices();
+      debugPrint('Mevcut aygit sayisi: ${devices.length}');
 
       if (devices.isEmpty) {
         debugPrint('Varsayilan aygitlar kuruluyor...');
 
+        debugPrint('Yazici kontrol ediliyor...');
         final printerConnected = await _sunmiPrinter.isConnected();
+        debugPrint('Yazici bagli mi: $printerConnected');
+
         if (printerConnected) {
           final printerInfo = await _sunmiPrinter.getPrinterInfo();
+          debugPrint('Yazici bilgisi: $printerInfo');
 
           await _addDevice({
             'id': 'sunmi_printer',
@@ -56,10 +62,15 @@ class DeviceManagerService {
           });
 
           await setDefaultPrinter('sunmi_printer');
-          debugPrint('Sunmi yazici eklendi');
+          debugPrint(' Sunmi yazici eklendi');
+        } else {
+          debugPrint(' Yazici bulunamadi');
         }
 
+        debugPrint('Scanner kontrol ediliyor...');
         final scannerAvailable = await _checkSunmiScanner();
+        debugPrint('Scanner var mi: $scannerAvailable');
+
         if (scannerAvailable) {
           await _addDevice({
             'id': 'sunmi_scanner',
@@ -68,11 +79,19 @@ class DeviceManagerService {
             'connection': 'internal',
             'status': 'connected',
           });
-          debugPrint('Scanner eklendi');
+          debugPrint(' Scanner eklendi');
+        } else {
+          debugPrint(' Scanner bulunamadi');
         }
+
+        final finalDevices = await getAllDevices();
+        debugPrint(
+            '=== SETUP TAMAMLANDI - Toplam: ${finalDevices.length} aygit ===');
+      } else {
+        debugPrint('Aygitlar zaten mevcut, kurulum atlanıyor');
       }
     } catch (e) {
-      debugPrint('Kurulum hatasi: $e');
+      debugPrint('!!! KURULUM HATASI: $e');
     }
   }
 
