@@ -1,20 +1,19 @@
-import 'package:telephony/telephony.dart';
+import 'package:flutter_sms/flutter_sms.dart';
 import '../models/order.dart';
 import 'database_service.dart';
 
 class SmsService {
-  final Telephony telephony = Telephony.instance;
-
   Future<bool> sendSms(String phone, String message, {int? orderId}) async {
     try {
-      await telephony.sendSms(
-        to: phone,
+      String result = await sendSMS(
         message: message,
+        recipients: [phone],
       );
 
       // Log kaydet
-      await _logSms(phone, message, 'sent', orderId);
-      return true;
+      await _logSms(
+          phone, message, result == 'sent' ? 'sent' : 'failed', orderId);
+      return result == 'sent';
     } catch (e) {
       await _logSms(phone, message, 'failed', orderId);
       return false;

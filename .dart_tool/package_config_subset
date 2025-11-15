@@ -166,6 +166,10 @@ flutter_plugin_android_lifecycle
 3.6
 file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/
 file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.28/lib/
+flutter_sms
+2.12
+file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_sms-2.3.3/
+file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_sms-2.3.3/lib/
 frontend_server_client
 3.0
 file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/frontend_server_client-4.0.0/
@@ -490,10 +494,6 @@ synchronized
 3.7
 file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/synchronized-3.3.1/
 file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/synchronized-3.3.1/lib/
-telephony
-2.15
-file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/telephony-0.2.0/
-file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/telephony-0.2.0/lib/
 term_glyph
 3.1
 file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/term_glyph-1.2.2/

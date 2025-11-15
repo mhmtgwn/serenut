@@ -260,6 +260,12 @@
       "languageVersion": "3.6"
     },
     {
+      "name": "flutter_sms",
+      "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_sms-2.3.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "flutter_test",
       "rootUri": "file:///C:/src/flutter/packages/flutter_test",
       "packageUri": "lib/",
@@ -764,12 +770,6 @@
       "languageVersion": "3.7"
     },
     {
-      "name": "telephony",
-      "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/telephony-0.2.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.15"
-    },
-    {
       "name": "term_glyph",
       "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/term_glyph-1.2.2",
       "packageUri": "lib/",
@@ -908,7 +908,7 @@
       "languageVersion": "3.1"
     }
   ],
-  "generated": "2025-11-15T11:09:00.262325Z",
+  "generated": "2025-11-15T11:14:09.169802Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///C:/src/flutter",
