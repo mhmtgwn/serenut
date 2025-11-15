@@ -111,26 +111,28 @@ class _CustomersPageState extends State<CustomersPage> {
               )
             : Text(widget.selectionMode ? 'Müşteri Seç' : 'Müşteriler'),
         actions: [
-          IconButton(
-            icon:
-                Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
-            onPressed: () {
-              setState(() {
-                _isSearching = !_isSearching;
-                if (!_isSearching) {
-                  _searchController.clear();
-                  _filterCustomers('');
-                }
-              });
-            },
-            tooltip: _isSearching ? 'Kapat' : 'Ara',
-          ),
-          if (!_isSearching)
+          if (!widget.selectionMode) ...[
             IconButton(
-              icon: const Icon(Icons.contacts_rounded),
-              onPressed: _importFromContacts,
-              tooltip: 'Rehberden İçe Aktar',
+              icon: Icon(
+                  _isSearching ? Icons.close_rounded : Icons.search_rounded),
+              onPressed: () {
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    _filterCustomers('');
+                  }
+                });
+              },
+              tooltip: _isSearching ? 'Kapat' : 'Ara',
             ),
+            if (!_isSearching)
+              IconButton(
+                icon: const Icon(Icons.contacts_rounded),
+                onPressed: _importFromContacts,
+                tooltip: 'Rehberden İçe Aktar',
+              ),
+          ],
           const SizedBox(width: 8),
         ],
       ),
@@ -138,7 +140,26 @@ class _CustomersPageState extends State<CustomersPage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                if (!_isSearching)
+                // Arama kutusu (seçim modunda)
+                if (widget.selectionMode)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      onChanged: _filterCustomers,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Müşteri ara...',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                    ),
+                  ),
+                // Filtre (normal modda)
+                if (!_isSearching && !widget.selectionMode)
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(

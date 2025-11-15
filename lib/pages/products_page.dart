@@ -86,20 +86,21 @@ class _ProductsPageState extends State<ProductsPage> {
               )
             : Text(widget.selectionMode ? 'Ürün Seç' : 'Ürünler'),
         actions: [
-          IconButton(
-            icon:
-                Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
-            onPressed: () {
-              setState(() {
-                _isSearching = !_isSearching;
-                if (!_isSearching) {
-                  _searchController.clear();
-                  _filterProducts();
-                }
-              });
-            },
-            tooltip: _isSearching ? 'Kapat' : 'Ara',
-          ),
+          if (!widget.selectionMode)
+            IconButton(
+              icon: Icon(
+                  _isSearching ? Icons.close_rounded : Icons.search_rounded),
+              onPressed: () {
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    _filterProducts();
+                  }
+                });
+              },
+              tooltip: _isSearching ? 'Kapat' : 'Ara',
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -109,6 +110,25 @@ class _ProductsPageState extends State<ProductsPage> {
               ? const Center(child: Text('Ürün yok'))
               : Column(
                   children: [
+                    // Arama kutusu (seçim modunda)
+                    if (widget.selectionMode)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (_) => _filterProducts(),
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: 'Ürün ara...',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                        ),
+                      ),
                     // Kategori Filtreleri
                     SizedBox(
                       height: 50,
