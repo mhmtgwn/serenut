@@ -6,6 +6,7 @@ import 'finance_page.dart';
 import '../services/order_service.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
+import '../widgets/modern_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -124,33 +125,43 @@ class _DashboardPageState extends State<DashboardPage> {
               onRefresh: _loadStats,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Bugün',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    Text(
+                      DateTime.now().toString().split(' ')[0],
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     Row(
                       children: [
                         Expanded(
-                          child: _buildCard(
-                            'Satışlar',
-                            '₺${_totalSales.toStringAsFixed(2)}',
-                            Icons.attach_money,
-                            Colors.green,
+                          child: StatCard(
+                            title: 'Satışlar',
+                            value: '₺${_totalSales.toStringAsFixed(2)}',
+                            icon: Icons.trending_up_rounded,
+                            color: const Color(0xFF4CAF50),
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildCard(
-                            'Siparişler',
-                            '$_orderCount',
-                            Icons.shopping_cart,
-                            Colors.blue,
+                          child: StatCard(
+                            title: 'Siparişler',
+                            value: '$_orderCount',
+                            icon: Icons.shopping_bag_rounded,
+                            color: const Color(0xFF2196F3),
                           ),
                         ),
                       ],
@@ -159,20 +170,20 @@ class _DashboardPageState extends State<DashboardPage> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildCard(
-                            'Müşteriler',
-                            '$_customerCount',
-                            Icons.people,
-                            Colors.orange,
+                          child: StatCard(
+                            title: 'Müşteriler',
+                            value: '$_customerCount',
+                            icon: Icons.people_rounded,
+                            color: const Color(0xFFFF9800),
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _buildCard(
-                            'Ürünler',
-                            '$_productCount',
-                            Icons.inventory,
-                            Colors.purple,
+                          child: StatCard(
+                            title: 'Ürünler',
+                            value: '$_productCount',
+                            icon: Icons.inventory_2_rounded,
+                            color: const Color(0xFF9C27B0),
                           ),
                         ),
                       ],
@@ -181,31 +192,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _buildCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
