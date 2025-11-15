@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'profile_settings_page.dart';
 import 'devices_page.dart';
-import 'device_settings_page.dart';
 import 'message_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -34,26 +33,12 @@ class SettingsPage extends StatelessWidget {
             context,
             icon: Icons.devices_rounded,
             title: 'Aygıtlar',
-            subtitle: 'Yazıcı ve donanım listesi',
+            subtitle: 'Yazıcı ve donanım yönetimi',
             color: const Color(0xFF3B82F6),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const DevicesPage()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildMenuCard(
-            context,
-            icon: Icons.settings_rounded,
-            title: 'Aygıt Ayarları',
-            subtitle: 'Yazdırma ve stok uyarı ayarları',
-            color: const Color(0xFF8B5CF6),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DeviceSettingsPage()),
               );
             },
           ),
