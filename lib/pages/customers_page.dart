@@ -16,12 +16,14 @@ class CustomersPage extends StatefulWidget {
 class _CustomersPageState extends State<CustomersPage> {
   final CustomerService _service = CustomerService();
   final OrderService _orderService = OrderService();
+  final TextEditingController _searchController = TextEditingController();
   List<Customer> _customers = [];
   List<Customer> _filteredCustomers = [];
   Map<int, double> _customerDebts = {};
-  bool _isLoading = true;
   String _searchQuery = '';
   bool _showOnlyDebtors = false;
+  bool _isLoading = true;
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -93,16 +95,40 @@ class _CustomersPageState extends State<CustomersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Müşteriler'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Müşteri ara...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.white70),
+                ),
+                style: const TextStyle(color: Colors.white),
+                onChanged: _filterCustomers,
+              )
+            : const Text('Müşteriler'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.contacts_rounded),
-            onPressed: _importFromContacts,
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFFF1F5F9),
-            ),
-            tooltip: 'Rehberden İçe Aktar',
+            icon:
+                Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _filterCustomers('');
+                }
+              });
+            },
+            tooltip: _isSearching ? 'Kapat' : 'Ara',
           ),
+          if (!_isSearching)
+            IconButton(
+              icon: const Icon(Icons.contacts_rounded),
+              onPressed: _importFromContacts,
+              tooltip: 'Rehberden İçe Aktar',
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -110,52 +136,31 @@ class _CustomersPageState extends State<CustomersPage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      TextField(
-                        onChanged: _filterCustomers,
-                        decoration: InputDecoration(
-                          hintText: 'Müşteri ara...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded),
-                                  onPressed: () {
-                                    _filterCustomers('');
-                                    FocusScope.of(context).unfocus();
-                                  },
-                                )
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          FilterChip(
-                            label: Text(
-                                'Borçlu Müşteriler (${_customerDebts.length})'),
-                            selected: _showOnlyDebtors,
-                            onSelected: (selected) {
-                              setState(() => _showOnlyDebtors = selected);
-                              _applyFilters();
-                            },
-                            avatar: Icon(
-                              Icons.account_balance_wallet_rounded,
-                              size: 18,
-                              color: _showOnlyDebtors
-                                  ? Colors.white
-                                  : Colors.orange,
-                            ),
-                            selectedColor: Colors.orange,
-                            checkmarkColor: Colors.white,
+                if (!_isSearching)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        FilterChip(
+                          label: Text(
+                              'Borçlu Müşteriler (${_customerDebts.length})'),
+                          selected: _showOnlyDebtors,
+                          onSelected: (selected) {
+                            setState(() => _showOnlyDebtors = selected);
+                            _applyFilters();
+                          },
+                          avatar: Icon(
+                            Icons.account_balance_wallet_rounded,
+                            size: 18,
+                            color:
+                                _showOnlyDebtors ? Colors.white : Colors.orange,
                           ),
-                        ],
-                      ),
-                    ],
+                          selectedColor: Colors.orange,
+                          checkmarkColor: Colors.white,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 Expanded(
                   child: _filteredCustomers.isEmpty
                       ? Center(
