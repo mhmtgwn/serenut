@@ -19,7 +19,34 @@ class _DevicesPageState extends State<DevicesPage> {
   @override
   void initState() {
     super.initState();
+    _testAddDevices(); // TEST
     _loadDevices();
+  }
+
+  // TEST: Manuel aygıt ekleme
+  void _testAddDevices() {
+    debugPrint('>>> TEST: Manuel aygit ekleniyor...');
+    setState(() {
+      _devices = [
+        {
+          'id': 'sunmi_printer',
+          'name': 'Sunmi Dahili Yazici',
+          'type': 'printer',
+          'connection': 'internal',
+          'status': 'connected',
+          'isDefault': true,
+        },
+        {
+          'id': 'sunmi_scanner',
+          'name': 'Sunmi Barkod Okuyucu',
+          'type': 'scanner',
+          'connection': 'internal',
+          'status': 'connected',
+          'isDefault': false,
+        },
+      ];
+    });
+    debugPrint('>>> TEST: ${_devices.length} aygit eklendi');
   }
 
   Future<void> _loadDevices() async {
