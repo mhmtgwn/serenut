@@ -219,17 +219,192 @@ class _CustomerDetailPageState extends State<CustomerDetailPage>
   }
 
   Widget _buildTransactionsTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.history_rounded, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text('Ödeme geçmişi yakında...',
-              style: TextStyle(fontSize: 18, color: Colors.grey[600])),
-        ],
+    // Tüm siparişlerden ödeme hareketlerini çıkar
+    final List<Map<String, dynamic>> transactions = [];
+
+    for (var order in _orders) {
+      // Sipariş oluşturma
+      transactions.add({
+        'type': 'order_created',
+        'date': DateTime.parse(order.createdAt),
+        'amount': order.total,
+        'order': order,
+        'note': 'Sipariş oluşturuldu',
+      });
+
+      // Ödeme varsa
+      if (order.paidAmount > 0) {
+        transactions.add({
+          'type': 'payment',
+          'date': DateTime.parse(order
+              .createdAt), // Gerçek ödeme tarihi olmalı ama şimdilik sipariş tarihi
+          'amount': order.paidAmount,
+          'order': order,
+          'note': order.paymentStatus == 'paid' ? 'Tam ödeme' : 'Kısmi ödeme',
+        });
+      }
+    }
+
+    // Tarihe göre sırala (en yeni en üstte)
+    transactions.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+
+    if (transactions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_rounded, size: 80, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text('Henüz hareket yok',
+                style: TextStyle(fontSize: 18, color: Colors.grey[600])),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: transactions.length,
+      itemBuilder: (context, index) {
+        final transaction = transactions[index];
+        return _buildTransactionCard(transaction);
+      },
+    );
+  }
+
+  Widget _buildTransactionCard(Map<String, dynamic> transaction) {
+    final type = transaction['type'] as String;
+    final date = transaction['date'] as DateTime;
+    final amount = transaction['amount'] as double;
+    final note = transaction['note'] as String;
+    final order = transaction['order'] as Order;
+
+    final isPayment = type == 'payment';
+    final isDebt = type == 'order_created' && order.paymentMethod == 'debt';
+
+    Color color;
+    IconData icon;
+    String title;
+
+    if (isPayment) {
+      color = const Color(0xFF10B981);
+      icon = Icons.arrow_downward_rounded;
+      title = 'Ödeme Alındı';
+    } else if (isDebt) {
+      color = Colors.orange;
+      icon = Icons.arrow_upward_rounded;
+      title = 'Borç Eklendi';
+    } else {
+      color = const Color(0xFF3B82F6);
+      icon = Icons.shopping_cart_rounded;
+      title = 'Sipariş';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    note,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time_rounded,
+                          size: 14, color: Colors.grey[500]),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDateTime(date),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${isPayment ? '-' : '+'}₺${amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  order.orderNumber,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  String _formatDateTime(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dateOnly = DateTime(date.year, date.month, date.day);
+
+    String dateStr;
+    if (dateOnly == today) {
+      dateStr = 'Bugün';
+    } else if (dateOnly == yesterday) {
+      dateStr = 'Dün';
+    } else {
+      dateStr = '${date.day}.${date.month}.${date.year}';
+    }
+
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+
+    return '$dateStr $hour:$minute';
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
