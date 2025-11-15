@@ -19,43 +19,16 @@ class _DevicesPageState extends State<DevicesPage> {
   @override
   void initState() {
     super.initState();
-    _testAddDevices(); // TEST
     _loadDevices();
-  }
-
-  // TEST: Manuel aygıt ekleme
-  void _testAddDevices() {
-    debugPrint('>>> TEST: Manuel aygit ekleniyor...');
-    setState(() {
-      _devices = [
-        {
-          'id': 'sunmi_printer',
-          'name': 'Sunmi Dahili Yazici',
-          'type': 'printer',
-          'connection': 'internal',
-          'status': 'connected',
-          'isDefault': true,
-        },
-        {
-          'id': 'sunmi_scanner',
-          'name': 'Sunmi Barkod Okuyucu',
-          'type': 'scanner',
-          'connection': 'internal',
-          'status': 'connected',
-          'isDefault': false,
-        },
-      ];
-    });
-    debugPrint('>>> TEST: ${_devices.length} aygit eklendi');
   }
 
   Future<void> _loadDevices() async {
     if (!mounted) return;
 
-    setState(() => _isLoading = true);
-
     try {
       debugPrint('>>> DEVICES PAGE: Aygitlar yukleniyor...');
+
+      setState(() => _isLoading = true);
 
       // Önce setup'ı çalıştır (eğer aygıt yoksa ekler)
       await _deviceManager.setupDefaultDevices();
@@ -71,11 +44,17 @@ class _DevicesPageState extends State<DevicesPage> {
 
       if (mounted) {
         setState(() {
-          _devices = devices;
+          _devices = List.from(devices); // Yeni liste oluştur
           _isLoading = false;
         });
         debugPrint(
-            '>>> DEVICES PAGE: UI guncellendi, toplam: ${_devices.length}');
+            '>>> DEVICES PAGE: setState cagrildi, _devices.length = ${_devices.length}');
+
+        // Bir frame sonra kontrol et
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          debugPrint(
+              '>>> DEVICES PAGE: PostFrame - _devices.length = ${_devices.length}');
+        });
       }
     } catch (e) {
       debugPrint('>>> DEVICES PAGE HATA: $e');
