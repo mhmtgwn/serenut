@@ -43,86 +43,61 @@ class DeviceManagerService {
       debugPrint('Mevcut kayitli aygit sayisi: ${devices.length}');
 
       if (devices.isEmpty) {
-        debugPrint('Sunmi donanimlari tespit ediliyor...');
+        debugPrint('Sunmi donanimlari ekleniyor...');
 
-        // 1. SUNMI YAZICI
-        try {
-          debugPrint('1. Yazici kontrol ediliyor...');
-          await SunmiPrinter.bindingPrinter();
-          await Future.delayed(const Duration(milliseconds: 500));
+        // 1. SUNMI YAZICI - Her zaman ekle
+        debugPrint('1. Yazici ekleniyor...');
+        await _addDevice({
+          'id': 'sunmi_printer',
+          'name': 'Sunmi Dahili Yazici',
+          'type': 'printer',
+          'connection': 'internal',
+          'status': 'connected',
+        });
+        await setDefaultPrinter('sunmi_printer');
+        debugPrint('   ✓ Yazici eklendi');
 
-          await _addDevice({
-            'id': 'sunmi_printer',
-            'name': 'Sunmi Dahili Yazici',
-            'type': 'printer',
-            'connection': 'internal',
-            'status': 'connected',
-          });
-          await setDefaultPrinter('sunmi_printer');
-          debugPrint('   ✓ Yazici eklendi');
-        } catch (e) {
-          debugPrint('   ✗ Yazici hatasi: $e');
-        }
+        // 2. SUNMI SCANNER - Her zaman ekle
+        debugPrint('2. Scanner ekleniyor...');
+        await _addDevice({
+          'id': 'sunmi_scanner',
+          'name': 'Sunmi Barkod Okuyucu',
+          'type': 'scanner',
+          'connection': 'internal',
+          'status': 'connected',
+        });
+        debugPrint('   ✓ Scanner eklendi');
 
-        // 2. SUNMI SCANNER
-        try {
-          debugPrint('2. Scanner kontrol ediliyor...');
-          await _addDevice({
-            'id': 'sunmi_scanner',
-            'name': 'Sunmi Barkod Okuyucu',
-            'type': 'scanner',
-            'connection': 'internal',
-            'status': 'connected',
-          });
-          debugPrint('   ✓ Scanner eklendi');
-        } catch (e) {
-          debugPrint('   ✗ Scanner hatasi: $e');
-        }
+        // 3. SUNMI LCD - Her zaman ekle
+        debugPrint('3. LCD ekleniyor...');
+        await _addDevice({
+          'id': 'sunmi_lcd',
+          'name': 'Musteri Ekrani',
+          'type': 'lcd',
+          'connection': 'internal',
+          'status': 'connected',
+        });
+        debugPrint('   ✓ LCD eklendi');
 
-        // 3. SUNMI LCD
-        try {
-          debugPrint('3. LCD kontrol ediliyor...');
-          await SunmiLcd.configLCD(SunmiLCDStatus.INIT);
-          await Future.delayed(const Duration(milliseconds: 300));
-
-          await _addDevice({
-            'id': 'sunmi_lcd',
-            'name': 'Musteri Ekrani',
-            'type': 'lcd',
-            'connection': 'internal',
-            'status': 'connected',
-          });
-          debugPrint('   ✓ LCD eklendi');
-        } catch (e) {
-          debugPrint('   ✗ LCD hatasi: $e');
-        }
-
-        // 4. SUNMI DRAWER
-        try {
-          debugPrint('4. Drawer kontrol ediliyor...');
-          final drawerOpen = await SunmiDrawer.i.isDrawerOpen();
-          debugPrint('   Drawer durumu: $drawerOpen');
-
-          await _addDevice({
-            'id': 'sunmi_drawer',
-            'name': 'Kasa Cekmecesi',
-            'type': 'drawer',
-            'connection': 'internal',
-            'status': 'connected',
-          });
-          debugPrint('   ✓ Drawer eklendi');
-        } catch (e) {
-          debugPrint('   ✗ Drawer hatasi: $e');
-        }
+        // 4. SUNMI DRAWER - Her zaman ekle
+        debugPrint('4. Drawer ekleniyor...');
+        await _addDevice({
+          'id': 'sunmi_drawer',
+          'name': 'Kasa Cekmecesi',
+          'type': 'drawer',
+          'connection': 'internal',
+          'status': 'connected',
+        });
+        debugPrint('   ✓ Drawer eklendi');
 
         final finalDevices = await getAllDevices();
         debugPrint(
-            '=== TESPIT TAMAMLANDI - Toplam: ${finalDevices.length} aygit ===');
+            '=== KURULUM TAMAMLANDI - Toplam: ${finalDevices.length} aygit ===');
       } else {
         debugPrint('Aygitlar zaten kayitli (${devices.length} adet)');
       }
     } catch (e) {
-      debugPrint('!!! TESPIT HATASI: $e');
+      debugPrint('!!! KURULUM HATASI: $e');
     }
   }
 
