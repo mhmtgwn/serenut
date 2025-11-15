@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/order.dart';
 import '../services/order_service.dart';
-import 'create_order_page.dart';
+import 'new_order_page.dart';
 import 'order_detail_page.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -64,13 +64,13 @@ class _OrdersPageState extends State<OrdersPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          await Navigator.push(
+          final result = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const CreateOrderPage()),
+            MaterialPageRoute(builder: (_) => const NewOrderPage()),
           );
-          _loadOrders();
+          if (result == true) _loadOrders();
         },
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
         label: const Text('Yeni Sipariş'),
       ),
     );
