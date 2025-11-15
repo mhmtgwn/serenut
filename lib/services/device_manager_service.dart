@@ -45,50 +45,35 @@ class DeviceManagerService {
       if (devices.isEmpty) {
         debugPrint('Varsayilan aygitlar kuruluyor...');
 
-        debugPrint('Yazici kontrol ediliyor...');
-        final printerConnected = await _sunmiPrinter.isConnected();
-        debugPrint('Yazici bagli mi: $printerConnected');
+        // SUNMI YAZICI - Her zaman ekle (Sunmi cihazda çalışıyoruz)
+        debugPrint('Yazici ekleniyor...');
+        await _addDevice({
+          'id': 'sunmi_printer',
+          'name': 'Sunmi Dahili Yazici',
+          'type': 'printer',
+          'connection': 'internal',
+          'status': 'connected',
+        });
+        await setDefaultPrinter('sunmi_printer');
+        debugPrint('✓ Sunmi yazici eklendi');
 
-        if (printerConnected) {
-          final printerInfo = await _sunmiPrinter.getPrinterInfo();
-          debugPrint('Yazici bilgisi: $printerInfo');
-
-          await _addDevice({
-            'id': 'sunmi_printer',
-            'name': 'Sunmi Dahili Yazici',
-            'type': 'printer',
-            'connection': 'internal',
-            'status': 'connected',
-          });
-
-          await setDefaultPrinter('sunmi_printer');
-          debugPrint(' Sunmi yazici eklendi');
-        } else {
-          debugPrint(' Yazici bulunamadi');
-        }
-
-        debugPrint('Scanner kontrol ediliyor...');
-        final scannerAvailable = await _checkSunmiScanner();
-        debugPrint('Scanner var mi: $scannerAvailable');
-
-        if (scannerAvailable) {
-          await _addDevice({
-            'id': 'sunmi_scanner',
-            'name': 'Sunmi Barkod Okuyucu',
-            'type': 'scanner',
-            'connection': 'internal',
-            'status': 'connected',
-          });
-          debugPrint(' Scanner eklendi');
-        } else {
-          debugPrint(' Scanner bulunamadi');
-        }
+        // SUNMI SCANNER - Her zaman ekle
+        debugPrint('Scanner ekleniyor...');
+        await _addDevice({
+          'id': 'sunmi_scanner',
+          'name': 'Sunmi Barkod Okuyucu',
+          'type': 'scanner',
+          'connection': 'internal',
+          'status': 'connected',
+        });
+        debugPrint('✓ Scanner eklendi');
 
         final finalDevices = await getAllDevices();
         debugPrint(
             '=== SETUP TAMAMLANDI - Toplam: ${finalDevices.length} aygit ===');
       } else {
-        debugPrint('Aygitlar zaten mevcut, kurulum atlanıyor');
+        debugPrint(
+            'Aygitlar zaten mevcut (${devices.length} adet), kurulum atlanıyor');
       }
     } catch (e) {
       debugPrint('!!! KURULUM HATASI: $e');
