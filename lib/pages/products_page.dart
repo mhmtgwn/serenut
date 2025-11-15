@@ -19,6 +19,7 @@ class _ProductsPageState extends State<ProductsPage> {
   String _selectedCategory = 'Tümü';
   List<String> _categories = ['Tümü'];
   bool _isLoading = true;
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -69,7 +70,36 @@ class _ProductsPageState extends State<ProductsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ürünler'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Ürün ara...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.white70),
+                ),
+                style: const TextStyle(color: Colors.white),
+                onChanged: (_) => _filterProducts(),
+              )
+            : const Text('Ürünler'),
+        actions: [
+          IconButton(
+            icon:
+                Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _filterProducts();
+                }
+              });
+            },
+            tooltip: _isSearching ? 'Kapat' : 'Ara',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -77,33 +107,6 @@ class _ProductsPageState extends State<ProductsPage> {
               ? const Center(child: Text('Ürün yok'))
               : Column(
                   children: [
-                    // Arama Çubuğu
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Ürün ara...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _filterProducts();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        onChanged: (_) => _filterProducts(),
-                      ),
-                    ),
-
                     // Kategori Filtreleri
                     SizedBox(
                       height: 50,
