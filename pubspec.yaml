@@ -46,6 +46,7 @@ dependencies:
   url_launcher: ^6.2.5
   fl_chart: ^1.0.0
   sunmi_printer_plus: ^4.1.0
+  sunmi_scanner: ^0.0.6
   screenshot: ^3.0.0
   network_info_plus: ^6.1.4
   bluetooth_print_plus: ^2.4.6

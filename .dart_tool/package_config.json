@@ -764,6 +764,12 @@
       "languageVersion": "3.5"
     },
     {
+      "name": "sunmi_scanner",
+      "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/sunmi_scanner-0.0.6",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
+    },
+    {
       "name": "synchronized",
       "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/synchronized-3.3.1",
       "packageUri": "lib/",
@@ -908,7 +914,7 @@
       "languageVersion": "3.1"
     }
   ],
-  "generated": "2025-11-15T14:30:45.442841Z",
+  "generated": "2025-11-15T16:07:02.140697Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///C:/src/flutter",
