@@ -3,6 +3,9 @@ import 'orders_page.dart';
 import 'customers_page.dart';
 import 'products_page.dart';
 import 'finance_page.dart';
+import '../services/order_service.dart';
+import '../services/customer_service.dart';
+import '../services/product_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,8 +63,48 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  int _orderCount = 0;
+  double _totalSales = 0;
+  int _customerCount = 0;
+  int _productCount = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final orderService = OrderService();
+      final customerService = CustomerService();
+      final productService = ProductService();
+
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final summary = await orderService.getDailySummary(today);
+      final customers = await customerService.getAll();
+      final products = await productService.getAll();
+
+      setState(() {
+        _orderCount = summary['order_count'] ?? 0;
+        _totalSales = summary['total_amount'] ?? 0.0;
+        _customerCount = customers.length;
+        _productCount = products.length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,67 +113,74 @@ class DashboardPage extends StatelessWidget {
         title: const Text('SHAMAN POS'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadStats,
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Bugün',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadStats,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bugün',
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCard(
+                            'Satışlar',
+                            '₺${_totalSales.toStringAsFixed(2)}',
+                            Icons.attach_money,
+                            Colors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildCard(
+                            'Siparişler',
+                            '$_orderCount',
+                            Icons.shopping_cart,
+                            Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCard(
+                            'Müşteriler',
+                            '$_customerCount',
+                            Icons.people,
+                            Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildCard(
+                            'Ürünler',
+                            '$_productCount',
+                            Icons.inventory,
+                            Colors.purple,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCard(
-                    'Satışlar',
-                    '₺0',
-                    Icons.attach_money,
-                    Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildCard(
-                    'Siparişler',
-                    '0',
-                    Icons.shopping_cart,
-                    Colors.blue,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildCard(
-                    'Müşteriler',
-                    '0',
-                    Icons.people,
-                    Colors.orange,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: _buildCard(
-                    'Ürünler',
-                    '0',
-                    Icons.inventory,
-                    Colors.purple,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 

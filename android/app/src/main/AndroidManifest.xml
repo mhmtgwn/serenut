@@ -31,6 +31,11 @@
     <!-- Kamera izni -->
     <uses-permission android:name="android.permission.CAMERA" />
     
+    <!-- SMS izinleri -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    
     <!-- NFC izinleri -->
     <uses-permission android:name="android.permission.NFC" />
     

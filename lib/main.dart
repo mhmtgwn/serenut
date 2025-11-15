@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
+import 'utils/seed_data.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // İlk çalıştırmada örnek veriler ekle
+  await SeedData.seedIfEmpty();
+
   runApp(const MyApp());
 }
 
