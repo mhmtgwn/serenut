@@ -4,6 +4,7 @@ import 'orders_page.dart';
 import 'customers_page.dart';
 import 'products_page.dart';
 import 'finance_page.dart';
+import 'settings_page.dart';
 import '../services/order_service.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
@@ -149,11 +150,25 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFFF1F5F9),
+            ),
+            tooltip: 'Ayarlar',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadStats,
             style: IconButton.styleFrom(
               backgroundColor: const Color(0xFFF1F5F9),
             ),
+            tooltip: 'Yenile',
           ),
           const SizedBox(width: 8),
         ],
