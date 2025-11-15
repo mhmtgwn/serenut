@@ -51,6 +51,7 @@ dependencies:
   bluetooth_print_plus: ^2.4.6
   barcode_widget: ^2.0.4
   image: ^4.5.4
+  telephony: ^0.2.0
 
 dev_dependencies:
   flutter_test:

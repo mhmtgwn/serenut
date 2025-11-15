@@ -764,6 +764,12 @@
       "languageVersion": "3.7"
     },
     {
+      "name": "telephony",
+      "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/telephony-0.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
       "name": "term_glyph",
       "rootUri": "file:///C:/Users/notop/AppData/Local/Pub/Cache/hosted/pub.dev/term_glyph-1.2.2",
       "packageUri": "lib/",
@@ -902,7 +908,7 @@
       "languageVersion": "3.1"
     }
   ],
-  "generated": "2025-11-14T14:28:23.972931Z",
+  "generated": "2025-11-15T11:09:00.262325Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///C:/src/flutter",
