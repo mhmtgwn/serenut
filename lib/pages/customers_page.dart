@@ -7,7 +7,9 @@ import 'customer_detail_page.dart';
 import 'add_customer_page.dart';
 
 class CustomersPage extends StatefulWidget {
-  const CustomersPage({super.key});
+  final bool selectionMode;
+
+  const CustomersPage({super.key, this.selectionMode = false});
 
   @override
   State<CustomersPage> createState() => _CustomersPageState();
@@ -107,7 +109,7 @@ class _CustomersPageState extends State<CustomersPage> {
                 style: const TextStyle(color: Colors.white),
                 onChanged: _filterCustomers,
               )
-            : const Text('Müşteriler'),
+            : Text(widget.selectionMode ? 'Müşteri Seç' : 'Müşteriler'),
         actions: [
           IconButton(
             icon:
@@ -234,12 +236,16 @@ class _CustomersPageState extends State<CustomersPage> {
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CustomerDetailPage(customer: customer),
-              ),
-            ).then((_) => _loadCustomers());
+            if (widget.selectionMode) {
+              Navigator.pop(context, customer);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CustomerDetailPage(customer: customer),
+                ),
+              ).then((_) => _loadCustomers());
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(16),

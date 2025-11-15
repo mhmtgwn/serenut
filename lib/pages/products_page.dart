@@ -5,7 +5,9 @@ import 'product_detail_page.dart';
 import 'add_product_page.dart';
 
 class ProductsPage extends StatefulWidget {
-  const ProductsPage({super.key});
+  final bool selectionMode;
+
+  const ProductsPage({super.key, this.selectionMode = false});
 
   @override
   State<ProductsPage> createState() => _ProductsPageState();
@@ -82,7 +84,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 style: const TextStyle(color: Colors.white),
                 onChanged: (_) => _filterProducts(),
               )
-            : const Text('Ürünler'),
+            : Text(widget.selectionMode ? 'Ürün Seç' : 'Ürünler'),
         actions: [
           IconButton(
             icon:
@@ -223,12 +225,16 @@ class _ProductsPageState extends State<ProductsPage> {
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetailPage(product: product),
-              ),
-            ).then((_) => _loadProducts());
+            if (widget.selectionMode) {
+              Navigator.pop(context, product);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailPage(product: product),
+                ),
+              ).then((_) => _loadProducts());
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(16),

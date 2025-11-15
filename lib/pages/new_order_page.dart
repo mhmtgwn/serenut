@@ -44,7 +44,7 @@ class _NewOrderPageState extends State<NewOrderPage> {
     final result = await Navigator.push<Customer>(
       context,
       MaterialPageRoute(
-        builder: (_) => const CustomersPage(),
+        builder: (_) => const CustomersPage(selectionMode: true),
       ),
     );
 
@@ -54,18 +54,16 @@ class _NewOrderPageState extends State<NewOrderPage> {
   }
 
   Future<void> _selectProducts() async {
-    final result = await Navigator.push<List<Product>>(
+    final result = await Navigator.push<Product>(
       context,
       MaterialPageRoute(
-        builder: (_) => const ProductsPage(),
+        builder: (_) => const ProductsPage(selectionMode: true),
       ),
     );
 
-    if (result != null && result.isNotEmpty) {
+    if (result != null) {
       setState(() {
-        for (var product in result) {
-          _cart[product] = (_cart[product] ?? 0) + 1;
-        }
+        _cart[result] = (_cart[result] ?? 0) + 1;
       });
     }
   }
