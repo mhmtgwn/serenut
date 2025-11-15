@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/customer.dart';
 import '../services/customer_service.dart';
+import '../services/order_service.dart';
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key});
@@ -12,10 +13,13 @@ class CustomersPage extends StatefulWidget {
 
 class _CustomersPageState extends State<CustomersPage> {
   final CustomerService _service = CustomerService();
+  final OrderService _orderService = OrderService();
   List<Customer> _customers = [];
   List<Customer> _filteredCustomers = [];
+  Map<int, double> _customerDebts = {};
   bool _isLoading = true;
   String _searchQuery = '';
+  bool _showOnlyDebtors = false;
 
   @override
   void initState() {
@@ -26,24 +30,60 @@ class _CustomersPageState extends State<CustomersPage> {
   Future<void> _loadCustomers() async {
     setState(() => _isLoading = true);
     final customers = await _service.getAll();
+    final allOrders = await _orderService.getAll();
+
+    // Her müşteri için borç hesapla
+    final debts = <int, double>{};
+    for (var customer in customers) {
+      final customerOrders =
+          allOrders.where((o) => o.customerId == customer.id).toList();
+      final totalDebt = customerOrders.fold<double>(
+          0, (sum, order) => sum + order.remainingAmount);
+      if (totalDebt > 0) {
+        debts[customer.id!] = totalDebt;
+      }
+    }
+
     setState(() {
       _customers = customers;
+      _customerDebts = debts;
       _filteredCustomers = customers;
       _isLoading = false;
     });
+    _applyFilters();
   }
 
   void _filterCustomers(String query) {
     setState(() {
       _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredCustomers = _customers;
-      } else {
-        _filteredCustomers = _customers.where((customer) {
-          return customer.name.toLowerCase().contains(query.toLowerCase()) ||
-              customer.phone.contains(query);
+    });
+    _applyFilters();
+  }
+
+  void _applyFilters() {
+    setState(() {
+      var filtered = _customers;
+
+      // Arama filtresi
+      if (_searchQuery.isNotEmpty) {
+        filtered = filtered.where((customer) {
+          return customer.name
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()) ||
+              customer.phone.contains(_searchQuery);
         }).toList();
       }
+
+      // Borçlu filtresi
+      if (_showOnlyDebtors) {
+        filtered = filtered
+            .where((customer) =>
+                _customerDebts.containsKey(customer.id) &&
+                _customerDebts[customer.id]! > 0)
+            .toList();
+      }
+
+      _filteredCustomers = filtered;
     });
   }
 
@@ -70,21 +110,48 @@ class _CustomersPageState extends State<CustomersPage> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    onChanged: _filterCustomers,
-                    decoration: InputDecoration(
-                      hintText: 'Müşteri ara...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded),
-                              onPressed: () {
-                                _filterCustomers('');
-                                FocusScope.of(context).unfocus();
-                              },
-                            )
-                          : null,
-                    ),
+                  child: Column(
+                    children: [
+                      TextField(
+                        onChanged: _filterCustomers,
+                        decoration: InputDecoration(
+                          hintText: 'Müşteri ara...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded),
+                                  onPressed: () {
+                                    _filterCustomers('');
+                                    FocusScope.of(context).unfocus();
+                                  },
+                                )
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          FilterChip(
+                            label: Text(
+                                'Borçlu Müşteriler (${_customerDebts.length})'),
+                            selected: _showOnlyDebtors,
+                            onSelected: (selected) {
+                              setState(() => _showOnlyDebtors = selected);
+                              _applyFilters();
+                            },
+                            avatar: Icon(
+                              Icons.account_balance_wallet_rounded,
+                              size: 18,
+                              color: _showOnlyDebtors
+                                  ? Colors.white
+                                  : Colors.orange,
+                            ),
+                            selectedColor: Colors.orange,
+                            checkmarkColor: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -126,15 +193,24 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 
   Widget _buildCustomerCard(Customer customer) {
+    final debt = _customerDebts[customer.id] ?? 0;
+    final hasDebt = debt > 0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: hasDebt
+              ? Colors.orange.withOpacity(0.3)
+              : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.05),
+            color: hasDebt
+                ? Colors.orange.withOpacity(0.1)
+                : const Color(0xFF10B981).withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -174,13 +250,36 @@ class _CustomersPageState extends State<CustomersPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        customer.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              customer.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                          if (hasDebt)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '₺${debt.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -222,7 +321,8 @@ class _CustomersPageState extends State<CustomersPage> {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
+                if (!hasDebt)
+                  Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
               ],
             ),
           ),

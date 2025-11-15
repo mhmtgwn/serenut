@@ -181,24 +181,56 @@ class _FinancePageState extends State<FinancePage> {
     final expenseTotal = _expenses.fold<double>(0, (sum, e) => sum + e.amount);
     final profit = income - expenseTotal;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildMiniCard('Gelir', '₺${income.toStringAsFixed(0)}',
-              Icons.trending_up_rounded, const Color(0xFF10B981)),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMiniCard('Gelir', '₺${income.toStringAsFixed(0)}',
+                  Icons.trending_up_rounded, const Color(0xFF10B981)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMiniCard(
+                  'Gider',
+                  '₺${expenseTotal.toStringAsFixed(0)}',
+                  Icons.trending_down_rounded,
+                  Colors.orange),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildMiniCard('Gider', '₺${expenseTotal.toStringAsFixed(0)}',
-              Icons.trending_down_rounded, Colors.orange),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildMiniCard('Kar', '₺${profit.toStringAsFixed(0)}',
-              Icons.account_balance_rounded, const Color(0xFF3B82F6)),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMiniCard('Kar', '₺${profit.toStringAsFixed(0)}',
+                  Icons.account_balance_rounded, const Color(0xFF3B82F6)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FutureBuilder<double>(
+                future: _getTotalDebt(),
+                builder: (context, snapshot) {
+                  final debt = snapshot.data ?? 0;
+                  return _buildMiniCard(
+                    'Borç',
+                    '₺${debt.toStringAsFixed(0)}',
+                    Icons.account_balance_wallet_rounded,
+                    debt > 0 ? Colors.red : Colors.grey,
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  Future<double> _getTotalDebt() async {
+    final allOrders = await _orderService.getAll();
+    return allOrders.fold<double>(
+        0, (sum, order) => sum + order.remainingAmount);
   }
 
   Widget _buildMiniCard(

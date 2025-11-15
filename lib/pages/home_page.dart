@@ -4,7 +4,6 @@ import 'orders_page.dart';
 import 'customers_page.dart';
 import 'products_page.dart';
 import 'finance_page.dart';
-import 'debts_page.dart';
 import '../services/order_service.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
@@ -26,7 +25,6 @@ class _HomePageState extends State<HomePage> {
     const CustomersPage(),
     const ProductsPage(),
     const FinancePage(),
-    const DebtsPage(),
   ];
 
   @override
@@ -60,10 +58,6 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(
             icon: Icon(Icons.attach_money),
             label: 'Finans',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_rounded),
-            label: 'Borçlar',
           ),
         ],
       ),
