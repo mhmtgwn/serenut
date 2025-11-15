@@ -171,57 +171,96 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   Widget _buildStatusSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Sipariş Durumu',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    final statuses = [
+      {
+        'value': 'pending',
+        'label': 'Beklemede',
+        'icon': Icons.schedule_rounded
+      },
+      {
+        'value': 'preparing',
+        'label': 'Hazırlanıyor',
+        'icon': Icons.restaurant_rounded
+      },
+      {'value': 'ready', 'label': 'Hazır', 'icon': Icons.check_circle_rounded},
+      {
+        'value': 'delivered',
+        'label': 'Teslim Edildi',
+        'icon': Icons.done_all_rounded
+      },
+      {'value': 'cancelled', 'label': 'İptal', 'icon': Icons.cancel_rounded},
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sipariş Durumu',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1E293B),
             ),
-            const SizedBox(height: 12),
-            Chip(
-              label: Text(_getStatusText(_currentOrder.status)),
-              backgroundColor:
-                  _getStatusColor(_currentOrder.status).withOpacity(0.2),
-              avatar: Icon(
-                Icons.circle,
-                color: _getStatusColor(_currentOrder.status),
-                size: 12,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Durum Güncelle:',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                if (_currentOrder.status == 'pending')
-                  ElevatedButton(
-                    onPressed: () => _updateStatus('preparing'),
-                    child: const Text('Hazırlanıyor'),
-                  ),
-                if (_currentOrder.status == 'preparing')
-                  ElevatedButton(
-                    onPressed: () => _updateStatus('ready'),
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    child: const Text('Hazır'),
-                  ),
-                if (_currentOrder.status == 'ready')
-                  ElevatedButton(
-                    onPressed: () => _updateStatus('delivered'),
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                    child: const Text('Teslim Edildi'),
-                  ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: statuses.map((status) {
+              final isSelected = _currentOrder.status == status['value'];
+              final color = _getStatusColor(status['value'] as String);
+
+              return FilterChip(
+                selected: isSelected,
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      status['icon'] as IconData,
+                      size: 18,
+                      color: isSelected ? Colors.white : color,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      status['label'] as String,
+                      style: TextStyle(
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                onSelected: (selected) {
+                  if (selected && !isSelected) {
+                    _updateStatus(status['value'] as String);
+                  }
+                },
+                backgroundColor: color.withOpacity(0.1),
+                selectedColor: color,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : color,
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
