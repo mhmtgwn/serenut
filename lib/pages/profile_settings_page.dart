@@ -17,6 +17,10 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   final _companyAddressController = TextEditingController();
   final _companyTaxController = TextEditingController();
   final _companyEmailController = TextEditingController();
+  final _companyRegistrationController = TextEditingController();
+  final _companyWebsiteController = TextEditingController();
+  final _userNameController = TextEditingController();
+  final _userPhoneController = TextEditingController();
   final _imagePicker = ImagePicker();
 
   bool _isLoading = true;
@@ -35,6 +39,10 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     _companyAddressController.dispose();
     _companyTaxController.dispose();
     _companyEmailController.dispose();
+    _companyRegistrationController.dispose();
+    _companyWebsiteController.dispose();
+    _userNameController.dispose();
+    _userPhoneController.dispose();
     super.dispose();
   }
 
@@ -46,6 +54,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       _companyAddressController.text = prefs.getString('company_address') ?? '';
       _companyTaxController.text = prefs.getString('company_tax') ?? '';
       _companyEmailController.text = prefs.getString('company_email') ?? '';
+      _companyRegistrationController.text =
+          prefs.getString('company_registration') ?? '';
+      _companyWebsiteController.text = prefs.getString('company_website') ?? '';
+      _userNameController.text = prefs.getString('user_name') ?? '';
+      _userPhoneController.text = prefs.getString('user_phone') ?? '';
       _logoPath = prefs.getString('company_logo');
       _isLoading = false;
     });
@@ -60,6 +73,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     await prefs.setString('company_address', _companyAddressController.text);
     await prefs.setString('company_tax', _companyTaxController.text);
     await prefs.setString('company_email', _companyEmailController.text);
+    await prefs.setString(
+        'company_registration', _companyRegistrationController.text);
+    await prefs.setString('company_website', _companyWebsiteController.text);
+    await prefs.setString('user_name', _userNameController.text);
+    await prefs.setString('user_phone', _userPhoneController.text);
     if (_logoPath != null) {
       await prefs.setString('company_logo', _logoPath!);
     }
@@ -155,8 +173,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                           GestureDetector(
                             onTap: _pickLogo,
                             child: Container(
-                              width: 150,
-                              height: 150,
+                              width: _logoPath != null ? double.infinity : 150,
+                              height: _logoPath != null ? 200 : 150,
                               decoration: BoxDecoration(
                                 color: Colors.grey[100],
                                 borderRadius: BorderRadius.circular(20),
@@ -171,7 +189,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                                       borderRadius: BorderRadius.circular(18),
                                       child: Image.file(
                                         File(_logoPath!),
-                                        fit: BoxFit.cover,
+                                        fit: BoxFit.contain,
                                       ),
                                     )
                                   : Column(
@@ -282,6 +300,29 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
+                            controller: _companyRegistrationController,
+                            decoration: InputDecoration(
+                              labelText: 'Kayıt No / Ticaret Sicil No',
+                              prefixIcon: const Icon(Icons.badge_rounded),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _companyWebsiteController,
+                            decoration: InputDecoration(
+                              labelText: 'Web Sitesi',
+                              prefixIcon: const Icon(Icons.language_rounded),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.url,
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
                             controller: _companyAddressController,
                             decoration: InputDecoration(
                               labelText: 'Adres',
@@ -291,6 +332,84 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                               ),
                             ),
                             maxLines: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Kullanıcı Bilgileri
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF3B82F6).withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF3B82F6).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.person_rounded,
+                                    size: 20, color: Color(0xFF3B82F6)),
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Kullanıcı Bilgileri',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _userNameController,
+                            decoration: InputDecoration(
+                              labelText: 'Adınız Soyadınız',
+                              prefixIcon:
+                                  const Icon(Icons.person_outline_rounded),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              helperText: 'Siparişlerde görünecek',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Adınız gerekli';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _userPhoneController,
+                            decoration: InputDecoration(
+                              labelText: 'Telefon Numaranız',
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              helperText: 'İletişim için kullanılacak',
+                            ),
+                            keyboardType: TextInputType.phone,
                           ),
                         ],
                       ),
