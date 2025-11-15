@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../models/product.dart';
 import '../services/product_service.dart';
 
@@ -17,8 +20,11 @@ class _AddProductPageState extends State<AddProductPage> {
   final _priceController = TextEditingController();
   final _stockController = TextEditingController();
   final _categoryController = TextEditingController();
+  final _barcodeController = TextEditingController();
   final ProductService _service = ProductService();
+  final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
+  File? _productImage;
 
   final List<String> _popularCategories = [
     'Yiyecek',
@@ -46,7 +52,96 @@ class _AddProductPageState extends State<AddProductPage> {
     _priceController.dispose();
     _stockController.dispose();
     _categoryController.dispose();
+    _barcodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanBarcode() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Barkod Tara'),
+            backgroundColor: Colors.black,
+          ),
+          body: MobileScanner(
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              if (barcodes.isNotEmpty) {
+                final barcode = barcodes.first.rawValue;
+                if (barcode != null) {
+                  setState(() => _barcodeController.text = barcode);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Barkod okundu: $barcode'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showImageSourceDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Fotoğraf Kaynağı'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded),
+              title: const Text('Kamera'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Galeri'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _productImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fotoğraf seçilemedi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -225,6 +320,28 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
             const SizedBox(height: 16),
 
+            // Barkod
+            TextFormField(
+              controller: _barcodeController,
+              decoration: InputDecoration(
+                labelText: 'Barkod',
+                hintText: 'Ürün barkodu (opsiyonel)',
+                prefixIcon: const Icon(Icons.qr_code_rounded),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  onPressed: _scanBarcode,
+                  tooltip: 'Barkod Tara',
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+
             // Kategori
             TextFormField(
               controller: _categoryController,
@@ -240,7 +357,63 @@ class _AddProductPageState extends State<AddProductPage> {
               ),
               textCapitalization: TextCapitalization.words,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+
+            // Ürün Fotoğrafı
+            const Text(
+              'Ürün Fotoğrafı:',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _showImageSourceDialog,
+              child: Container(
+                height: 180,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: _productImage != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.file(
+                          _productImage!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate_rounded,
+                              size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Fotoğraf Ekle',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            if (_productImage != null) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => setState(() => _productImage = null),
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Fotoğrafı Kaldır'),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+              ),
+            ],
+            const SizedBox(height: 16),
 
             // Popüler Kategoriler
             const Text(
