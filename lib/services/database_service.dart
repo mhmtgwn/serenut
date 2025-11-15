@@ -4,7 +4,8 @@ import 'package:path/path.dart';
 class DatabaseService {
   static Database? _database;
   static const String _dbName = 'shaman_v2.db';
-  static const int _version = 2; // Borç takibi için versiyon artırıldı
+  static const int _version =
+      3; // Payment transactions ve stock movements eklendi
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -100,12 +101,55 @@ class DatabaseService {
       )
     ''');
 
+    // PAYMENT_TRANSACTIONS
+    await db.execute('''
+      CREATE TABLE payment_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_id INTEGER NOT NULL,
+        order_id INTEGER,
+        amount REAL NOT NULL,
+        type TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES customers(id),
+        FOREIGN KEY (order_id) REFERENCES orders(id)
+      )
+    ''');
+
+    // STOCK_MOVEMENTS
+    await db.execute('''
+      CREATE TABLE stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        reference_id INTEGER,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products(id)
+      )
+    ''');
+
+    // CATEGORIES
+    await db.execute('''
+      CREATE TABLE categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        color TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
     // INDEXES
     await db.execute('CREATE INDEX idx_orders_status ON orders(status)');
     await db.execute('CREATE INDEX idx_orders_date ON orders(created_at)');
     await db.execute('CREATE INDEX idx_products_stock ON products(stock)');
     await db.execute(
         'CREATE INDEX idx_orders_payment_status ON orders(payment_status)');
+    await db.execute(
+        'CREATE INDEX idx_payment_transactions_customer ON payment_transactions(customer_id)');
+    await db.execute(
+        'CREATE INDEX idx_stock_movements_product ON stock_movements(product_id)');
   }
 
   static Future<void> _onUpgrade(
@@ -118,6 +162,52 @@ class DatabaseService {
           'ALTER TABLE orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT "unpaid"');
       await db.execute(
           'CREATE INDEX idx_orders_payment_status ON orders(payment_status)');
+    }
+
+    if (oldVersion < 3) {
+      // Payment transactions tablosu
+      await db.execute('''
+        CREATE TABLE payment_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_id INTEGER NOT NULL,
+          order_id INTEGER,
+          amount REAL NOT NULL,
+          type TEXT NOT NULL,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers(id),
+          FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+      ''');
+
+      // Stock movements tablosu
+      await db.execute('''
+        CREATE TABLE stock_movements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          reference_id INTEGER,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (product_id) REFERENCES products(id)
+        )
+      ''');
+
+      // Categories tablosu
+      await db.execute('''
+        CREATE TABLE categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          color TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
+
+      await db.execute(
+          'CREATE INDEX idx_payment_transactions_customer ON payment_transactions(customer_id)');
+      await db.execute(
+          'CREATE INDEX idx_stock_movements_product ON stock_movements(product_id)');
     }
   }
 }

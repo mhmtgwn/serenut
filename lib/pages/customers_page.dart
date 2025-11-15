@@ -3,6 +3,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/customer.dart';
 import '../services/customer_service.dart';
 import '../services/order_service.dart';
+import 'customer_detail_page.dart';
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key});
@@ -220,7 +221,14 @@ class _CustomersPageState extends State<CustomersPage> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _showCustomerDialog(customer),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CustomerDetailPage(customer: customer),
+              ),
+            ).then((_) => _loadCustomers());
+          },
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
