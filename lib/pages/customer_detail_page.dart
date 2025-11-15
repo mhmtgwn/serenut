@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/customer.dart';
 import '../models/order.dart';
 import '../services/order_service.dart';
+import '../services/customer_service.dart';
 import 'order_detail_page.dart';
 
 class CustomerDetailPage extends StatefulWidget {
@@ -16,6 +17,7 @@ class CustomerDetailPage extends StatefulWidget {
 class _CustomerDetailPageState extends State<CustomerDetailPage>
     with SingleTickerProviderStateMixin {
   final OrderService _orderService = OrderService();
+  final CustomerService _customerService = CustomerService();
   List<Order> _orders = [];
   double _totalDebt = 0;
   double _totalSpent = 0;
@@ -71,7 +73,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage>
             ),
           IconButton(
             icon: const Icon(Icons.edit_rounded),
-            onPressed: () {},
+            onPressed: _showEditDialog,
             style: IconButton.styleFrom(
               backgroundColor: const Color(0xFFF1F5F9),
             ),
@@ -408,6 +410,83 @@ class _CustomerDetailPageState extends State<CustomerDetailPage>
       default:
         return status;
     }
+  }
+
+  Future<void> _showEditDialog() async {
+    final nameController = TextEditingController(text: widget.customer.name);
+    final phoneController = TextEditingController(text: widget.customer.phone);
+    final addressController =
+        TextEditingController(text: widget.customer.address);
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Müşteri Düzenle'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Ad Soyad',
+                  prefixIcon: Icon(Icons.person_rounded),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Telefon',
+                  prefixIcon: Icon(Icons.phone_rounded),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Adres',
+                  prefixIcon: Icon(Icons.location_on_rounded),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final updatedCustomer = Customer(
+                id: widget.customer.id,
+                name: nameController.text,
+                phone: phoneController.text,
+                address: addressController.text,
+                createdAt: widget.customer.createdAt,
+              );
+
+              await _customerService.update(updatedCustomer);
+
+              if (context.mounted) {
+                Navigator.pop(context);
+                Navigator.pop(context, true); // Geri dön ve refresh et
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Müşteri güncellendi'),
+                    backgroundColor: Color(0xFF10B981),
+                  ),
+                );
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showPaymentDialog() async {
