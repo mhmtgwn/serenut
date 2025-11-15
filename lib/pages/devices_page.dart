@@ -23,24 +23,35 @@ class _DevicesPageState extends State<DevicesPage> {
   }
 
   Future<void> _loadDevices() async {
+    if (!mounted) return;
+
     setState(() => _isLoading = true);
 
     try {
+      debugPrint('>>> DEVICES PAGE: Aygitlar yukleniyor...');
+
       // Önce setup'ı çalıştır (eğer aygıt yoksa ekler)
       await _deviceManager.setupDefaultDevices();
 
       // Sonra aygıtları yükle
       final devices = await _deviceManager.getAllDevices();
-      debugPrint('Yuklenen aygit sayisi: ${devices.length}');
+      debugPrint('>>> DEVICES PAGE: Yuklenen aygit sayisi: ${devices.length}');
+
+      for (var device in devices) {
+        debugPrint(
+            '>>> DEVICE: ${device['name']} - ${device['type']} - ${device['connection']}');
+      }
 
       if (mounted) {
         setState(() {
           _devices = devices;
           _isLoading = false;
         });
+        debugPrint(
+            '>>> DEVICES PAGE: UI guncellendi, toplam: ${_devices.length}');
       }
     } catch (e) {
-      debugPrint('Hata: $e');
+      debugPrint('>>> DEVICES PAGE HATA: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
