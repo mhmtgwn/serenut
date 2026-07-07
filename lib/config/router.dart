@@ -1,0 +1,434 @@
+// lib/config/router.dart
+// Navigation Router — StatefulShellRoute with 5-tab Bottom Navigation Bar
+// Settings → free route (AppBar icon), Reports → free route
+// Generated: 21 Jun 2026 (v2)
+
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/presentation/pages/onboarding/onboarding_wizard_page.dart';
+import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
+import 'package:serenutos/presentation/pages/login_page.dart';
+import 'package:serenutos/presentation/pages/home_page.dart';
+import 'package:serenutos/presentation/pages/sales_page.dart';
+import 'package:serenutos/presentation/pages/customers_page.dart';
+import 'package:serenutos/presentation/pages/products_page.dart';
+import 'package:serenutos/presentation/pages/reports_page.dart';
+import 'package:serenutos/presentation/pages/orders_page.dart';
+import 'package:serenutos/presentation/pages/settings_page.dart';
+import 'package:serenutos/presentation/pages/customer_details_page.dart';
+import 'package:serenutos/presentation/pages/customer_form_page.dart';
+import 'package:serenutos/presentation/pages/collection_page.dart';
+import 'package:serenutos/presentation/pages/product_form_page.dart';
+import 'package:serenutos/presentation/pages/order_details_page.dart';
+import 'package:serenutos/presentation/pages/sale_details_page.dart';
+import 'package:serenutos/presentation/pages/sales_history_page.dart';
+import 'package:serenutos/presentation/widgets/app_shell.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
+
+import 'package:serenutos/presentation/pages/sync_conflict_page.dart';
+import 'package:serenutos/presentation/pages/license_page.dart' show LicenseManagementPage;
+import 'package:serenutos/presentation/pages/admin/admin_page.dart';
+import 'package:serenutos/presentation/pages/operations_hub_page.dart';
+import 'package:serenutos/presentation/pages/finance_hub_page.dart';
+import 'package:serenutos/presentation/pages/system_hub_page.dart';
+import 'package:serenutos/presentation/pages/management_hub_page.dart';
+import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
+import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
+import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
+
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/pages/paywall_page.dart';
+import 'package:serenutos/domain/services/access_manager.dart';
+import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
+import 'package:serenutos/presentation/pages/admin/mobile_admin_dashboard.dart';
+import 'package:serenutos/presentation/pages/admin/ticket_chat_page.dart';
+
+/// Navigation routes
+class AppRoutes {
+  static const login       = '/login';
+  static const onboarding  = '/onboarding'; // Onboarding wizard — tek giriş noktası
+  static const activation  = '/onboarding'; // Eski alias
+  static const paywall     = '/paywall';
+  static const home = '/';
+  static const sales = '/sales';
+  static const customers = '/customers';
+  static const customerDetail = '/customers/detail';
+  static const customerAdd = '/customers/add';
+  static const customerEdit = '/customers/edit';
+  static const customerCollect = '/customers/collect';
+  static const products = '/products';
+  static const productAdd = '/products/add';
+  static const productEdit = '/products/edit';
+  static const reports = '/reports';
+  static const orders = '/orders';
+  static const orderDetail = '/orders/detail';
+  static const saleDetail = '/sales/detail';
+  static const settings = '/settings';
+
+  // ── Phase 4-6 New Routes ──────────────────────────────────────────────
+  static const syncConflict = '/sync-conflict';
+  static const license     = '/license';
+  static const admin       = '/admin';
+  static const printQueue  = '/settings/print-queue';
+  static const smsHistory  = '/settings/sms-history';
+  static const dbHealth    = '/settings/db-health';
+  // ── Phase A Hub Routes ────────────────────────────────────────────────
+  static const operations  = '/operations';
+  static const finance     = '/finance';
+  static const system      = '/system';
+  static const management  = '/management';
+  static const mobileAdmin = '/admin/mobile-dashboard';
+  static const ticketChat  = '/admin/mobile-dashboard/ticket';
+}
+
+/// GoRouter configuration provider
+final routerProvider = Provider<GoRouter>((ref) {
+  final isAuthenticated = ref.watch(isAuthenticatedProvider);
+  final accessManager = ref.watch(accessManagerProvider);
+  final accessStatus = accessManager.checkAccess();
+  final prefs = ref.watch(sharedPreferencesProvider);
+
+  return GoRouter(
+    initialLocation: (accessStatus == AccessStatus.paywall)
+        ? AppRoutes.paywall
+        : (isAuthenticated
+            ? AppRoutes.home
+            : ((prefs.getString('admin_pin_code') ?? '').isEmpty
+                ? AppRoutes.onboarding  // Onboarding wizard — tek giriş noktası
+                : AppRoutes.login)),
+    redirect: (context, state) {
+      final loggedIn = isAuthenticated;
+      final status = accessManager.checkAccess();
+      final onPaywall = state.matchedLocation == AppRoutes.paywall;
+      
+      if (loggedIn && status == AccessStatus.paywall) {
+        if (!onPaywall) return AppRoutes.paywall;
+        return null;
+      }
+      
+      if (onPaywall) {
+        return loggedIn ? AppRoutes.home : AppRoutes.login;
+      }
+      
+      // Onboarding tamamlandı mı?
+      final hasAdminPin = (prefs.getString('admin_pin_code') ?? '').isNotEmpty;
+      final onLogin       = state.matchedLocation == AppRoutes.login;
+      final onOnboarding  = state.matchedLocation.startsWith('/onboarding');
+      
+      if (!loggedIn) {
+        if (!hasAdminPin) {
+          if (!onOnboarding) return AppRoutes.onboarding; // Onboarding'e yönlendir
+          return null;
+        }
+        if (!onLogin) return AppRoutes.login;
+        return null;
+      }
+      
+      if (onLogin || onOnboarding) return AppRoutes.home;
+      return null;
+    },
+    routes: [
+      // ── Login (no shell) ─────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.login,
+        name: 'login',
+        builder: (context, state) => const LoginPage(),
+      ),
+
+      // ── Onboarding Wizard (ActivationPage yerini aldı) ────────────────
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingSplashScreen(),
+        routes: [
+          GoRoute(
+            path: 'business',
+            name: 'onboardingBusiness',
+            builder: (context, state) => const OnboardingStep1Page(),
+          ),
+          GoRoute(
+            path: 'admin',
+            name: 'onboardingAdmin',
+            builder: (context, state) => const OnboardingStep2Page(),
+          ),
+          GoRoute(
+            path: 'success',
+            name: 'onboardingSuccess',
+            builder: (context, state) => const OnboardingSuccessPage(),
+          ),
+          GoRoute(
+            path: 'license',
+            name: 'onboardingLicense',
+            builder: (context, state) => const OnboardingLicensePage(),
+          ),
+        ],
+      ),
+
+
+
+      // ── Paywall Screen (no shell) ──────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.paywall,
+        name: 'paywall',
+        builder: (context, state) => const PaywallPage(),
+      ),
+
+      // ── Settings (free route — accessed via AppBar icon) ─────────────
+      GoRoute(
+        path: AppRoutes.settings,
+        name: 'settings',
+        builder: (context, state) => const SettingsPage(),
+      ),
+
+      // ── Phase 4-6 New Free Routes ─────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.syncConflict,
+        name: 'syncConflict',
+        builder: (context, state) => const SyncConflictPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.license,
+        name: 'license',
+        builder: (context, state) => const LicenseManagementPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.admin,
+        name: 'admin',
+        builder: (context, state) => const AdminPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.mobileAdmin,
+        name: 'mobileAdmin',
+        builder: (context, state) => const MobileAdminDashboard(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.ticketChat}/:id',
+        name: 'ticketChat',
+        builder: (context, state) {
+          final ticketId = state.pathParameters['id'] ?? '';
+          final ticketTitle = state.uri.queryParameters['title'] ?? 'Destek Talebi';
+          return TicketChatPage(ticketId: ticketId, ticketTitle: ticketTitle);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.printQueue,
+        name: 'printQueue',
+        builder: (context, state) => const PrintQueuePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.smsHistory,
+        name: 'smsHistory',
+        builder: (context, state) => const SmsHistoryPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.dbHealth,
+        name: 'dbHealth',
+        builder: (context, state) => const DbHealthPage(),
+      ),
+
+      // ── Reports (free route — no navbar tab) ─────────────────────────
+      GoRoute(
+        path: AppRoutes.reports,
+        name: 'reports',
+        builder: (context, state) => const ReportsPage(),
+      ),
+
+      GoRoute(
+        path: AppRoutes.finance,
+        name: 'finance',
+        builder: (context, state) => const FinanceHubPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.system,
+        name: 'system',
+        builder: (context, state) => const SystemHubPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.operations,
+        name: 'operations',
+        builder: (context, state) => const OperationsHubPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.management,
+        name: 'management',
+        builder: (context, state) => const SettingsPage(),
+      ),
+
+      // ── Main shell with 5-tab Bottom Navigation Bar ───────────────────
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return AppShell(navigationShell: navigationShell);
+        },
+        branches: [
+          // Branch 0 — Home (Dashboard / Command Center)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.home,
+                name: 'home',
+                builder: (context, state) => const HomePage(),
+              ),
+            ],
+          ),
+
+          // Branch 1 — Sales (Kasa / Satış)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.sales,
+                name: 'sales',
+                builder: (context, state) => const SalesPage(),
+                routes: [
+                  GoRoute(
+                    path: 'detail/:id',
+                    name: 'saleDetail',
+                    builder: (context, state) => SaleDetailsPage(
+                      saleId: state.pathParameters['id']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'history',
+                    name: 'salesHistory',
+                    builder: (context, state) => const SalesHistoryPage(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // Branch 2 — Orders (Siparişler)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.orders,
+                name: 'orders',
+                builder: (context, state) => const OrdersPage(),
+                routes: [
+                  GoRoute(
+                    path: 'detail/:id',
+                    name: 'orderDetail',
+                    builder: (context, state) => OrderDetailsPage(
+                      orderId: state.pathParameters['id']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // Branch 3 — Customers (Müşteriler / Cariler)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.customers,
+                name: 'customers',
+                builder: (context, state) => const CustomersPage(),
+                routes: [
+                  GoRoute(
+                    path: 'detail/:id',
+                    name: 'customerDetail',
+                    builder: (context, state) => CustomerDetailsPage(
+                      customerId: state.pathParameters['id']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'add',
+                    name: 'customerAdd',
+                    builder: (context, state) => const CustomerFormPage(
+                      isEditing: false,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'edit/:id',
+                    name: 'customerEdit',
+                    builder: (context, state) => CustomerFormPage(
+                      isEditing: true,
+                      existingCustomer: state.extra as CustomerEntity?,
+                    ),
+                  ),
+                  GoRoute(
+                    path: ':id/collect',
+                    name: 'customerCollect',
+                    builder: (context, state) => CollectionPage(
+                      customerId: state.pathParameters['id']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // Branch 4 — Products (Ürünler)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.products,
+                name: 'products',
+                builder: (context, state) => const ProductsPage(),
+                routes: [
+                  GoRoute(
+                    path: 'add',
+                    name: 'productAdd',
+                    builder: (context, state) => const ProductFormPage(
+                      isEditing: false,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'edit/:id',
+                    name: 'productEdit',
+                    builder: (context, state) => ProductFormPage(
+                      isEditing: true,
+                      existingProduct: state.extra as ProductEntity?,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    ],
+
+    // Error page
+    errorBuilder: (context, state) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 20),
+              const Text(
+                'Sayfa bulunamadı',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => context.go(AppRoutes.home),
+                child: const Text('Ana sayfaya dön'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+});
+
+/// GoRouter extension for easy navigation
+extension GoRouterX on GoRouter {
+  void goLogin() => go(AppRoutes.login);
+  void goHome() => go(AppRoutes.home);
+  void goSales() => go(AppRoutes.sales);
+  void goCustomers() => go(AppRoutes.customers);
+  void goProducts() => go(AppRoutes.products);
+  void goReports() => go(AppRoutes.reports);
+  void goOrders() => go(AppRoutes.orders);
+  void goSettings() => go(AppRoutes.settings);
+  void goOperations() => go(AppRoutes.operations);
+  void goFinance() => go(AppRoutes.finance);
+  void goSystem() => go(AppRoutes.system);
+  void goManagement() => go(AppRoutes.management);
+}

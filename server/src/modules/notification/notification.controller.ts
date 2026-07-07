@@ -1,0 +1,383 @@
+import { Router, Response } from 'express';
+import { pgPool, redisClient } from '../../config/database';
+import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
+import { TemplateParserService } from './template_parser.service';
+import { logger } from '../../config/logger';
+import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate_limit.middleware';
+
+const router = Router();
+
+// Apply auth globally
+router.use(authenticateUser);
+
+async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SET LOCAL app.current_company_id = '${companyId.replace(/'/g, "''")}'`);
+    const res = await client.query(sql, params);
+    await client.query('COMMIT');
+    return res;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function runBypassingRLS(sql: string, params: any[] = []) {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const res = await client.query(sql, params);
+    await client.query('COMMIT');
+    return res;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Helper to check if company has sufficient notification credits.
+ */
+async function hasSufficientCredits(companyId: string, channel: string): Promise<boolean> {
+  let creditCol = 'sms_credits';
+  if (channel === 'whatsapp') creditCol = 'whatsapp_credits';
+  if (channel === 'email') creditCol = 'email_credits';
+
+  const cacheKey = `notif_credits:${companyId}:${channel}`;
+  if (redisClient && redisClient.isOpen) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached !== null) {
+        return parseInt(cached, 10) > 0;
+      }
+    } catch (err) {
+      logger.error('Redis credits get error:', err);
+    }
+  }
+
+  const creditsRes = await runBypassingRLS(
+    `SELECT ${creditCol} FROM company_notification_credits WHERE company_id = $1`,
+    [companyId]
+  );
+
+  if (creditsRes.rows.length === 0) {
+    // If no credit record exists, seed initial credits (100 SMS, 50 WhatsApp, 1000 email)
+    await runBypassingRLS(
+      `INSERT INTO company_notification_credits (company_id) VALUES ($1)`,
+      [companyId]
+    );
+    if (redisClient && redisClient.isOpen) {
+      const val = channel === 'sms' ? 100 : channel === 'whatsapp' ? 50 : 1000;
+      await redisClient.setEx(cacheKey, 60, String(val));
+    }
+    return true;
+  }
+
+  const credits = creditsRes.rows[0][creditCol];
+  if (redisClient && redisClient.isOpen) {
+    await redisClient.setEx(cacheKey, 60, String(credits));
+  }
+  return credits > 0;
+}
+
+/**
+ * @openapi
+ * /api/v1/notifications/send-direct:
+ *   post:
+ *     summary: Queue a direct single message
+ */
+router.post('/send-direct', enforceNotificationRateLimit, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { channel, recipient, title, body, template_name, template_payload, scheduled_at } = req.body;
+
+  if (!channel || !recipient) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Kanal ve alıcı bilgileri zorunludur.' });
+  }
+
+  try {
+    // 1. Verify credits
+    const hasCredit = await hasSufficientCredits(user.company_id, channel);
+    if (!hasCredit) {
+      return res.status(402).json({ error: 'out_of_credits', message: 'Gönderim için kalan krediniz yetersizdir.' });
+    }
+
+    let finalBody = body || '';
+
+    // 2. Parse dynamic template if template_name is specified
+    if (template_name) {
+      const templateRes = await runWithTenantContext(
+        user.company_id,
+        'SELECT body FROM notification_templates WHERE name = $1 AND channel = $2',
+        [template_name, channel]
+      );
+      if (templateRes.rows.length > 0) {
+        finalBody = TemplateParserService.parse(templateRes.rows[0].body, template_payload || {});
+      } else {
+        return res.status(404).json({ error: 'template_not_found', message: 'Belirtilen şablon bulunamadı.' });
+      }
+    }
+
+    if (!finalBody) {
+      return res.status(400).json({ error: 'empty_message', message: 'Mesaj içeriği boş olamaz.' });
+    }
+
+    // 3. Insert into queue
+    const id = `notif-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const parsedScheduledAt = scheduled_at ? new Date(scheduled_at) : new Date();
+
+    await runWithTenantContext(
+      user.company_id,
+      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, scheduled_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, user.company_id, channel, recipient, title || null, finalBody, parsedScheduledAt]
+    );
+
+    return res.status(201).json({ success: true, queue_id: id });
+  } catch (err) {
+    logger.error('Failed direct notify queue push:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/notifications/queue:
+ *   get:
+ *     summary: Get message queue delivery history
+ */
+router.get('/queue', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  try {
+    const history = await runWithTenantContext(
+      user.company_id,
+      'SELECT id, channel, recipient, title, body, status, retry_count, error_message, delivered_at, created_at FROM notification_queue ORDER BY created_at DESC LIMIT 100'
+    );
+    return res.json(history.rows);
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/notifications/credits:
+ *   get:
+ *     summary: Retrieve remaining messaging credits
+ */
+router.get('/credits', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  try {
+    const creditsRes = await runWithTenantContext(
+      user.company_id,
+      'SELECT sms_credits, whatsapp_credits, email_credits FROM company_notification_credits'
+    );
+
+    if (creditsRes.rows.length === 0) {
+      // Seed credits
+      await runBypassingRLS(
+        'INSERT INTO company_notification_credits (company_id) VALUES ($1)',
+        [user.company_id]
+      );
+      return res.json({ sms_credits: 100, whatsapp_credits: 50, email_credits: 1000 });
+    }
+
+    return res.json(creditsRes.rows[0]);
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/notifications/templates:
+ *   post:
+ *     summary: Create or update notification template
+ */
+router.post('/templates', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { name, channel, title, body } = req.body;
+
+  if (!name || !channel || !body) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
+
+  try {
+    const id = `tpl-${Date.now()}`;
+    await runWithTenantContext(
+      user.company_id,
+      `INSERT INTO notification_templates (id, company_id, name, channel, title, body)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (company_id, name) DO UPDATE SET
+         channel = EXCLUDED.channel,
+         title = EXCLUDED.title,
+         body = EXCLUDED.body,
+         updated_at = NOW()`,
+      [id, user.company_id, name, channel, title || null, body]
+    );
+
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/notifications/templates:
+ *   get:
+ *     summary: List templates
+ */
+router.get('/templates', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  try {
+    const list = await runWithTenantContext(user.company_id, 'SELECT * FROM notification_templates ORDER BY name ASC');
+    return res.json(list.rows);
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/notifications/campaign:
+ *   post:
+ *     summary: Trigger targeted marketing campaigns (segmentation)
+ */
+router.post('/campaign', enforceCampaignAbuseLimit, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { segment, channel, template_name } = req.body;
+
+  if (!segment || !channel || !template_name) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Segment, kanal ve şablon seçimi zorunludur.' });
+  }
+
+  try {
+    // 1. Fetch template body
+    const templateRes = await runWithTenantContext(
+      user.company_id,
+      'SELECT body, title FROM notification_templates WHERE name = $1 AND channel = $2',
+      [template_name, channel]
+    );
+
+    if (templateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'template_not_found', message: 'Şablon bulunamadı.' });
+    }
+
+    const { body: templateBody, title: templateTitle } = templateRes.rows[0];
+
+    // 2. Fetch segment recipients based on RLS constraints
+    let recipientsRes: any;
+    if (segment === 'all_customers') {
+      recipientsRes = await runWithTenantContext(
+        user.company_id,
+        'SELECT name, phone, email FROM customers WHERE is_deleted = FALSE'
+      );
+    } else if (segment === 'debtors') {
+      recipientsRes = await runWithTenantContext(
+        user.company_id,
+        'SELECT name, phone, email FROM customers WHERE balance > 0 AND is_deleted = FALSE'
+      );
+    } else if (segment === 'inactive_30d') {
+      // Fetch customers who haven't made a transaction/sale in the last 30 days
+      recipientsRes = await runWithTenantContext(
+        user.company_id,
+        `SELECT c.name, c.phone, c.email FROM customers c
+         LEFT JOIN sales s ON s.customer_id = c.id AND s.created_at >= NOW() - INTERVAL '30 days'
+         WHERE s.id IS NULL AND c.is_deleted = FALSE`
+      );
+    } else {
+      return res.status(400).json({ error: 'invalid_segment', message: 'Geçersiz alıcı grubu seçimi.' });
+    }
+
+    const recipients = recipientsRes.rows;
+    if (recipients.length === 0) {
+      return res.json({ success: true, queued_count: 0, message: 'Seçilen grupta uygun alıcı bulunamadı.' });
+    }
+
+    // 3. Batch insert queue entries using transaction bypassing RLS for bulk write efficiency
+    const client = await pgPool.connect();
+    let queuedCount = 0;
+
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      for (const rec of recipients) {
+        // Enforce credit check per record
+        const hasCredit = await hasSufficientCredits(user.company_id, channel);
+        if (!hasCredit) {
+          logger.warn(`Campaign aborted midway for company ${user.company_id} due to out of credits.`);
+          break;
+        }
+
+        const recipientAddr = channel === 'email' ? rec.email : rec.phone;
+        if (!recipientAddr) continue; // Skip if no address contact exists
+
+        // Parse template
+        const resolvedBody = TemplateParserService.parse(templateBody, {
+          customer: rec.name,
+          store: 'Serenut POS'
+        });
+
+        const id = `notif-camp-${Date.now()}-${Math.floor(Math.random()*10000)}`;
+
+        await client.query(`
+          INSERT INTO notification_queue (id, company_id, channel, recipient, title, body)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [id, user.company_id, channel, recipientAddr, templateTitle || null, resolvedBody]);
+
+        queuedCount++;
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    return res.json({ success: true, queued_count: queuedCount, message: `${queuedCount} adet kampanya mesajı başarıyla kuyruğa eklendi.` });
+  } catch (err) {
+    logger.error('Campaign trigger failed:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/v1/admin/notifications/stats:
+ *   get:
+ *     summary: Admin global notification delivery metrics
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get('/admin/stats', requireRole('sysadmin'), async (req, res: Response) => {
+  try {
+    const stats = await runBypassingRLS(`
+      SELECT 
+        status, 
+        COUNT(*) as count 
+      FROM notification_queue
+      GROUP BY status
+    `);
+
+    const result: Record<string, number> = { queued: 0, sent: 0, failed: 0, retrying: 0, sending: 0 };
+    for (const row of stats.rows) {
+      result[row.status] = parseInt(row.count, 10);
+    }
+
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+export default router;

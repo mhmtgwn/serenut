@@ -35,6 +35,9 @@ import { RealtimeBroadcastService } from './modules/realtime/broadcast.service';
 import billingRouter from './modules/billing/billing.controller';
 import notificationRouter from './modules/notification/notification.controller';
 import telemetryRouter from './modules/analytics/telemetry.controller';
+import supportRouter from './modules/support/support.controller';
+import branchRouter from './modules/branch/branch.controller';
+import orderRouter from './modules/order/order.controller';
 
 // BullMQ Workers
 import { startNotificationWorker } from './workers/notification.worker';
@@ -201,6 +204,10 @@ app.use('/api/v1/notifications', notificationRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/portal', portalRouter);
+app.use('/api/v1/support', supportRouter);
+app.use('/api/v1/branches', branchRouter);
+app.use('/api/v1/orders', orderRouter);
+app.use('/api/v1/sales', orderRouter);
 app.use('/api/v1', tenantRouter);
 
 // ── SYSTEM HEALTH CHECK ───────────────────────────────────────────────────────

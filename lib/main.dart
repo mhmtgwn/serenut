@@ -1,104 +1,195 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'pages/home_page.dart';
-import 'utils/seed_data.dart';
-import 'services/device_manager_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/router.dart';
+import 'package:serenutos/domain/services/auth_service.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/sync_provider.dart';
+import 'package:serenutos/providers/sms_provider.dart';
+import 'package:serenutos/providers/service_providers.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
+import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
+import 'package:serenutos/infrastructure/services/password_hash_service.dart';
+import 'package:serenutos/domain/services/version_checker.dart';
+import 'package:serenutos/domain/services/error_boundary.dart';
+import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:serenutos/presentation/pages/force_update_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632';
+      options.tracesSampleRate = 0.1;
+      options.environment = kReleaseMode ? 'production' : 'development';
+    },
+    appRunner: () async {
+      ErrorBoundary.install();
+      await initializeDateFormatting('tr_TR', null);
+      
+      if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+      
+      // Initialize SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
 
-  // İlk çalıştırmada örnek veriler ekle
-  await SeedData.seedIfEmpty();
+      // Initialize AuthService with required dependencies
+      final IUserRepository userRepository;
+      if (kIsWeb) {
+        userRepository = InMemoryUserRepository();
+      } else {
+        final dbManager = DatabaseManager();
+        final gateway = DbGatewayImpl(dbManager);
+        userRepository = SqliteUserRepository(gateway);
+      }
+      final hashService = PasswordHashServiceImpl();
+      final apiClient = ApiClient();
 
-  // Dahili aygıtları kur
-  await DeviceManagerService().setupDefaultDevices();
+      final authService = AuthService(
+        userRepository: userRepository,
+        hashService: hashService,
+        apiClient: apiClient,
+      );
+      await authService.initialize();
+      
+      // If database contains no users, reset onboarding status to show the wizard
+      if (!kIsWeb) {
+        try {
+          final users = await authService.getUsers();
+          if (users.isEmpty) {
+            await prefs.remove('admin_pin_code');
+          }
+        } catch (_) {}
+      }
 
-  runApp(const MyApp());
+      // Initialize DatasetLoaderService
+      final datasetLoader = DatasetLoaderService(prefs);
+      await datasetLoader.init();
+      
+      runApp(
+        ProviderScope(
+          overrides: [
+            authServiceProvider.overrideWithValue(authService),
+            apiClientProvider.overrideWithValue(apiClient),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            datasetLoaderServiceProvider.overrideWithValue(datasetLoader),
+          ],
+          child: const MyApp(),
+        ),
+      );
+    },
+  );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  bool _checkingVersion = true;
+  bool _forceUpdateRequired = false;
+  String _latestVersion = '';
+  String _releaseNotes = '';
+  String _downloadUrl = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkVersion();
+    _triggerAutoBackup();
+  }
+
+  void _triggerAutoBackup() {
+    if (!kIsWeb) {
+      ref.read(backupServiceProvider).autoBackupIfNeeded().catchError((e) {
+        debugPrint('Otomatik yedekleme hatası: $e');
+      });
+    }
+  }
+
+  Future<void> _checkVersion() async {
+    final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
+    final required = await checker.checkForceUpdateRequired();
+    if (required) {
+      final info = await checker.getVersionInfo();
+      if (info != null) {
+        _latestVersion = info.latestVersion;
+        _releaseNotes = info.releaseNotes;
+        _downloadUrl = info.downloadUrl;
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _forceUpdateRequired = required;
+        _checkingVersion = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SHAMAN POS',
+    if (_checkingVersion) {
+      return MaterialApp(
+        title: 'Serenut POS',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    if (_forceUpdateRequired) {
+      return MaterialApp(
+        title: 'Serenut POS',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: ForceUpdatePage(
+          latestVersion: _latestVersion.isNotEmpty ? _latestVersion : '1.1.0',
+          releaseNotes: _releaseNotes.isNotEmpty
+              ? _releaseNotes
+              : 'Kritik güvenlik ve performans güncellemeleri içerir.',
+          downloadUrl: _downloadUrl.isNotEmpty
+              ? _downloadUrl
+              : 'https://serenut.com/api/v1/updates/download/android/latest',
+        ),
+      );
+    }
+
+    final router = ref.watch(routerProvider);
+    
+    // Eagerly initialize sync provider so AppLifecycle observer is registered
+    // and auto-sync fires when app resumes from background.
+    ref.watch(syncProvider);
+    
+    // Eagerly initialize SMS notification handler to subscribe to domain events on startup
+    ref.watch(smsNotificationHandlerProvider);
+    
+    return MaterialApp.router(
+      title: 'Serenut POS',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF10B981),
-          primary: const Color(0xFF10B981),
-          secondary: const Color(0xFF3B82F6),
-          surface: Colors.white,
-          background: const Color(0xFFF8FAFC),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        textTheme: GoogleFonts.poppinsTextTheme(),
-        appBarTheme: AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1E293B),
-          titleTextStyle: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1E293B),
-          ),
-        ),
-        cardTheme: CardTheme(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          color: Colors.white,
-        ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: const Color(0xFF10B981),
-          foregroundColor: Colors.white,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            textStyle: GoogleFonts.poppins(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF1F5F9),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
-          ),
-          labelStyle: GoogleFonts.poppins(
-            color: const Color(0xFF64748B),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-      home: const HomePage(),
+      theme: AppTheme.light,
+      routerConfig: router,
     );
   }
 }
