@@ -28,8 +28,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
   await SentryFlutter.init(
     (options) {
       options.dsn = 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632';
@@ -37,6 +35,7 @@ void main() async {
       options.environment = kReleaseMode ? 'production' : 'development';
     },
     appRunner: () async {
+      WidgetsFlutterBinding.ensureInitialized();
       ErrorBoundary.install();
       await initializeDateFormatting('tr_TR', null);
       
