@@ -133,7 +133,7 @@ jobs:
           script: |
             cd /opt/serenut-os/server
             git fetch --all
-            git reset --hard origin/main
+            git reset --hard origin/master
             docker compose -f docker-compose.prod.yml build
             # Execute Rollback & Schema integrity validation
             bash devops/migrate-with-rollback.sh || exit 1
