@@ -1,0 +1,145 @@
+name: Serenut OS Continuous Integration & Staging Deployment
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  backend-ci:
+    name: Backend CI & Database Rollback Validation
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
+
+      - name: Install Server Dependencies
+        run: |
+          cd server
+          npm install --legacy-peer-deps
+
+      - name: Compile TypeScript Server
+        run: |
+          cd server
+          npm run build
+
+      - name: Validate Database Schema Migrations (Up)
+        env:
+          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
+        run: |
+          cd server
+          npm run migrate
+
+      - name: Run Sprint 2 Verification Tests (Sync, Idempotency, Triggers)
+        env:
+          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
+          JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
+        run: |
+          cd server
+          npx ts-node src/test/sprint2_verification.ts
+
+      - name: Run Sprint 8 Verification Tests (Billing, Grace Period, Suspension)
+        env:
+          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
+          JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
+        run: |
+          cd server
+          npx ts-node src/test/sprint8_verification.ts
+
+      - name: Run Sprint 9 Verification Tests (Notification Gateways, Caching)
+        env:
+          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
+          JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
+        run: |
+          cd server
+          npx ts-node src/test/sprint9_verification.ts
+
+  frontend-ci:
+    name: Frontend CI & Build Compilation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Java SDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Run Static Code Analysis (Strict warnings as failure)
+        run: flutter analyze --fatal-warnings
+
+      - name: Run Widget & Logic Tests
+        run: flutter test --fail-fast
+
+      - name: Build Web Application Bundle
+        run: flutter build web --release
+
+      - name: Upload Web Application Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: serenut-pos-web-bundle
+          path: build/web/
+
+  deploy-staging:
+    name: Continuous Staging Deployment (VPS)
+    needs: [backend-ci, frontend-ci]
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to Staging VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_VPS_HOST }}
+          username: ${{ secrets.STAGING_VPS_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.STAGING_VPS_PORT || 22 }}
+          script: |
+            cd /opt/serenut-os/server
+            git fetch --all
+            git reset --hard origin/main
+            docker compose -f docker-compose.prod.yml build
+            # Execute Rollback & Schema integrity validation
+            bash devops/migrate-with-rollback.sh || exit 1
+            # Restart Services with resource limits
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d
+            sleep 5
+            docker compose -f docker-compose.prod.yml exec -T backend npx ts-node src/test/seed_release.ts
+            logger info "Staging deployment and database release seeding completed successfully."
