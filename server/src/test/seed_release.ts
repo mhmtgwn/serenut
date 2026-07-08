@@ -12,9 +12,9 @@ async function seed() {
       file_size_bytes, release_notes
     ) VALUES (
       'win-v1-stable', '1.0.0', 'windows', '/api/v1/updates/download/windows/latest', 
-      'E6AF8FF7C9F80DAF9784DECCBE9B28A7E7DA7E7BC02B5986BB8EDC886269899A', 
-      'C:\\\\Users\\\\notop\\\\AndroidStudioProjects\\\\shaman_new\\\\build\\\\windows\\\\installer\\\\SerenutOSSetup.exe', 
-      'active', 'stable', true, 100, 14072232, 'RC1 Release Build'
+      '4E36E6D63BBB9B903C7F30DBE73FDD686B29CE1FDE199DFF54EDDA6173925587', 
+      'public/website/downloads/SerenutOSSetup.exe', 
+      'active', 'stable', true, 100, 9214299, 'RC1 Release Build'
     ) ON CONFLICT (id) DO UPDATE SET 
       file_path = EXCLUDED.file_path, 
       version_code = EXCLUDED.version_code,

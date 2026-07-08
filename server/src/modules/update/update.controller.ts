@@ -22,7 +22,12 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
     `;
     const result = await pgPool.query(query, [platform]);
     
-    if (result.rows.length === 0 || !result.rows[0].file_path || !fs.existsSync(result.rows[0].file_path)) {
+    const release = result.rows[0];
+    const resolvedPath = path.isAbsolute(release.file_path) 
+      ? release.file_path 
+      : path.resolve(process.cwd(), release.file_path);
+
+    if (result.rows.length === 0 || !release.file_path || !fs.existsSync(resolvedPath)) {
       return res.status(404).send(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
           <h2 style="color: #ef4444;">Dosya Bulunamadı</h2>
@@ -32,12 +37,11 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       `);
     }
 
-    const release = result.rows[0];
-    const ext = path.extname(release.file_path);
+    const ext = path.extname(resolvedPath);
     const filename = `serenut-${release.version_code}-${platform}${ext}`;
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    const stream = fs.createReadStream(release.file_path);
+    const stream = fs.createReadStream(resolvedPath);
     stream.pipe(res);
   } catch (err) {
     console.error('Public download error:', err);
