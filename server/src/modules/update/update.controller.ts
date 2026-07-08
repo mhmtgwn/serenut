@@ -49,6 +49,20 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
   }
 });
 
+router.get('/debug/db-state', async (req: Request, res: Response) => {
+  try {
+    const query = `
+      SELECT id, version_code, platform, sha256_hash, file_path, status, created_at
+      FROM app_versions
+      ORDER BY created_at DESC;
+    `;
+    const result = await pgPool.query(query);
+    return res.json(result.rows);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/check', async (req: Request, res: Response) => {
   const platform = req.query.platform as string;
   const current_version = req.query.current_version as string;
