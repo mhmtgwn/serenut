@@ -10,7 +10,6 @@ import 'package:serenutos/domain/services/auth_service.dart' hide AuthException;
 import 'package:serenutos/presentation/state/app_state.dart';
 import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
 
-import 'package:serenutos/domain/services/trial_manager.dart';
 
 /// Riverpod StateNotifier wrapping AuthService
 /// 
@@ -32,9 +31,8 @@ import 'package:serenutos/domain/services/trial_manager.dart';
 /// ```
 class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   final AuthService _authService;
-  final TrialManager _trialManager;
 
-  AppAuthNotifier(this._authService, this._trialManager) 
+  AppAuthNotifier(this._authService)
     : super(AppState.loading()) {
     // Initialize: load stored user on startup
     _initializeUser();
@@ -61,16 +59,18 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   /// 
   /// Flow:
   /// 1. Set state to loading
-  /// 2. Call AuthService.login()
-  /// 3. On success: set state to success(user)
-  /// 4. On error: set state to error(exception)
+  /// 2. Call AuthService.login() — backend-first, local SQLite fallback
+  /// 3. Trial sync: AuthService.login() backend'den trial_started_at okur (tek yer)
+  /// 4. On success: set state to success(user)
+  /// 5. On error: set state to error(exception)
   /// 
   /// Throws: Never (errors go to state.error)
   Future<void> login(String username, String password) async {
     try {
       state = AppState.loading();
       final user = await _authService.login(username, password);
-      await _trialManager.initTrialIfNeeded();
+      // Trial sync: AuthService.login() içinde backend'den halloluyor
+      // Burada çift tetiklemeye gerek yok
       state = AppState.success(user);
     } catch (e) {
       state = AppState.error(AppException.from(e));

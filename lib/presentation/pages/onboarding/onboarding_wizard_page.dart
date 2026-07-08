@@ -26,6 +26,7 @@ import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:uuid/uuid.dart'; // Admin ID için benzersiz UUID üretimi
 import 'package:serenutos/domain/models/industry_template.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_product_repository.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -146,7 +147,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     // Create admin user in SQLite database to support logins
     final authService = ref.read(authServiceProvider);
     final adminUser = AuthUser(
-      id: 'admin',
+      id: const Uuid().v4(), // Benzersiz ID — hardcode 'admin' kaldırıldı
       name: state.admin.adminFullName,
       email: state.admin.username,
       role: UserRole.admin,
@@ -200,7 +201,30 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       }
     }
 
-    // 5. Onboarding tamamlandı
+    // 5. Backend'e de kaydol (opsiyonel — network yoksa silent fail)
+    // Bu kaynak doğruluk noktasını backend'de de oluşturur
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final rawPassword = state.admin.password.isNotEmpty ? state.admin.password : state.admin.pin;
+      final res = await apiClient.post('/auth/register', {
+        'company_name': state.business.businessName,
+        'name': state.admin.adminFullName,
+        'email': state.admin.username,
+        'password': rawPassword,
+        'phone': state.business.phone,
+      });
+      if (res.isSuccess) {
+        final data = res.json;
+        await prefs.setString('auth_jwt_token', data['access_token'] as String? ?? '');
+        await prefs.setString('auth_refresh_token', data['refresh_token'] as String? ?? '');
+        debugPrint('Onboarding: Backend kayıt başarılı ✓');
+      }
+    } catch (e) {
+      // Network yoksa veya backend hata verirse — local devam eder
+      debugPrint('Onboarding: Backend kayıt atlandı (network/hata): $e');
+    }
+
+    // 6. Onboarding tamamlandı
     await _persistence.markCompleted();
   }
 

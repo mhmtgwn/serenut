@@ -61,25 +61,6 @@ class AuthService {
     }
   }
 
-  AuthUser _mapRowToAuthUser(Map<String, dynamic> row) {
-    final roleStr = row['role'] as String;
-    final role = UserRole.values.firstWhere(
-      (r) => r.name == roleStr,
-      orElse: () => UserRole.cashier,
-    );
-    return AuthUser(
-      id: row['id'] as String,
-      companyId: row['company_id'] as String? ?? 'TEST_COMPANY',
-      name: row['name'] as String,
-      email: row['email'] as String? ?? '',
-      role: role,
-      permissions: getPermissionsForRole(role),
-      createdAt: DateTime.parse(
-        (row['created_at'] ?? DateTime.now().toIso8601String()) as String,
-      ),
-    );
-  }
-
   // ════════════════════════════════════════════════════════════
   // LOGIN — Secure PBKDF2 verification
   // ════════════════════════════════════════════════════════════
@@ -173,38 +154,11 @@ class AuthService {
       }
     }
 
-    if (kIsWeb) {
-      final trimmedUser = username.trim().toLowerCase();
-      String matchedRole = '';
-      if (trimmedUser == 'admin@serenut.com' || trimmedUser == 'admin') {
-        if (password == 'admin123' || password == 'admin') {
-          matchedRole = 'admin';
-        }
-      } else if (trimmedUser == 'yonetici@serenut.com' || trimmedUser == 'manager') {
-        if (password == 'manager123' || password == 'manager') {
-          matchedRole = 'manager';
-        }
-      } else if (trimmedUser == 'kasiyer@serenut.com' || trimmedUser == 'cashier') {
-        if (password == 'kasiyer123' || password == 'cashier') {
-          matchedRole = 'cashier';
-        }
-      }
-
-      if (matchedRole.isNotEmpty) {
-        final role = UserRole.values.firstWhere((r) => r.name == matchedRole);
-        final user = AuthUser(
-          id: 'user-$matchedRole',
-          name: matchedRole == 'admin' ? 'Admin' : (matchedRole == 'manager' ? 'Yönetici' : (matchedRole == 'cashier' ? 'Kasiyer' : 'Personel')),
-          email: '$matchedRole@serenut.com',
-          role: role,
-          permissions: getPermissionsForRole(role),
-          createdAt: DateTime.now(),
-        );
-        await _onLoginSuccess(user);
-        return user;
-      }
-      throw AuthException('Kullanıcı adı veya şifre hatalı.');
-    }
+    // Not: kIsWeb hardcode kullanıcı bloğu kaldırıldı (güvenlik açığı).
+    // Web'de de backend API çağrısı yapılır (satır 99-174 yukarıda).
+    // Backend erişilemiyorsa local SQLite'a düşülür (aşağıdaki blok).
+    // kIsWeb + local SQLite sorgusu: web'de SQLite çalışmaz, hata fırlatır
+    // → throw AuthException ile sonuçlanır, bu doğru davranış.
 
     try {
       final user = await _userRepository.findByUsername(username.trim());
@@ -299,12 +253,14 @@ class AuthService {
     _apiClient?.setJwtToken(null);
   }
 
+  /// Offline login başarısında çağrılır.
+  /// NOT: JWT token burada üretilmez — offline session JWT'siz çalışır.
+  /// Gerçek JWT yalnızca backend login başarısında (satır 108-157) set edilir.
   Future<void> _onLoginSuccess(AuthUser user) async {
     _currentUser = user;
     await _prefs.setString(_userStorageKey, user.toJson());
-    final token = 'jwt_mock_${user.id}_${DateTime.now().millisecondsSinceEpoch}';
-    await _prefs.setString('auth_jwt_token', token);
-    _apiClient?.setJwtToken(token);
+    // Offline durumda API çağrılarına gerek yok;
+    // token null kalır → sync geldiğinde yeniden login istenir
   }
 
   /// Directly set the current authenticated user — used after setup (Web)
@@ -319,7 +275,20 @@ class AuthService {
     return user != null;
   }
 
-  /// Check if current user has permission
+  /// Şifre sıfırlama isteği gönder (backend e-posta akışı)
+  /// 
+  /// Backend POST /auth/forgot-password çağırır.
+  /// Network yoksa veya backend hata verirse silent fail —
+  /// güvenlik gereği kullanıcıya her zaman başarı gösterilir.
+  Future<void> requestPasswordReset(String email) async {
+    if (_apiClient == null) return;
+    try {
+      await _apiClient!.post('/auth/forgot-password', {'email': email});
+    } catch (_) {
+      // Silent fail — enumeration önlemi için UI her zaman başarı gösterir
+    }
+  }
+
   Future<bool> hasPermission(String permission) async {
     final user = await getCurrentUser();
     return user?.hasPermission(permission) ?? false;

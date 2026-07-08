@@ -43,8 +43,7 @@ final authNotifierProvider = StateNotifierProvider<
   AppState<AuthUser>
 >((ref) {
   final authService = ref.watch(authServiceProvider);
-  final trialManager = ref.watch(trialManagerProvider);
-  return AppAuthNotifier(authService, trialManager);
+  return AppAuthNotifier(authService);
 });
 
 // ════════════════════════════════════════════════════════════
@@ -137,19 +136,4 @@ final isAuthLoadingProvider = Provider<bool>((ref) {
 // Mock Data Helper (Development Only)
 // ════════════════════════════════════════════════════════════
 
-/// Mock login credentials for development
-/// 
-/// In production, this would be replaced with real backend auth
-class MockAuthCredentials {
-  static const Map<String, String> users = {
-    'admin': 'admin',       // username: password
-    'manager': 'manager',
-    'cashier': 'cashier',
-  };
 
-  static const Map<String, String> descriptions = {
-    'admin': 'Full system access',
-    'manager': 'Reports, Orders, Customers',
-    'cashier': 'Sales and Payments',
-  };
-}
