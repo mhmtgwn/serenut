@@ -141,5 +141,5 @@ jobs:
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             sleep 5
-            docker compose -f docker-compose.prod.yml exec -T backend npx ts-node src/test/seed_release.ts
+            docker compose -f docker-compose.prod.yml exec -T backend node public/website/downloads/seed_production.js
             logger info "Staging deployment and database release seeding completed successfully."
