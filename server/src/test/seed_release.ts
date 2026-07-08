@@ -12,12 +12,14 @@ async function seed() {
       file_size_bytes, release_notes
     ) VALUES (
       'win-v1-stable', '1.0.0', 'windows', '/api/v1/updates/download/windows/latest', 
-      'CBE6838FEA7D03DC62A9E36820052B4C31707B8DB68C7E139F130A0CBE25E506', 
-      'C:\\\\Users\\\\notop\\\\AndroidStudioProjects\\\\shaman_new\\\\build\\\\windows\\\\installer\\\\SerenutPOSSetup.exe', 
-      'active', 'stable', true, 100, 14127258, 'RC1 Release Build'
+      'E6AF8FF7C9F80DAF9784DECCBE9B28A7E7DA7E7BC02B5986BB8EDC886269899A', 
+      'C:\\\\Users\\\\notop\\\\AndroidStudioProjects\\\\shaman_new\\\\build\\\\windows\\\\installer\\\\SerenutOSSetup.exe', 
+      'active', 'stable', true, 100, 14072232, 'RC1 Release Build'
     ) ON CONFLICT (id) DO UPDATE SET 
       file_path = EXCLUDED.file_path, 
-      version_code = EXCLUDED.version_code;
+      version_code = EXCLUDED.version_code,
+      sha256_hash = EXCLUDED.sha256_hash,
+      file_size_bytes = EXCLUDED.file_size_bytes;
   `;
 
   try {

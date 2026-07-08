@@ -1,21 +1,14 @@
-﻿// lib/presentation/pages/login_page.dart
-// PHASE 1 - Login Screen with Advanced Local Recovery
-// Generated: 02 Jul 2026
+// lib/presentation/pages/login_page.dart
+// Auth: Backend-first login (online) → local SQLite fallback (offline)
+// Race condition fix: ref.listen pattern — navigasyon state'i dinleyerek yapılır
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
+import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/presentation/state/app_state.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/repository_providers.dart';
-import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
-import 'package:serenutos/domain/models/permission.dart' show UserRole;
-import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:serenutos/infrastructure/database/db_gateway.dart';
-import 'package:serenutos/infrastructure/repositories/sqlite_business_profile_repository.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -44,9 +37,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      setState(() => _errorMessage = 'Kullanıcı adı ve şifre zorunludur');
+  /// Login tetikler — navigasyon ref.listen ile build() içinde handle edilir
+  void _handleLogin() {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+
+    if (username.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'E-posta ve şifre zorunludur.');
       return;
     }
 
@@ -55,184 +52,110 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       _errorMessage = null;
     });
 
-    try {
-      await ref.read(authNotifierProvider.notifier).login(
-        _usernameController.text,
-        _passwordController.text,
-      );
-
-      // Check if login was successful
-      final authState = ref.read(authNotifierProvider);
-      authState.when(
-        success: (user) {
-          context.go(AppRoutes.home);
-        },
-        loading: () {},
-        error: (error) {
-          setState(() => _errorMessage = error.userMessage);
-        },
-      );
-    } catch (e) {
-      setState(() => _errorMessage = 'Giriş hatası: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    // Fire and forget — sonucu ref.listen karşılar (race condition yok)
+    ref.read(authNotifierProvider.notifier).login(username, password);
   }
 
+  /// Şifre sıfırlama: e-posta ile backend'e istek at
+  /// Backend POST /auth/forgot-password çağrılır
   void _showForgotPasswordDialog() {
-    final usernameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    
+    final emailController = TextEditingController(
+      text: _usernameController.text.trim(),
+    );
+    bool isSending = false;
+    bool sent = false;
+    String? dialogError;
+
     showDialog(
       context: context,
       builder: (context) {
-        bool isResetting = false;
-        String? dialogError;
-        String? dialogSuccess;
-        
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Şifre / PIN Sıfırlama'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              title: const Text('Şifre Sıfırla'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!sent) ...[
                     const Text(
-                      'Güvenlik nedeniyle personel hesaplarının şifreleri sadece yönetici (admin) tarafından Ayarlar > Kullanıcı Yönetimi ekranından sıfırlanabilir.\n\nYönetici (admin) şifrenizi sıfırlamak için kurulumda kaydettiğiniz işletme telefon numarasını girmeniz gerekmektedir.',
+                      'E-posta adresinizi girin. Şifre sıfırlama bağlantısı gönderilecektir.',
                       style: TextStyle(fontSize: 13, color: Colors.black54),
                     ),
                     const SizedBox(height: 16),
                     if (dialogError != null)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(dialogError!,
+                            style: const TextStyle(color: Colors.red, fontSize: 13)),
                       ),
-                    if (dialogSuccess != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Text(dialogSuccess!, style: const TextStyle(color: Colors.green, fontSize: 13)),
-                      ),
-                    const SizedBox(height: 12),
                     TextField(
-                      controller: usernameController,
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
-                        labelText: 'Kullanıcı Adı',
+                        labelText: 'E-posta Adresi',
                         border: OutlineInputBorder(),
                       ),
-                      enabled: !isResetting && dialogSuccess == null,
+                      enabled: !isSending,
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'İşletme Telefon Numarası',
-                        hintText: '5XXXXXXXXX',
-                        border: OutlineInputBorder(),
+                  ] else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Sıfırlama bağlantısı ${emailController.text} adresine gönderildi.',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
-                      keyboardType: TextInputType.phone,
-                      enabled: !isResetting && dialogSuccess == null,
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: newPasswordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Yeni Şifre / PIN',
-                        border: OutlineInputBorder(),
-                      ),
-                      enabled: !isResetting && dialogSuccess == null,
-                    ),
-                  ],
-                ),
+                ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Kapat'),
                 ),
-                if (dialogSuccess == null)
+                if (!sent)
                   ElevatedButton(
-                    onPressed: isResetting
+                    onPressed: isSending
                         ? null
                         : () async {
-                            final username = usernameController.text.trim();
-                            final phone = phoneController.text.trim();
-                            final newPassword = newPasswordController.text.trim();
-                            
-                            if (username.isEmpty || phone.isEmpty || newPassword.isEmpty) {
-                              setDialogState(() {
-                                dialogError = 'Lütfen tüm alanları doldurun.';
-                              });
+                            final email = emailController.text.trim();
+                            if (email.isEmpty || !email.contains('@')) {
+                              setDialogState(() =>
+                                  dialogError = 'Geçerli bir e-posta adresi girin.');
                               return;
                             }
-                            if (newPassword.length < 4) {
-                              setDialogState(() {
-                                dialogError = 'Yeni şifre/PIN en az 4 karakter olmalıdır.';
-                              });
-                              return;
-                            }
-                            
                             setDialogState(() {
-                              isResetting = true;
+                              isSending = true;
                               dialogError = null;
                             });
-                            
                             try {
-                              final userRepo = ref.read(userRepositoryProvider);
-                              final user = await userRepo.findByUsername(username);
-                              if (user == null) {
-                                throw 'Kullanıcı bulunamadı.';
-                              }
-                              
-                              if (user.role != UserRole.admin) {
-                                throw 'Güvenlik nedeniyle personel şifreleri sadece yönetici (admin) tarafından sıfırlanabilir.';
-                              }
-                              
-                              // Check phone number
-                              final dbManager = DatabaseManager();
-                              final gateway = DbGatewayImpl(dbManager);
-                              final profileRepo = SqliteBusinessProfileRepository(gateway);
-                              final profile = await profileRepo.getProfile();
-                              
-                              final enteredPhoneClean = phone.replaceAll(RegExp(r'\D'), '');
-                              final dbPhoneClean = (profile?.phone ?? '').replaceAll(RegExp(r'\D'), '');
-                              
-                              if (enteredPhoneClean.isEmpty || enteredPhoneClean != dbPhoneClean) {
-                                throw 'Girdiğiniz telefon numarası işletme profili ile uyuşmuyor!';
-                              }
-                              
-                              // Success! Update password
-                              final authService = ref.read(authServiceProvider);
-                              await authService.updateUser(user, password: newPassword);
-                              
-                              // Update SharedPreferences
-                              final hashService = ref.read(hashServiceProvider);
-                              final prefs = ref.read(sharedPreferencesProvider);
-                              final pinHash = hashService.hashPassword(newPassword);
-                              await prefs.setString('admin_pin_code', pinHash);
-                              await prefs.setString('admin_password_hash', pinHash);
-                              
+                              final authService =
+                                  ref.read(authServiceProvider);
+                              await authService.requestPasswordReset(email);
+                            } catch (_) {
+                              // Enumeration: her zaman başarı göster
+                            } finally {
                               setDialogState(() {
-                                dialogSuccess = 'Şifreniz başarıyla güncellendi!';
-                                isResetting = false;
-                              });
-                            } catch (e) {
-                              setDialogState(() {
-                                dialogError = e.toString();
-                                isResetting = false;
+                                isSending = false;
+                                sent = true;
                               });
                             }
                           },
-                    child: isResetting
+                    child: isSending
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 18,
+                            height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Şifreyi Sıfırla'),
+                        : const Text('Gönder'),
                   ),
               ],
             );
@@ -249,7 +172,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return AlertDialog(
           title: const Text('Kayıt Ol / Yeni Kullanıcı'),
           content: const Text(
-            'Serenut POS, lokal çalışan kapalı devre bir işletme otomasyonudur.\n\nYeni bir kasiyer, yönetici veya personel hesabı açmak için lütfen yönetici (admin) hesabı ile giriş yapıp:\n\n**Yönetim > Ayarlar > Kullanıcı Yönetimi**\n\nekranından yeni kullanıcı kaydı oluşturun.',
+            'Serenut OS, lokal çalışan kapalı devre bir işletme otomasyonudur.\n\nYeni bir kasiyer, yönetici veya personel hesabı açmak için lütfen yönetici (admin) hesabı ile giriş yapıp:\n\n**Yönetim > Ayarlar > Kullanıcı Yönetimi**\n\nekranından yeni kullanıcı kaydı oluşturun.',
             style: TextStyle(fontSize: 14),
           ),
           actions: [
@@ -265,9 +188,36 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ── Auth state listener: login/logout sonucu burada handle edilir ──
+    // ref.listen, build frame'ine bağlı — race condition yok
+    ref.listen<AppState<AuthUser>>(authNotifierProvider, (previous, next) {
+      if (!mounted) return;
+      next.when(
+        success: (_) {
+          // Giriş başarılı → home'a git
+          if (_isLoading) {
+            setState(() => _isLoading = false);
+          }
+          context.go(AppRoutes.home);
+        },
+        loading: () {
+          // Notifier bizzat loading set etti — buton zaten disabled
+        },
+        error: (error) {
+          // Hata mesajını göster, butonu etkinleştir
+          if (_isLoading) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = error.userMessage;
+            });
+          }
+        },
+      );
+    });
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SERENUT POS'),
+        title: const Text('SERENUT OS'),
         centerTitle: true,
         elevation: 0,
       ),
@@ -294,7 +244,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
               // Title
               const Text(
-                'SERENUT POS',
+                'SERENUT OS',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
@@ -361,7 +311,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
               const SizedBox(height: 24),
 
-              // Login button
+              // Login button — onPressed artık void (async değil)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -411,12 +361,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
 
               const SizedBox(height: 40),
-
-              // Footer
-              Text(
-                'Demo Amaçlı Sistem',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
             ],
           ),
         ),

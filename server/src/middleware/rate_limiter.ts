@@ -5,6 +5,9 @@ export function rateLimiter(limitCount: number, windowMs: number) {
   return async (req: Request, res: Response, next: NextFunction) => {
     // [SEC-A] Redis down → 503 (güvenli hata, fallback yok)
     if (!redisClient || !redisClient.isOpen) {
+      if (process.env.NODE_ENV !== 'production') {
+        return next();
+      }
       return res.status(503).json({
         error: 'service_unavailable',
         message: 'Güvenlik sistemi geçici olarak servis dışı. Lütfen daha sonra tekrar deneyin.'

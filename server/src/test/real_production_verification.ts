@@ -29,7 +29,7 @@ async function verifyClientBundle() {
     return;
   }
   
-  const exePath = path.join(releaseDir, 'shaman_new.exe');
+  const exePath = path.join(releaseDir, 'serenutos.exe');
   const dllPath = path.join(releaseDir, 'flutter_windows.dll');
   const dataPath = path.join(releaseDir, 'data');
   const sqliteDllPath = path.join(releaseDir, 'sqlite3.dll');
@@ -37,9 +37,9 @@ async function verifyClientBundle() {
   // Verify Exe
   if (fs.existsSync(exePath)) {
     const stat = fs.statSync(exePath);
-    logAudit('shaman_new.exe Launcher', true, `Size: ${stat.size} bytes (Factual Launcher Executable)`);
+    logAudit('serenutos.exe Launcher', true, `Size: ${stat.size} bytes (Factual Launcher Executable)`);
   } else {
-    logAudit('shaman_new.exe Launcher', false, 'Missing!');
+    logAudit('serenutos.exe Launcher', false, 'Missing!');
   }
 
   // Verify flutter_windows.dll (The actual framework engine)

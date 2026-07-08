@@ -268,7 +268,7 @@ router.post('/register', authRateLimit, async (req: Request, res: Response) => {
         `INSERT INTO subscriptions
            (id, company_id, plan_id, status, current_period_start, current_period_end,
             trial_started_at, trial_ends_at, payment_retry_count)
-         VALUES ($1, $2, 'plan-free', 'trialing', CURRENT_TIMESTAMP, NULL,
+         VALUES ($1, $2, 'plan-free', 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
                  NULL, NULL, 0)`,
         [subId, companyId]
       );

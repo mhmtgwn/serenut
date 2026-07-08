@@ -1,5 +1,5 @@
 // lib/infrastructure/services/native_printer_bridge.dart
-// Serenut POS — Native Printer Bridge (Platform-guarded)
+// Serenut OS — Native Printer Bridge (Platform-guarded)
 // Supports: Sunmi internal (Android), Bluetooth (Android)
 // iOS / Windows: returns safe no-op (network printer only on those platforms)
 // Updated: 24 Jun 2026
@@ -10,11 +10,11 @@ import 'package:flutter/services.dart';
 
 class NativePrinterBridge {
   static const MethodChannel _bluetoothChannel =
-      MethodChannel('com.shaman.printer/bluetooth');
+      MethodChannel('com.serenutos.printer/bluetooth');
   static const MethodChannel _sunmiChannel =
-      MethodChannel('com.shaman.printer/sunmi');
+      MethodChannel('com.serenutos.printer/sunmi');
   static const MethodChannel _usbChannel =
-      MethodChannel('com.shaman.printer/usb');
+      MethodChannel('com.serenutos.printer/usb');
 
   // ── Platform guards ────────────────────────────────────────────────────────
 

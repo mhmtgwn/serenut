@@ -19,6 +19,10 @@ export function createRedisLimiter(options: LimiterOptions) {
 
     // [SEC-A] Redis down → 503 (güvenli hata, fallback yok)
     if (!redisClient || !redisClient.isOpen) {
+      if (process.env.NODE_ENV !== 'production') {
+        logger.warn(`Rate Limiter: Redis is down/inactive. Bypassing check in development mode.`);
+        return next();
+      }
       logger.error(`Rate Limiter blocked request: Redis is down/inactive. Route: ${req.originalUrl}`);
       return res.status(503).json({
         error: 'service_unavailable',

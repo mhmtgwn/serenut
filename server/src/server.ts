@@ -99,7 +99,14 @@ app.set('trust proxy', 1);
 
 app.use(helmet({
   contentSecurityPolicy: {
-    directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"] }
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://*"]
+    }
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   referrerPolicy: { policy: 'no-referrer' },
@@ -188,10 +195,13 @@ app.use(enforceSchemaHandshake);
 app.use('/admin', express.static(path.join(process.cwd(), 'public/admin')));
 app.use('/portal', express.static(path.join(process.cwd(), 'public/portal')));
 app.use('/', express.static(path.join(process.cwd(), 'public/website')));
+app.use('/marketing', express.static(path.join(process.cwd(), '../web/marketing')));
 
 // ── ROUTERS — Auth & License (özel rate limitler) ────────────────────────────
 app.use('/api/v1/auth', authLimiter, authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/v1/licenses', licenseLimiter, licenseRouter);
+app.use('/api/licenses', licenseLimiter, licenseRouter);
 
 // ── ROUTERS — Genel ───────────────────────────────────────────────────────────
 app.use('/api/v1/updates', updateRouter);
