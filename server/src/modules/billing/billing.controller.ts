@@ -811,12 +811,24 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     return res.status(400).json({ error: 'missing_signature' });
   }
 
+  if (!req.rawBody && process.env.NODE_ENV === 'production') {
+    logger.error('[Iyzico Webhook] Raw body buffer is missing in production. Express parser verify config is incorrect.');
+    return res.status(500).json({ error: 'internal_error' });
+  }
+
+  const rawPayload = req.rawBody || Buffer.from(JSON.stringify(payload));
   const computedSignature = crypto
     .createHmac('sha256', IYZICO_SECRET)
-    .update(req.rawBody || JSON.stringify(payload))
+    .update(rawPayload)
     .digest('hex');
 
-  if (computedSignature !== signature) {
+  const signatureBuffer = Buffer.from(signature, 'hex');
+  const computedBuffer = Buffer.from(computedSignature, 'hex');
+
+  if (
+    signatureBuffer.length !== computedBuffer.length ||
+    !crypto.timingSafeEqual(signatureBuffer, computedBuffer)
+  ) {
     logger.warn('[Iyzico Webhook] Webhook signature verification failed!');
     return res.status(400).json({ error: 'invalid_signature' });
   }
