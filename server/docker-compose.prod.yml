@@ -1,0 +1,136 @@
+version: '3.9'
+
+# Serenut OS — Production Docker Compose
+# Kullanım: docker compose -f docker-compose.prod.yml up -d
+#
+# UYARI: Bu dosya .env.production dosyasını okur.
+# .env.production dosyası Git'e commit edilmemeli.
+# .env.example dosyasını kopyalayarak .env.production oluşturun:
+#   cp .env.example .env.production
+#   nano .env.production   → Gerçek değerleri doldurun
+
+services:
+  # ── Node.js Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: serenut-backend:latest
+    container_name: serenut-backend
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      # Yalnızca localhost'a bağla — Nginx dışarıya açar
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - serenut-db-redis
+      - serenut-external
+    deploy:
+      resources:
+        limits:
+          cpus: '0.80'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ── PostgreSQL 15 ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: serenut-db
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - serenut-db-redis
+    ports:
+      - "127.0.0.1:5432:5432"
+    # PostgreSQL'i dışarıya AÇMIYORUZ (güvenlik için)
+    # Dışarıdan erişim gerekiyorsa SSH tüneli kullanın:
+    #   ssh -L 5432:localhost:5432 user@sunucu
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: serenut-redis
+    restart: unless-stopped
+    # Şifre koruması + AOF kalıcılığı
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - serenut-db-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    # Redis'i dışarıya AÇMIYORUZ
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+# ── Ağ Tanımı ─────────────────────────────────────────────────────────────────
+networks:
+  serenut-db-redis:
+    driver: bridge
+    internal: true   # Keep DB and Redis fully isolated from external internet
+  serenut-external:
+    driver: bridge   # Allows backend to reach outbound endpoints like Iyzico/SMS APIs
+
+# ── Kalıcı Veri Hacimleri ─────────────────────────────────────────────────────
+volumes:
+  db-data:
+    driver: local
+  redis-data:
+    driver: local

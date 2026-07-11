@@ -1,0 +1,26 @@
+# ── Bağımlılıklar ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Derleme Çıktıları ─────────────────────────────────────────────────────────
+dist/
+build/
+
+# ── Ortam Değişkenleri — ASLA COMMIT ETMEYİN ─────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+.env.development
+
+# ── Log Dosyaları ─────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Yedekler ─────────────────────────────────────────────────────────────────
+backups/
+*.sql.gz
+*.sql.gz.gpg
+
+# ── OS Dosyaları ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

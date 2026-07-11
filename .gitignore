@@ -59,3 +59,9 @@ server/db/
 .sentry-native/
 .vscode/
 .agents/
+
+# Binary builds and installers
+*.apk
+*.exe
+server/public/website/downloads/
+web/marketing/downloads/
