@@ -811,8 +811,8 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     return res.status(400).json({ error: 'missing_signature' });
   }
 
-  if (!req.rawBody && process.env.NODE_ENV === 'production') {
-    logger.error('[Iyzico Webhook] Raw body buffer is missing in production. Express parser verify config is incorrect.');
+  if (!req.rawBody && process.env.NODE_ENV !== 'test') {
+    logger.error('[Iyzico Webhook] Raw body buffer is missing. Express parser verify config is incorrect.');
     return res.status(500).json({ error: 'internal_error' });
   }
 
@@ -822,15 +822,20 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     .update(rawPayload)
     .digest('hex');
 
-  const signatureBuffer = Buffer.from(signature, 'hex');
-  const computedBuffer = Buffer.from(computedSignature, 'hex');
+  try {
+    const signatureBuffer = Buffer.from(signature, 'hex');
+    const computedBuffer = Buffer.from(computedSignature, 'hex');
 
-  if (
-    signatureBuffer.length !== computedBuffer.length ||
-    !crypto.timingSafeEqual(signatureBuffer, computedBuffer)
-  ) {
-    logger.warn('[Iyzico Webhook] Webhook signature verification failed!');
-    return res.status(400).json({ error: 'invalid_signature' });
+    if (
+      signatureBuffer.length !== computedBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, computedBuffer)
+    ) {
+      logger.warn('[Iyzico Webhook] Webhook signature verification failed!');
+      return res.status(400).json({ error: 'invalid_signature' });
+    }
+  } catch (err) {
+    logger.error('[Iyzico Webhook] Hex signature parsing or comparison failed:', err);
+    return res.status(400).json({ error: 'invalid_signature_format' });
   }
 
   // Replay protection: Check webhook timestamp payload if present (iyziEventTime or standard timestamp)
