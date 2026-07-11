@@ -64,6 +64,12 @@ export async function executeBillingCron(): Promise<void> {
             UPDATE licenses SET status = 'active', expires_at = $1 WHERE company_id = $2
           `, [newEnd, sub.company_id]);
 
+          await runBypassingRLS(`
+            UPDATE license_entitlements 
+            SET status = 'active', valid_until = $1, token_version = token_version + 1, updated_at = NOW()
+            WHERE company_id = $2 AND status IN ('trial', 'active')
+          `, [newEnd, sub.company_id]);
+
         } else {
           // Payment failed: grant 7-day grace period
           logger.warn(`Payment failed on renewal for company: ${sub.company_id}. Granting 7 days grace period.`);
@@ -111,10 +117,21 @@ async function suspendSubscription(companyId: string, subscriptionId: string) {
   await runBypassingRLS(`
     UPDATE licenses SET status = 'suspended' WHERE company_id = $1
   `, [companyId]);
+
+  await runBypassingRLS(`
+    UPDATE license_entitlements 
+    SET status = 'expired', token_version = token_version + 1, updated_at = NOW()
+    WHERE company_id = $1 AND status IN ('trial', 'active')
+  `, [companyId]);
 }
 
 // Mock payment helper
 async function simulateMockupPayment(companyId: string, amount: number): Promise<boolean> {
+  if (process.env.NODE_ENV === 'production') {
+    // In production, mockup automatic recurring payment fails since real charging is not implemented yet
+    logger.warn(`Billing renewal blocked: Mock payment is disabled in production for company ${companyId}`);
+    return false;
+  }
   // If company tax number ends in 9, simulate payment failure for verification tests
   const res = await runBypassingRLS('SELECT tax_number FROM companies WHERE id = $1', [companyId]);
   if (res.rows.length > 0) {

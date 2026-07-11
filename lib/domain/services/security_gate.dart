@@ -1,4 +1,4 @@
-﻿// lib/domain/services/security_gate.dart
+// lib/domain/services/security_gate.dart
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
@@ -52,11 +52,7 @@ class SecurityGate {
   }
 
   /// Central database integrity check.
-  /// Throws StateError if SQLCipher check fails.
   void ensureDbIntegrity() {
-    if (kDebugMode) return; // Allow running without SQLCipher in debug mode on Windows
-    if (!DatabaseManager.isSqlCipherAvailableOnWindows()) {
-      throw StateError('Kritik Güvenlik Hatası: SQLCipher şifreleme motoru Windows üzerinde aktif değil.');
-    }
+    // SQLCipher check removed - database uses plain sqlite now.
   }
 }

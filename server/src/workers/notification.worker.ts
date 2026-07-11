@@ -96,6 +96,9 @@ async function dispatchGateway(data: NotificationJobData): Promise<boolean> {
 async function dispatchSms(to: string, body: string): Promise<boolean> {
   const isMock = !process.env.SMS_API_KEY || process.env.SMS_API_KEY.startsWith('YOUR_') || process.env.SMS_API_KEY === 'mock';
   if (isMock) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SMS API Credentials are not configured in production! Mock SMS is disabled.');
+    }
     logger.info(`[SMS][MOCK] Sending to ${to}: "${body.substring(0, 40)}..."`);
     await new Promise((resolve) => setTimeout(resolve, 100));
     return true;
@@ -129,6 +132,9 @@ async function dispatchSms(to: string, body: string): Promise<boolean> {
 async function dispatchEmail(to: string, subject: string, body: string): Promise<boolean> {
   const isMock = !process.env.SMTP_API_KEY || process.env.SMTP_API_KEY.startsWith('YOUR_') || process.env.SMTP_API_KEY === 'mock';
   if (isMock) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SMTP/Postmark API Key is not configured in production! Mock Email is disabled.');
+    }
     logger.info(`[EMAIL][MOCK] Sending to ${to}: "${subject}"`);
     await new Promise((resolve) => setTimeout(resolve, 100));
     return true;

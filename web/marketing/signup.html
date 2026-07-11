@@ -6,534 +6,310 @@
   <title>Giriş Yap / Kayıt Ol — Serenut OS</title>
   <meta name="description" content="Serenut OS'a giriş yapın veya ücretsiz hesap oluşturun." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2316A34A'/><text y='24' x='5' font-size='22' font-weight='900' fill='white' font-family='system-ui'>S</text></svg>" />
-  <link rel="stylesheet" href="css/serenut.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
-    /* ── Reset for auth layout ── */
-    html { height: 100%; }
+    :root {
+      --primary: #10b981;
+      --primary-hover: #0d9668;
+      --bg: #ffffff;
+      --card-bg: #f7fcf9;
+      --card-border: #e2f5ec;
+      --text: #374151;
+      --text-dark: #1f2937;
+      --text-muted: #6B7280;
+      --input-border: #d1d5db;
+      --input-pw-bg: #eff6ff;
+      --input-pw-border: #bfdbfe;
+    }
+
     body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: row;
+      font-family: 'Inter', sans-serif;
+      background-color: #ffffff;
+      color: var(--text);
       margin: 0;
       padding: 0;
-      background: #fff;
-    }
-
-    /* ══ SOL PANEL ══════════════════════════════════════════ */
-    .auth-left {
-      flex: 1;
-      min-width: 0;
-      background: #16A34A;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 40px 48px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Büyük dekoratif daireler */
-    .auth-left::before {
-      content: '';
-      position: absolute;
-      bottom: -100px; right: -100px;
-      width: 360px; height: 360px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.06);
-      pointer-events: none;
-    }
-    .auth-left::after {
-      content: '';
-      position: absolute;
-      top: -80px; left: -80px;
-      width: 260px; height: 260px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.05);
-      pointer-events: none;
-    }
-
-    .left-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #fff;
-      text-decoration: none;
-      position: relative;
-      z-index: 1;
-    }
-
-    .left-logo-mark {
-      width: 36px; height: 36px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 1.15rem;
-      color: #fff;
-    }
-
-    .left-content {
-      position: relative;
-      z-index: 1;
-    }
-
-    .left-content h2 {
-      font-size: 2rem;
-      font-weight: 900;
-      letter-spacing: -0.04em;
-      line-height: 1.2;
-      color: #fff;
-      margin-bottom: 14px;
-    }
-
-    .left-content p {
-      font-size: 0.95rem;
-      color: rgba(255,255,255,0.78);
-      line-height: 1.7;
-      margin-bottom: 30px;
-    }
-
-    .left-features {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .left-feat {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 0.9rem;
-      color: rgba(255,255,255,0.9);
-      font-weight: 500;
-    }
-
-    .left-feat-icon {
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.15);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
-    }
-
-    .left-quote {
-      position: relative;
-      z-index: 1;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 14px;
-      padding: 20px 22px;
-    }
-
-    .left-quote-text {
-      font-size: 0.875rem;
-      color: rgba(255,255,255,0.92);
-      line-height: 1.7;
-      font-style: italic;
-      margin-bottom: 14px;
-    }
-
-    .left-quote-author {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .left-quote-avatar {
-      width: 34px; height: 34px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.25);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 0.8rem;
-      color: #fff;
-    }
-
-    .left-quote-name {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #fff;
-      display: block;
-    }
-
-    .left-quote-role {
-      font-size: 0.775rem;
-      color: rgba(255,255,255,0.65);
-      display: block;
-    }
-
-    /* ══ SAĞ PANEL ══════════════════════════════════════════ */
-    .auth-right {
-      width: 500px;
-      flex-shrink: 0;
-      background: #fff;
-      border-left: 1px solid #E5E7EB;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 48px 44px;
-      overflow-y: auto;
       min-height: 100vh;
-    }
-
-    .auth-back {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #6B7280;
-      text-decoration: none;
-      margin-bottom: 32px;
-      transition: color 0.15s;
-    }
-    .auth-back:hover { color: #111827; }
-
-    /* ── Tab bar ── */
-    .auth-tabs {
       display: flex;
-      background: #F3F4F6;
-      border: 1px solid #E5E7EB;
-      border-radius: 10px;
-      padding: 3px;
-      margin-bottom: 28px;
+      flex-direction: column;
     }
 
-    .auth-tab {
+    /* Header */
+    .auth-header {
+      background-color: #ffffff;
+      border-bottom: 1px solid #f3f4f6;
+      padding: 16px 40px;
+    }
+    .auth-header-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .logo-icon {
+      display: flex;
+      align-items: center;
+    }
+    .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #1f2937;
+    }
+    .logo-text span {
+      color: var(--primary);
+    }
+
+    /* Main Wrapper */
+    .auth-main-wrapper {
       flex: 1;
-      padding: 9px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    /* Card */
+    .auth-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.03);
+      box-sizing: border-box;
+    }
+
+    .auth-card-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .card-logo-icon {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      margin: 0 0 4px 0;
+    }
+    .card-subtitle {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.08em;
+      margin: 0;
+    }
+
+    /* Tabs */
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background-color: #eef7f2;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+    .auth-tab {
+      background: transparent;
       border: none;
       border-radius: 8px;
-      font-size: 0.875rem;
+      padding: 10px;
+      font-size: 0.95rem;
       font-weight: 600;
-      color: #6B7280;
-      background: transparent;
+      color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.18s;
+      transition: all 0.2s;
     }
-
     .auth-tab.active {
-      background: #fff;
-      color: #111827;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.10), 0 0 0 1px #E5E7EB;
+      background-color: var(--primary);
+      color: #ffffff;
     }
 
-    /* ── Panels ── */
-    .auth-panel { display: none; }
-    .auth-panel.active { display: block; }
-
-    .panel-title {
-      font-size: 1.35rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #111827;
-      margin-bottom: 5px;
+    /* Panels */
+    .auth-panel {
+      display: none;
     }
-
-    .panel-sub {
-      font-size: 0.875rem;
-      color: #6B7280;
-      margin-bottom: 22px;
-      line-height: 1.55;
-    }
-
-    /* ── Form elements ── */
-    .fg { margin-bottom: 14px; }
-
-    .fl {
+    .auth-panel.active {
       display: block;
-      font-size: 0.82rem;
+    }
+
+    /* Form styles */
+    .fg {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 18px;
+    }
+    .fl {
+      font-size: 0.9rem;
       font-weight: 600;
-      color: #374151;
+      color: var(--text-dark);
       margin-bottom: 6px;
     }
-
-    .fl .req { color: #16A34A; }
-
-    .fi {
-      width: 100%;
-      padding: 10px 13px;
-      background: #fff;
-      border: 1.5px solid #E5E7EB;
-      border-radius: 9px;
-      color: #111827;
-      font-size: 0.9rem;
+    .fi, .fs {
+      background-color: #ffffff;
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 12px 16px;
       font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      font-size: 0.95rem;
+      color: var(--text-dark);
+      transition: all 0.2s;
       box-sizing: border-box;
-    }
-
-    .fi::placeholder { color: #9CA3AF; }
-    .fi:focus { border-color: #16A34A; box-shadow: 0 0 0 3px #DCFCE7; }
-    .fi.err { border-color: #EF4444; box-shadow: 0 0 0 3px #FEE2E2; }
-
-    .fe {
-      display: none;
-      font-size: 0.775rem;
-      color: #B91C1C;
-      margin-top: 4px;
-      font-weight: 500;
-    }
-
-    .fi.err + .fe { display: block; }
-
-    .fh {
-      font-size: 0.775rem;
-      color: #9CA3AF;
-      margin-top: 4px;
-    }
-
-    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-    /* select */
-    .fs {
       width: 100%;
-      padding: 10px 36px 10px 13px;
-      border: 1.5px solid #E5E7EB;
-      border-radius: 9px;
-      font-size: 0.9rem;
-      font-family: inherit;
-      color: #111827;
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
-      -webkit-appearance: none;
+    }
+    .fi:focus, .fs:focus {
       outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      box-sizing: border-box;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+    .fi.fi-pwd {
+      background-color: var(--input-pw-bg);
+      border-color: var(--input-pw-border);
+    }
+    .fi.fi-pwd:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
     }
 
-    .fs:focus { border-color: #16A34A; box-shadow: 0 0 0 3px #DCFCE7; }
-
-    /* password wrapper */
-    .pw-wrap { position: relative; }
-    .pw-wrap .fi { padding-right: 42px; }
-
+    .pw-wrap {
+      position: relative;
+      display: flex;
+    }
     .pw-eye {
       position: absolute;
-      right: 12px; top: 50%;
+      right: 12px;
+      top: 50%;
       transform: translateY(-50%);
-      background: none; border: none;
-      color: #9CA3AF; cursor: pointer;
-      font-size: 1rem; padding: 3px;
-      transition: color 0.15s;
-    }
-    .pw-eye:hover { color: #374151; }
-
-    /* checkbox */
-    .fcheck {
-      display: flex;
-      align-items: flex-start;
-      gap: 9px;
-      font-size: 0.84rem;
-      color: #4B5563;
-      line-height: 1.55;
-      margin-bottom: 10px;
-    }
-
-    .fcheck input[type="checkbox"] {
-      width: 16px; height: 16px;
-      border: 1.5px solid #D1D5DB;
-      border-radius: 4px;
-      accent-color: #16A34A;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-
-    .fcheck a { color: #16A34A; font-weight: 600; }
-    .fcheck a:hover { text-decoration: underline; }
-
-    /* buttons */
-    .btn-submit {
-      width: 100%;
-      padding: 12px 20px;
-      background: #16A34A;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-      box-shadow: 0 4px 14px rgba(22,163,74,0.25);
-      margin-top: 4px;
-      position: relative;
-    }
-
-    .btn-submit:hover {
-      background: #15803D;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(22,163,74,0.30);
-    }
-
-    .btn-submit:active { transform: translateY(0); }
-    .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
-
-    .btn-submit.loading { color: transparent; }
-    .btn-submit.loading::after {
-      content: '';
-      position: absolute;
-      width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      top: 50%; left: 50%;
-      margin: -8px 0 0 -8px;
-      animation: spin 0.7s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Info box */
-    .info-box {
-      background: #F0FDF4;
-      border: 1px solid #BBF7D0;
-      border-radius: 9px;
-      padding: 12px 14px;
-      font-size: 0.84rem;
-      color: #15803D;
-      display: flex;
-      gap: 9px;
-      margin-bottom: 14px;
-      line-height: 1.55;
-    }
-
-    /* Divider */
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 18px 0;
-      font-size: 0.8rem;
-      color: #9CA3AF;
-      font-weight: 500;
-    }
-    .divider::before, .divider::after {
-      content: ''; flex: 1;
-      height: 1px; background: #E5E7EB;
-    }
-
-    /* forgot */
-    .forgot-link {
-      float: right;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #16A34A;
-      cursor: pointer;
       background: none;
       border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .frow {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .fcheck {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .fcheck input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .fcheck label {
+      font-size: 0.85rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .fcheck label a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background-color: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
       font-family: inherit;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-bottom: 16px;
+    }
+    .btn-submit:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .forgot-link {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
       padding: 0;
     }
-    .forgot-link:hover { text-decoration: underline; }
+    .forgot-link:hover {
+      text-decoration: underline;
+    }
 
-    /* Terms text */
-    .terms-note {
-      margin-top: 14px;
-      font-size: 0.775rem;
-      color: #9CA3AF;
+    .divider {
       text-align: center;
-      line-height: 1.6;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin: 16px 0;
+      position: relative;
     }
-    .terms-note a { color: #16A34A; font-weight: 600; }
-    .terms-note a:hover { text-decoration: underline; }
-
-    /* Success screen */
-    .success-screen {
-      display: none;
-      text-align: center;
-      padding: 8px 0;
+    .divider::before, .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 32%;
+      height: 1px;
+      background-color: rgba(0,0,0,0.06);
     }
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
 
-    .success-icon {
-      width: 64px; height: 64px;
-      border-radius: 50%;
-      background: #16A34A;
-      color: #fff;
-      font-size: 2rem;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 18px;
-      box-shadow: 0 4px 14px rgba(22,163,74,0.3);
-    }
-
-    .success-title {
-      font-size: 1.3rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      color: #111827;
-      margin-bottom: 8px;
-    }
-
-    .success-sub {
-      font-size: 0.875rem;
-      color: #6B7280;
-      line-height: 1.65;
-      margin-bottom: 22px;
-    }
-
-    .steps-list {
-      text-align: left;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      margin-bottom: 22px;
-    }
-
-    .step-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 11px 13px;
-      background: #F9FAFB;
-      border: 1px solid #E5E7EB;
-      border-radius: 9px;
-      font-size: 0.84rem;
-      color: #4B5563;
-    }
-
-    .step-num {
-      width: 20px; height: 20px;
-      border-radius: 50%;
-      background: #16A34A;
-      color: #fff;
-      font-size: 0.7rem;
-      font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .btn-back-home {
-      width: 100%;
-      padding: 11px;
-      border: 1.5px solid #E5E7EB;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      font-family: inherit;
-      color: #374151;
-      background: #fff;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .btn-back-home:hover { background: #F9FAFB; border-color: #9CA3AF; }
-
-    /* switch to tab link */
     .switch-tab-link {
-      background: none; border: none;
-      color: #16A34A; font-weight: 700;
-      font-size: inherit; font-family: inherit;
-      cursor: pointer; padding: 0;
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: inherit;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 0;
     }
-    .switch-tab-link:hover { text-decoration: underline; }
+    .switch-tab-link:hover {
+      text-decoration: underline;
+    }
 
-    /* ── Toast ── */
+    /* Error Validation */
+    .fe {
+      display: none;
+      font-size: 0.8rem;
+      color: #EF4444;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .fi.err, .fs.err {
+      border-color: #EF4444 !important;
+      background-color: #FEF2F2 !important;
+    }
+    .fi.err ~ .fe, .fs.err ~ .fe {
+      display: block;
+    }
+
+    /* Toast */
     .toast {
       position: fixed;
-      bottom: 24px; right: 24px;
+      bottom: 24px;
+      right: 24px;
       z-index: 9999;
       padding: 12px 18px;
       border-radius: 10px;
@@ -547,279 +323,324 @@
       font-family: inherit;
     }
     .toast.show { transform: translateY(0); opacity: 1; }
-    .toast.success { background: #16A34A; }
+    .toast.success { background: var(--primary); }
     .toast.error   { background: #EF4444; }
 
-    /* ── Responsive ── */
-    @media (max-width: 860px) {
-      body { flex-direction: column; }
-      .auth-left { min-height: 200px; flex: none; padding: 28px 24px; }
-      .auth-left .left-quote { display: none; }
-      .auth-right { width: 100%; min-height: auto; padding: 32px 20px; }
+    /* Success screen inside card */
+    .success-screen {
+      text-align: center;
+      padding: 10px 0;
+    }
+    .success-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background-color: var(--primary);
+      color: #ffffff;
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+    }
+    .success-title {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+    }
+    .success-sub {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: left;
+      margin-bottom: 24px;
+    }
+    .step-item {
+      display: flex;
+      gap: 12px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--text);
+    }
+    .step-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: var(--primary);
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .btn-back-home {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      background-color: #ffffff;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-back-home:hover {
+      background-color: #f9fafb;
     }
   </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════════
-     SOL YEŞİL PANEL
-════════════════════════════════════════════════════════ -->
-<aside class="auth-left">
-  <a href="index.html" class="left-logo">
-    <div class="left-logo-mark">S</div>
-    Serenut OS
-  </a>
-
-  <div class="left-content">
-    <h2>İşletmeniz için akıllı kasa sistemi.</h2>
-    <p>30 gün boyunca ücretsiz deneyin.<br>Kredi kartı gerekmez, sözleşme yok.</p>
-
-    <div class="left-features">
-      <div class="left-feat">
-        <div class="left-feat-icon">🔌</div>
-        <span>İnternet kesilse de satış yapmaya devam edin</span>
-      </div>
-      <div class="left-feat">
-        <div class="left-feat-icon">⚡</div>
-        <span>2 dakikada kurulum — teknik bilgiye gerek yok</span>
-      </div>
-      <div class="left-feat">
-        <div class="left-feat-icon">📊</div>
-        <span>KDV raporu, Z/X raporu, Excel dışa aktarım</span>
-      </div>
-      <div class="left-feat">
-        <div class="left-feat-icon">🔒</div>
-        <span>256-bit şifreli veritabanı, KVKK uyumlu</span>
-      </div>
-      <div class="left-feat">
-        <div class="left-feat-icon">📱</div>
-        <span>Android & Windows, termal yazıcı desteği</span>
-      </div>
-    </div>
+<!-- HEADER -->
+<header class="auth-header">
+  <div class="auth-header-container">
+    <a href="index.html" class="logo">
+      <span class="logo-icon">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#10b981" stroke-width="2.5">
+          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
+          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
+        </svg>
+      </span>
+      <span class="logo-text">Serenut<span>OS</span></span>
+    </a>
   </div>
+</header>
 
-  <div class="left-quote">
-    <p class="left-quote-text">"Serenut ile artık veresiye takibini sistemden yapıyorum. Tahsilatlarım iyileşti, müşterilerime SMS gidiyor."</p>
-    <div class="left-quote-author">
-      <div class="left-quote-avatar">MÇ</div>
-      <div>
-        <span class="left-quote-name">Mehmet Ç.</span>
-        <span class="left-quote-role">Bakkal Sahibi, Ankara</span>
+<!-- MAIN WRAPPER -->
+<main class="auth-main-wrapper">
+  <div class="auth-card">
+    
+    <!-- CARD LOGO & TITLE -->
+    <div class="auth-card-header">
+      <div class="card-logo-icon">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
+          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
+        </svg>
       </div>
-    </div>
-  </div>
-</aside>
-
-
-<!-- ══════════════════════════════════════════════════════
-     SAĞ FORM PANELİ
-════════════════════════════════════════════════════════ -->
-<main class="auth-right">
-
-  <a href="index.html" class="auth-back">← Ana Sayfaya Dön</a>
-
-  <!-- Tab bar -->
-  <div class="auth-tabs" role="tablist">
-    <button class="auth-tab" id="tab-login"
-      role="tab" aria-selected="false" aria-controls="panel-login"
-      onclick="switchTab('login')">
-      Giriş Yap
-    </button>
-    <button class="auth-tab" id="tab-register"
-      role="tab" aria-selected="false" aria-controls="panel-register"
-      onclick="switchTab('register')">
-      Kayıt Ol
-    </button>
-  </div>
-
-
-  <!-- ══ GİRİŞ PANELİ ═════════════════════════════════ -->
-  <section class="auth-panel" id="panel-login" role="tabpanel" aria-labelledby="tab-login">
-    <h1 class="panel-title">Tekrar hoş geldiniz</h1>
-    <p class="panel-sub">Hesabınıza giriş yapın.</p>
-
-    <form id="login-form" novalidate>
-      <div class="fg">
-        <label class="fl" for="l-email">E-posta <span class="req">*</span></label>
-        <input class="fi" type="email" id="l-email" placeholder="ahmet@isletmem.com" autocomplete="email" required />
-        <span class="fe">Geçerli bir e-posta adresi girin.</span>
-      </div>
-
-      <div class="fg">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-          <label class="fl" for="l-pass" style="margin:0;">Şifre <span class="req">*</span></label>
-          <button type="button" class="forgot-link" onclick="handleForgot()">Şifremi unuttum</button>
-        </div>
-        <div class="pw-wrap">
-          <input class="fi" type="password" id="l-pass" placeholder="Şifrenizi girin" autocomplete="current-password" required />
-          <button type="button" class="pw-eye" onclick="togglePwd('l-pass',this)" aria-label="Şifreyi göster/gizle">👁</button>
-        </div>
-        <span class="fe" id="l-pass-err">Şifre zorunludur.</span>
-      </div>
-
-      <div class="fcheck">
-        <input type="checkbox" id="l-remember" />
-        <label for="l-remember">Beni hatırla</label>
-      </div>
-
-      <button type="submit" class="btn-submit" id="login-btn">Giriş Yap</button>
-    </form>
-
-    <div class="divider">veya</div>
-    <p style="text-align:center; font-size:0.875rem; color:#6B7280;">
-      Hesabınız yok mu?
-      <button class="switch-tab-link" onclick="switchTab('register')">Ücretsiz kayıt olun →</button>
-    </p>
-
-    <p class="terms-note">
-      Giriş yaparak <a href="terms.html">Kullanım Şartları</a>'nı kabul etmiş olursunuz.
-    </p>
-  </section>
-
-
-  <!-- ══ KAYIT PANELİ ══════════════════════════════════ -->
-  <section class="auth-panel" id="panel-register" role="tabpanel" aria-labelledby="tab-register">
-
-    <!-- Başarı ekranı -->
-    <div class="success-screen" id="success-screen">
-      <div class="success-icon">✓</div>
-      <h2 class="success-title">Hoş Geldiniz! 🎉</h2>
-      <p class="success-sub">
-        Hesabınız oluşturuldu. Lisans anahtarı ve kurulum bağlantısı<br>
-        <strong id="success-email"></strong> adresine gönderildi.
-      </p>
-      <div class="steps-list">
-        <div class="step-item">
-          <span class="step-num">1</span>
-          <span>E-postanızdaki linkten uygulamayı cihazınıza indirin.</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <span>Lisans anahtarınızı uygulamaya girerek etkinleştirin.</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">3</span>
-          <span>Kurulum ekibimiz 24 saat içinde sizi arayacak.</span>
-        </div>
-      </div>
-      <button class="btn-back-home" onclick="window.location.href='index.html'">Ana Sayfaya Dön</button>
+      <h2 class="card-title">Serenut Portal</h2>
+      <p class="card-subtitle">MÜŞTERİ YÖNETİM ALANI</p>
     </div>
 
-    <!-- Kayıt formu -->
-    <div id="register-form-wrap">
-      <h1 class="panel-title">Hesap oluşturun</h1>
-      <p class="panel-sub">30 gün ücretsiz — kredi kartı gerekmez.</p>
+    <!-- TABS -->
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab" id="tab-login" role="tab" aria-selected="false" aria-controls="panel-login">
+        Giriş Yap
+      </button>
+      <button class="auth-tab" id="tab-register" role="tab" aria-selected="false" aria-controls="panel-register">
+        Kayıt Ol
+      </button>
+    </div>
 
-      <form id="register-form" novalidate>
-        <div class="frow">
-          <div class="fg">
-            <label class="fl" for="r-name">Ad <span class="req">*</span></label>
-            <input class="fi" type="text" id="r-name" placeholder="Ahmet" autocomplete="given-name" required />
-            <span class="fe">Ad zorunludur.</span>
-          </div>
-          <div class="fg">
-            <label class="fl" for="r-surname">Soyad <span class="req">*</span></label>
-            <input class="fi" type="text" id="r-surname" placeholder="Kaya" autocomplete="family-name" required />
-            <span class="fe">Soyad zorunludur.</span>
-          </div>
-        </div>
-
+    <!-- ══ GİRİŞ PANELİ ═════════════════════════════════ -->
+    <section class="auth-panel" id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+      <form id="login-form" novalidate>
         <div class="fg">
-          <label class="fl" for="r-email">E-posta <span class="req">*</span></label>
-          <input class="fi" type="email" id="r-email" placeholder="ahmet@isletmem.com" autocomplete="email" required />
+          <label class="fl" for="l-email">E-Posta</label>
+          <input class="fi" type="email" id="l-email" placeholder="owner@sirketiniz.com" autocomplete="email" required />
           <span class="fe">Geçerli bir e-posta adresi girin.</span>
         </div>
 
         <div class="fg">
-          <label class="fl" for="r-phone">Telefon <span class="req">*</span></label>
-          <input class="fi" type="tel" id="r-phone" placeholder="05XX XXX XX XX" autocomplete="tel-national" required />
-          <div class="fh">Aktivasyon SMS'i bu numaraya gönderilir.</div>
-          <span class="fe">Telefon zorunludur.</span>
-        </div>
-
-        <div class="fg">
-          <label class="fl" for="r-biz">İşletme Adı <span class="req">*</span></label>
-          <input class="fi" type="text" id="r-biz" placeholder="Kaya Market" autocomplete="organization" required />
-          <span class="fe">İşletme adı zorunludur.</span>
-        </div>
-
-        <div class="frow">
-          <div class="fg">
-            <label class="fl" for="r-type">İşletme Türü</label>
-            <select class="fs" id="r-type">
-              <option value="">Seçiniz…</option>
-              <option>Market / Bakkal</option>
-              <option>Manav / Kuruyemiş</option>
-              <option>Kasap / Şarküteri</option>
-              <option>Tekstil / Giyim</option>
-              <option>Elektronik</option>
-              <option>Restoran / Kafe</option>
-              <option>Diğer</option>
-            </select>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <label class="fl" for="l-pass" style="margin:0;">Şifre</label>
+            <button type="button" class="forgot-link" id="btn-forgot-pwd">Şifremi unuttum</button>
           </div>
-          <div class="fg">
-            <label class="fl" for="r-plan">Paket</label>
-            <select class="fs" id="r-plan">
-              <option value="starter">Başlangıç — ₺499/ay</option>
-              <option value="growth" selected>Büyüme — ₺899/ay ⭐</option>
-              <option value="pro">Pro — ₺1.699/ay</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="fg">
-          <label class="fl" for="r-pass">Şifre <span class="req">*</span></label>
           <div class="pw-wrap">
-            <input class="fi" type="password" id="r-pass" placeholder="En az 8 karakter" autocomplete="new-password" required minlength="8" />
-            <button type="button" class="pw-eye" onclick="togglePwd('r-pass',this)" aria-label="Şifreyi göster/gizle">👁</button>
+            <input class="fi fi-pwd" type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password" required />
+            <button type="button" class="pw-eye" id="btn-toggle-l-pass" aria-label="Şifreyi göster/gizle">👁</button>
           </div>
-          <div class="fh">En az 8 karakter, 1 büyük harf ve 1 rakam önerilir.</div>
-          <span class="fe" id="r-pass-err">Şifre en az 8 karakter olmalıdır.</span>
-        </div>
-
-        <div class="info-box">
-          <span>🎁</span>
-          <span>İlk <strong>30 gün tamamen ücretsiz.</strong> Deneme sonunda IBAN'a havale ile ödeme yapabilirsiniz.</span>
+          <span class="fe" id="l-pass-err">Şifre zorunludur.</span>
         </div>
 
         <div class="fcheck">
-          <input type="checkbox" id="r-terms" required />
-          <label for="r-terms">
-            <a href="terms.html" target="_blank">Kullanım Şartları</a> ve
-            <a href="privacy.html" target="_blank">Gizlilik Politikası</a>'nı kabul ediyorum. <span class="req">*</span>
-          </label>
+          <input type="checkbox" id="l-remember" />
+          <label for="l-remember">Beni hatırla</label>
         </div>
 
-        <div class="fcheck">
-          <input type="checkbox" id="r-kvkk" required />
-          <label for="r-kvkk">
-            <a href="kvkk.html" target="_blank">KVKK Aydınlatma Metni</a>'ni okudum, kişisel verilerimin işlenmesine onay veriyorum. <span class="req">*</span>
-          </label>
-        </div>
+        <button type="submit" class="btn-submit" id="login-btn">Giriş Yap</button>
+      </form>
 
-        <button type="submit" class="btn-submit" id="register-btn">
-          Hesap Oluştur ve Ücretsiz Başla →
-        </button>
+      <div class="divider">veya</div>
+      <p style="text-align:center; font-size:0.875rem; color:#6B7280; margin:0;">
+        Hesabınız yok mu?
+        <button class="switch-tab-link" id="link-go-to-register">Ücretsiz kayıt olun →</button>
+      </p>
+    </section>
+
+    <!-- ══ KAYIT PANELİ ══════════════════════════════════ -->
+    <section class="auth-panel" id="panel-register" role="tabpanel" aria-labelledby="tab-register">
+      
+      <!-- Başarı ekranı -->
+      <div class="success-screen" id="success-screen" style="display:none;">
+        <div class="success-icon">✓</div>
+        <h2 class="success-title">Hoş Geldiniz! 🎉</h2>
+        <p class="success-sub">
+          Hesabınız oluşturuldu. Lisans anahtarı ve kurulum bağlantısı<br>
+          <strong id="success-email"></strong> adresine gönderildi.
+        </p>
+        <div class="steps-list">
+          <div class="step-item">
+            <span class="step-num">1</span>
+            <span>E-postanızdaki linkten uygulamayı cihazınıza indirin.</span>
+          </div>
+          <div class="step-item">
+            <span class="step-num">2</span>
+            <span>Lisans anahtarınızı uygulamaya girerek etkinleştirin.</span>
+          </div>
+          <div class="step-item">
+            <span class="step-num">3</span>
+            <span>Kurulum ekibimiz 24 saat içinde sizi arayacak.</span>
+          </div>
+        </div>
+        <button class="btn-back-home" id="btn-success-home">Ana Sayfaya Dön</button>
+      </div>
+
+      <!-- Kayıt formu -->
+      <div id="register-form-wrap">
+        <form id="register-form" novalidate>
+          <div class="frow">
+            <div class="fg">
+              <label class="fl" for="r-name">Ad</label>
+              <input class="fi" type="text" id="r-name" placeholder="Ahmet" autocomplete="given-name" required />
+              <span class="fe">Ad zorunludur.</span>
+            </div>
+            <div class="fg">
+              <label class="fl" for="r-surname">Soyad</label>
+              <input class="fi" type="text" id="r-surname" placeholder="Kaya" autocomplete="family-name" required />
+              <span class="fe">Soyad zorunludur.</span>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label class="fl" for="r-email">E-posta</label>
+            <input class="fi" type="email" id="r-email" placeholder="owner@sirketiniz.com" autocomplete="email" required />
+            <span class="fe">Geçerli bir e-posta adresi girin.</span>
+          </div>
+
+          <div class="fg">
+            <label class="fl" for="r-phone">Telefon</label>
+            <input class="fi" type="tel" id="r-phone" placeholder="05XX XXX XX XX" autocomplete="tel-national" required />
+            <span class="fe">Telefon zorunludur.</span>
+          </div>
+
+          <div class="fg">
+            <label class="fl" for="r-biz">İşletme Adı</label>
+            <input class="fi" type="text" id="r-biz" placeholder="Kaya Market" autocomplete="organization" required />
+            <span class="fe">İşletme adı zorunludur.</span>
+          </div>
+
+          <div class="frow">
+            <div class="fg">
+              <label class="fl" for="r-type">İşletme Türü</label>
+              <select class="fs" id="r-type">
+                <option value="">Seçiniz…</option>
+                <option>Market / Bakkal</option>
+                <option>Manav / Kuruyemiş</option>
+                <option>Kasap / Şarküteri</option>
+                <option>Tekstil / Giyim</option>
+                <option>Elektronik</option>
+                <option>Restoran / Kafe</option>
+                <option>Diğer</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="fl" for="r-plan">Plan</label>
+              <select class="fs" id="r-plan">
+                <option value="starter">Başlangıç — ₺499/ay</option>
+                <option value="growth" selected>Profesyonel — ₺899/ay ⭐</option>
+                <option value="pro">Kurumsal — ₺1.699/ay</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fg">
+            <label class="fl" for="r-pass">Şifre</label>
+            <div class="pw-wrap">
+              <input class="fi fi-pwd" type="password" id="r-pass" placeholder="••••••••" autocomplete="new-password" required minlength="8" />
+              <button type="button" class="pw-eye" id="btn-toggle-r-pass" aria-label="Şifreyi göster/gizle">👁</button>
+            </div>
+            <span class="fe" id="r-pass-err">Şifre en az 8 karakter olmalıdır.</span>
+          </div>
+
+          <div class="fcheck">
+            <input type="checkbox" id="r-terms" required />
+            <label for="r-terms">
+              <a href="terms.html" target="_blank">Kullanım Şartları</a> ve
+              <a href="privacy.html" target="_blank">Gizlilik Politikası</a>'nı kabul ediyorum. <span class="req">*</span>
+            </label>
+          </div>
+
+          <div class="fcheck">
+            <input type="checkbox" id="r-kvkk" required />
+            <label for="r-kvkk">
+              <a href="kvkk.html" target="_blank">KVKK Aydınlatma Metni</a>'ni okudum, kişisel verilerimin işlenmesine onay veriyorum. <span class="req">*</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn-submit" id="register-btn">
+            Hesap Oluştur ve Ücretsiz Başla →
+          </button>
+        </form>
 
         <div class="divider">veya</div>
-        <p style="text-align:center; font-size:0.875rem; color:#6B7280;">
+        <p style="text-align:center; font-size:0.875rem; color:#6B7280; margin:0;">
           Zaten hesabınız var mı?
-          <button class="switch-tab-link" onclick="switchTab('login')">Giriş yapın →</button>
+          <button class="switch-tab-link" id="link-go-to-login">Giriş yapın →</button>
         </p>
+      </div>
+    </section>
 
-        <p class="terms-note">
-          Kayıt olarak <a href="terms.html">Kullanım Şartları</a>'nı kabul etmiş olursunuz.
-        </p>
-      </form>
-    </div>
-  </section>
-
+  </div>
 </main>
 
 <!-- ══ Toast ═══════════════════════════════════════════════════ -->
 <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
 <script>
+  // Programmatic event listeners binding to satisfy CSP
+  document.addEventListener('DOMContentLoaded', () => {
+    // Tab buttons
+    const tabLogin = document.getElementById('tab-login');
+    if (tabLogin) tabLogin.addEventListener('click', () => switchTab('login'));
+
+    const tabRegister = document.getElementById('tab-register');
+    if (tabRegister) tabRegister.addEventListener('click', () => switchTab('register'));
+
+    // Switch links
+    const linkRegister = document.getElementById('link-go-to-register');
+    if (linkRegister) linkRegister.addEventListener('click', () => switchTab('register'));
+
+    const linkLogin = document.getElementById('link-go-to-login');
+    if (linkLogin) linkLogin.addEventListener('click', () => switchTab('login'));
+
+    // Password toggles
+    const btnToggleL = document.getElementById('btn-toggle-l-pass');
+    if (btnToggleL) btnToggleL.addEventListener('click', function() { togglePwd('l-pass', this); });
+
+    const btnToggleR = document.getElementById('btn-toggle-r-pass');
+    if (btnToggleR) btnToggleR.addEventListener('click', function() { togglePwd('r-pass', this); });
+
+    // Forgot password
+    const btnForgot = document.getElementById('btn-forgot-pwd');
+    if (btnForgot) btnForgot.addEventListener('click', handleForgot);
+
+    // Success back button
+    const btnSuccessHome = document.getElementById('btn-success-home');
+    if (btnSuccessHome) btnSuccessHome.addEventListener('click', () => { window.location.href = 'index.html'; });
+  });
+
   // ── Tab switching ─────────────────────────────────────────
   function switchTab(tab) {
     // buttons
@@ -873,14 +694,13 @@
       document.getElementById('l-email').focus();
       return;
     }
-    // Enumeration attack'a karşı her zaman aynı mesaj göster
     try {
       await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-    } catch (_) { /* network hatası — sessizce geç */ }
+    } catch (_) { /* ignore network error */ }
     showToast('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.', 'success');
   }
 
@@ -937,17 +757,16 @@
       const loginForm = document.getElementById('login-form');
       loginForm.style.display = 'none';
 
-      // Başarı mesajı ekle (formun ardından)
       const loginPanel = document.getElementById('panel-login');
       loginPanel.insertAdjacentHTML('beforeend', `
         <div style="text-align:center; padding:8px 0;">
-          <div style="width:64px;height:64px;border-radius:50%;background:#16A34A;color:#fff;font-size:2rem;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 4px 14px rgba(22,163,74,.3);">✓</div>
+          <div style="width:64px;height:64px;border-radius:50%;background:#10b981;color:#fff;font-size:2rem;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 4px 14px rgba(16,185,129,.3);">✓</div>
           <h2 style="font-size:1.3rem;font-weight:800;letter-spacing:-.03em;color:#111827;margin-bottom:8px;">Giriş Başarılı!</h2>
           <p style="font-size:.875rem;color:#6B7280;line-height:1.65;margin-bottom:22px;">
             Hesabınız doğrulandı. Uygulamayı açmak için aşağıdaki butona tıklayın.
           </p>
           <a href="../index.html"
-             style="display:block;width:100%;padding:13px;background:#16A34A;color:#fff;border-radius:10px;font-size:.95rem;font-weight:700;text-align:center;text-decoration:none;box-shadow:0 4px 14px rgba(22,163,74,.25);margin-bottom:10px;box-sizing:border-box;">
+             style="display:block;width:100%;padding:13px;background:#10b981;color:#fff;border-radius:10px;font-size:.95rem;font-weight:700;text-align:center;text-decoration:none;box-shadow:0 4px 14px rgba(16,185,129,.25);margin-bottom:10px;box-sizing:border-box;">
             Uygulamayı Aç →
           </a>
           <a href="index.html"
@@ -957,7 +776,6 @@
         </div>
       `);
 
-      // Başarı alanı görünür yap (divider ve alt linkler gizle)
       const dividers = loginPanel.querySelectorAll('.divider, p:not(.panel-sub)');
       dividers.forEach(el => el.style.display = 'none');
 
@@ -1027,11 +845,9 @@
         return;
       }
 
-      // Token'ları kaydet (otomatik login)
       if (data.access_token)  sessionStorage.setItem('serenut_access_token',  data.access_token);
       if (data.refresh_token) sessionStorage.setItem('serenut_refresh_token', data.refresh_token);
 
-      // Başarı ekranını göster
       document.getElementById('register-form-wrap').style.display = 'none';
       const ss = document.getElementById('success-screen');
       ss.style.display = 'block';
@@ -1045,7 +861,6 @@
     }
   });
 
-  // Input: clear error on change
   document.querySelectorAll('.fi').forEach(inp => {
     inp.addEventListener('input', () => inp.classList.remove('err'));
   });

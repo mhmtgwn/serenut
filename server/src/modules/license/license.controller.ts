@@ -1,20 +1,30 @@
 import { Router, Request, Response } from 'express';
 import { LicenseService } from './license.service';
 import { authenticateUser, requireRole, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { rateLimiter } from '../../middleware/rate_limiter';
+import { incrementLicenseValidation } from '../../utils/telemetry';
 
 const router = Router();
+const licenseRateLimit = rateLimiter(20, 60 * 1000); // 20 requests per minute
 
-// Public Activation Route
-router.post('/activate', async (req: Request, res: Response) => {
-  const { license_key, device_hash, device_name } = req.body;
+
+// Secured Activation Route (enforces authentication to lock down activation scope)
+router.post('/activate', licenseRateLimit, authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  const { license_key, device_hash, device_name, fingerprint } = req.body;
   if (!license_key || !device_hash || !device_name) {
+    incrementLicenseValidation(false);
     return res.status(400).json({ error: 'missing_fields', message: 'Lisans anahtarı, cihaz imzası ve cihaz adı zorunludur.' });
   }
 
   try {
-    const result = await LicenseService.activate(license_key, device_hash, device_name);
+    const result = await LicenseService.activate(license_key, device_hash, device_name, req.user!.company_id, fingerprint);
+    incrementLicenseValidation(true);
     return res.json(result);
   } catch (err: any) {
+    incrementLicenseValidation(false);
+    if (err.message === 'company_mismatch') {
+      return res.status(403).json({ error: 'company_mismatch', message: 'Bu lisans anahtarı işletmeniz ile eşleşmiyor.' });
+    }
     if (err.message === 'invalid_license_key') {
       return res.status(404).json({ error: 'invalid_license_key', message: 'Geçersiz lisans anahtarı.' });
     }
@@ -30,38 +40,47 @@ router.post('/activate', async (req: Request, res: Response) => {
     if (err.message === 'device_limit_exceeded') {
       return res.status(403).json({ error: 'device_limit_exceeded', message: 'Bu lisans için tanımlı maksimum cihaz sınırına ulaşıldı.' });
     }
+    if (err.message === 'hardware_tampered_limit_exceeded') {
+      return res.status(403).json({ error: 'hardware_tampered_limit_exceeded', message: 'Cihaz donanım değişikliği limiti aşılmıştır.' });
+    }
     console.error('Activation error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Lisans aktivasyonu esnasında hata oluştu.' });
   }
 });
 
 // Public Validation Route
-router.post('/validate', async (req: Request, res: Response) => {
+router.post('/validate', licenseRateLimit, async (req: Request, res: Response) => {
   const { device_hash } = req.body;
   if (!device_hash) {
+    incrementLicenseValidation(false);
     return res.status(400).json({ error: 'missing_device_hash', message: 'Cihaz imzası zorunludur.' });
   }
 
   try {
     const isValid = await LicenseService.validate(device_hash);
+    incrementLicenseValidation(isValid);
     return res.json({ valid: isValid });
   } catch (err) {
+    incrementLicenseValidation(false);
     console.error('Validation error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
 
 // --- Sprint 3: POS Heartbeat Route ---
-router.post('/heartbeat', async (req: Request, res: Response) => {
-  const { license_key, device_hash } = req.body;
+router.post('/heartbeat', licenseRateLimit, async (req: Request, res: Response) => {
+  const { license_key, device_hash, fingerprint } = req.body;
   if (!license_key || !device_hash) {
+    incrementLicenseValidation(false);
     return res.status(400).json({ error: 'missing_fields', message: 'Lisans anahtarı ve cihaz imzası zorunludur.' });
   }
 
   try {
-    const result = await LicenseService.heartbeat(license_key, device_hash);
+    const result = await LicenseService.heartbeat(license_key, device_hash, fingerprint);
+    incrementLicenseValidation(true);
     return res.json(result);
   } catch (err: any) {
+    incrementLicenseValidation(false);
     if (err.message === 'invalid_association') {
       return res.status(404).json({ error: 'invalid_association', message: 'Cihaz bu lisans ile eşleşmiyor.' });
     }
@@ -73,6 +92,9 @@ router.post('/heartbeat', async (req: Request, res: Response) => {
     }
     if (err.message === 'device_blocked') {
       return res.status(403).json({ error: 'device_blocked', message: 'Cihaz bloke edilmiştir.' });
+    }
+    if (err.message === 'hardware_tampered_limit_exceeded') {
+      return res.status(403).json({ error: 'hardware_tampered_limit_exceeded', message: 'Cihaz donanım değişikliği limiti aşılmıştır.' });
     }
     console.error('Heartbeat error:', err);
     return res.status(500).json({ error: 'server_error' });

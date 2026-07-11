@@ -81,7 +81,7 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json(createError('AUTH005'));
   }
 
-  const { name, address, phone, tax_office } = req.body;
+  const { name, address, phone, tax_office, logo_url } = req.body;
 
   const updates: string[] = [];
   const values: any[] = [];
@@ -91,6 +91,7 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
   if (address !== undefined) { updates.push(`address = $${idx++}`); values.push(address); }
   if (phone !== undefined) { updates.push(`phone = $${idx++}`); values.push(phone); }
   if (tax_office !== undefined) { updates.push(`tax_office = $${idx++}`); values.push(tax_office); }
+  if (logo_url !== undefined) { updates.push(`logo_url = $${idx++}`); values.push(logo_url); }
 
   if (updates.length === 0) {
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'Güncellenecek alan belirtilmedi.' } });
@@ -118,7 +119,7 @@ router.get('/companies/current', async (req: AuthenticatedRequest, res: Response
   const user = req.user!;
   try {
     const compRes = await pgPool.query(
-      'SELECT id, name, tax_number, tax_office, status, created_at FROM companies WHERE id = $1',
+      'SELECT id, name, tax_number, tax_office, phone, email, address, logo_url, status, created_at FROM companies WHERE id = $1',
       [user.company_id]
     );
     if (compRes.rows.length === 0) {

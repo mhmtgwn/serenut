@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/update_dialog.dart
+// lib/presentation/widgets/update_dialog.dart
 // Serenut Platform — OTA Update Dialog (Sprint 6)
 // Three modes: force update blocker, optional update offer, download progress screen.
 // Created: 04 Jul 2026
@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/providers/service_providers.dart';
 
 enum _DialogState { offer, downloading, verifying, done, error }
 
@@ -38,7 +40,7 @@ Future<bool> showUpdateDialog({
       false;
 }
 
-class _UpdateDialog extends StatefulWidget {
+class _UpdateDialog extends ConsumerStatefulWidget {
   final UpdateInfo updateInfo;
   final ReleaseManagerService releaseManager;
   final String platform;
@@ -54,10 +56,10 @@ class _UpdateDialog extends StatefulWidget {
   });
 
   @override
-  State<_UpdateDialog> createState() => _UpdateDialogState();
+  ConsumerState<_UpdateDialog> createState() => _UpdateDialogState();
 }
 
-class _UpdateDialogState extends State<_UpdateDialog> with SingleTickerProviderStateMixin {
+class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerProviderStateMixin {
   _DialogState _state = _DialogState.offer;
   double _progress = 0.0;
   String _progressText = '';
@@ -84,13 +86,40 @@ class _UpdateDialogState extends State<_UpdateDialog> with SingleTickerProviderS
 
   Future<void> _startDownload() async {
     setState(() {
+      _state = _DialogState.verifying;
+      _progress = 0.0;
+      _progressText = 'Sistem gereksinimleri kontrol ediliyor...';
+    });
+
+    final rollback = ref.read(rollbackManagerProvider);
+    final specResult = await rollback.verifyInstallationSpecs();
+    if (!specResult.isAllPass) {
+      setState(() {
+        _state = _DialogState.error;
+        _errorMessage = 'Sistem gereksinimleri karşılanamadı:\n' + specResult.issues.join('\n');
+      });
+      return;
+    }
+
+    setState(() {
+      _progressText = 'Mevcut sürüm yedekleniyor...';
+    });
+    final backupSuccess = await rollback.backupCurrentVersion();
+    if (!backupSuccess) {
+      setState(() {
+        _state = _DialogState.error;
+        _errorMessage = 'Mevcut sürüm yedeklenemedi. Güncelleme güvenliğiniz için iptal edildi.';
+      });
+      return;
+    }
+
+    setState(() {
       _state = _DialogState.downloading;
       _progress = 0.0;
       _progressText = 'İndiriliyor...';
     });
 
     File? downloadedFile;
-    String? logId;
 
     try {
       // Stream download progress
@@ -127,14 +156,20 @@ class _UpdateDialogState extends State<_UpdateDialog> with SingleTickerProviderS
 
       bool verified = true;
       if (widget.updateInfo.sha256Hash != null) {
-        verified = await widget.releaseManager.verifyDownload(downloadedFile, widget.updateInfo.sha256Hash!);
+        verified = await widget.releaseManager.verifyDownload(
+          downloadedFile,
+          widget.updateInfo.sha256Hash!,
+          widget.updateInfo.signature ?? '',
+        );
       }
 
       if (!verified) {
-        await downloadedFile.delete();
+        if (await downloadedFile.exists()) {
+          await downloadedFile.delete();
+        }
         setState(() {
           _state = _DialogState.error;
-          _errorMessage = 'Dosya bütünlüğü doğrulanamadı (SHA-256 uyuşmazlığı). Güvenlik nedeniyle kurulum iptal edildi.';
+          _errorMessage = 'Dosya bütünlüğü veya dijital imza doğrulanamadı. Güvenlik nedeniyle kurulum iptal edildi.';
         });
         return;
       }
@@ -150,16 +185,20 @@ class _UpdateDialogState extends State<_UpdateDialog> with SingleTickerProviderS
       if (result == InstallResult.success) {
         if (mounted) Navigator.of(context).pop(true);
       } else {
+        // Trigger automated rollback
+        await rollback.triggerRollback();
         setState(() {
           _state = _DialogState.error;
-          _errorMessage = 'Kurulum başlatılamadı (${result.name}). Lütfen manuel olarak kurun.';
+          _errorMessage = 'Kurulum başlatılamadı (${result.name}). Sistem önceki stabil sürüme geri döndürüldü (Rollback).';
         });
       }
     } catch (e) {
       if (!mounted) return;
+      // Trigger automated rollback on unexpected exceptions during setup
+      await rollback.triggerRollback();
       setState(() {
         _state = _DialogState.error;
-        _errorMessage = 'Güncelleme hatası: ${e.toString()}';
+        _errorMessage = 'Güncelleme hatası: ${e.toString()}. Sistem geri döndürüldü (Rollback).';
       });
     }
   }

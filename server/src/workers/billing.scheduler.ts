@@ -288,6 +288,10 @@ export async function processReactivation(
 
     // Lisansı da aktif et
     await runBypassingRLS(
+      `UPDATE license_entitlements SET status = 'active', token_version = token_version + 1, updated_at = NOW() WHERE company_id = $1`,
+      [companyId]
+    );
+    await runBypassingRLS(
       `UPDATE licenses SET status = 'active' WHERE company_id = $1`,
       [companyId]
     );
@@ -441,9 +445,42 @@ export function startBillingScheduler(): void {
         // Ödeme retry (1/2/3)
         case 'payment_retry': {
           const retryCount = data.retryCount || 1;
+          const invoiceId = data.invoiceId;
 
-          // Gerçek ödeme yeniden deneme (İyzico servis çağrısı Sprint 2 tam entegrasyon sonrası)
-          // Şimdilik loglama + email bildirimi
+          // 1. Pre-flight check: check if the invoice has already been paid
+          if (invoiceId) {
+            try {
+              const invCheck = await runBypassingRLS(
+                "SELECT status FROM invoices WHERE id = $1",
+                [invoiceId]
+              );
+              if (invCheck.rows.length > 0 && invCheck.rows[0].status === 'paid') {
+                logger.info(`[BillingScheduler] Payment retry #${retryCount} skipped: Invoice ${invoiceId} is already paid.`);
+                break;
+              }
+            } catch (dbErr: any) {
+              logger.error(`[BillingScheduler] Pre-flight invoice status check failed: ${dbErr.message}`);
+            }
+          }
+
+          // 2. Check current subscription status
+          try {
+            const subCheck = await runBypassingRLS(
+              "SELECT status, last_payment_status FROM subscriptions WHERE company_id = $1",
+              [data.companyId]
+            );
+            if (subCheck.rows.length > 0) {
+              const sub = subCheck.rows[0];
+              if (sub.status === 'active' && sub.last_payment_status === 'success') {
+                logger.info(`[BillingScheduler] Payment retry #${retryCount} skipped: Subscription is active and paid for company ${data.companyId}.`);
+                break;
+              }
+            }
+          } catch (dbErr: any) {
+            logger.error(`[BillingScheduler] Pre-flight subscription status check failed: ${dbErr.message}`);
+          }
+
+          // Gerçek ödeme yeniden deneme (İyzico servis çağrısı)
           logger.info(`[BillingScheduler] Ödeme retry #${retryCount}: ${data.companyId} — ${data.amount} ${data.currency}`);
 
           if (retryCount < 3) {
@@ -465,6 +502,10 @@ export function startBillingScheduler(): void {
             // Retry #3 başarısız → askıya al
             await runBypassingRLS(
               `UPDATE subscriptions SET status = 'suspended' WHERE company_id = $1`,
+              [data.companyId]
+            );
+            await runBypassingRLS(
+              `UPDATE license_entitlements SET status = 'expired', token_version = token_version + 1, updated_at = NOW() WHERE company_id = $1`,
               [data.companyId]
             );
             await runBypassingRLS(

@@ -77,6 +77,17 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
     }
   }
 
+  /// Perform sub-user login with businessCode, username, and PIN
+  Future<void> loginSubUser(String businessCode, String username, String pin) async {
+    try {
+      state = AppState.loading();
+      final user = await _authService.loginSubUser(businessCode, username, pin);
+      state = AppState.success(user);
+    } catch (e) {
+      state = AppState.error(AppException.from(e));
+    }
+  }
+
   /// Perform logout
   /// 
   /// Flow:

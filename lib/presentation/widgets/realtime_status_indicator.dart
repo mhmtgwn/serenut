@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/realtime_status_indicator.dart
+// lib/presentation/widgets/realtime_status_indicator.dart
 // Premium UI badge and status banner for WebSocket connection
 
 import 'package:flutter/material.dart';
@@ -104,12 +104,14 @@ class RealtimeStatusIndicator extends ConsumerWidget {
         children: [
           Icon(icon, color: textColor, size: 14),
           const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

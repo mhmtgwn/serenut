@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/network/api_client.dart
+// lib/infrastructure/network/api_client.dart
 // Serenut Platform — API Network Client
 // Standardized client layer with error mapper, idempotency keys, and mock response interceptors.
 // Created: 04 Jul 2026
@@ -40,6 +40,11 @@ class ApiClient {
   final EnvironmentConfig _config;
   String? _jwtToken;
   
+  // Callbacks for dynamic token refresh and session expiration
+  Future<bool> Function()? onTokenExpired;
+  void Function()? onSessionExpired;
+  Future<bool>? _refreshFuture;
+
   // Custom mock handler function for testing/development
   ApiResponse Function(http.BaseRequest request)? mockHandler;
 
@@ -115,6 +120,45 @@ class ApiClient {
         body: response.body,
         headers: response.headers,
       );
+
+      // Handle transparent JWT token refresh on 401s
+      if (response.statusCode == 401 && !path.startsWith('/auth/') && onTokenExpired != null) {
+        _refreshFuture ??= onTokenExpired!();
+        final success = await _refreshFuture!;
+        _refreshFuture = null; // reset for next time
+
+        if (success) {
+          final newHeaders = _buildHeaders(includeIdempotency: includeIdempotency);
+          final retryRequest = http.Request(method, uri);
+          retryRequest.headers.addAll(newHeaders);
+          if (bodyString != null) {
+            retryRequest.body = bodyString;
+          }
+
+          final retryStreamed = await _client.send(retryRequest);
+          final retryResponse = await http.Response.fromStream(retryStreamed);
+          
+          final retryApiResponse = ApiResponse(
+            statusCode: retryResponse.statusCode,
+            body: retryResponse.body,
+            headers: retryResponse.headers,
+          );
+
+          if (!retryApiResponse.isSuccess) {
+            throw ApiException(
+              'HTTP Request failed with status code ${retryResponse.statusCode}',
+              statusCode: retryResponse.statusCode,
+              responseBody: retryResponse.body,
+            );
+          }
+          return retryApiResponse;
+        } else {
+          if (onSessionExpired != null) {
+            onSessionExpired!();
+          }
+          throw ApiException('Session expired', statusCode: 401);
+        }
+      }
 
       if (!apiResponse.isSuccess) {
         throw ApiException(

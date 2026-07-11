@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -90,7 +90,14 @@ class SqliteUserRepository implements IUserRepository {
   }
 
   @override
-  Future<void> insertUser(AuthUser user, String passwordHash) async {
+  Future<void> insertUser(
+    AuthUser user,
+    String passwordHash, {
+    String? username,
+    String? pinHash,
+    String? businessCode,
+    int? deviceTokenVersion,
+  }) async {
     await _executor.insert('users', {
       'id': user.id,
       'name': user.name,
@@ -100,11 +107,23 @@ class SqliteUserRepository implements IUserRepository {
       'is_active': 1,
       'created_at': user.createdAt.toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
+      if (username != null) 'username': username,
+      if (pinHash != null) 'pin_hash': pinHash,
+      if (businessCode != null) 'business_code': businessCode,
+      if (deviceTokenVersion != null) 'device_token_version': deviceTokenVersion,
     });
   }
 
   @override
-  Future<void> updateUserFields(AuthUser user, {bool? isActive, String? passwordHash}) async {
+  Future<void> updateUserFields(
+    AuthUser user, {
+    bool? isActive,
+    String? passwordHash,
+    String? username,
+    String? pinHash,
+    String? businessCode,
+    int? deviceTokenVersion,
+  }) async {
     final Map<String, dynamic> values = {
       'name': user.name,
       'email': user.email,
@@ -116,6 +135,18 @@ class SqliteUserRepository implements IUserRepository {
     }
     if (isActive != null) {
       values['is_active'] = isActive ? 1 : 0;
+    }
+    if (username != null) {
+      values['username'] = username;
+    }
+    if (pinHash != null) {
+      values['pin_hash'] = pinHash;
+    }
+    if (businessCode != null) {
+      values['business_code'] = businessCode;
+    }
+    if (deviceTokenVersion != null) {
+      values['device_token_version'] = deviceTokenVersion;
     }
     await _executor.update('users', values, where: 'id = ?', whereArgs: [user.id]);
   }
@@ -148,5 +179,31 @@ class SqliteUserRepository implements IUserRepository {
   Future<bool> exists(dynamic id) async {
     final user = await findById(id);
     return user != null;
+  }
+
+  @override
+  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username) async {
+    final rows = await _executor.query(
+      'users',
+      where: 'business_code = ? AND username = ? AND is_active = 1',
+      whereArgs: [businessCode.trim().toUpperCase(), username.trim()],
+    );
+    if (rows.isEmpty) return null;
+    return _mapRowToAuthUser(rows.first);
+  }
+
+  @override
+  Future<Map<String, String?>> getCredentialHashes(String userId) async {
+    final rows = await _executor.query(
+      'users',
+      columns: ['password_hash', 'pin_hash'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    if (rows.isEmpty) return {};
+    return {
+      'password_hash': rows.first['password_hash'] as String?,
+      'pin_hash': rows.first['pin_hash'] as String?,
+    };
   }
 }

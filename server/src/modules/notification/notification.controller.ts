@@ -14,7 +14,7 @@ async function runWithTenantContext(companyId: string, sql: string, params: any[
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(`SET LOCAL app.current_company_id = '${companyId.replace(/'/g, "''")}'`);
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
     const res = await client.query(sql, params);
     await client.query('COMMIT');
     return res;

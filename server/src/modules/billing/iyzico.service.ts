@@ -19,9 +19,22 @@ import https from 'https';
 import { logger } from '../../config/logger';
 
 // ── YAPILANDIRMA ──────────────────────────────────────────────────────────────
-const IYZICO_API_KEY = process.env.IYZICO_API_KEY || '';
-const IYZICO_SECRET = process.env.IYZICO_SECRET_KEY || '';
-const IYZICO_BASE_URL = process.env.IYZICO_BASE_URL || 'https://sandbox-api.iyzipay.com';
+export let IYZICO_API_KEY = process.env.IYZICO_API_KEY || '';
+export let IYZICO_SECRET = process.env.IYZICO_SECRET_KEY || '';
+export let IYZICO_BASE_URL = process.env.IYZICO_BASE_URL || 'https://sandbox-api.iyzipay.com';
+
+export async function loadIyzicoConfig(pool: any) {
+  try {
+    const res = await pool.query("SELECT key, value FROM system_settings WHERE key IN ('iyzico_api_key', 'iyzico_secret_key', 'iyzico_base_url')");
+    res.rows.forEach((r: any) => {
+      if (r.key === 'iyzico_api_key' && r.value) IYZICO_API_KEY = r.value;
+      if (r.key === 'iyzico_secret_key' && r.value) IYZICO_SECRET = r.value;
+      if (r.key === 'iyzico_base_url' && r.value) IYZICO_BASE_URL = r.value;
+    });
+  } catch (err) {
+    logger.warn('Failed to load database iyzico credentials, using defaults:', err);
+  }
+}
 
 if (process.env.NODE_ENV === 'production' && (!IYZICO_API_KEY || !IYZICO_SECRET)) {
   logger.warn('⚠️  IYZICO_API_KEY veya IYZICO_SECRET_KEY tanımlı değil. Ödeme işlemleri çalışmayacak.');

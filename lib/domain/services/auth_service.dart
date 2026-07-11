@@ -45,6 +45,15 @@ class AuthService {
     // Restore JWT token to ApiClient if exists
     final savedToken = _prefs.getString('auth_jwt_token');
     _apiClient?.setJwtToken(savedToken);
+
+    if (_apiClient != null) {
+      _apiClient!.onTokenExpired = () async {
+        return await refreshToken();
+      };
+      _apiClient!.onSessionExpired = () {
+        logout();
+      };
+    }
   }
 
   /// Load user from local storage if exists
@@ -187,6 +196,118 @@ class AuthService {
     }
 
     throw AuthException('Kullanıcı adı veya şifre hatalı.');
+  }
+
+  /// Login sub-user (cashier, manager, staff) using business_code, username, and PIN.
+  /// Enforces online lookup with automatic local SQLite cache and offline fallback.
+  Future<AuthUser> loginSubUser(String businessCode, String username, String pin) async {
+    if (businessCode.trim().isEmpty || username.trim().isEmpty || pin.isEmpty) {
+      throw AuthException('İşletme kodu, kullanıcı adı ve PIN boş olamaz.');
+    }
+
+    // Try online path first
+    if (_apiClient != null) {
+      try {
+        final response = await _apiClient!.post('/auth/login/sub', {
+          'business_code': businessCode.trim().toUpperCase(),
+          'username': username.trim(),
+          'pin': pin,
+        });
+
+        if (response.isSuccess) {
+          final data = response.json;
+          final token = data['accessToken'] as String;
+          final refreshToken = data['refreshToken'] as String;
+          final userMap = data['user'] as Map<String, dynamic>;
+
+          await _prefs.setString('auth_jwt_token', token);
+          await _prefs.setString('auth_refresh_token', refreshToken);
+          _apiClient!.setJwtToken(token);
+
+          final roles = userMap['roles'] as List<dynamic>? ?? [];
+          final roleStr = roles.isNotEmpty ? roles.first.toString() : 'cashier';
+          final role = UserRole.values.firstWhere(
+            (r) => r.name == roleStr.toLowerCase(),
+            orElse: () => UserRole.cashier,
+          );
+
+          final user = AuthUser(
+            id: userMap['id'] as String,
+            companyId: userMap['company_id'] as String? ?? 'TEST_COMPANY',
+            name: userMap['name'] as String,
+            email: userMap['email'] as String? ?? '',
+            role: role,
+            permissions: getPermissionsForRole(role),
+            createdAt: DateTime.now(),
+          );
+
+          // Cache credentials in local sqlite for offline login
+          try {
+            final hashedPin = _hashService.hashPassword(pin);
+            await _userRepository.insertUser(
+              user,
+              '', // no password
+              username: username.trim(),
+              pinHash: hashedPin,
+              businessCode: businessCode.trim().toUpperCase(),
+            );
+          } catch (_) {
+            try {
+              final hashedPin = _hashService.hashPassword(pin);
+              await _userRepository.updateUserFields(
+                user,
+                isActive: true,
+                username: username.trim(),
+                pinHash: hashedPin,
+                businessCode: businessCode.trim().toUpperCase(),
+              );
+            } catch (_) {}
+          }
+
+          _currentUser = user;
+          await _prefs.setString(_userStorageKey, user.toJson());
+          return user;
+        }
+      } catch (e) {
+        if (e is ApiException) {
+          if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
+            final body = e.responseBody;
+            String message = 'Giriş başarısız.';
+            if (body != null) {
+              try {
+                message = jsonDecode(body)['message'] ?? message;
+              } catch (_) {}
+            }
+            throw AuthException(message);
+          }
+        }
+        // Network timeout / DNS resolution issues — fall back to offline DB check
+      }
+    }
+
+    // Offline path fallback
+    try {
+      final user = await _userRepository.findByBusinessCodeAndUsername(
+        businessCode.trim(),
+        username.trim(),
+      );
+      if (user != null) {
+        final hashes = await _userRepository.getCredentialHashes(user.id);
+        final pinHash = hashes['pin_hash'];
+        if (pinHash != null) {
+          final isValid = _hashService.verifyPassword(pin, pinHash);
+          if (isValid) {
+            await _onLoginSuccess(user);
+            await _userRepository.updateLastLogin(user.id);
+            return user;
+          }
+        }
+      }
+    } catch (e) {
+      if (e is AuthException) rethrow;
+    }
+
+    throw AuthException('İşletme kodu, kullanıcı adı veya PIN hatalı.');
   }
 
   /// Rehash a legacy password with PBKDF2 after successful login.

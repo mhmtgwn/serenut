@@ -39,22 +39,19 @@ async function seedData() {
        ('comp-B', 'Tenant B POS', '2222222222', 'Çankaya V.D.', 'active')`
     );
 
-    // 2. Create Roles & Permissions
-    await client.query(
-      `INSERT INTO roles (id, name, description) VALUES 
-       ('role-owner', 'owner', 'Company owner')`
-    );
-
+    // 2. Create Permissions
     await client.query(
       `INSERT INTO permissions (id, code, description) VALUES 
        ('perm-sync', 'sync:push', 'Sync push'),
-       ('perm-sync-pull', 'sync:pull', 'Sync pull')`
+       ('perm-sync-pull', 'sync:pull', 'Sync pull')
+       ON CONFLICT (id) DO NOTHING`
     );
 
     await client.query(
       `INSERT INTO role_permissions (role_id, permission_id) VALUES 
-       ('role-owner', 'perm-sync'),
-       ('role-owner', 'perm-sync-pull')`
+       ('owner', 'perm-sync'),
+       ('owner', 'perm-sync-pull')
+       ON CONFLICT (role_id, permission_id) DO NOTHING`
     );
 
     // 3. Create Users
@@ -67,7 +64,7 @@ async function seedData() {
 
     await client.query(
       `INSERT INTO user_roles (user_id, role_id) VALUES 
-       ('user-A1', 'role-owner')`
+       ('user-A1', 'owner')`
     );
 
     // 4. Create Customers

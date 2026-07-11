@@ -1,4 +1,4 @@
-﻿// lib/providers/sync_provider.dart
+// lib/providers/sync_provider.dart
 // Serenut POS — Offline Sync Riverpod Provider + AppLifecycle Trigger
 // Created: 24 Jun 2026
 
@@ -68,10 +68,12 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
       final saleRepo   = await _ref.read(saleRepositoryProvider.future);
       final transactionRepo = await _ref.read(financialTransactionRepositoryProvider.future);
       final licenseService = _ref.read(licenseServiceProvider);
+      final trialManager   = _ref.read(trialManagerProvider);
       _syncService     = OfflineSyncService(
         saleRepository: saleRepo,
         transactionRepository: transactionRepo,
         licenseService: licenseService,
+        trialManager: trialManager,
       );
       await triggerSync();
     } catch (_) {

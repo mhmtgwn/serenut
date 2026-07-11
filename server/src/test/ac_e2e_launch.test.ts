@@ -204,7 +204,7 @@ async function runE2E() {
   const portalClient = await pgPool.connect();
   try {
     await portalClient.query('BEGIN');
-    await portalClient.query(`SET LOCAL app.current_company_id = '${companyId}'`);
+    await portalClient.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
     
     const countStores = await portalClient.query('SELECT COUNT(*) FROM stores');
     const sumSales = await portalClient.query('SELECT SUM(total_amount) FROM sales');

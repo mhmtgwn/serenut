@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/products_page.dart
+// lib/presentation/pages/products_page.dart
 // Serenut POS — Ürünler Sayfası
 // Yeşil + Sarı + Premium POS Teması
 // Generated: 21 Jun 2026 (v2)
@@ -40,6 +40,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false;
+  bool _showFilters = false;
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -150,34 +151,121 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         ref.read(productSearchQueryProvider.notifier).state = val;
         setState(() {});
       },
-      filterWidget: InkWell(
-        onTap: () => _showCategoryBottomSheet(context),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: _kSurface,
+      filterWidget: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _showFilters = !_showFilters),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kBorder),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.filter_list_rounded, size: 18, color: _kGreenDark),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  selectedCategory == null ? 'Kategori: Tümü' : 'Kategori: $selectedCategory',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: _kText,
-                  ),
-                ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _kSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kBorder),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: _kTextSecondary),
-            ],
+              child: Row(
+                children: [
+                  const Icon(Icons.filter_list_rounded, size: 18, color: _kGreenDark),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      selectedCategory == null ? 'Kategori: Tümü' : 'Kategori: $selectedCategory',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _kText,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _showFilters
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: _kTextSecondary,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _kBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Text(
+                          'Kategori Seçin',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _kText,
+                          ),
+                        ),
+                      ),
+                      if (selectedCategory != null)
+                        TextButton(
+                          onPressed: () {
+                            ref.read(productCategoryFilterProvider.notifier).state = null;
+                            setState(() => _showFilters = false);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: _kGreen,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Temizle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Column(
+                    children: List.generate(categoriesVal.length + 1, (index) {
+                      final isAll = index == 0;
+                      final catName = isAll ? 'Tümü' : categoriesVal[index - 1];
+                      final isSelected = isAll ? selectedCategory == null : selectedCategory == catName;
+                      final icon = isAll ? Icons.grid_view_rounded : _getCategoryIcon(catName);
+
+                      return _buildCategoryListRow(
+                        context,
+                        label: catName,
+                        icon: icon,
+                        isSelected: isSelected,
+                        onTap: () {
+                          ref.read(productCategoryFilterProvider.notifier).state = isAll ? null : catName;
+                          setState(() => _showFilters = false);
+                        },
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: _showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
       ),
       body: filteredProductsVal.when(
                 loading: () => const Center(
@@ -488,103 +576,55 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     });
   }
 
-  void _showCategoryBottomSheet(BuildContext context) {
-    final categoriesVal = ref.read(productCategoriesProvider);
-    final selectedCategory = ref.read(productCategoryFilterProvider);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Kategori Filtrele',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _kText,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildModalChip(
-                        ctx,
-                        label: 'Tümü',
-                        isSelected: selectedCategory == null,
-                        onTap: () {
-                          ref.read(productCategoryFilterProvider.notifier).state = null;
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      ...categoriesVal.map((cat) {
-                        return _buildModalChip(
-                          ctx,
-                          label: cat,
-                          isSelected: selectedCategory == cat,
-                          onTap: () {
-                            ref.read(productCategoryFilterProvider.notifier).state = cat;
-                            Navigator.pop(ctx);
-                          },
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildModalChip(
+  Widget _buildCategoryListRow(
     BuildContext context, {
     required String label,
+    required IconData icon,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? _kGreen : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? _kGreen : const Color(0xFFE2E8F0),
-            width: 1,
-          ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2.5),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSelected ? _kGreen : const Color(0xFFE2E8F0),
+          width: isSelected ? 1.5 : 1,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF475569),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            fontSize: 13,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? _kGreen : const Color(0xFF64748B),
+                  size: 18,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? _kGreenDark : const Color(0xFF334155),
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const Spacer(),
+                if (isSelected)
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: _kGreen,
+                    size: 16,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,19 +1,21 @@
-﻿// lib/domain/services/offline_sync_service.dart
+// lib/domain/services/offline_sync_service.dart
 // Serenut POS — Offline Sync Service (Production Implementation)
 // Real HTTP with exponential backoff, idempotent uploads, and sync queue
 // Updated: 24 Jun 2026
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
+import 'package:serenutos/domain/services/trial_manager.dart';
 
 import 'package:serenutos/domain/services/sync_chaos_injector.dart';
 import 'package:serenutos/domain/services/sync_state_machine.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Result of a single sync operation.
 class SyncResult {
@@ -42,6 +44,7 @@ class OfflineSyncService {
   final ISaleRepository _saleRepository;
   final IFinancialTransactionRepository? _transactionRepository;
   final LicenseService _licenseService;
+  final TrialManager? _trialManager;
   final ApiClient _apiClient;
 
   /// Optional chaos injector for simulating network cuts, latencies, etc.
@@ -59,12 +62,14 @@ class OfflineSyncService {
     required ISaleRepository saleRepository,
     IFinancialTransactionRepository? transactionRepository,
     required LicenseService licenseService,
+    TrialManager? trialManager,
     ApiClient? apiClient,
     SyncChaosInjector? chaosInjector,
     SyncStateMachine? stateMachine,
   })  : _saleRepository = saleRepository,
         _transactionRepository = transactionRepository,
         _licenseService  = licenseService,
+        _trialManager    = trialManager,
         _apiClient       = apiClient ?? ApiClient(),
         _chaosInjector   = chaosInjector,
         _stateMachine    = stateMachine;
@@ -86,25 +91,28 @@ class OfflineSyncService {
       _stateMachine = stateMachine;
     }
     // 1. License & Feature Gate verification
-    final info = _licenseService.getLicenseInfo();
-    final token = _licenseService.getLicenseToken();
-    if (info == null || token == null || !_licenseService.verifyLicenseToken(token)) {
-      await TelemetryService().logStructured(
-        event: 'sync_license_invalid',
-        level: LogLevel.error,
-        correlationId: _stateMachine?.sessionId,
-        metadata: {'reason': 'Invalid or missing license token'},
-      );
-      return const SyncResult(synced: 0, failed: 0, errors: ['Bulut senkronizasyonu için geçerli bir ticari lisans bulunamadı.']);
-    }
-    if (!info.features.contains('cloud_sync')) {
-      await TelemetryService().logStructured(
-        event: 'sync_license_invalid',
-        level: LogLevel.error,
-        correlationId: _stateMachine?.sessionId,
-        metadata: {'reason': 'cloud_sync feature disabled'},
-      );
-      return const SyncResult(synced: 0, failed: 0, errors: ['Mevcut lisans paketiniz bulut senkronizasyonu (cloud_sync) özelliğini desteklemiyor.']);
+    final isTrial = _trialManager?.isTrialActive() ?? false;
+    if (!isTrial) {
+      final info = _licenseService.getLicenseInfo();
+      final token = _licenseService.getLicenseToken();
+      if (info == null || token == null || !_licenseService.verifyLicenseToken(token)) {
+        await TelemetryService().logStructured(
+          event: 'sync_license_invalid',
+          level: LogLevel.error,
+          correlationId: _stateMachine?.sessionId,
+          metadata: {'reason': 'Invalid or missing license token'},
+        );
+        return const SyncResult(synced: 0, failed: 0, errors: ['Bulut senkronizasyonu için geçerli bir ticari lisans bulunamadı.']);
+      }
+      if (!info.features.contains('cloud_sync')) {
+        await TelemetryService().logStructured(
+          event: 'sync_license_invalid',
+          level: LogLevel.error,
+          correlationId: _stateMachine?.sessionId,
+          metadata: {'reason': 'cloud_sync feature disabled'},
+        );
+        return const SyncResult(synced: 0, failed: 0, errors: ['Mevcut lisans paketiniz bulut senkronizasyonu (cloud_sync) özelliğini desteklemiyor.']);
+      }
     }
 
     // 2. Database Schema Version Handshake
@@ -251,60 +259,140 @@ class OfflineSyncService {
       final response = await _apiClient.get('/sync/pull?last_timestamp=$lastTimestamp');
       if (response.statusCode == 200) {
         final data = response.json;
-        // print('📥 Successfully pulled updates from remote backend: $data');
 
-        if (data is Map<String, dynamic> && data.containsKey('transactions') && _transactionRepository != null) {
+        if (data is Map<String, dynamic> && data.containsKey('transactions')) {
           final txs = data['transactions'] as List<dynamic>;
+          final db = await DatabaseManager().getDatabase();
           
-          // Get local maximum logical clock once before processing batch
-          final localTxs = await _transactionRepository!.findAll();
+          // Get local maximum logical clock once before processing batch (for financial transactions clock security check)
           int maxLocalClock = 0;
-          for (final tx in localTxs) {
-            if (tx.logicalClock > maxLocalClock) {
-              maxLocalClock = tx.logicalClock;
+          if (_transactionRepository != null) {
+            final localTxs = await _transactionRepository!.findAll();
+            for (final tx in localTxs) {
+              if (tx.logicalClock > maxLocalClock) {
+                maxLocalClock = tx.logicalClock;
+              }
             }
           }
 
           for (final txMap in txs) {
             if (txMap is Map<String, dynamic>) {
               final type = txMap['type'] as String? ?? 'financial_transaction';
-              if (type != 'financial_transaction') continue; // only process financial transactions here
-
               final payload = txMap['payload'] as Map<String, dynamic>;
-              final txId = payload['id'] as String;
-              final exists = await _transactionRepository!.exists(txId);
-              
-              if (!exists) {
-                final entity = FinancialTransactionEntity.fromMap(payload);
+              final id = payload['id'] as String;
 
-                // Validation Guard 1: Logical Clock Spoofing Check
-                final bool isLogicalClockInflated = entity.logicalClock > maxLocalClock + 10000;
-                
-                // Validation Guard 2: Future Timestamp spoofing check (1-day grace window)
-                final bool isFutureClock = entity.date.isAfter(DateTime.now().add(const Duration(days: 1)));
+              if (type == 'product') {
+                await db.insert(
+                  'products',
+                  {
+                    'id': payload['id'],
+                    'name': payload['name'],
+                    'barcode': payload['barcode'],
+                    'price': payload['price'] != null ? (payload['price'] as num).toDouble() : 0.0,
+                    'cost': payload['cost'] != null ? (payload['cost'] as num).toDouble() : 0.0,
+                    'vat_rate': payload['vat_rate'] != null ? (payload['vat_rate'] as num).toDouble() : 0.0,
+                    'category': payload['category'],
+                    'image_url': payload['image_url'],
+                    'stock': payload['stock'] != null ? (payload['stock'] as num).toInt() : 0,
+                    'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                    'created_at': payload['created_at'],
+                    'updated_at': payload['updated_at'],
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+              } else if (type == 'customer') {
+                await db.insert(
+                  'customers',
+                  {
+                    'id': payload['id'],
+                    'name': payload['name'],
+                    'email': payload['email'],
+                    'phone': payload['phone'],
+                    'balance': payload['balance'] != null ? (payload['balance'] as num).toDouble() : 0.0,
+                    'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                    'created_at': payload['created_at'],
+                    'updated_at': payload['updated_at'],
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+              } else if (type == 'sale') {
+                await db.insert(
+                  'sales',
+                  {
+                    'id': payload['id'],
+                    'customer_id': payload['customer_id'],
+                    'total_amount': payload['total_amount'] != null ? (payload['total_amount'] as num).toDouble() : 0.0,
+                    'paid_amount': payload['paid_amount'] != null ? (payload['paid_amount'] as num).toDouble() : 0.0,
+                    'payment_method': payload['payment_method'],
+                    'status': payload['status'],
+                    'created_at': payload['created_at'],
+                    'updated_at': payload['updated_at'],
+                    'idempotency_key': payload['idempotency_key'],
+                    'is_synced': 1,
+                    'created_by': payload['created_by'],
+                    'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
 
-                if (isLogicalClockInflated || isFutureClock) {
-                  final String reason = isLogicalClockInflated
-                      ? 'Logical clock inflated: ${entity.logicalClock} vs max local $maxLocalClock'
-                      : 'Physical clock spoofed into future: ${entity.date}';
-
-                  await TelemetryService().logStructured(
-                    event: 'sync_security_anomaly_detected',
-                    level: LogLevel.critical,
-                    correlationId: _stateMachine?.sessionId,
-                    metadata: {
-                      'transaction_id': entity.id,
-                      'reason': reason,
-                      'logical_clock': entity.logicalClock,
-                      'device_id': entity.deviceId,
-                      'date': entity.date.toIso8601String(),
-                    },
-                  );
-                  errors.add('Security anomaly: Transaction ${entity.id} rejected due to: $reason');
-                  continue;
+                if (payload['items'] != null) {
+                  final items = payload['items'] as List<dynamic>;
+                  await db.delete('sale_items', where: 'sale_id = ?', whereArgs: [payload['id']]);
+                  
+                  for (final item in items) {
+                    if (item is Map<String, dynamic>) {
+                      await db.insert(
+                        'sale_items',
+                        {
+                          'id': item['id'] ?? 'si-${payload['id']}-${item['product_id'] ?? item['productId']}',
+                          'sale_id': payload['id'],
+                          'product_id': item['product_id'] ?? item['productId'],
+                          'quantity': item['quantity'] != null ? (item['quantity'] as num).toDouble() : (item['qty'] != null ? (item['qty'] as num).toDouble() : 0.0),
+                          'unit_price': item['unit_price'] != null ? (item['unit_price'] as num).toDouble() : (item['unitPrice'] != null ? (item['unitPrice'] as num).toDouble() : 0.0),
+                          'total_price': item['total_price'] != null ? (item['total_price'] as num).toDouble() : 0.0,
+                        },
+                        conflictAlgorithm: ConflictAlgorithm.replace,
+                      );
+                    }
+                  }
                 }
+              } else if (type == 'financial_transaction') {
+                if (_transactionRepository != null) {
+                  final exists = await _transactionRepository!.exists(id);
+                  
+                  if (!exists) {
+                    final entity = FinancialTransactionEntity.fromMap(payload);
 
-                await _transactionRepository!.create(entity);
+                    // Validation Guard 1: Logical Clock Spoofing Check
+                    final bool isLogicalClockInflated = entity.logicalClock > maxLocalClock + 10000;
+                    
+                    // Validation Guard 2: Future Timestamp spoofing check (1-day grace window)
+                    final bool isFutureClock = entity.date.isAfter(DateTime.now().add(const Duration(days: 1)));
+
+                    if (isLogicalClockInflated || isFutureClock) {
+                      final String reason = isLogicalClockInflated
+                          ? 'Logical clock inflated: ${entity.logicalClock} vs max local $maxLocalClock'
+                          : 'Physical clock spoofed into future: ${entity.date}';
+
+                      await TelemetryService().logStructured(
+                        event: 'sync_security_anomaly_detected',
+                        level: LogLevel.critical,
+                        correlationId: _stateMachine?.sessionId,
+                        metadata: {
+                          'transaction_id': entity.id,
+                          'reason': reason,
+                          'logical_clock': entity.logicalClock,
+                          'device_id': entity.deviceId,
+                          'date': entity.date.toIso8601String(),
+                        },
+                      );
+                      errors.add('Security anomaly: Transaction ${entity.id} rejected due to: $reason');
+                      continue;
+                    }
+
+                    await _transactionRepository!.create(entity);
+                  }
+                }
               }
             }
           }
@@ -419,7 +507,16 @@ class OfflineSyncService {
         'payment_method':  sale.paymentMethod,
         'status':          sale.status,
         'created_at':      sale.createdAt.toIso8601String(),
-        'items':           sale.items,
+        'items':           sale.items.map((item) {
+          if (item is Map<String, dynamic>) {
+            return {
+              'productId': item['product_id'],
+              'qty': item['quantity'] ?? item['qty'],
+              'unitPrice': item['unit_price'] ?? item['unitPrice'],
+            };
+          }
+          return item;
+        }).toList(),
       };
 
   void dispose() {}

@@ -49,6 +49,8 @@
 	<string>Need Bluetooth permission to connect to printers</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Need Bluetooth permission to connect to printers</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Müşterilerinizi hızlıca ekleyebilmeniz için rehberinizdeki kişileri listelemek istiyoruz.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

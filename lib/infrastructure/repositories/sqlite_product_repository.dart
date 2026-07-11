@@ -1,5 +1,5 @@
-﻿import 'dart:async';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'dart:async';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
@@ -48,7 +48,7 @@ class SqliteProductRepository implements IProductRepository {
       }
       
       final rows = await _datasetLoader!.activeDb!.rawQuery(sql, args);
-      return rows.map((row) => ProductEntity(
+      final datasetProducts = rows.map((row) => ProductEntity(
         id: row['id'] as String,
         name: row['name'] as String,
         description: row['description'] as String,
@@ -57,6 +57,42 @@ class SqliteProductRepository implements IProductRepository {
         category: row['category'] as String,
         vat: row['vat'] as int?,
       )).toList();
+
+      if (datasetProducts.isEmpty) return [];
+
+      final ids = datasetProducts.map((p) => p.id).toList();
+      final placeholders = List.filled(ids.length, '?').join(',');
+      final localOverrides = await _executor.query(
+        'products',
+        where: 'id IN ($placeholders)',
+        whereArgs: ids,
+      );
+      final overrideMap = {for (var row in localOverrides) row['id'] as String: row};
+
+      final result = <ProductEntity>[];
+      for (final p in datasetProducts) {
+        final override = overrideMap[p.id];
+        if (override != null) {
+          final isActive = override['is_active'] as int? ?? 1;
+          final isDeleted = override['is_deleted'] as int? ?? 0;
+          if (isActive == 0 || isDeleted == 1) {
+            continue;
+          }
+          result.add(ProductEntity(
+            id: p.id,
+            name: override['name'] as String? ?? p.name,
+            description: override['description'] as String? ?? p.description,
+            price: (override['price'] as num?)?.toDouble() ?? p.price,
+            quantity: (override['quantity'] as num?)?.toInt() ?? p.quantity,
+            category: override['category'] as String? ?? p.category,
+            vat: override['vat'] as int? ?? p.vat,
+            imageUrl: override['image_url'] as String? ?? p.imageUrl,
+          ));
+        } else {
+          result.add(p);
+        }
+      }
+      return result;
     } else {
       final rows = await _executor.query('products', where: where, whereArgs: whereArgs, orderBy: orderBy);
       return rows.map((row) => ProductEntity.fromMap(row)).toList();
@@ -198,6 +234,29 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<void> decreaseStock(String productId, int quantity) async {
+    if (_hasDataset) {
+      final localRes = await _executor.query('products', where: 'id = ?', whereArgs: [productId]);
+      if (localRes.isEmpty) {
+        final original = await findById(productId);
+        if (original != null) {
+          final newQty = original.quantity - quantity;
+          await _executor.insert('products', {
+            'id': original.id,
+            'name': original.name,
+            'barcode': original.id,
+            'price': original.price,
+            'quantity': newQty,
+            'category': original.category,
+            'vat_rate': original.vat ?? 18,
+            'is_active': 1,
+            'is_deleted': 0,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+          return;
+        }
+      }
+    }
     await _executor.rawUpdate(
       'UPDATE products SET quantity = quantity - ?, updated_at = ? WHERE id = ?',
       [quantity, DateTime.now().toIso8601String(), productId],
@@ -206,6 +265,29 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<void> increaseStock(String productId, int quantity) async {
+    if (_hasDataset) {
+      final localRes = await _executor.query('products', where: 'id = ?', whereArgs: [productId]);
+      if (localRes.isEmpty) {
+        final original = await findById(productId);
+        if (original != null) {
+          final newQty = original.quantity + quantity;
+          await _executor.insert('products', {
+            'id': original.id,
+            'name': original.name,
+            'barcode': original.id,
+            'price': original.price,
+            'quantity': newQty,
+            'category': original.category,
+            'vat_rate': original.vat ?? 18,
+            'is_active': 1,
+            'is_deleted': 0,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+          return;
+        }
+      }
+    }
     await _executor.rawUpdate(
       'UPDATE products SET quantity = quantity + ?, updated_at = ? WHERE id = ?',
       [quantity, DateTime.now().toIso8601String(), productId],

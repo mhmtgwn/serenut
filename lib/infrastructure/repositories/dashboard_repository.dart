@@ -2,7 +2,7 @@
 // Phase 3 — Dashboard Repository and SQLite Engine
 // Generated: 21 Jun 2026
 
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 

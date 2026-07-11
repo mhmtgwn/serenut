@@ -147,33 +147,9 @@ export class AuthService {
         [user.id]
       );
 
-      // 4b. Trial FSM: Start trial on FIRST login (AC 1.2)
-      // If subscription exists with trial_started_at IS NULL → set it now.
-      // trial_ends_at = trial_started_at + 30 days, status → 'trialing'
-      let trialStarted = false;
-      const subRes = await client.query(
-        `SELECT id, status, trial_started_at
-         FROM subscriptions
-         WHERE company_id = $1
-         ORDER BY current_period_start DESC
-         LIMIT 1`,
-        [userRes.rows[0].company_id]
-      );
-
-      if (subRes.rows.length > 0 && subRes.rows[0].trial_started_at === null) {
-        const trialStart = new Date();
-        const trialEnd = new Date(trialStart.getTime() + 30 * 24 * 60 * 60 * 1000);
-        await client.query(
-          `UPDATE subscriptions
-           SET trial_started_at = $1,
-               trial_ends_at = $2,
-               status = 'trialing'
-           WHERE id = $3`,
-          [trialStart, trialEnd, subRes.rows[0].id]
-        );
-        trialStarted = true;
-        logger.info(`Trial started for company ${userRes.rows[0].company_id} — ends ${trialEnd.toISOString()}`);
-      }
+      // 4b. Trial FSM: Trial now starts on FIRST POS device activation (not on login).
+      // See: LicenseService.activate() — sets trial_started_at on the subscription.
+      // Login must NOT alter subscription state.
 
       // 5. Fetch full user profile (roles + permissions)
       const profileRes = await client.query(
@@ -233,18 +209,19 @@ export class AuthService {
 
       await client.query('COMMIT');
 
-      let trialStartedAt = null;
-      let trialEndsAt = null;
-      if (subRes.rows.length > 0) {
-        trialStartedAt = subRes.rows[0].trial_started_at;
-        trialEndsAt = subRes.rows[0].trial_ends_at;
-      }
+      // Fetch current trial timestamps from DB (trial start is now triggered by POS activation, not login)
+      const trialRes = await pgPool.query(
+        `SELECT trial_started_at, trial_ends_at FROM subscriptions WHERE company_id = $1 LIMIT 1`,
+        [userRow.company_id]
+      );
+      const trialStartedAt = trialRes.rows[0]?.trial_started_at ?? null;
+      const trialEndsAt   = trialRes.rows[0]?.trial_ends_at   ?? null;
 
       return {
         access_token: accessToken,
         refresh_token: refreshToken,
         expires_in: 3600,
-        trial_started: trialStarted,
+        trial_started: false,
         trial_started_at: trialStartedAt,
         trial_ends_at: trialEndsAt,
         user: payload,
@@ -427,7 +404,7 @@ export class AuthService {
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`SET LOCAL app.current_company_id = '${companyId.replace(/'/g, "''")}'`);
+      await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
 
       const verifyRes = await client.query(
         'SELECT password_hash FROM users WHERE id = $1',
@@ -558,6 +535,154 @@ export class AuthService {
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Sub-user login: business_code + username + PIN
+   * Used by cashiers, managers, and staff logging into the POS.
+   * Returns the same JWT structure as the primary login().
+   */
+  public static async loginSubUser(
+    businessCode: string,
+    username: string,
+    pin: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<any> {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      // 1. Resolve company from business_code
+      const companyRes = await client.query(
+        'SELECT id FROM companies WHERE business_code = $1',
+        [businessCode.toUpperCase().trim()]
+      );
+      if (companyRes.rows.length === 0) {
+        throw new Error('business_code_not_found');
+      }
+      const companyId = companyRes.rows[0].id;
+
+      // 2. Lookup user by username within this company
+      const userRes = await client.query(
+        `SELECT u.id, u.name, u.email, u.username, u.company_id,
+                u.password_hash, u.pin_hash, u.is_active,
+                u.failed_login_attempts, u.locked_until
+         FROM users u
+         WHERE u.company_id = $1
+           AND u.username = $2`,
+        [companyId, username.trim()]
+      );
+      if (userRes.rows.length === 0) {
+        throw new Error('invalid_credentials');
+      }
+
+      const user = userRes.rows[0];
+
+      // 3. Check account active
+      if (!user.is_active) {
+        throw new Error('user_suspended');
+      }
+
+      // 4. Check lockout
+      if (user.locked_until && new Date(user.locked_until) > new Date()) {
+        throw new Error('account_locked');
+      }
+
+      // 5. Verify PIN (or password as fallback)
+      let credentialsValid = false;
+      if (user.pin_hash) {
+        credentialsValid = await bcrypt.compare(pin, user.pin_hash);
+      }
+      if (!credentialsValid && user.password_hash) {
+        credentialsValid = await bcrypt.compare(pin, user.password_hash);
+      }
+
+      if (!credentialsValid) {
+        const newAttempts = (user.failed_login_attempts || 0) + 1;
+        const lockUntil = newAttempts >= MAX_LOGIN_ATTEMPTS
+          ? new Date(Date.now() + LOCK_TIME_MS)
+          : null;
+        await client.query(
+          'UPDATE users SET failed_login_attempts = $1, locked_until = $2 WHERE id = $3',
+          [newAttempts, lockUntil, user.id]
+        );
+        await client.query('COMMIT');
+        throw new Error(newAttempts >= MAX_LOGIN_ATTEMPTS ? 'account_locked' : 'invalid_credentials');
+      }
+
+      // 6. Reset failed attempts
+      await client.query(
+        'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW() WHERE id = $1',
+        [user.id]
+      );
+
+      // 7. Fetch roles + permissions
+      const profileRes = await client.query(
+        `SELECT u.id, u.name, u.email, u.username, u.company_id,
+                c.business_code,
+                COALESCE(json_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL), '[]') AS roles,
+                COALESCE(json_agg(DISTINCT p.code)  FILTER (WHERE p.code IS NOT NULL),  '[]') AS permissions
+         FROM users u
+         JOIN companies c ON c.id = u.company_id
+         LEFT JOIN user_roles ur ON ur.user_id = u.id
+         LEFT JOIN roles r ON r.id = ur.role_id
+         LEFT JOIN role_permissions rp ON rp.role_id = r.id
+         LEFT JOIN permissions p ON p.id = rp.permission_id
+         WHERE u.id = $1
+         GROUP BY u.id, u.name, u.email, u.username, u.company_id, c.business_code`,
+        [user.id]
+      );
+      const profile = profileRes.rows[0];
+
+      // 8. Issue JWT
+      const accessToken = jwt.sign(
+        {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email ?? null,
+          company_id: profile.company_id,
+          roles: profile.roles,
+          permissions: profile.permissions,
+          login_type: 'sub_user',
+        },
+        JWT_SECRET as string,
+        { expiresIn: ACCESS_TOKEN_EXPIRY, issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
+      );
+
+      const refreshToken = crypto.randomBytes(64).toString('hex');
+      const refreshExpiry = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+      const sessionId = `sess-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+      await client.query(
+        `INSERT INTO sessions (id, user_id, company_id, refresh_token, ip_address, user_agent, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [sessionId, user.id, companyId, refreshToken, ipAddress, userAgent, refreshExpiry]
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email ?? null,
+          username: profile.username,
+          company_id: profile.company_id,
+          business_code: profile.business_code,
+          roles: profile.roles,
+          permissions: profile.permissions,
+        }
+      };
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
       throw err;
     } finally {
       client.release();

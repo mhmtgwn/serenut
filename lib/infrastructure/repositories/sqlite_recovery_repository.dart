@@ -1,5 +1,5 @@
 ﻿// lib/infrastructure/repositories/sqlite_recovery_repository.dart
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/recovery_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 

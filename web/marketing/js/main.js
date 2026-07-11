@@ -60,9 +60,9 @@
 // ── Active Nav Link ────────────────────────────────────────────
 (function initActiveLink() {
   const path = window.location.pathname.split('/').pop() || 'index.html';
-  document.querySelectorAll('.nav__link').forEach(a => {
+  document.querySelectorAll('.nav-link, .nav__link').forEach(a => {
     const href = a.getAttribute('href');
-    if (href === path || (path === '' && href === 'index.html')) {
+    if (href === path || (path === '' && href === 'index.html') || (path === 'index.html' && href === '/')) {
       a.classList.add('active');
     }
   });
@@ -86,20 +86,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── FAQ Accordion ──────────────────────────────────────────────
 (function initFaq() {
-  document.querySelectorAll('.faq-question').forEach(btn => {
+  document.querySelectorAll('.faq-btn, .faq-question').forEach(btn => {
     btn.addEventListener('click', () => {
-      const answer = btn.nextElementSibling;
-      const isOpen = btn.classList.contains('open');
+      const item = btn.closest('.faq-item');
+      const answer = btn.nextElementSibling || (item ? item.querySelector('.faq-body, .faq-answer') : null);
+      if (!answer) return;
 
-      // close all
-      document.querySelectorAll('.faq-question.open').forEach(b => {
+      const isOpen = btn.classList.contains('open') || (item && item.classList.contains('open'));
+
+      // Close all first
+      document.querySelectorAll('.faq-btn, .faq-question').forEach(b => {
         b.classList.remove('open');
-        b.nextElementSibling.classList.remove('open');
         b.setAttribute('aria-expanded', 'false');
+        const parent = b.closest('.faq-item');
+        if (parent) parent.classList.remove('open');
+        const ans = b.nextElementSibling || (parent ? parent.querySelector('.faq-body, .faq-answer') : null);
+        if (ans) ans.classList.remove('open');
       });
 
       if (!isOpen) {
         btn.classList.add('open');
+        if (item) item.classList.add('open');
         answer.classList.add('open');
         btn.setAttribute('aria-expanded', 'true');
       }

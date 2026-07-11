@@ -10,7 +10,7 @@ async function runWithTenantContext(companyId: string, fn: (client: any) => Prom
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('SET LOCAL app.current_company_id = $1', [companyId]);
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [companyId]);
     const result = await fn(client);
     await client.query('COMMIT');
     return result;

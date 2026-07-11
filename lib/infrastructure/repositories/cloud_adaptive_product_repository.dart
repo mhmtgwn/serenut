@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/cloud_adaptive_product_repository.dart
+// lib/infrastructure/repositories/cloud_adaptive_product_repository.dart
 // Serenut Platform — Cloud Adaptive Product Repository
 // Implements Repository Pattern, orchestrating Local SQLite and Remote Data Source.
 // Created: 04 Jul 2026

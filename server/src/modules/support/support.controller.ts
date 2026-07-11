@@ -14,6 +14,22 @@ import { createError } from '../../config/error-codes';
 
 const router = Router();
 
+// Public route for landing page contact form
+router.post('/public-contact', async (req, res) => {
+  const { name, email, phone, subject, message } = req.body;
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Lütfen tüm zorunlu alanları doldurun.' });
+  }
+  console.log(`✉️ İletişim Formu Mesajı Alındı:
+    Ad: ${name}
+    E-posta: ${email}
+    Telefon: ${phone || 'Belirtilmedi'}
+    Konu: ${subject}
+    Mesaj: ${message}
+  `);
+  return res.status(200).json({ success: true, message: 'Mesajınız başarıyla iletildi.' });
+});
+
 // All support routes require authentication
 router.use(authenticateUser);
 

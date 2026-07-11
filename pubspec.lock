@@ -1162,14 +1162,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.0"
-  sqflite_sqlcipher:
-    dependency: "direct main"
-    description:
-      name: sqflite_sqlcipher
-      sha256: "81f690c8c250ecbcd981d5c7b98abbc2767a161ed2cdd5277b505cd4d95c681e"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.3.0"
   sqlite3:
     dependency: transitive
     description:

@@ -36,7 +36,7 @@ class EnvironmentConfig {
       case AppEnvironment.dev:
         return const EnvironmentConfig(
           environment: AppEnvironment.dev,
-          apiBaseUrl: 'http://185.255.93.94:3000/api/v1',
+          apiBaseUrl: 'https://serenut.com/api/v1',
           authEndpoint: '/auth',
           syncEndpoint: '/sync',
           updateEndpoint: '/updates',

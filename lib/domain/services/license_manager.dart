@@ -1,4 +1,4 @@
-﻿// lib/domain/services/license_manager.dart
+// lib/domain/services/license_manager.dart
 import 'package:serenutos/domain/models/license_model.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 
@@ -24,7 +24,7 @@ class LicenseManager {
     return CompanyLicense(
       companyId: info.merchantId,
       tier: info.tier,
-      activeDeviceIds: info.allowedDevices,
+      activeDeviceIds: info.allowedDevices ?? [],
       isActive: true,
     );
   }

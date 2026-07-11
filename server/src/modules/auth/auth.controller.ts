@@ -1,14 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { rateLimiter } from '../../middleware/rate_limiter';
+import { authLimiter, passwordResetLimiter, signupLimiter } from '../../middleware/rate-limit.middleware';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { createError } from '../../config/error-codes';
 
 const router = Router();
-
-// Apply strict rate limiting on Auth/Login/Forgot-Password
-const authRateLimit = rateLimiter(5, 15 * 60 * 1000); // 5 attempts per 15 minutes
 
 /**
  * @swagger
@@ -36,7 +33,7 @@ const authRateLimit = rateLimiter(5, 15 * 60 * 1000); // 5 attempts per 15 minut
  *       429:
  *         description: AUTH004 — Too many attempts
  */
-router.post('/login', authRateLimit, async (req: Request, res: Response) => {
+router.post('/login', authLimiter, async (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'E-posta ve şifre zorunludur.' } });
@@ -67,6 +64,67 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
       return res.status(429).json(createError('AUTH004'));
     }
     console.error('Login error:', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Giriş işlemi esnasında bir hata oluştu.' } });
+  }
+});
+
+/**
+ * @swagger
+ * /auth/login/sub:
+ *   post:
+ *     summary: Sub-user login (cashier, manager, staff) using business_code + username + PIN
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_code, username, pin]
+ *             properties:
+ *               business_code: { type: string, example: "SRNTT-7X9K" }
+ *               username: { type: string, example: "ahmet_kasiyer" }
+ *               pin: { type: string, example: "1234" }
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ *       429:
+ *         description: Too many attempts
+ */
+router.post('/login/sub', authLimiter, async (req: Request, res: Response) => {
+  const { business_code, username, pin } = req.body;
+  if (!business_code || !username || !pin) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'İşletme kodu, kullanıcı adı ve PIN zorunludur.' } });
+  }
+
+  const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+  const userAgent = req.headers['user-agent'] || undefined;
+
+  try {
+    const result = await AuthService.loginSubUser(business_code, username, pin, ipAddress, userAgent);
+
+    RealtimeBroadcastService.publishEvent(result.user.company_id, 'UserLoggedIn', {
+      userId: result.user.id,
+      name: result.user.name,
+    }).catch(() => {});
+
+    return res.json(result);
+  } catch (err: any) {
+    if (err.message === 'invalid_credentials') {
+      return res.status(401).json(createError('AUTH001'));
+    }
+    if (err.message === 'user_suspended') {
+      return res.status(403).json(createError('AUTH003'));
+    }
+    if (err.message === 'account_locked') {
+      return res.status(429).json(createError('AUTH004'));
+    }
+    if (err.message === 'business_code_not_found') {
+      return res.status(401).json({ error: { code: 'AUTH001', message: 'İşletme kodu, kullanıcı adı veya PIN hatalı.' } });
+    }
+    console.error('Sub-user login error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Giriş işlemi esnasında bir hata oluştu.' } });
   }
 });
@@ -155,7 +213,7 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
   }
 });
 
-router.post('/forgot-password', authRateLimit, async (req: Request, res: Response) => {
+router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'missing_email' });
@@ -170,7 +228,7 @@ router.post('/forgot-password', authRateLimit, async (req: Request, res: Respons
   }
 });
 
-router.post('/reset-password', authRateLimit, async (req: Request, res: Response) => {
+router.post('/reset-password', passwordResetLimiter, async (req: Request, res: Response) => {
   const { token, newPassword } = req.body;
   if (!token || !newPassword) {
     return res.status(400).json({ error: 'missing_fields', message: 'Token ve yeni şifre zorunludur.' });
@@ -193,7 +251,7 @@ router.post('/reset-password', authRateLimit, async (req: Request, res: Response
 
 // ── SELF-SERVICE REGISTRATION ────────────────────────────────────────────────
 // Creates a new company tenant + owner/admin user in a single atomic transaction.
-router.post('/register', authRateLimit, async (req: Request, res: Response) => {
+router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   const { company_name, name, email, password, phone, tax_number } = req.body;
 
   if (!company_name || !name || !email || !password) {
@@ -203,10 +261,10 @@ router.post('/register', authRateLimit, async (req: Request, res: Response) => {
     });
   }
 
-  if (password.length < 8) {
+  if (password.length < 4) {
     return res.status(400).json({
       error: 'weak_password',
-      message: 'Şifre en az 8 karakter olmalıdır.'
+      message: 'Şifre veya PIN en az 4 karakter olmalıdır.'
     });
   }
 
@@ -272,8 +330,37 @@ router.post('/register', authRateLimit, async (req: Request, res: Response) => {
                  NULL, NULL, 0)`,
         [subId, companyId]
       );
+
+      // Generate a canonical license key and trial entitlement during registration!
+      const parts = [];
+      for (let i = 0; i < 4; i++) {
+        parts.push(crypto.randomBytes(2).toString('hex').toUpperCase());
+      }
+      const licenseKey = `SRNT-${parts.join('-')}`;
+
+      // Insert into license_entitlements
+      const entId = `ent-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      await client.query(`
+        INSERT INTO license_entitlements (
+          id, company_id, subscription_id, plan_id,
+          status, device_limit, store_limit,
+          valid_from, valid_until, token_version,
+          license_key, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), NOW() + INTERVAL '30 days', 1, $4, NOW(), NOW())
+      `, [entId, companyId, subId, licenseKey]);
+
+      // Sync legacy licenses table
+      await client.query(`
+        INSERT INTO licenses (
+          id, company_id, license_key, tier,
+          allowed_devices_count, status, expires_at, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, 'trial', 2, 'active', NOW() + INTERVAL '30 days', NOW(), NOW())
+      `, [`lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, companyId, licenseKey]);
+
     } catch (e) {
-      console.error('Failed to create subscription:', e);
+      console.error('Failed to create subscription or trial licenses:', e);
     }
 
     await client.query('COMMIT');

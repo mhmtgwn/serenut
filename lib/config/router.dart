@@ -8,8 +8,10 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/pages/onboarding/onboarding_wizard_page.dart';
+import 'package:serenutos/presentation/pages/onboarding/bootstrap_loading_view.dart';
 import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
 import 'package:serenutos/presentation/pages/login_page.dart';
+import 'package:serenutos/presentation/pages/register_page.dart';
 import 'package:serenutos/presentation/pages/home_page.dart';
 import 'package:serenutos/presentation/pages/sales_page.dart';
 import 'package:serenutos/presentation/pages/customers_page.dart';
@@ -33,7 +35,6 @@ import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/operations_hub_page.dart';
 import 'package:serenutos/presentation/pages/finance_hub_page.dart';
 import 'package:serenutos/presentation/pages/system_hub_page.dart';
-import 'package:serenutos/presentation/pages/management_hub_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
@@ -41,13 +42,13 @@ import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/paywall_page.dart';
 import 'package:serenutos/domain/services/access_manager.dart';
-import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/presentation/pages/admin/mobile_admin_dashboard.dart';
 import 'package:serenutos/presentation/pages/admin/ticket_chat_page.dart';
 
 /// Navigation routes
 class AppRoutes {
   static const login       = '/login';
+  static const loginSub    = '/login/sub';
   static const onboarding  = '/onboarding'; // Onboarding wizard — tek giriş noktası
   static const activation  = '/onboarding'; // Eski alias
   static const paywall     = '/paywall';
@@ -88,16 +89,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   final isAuthenticated = ref.watch(isAuthenticatedProvider);
   final accessManager = ref.watch(accessManagerProvider);
   final accessStatus = accessManager.checkAccess();
-  final prefs = ref.watch(sharedPreferencesProvider);
 
   return GoRouter(
     initialLocation: (accessStatus == AccessStatus.paywall)
         ? AppRoutes.paywall
         : (isAuthenticated
             ? AppRoutes.home
-            : ((prefs.getString('admin_pin_code') ?? '').isEmpty
-                ? AppRoutes.onboarding  // Onboarding wizard — tek giriş noktası
-                : AppRoutes.login)),
+            : AppRoutes.login),
     redirect: (context, state) {
       final loggedIn = isAuthenticated;
       final status = accessManager.checkAccess();
@@ -112,29 +110,48 @@ final routerProvider = Provider<GoRouter>((ref) {
         return loggedIn ? AppRoutes.home : AppRoutes.login;
       }
       
-      // Onboarding tamamlandı mı?
-      final hasAdminPin = (prefs.getString('admin_pin_code') ?? '').isNotEmpty;
       final onLogin       = state.matchedLocation == AppRoutes.login;
+      final onLoginForm   = state.matchedLocation == '/login/form';
+      final onLoginSub     = state.matchedLocation == AppRoutes.loginSub;
+      final onRegister    = state.matchedLocation.startsWith('/register');
       final onOnboarding  = state.matchedLocation.startsWith('/onboarding');
+      final onAuthScreen  = onLogin || onLoginForm || onLoginSub || onRegister || onOnboarding;
       
       if (!loggedIn) {
-        if (!hasAdminPin) {
-          if (!onOnboarding) return AppRoutes.onboarding; // Onboarding'e yönlendir
-          return null;
-        }
-        if (!onLogin) return AppRoutes.login;
+        if (!onAuthScreen) return AppRoutes.login;
         return null;
       }
       
-      if (onLogin || onOnboarding) return AppRoutes.home;
+      if (onAuthScreen) return AppRoutes.home;
       return null;
     },
     routes: [
-      // ── Login (no shell) ─────────────────────────────────────────────
+      // ── Login (karşılama ekranı)
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
         builder: (context, state) => const LoginPage(),
+      ),
+
+      // ── Login formu (giriş yap ekranı)
+      GoRoute(
+        path: '/login/form',
+        name: 'login-form',
+        builder: (context, state) => const LoginFormPage(),
+      ),
+
+      // ── Personel Girişi (PIN-based)
+      GoRoute(
+        path: AppRoutes.loginSub,
+        name: 'login-sub',
+        builder: (context, state) => const SubUserLoginPage(),
+      ),
+
+      // ── Hesap Oluştur (2 adımlı kayıt)
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegisterPage(),
       ),
 
       // ── Onboarding Wizard (ActivationPage yerini aldı) ────────────────
@@ -162,6 +179,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'license',
             name: 'onboardingLicense',
             builder: (context, state) => const OnboardingLicensePage(),
+          ),
+          GoRoute(
+            path: 'bootstrap',
+            name: 'onboardingBootstrap',
+            builder: (context, state) => BootstrapLoadingView(
+              onCompleted: () => context.go(AppRoutes.login),
+            ),
           ),
         ],
       ),

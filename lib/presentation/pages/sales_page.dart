@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/sales_page.dart
+// lib/presentation/pages/sales_page.dart
 // Serenut POS — Satış Sayfası / POS Sepet Ekranı
 // Yeşil + Sarı + Premium POS Teması
 // Revized: 22 Jun 2026 (Modularized)
@@ -329,28 +329,10 @@ class _SalesPageState extends ConsumerState<SalesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final flowState = ref.watch(salesFlowProvider);
     final filteredProductsVal = ref.watch(salesProductsControllerProvider);
     final categoriesVal       = ref.watch(productCategoriesProvider);
     final selectedCategory    = ref.watch(salesProductCategoryFilterProvider);
-    final customersAsyncVal   = ref.watch(customersControllerProvider);
-    final cartCount           = flowState.cartQuantities.values.fold(0, (a, b) => a + b);
-
-    final checkoutWidget = CheckoutSection(
-      total: flowState.total,
-      selectedCustomer: flowState.selectedCustomer,
-      paymentMethod: flowState.paymentMethod,
-      paidAmount: flowState.paidAmount,
-      paidController: _paidController,
-      isSubmitting: flowState.isSubmitting,
-      customersAsyncVal: customersAsyncVal,
-      onCustomerChanged: (cust) => ref.read(salesFlowProvider.notifier).selectCustomer(cust),
-      onPaymentMethodChanged: (method) => ref.read(salesFlowProvider.notifier).setPaymentMethod(method),
-      onPaidAmountChanged: (amt) => ref.read(salesFlowProvider.notifier).setPaidAmount(amt),
-      onSubmitSale: _submitSale,
-    );
-
-    final isProcessing = flowState.status == SalesFlowStatus.processing;
+    final isProcessing        = ref.watch(salesFlowProvider.select((state) => state.status == SalesFlowStatus.processing));
 
     return Scaffold(
       backgroundColor: _kSurface,
@@ -382,21 +364,42 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                         Container(width: 1, color: _kBorder),
                         Expanded(
                           flex: 2,
-                          child: CartPanel(
-                            cartQuantities: flowState.cartQuantities,
-                            cartProducts: flowState.cartProducts,
-                            onClearCart: () => ref.read(salesFlowProvider.notifier).clearCart(),
-                            onRemoveFromCart: (p) => ref.read(salesFlowProvider.notifier).removeFromCart(p),
-                            onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
-                            onDeleteFromCart: (p) => ref.read(salesFlowProvider.notifier).deleteFromCart(p),
-                            onQuantityChanged: (p, qty) => ref.read(salesFlowProvider.notifier).updateQuantity(p, qty),
-                            checkoutSectionWidget: checkoutWidget,
+                          child: Consumer(
+                            builder: (context, ref, child) {
+                              final flowState = ref.watch(salesFlowProvider);
+                              final customersAsyncVal = ref.watch(customersControllerProvider);
+
+                              final checkoutWidget = CheckoutSection(
+                                total: flowState.total,
+                                selectedCustomer: flowState.selectedCustomer,
+                                paymentMethod: flowState.paymentMethod,
+                                paidAmount: flowState.paidAmount,
+                                paidController: _paidController,
+                                isSubmitting: flowState.isSubmitting,
+                                customersAsyncVal: customersAsyncVal,
+                                onCustomerChanged: (cust) => ref.read(salesFlowProvider.notifier).selectCustomer(cust),
+                                onPaymentMethodChanged: (method) => ref.read(salesFlowProvider.notifier).setPaymentMethod(method),
+                                onPaidAmountChanged: (amt) => ref.read(salesFlowProvider.notifier).setPaidAmount(amt),
+                                onSubmitSale: _submitSale,
+                              );
+
+                              return CartPanel(
+                                cartQuantities: flowState.cartQuantities,
+                                cartProducts: flowState.cartProducts,
+                                onClearCart: () => ref.read(salesFlowProvider.notifier).clearCart(),
+                                onRemoveFromCart: (p) => ref.read(salesFlowProvider.notifier).removeFromCart(p),
+                                onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
+                                onDeleteFromCart: (p) => ref.read(salesFlowProvider.notifier).deleteFromCart(p),
+                                onQuantityChanged: (p, qty) => ref.read(salesFlowProvider.notifier).updateQuantity(p, qty),
+                                checkoutSectionWidget: checkoutWidget,
+                              );
+                            },
                           ),
                         ),
                       ],
                     );
                   }
-
+ 
                   return DefaultTabController(
                     length: 2,
                     child: Scaffold(
@@ -413,15 +416,36 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
                             onBarcodeSubmit: _handleBarcodeSubmit,
                           ),
-                          CartPanel(
-                            cartQuantities: flowState.cartQuantities,
-                            cartProducts: flowState.cartProducts,
-                            onClearCart: () => ref.read(salesFlowProvider.notifier).clearCart(),
-                            onRemoveFromCart: (p) => ref.read(salesFlowProvider.notifier).removeFromCart(p),
-                            onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
-                            onDeleteFromCart: (p) => ref.read(salesFlowProvider.notifier).deleteFromCart(p),
-                            onQuantityChanged: (p, qty) => ref.read(salesFlowProvider.notifier).updateQuantity(p, qty),
-                            checkoutSectionWidget: checkoutWidget,
+                          Consumer(
+                            builder: (context, ref, child) {
+                              final flowState = ref.watch(salesFlowProvider);
+                              final customersAsyncVal = ref.watch(customersControllerProvider);
+
+                              final checkoutWidget = CheckoutSection(
+                                total: flowState.total,
+                                selectedCustomer: flowState.selectedCustomer,
+                                paymentMethod: flowState.paymentMethod,
+                                paidAmount: flowState.paidAmount,
+                                paidController: _paidController,
+                                isSubmitting: flowState.isSubmitting,
+                                customersAsyncVal: customersAsyncVal,
+                                onCustomerChanged: (cust) => ref.read(salesFlowProvider.notifier).selectCustomer(cust),
+                                onPaymentMethodChanged: (method) => ref.read(salesFlowProvider.notifier).setPaymentMethod(method),
+                                onPaidAmountChanged: (amt) => ref.read(salesFlowProvider.notifier).setPaidAmount(amt),
+                                onSubmitSale: _submitSale,
+                              );
+
+                              return CartPanel(
+                                cartQuantities: flowState.cartQuantities,
+                                cartProducts: flowState.cartProducts,
+                                onClearCart: () => ref.read(salesFlowProvider.notifier).clearCart(),
+                                onRemoveFromCart: (p) => ref.read(salesFlowProvider.notifier).removeFromCart(p),
+                                onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
+                                onDeleteFromCart: (p) => ref.read(salesFlowProvider.notifier).deleteFromCart(p),
+                                onQuantityChanged: (p, qty) => ref.read(salesFlowProvider.notifier).updateQuantity(p, qty),
+                                checkoutSectionWidget: checkoutWidget,
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -438,13 +462,13 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             unselectedLabelColor: _kTextSecondary,
                             labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                             unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
-                            tabs: [
-                              const Tab(
+                            tabs: const [
+                              Tab(
                                 icon: Icon(Icons.grid_view_rounded, size: 20),
                                 text: 'Katalog',
                               ),
                               Tab(
-                                icon: _AnimatedCartTab(cartCount: cartCount),
+                                icon: _AnimatedCartTab(),
                                 text: 'Sepet',
                               ),
                             ],
@@ -473,18 +497,17 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   }
 }
 
-class _AnimatedCartTab extends StatefulWidget {
-  final int cartCount;
-
-  const _AnimatedCartTab({required this.cartCount});
+class _AnimatedCartTab extends ConsumerStatefulWidget {
+  const _AnimatedCartTab();
 
   @override
-  State<_AnimatedCartTab> createState() => _AnimatedCartTabState();
+  ConsumerState<_AnimatedCartTab> createState() => _AnimatedCartTabState();
 }
 
-class _AnimatedCartTabState extends State<_AnimatedCartTab> with SingleTickerProviderStateMixin {
+class _AnimatedCartTabState extends ConsumerState<_AnimatedCartTab> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  int _lastCount = 0;
 
   @override
   void initState() {
@@ -501,14 +524,6 @@ class _AnimatedCartTabState extends State<_AnimatedCartTab> with SingleTickerPro
   }
 
   @override
-  void didUpdateWidget(covariant _AnimatedCartTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.cartCount > oldWidget.cartCount) {
-      _controller.forward(from: 0.0);
-    }
-  }
-
-  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -516,13 +531,22 @@ class _AnimatedCartTabState extends State<_AnimatedCartTab> with SingleTickerPro
 
   @override
   Widget build(BuildContext context) {
+    final cartCount = ref.watch(salesFlowProvider.select(
+      (state) => state.cartQuantities.values.fold(0, (a, b) => a + b),
+    ));
+
+    if (cartCount > _lastCount) {
+      _controller.forward(from: 0.0);
+    }
+    _lastCount = cartCount;
+
     return ScaleTransition(
       scale: _animation,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           const Icon(Icons.shopping_basket_rounded, size: 20),
-          if (widget.cartCount > 0)
+          if (cartCount > 0)
             Positioned(
               top: -6,
               right: -8,
@@ -535,7 +559,7 @@ class _AnimatedCartTabState extends State<_AnimatedCartTab> with SingleTickerPro
                 ),
                 child: Center(
                   child: Text(
-                    '${widget.cartCount}',
+                    '$cartCount',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 9,

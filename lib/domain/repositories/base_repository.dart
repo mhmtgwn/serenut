@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/base_repository.dart
+// lib/infrastructure/repositories/base_repository.dart
 // PHASE 0 Day 3 - Repository Pattern
 // Base interfaces for data access layer
 // Generated: 21 Jun 2026
@@ -441,11 +441,28 @@ abstract class IDbTransactionRunner {
 /// User repository contract
 abstract class IUserRepository implements BaseRepository<AuthUser> {
   Future<AuthUser?> findByUsername(String username);
+  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username);
   Future<String?> getPasswordHash(String userId);
+  Future<Map<String, String?>> getCredentialHashes(String userId);
   Future<void> updateLastLogin(String userId);
   Future<void> updatePasswordHash(String userId, String passwordHash);
-  Future<void> insertUser(AuthUser user, String passwordHash);
-  Future<void> updateUserFields(AuthUser user, {bool? isActive, String? passwordHash});
+  Future<void> insertUser(
+    AuthUser user,
+    String passwordHash, {
+    String? username,
+    String? pinHash,
+    String? businessCode,
+    int? deviceTokenVersion,
+  });
+  Future<void> updateUserFields(
+    AuthUser user, {
+    bool? isActive,
+    String? passwordHash,
+    String? username,
+    String? pinHash,
+    String? businessCode,
+    int? deviceTokenVersion,
+  });
 }
 
 /// DTO representing the counts of database health anomalies

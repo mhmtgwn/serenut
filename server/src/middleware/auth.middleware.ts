@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService, UserPayload } from '../modules/auth/auth.service';
-import { pgPool } from '../config/database';
+import { pgPool, tenantLocalStorage } from '../config/database';
+import { incrementJwtFailures } from '../utils/telemetry';
 
 export interface AuthenticatedRequest extends Request {
   user?: UserPayload;
@@ -9,6 +10,7 @@ export interface AuthenticatedRequest extends Request {
 export async function authenticateUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    incrementJwtFailures();
     return res.status(401).json({ error: 'unauthorized', message: 'Bearer token gereklidir.' });
   }
 
@@ -16,13 +18,19 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
   try {
     const isBlacklisted = await AuthService.isTokenBlacklisted(token);
     if (isBlacklisted) {
+      incrementJwtFailures();
       return res.status(401).json({ error: 'unauthorized', message: 'Token geçersiz kılınmıştır (oturum kapatıldı).' });
     }
 
     const decoded = AuthService.verifyAccessToken(token);
     req.user = decoded;
-    next();
+    
+    // Bind context of PG RLS for asynchronous callbacks
+    tenantLocalStorage.run({ companyId: decoded.company_id, bypassRls: false }, () => {
+      next();
+    });
   } catch (err) {
+    incrementJwtFailures();
     return res.status(401).json({ error: 'unauthorized', message: 'Geçersiz veya süresi dolmuş token.' });
   }
 }

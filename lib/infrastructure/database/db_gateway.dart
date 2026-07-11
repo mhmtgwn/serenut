@@ -1,11 +1,11 @@
-﻿// lib/infrastructure/database/db_gateway.dart
+// lib/infrastructure/database/db_gateway.dart
 // PHASE 2 - Database Safety Layer
 // DbGateway handles safe, lock-aware, transaction-routed database execution.
 
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
@@ -42,18 +42,13 @@ class DbGatewayImpl implements DbGateway {
     if (Zone.current[#sqlite_txn] != null) {
       return;
     }
-    
-    final bool isSqlCipherAvailable = DatabaseManager.isSqlCipherAvailableOnWindows() || kDebugMode;
-
-    if (isWrite && !isSqlCipherAvailable) {
-      throw StateError('Kritik Güvenlik Hatası: SQLCipher şifreleme motoru Windows üzerinde aktif olmadığından veritabanı yazma işlemleri kilitlenmiştir.');
-    }
+    // Write verification block removed (SQLCipher removed)
 
     int attempts = 0;
     final bool isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
     final int maxAttempts = isTest ? 2 : 40;
     while (DatabaseManager.isWriteLocked) {
-      if (!isWrite && !isSqlCipherAvailable) {
+      if (!isWrite) {
         break;
       }
       attempts++;

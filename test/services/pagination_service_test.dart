@@ -1,4 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:serenutos/domain/services/pagination_service.dart';
 
 // Mock veri yükleyici
 Future<List<String>> mockDataLoader(int offset, int limit, String? searchQuery) async {
@@ -25,92 +26,12 @@ Future<List<String>> mockDataLoader(int offset, int limit, String? searchQuery) 
   return filteredData.sublist(startIndex, endIndex);
 }
 
-// Basit PaginationService implementasyonu (test için)
-class TestPaginationService<T> {
-  final Future<List<T>> Function(int offset, int limit, String? searchQuery) _dataLoader;
-  final int _pageSize;
-  
-  List<T> _items = [];
-  bool _isLoading = false;
-  bool _hasMoreData = true;
-  int _currentPage = 0;
-  String _currentSearchQuery = '';
-  
-  // Getters
-  List<T> get items => _items;
-  bool get isLoading => _isLoading;
-  bool get hasMoreData => _hasMoreData;
-  int get totalItems => _items.length;
-  int get currentPage => _currentPage;
-  String get currentSearchQuery => _currentSearchQuery;
-
-  TestPaginationService({
-    required Future<List<T>> Function(int offset, int limit, String? searchQuery) dataLoader,
-    int pageSize = 20,
-  }) : _dataLoader = dataLoader,
-       _pageSize = pageSize;
-
-  Future<void> loadFirstPage({String? searchQuery}) async {
-    if (_isLoading) return;
-
-    _isLoading = true;
-    _currentPage = 0;
-    _currentSearchQuery = searchQuery ?? '';
-    
-    final newItems = await _dataLoader(0, _pageSize, _currentSearchQuery);
-    
-    _items = newItems;
-    _hasMoreData = newItems.length == _pageSize;
-    _isLoading = false;
-  }
-
-  Future<void> loadNextPage() async {
-    if (_isLoading || !_hasMoreData) return;
-
-    _isLoading = true;
-    _currentPage++;
-    
-    final offset = _currentPage * _pageSize;
-    final newItems = await _dataLoader(offset, _pageSize, _currentSearchQuery);
-    
-    _items.addAll(newItems);
-    _hasMoreData = newItems.length == _pageSize;
-    _isLoading = false;
-  }
-
-  Future<void> search(String query) async {
-    if (_currentSearchQuery == query) return;
-    await loadFirstPage(searchQuery: query);
-  }
-
-  Future<void> refresh() async {
-    _hasMoreData = true;
-    await loadFirstPage(searchQuery: _currentSearchQuery);
-  }
-
-  void reset() {
-    _items.clear();
-    _isLoading = false;
-    _hasMoreData = true;
-    _currentPage = 0;
-    _currentSearchQuery = '';
-  }
-
-  void addItem(T item) {
-    _items.insert(0, item);
-  }
-
-  void removeItem(T item) {
-    _items.remove(item);
-  }
-}
-
 void main() {
   group('PaginationService Tests', () {
-    late TestPaginationService<String> paginationService;
+    late PaginationService<String> paginationService;
 
     setUp(() {
-      paginationService = TestPaginationService<String>(
+      paginationService = PaginationService<String>(
         dataLoader: mockDataLoader,
         pageSize: 10,
       );
@@ -231,7 +152,7 @@ void main() {
 
   group('Performance Tests', () {
     test('should load data within reasonable time', () async {
-      final paginationService = TestPaginationService<String>(
+      final paginationService = PaginationService<String>(
         dataLoader: mockDataLoader,
         pageSize: 50,
       );
@@ -245,7 +166,7 @@ void main() {
     });
 
     test('should handle large datasets efficiently', () async {
-      final paginationService = TestPaginationService<String>(
+      final paginationService = PaginationService<String>(
         dataLoader: (offset, limit, query) async {
           // Simulate large dataset
           final data = List.generate(limit, (index) => 'Item ${offset + index}');
@@ -272,7 +193,7 @@ void main() {
 
   group('Edge Cases', () {
     test('should handle empty data source', () async {
-      final emptyPaginationService = TestPaginationService<String>(
+      final emptyPaginationService = PaginationService<String>(
         dataLoader: (offset, limit, query) async => [],
         pageSize: 10,
       );
@@ -284,7 +205,7 @@ void main() {
     });
 
     test('should handle data loader errors gracefully', () async {
-      final errorPaginationService = TestPaginationService<String>(
+      final errorPaginationService = PaginationService<String>(
         dataLoader: (offset, limit, query) async {
           throw Exception('Data loading failed');
         },
@@ -295,11 +216,12 @@ void main() {
     });
 
     test('should handle null search query', () async {
-      final paginationService = TestPaginationService<String>(
+      final paginationService = PaginationService<String>(
         dataLoader: mockDataLoader,
         pageSize: 10,
       );
       
+      await paginationService.loadFirstPage(searchQuery: 'Item');
       await paginationService.search('');
       
       expect(paginationService.currentSearchQuery, isEmpty);

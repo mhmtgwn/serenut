@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/in_memory_repositories.dart
+// lib/infrastructure/repositories/in_memory_repositories.dart
 // Stateful In-Memory Repositories for Web fallback execution
 // Generated: 21 Jun 2026
 
@@ -1240,20 +1240,41 @@ class InMemoryUserRepository implements IUserRepository {
   }
 
   @override
-  Future<void> insertUser(AuthUser user, String passwordHash) async {
+  Future<void> insertUser(
+    AuthUser user,
+    String passwordHash, {
+    String? username,
+    String? pinHash,
+    String? businessCode,
+    int? deviceTokenVersion,
+  }) async {
     InMemoryDb.users.removeWhere((u) => u.id == user.id);
     InMemoryDb.users.add(user);
     _passwordHashes[user.id] = passwordHash;
+    if (pinHash != null) {
+      _passwordHashes['${user.id}_pin'] = pinHash;
+    }
   }
 
   @override
-  Future<void> updateUserFields(AuthUser user, {bool? isActive, String? passwordHash}) async {
+  Future<void> updateUserFields(
+    AuthUser user, {
+    bool? isActive,
+    String? passwordHash,
+    String? username,
+    String? pinHash,
+    String? businessCode,
+    int? deviceTokenVersion,
+  }) async {
     final index = InMemoryDb.users.indexWhere((u) => u.id == user.id);
     if (index != -1) {
       InMemoryDb.users[index] = user;
     }
     if (passwordHash != null) {
       _passwordHashes[user.id] = passwordHash;
+    }
+    if (pinHash != null) {
+      _passwordHashes['${user.id}_pin'] = pinHash;
     }
   }
 
@@ -1273,6 +1294,7 @@ class InMemoryUserRepository implements IUserRepository {
   Future<int> delete(dynamic id) async {
     InMemoryDb.users.removeWhere((u) => u.id == id);
     _passwordHashes.remove(id);
+    _passwordHashes.remove('${id}_pin');
     return 1;
   }
 
@@ -1282,5 +1304,19 @@ class InMemoryUserRepository implements IUserRepository {
   @override
   Future<bool> exists(dynamic id) async {
     return InMemoryDb.users.any((u) => u.id == id);
+  }
+
+  @override
+  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username) async {
+    // InMemory search
+    return null;
+  }
+
+  @override
+  Future<Map<String, String?>> getCredentialHashes(String userId) async {
+    return {
+      'password_hash': _passwordHashes[userId],
+      'pin_hash': _passwordHashes['${userId}_pin'],
+    };
   }
 }

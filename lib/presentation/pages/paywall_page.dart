@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:serenutos/domain/models/license_model.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _kPrimary = Color(0xFF10B981); // Emerald Green
@@ -22,7 +23,6 @@ class PaywallPage extends ConsumerStatefulWidget {
 class _PaywallPageState extends ConsumerState<PaywallPage> {
   final _tokenCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  LicenseTier _selectedTier = LicenseTier.pro; // Default selection
   bool _isLoading = false;
   String? _errorMessage;
   String? _successMessage;
@@ -74,39 +74,30 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
     }
   }
 
-  Future<void> _purchaseSubscription() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-
+  Future<void> _launchWebUrl(String urlString) async {
     try {
-      final billingRepo = ref.read(billingRepositoryProvider);
-      
-      // Determine plan code
-      final planId = _selectedTier == LicenseTier.basic 
-          ? 'plan-basic' 
-          : (_selectedTier == LicenseTier.pro ? 'plan-pro' : 'plan-enterprise');
-
-      // Request checkout session URL from Server
-      final checkoutUrl = await billingRepo.startSubscription(planId);
-      
-      // Launch webview sim
-      final uri = Uri.parse('https://serenut.com$checkoutUrl');
-      
+      final uri = Uri.parse(urlString);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-        setState(() {
-          _successMessage = 'Ödeme sayfası tarayıcınızda açıldı. Ödemeyi tamamladıktan sonra lisansınız otomatik aktif olacaktır.';
-        });
       } else {
-        throw Exception('Ödeme sayfası açılamadı.');
+        throw Exception('Tarayıcı açılamadı.');
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Ödeme başlatma hatası: $e';
+        _errorMessage = 'Bağlantı açılamadı: $e';
       });
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(authNotifierProvider.notifier).logout();
+      if (mounted) {
+        context.go('/login');
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'Çıkış yapılırken hata oluştu.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -175,7 +166,7 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                             Expanded(
                               child: Text(
                                 isTrialExpired
-                                    ? 'Deneme Süreniz Sona Erdi! Devam etmek için lisans anahtarınızı girin veya satın alın.'
+                                    ? 'Deneme Süreniz Sona Erdi! Devam etmek için lisans anahtarınızı girin veya web sitemizden satın alın.'
                                     : 'Deneme Süreniz Aktif ($remainingDays gün kaldı).',
                                 style: const TextStyle(
                                   color: Colors.white,
@@ -189,68 +180,31 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Packages Selection Header
+                      // Website Information Text
                       const Text(
-                        'İşletmeniz İçin Koruma Planı Seçin',
+                        'Lisans ve Abonelik İşlemleri',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       const Text(
-                        'Nutoplano Serenut OS ile veri kayıplarını ve finansal riskleri sıfıra indirin.',
+                        'Lisans satın alma, yenileme ve hesap yönetimi işlemleri güvenliğiniz için Serenut web sitesi üzerinden gerçekleştirilmektedir.',
                         style: TextStyle(
                           color: _kTextMuted,
-                          fontSize: 12,
+                          fontSize: 13,
+                          height: 1.4,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                      // Package Cards
-                      _buildPackageCard(
-                        tier: LicenseTier.basic,
-                        title: 'BASIC (Temel POS - 450 TL/Ay)',
-                        desc: 'Günlük perakende satış ve stok takibi',
-                        features: [
-                          'Temel veresiye & nakit satışı',
-                          'Müşteri & ürün katalog yönetimi',
-                          'Maksimum 2 aktif cihaz desteği',
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPackageCard(
-                        tier: LicenseTier.pro,
-                        title: 'PRO (Ledger Bütünlüğü - 950 TL/Ay)',
-                        desc: 'Finansal risk koruması ve resmi raporlama',
-                        features: [
-                          'Drift korumalı bank-grade ledger bütünlüğü',
-                          'Resmi PDF banka ekstresi & Excel çıktıları',
-                          'Müşterilere otomatik SMS bakiye bildirimleri',
-                          'Maksimum 5 aktif cihaz desteği',
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPackageCard(
-                        tier: LicenseTier.proPlus,
-                        title: 'ENTERPRISE (Sınırsız - 2450 TL/Ay)',
-                        desc: 'Tam kontrol, izleme ve kurtarma araçları',
-                        features: [
-                          'Multi-device otomatik bulut senkronizasyonu',
-                          'Çakışma çözümleme paneli (conflict resolution)',
-                          'Yazıcı ve SMS kuyruğu arka plan denetimleri',
-                          'Sistem observability telemetrisi & audit logs',
-                          'Maksimum 99 aktif cihaz desteği',
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Purchase Button
+                      // Web site actions
                       ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _purchaseSubscription,
-                        icon: const Icon(Icons.credit_card_rounded),
-                        label: const Text('Kredi Kartı ile Satın Al / Yenile'),
+                        onPressed: () => _launchWebUrl('https://serenut.com/portal/'),
+                        icon: const Icon(Icons.shopping_bag_rounded),
+                        label: const Text('Lisans Satın Al / Yenile (Web)'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blueAccent,
                           foregroundColor: Colors.white,
@@ -260,7 +214,39 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+
+                      // Secondary actions on Web
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _launchWebUrl('https://serenut.com/portal/#register'),
+                              icon: const Icon(Icons.person_add_rounded, size: 18),
+                              label: const Text('Kayıt Ol'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(color: Color(0xFF475569)),
+                                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _launchWebUrl('https://serenut.com/portal/#reset'),
+                              icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                              label: const Text('Şifremi Unuttum'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(color: Color(0xFF475569)),
+                                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
                       const Divider(color: Color(0xFF334155)),
                       const SizedBox(height: 16),
 
@@ -345,7 +331,18 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+
+                      // Local logout / Switch account button
+                      TextButton.icon(
+                        onPressed: _isLoading ? null : _handleLogout,
+                        icon: const Icon(Icons.exit_to_app_rounded, size: 18),
+                        label: const Text('Farklı Hesapla Giriş Yap (Çıkış Yap)'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
 
                       // Footer Device ID
                       Center(
@@ -364,89 +361,6 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPackageCard({
-    required LicenseTier tier,
-    required String title,
-    required String desc,
-    required List<String> features,
-  }) {
-    final isSelected = _selectedTier == tier;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTier = tier;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0F2D24) : const Color(0xFF0F172A),
-          border: Border.all(
-            color: isSelected ? _kPrimary : const Color(0xFF1E293B),
-            width: isSelected ? 1.5 : 1.0,
-          ),
-          borderRadius: BorderRadius.circular(12.0),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      desc,
-                      style: const TextStyle(
-                        color: _kTextMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-                Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                  color: isSelected ? _kPrimary : _kTextMuted,
-                  size: 20,
-                ),
-              ],
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 12),
-              const Divider(color: Color(0xFF1E293B), height: 1),
-              const SizedBox(height: 10),
-              ...features.map((f) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: _kPrimary, size: 14),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        f,
-                        style: const TextStyle(color: Colors.white, fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-            ],
-          ],
         ),
       ),
     );

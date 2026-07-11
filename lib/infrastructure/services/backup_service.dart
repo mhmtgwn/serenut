@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/domain/services/i_backup_service.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
@@ -154,21 +154,13 @@ class BackupService implements IBackupService {
       throw Exception('Geri yüklenecek yedek dosyası bulunamadı.');
     }
 
-    // 1. Determine key to test decrypting the backup
-    String? testKey;
     final dbManager = DatabaseManager();
-    if (recoveryKey != null && recoveryKey.isNotEmpty) {
-      testKey = dbManager.deriveEncryptionKey(recoveryKey);
-    } else {
-      testKey = dbManager.encryptionKey;
-    }
 
-    // Verify it is a valid sqlite file and can be opened with the key
+    // Verify it is a valid sqlite file and can be opened
     Database? tempDb;
     try {
       tempDb = await dbManager.openDatabaseConnection(
         backupPath,
-        password: testKey,
         readOnly: true,
       );
       final tables = await tempDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
@@ -179,7 +171,7 @@ class BackupService implements IBackupService {
         throw Exception('Geçersiz yedek dosyası. Gerekli Serenut POS tabloları bulunamadı.');
       }
     } catch (e) {
-      throw Exception('Yedek dosyası doğrulanamadı veya şifresi hatalı: $e');
+      throw Exception('Yedek dosyası doğrulanamadı: $e');
     } finally {
       if (tempDb != null) {
         await tempDb.close();
@@ -226,7 +218,6 @@ class BackupService implements IBackupService {
       try {
         testRestoredDb = await dbManager.openDatabaseConnection(
           dbPath,
-          password: testKey,
           readOnly: true,
         );
         await testRestoredDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
@@ -240,12 +231,6 @@ class BackupService implements IBackupService {
       if (await tempBackupDbFile.exists()) await tempBackupDbFile.delete();
       if (await tempBackupWalFile.exists()) await tempBackupWalFile.delete();
       if (await tempBackupShmFile.exists()) await tempBackupShmFile.delete();
-
-      // Save the new recovery key to SharedPreferences if it was different
-      if (recoveryKey != null && recoveryKey.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('database_recovery_key', recoveryKey);
-      }
     } catch (e) {
       // Restore failed, roll back original files!
       if (await dbFile.exists()) await dbFile.delete();

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/orders_page.dart
+// lib/presentation/pages/orders_page.dart
 // Serenut POS — Sipariş Yönetimi
 // Phase 6 UI Redesign — Square/Loyverse POS Stili
 // Revized: 22 Jun 2026
@@ -65,6 +65,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   bool _isSearching = false;
   String _orderQuery = '';
   final _searchController = TextEditingController();
+  bool _showFilters = false;
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -141,163 +142,80 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     }
   }
 
-  void _showStatusBottomSheet(BuildContext context, Map<String, int> counts) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Durum Filtrele',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _kText,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildModalChip(
-                        ctx,
-                        label: 'Tümü',
-                        count: counts['all']!,
-                        isSelected: _statusFilter == 'all',
-                        onTap: () {
-                          setState(() => _statusFilter = 'all');
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      _buildModalChip(
-                        ctx,
-                        label: 'Yeni',
-                        count: counts['created']!,
-                        isSelected: _statusFilter == 'created',
-                        onTap: () {
-                          setState(() => _statusFilter = 'created');
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      _buildModalChip(
-                        ctx,
-                        label: 'Hazırlanıyor',
-                        count: counts['preparing']!,
-                        isSelected: _statusFilter == 'preparing',
-                        onTap: () {
-                          setState(() => _statusFilter = 'preparing');
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      _buildModalChip(
-                        ctx,
-                        label: 'Hazır',
-                        count: counts['ready']!,
-                        isSelected: _statusFilter == 'ready',
-                        onTap: () {
-                          setState(() => _statusFilter == 'ready');
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      _buildModalChip(
-                        ctx,
-                        label: 'Teslim Edildi',
-                        count: counts['delivered']!,
-                        isSelected: _statusFilter == 'delivered',
-                        onTap: () {
-                          setState(() => _statusFilter == 'delivered');
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      _buildModalChip(
-                        ctx,
-                        label: 'İptal',
-                        count: counts['cancelled']!,
-                        isSelected: _statusFilter == 'cancelled',
-                        onTap: () {
-                          setState(() => _statusFilter == 'cancelled');
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildModalChip(
+  Widget _buildFilterRow(
     BuildContext context, {
     required String label,
     required int count,
     required bool isSelected,
     required VoidCallback onTap,
+    required Color statusColor,
+    required IconData icon,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? _kGreen : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? _kGreen : const Color(0xFFE2E8F0),
-            width: 1,
-          ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? statusColor.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected ? statusColor : const Color(0xFFE2E8F0),
+          width: isSelected ? 2 : 1,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFF475569),
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.25) : _kGreenLight,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: isSelected ? Colors.white : _kGreenDark,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Colored left bar indicator
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                // Status icon
+                Icon(
+                  icon,
+                  color: isSelected ? statusColor : const Color(0xFF64748B),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                // Status label
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? statusColor : const Color(0xFF334155),
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const Spacer(),
+                // Item count badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected ? statusColor.withValues(alpha: 0.15) : const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? statusColor : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -365,36 +283,156 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
           onSearchChanged: (val) => setState(() => _orderQuery = val),
           showRefresh: true,
           onRefresh: () => ref.read(ordersControllerProvider.notifier).refresh(),
-          filterWidget: InkWell(
-            onTap: () => _showStatusBottomSheet(context, counts),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _kSurface,
+          filterWidget: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: () => setState(() => _showFilters = !_showFilters),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.filter_list_rounded, size: 16, color: _kGreenDark),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _statusFilter == 'all'
-                          ? 'Durum: Tümü (${counts['all']})'
-                          : 'Durum: ${_statusLabel(_statusFilter)} (${counts[_statusFilter]})',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _kText,
-                      ),
-                    ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _kSurface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _kBorder),
                   ),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _kTextSecondary),
-                ],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.filter_list_rounded, size: 16, color: _kGreenDark),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _statusFilter == 'all'
+                              ? 'Durum: Tümü (${counts['all']})'
+                              : 'Durum: ${_statusLabel(_statusFilter)} (${counts[_statusFilter]})',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _kText,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        _showFilters
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: _kTextSecondary,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _kBorder),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildFilterRow(
+                        context,
+                        label: 'Tümü',
+                        count: counts['all']!,
+                        isSelected: _statusFilter == 'all',
+                        onTap: () {
+                          setState(() {
+                            _statusFilter = 'all';
+                            _showFilters = false;
+                          });
+                        },
+                        statusColor: const Color(0xFF64748B),
+                        icon: Icons.grid_view_rounded,
+                      ),
+                      _buildFilterRow(
+                        context,
+                        label: 'Yeni',
+                        count: counts['created']!,
+                        isSelected: _statusFilter == 'created',
+                        onTap: () {
+                          setState(() {
+                            _statusFilter = 'created';
+                            _showFilters = false;
+                          });
+                        },
+                        statusColor: const Color(0xFF3B82F6),
+                        icon: Icons.fiber_new_rounded,
+                      ),
+                      _buildFilterRow(
+                        context,
+                        label: 'Hazırlanıyor',
+                        count: counts['preparing']!,
+                        isSelected: _statusFilter == 'preparing',
+                        onTap: () {
+                          setState(() {
+                            _statusFilter = 'preparing';
+                            _showFilters = false;
+                          });
+                        },
+                        statusColor: const Color(0xFFFF9500),
+                        icon: Icons.soup_kitchen_rounded,
+                      ),
+                      _buildFilterRow(
+                        context,
+                        label: 'Hazır',
+                        count: counts['ready']!,
+                        isSelected: _statusFilter == 'ready',
+                        onTap: () {
+                          setState(() {
+                            _statusFilter = 'ready';
+                            _showFilters = false;
+                          });
+                        },
+                        statusColor: const Color(0xFF10B981),
+                        icon: Icons.check_circle_outline_rounded,
+                      ),
+                      _buildFilterRow(
+                        context,
+                        label: 'Teslim Edildi',
+                        count: counts['delivered']!,
+                        isSelected: _statusFilter == 'delivered',
+                        onTap: () {
+                          setState(() {
+                            _statusFilter = 'delivered';
+                            _showFilters = false;
+                          });
+                        },
+                        statusColor: const Color(0xFF6366F1),
+                        icon: Icons.local_shipping_rounded,
+                      ),
+                      _buildFilterRow(
+                        context,
+                        label: 'İptal',
+                        count: counts['cancelled']!,
+                        isSelected: _statusFilter == 'cancelled',
+                        onTap: () {
+                          setState(() {
+                            _statusFilter = 'cancelled';
+                            _showFilters = false;
+                          });
+                        },
+                        statusColor: const Color(0xFFEF4444),
+                        icon: Icons.cancel_rounded,
+                      ),
+                    ],
+                  ),
+                ),
+                crossFadeState: _showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
+              ),
+            ],
           ),
           body: filtered.isEmpty
               ? _EmptyView(

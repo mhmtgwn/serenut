@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/app_shell.dart
+// lib/presentation/widgets/app_shell.dart
 // Bottom Navigation Shell — 5 tabs: Ana Sayfa, Satış, Siparişler, Müşteriler, Ürünler
 // Ayarlar → AppBar icon (sağ üst)
 // Raporlar → navbar'dan kaldırıldı
@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/realtime/realtime_provider.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
@@ -26,13 +28,27 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Automatically manage real-time WebSocket connection based on authentication
+    ref.listen(isAuthenticatedProvider, (previous, next) {
+      if (next) {
+        ref.read(connectionManagerProvider).connect();
+      } else {
+        ref.read(connectionManagerProvider).disconnect();
+      }
+    });
+
     final activeIndex = navigationShell.currentIndex;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(activeShellIndexProvider) != activeIndex) {
         ref.read(activeShellIndexProvider.notifier).state = activeIndex;
       }
+      // Trigger connection if already authenticated on initial build
+      if (ref.read(isAuthenticatedProvider)) {
+        ref.read(connectionManagerProvider).connect();
+      }
     });
+
 
     const navItems = [
       _NavItem(
@@ -42,7 +58,7 @@ class AppShell extends ConsumerWidget {
         route: AppRoutes.home,
       ),
       _NavItem(
-        label: 'Kasa (Satış)',
+        label: 'Satış',
         icon: Icons.shopping_cart_outlined,
         activeIcon: Icons.shopping_cart_rounded,
         route: AppRoutes.sales,

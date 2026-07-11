@@ -5,8 +5,13 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const srcUrl = process.env.DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:5432/nutopiano';
-const tempDbName = `nutopiano_dr_test_${Date.now()}`;
+if (!process.env.DATABASE_URL) {
+  console.error('❌ Error: DATABASE_URL environment variable is required.');
+  process.exit(1);
+}
+
+const srcUrl = process.env.DATABASE_URL;
+const tempDbName = `serenut_dr_test_${Date.now()}`;
 
 // Parse connection URL (postgres://user:pass@host:port/dbname)
 const urlPattern = /postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/;
@@ -18,7 +23,7 @@ if (!match) {
 }
 
 const [, user, password, host, port, dbName] = match;
-const dumpFilePath = path.join(__dirname, `../../nutopiano_backup_dr.sql`);
+const dumpFilePath = path.join(__dirname, `../../serenut_backup_dr.sql`);
 
 async function runCommand(cmd: string, envOverrides = {}): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,7 +54,7 @@ async function verifyDr() {
   const fileExists = fs.existsSync(dumpFilePath);
 
   // 2. Connect to postgres admin database to create a temp test db
-  const adminUrl = `postgres://${user}:${password}@${host}:${port}/postgres`;
+  const adminUrl = `postgres://${user}:${password}@${host}:${port}/template1`;
   const adminClient = new Client({ connectionString: adminUrl });
   await adminClient.connect();
 

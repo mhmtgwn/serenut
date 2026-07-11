@@ -10,6 +10,7 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/domain/services/license_service.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
@@ -59,6 +60,11 @@ void main() async {
       final hashService = PasswordHashServiceImpl();
       final apiClient = ApiClient();
 
+      final licenseService = LicenseService(prefs);
+      if (licenseService.getLicenseInfo() != null) {
+        licenseService.startHeartbeat(apiClient);
+      }
+
       final authService = AuthService(
         userRepository: userRepository,
         hashService: hashService,
@@ -87,6 +93,7 @@ void main() async {
             apiClientProvider.overrideWithValue(apiClient),
             sharedPreferencesProvider.overrideWithValue(prefs),
             datasetLoaderServiceProvider.overrideWithValue(datasetLoader),
+            licenseServiceProvider.overrideWithValue(licenseService),
           ],
           child: const MyApp(),
         ),
@@ -103,6 +110,8 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
+  bool _checkingIntegrity = true;
+  String? _integrityError;
   bool _checkingVersion = true;
   bool _forceUpdateRequired = false;
   String _latestVersion = '';
@@ -112,6 +121,47 @@ class _MyAppState extends ConsumerState<MyApp> {
   @override
   void initState() {
     super.initState();
+    _runIntegrityDiagnostics();
+  }
+
+  Future<void> _runIntegrityDiagnostics() async {
+    if (kIsWeb) {
+      setState(() {
+        _checkingIntegrity = false;
+      });
+      _checkVersion();
+      _triggerAutoBackup();
+      return;
+    }
+
+    try {
+      final diag = ref.read(integrityCheckServiceProvider);
+      final report = await diag.runDiagnostics();
+      if (!report.isAllPass) {
+        // Attempt automated recovery repair
+        final repaired = await diag.attemptDatabaseRepair();
+        if (!repaired) {
+          setState(() {
+            _integrityError = report.issues.join('\n');
+            _checkingIntegrity = false;
+          });
+          return;
+        }
+      }
+
+      // Run crash recovery scan on startup
+      final recovery = ref.read(crashRecoveryManagerProvider);
+      final crashed = await recovery.checkForCrashOnStartup();
+      if (crashed) {
+        await recovery.recoverInterruptedSyncJobs();
+      }
+    } catch (e) {
+      debugPrint('Integrity diagnostics run failure: $e');
+    }
+
+    setState(() {
+      _checkingIntegrity = false;
+    });
     _checkVersion();
     _triggerAutoBackup();
   }
@@ -145,6 +195,71 @@ class _MyAppState extends ConsumerState<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingIntegrity) {
+      return MaterialApp(
+        title: 'Serenut POS',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Sistem bütünlüğü kontrol ediliyor...'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_integrityError != null) {
+      return MaterialApp(
+        title: 'Serenut POS',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.redAccent),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Veritabanı Bütünlük Hatası!',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Sistem otomatik kurtarmayı denedi ancak başarılı olamadı. Lütfen teknik destek ekibiyle iletişime geçin.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withAlpha(20),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.redAccent.withAlpha(60)),
+                    ),
+                    child: Text(
+                      _integrityError!,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_checkingVersion) {
       return MaterialApp(
         title: 'Serenut POS',

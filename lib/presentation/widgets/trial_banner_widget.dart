@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/trial_banner_widget.dart
+// lib/presentation/widgets/trial_banner_widget.dart
 // Serenut POS — Trial/License Countdown Banner
 // Backend: LicenseService.getRemainingDays() + checkLicenseStatus() — sıfır değişiklik
 // Created: Phase 4 — 01 Jul 2026
@@ -17,6 +17,20 @@ const _kGreen  = Color(0xFF10B981);
 
 final licenseStatusProvider = Provider<LicenseStatus>((ref) {
   final service = ref.watch(licenseServiceProvider);
+  final trialManager = ref.watch(trialManagerProvider);
+
+  final isTrialActive = trialManager.isTrialActive();
+  if (isTrialActive) {
+    final remainingDays = trialManager.getRemainingDays();
+    return LicenseStatus(
+      status: 'trial',
+      daysLeft: remainingDays,
+      tierName: 'TRIAL',
+      expiryDate: null,
+      deviceUuid: service.getDeviceUuid(),
+    );
+  }
+
   final status = service.checkLicenseStatus();
   final info = service.getLicenseInfo();
   final daysLeft = service.getRemainingDays();
@@ -61,6 +75,20 @@ class TrialBannerWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final licStatus = ref.watch(licenseStatusProvider);
+
+    // Active trial countdown
+    if (licStatus.status == 'trial') {
+      final isLow = licStatus.daysLeft <= 7;
+      return _Banner(
+        icon: Icons.timer_rounded,
+        color: isLow ? _kAmber : _kGreen,
+        title: 'Deneme Sürümü Aktif',
+        subtitle: 'Lisansınızın bitmesine ${licStatus.daysLeft} gün kaldı.',
+        actionLabel: 'Lisans Gir',
+        onAction: () => context.push('/license'),
+        isCritical: false,
+      );
+    }
 
     // Tampered clock — blocker level
     if (licStatus.status == 'tampered') {

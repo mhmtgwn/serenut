@@ -4,6 +4,7 @@
 
 import { pgPool } from '../config/database';
 import { AuthService } from '../modules/auth/auth.service';
+import { LicenseService } from '../modules/license/license.service';
 import { runMigrations } from '../migrations';
 
 async function setup() {
@@ -25,7 +26,7 @@ async function run() {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-    console.log('🌱 Seeding company, subscription and user...');
+    console.log('🌱 Seeding company, subscription, license, entitlement, and user...');
     await client.query(
       `INSERT INTO companies (id, name, tax_number, tax_office, status)
        VALUES ('trial-comp', 'Trial Co', '1234567890', 'Ankara', 'active')`
@@ -33,7 +34,17 @@ async function run() {
 
     await client.query(
       `INSERT INTO subscriptions (id, company_id, plan_id, status, current_period_start, current_period_end, trial_started_at, trial_ends_at, payment_retry_count)
-       VALUES ('sub-trial', 'trial-comp', 'plan-free', 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', NULL, NULL, 0)`
+       VALUES ('sub-trial', 'trial-comp', 'plan-free', 'inactive', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', NULL, NULL, 0)`
+    );
+
+    await client.query(
+      `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
+       VALUES ('lic-trial', 'trial-comp', 'trial-key-123', 'pro', 2, 'active', CURRENT_TIMESTAMP + INTERVAL '30 days')`
+    );
+
+    await client.query(
+      `INSERT INTO license_entitlements (id, company_id, subscription_id, plan_id, status, device_limit, store_limit, valid_from, valid_until, license_key)
+       VALUES ('ent-trial', 'trial-comp', 'sub-trial', 'plan-free', 'trial', 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days', 'trial-key-123')`
     );
 
     const hash = await AuthService.hashPassword('password123');
@@ -47,9 +58,6 @@ async function run() {
     const initialSub = await client.query(
       `SELECT status, trial_started_at FROM subscriptions WHERE company_id = 'trial-comp'`
     );
-    if (initialSub.rows.length === 0) {
-      throw new Error('Subscription was not created during company registration!');
-    }
     if (initialSub.rows[0].trial_started_at !== null) {
       throw new Error('Trial started date is not null at registration!');
     }
@@ -57,47 +65,45 @@ async function run() {
 
     await client.query('COMMIT');
 
-    // 1st Login — should set trial_started_at
-    console.log('🔑 Performing 1st login...');
-    const login1 = await AuthService.login('test@trial.com', 'password123');
-    if (!login1.trial_started) {
-      throw new Error('1st login should flag trial_started = true');
+    // Login — trial should NOT start yet (should remain NULL)
+    console.log('🔑 Performing login (should not start trial)...');
+    const loginResponse = await AuthService.login('test@trial.com', 'password123');
+    if (loginResponse.trial_started) {
+      throw new Error('Login should not start trial anymore!');
     }
 
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const sub1 = await client.query(
+    const midSub = await pgPool.query(
       `SELECT status, trial_started_at FROM subscriptions WHERE company_id = 'trial-comp'`
     );
-    const start1 = sub1.rows[0].trial_started_at;
-    if (start1 === null) {
-      throw new Error('trial_started_at is still null after first login');
+    if (midSub.rows[0].trial_started_at !== null) {
+      throw new Error('Trial started date was incorrectly set on login!');
     }
-    if (sub1.rows[0].status !== 'trialing') {
-      throw new Error(`Expected subscription status to be 'trialing', got: ${sub1.rows[0].status}`);
-    }
-    console.log('  ✔️ 1st login started trial successfully at:', start1);
-    await client.query('COMMIT');
+    console.log('  ✔️ Login did not start the trial.');
 
-    // 2nd Login — should NOT overwrite trial_started_at
-    console.log('🔑 Performing 2nd login...');
-    const login2 = await AuthService.login('test@trial.com', 'password123');
-    if (login2.trial_started) {
-      throw new Error('2nd login should not flag trial_started = true');
+    // POS Activation — this should start the trial
+    console.log('📱 Performing POS Activation (should start trial)...');
+    const activationResult = await LicenseService.activate(
+      'trial-key-123',
+      'dev-hash-test-trial',
+      'Trial Device',
+      'trial-comp'
+    );
+
+    if (activationResult.status !== 'activated') {
+      throw new Error('License activation failed!');
     }
 
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-    const sub2 = await client.query(
+    const postSub = await pgPool.query(
       `SELECT status, trial_started_at FROM subscriptions WHERE company_id = 'trial-comp'`
     );
-    const start2 = sub2.rows[0].trial_started_at;
-    if (start1.getTime() !== start2.getTime()) {
-      throw new Error('trial_started_at was modified on second login!');
+    if (postSub.rows[0].trial_started_at === null) {
+      throw new Error('Trial started date is still null after device activation!');
     }
-    console.log('  ✔️ 2nd login preserved original trial start date.');
-    await client.query('COMMIT');
+    if (postSub.rows[0].status !== 'trialing') {
+      throw new Error(`Expected subscription status to be 'trialing', got: ${postSub.rows[0].status}`);
+    }
 
+    console.log('  ✔️ Trial successfully started on POS device activation at:', postSub.rows[0].trial_started_at);
     console.log('🏆 AC Trial Tests: PASS');
     process.exit(0);
   } catch (err) {

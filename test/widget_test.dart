@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 class TestApp extends StatelessWidget {
   final Widget child;
   
-  const TestApp({Key? key, required this.child}) : super(key: key);
+  const TestApp({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +18,7 @@ class TestApp extends StatelessWidget {
 }
 
 class SimpleCounter extends StatefulWidget {
-  const SimpleCounter({Key? key}) : super(key: key);
+  const SimpleCounter({super.key});
 
   @override
   State<SimpleCounter> createState() => _SimpleCounterState();

@@ -1,5 +1,5 @@
-﻿import 'dart:async';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'dart:async';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';

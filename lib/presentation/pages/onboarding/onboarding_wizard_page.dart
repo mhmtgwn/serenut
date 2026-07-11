@@ -165,10 +165,12 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       type:        state.business.businessType,
       phone:       state.business.phone,
       email:       state.business.email.isEmpty ? null : state.business.email,
+      taxNumber:   state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
       city:        state.business.city,
       district:    state.business.district,
       currency:    state.business.currency,
       taxIncluded: state.business.taxIncluded,
+      logoPath:    state.business.logoPath,
       createdAt:   DateTime.now(),
     );
     await profileRepo.saveProfile(profile);
@@ -179,6 +181,13 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       businessName:    state.business.businessName,
       businessPhone:   state.business.phone,
       businessAddress: '${state.business.district}, ${state.business.city}',
+      businessTaxId:   state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
+      businessLogo:    state.business.logoPath,
+      ownerName:       state.business.ownerName,
+      businessEmail:   state.business.email.isEmpty ? null : state.business.email,
+      businessCity:    state.business.city,
+      businessDistrict: state.business.district,
+      businessType:    state.business.businessType,
       currency:        state.business.currency,
       createdAt:       DateTime.now(),
     ));
@@ -303,7 +312,7 @@ class _OnboardingSuccessPageState extends ConsumerState<OnboardingSuccessPage> {
       state:           _state,
       trialExpiryDate: _expiryDate,
       appVersion:      '1.0.0',
-      onLaunch:        () => context.go(AppRoutes.login),
+      onLaunch:        () => context.go('/onboarding/bootstrap'),
     );
   }
 }

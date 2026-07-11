@@ -1,6 +1,6 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
@@ -14,13 +14,24 @@ class SqliteSaleRepository implements ISaleRepository {
 
   @override
   Future<List<SaleEntity>> findAll() async {
+    List<Map<String, dynamic>> rows;
     try {
-      final rows = await _executor.query('sales', where: 'is_deleted = 0 OR is_deleted IS NULL');
-      return rows.map((row) => SaleEntity.fromMap(row)).toList();
+      rows = await _executor.query('sales', where: 'is_deleted = 0 OR is_deleted IS NULL');
     } catch (_) {
-      final rows = await _executor.query('sales');
-      return rows.map((row) => SaleEntity.fromMap(row)).toList();
+      rows = await _executor.query('sales');
     }
+    final sales = <SaleEntity>[];
+    for (final row in rows) {
+      final sale = SaleEntity.fromMap(row);
+      final items = await _executor.query(
+        'sale_items',
+        where: 'sale_id = ?',
+        whereArgs: [sale.id],
+      );
+      sale.items.addAll(items);
+      sales.add(sale);
+    }
+    return sales;
   }
 
   @override
@@ -322,43 +333,16 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
 
   @override
   Future<int> update(FinancialTransactionEntity entity) async {
-    return await _gateway.transaction(() async {
-      await _executor.execute('UPDATE ledger_bypass_flag SET active = 1');
-      final result = await _executor.update(
-        'financial_transactions',
-        {
-          'id': entity.id,
-          'type': entity.type,
-          'customer_id': entity.customerId,
-          'amount': entity.amount,
-          'paid_amount': entity.paidAmount,
-          'debt_amount': entity.debtAmount,
-          'reference_id': entity.referenceId,
-          'metadata': entity.metadata != null ? jsonEncode(entity.metadata) : null,
-          'created_at': entity.date.toIso8601String(),
-          'logical_clock': entity.logicalClock,
-          'device_id': entity.deviceId ?? deviceId ?? 'unknown-device',
-        },
-        where: 'id = ?',
-        whereArgs: [entity.id],
-      );
-      await _executor.execute('UPDATE ledger_bypass_flag SET active = 0');
-      return result;
-    });
+    throw UnsupportedError(
+      'Finansal defter kayıtları güncellenemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.'
+    );
   }
 
   @override
   Future<int> delete(dynamic id) async {
-    return await _gateway.transaction(() async {
-      await _executor.execute('UPDATE ledger_bypass_flag SET active = 1');
-      final result = await _executor.delete(
-        'financial_transactions',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      await _executor.execute('UPDATE ledger_bypass_flag SET active = 0');
-      return result;
-    });
+    throw UnsupportedError(
+      'Finansal defter kayıtları silinemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.'
+    );
   }
 
   @override

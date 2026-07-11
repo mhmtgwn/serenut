@@ -10,6 +10,11 @@ class Settings {
   final String businessAddress;
   final String? businessTaxId;
   final String? businessLogo;
+  final String ownerName;
+  final String? businessEmail;
+  final String businessCity;
+  final String businessDistrict;
+  final String businessType;
   final String currency;          // ₺
   
   // Yazıcı ayarları
@@ -48,6 +53,11 @@ class Settings {
     required this.businessAddress,
     this.businessTaxId,
     this.businessLogo,
+    this.ownerName = '',
+    this.businessEmail,
+    this.businessCity = '',
+    this.businessDistrict = '',
+    this.businessType = '',
     this.currency = '₺',
     this.printerName,
     this.printerIp,
@@ -81,7 +91,13 @@ class Settings {
       businessAddress: map['business_address'] ?? map['company_address'] as String,
       businessTaxId: map['business_tax_id'] ?? map['company_tax_number'] as String?,
       businessLogo: map['business_logo'] as String?,
+      ownerName: map['owner_name'] as String? ?? '',
+      businessEmail: map['business_email'] as String?,
+      businessCity: map['business_city'] as String? ?? '',
+      businessDistrict: map['business_district'] as String? ?? '',
+      businessType: map['business_type'] as String? ?? '',
       currency: map['currency'] as String? ?? '₺',
+
       printerName: map['printer_name'] as String?,
       printerIp: map['printer_ip'] as String?,
       printerPort: (map['printer_port'] as int?) ?? 9100,
@@ -111,7 +127,13 @@ class Settings {
       'business_address': businessAddress,
       'business_tax_id': businessTaxId,
       'business_logo': businessLogo,
+      'owner_name': ownerName,
+      'business_email': businessEmail,
+      'business_city': businessCity,
+      'business_district': businessDistrict,
+      'business_type': businessType,
       'currency': currency,
+
       'printer_name': printerName,
       'printer_ip': printerIp,
       'printer_port': printerPort,
@@ -145,7 +167,13 @@ class Settings {
     String? businessAddress,
     String? businessTaxId,
     String? businessLogo,
+    String? ownerName,
+    String? businessEmail,
+    String? businessCity,
+    String? businessDistrict,
+    String? businessType,
     String? currency,
+
     String? printerName,
     String? printerIp,
     int? printerPort,
@@ -173,7 +201,13 @@ class Settings {
       businessAddress: businessAddress ?? this.businessAddress,
       businessTaxId: businessTaxId ?? this.businessTaxId,
       businessLogo: businessLogo ?? this.businessLogo,
+      ownerName: ownerName ?? this.ownerName,
+      businessEmail: businessEmail ?? this.businessEmail,
+      businessCity: businessCity ?? this.businessCity,
+      businessDistrict: businessDistrict ?? this.businessDistrict,
+      businessType: businessType ?? this.businessType,
       currency: currency ?? this.currency,
+
       printerName: printerName ?? this.printerName,
       printerIp: printerIp ?? this.printerIp,
       printerPort: printerPort ?? this.printerPort,

@@ -61,7 +61,7 @@ export function createRedisLimiter(options: LimiterOptions) {
 // ── GENEL API RATE LİMİTER ────────────────────────────────────────────────────
 export const generalApiLimiter = createRedisLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: 5000,
   error: 'rate_limit_exceeded',
   message: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.',
   skip: (req) => {
@@ -72,7 +72,7 @@ export const generalApiLimiter = createRedisLimiter({
 // ── KİMLİK DOĞRULAMA LİMİTER ─────────────────────────────────────────────────
 export const authLimiter = createRedisLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 200, // Geliştirme & test kolaylığı için artırıldı (üretimde düşürülmeli)
   error: 'too_many_auth_attempts',
   message: 'Çok fazla giriş denemesi yapıldı. 15 dakika bekleyin.'
 });
@@ -99,4 +99,28 @@ export const smsLimiter = createRedisLimiter({
   max: 3,
   error: 'sms_rate_limit_exceeded',
   message: 'SMS gönderim sınırına ulaşıldı. 1 dakika bekleyin.'
+});
+
+// ── ŞİFRE SIFIRLAMA LİMİTER ──────────────────────────────────────────────────
+export const passwordResetLimiter = createRedisLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  error: 'too_many_reset_attempts',
+  message: 'Çok fazla şifre sıfırlama denemesi yapıldı. 15 dakika bekleyin.'
+});
+
+// ── SENKRONİZASYON (SYNC) LİMİTER ────────────────────────────────────────────
+export const syncLimiter = createRedisLimiter({
+  windowMs: 60 * 1000,
+  max: 100,
+  error: 'sync_rate_limit_exceeded',
+  message: 'Çok fazla senkronizasyon isteği gönderildi. Lütfen 1 dakika bekleyin.'
+});
+
+// ── WEBHOOK LİMİTER ──────────────────────────────────────────────────────────
+export const webhookLimiter = createRedisLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  error: 'webhook_rate_limit_exceeded',
+  message: 'Çok fazla webhook isteği gönderildi.'
 });

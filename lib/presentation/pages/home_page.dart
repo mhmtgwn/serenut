@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/home_page.dart
+// lib/presentation/pages/home_page.dart
 // Serenut POS — Ana Sayfa / Dashboard (Restructured & Redesigned)
 // Generated: 25 Jun 2026
 
@@ -22,6 +22,7 @@ import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/providers/sms_provider.dart';
+import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
 // ── System Trust Metrics Provider ─────────────────────────────────────────────
@@ -185,6 +186,11 @@ class HomePage extends ConsumerWidget {
     final dayName = DateFormat('EEEE', 'tr_TR').format(now);
     final dateFormatted = '${now.day} ${DateFormat('MMMM', 'tr_TR').format(now)} $dayName';
 
+    final settings = ref.watch(settingsNotifierProvider).value;
+    final titleText = (settings?.businessName != null && settings!.businessName.isNotEmpty)
+        ? settings.businessName
+        : 'İyi Çalışmalar';
+
     return Row(
       children: [
         Expanded(
@@ -201,13 +207,15 @@ class HomePage extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Bugün işler yolunda',
-                style: TextStyle(
+              Text(
+                titleText,
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: _kTextDark,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
@@ -1318,18 +1326,30 @@ final recentAlertsProvider = FutureProvider.autoDispose<List<String>>((ref) asyn
 Widget _buildSystemTrustPanel(BuildContext context, WidgetRef ref) {
   final metricsAsync = ref.watch(systemTrustMetricsProvider);
 
-  return metricsAsync.when(
-    loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
-    error: (e, _) => Container(
+  final metrics = metricsAsync.value;
+  if (metrics == null) {
+    if (metricsAsync.isLoading) {
+      return const SizedBox(
+        height: 80,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.0,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+          ),
+        ),
+      );
+    }
+    return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-      child: Text('Sistem telemetri verileri yüklenemedi: $e', style: const TextStyle(color: Colors.red, fontSize: 12)),
-    ),
-    data: (metrics) {
-      final syncOk = metrics.syncState.status != SyncStatus.error;
-      final clockOk = metrics.clockStatus == 'OK';
+      child: const Text('Sistem telemetri verileri yüklenemedi', style: TextStyle(color: Colors.red, fontSize: 12)),
+    );
+  }
 
-      return Container(
+  final syncOk = metrics.syncState.status != SyncStatus.error;
+  final clockOk = metrics.clockStatus == 'OK';
+
+  return Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1434,8 +1454,6 @@ Widget _buildSystemTrustPanel(BuildContext context, WidgetRef ref) {
           ],
         ),
       );
-    },
-  );
 }
 
 Widget _buildQuickActions(BuildContext context, WidgetRef ref) {

@@ -1,19 +1,19 @@
-﻿// lib/providers/database_provider.dart
+// lib/providers/database_provider.dart
 // PHASE 0 Day 4 - Database Riverpod Provider
 // Provides SQLite database and repositories for Phase 6 integration
 // Generated: 21 Jun 2026
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 /// Database Provider
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 
 /// Get SQLite database instance
 /// 
@@ -32,9 +32,9 @@ final dbGatewayProvider = Provider<DbGateway>((ref) {
   return DbGatewayImpl(dbManager);
 });
 
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 /// SQLite Repository Providers (Phase 6 Ready)
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 /// 
 /// These providers are ready for Phase 6 integration.
 /// Simply switch from mock providers to these SQLite versions.
@@ -47,7 +47,7 @@ final dbGatewayProvider = Provider<DbGateway>((ref) {
 /// - Override repository_providers.dart to use these SQLite versions
 /// - Same provider names, same interface contracts
 /// - Zero UI changes needed
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 
 /// SQLite Product Repository Provider
 /// 
@@ -93,9 +93,9 @@ final sqliteOrderRepositoryProvider = FutureProvider<IOrderRepository>((ref) asy
   return SqliteOrderRepository(gateway);
 });
 
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 /// Phase 6 Migration Instructions
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 /// 
 /// When ready for Phase 6 transition:
 /// 
@@ -142,9 +142,9 @@ final sqliteOrderRepositoryProvider = FutureProvider<IOrderRepository>((ref) asy
 /// - Ensure all mock data inserts
 /// - Test each screen with real data
 /// 
-/// ════════════════════════════════════════════════════════════
+/// ============================================================
 /// 
 /// No UI code changes required!
 /// Same provider names, same interfaces, same behavior
 /// Only the underlying implementation changes.
-/// ════════════════════════════════════════════════════════════
+/// ============================================================

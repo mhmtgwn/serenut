@@ -33,13 +33,6 @@ async function seedData() {
   console.log('🌱 Seeding Sprint 5 verification roles, users, and tickets...');
   const client = await pgPool.connect();
   try {
-    // 1. Create Roles
-    await client.query(
-      `INSERT INTO roles (id, name, description) VALUES 
-       ('role-sysadmin', 'sysadmin', 'System Administrator'),
-       ('role-owner', 'owner', 'Company Owner')`
-    );
-
     // 2. Create Companies
     await client.query(
       `INSERT INTO companies (id, name, tax_number, tax_office, status) VALUES 
@@ -64,9 +57,9 @@ async function seedData() {
     // Assign Roles
     await client.query(
       `INSERT INTO user_roles (user_id, role_id) VALUES 
-       ('user-sysadmin', 'role-sysadmin'),
-       ('user-ownerA', 'role-owner'),
-       ('user-ownerB', 'role-owner')`
+       ('user-sysadmin', 'sysadmin'),
+       ('user-ownerA', 'owner'),
+       ('user-ownerB', 'owner')`
     );
 
     // 4. Create Support Ticket for Company A

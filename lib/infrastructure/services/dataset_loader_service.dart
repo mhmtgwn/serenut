@@ -1,11 +1,11 @@
-﻿// lib/infrastructure/services/dataset_loader_service.dart
+// lib/infrastructure/services/dataset_loader_service.dart
 // POS Dataset Loader Service
 // Design Evolution v3: Offline dataset mounting, hot switching, rollback, default market price mapping
 // Revized: 24 Jun 2026
 
 import 'dart:io';
 import 'dart:convert';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';

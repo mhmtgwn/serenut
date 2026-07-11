@@ -1,65 +1,76 @@
-import { pgPool } from '../config/database';
+import { redisClient } from '../config/database';
 import { logger } from '../config/logger';
-
-/**
- * Hash a string to a 32-bit signed integer for pg_advisory_lock consumption
- */
-function hashKeyToInt(key: string): number {
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    const char = key.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32-bit signed integer
-  }
-  return hash;
-}
 
 export class LockManager {
   /**
-   * Try to acquire a session-level distributed lock on a given key.
+   * Try to acquire a distributed lock on a given key using Redis (NX/PX pattern).
    * Returns true if lock is acquired, false otherwise (non-blocking).
+   * Default TTL is 30 seconds to prevent permanent deadlocks.
+   * Accept an unique token to identify the owner of the lock.
    */
-  public static async tryAcquireLock(key: string): Promise<boolean> {
-    const lockId = hashKeyToInt(key);
-    const client = await pgPool.connect();
+  public static async tryAcquireLock(key: string, token: string, ttlMs = 30000): Promise<boolean> {
+    const lockKey = `lock:${key}`;
+
+    if (!redisClient || !redisClient.isOpen) {
+      logger.warn(`⚠️ Redis is down. Bypassing lock check to prevent system blocking for key: ${key}`);
+      return true; // Safe operational fallback
+    }
+
     try {
-      const res = await client.query('SELECT pg_try_advisory_lock($1) as acquired', [lockId]);
-      const acquired = res.rows[0].acquired === true;
+      const res = await redisClient.set(lockKey, token, {
+        NX: true,
+        PX: ttlMs,
+      });
+      const acquired = res === 'OK';
       if (acquired) {
-        logger.info(`🔒 Lock acquired successfully for key: ${key} (id: ${lockId})`);
+        logger.info(`🔒 Redis Lock acquired successfully for key: ${key} (token: ${token})`);
       } else {
-        logger.warn(`⚠️ Failed to acquire lock (busy) for key: ${key} (id: ${lockId})`);
+        logger.warn(`⚠️ Failed to acquire Redis lock (busy) for key: ${key}`);
       }
       return acquired;
     } catch (err: any) {
-      logger.error(`🔴 Error acquiring advisory lock for key ${key}: ${err.message}`);
+      logger.error(`🔴 Error acquiring Redis lock for key ${key}: ${err.message}`);
       return false;
-    } finally {
-      client.release();
     }
   }
 
   /**
-   * Release a previously acquired session-level lock.
+   * Release a previously acquired distributed lock if and only if the token matches.
    * Returns true if released successfully, false otherwise.
    */
-  public static async releaseLock(key: string): Promise<boolean> {
-    const lockId = hashKeyToInt(key);
-    const client = await pgPool.connect();
+  public static async releaseLock(key: string, token: string): Promise<boolean> {
+    const lockKey = `lock:${key}`;
+
+    if (!redisClient || !redisClient.isOpen) {
+      return true;
+    }
+
     try {
-      const res = await client.query('SELECT pg_advisory_unlock($1) as released', [lockId]);
-      const released = res.rows[0].released === true;
+      // Atomic compare-and-delete Lua script to ensure safe release
+      const luaScript = `
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+          return redis.call("del", KEYS[1])
+        else
+          return 0
+        end
+      `;
+
+      // Execute Lua script using eval
+      const result = await redisClient.eval(luaScript, {
+        keys: [lockKey],
+        arguments: [token]
+      });
+
+      const released = Number(result) === 1;
       if (released) {
-        logger.info(`🔓 Lock released successfully for key: ${key} (id: ${lockId})`);
+        logger.info(`🔓 Redis Lock released successfully for key: ${key}`);
       } else {
-        logger.warn(`⚠️ Lock was not active/released for key: ${key} (id: ${lockId})`);
+        logger.warn(`⚠️ Lock release skipped: token mismatch or lock expired for key: ${key}`);
       }
       return released;
     } catch (err: any) {
-      logger.error(`🔴 Error releasing advisory lock for key ${key}: ${err.message}`);
+      logger.error(`🔴 Error releasing Redis lock for key ${key}: ${err.message}`);
       return false;
-    } finally {
-      client.release();
     }
   }
 }

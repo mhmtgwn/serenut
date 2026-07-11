@@ -1,6 +1,6 @@
-﻿import 'dart:io' show Platform;
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'database_executor.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 

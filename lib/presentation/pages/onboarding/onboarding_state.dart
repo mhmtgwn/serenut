@@ -18,44 +18,53 @@ class BusinessInfo {
   final String ownerName;
   final String phone;
   final String email;
+  final String taxNumber;   // Vergi no — fişe yazılır (zorunlu)
   final String city;
   final String district;
   final String currency;
   final bool taxIncluded;
   final String businessType;
+  final String? logoPath;   // null = Serenut varsayılan logosu kullanılır
 
   const BusinessInfo({
     this.businessName = '',
     this.ownerName    = '',
     this.phone        = '',
     this.email        = '',
+    this.taxNumber    = '',
     this.city         = '',
     this.district     = '',
     this.currency     = '₺',
     this.taxIncluded  = true,
     this.businessType = '',
+    this.logoPath,
   });
 
   BusinessInfo copyWith({
     String? businessName, String? ownerName, String? phone, String? email,
-    String? city, String? district, String? currency, bool? taxIncluded,
-    String? businessType,
+    String? taxNumber, String? city, String? district, String? currency,
+    bool? taxIncluded, String? businessType, String? logoPath,
+    bool clearLogo = false,
   }) => BusinessInfo(
     businessName: businessName ?? this.businessName,
     ownerName:    ownerName    ?? this.ownerName,
     phone:        phone        ?? this.phone,
     email:        email        ?? this.email,
+    taxNumber:    taxNumber    ?? this.taxNumber,
     city:         city         ?? this.city,
     district:     district     ?? this.district,
     currency:     currency     ?? this.currency,
     taxIncluded:  taxIncluded  ?? this.taxIncluded,
     businessType: businessType ?? this.businessType,
+    logoPath:     clearLogo ? null : (logoPath ?? this.logoPath),
   );
 
   Map<String, dynamic> toJson() => {
     'businessName': businessName, 'ownerName': ownerName,
-    'phone': phone, 'email': email, 'city': city, 'district': district,
-    'currency': currency, 'taxIncluded': taxIncluded, 'businessType': businessType,
+    'phone': phone, 'email': email, 'taxNumber': taxNumber,
+    'city': city, 'district': district,
+    'currency': currency, 'taxIncluded': taxIncluded,
+    'businessType': businessType, 'logoPath': logoPath,
   };
 
   factory BusinessInfo.fromJson(Map<String, dynamic> j) => BusinessInfo(
@@ -63,18 +72,25 @@ class BusinessInfo {
     ownerName:    j['ownerName']    ?? '',
     phone:        j['phone']        ?? '',
     email:        j['email']        ?? '',
+    taxNumber:    j['taxNumber']    ?? '',
     city:         j['city']         ?? '',
     district:     j['district']     ?? '',
     currency:     j['currency']     ?? '₺',
     taxIncluded:  j['taxIncluded']  ?? true,
     businessType: j['businessType'] ?? '',
+    logoPath:     j['logoPath']     as String?,
   );
 
+  /// Fişe yazılan tüm zorunlu alanlar dolu mu?
   bool get isValid =>
       businessName.trim().isNotEmpty &&
       ownerName.trim().isNotEmpty &&
       phone.trim().isNotEmpty &&
+      taxNumber.trim().isNotEmpty &&
       city.isNotEmpty;
+
+  /// logoPath null ise Serenut varsayılan logosu kullanılacak (app asset)
+  bool get usesDefaultLogo => logoPath == null || logoPath!.isEmpty;
 }
 
 // ─────────────────────────────────────────────────────────────

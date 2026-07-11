@@ -37,7 +37,7 @@ class ProductImage extends ConsumerWidget {
     // 1. Web execution
     if (kIsWeb) {
       if (imageUrl != null && (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:'))) {
-        return _buildNetworkImage(imageUrl!);
+        return _buildNetworkImage(context, imageUrl!);
       }
       return _buildPlaceholder();
     }
@@ -45,9 +45,9 @@ class ProductImage extends ConsumerWidget {
     // 2. Native: explicit imageUrl provided
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       if (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:')) {
-        return _buildNetworkImage(imageUrl!);
+        return _buildNetworkImage(context, imageUrl!);
       } else {
-        return _buildFileImage(imageUrl!);
+        return _buildFileImage(context, imageUrl!);
       }
     }
 
@@ -58,7 +58,7 @@ class ProductImage extends ConsumerWidget {
         final localPath = p.join(dir.path, 'product_images', '$barcode.jpg');
         final file = File(localPath);
         if (file.existsSync()) {
-          return _buildFileImage(localPath);
+          return _buildFileImage(context, localPath);
         }
         return _buildPlaceholder();
       },
@@ -73,22 +73,30 @@ class ProductImage extends ConsumerWidget {
     );
   }
 
-  Widget _buildNetworkImage(String url) {
+  Widget _buildNetworkImage(BuildContext context, String url) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final cacheSize = (size * dpr).round();
     return Image.network(
       url,
       width: size,
       height: size,
       fit: BoxFit.cover,
+      cacheWidth: cacheSize,
+      cacheHeight: cacheSize,
       errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
     );
   }
 
-  Widget _buildFileImage(String path) {
+  Widget _buildFileImage(BuildContext context, String path) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final cacheSize = (size * dpr).round();
     return Image.file(
       File(path),
       width: size,
       height: size,
       fit: BoxFit.cover,
+      cacheWidth: cacheSize,
+      cacheHeight: cacheSize,
       errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
     );
   }

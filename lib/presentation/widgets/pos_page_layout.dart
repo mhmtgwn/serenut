@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/pos_page_layout.dart
+// lib/presentation/widgets/pos_page_layout.dart
 // Serenut POS — Standart Ekran Tasarımı ve Üst Bar Bileşeni
 
 import 'package:flutter/material.dart';
@@ -116,22 +116,28 @@ class PosHeader extends StatelessWidget {
                 ),
                 if (onSearchToggled != null)
                   IconButton(
-                    icon: const Icon(Icons.search_rounded, color: _kGreen),
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.search_rounded, color: _kGreen, size: 22),
                     tooltip: 'Ara',
                     onPressed: () => onSearchToggled!(true),
                   ),
                 if (actions != null) ...actions!,
                 if (showRefresh && onRefresh != null)
                   IconButton(
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
                     onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh_rounded, color: _kTextSecondary),
+                    icon: const Icon(Icons.refresh_rounded, color: _kTextSecondary, size: 22),
                     tooltip: 'Yenile',
                   ),
                 const RealtimeStatusIndicator(compact: true),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 if (showSettings)
                   IconButton(
-                    icon: const Icon(Icons.settings_outlined, color: _kTextSecondary),
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.settings_outlined, color: _kTextSecondary, size: 22),
                     tooltip: 'Ayarlar',
                     onPressed: () => PinGateDialog.checkAndShow(
                       context,

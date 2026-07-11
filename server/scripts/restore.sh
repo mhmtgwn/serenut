@@ -10,11 +10,17 @@ fi
 
 ENCRYPTED_FILE=$1
 DECRYPTED_FILE="${ENCRYPTED_FILE%.enc}"
-DB_NAME="serenut_db"
-
 # Load environment variables
-source /var/www/serenut-api/.env
-ENCRYPTION_KEY=$BACKUP_ENCRYPTION_KEY
+if [ -f "/var/www/serenut-api/.env" ]; then
+    source /var/www/serenut-api/.env
+elif [ -f "./.env" ]; then
+    source ./.env
+fi
+
+ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY:-"default-backup-key-123!"}
+DB_HOST=${POSTGRES_HOST:-"127.0.0.1"}
+DB_USER=${POSTGRES_USER:-"postgres"}
+DB_NAME=${POSTGRES_DB:-"serenut_db"}
 
 if [ ! -f "${ENCRYPTED_FILE}" ]; then
     echo "❌ [Restore] File not found: ${ENCRYPTED_FILE}"
@@ -29,10 +35,12 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "🐘 [Restore] Dropping existing schema and restoring database..."
-# In production, drop schema and restore from sql dump
-# psql -U postgres -h 127.0.0.1 -d ${DB_NAME} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-# psql -U postgres -h 127.0.0.1 -d ${DB_NAME} < ${DECRYPTED_FILE}
+echo "🐘 [Restore] Dropping existing schema and restoring database on ${DB_HOST}..."
+export PGPASSWORD=$POSTGRES_PASSWORD
+
+# Execute schema reset and restore
+psql -U ${DB_USER} -h ${DB_HOST} -d ${DB_NAME} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+psql -U ${DB_USER} -h ${DB_HOST} -d ${DB_NAME} < ${DECRYPTED_FILE}
 
 if [ $? -eq 0 ]; then
     echo "✅ [Restore] Database successfully restored from dump: ${DECRYPTED_FILE}"

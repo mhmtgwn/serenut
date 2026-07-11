@@ -72,25 +72,33 @@ class IdempotencyCache {
 
     if (this.useRedis && this.redisClient.isOpen) {
       try {
-        await this.redisClient.set(
-          `idemp:${key}`,
-          JSON.stringify(value),
-          { EX: ttlSeconds }
-        );
+        if (ttlSeconds <= 0) {
+          await this.redisClient.del(`idemp:${key}`);
+        } else {
+          await this.redisClient.set(
+            `idemp:${key}`,
+            JSON.stringify(value),
+            { EX: ttlSeconds }
+          );
+        }
         return;
       } catch (err) {
-        logger.error('Failed to set in Redis:', err);
+        logger.error('Failed to set/delete in Redis:', err);
       }
     }
 
-    this.localCache.set(key, value);
-    // Cleanup local cache entry after expiration
-    setTimeout(() => {
-      const current = this.localCache.get(key);
-      if (current && current.expiresAt <= Date.now()) {
-        this.localCache.delete(key);
-      }
-    }, ttlSeconds * 1000);
+    if (ttlSeconds <= 0) {
+      this.localCache.delete(key);
+    } else {
+      this.localCache.set(key, value);
+      // Cleanup local cache entry after expiration
+      setTimeout(() => {
+        const current = this.localCache.get(key);
+        if (current && current.expiresAt <= Date.now()) {
+          this.localCache.delete(key);
+        }
+      }, ttlSeconds * 1000);
+    }
   }
 }
 

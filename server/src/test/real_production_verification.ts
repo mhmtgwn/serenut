@@ -121,11 +121,14 @@ function checkDomain(urlStr: string): Promise<boolean> {
 async function verifyProductionDomains() {
   console.log('\n--- 🌐 STEP 2: Production Domain Active Network Checks ---');
   
-  // Checking live domains
+  // Checking live domains and SRE metrics endpoints
   await checkDomain('https://serenut.com');
   await checkDomain('https://portal.serenut.com');
   await checkDomain('https://admin.serenut.com');
-  await checkDomain('https://api.serenut.com/api/v1/health');
+  await checkDomain('https://api.serenut.com/health');
+  await checkDomain('https://api.serenut.com/live');
+  await checkDomain('https://api.serenut.com/ready');
+  await checkDomain('https://api.serenut.com/metrics');
 }
 
 async function runAuditor() {

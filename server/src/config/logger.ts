@@ -2,7 +2,39 @@ import winston from 'winston';
 import path from 'path';
 import * as Sentry from '@sentry/node';
 
+const maskFields = new Set(['password', 'password_hash', 'token', 'cvv', 'pan', 'card_number', 'client_secret', 'secret', 'pin']);
+
+function maskSensitiveData(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (obj instanceof Error) return obj; // Preserve original error object
+
+  if (Array.isArray(obj)) {
+    return obj.map(maskSensitiveData);
+  }
+
+  const masked: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (maskFields.has(key.toLowerCase())) {
+      masked[key] = '***MASKED***';
+    } else if (typeof val === 'object' && val !== null) {
+      masked[key] = maskSensitiveData(val);
+    } else {
+      masked[key] = val;
+    }
+  }
+  return masked;
+}
+
+const maskFormat = winston.format((info) => {
+  if (typeof info.message === 'string') {
+    info.message = info.message.replace(/(password|cvv|pan|client_secret|pin|secret)=([^&\s]+)/gi, '$1=***MASKED***');
+  }
+  return maskSensitiveData(info) as winston.Logform.TransformableInfo;
+})();
+
 const logFormat = winston.format.combine(
+  maskFormat,
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.json()

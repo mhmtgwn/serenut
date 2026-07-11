@@ -1,6 +1,6 @@
-﻿import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 
 class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
   final DbGateway _gateway;

@@ -83,8 +83,9 @@ export function initRealtimeWebSocket(server: Server) {
           [user.company_id]
         );
 
-        if (companyRes.rows.length === 0 || companyRes.rows[0].status !== 'active') {
-          logger.warn(`WS Upgrade failed: Company suspended or invalid company_id=${user.company_id}`);
+        const companyStatus = companyRes.rows[0]?.status;
+        if (companyRes.rows.length === 0 || (companyStatus !== 'active' && companyStatus !== 'trial')) {
+          logger.warn(`WS Upgrade failed: Company suspended or invalid company_id=${user.company_id} status=${companyStatus}`);
           tenantRejections++;
           socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
           socket.destroy();
@@ -122,8 +123,21 @@ export function initRealtimeWebSocket(server: Server) {
       reconnectCount += clientReconnects;
     }
 
+    // Duplicate connection cleanup: terminate any other active socket of the same user
+    const activeConnections = ConnectionRegistry.getAllConnections();
+    for (const [activeWs, activeMeta] of activeConnections.entries()) {
+      if (activeMeta.userId === user.id && activeWs.readyState === WebSocket.OPEN) {
+        logger.info(`WS Client cleanup: closing duplicate active socket for user_id=${user.id}`);
+        activeWs.send(JSON.stringify({ action: 'close', reason: 'duplicate_connection' }));
+        activeWs.terminate();
+      }
+    }
+
     ConnectionRegistry.register(ws, meta);
     logger.info(`WS Client connected: user_id=${user.id}, company_id=${user.company_id}, reconnects=${clientReconnects}`);
+
+    // Send initial welcome message to trigger client-side stream.listen callback
+    ws.send(JSON.stringify({ action: 'welcome', status: 'connected' }));
 
     // Audit connection open (non-blocking)
     writeAuditLog(

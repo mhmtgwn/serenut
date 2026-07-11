@@ -3,7 +3,10 @@ import { pgPool } from '../../config/database';
 import { AuthService } from '../auth/auth.service';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 
+import { syncLimiter } from '../../middleware/rate-limit.middleware';
+
 const router = Router();
+router.use(syncLimiter);
 
 // Middleware to enforce authentication on sync endpoints
 const authMiddleware = async (req: Request, res: Response, next: any) => {
@@ -52,7 +55,7 @@ router.post('/push', async (req: Request, res: Response) => {
       await client.query('BEGIN');
       try {
         // Enforce Multi-tenant RLS context for safety
-        await client.query(`SET LOCAL app.current_company_id = '${user.company_id.replace(/'/g, "''")}'`);
+        await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
 
         // 1. Insert into sync_queue log
         await client.query(
@@ -195,15 +198,12 @@ router.post('/push', async (req: Request, res: Response) => {
         // Realtime Event Broadcasting
         try {
           if (entity_type === 'sale') {
-            // Publish OrderCreated event
             await RealtimeBroadcastService.publishEvent(user.company_id, 'OrderCreated', {
               orderId: payload.id,
               totalAmount: parseFloat(payload.total_amount || 0.00),
               paymentMethod: payload.payment_method || 'cash',
               createdAt: payload.created_at || new Date().toISOString(),
             });
-
-            // Trigger corresponding InventoryUpdated event since a sale affects inventory stock
             await RealtimeBroadcastService.publishEvent(user.company_id, 'InventoryUpdated', {
               reason: 'sale_sync',
               referenceId: payload.id,
@@ -312,10 +312,22 @@ router.get('/pull', async (req: Request, res: Response) => {
       });
     }
 
+    // FIX [AUDIT-005]: N+1 sorunu giderildi — tüm sale_items tek sorguda çekiliyor
+    const saleIds = salesRes.rows.map((r: any) => r.id);
+    const itemsBySaleId: Record<string, any[]> = {};
+    if (saleIds.length > 0) {
+      const allItemsRes = await pgPool.query(
+        'SELECT * FROM sale_items WHERE sale_id = ANY($1::text[])',
+        [saleIds]
+      );
+      for (const item of allItemsRes.rows) {
+        if (!itemsBySaleId[item.sale_id]) itemsBySaleId[item.sale_id] = [];
+        itemsBySaleId[item.sale_id].push(item);
+      }
+    }
+
     for (const row of salesRes.rows) {
-      // Fetch items for each sale
-      const itemsRes = await pgPool.query('SELECT * FROM sale_items WHERE sale_id = $1', [row.id]);
-      row.items = itemsRes.rows;
+      row.items = itemsBySaleId[row.id] || [];
       transactions.push({
         id: row.id,
         type: 'sale',
@@ -336,6 +348,82 @@ router.get('/pull', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Pull sync error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Senkronizasyon çekme işleminde hata oluştu.' });
+  }
+});
+
+// --- Sprint 2: Automated Bootstrap Sync Endpoint ---
+router.get('/bootstrap/:module', async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const { module } = req.params;
+
+  try {
+    let data: any = {};
+    if (module === 'company') {
+      const resDb = await pgPool.query('SELECT * FROM companies WHERE id = $1', [user.company_id]);
+      data = resDb.rows[0] || {};
+    } 
+    else if (module === 'stores') {
+      const resDb = await pgPool.query('SELECT * FROM stores WHERE company_id = $1', [user.company_id]);
+      data = resDb.rows;
+    }
+    else if (module === 'users') {
+      // FIX [AUDIT-001]: users tablosunda 'role' kolonu yok — RBAC user_roles/roles tablosunda
+      // Role bilgisi LEFT JOIN ile alınıyor; rol atanmamış kullanıcılar için 'cashier' varsayılan
+      const resDb = await pgPool.query(
+        `SELECT u.id, u.name, u.email, u.is_active,
+                COALESCE(r.name, 'cashier') AS role
+         FROM users u
+         LEFT JOIN user_roles ur ON u.id = ur.user_id
+         LEFT JOIN roles r ON ur.role_id = r.id
+         WHERE u.company_id = $1`,
+        [user.company_id]
+      );
+      data = resDb.rows;
+    }
+    else if (module === 'categories') {
+      const resDb = await pgPool.query('SELECT DISTINCT category FROM products WHERE company_id = $1', [user.company_id]);
+      data = resDb.rows.map((r: any) => r.category).filter(Boolean);
+    }
+    else if (module === 'products') {
+      const resDb = await pgPool.query('SELECT * FROM products WHERE company_id = $1 AND is_deleted = false', [user.company_id]);
+      data = resDb.rows;
+    }
+    else if (module === 'customers') {
+      const resDb = await pgPool.query('SELECT * FROM customers WHERE company_id = $1 AND is_deleted = false', [user.company_id]);
+      data = resDb.rows;
+    }
+    else if (module === 'payment-types') {
+      data = ['cash', 'credit_card', 'gift_card', 'bank_transfer'];
+    }
+    else if (module === 'tax-rates') {
+      data = [1, 8, 10, 18, 20];
+    }
+    else if (module === 'settings') {
+      // FIX [AUDIT-002 extended]: system_settings tablosunda company_id kolonu yok
+      // Global ayarlar key/value çiftleri olarak tutulur, tümü döndürülür
+      const resDb = await pgPool.query('SELECT key, value FROM system_settings');
+      const settingsMap: Record<string, string> = {};
+      resDb.rows.forEach((r: any) => { settingsMap[r.key] = r.value; });
+      data = settingsMap;
+    }
+    else if (module === 'printer-config') {
+      data = { printer_type: 'thermal', paper_width: 80, auto_print: true };
+    }
+    else if (module === 'license-config') {
+      const resDb = await pgPool.query(
+        "SELECT id, plan_id as tier, status, valid_until as expires_at, license_key, device_limit as allowed_devices_count FROM license_entitlements WHERE company_id = $1 AND status IN ('trial', 'active') ORDER BY valid_until DESC LIMIT 1",
+        [user.company_id]
+      );
+      data = resDb.rows[0] || {};
+    }
+    else {
+      return res.status(400).json({ error: 'invalid_module', message: 'Geçersiz bootstrap modülü.' });
+    }
+
+    return res.json({ module, data });
+  } catch (err: any) {
+    console.error(`Bootstrap sync error on ${module}:`, err);
+    return res.status(500).json({ error: 'server_error', message: `Bootstrap veri yükleme hatası: ${module}` });
   }
 });
 

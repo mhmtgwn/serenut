@@ -1,11 +1,35 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+const envFile = nodeEnv === 'test' ? '.env.test' : '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+
+// Environment Validation
+const isProduction = process.env.NODE_ENV === 'production';
+const requiredEnv = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET', 'RSA_PRIVATE_KEY'];
+const missingEnv = requiredEnv.filter(key => !process.env[key]);
+
+if (missingEnv.length > 0) {
+  console.error(`🚨 FATAL STARTUP ERROR: Missing required environment variables: ${missingEnv.join(', ')}`);
+  if (isProduction) {
+    process.exit(1);
+  }
+}
+
+// Operational warning for optional API keys
+const optionalEnv = ['SMS_API_KEY', 'SMTP_API_KEY'];
+optionalEnv.forEach(key => {
+  if (!process.env[key]) {
+    console.warn(`⚠️ Warning: Optional operational key ${key} is not set. Related dispatch services will fail.`);
+  }
+});
+
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import * as Sentry from '@sentry/node';
 
-import path from 'path';
 import http from 'http';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
@@ -13,6 +37,7 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import { pgPool, redisClient } from './config/database';
 import { runMigrations } from './migrations';
 import { logger } from './config/logger';
+import { getJwtFailuresCount, getLicenseSuccessCount, getLicenseFailuresCount, getSlowQueriesCount } from './utils/telemetry';
 import { generalApiLimiter, authLimiter, licenseLimiter } from './middleware/rate-limit.middleware';
 import { idempotencyMiddleware } from './middleware/idempotency';
 
@@ -38,10 +63,13 @@ import telemetryRouter from './modules/analytics/telemetry.controller';
 import supportRouter from './modules/support/support.controller';
 import branchRouter from './modules/branch/branch.controller';
 import orderRouter from './modules/order/order.controller';
+import remoteConfigRouter from './modules/remote-config/remote-config.controller';
+import logsRouter from './modules/logs/logs.controller';
+import healthRouter from './modules/health/health.controller';
 
 // BullMQ Workers
-import { startNotificationWorker } from './workers/notification.worker';
-import { startBillingScheduler } from './workers/billing.scheduler';
+import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
+import { startBillingScheduler, stopBillingScheduler } from './workers/billing.scheduler';
 
 const app = express();
 
@@ -77,8 +105,8 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,ht
 app.use(
   cors({
     origin: (origin, callback) => {
-      // API istemcileri (Flutter desktop) origin göndermeyebilir — izin ver
-      if (!origin) return callback(null, true);
+      // API istemcileri (Flutter desktop) veya form post yönlendirmelerinde origin boş/null gelebilir — izin ver
+      if (!origin || origin === 'null') return callback(null, true);
       const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
       const isSerenutDomain = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*serenut\.(?:com|com\.tr|az|de|net|org)(?::\d+)?$/.test(origin);
       if (allowedOrigins.includes(origin) || isLocal || isSerenutDomain || process.env.NODE_ENV !== 'production') {
@@ -95,7 +123,7 @@ app.use(
 );
 
 // Trust Nginx proxy (X-Forwarded-For için gerekli — rate limiter doğru IP'yi okusun)
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -116,7 +144,12 @@ app.use(helmet({
 app.disable('x-powered-by');
 
 // ── BODY PARSER ───────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(idempotencyMiddleware);
 
@@ -191,6 +224,26 @@ function enforceSchemaHandshake(req: Request, res: Response, next: NextFunction)
 
 app.use(enforceSchemaHandshake);
 
+// ── REDIRECTS (301 KALICI YÖNLENDİRME) ─────────────────────────────────────────
+app.get(['/pricing', '/pricing.html'], (req, res) => {
+  res.redirect(301, '/plans.html');
+});
+app.get(['/marketing/pricing', '/marketing/pricing.html'], (req, res) => {
+  res.redirect(301, '/marketing/plans.html');
+});
+app.get(['/features', '/features.html'], (req, res) => {
+  res.redirect(301, '/platform.html');
+});
+app.get(['/marketing/features', '/marketing/features.html'], (req, res) => {
+  res.redirect(301, '/marketing/platform.html');
+});
+app.get(['/login', '/login.html'], (req, res) => {
+  res.redirect(301, '/portal/');
+});
+app.get(['/marketing/login', '/marketing/login.html'], (req, res) => {
+  res.redirect(301, '/portal/');
+});
+
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
 app.use('/admin', express.static(path.join(process.cwd(), 'public/admin')));
 app.use('/portal', express.static(path.join(process.cwd(), 'public/portal')));
@@ -211,6 +264,9 @@ app.use('/api/v1/telemetry', telemetryRouter);
 app.use('/api/v1/analytics', biRouter);
 app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1/notifications', notificationRouter);
+app.use('/api/v1/remote-config', remoteConfigRouter);
+app.use('/api/v1/logs', logsRouter);
+app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/portal', portalRouter);
@@ -247,6 +303,7 @@ app.get('/health', async (req: Request, res: Response) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
+    uptime: process.uptime(),
     services: {
       express: 'up',
       database: 'down',
@@ -280,6 +337,37 @@ app.get('/health', async (req: Request, res: Response) => {
 
   return res.json(healthStatus);
 });
+
+// ── LIVENESS AND READINESS PROBES ─────────────────────────────────────────────
+app.get('/live', (req: Request, res: Response) => {
+  return res.json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
+app.get('/ready', async (req: Request, res: Response) => {
+  try {
+    await pgPool.query('SELECT 1');
+    if (redisClient && redisClient.isOpen) {
+      return res.json({ status: 'ready', timestamp: new Date().toISOString() });
+    }
+    return res.status(503).json({ status: 'degraded', reason: 'redis_not_connected' });
+  } catch (err: any) {
+    return res.status(503).json({ status: 'not_ready', reason: 'database_not_connected' });
+  }
+});
+
+
+// ── SYSTEM VERSION CHECK ─────────────────────────────────────────────────────
+const versionHandler = (req: Request, res: Response) => {
+  return res.json({
+    version: '1.0.0',
+    build: 'RC1',
+    commit: process.env.GIT_COMMIT || '8f828a2a8b9487c6e00a94f6e1f0e22ea1f8f3c7',
+    date: '2026-07-09'
+  });
+};
+app.get('/version', versionHandler);
+app.get('/api/v1/version', versionHandler);
+
 
 // ── PROMETHEUS METRICS EXPORTER ──────────────────────────────────────────────
 app.get('/metrics', async (req: Request, res: Response) => {
@@ -361,6 +449,9 @@ app.get('/metrics', async (req: Request, res: Response) => {
 
 // ── 404 HANDLER ───────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {
+  if (req.accepts('html')) {
+    return res.status(404).sendFile(path.join(process.cwd(), 'public/website/404.html'));
+  }
   res.status(404).json({
     error: 'not_found',
     message: `Route not found: ${req.method} ${req.originalUrl}`,
@@ -416,12 +507,13 @@ async function bootstrap() {
     // Caching warmup
     await warmupCache();
 
-    // Auto-seed/sanitize Windows release metadata on startup
+    // Auto-seed/sanitize Windows and Android release metadata on startup
     try {
       await pgPool.query(`
         UPDATE app_versions 
         SET status = 'inactive' 
-        WHERE platform = 'windows' AND id <> 'win-v1-stable';
+        WHERE (platform = 'windows' AND id <> 'win-v1-stable')
+           OR (platform = 'android' AND id <> 'android-v1-stable');
       `);
 
       await pgPool.query(`
@@ -431,9 +523,9 @@ async function bootstrap() {
           file_size_bytes, release_notes, created_at
         ) VALUES (
           'win-v1-stable', '1.0.0', 'windows', '/api/v1/updates/download/windows/latest', 
-          '4E36E6D63BBB9B903C7F30DBE73FDD686B29CE1FDE199DFF54EDDA6173925587', 
+          '94DACCA2B0C5605F960C6DE74D8B23A8B44D59AEAB79DC9A3C91EA3A19859B9D', 
           'public/website/downloads/SerenutOSSetup.exe', 
-          'active', 'stable', true, 100, 9214299, 'RC1 Release Build', NOW()
+          'active', 'stable', true, 100, 14009885, 'RC1 Release Build — Inno Setup Installer', NOW()
         ) ON CONFLICT (id) DO UPDATE SET 
           file_path = EXCLUDED.file_path, 
           version_code = EXCLUDED.version_code,
@@ -442,9 +534,28 @@ async function bootstrap() {
           status = 'active',
           created_at = NOW();
       `);
-      logger.info('✅ Production Windows release metadata auto-seeded successfully.');
+
+      await pgPool.query(`
+        INSERT INTO app_versions (
+          id, version_code, platform, download_url, sha256_hash, 
+          file_path, status, channel, is_mandatory, rollout_percentage, 
+          file_size_bytes, release_notes, created_at
+        ) VALUES (
+          'android-v1-stable', '1.0.0', 'android', '/api/v1/updates/download/android/latest', 
+          '36DA4BD533E1973B9A3A1ECFC1A59EE8F1D9B54F629857ADE78FBAC99D172C9B', 
+          'public/website/downloads/serenut.apk', 
+          'active', 'stable', true, 100, 142629988, 'RC1 Release Build — Android Application Package', NOW()
+        ) ON CONFLICT (id) DO UPDATE SET 
+          file_path = EXCLUDED.file_path, 
+          version_code = EXCLUDED.version_code,
+          sha256_hash = EXCLUDED.sha256_hash,
+          file_size_bytes = EXCLUDED.file_size_bytes,
+          status = 'active',
+          created_at = NOW();
+      `);
+      logger.info('✅ Production Windows and Android release metadata auto-seeded successfully.');
     } catch (seedErr: any) {
-      logger.error(`Failed to auto-seed Windows release metadata on startup: ${seedErr.message}`);
+      logger.error(`Failed to auto-seed release metadata on startup: ${seedErr.message}`);
     }
 
     server.listen(port, () => {
@@ -453,14 +564,32 @@ async function bootstrap() {
     });
 
     // Graceful shutdown
-    process.on('SIGTERM', async () => {
-      logger.info('SIGTERM received — shutting down gracefully...');
+    const gracefulShutdown = async (signal: string) => {
+      logger.info(`🚨 ${signal} received — starting graceful shutdown process...`);
       server.close(async () => {
-        await pgPool.end();
-        logger.info('Server closed. Bye!');
-        process.exit(0);
+        try {
+          logger.info('⏳ Stopping BullMQ Workers...');
+          await Promise.all([
+            stopNotificationWorker(),
+            stopBillingScheduler()
+          ]);
+          logger.info('⏳ Stopping Redis Client...');
+          if (redisClient && redisClient.isOpen) {
+            await redisClient.quit();
+          }
+          logger.info('⏳ Ending PostgreSQL Connection Pool...');
+          await pgPool.end();
+          logger.info('✅ All connections gracefully closed. Goodbye!');
+          process.exit(0);
+        } catch (shutdownErr: any) {
+          logger.error(`❌ Error during graceful shutdown: ${shutdownErr.message}`);
+          process.exit(1);
+        }
       });
-    });
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   } catch (err) {
     logger.error('Failed to bootstrap Serenut Cloud Server:', err);
     process.exit(1);

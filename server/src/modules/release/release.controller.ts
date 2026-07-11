@@ -51,6 +51,24 @@ function computeFileSha256(filePath: string): Promise<string> {
   });
 }
 
+// Helper: sign the computed SHA-256 hash using RSA Private Key
+function signReleaseFile(sha256Hash: string): string {
+  const privateKey = process.env.RSA_PRIVATE_KEY;
+  if (!privateKey) {
+    console.warn('⚠️ Warning: RSA_PRIVATE_KEY is not defined. Skipping release digital signature.');
+    return '';
+  }
+  try {
+    const sign = crypto.createSign('SHA256');
+    sign.update(sha256Hash);
+    sign.end();
+    return sign.sign(privateKey, 'base64');
+  } catch (err: any) {
+    console.error(`🔴 Cryptographic signing failed: ${err.message}`);
+    return '';
+  }
+}
+
 // Helper: RLS bypass for admin queries
 async function runBypassingRLS(sql: string, params: any[] = []) {
   const client = await pgPool.connect();
@@ -150,7 +168,7 @@ router.get('/check', async (req: Request, res: Response) => {
           // Check license tier targeting
           const tierCheck = await pgPool.query(`
             SELECT ut.id FROM update_targets ut
-            JOIN licenses l ON l.company_id = $1 AND l.tier = ut.target_value AND l.status = 'active'
+            JOIN license_entitlements le ON le.company_id = $1 AND (CASE WHEN le.plan_id LIKE '%pro%' THEN 'pro' ELSE 'basic' END) = ut.target_value AND le.status IN ('active', 'trial')
             WHERE ut.release_id = $2 AND ut.target_type = 'license_tier'
             LIMIT 1
           `, [company_id, release.id]);
@@ -197,6 +215,7 @@ router.get('/check', async (req: Request, res: Response) => {
       isForceUpdate,
       downloadUrl,
       sha256Hash: hasUpdate ? eligibleRelease.sha256_hash : null,
+      signature: hasUpdate ? eligibleRelease.signature : null,
       fileSizeBytes: hasUpdate ? eligibleRelease.file_size_bytes : null,
       releaseNotes: eligibleRelease.release_notes || null,
       hasUpdate,
@@ -229,7 +248,7 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
 
     // Verify user has active license
     const licenseCheck = await pgPool.query(
-      "SELECT id FROM licenses WHERE company_id = $1 AND status = 'active' LIMIT 1",
+      "SELECT id FROM license_entitlements WHERE company_id = $1 AND status IN ('active', 'trial') LIMIT 1",
       [user.company_id]
     );
     if (licenseCheck.rows.length === 0) {
@@ -252,16 +271,38 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
     const ext = path.extname(release.file_path);
     const filename = `serenut-${release.version_code}-${release.platform}${ext}`;
 
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('X-File-SHA256', release.sha256_hash);
-    res.setHeader('X-Release-Id', releaseId);
-    res.setHeader('X-Download-Log-Id', logId);
+    const range = req.headers.range;
+    let stream: fs.ReadStream;
 
-    if (release.file_size_bytes) {
-      res.setHeader('Content-Length', release.file_size_bytes);
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : release.file_size_bytes - 1;
+      
+      const chunksize = (end - start) + 1;
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${release.file_size_bytes}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'X-File-SHA256': release.sha256_hash,
+        'X-Release-Id': releaseId,
+        'X-Download-Log-Id': logId
+      });
+      stream = fs.createReadStream(release.file_path, { start, end });
+    } else {
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('X-File-SHA256', release.sha256_hash);
+      res.setHeader('X-Release-Id', releaseId);
+      res.setHeader('X-Download-Log-Id', logId);
+      if (release.file_size_bytes) {
+        res.setHeader('Content-Length', release.file_size_bytes);
+      }
+      stream = fs.createReadStream(release.file_path);
     }
-
-    const stream = fs.createReadStream(release.file_path);
+    
     stream.pipe(res);
 
     stream.on('end', () => {
@@ -367,15 +408,16 @@ router.post(
         });
       }
 
+      const signature = signReleaseFile(serverSha256);
       const releaseId = `rel-${Date.now()}`;
       const fileSizeBytes = file.size;
 
       await runBypassingRLS(`
         INSERT INTO app_versions (
           id, version_code, platform, channel, download_url, file_path,
-          sha256_hash, file_size_bytes, is_mandatory, min_required_version,
+          sha256_hash, signature, file_size_bytes, is_mandatory, min_required_version,
           release_notes, status, rollout_percentage, published_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', 100, $12)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', 100, $13)
       `, [
         releaseId,
         version_code,
@@ -384,6 +426,7 @@ router.post(
         `/api/v1/releases/download/${releaseId}`,
         file.path,
         serverSha256,
+        signature,
         fileSizeBytes,
         is_mandatory === 'true' || is_mandatory === true,
         min_required_version || null,
@@ -395,6 +438,7 @@ router.post(
         success: true,
         release_id: releaseId,
         sha256_hash: serverSha256,
+        signature,
         file_size_bytes: fileSizeBytes,
         version_code,
         platform,

@@ -38,16 +38,12 @@ async function run() {
        VALUES ('sync-branch', 'sync-comp', 'Branch 1')`
     );
     await client.query(
-      `INSERT INTO roles (id, name, description)
-       VALUES ('role-cashier', 'cashier', 'Cashier cashier')`
-    );
-    await client.query(
       `INSERT INTO users (id, company_id, name, email, password_hash, is_active)
        VALUES ('sync-user', 'sync-comp', 'Cashier', 'cashier@sync.com', 'hash', true)`
     );
     await client.query(
       `INSERT INTO user_roles (user_id, role_id)
-       VALUES ('sync-user', 'role-cashier')`
+       VALUES ('sync-user', 'cashier')`
     );
     await client.query('COMMIT');
 

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/settings_page.dart
+// lib/presentation/pages/settings_page.dart
 // Phase 2.5 �€” Premium iOS-Style Settings & Configurations Screen
 // Completely redesigned: 24 Jun 2026
 
@@ -77,6 +77,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _isUnlocked = false;
   bool _soundNotificationEnabled = false;
 
+  List<String> _cities = [];
+  Map<String, List<String>> _cityMap = {};
+  bool _citiesLoaded = false;
+
   void _runGuardedAction(VoidCallback action) {
     if (_isUnlocked) {
       action();
@@ -106,6 +110,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void initState() {
     super.initState();
     _loadSettingsAndPin();
+    _loadCities();
+  }
+
+  Future<void> _loadCities() async {
+    try {
+      final raw = await rootBundle.loadString('assets/data/cities.json');
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final countries = json['countries'] as List<dynamic>;
+      final tr = countries.firstWhere(
+        (c) => (c as Map<String, dynamic>)['code'] == 'TR',
+        orElse: () => null,
+      );
+      if (tr != null) {
+        final cityList = (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
+        final Map<String, List<String>> map = {};
+        for (final c in cityList) {
+          final name = (c as Map<String, dynamic>)['name'] as String;
+          final districts = (c['districts'] as List<dynamic>).cast<String>();
+          map[name] = districts;
+        }
+        if (mounted) {
+          setState(() {
+            _cityMap = map;
+            _cities = map.keys.toList()..sort();
+            _citiesLoaded = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Hata loading cities settings: $e');
+    }
   }
 
   Future<void> _loadSettingsAndPin() async {
@@ -832,14 +867,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ayarlar güncellenirken hata olu�Ÿtu: $e'),
+          content: Text('Ayarlar güncellenirken hata oluŸtu: $e'),
           backgroundColor: _kPink,
         ),
       );
     }
   }
 
-  // �”€�”€ Yetki / Profil Detay Modalı �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+  // ”€”€ Yetki / Profil Detay Modalı ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   void _showProfileDetails(AuthUser user) {
     final roleLabel = switch (user.role) {
       UserRole.admin => 'Yönetici',
@@ -858,10 +893,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               _buildInfoRow('Kullanıcı Adı', user.name),
               _buildInfoRow('Sistem Rolü', roleLabel.toUpperCase()),
-              _buildInfoRow('Hesap Olu�Ÿturulma Tarihi', user.createdAt.toLocal().toString().substring(0, 16)),
+              _buildInfoRow('Hesap OluŸturulma Tarihi', user.createdAt.toLocal().toString().substring(0, 16)),
               const SizedBox(height: 16),
               const Text(
-                'Sahip Oldu�Ÿum Yetkiler',
+                'Sahip OlduŸum Yetkiler',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _kTextPrimary),
               ),
               const SizedBox(height: 8),
@@ -900,20 +935,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // �”€�”€ İ�Ÿletme Bilgileri Düzenleme Ekranı �”€�”€
+  // ── İşletme Bilgileri Düzenleme Ekranı ──
   void _showBusinessInfoSheet(Settings settings) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: settings.businessName);
     final phoneCtrl = TextEditingController(text: settings.businessPhone);
-    final addressCtrl = TextEditingController(text: settings.businessAddress);
+    final ownerCtrl = TextEditingController(text: settings.ownerName);
+    final emailCtrl = TextEditingController(text: settings.businessEmail ?? '');
     final taxIdCtrl = TextEditingController(text: settings.businessTaxId ?? '');
+    final addressCtrl = TextEditingController(text: settings.businessAddress);
     String? selectedLogoPath = settings.businessLogo;
+
+    // Local dropdown values
+    String? localCity = settings.businessCity.isEmpty ? null : settings.businessCity;
+    String? localDistrict = settings.businessDistrict.isEmpty ? null : settings.businessDistrict;
+    String? localType = settings.businessType.isEmpty ? null : settings.businessType;
+
+    const businessTypes = [
+      'Market', 'Kafe', 'Restoran', 'Kuruyemişçi', 'Pastane',
+      'Büfe', 'Kasap', 'Manav', 'Eczane', 'Diğer',
+    ];
 
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (context) => StatefulBuilder(
           builder: (context, setModalState) {
+            final List<String> localDistricts = (localCity != null) ? (_cityMap[localCity] ?? []) : [];
+
             return FullScreenSettingsPage(
               title: 'İşletme Bilgileri',
               child: Form(
@@ -1030,6 +1079,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildFormTextField(
+                        controller: ownerCtrl,
+                        label: 'Yetkili Adı Soyadı *',
+                        icon: Icons.person_rounded,
+                        validator: (v) => v!.isEmpty ? 'Gerekli alan' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFormTextField(
                         controller: phoneCtrl,
                         label: 'Telefon Numarası *',
                         icon: Icons.phone_rounded,
@@ -1038,14 +1094,60 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildFormTextField(
+                        controller: emailCtrl,
+                        label: 'E-posta (İsteğe bağlı)',
+                        icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFormTextField(
                         controller: taxIdCtrl,
-                        label: 'Vergi Dairesi / No',
+                        label: 'Vergi Dairesi / No *',
                         icon: Icons.badge_rounded,
+                        validator: (v) => v!.isEmpty ? 'Gerekli alan (fişe yazılır)' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      if (_citiesLoaded)
+                        _buildFormDropdown<String>(
+                          label: 'Şehir *',
+                          icon: Icons.location_city_rounded,
+                          value: localCity,
+                          items: _cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                          onChanged: (v) => setModalState(() {
+                            localCity = v;
+                            localDistrict = null;
+                          }),
+                          validator: (v) => v == null ? 'Gerekli alan' : null,
+                        )
+                      else
+                        const Text('Şehir listesi yükleniyor...', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+                      const SizedBox(height: 12),
+                      if (localDistricts.isNotEmpty) ...[
+                        _buildFormDropdown<String>(
+                          label: 'İlçe *',
+                          icon: Icons.map_outlined,
+                          value: localDistrict,
+                          items: localDistricts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                          onChanged: (v) => setModalState(() {
+                            localDistrict = v;
+                          }),
+                          validator: (v) => v == null ? 'Gerekli alan' : null,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      _buildFormDropdown<String>(
+                        label: 'İşletme Türü',
+                        icon: Icons.category_rounded,
+                        value: localType,
+                        items: businessTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                        onChanged: (v) => setModalState(() {
+                          localType = v;
+                        }),
                       ),
                       const SizedBox(height: 12),
                       _buildFormTextField(
                         controller: addressCtrl,
-                        label: 'İşletme Adresi',
+                        label: 'Detaylı İşletme Adresi',
                         icon: Icons.location_on_rounded,
                         maxLines: 2,
                       ),
@@ -1058,6 +1160,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             businessAddress: addressCtrl.text.trim(),
                             businessTaxId: taxIdCtrl.text.trim().isEmpty ? null : taxIdCtrl.text.trim(),
                             businessLogo: selectedLogoPath,
+                            ownerName: ownerCtrl.text.trim(),
+                            businessEmail: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+                            businessCity: localCity ?? '',
+                            businessDistrict: localDistrict ?? '',
+                            businessType: localType ?? '',
                           );
                           await _updateSettingField(updated);
                           if (context.mounted) Navigator.pop(context);
@@ -1444,6 +1551,46 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         filled: true,
         fillColor: enabled ? const Color(0xFFF8FAFC) : const Color(0xFFEFEFEF),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+    );
+  }
+
+  Widget _buildFormDropdown<T>({
+    required String label,
+    required IconData icon,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required void Function(T?) onChanged,
+    String? hintText,
+    String? Function(T?)? validator,
+  }) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      items: items,
+      onChanged: onChanged,
+      validator: validator,
+      isExpanded: true,
+      dropdownColor: Colors.white,
+      style: const TextStyle(color: _kTextPrimary, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        prefixIcon: Icon(icon, size: 20, color: _kTextSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _kBorderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _kBorderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _kGreen, width: 1.5),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );

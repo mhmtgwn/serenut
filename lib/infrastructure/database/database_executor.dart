@@ -1,4 +1,4 @@
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Abstract database executor for transaction-aware CRUD operations.
 /// 

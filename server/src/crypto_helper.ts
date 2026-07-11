@@ -39,6 +39,10 @@ const devQi = modInverse(devQ, devP);
 function loadPrivateKey(): crypto.KeyObject {
   const envKey = process.env.RSA_PRIVATE_KEY;
   if (!envKey) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('🚨 FATAL ERROR: RSA_PRIVATE_KEY environment variable is not set in production! Exiting to prevent security breach.');
+      process.exit(1);
+    }
     console.warn('⚠️ Warning: RSA_PRIVATE_KEY environment variable is not set. Falling back to development key.');
     const jwk = {
       kty: 'RSA',

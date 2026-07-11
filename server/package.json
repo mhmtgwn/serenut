@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "migrate": "ts-node src/scripts/run-migrations.ts"
+    "migrate": "ts-node src/scripts/run-migrations.ts",
+    "test": "ts-node src/test/run_all_ac_tests.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.63.0",

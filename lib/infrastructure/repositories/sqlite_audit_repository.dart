@@ -1,5 +1,5 @@
-﻿// lib/infrastructure/repositories/sqlite_audit_repository.dart
-import 'package:sqflite_sqlcipher/sqflite.dart';
+// lib/infrastructure/repositories/sqlite_audit_repository.dart
+import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';

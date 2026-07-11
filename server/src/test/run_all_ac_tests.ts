@@ -67,10 +67,10 @@ async function runAll() {
   console.log('==================================================');
 
   if (allPassed) {
-    console.log('\n⭐ Pilot RC1 Approved: YES ⭐\n');
+    console.log('\n⭐ Pilot RC2.3 Approved: YES ⭐\n');
     process.exit(0);
   } else {
-    console.log('\n❌ Pilot RC1 Approved: NO (Fix failing acceptance tests) ❌\n');
+    console.log('\n❌ Pilot RC2.3 Approved: NO (Fix failing acceptance tests) ❌\n');
     process.exit(1);
   }
 }

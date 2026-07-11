@@ -1,7 +1,7 @@
 // lib/infrastructure/database/sqlcipher_stub.dart
 // Stub implementation of SQLCipher and Sqlite FFI check for web build compatibility.
 
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 
 void initWindowsSqlCipherSync() {}
 

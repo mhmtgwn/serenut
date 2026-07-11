@@ -7,6 +7,8 @@ import { getNotificationQueue } from '../../workers/notification.worker';
 import { getBillingQueue } from '../../workers/billing.scheduler';
 import { enqueueNotification } from '../../workers/notification.worker';
 import { getActiveWebSocketCount } from '../analytics/analytics.ws';
+import { loadIyzicoConfig } from '../billing/iyzico.service';
+import { logger } from '../../config/logger';
 
 const router = Router();
 
@@ -32,7 +34,7 @@ async function runBypassingRLS(sql: string, params: any[] = []) {
 }
 
 // Helper to write admin audit log
-async function writeAdminAudit(userId: string, action: string, entity: string, entityId: string, oldValue: any = null, newValue: any = null) {
+async function writeAdminAudit(userId: string, action: string, entity: string, entityId: string, oldValue: any = null, newValue: any = null, ipAddress: string = 'admin_panel') {
   const auditId = `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   try {
     await runBypassingRLS(
@@ -47,7 +49,7 @@ async function writeAdminAudit(userId: string, action: string, entity: string, e
         entityId,
         oldValue ? JSON.stringify(oldValue) : null,
         newValue ? JSON.stringify(newValue) : null,
-        'admin_panel'
+        ipAddress
       ]
     );
   } catch (err) {
@@ -209,7 +211,7 @@ router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
       [status || null, name || null, phone || null, email || null, address || null, req.params.id]
     );
 
-    await writeAdminAudit(req.user!.id, 'UPDATE_COMPANY', 'companies', req.params.id, original.rows[0], { status, name });
+    await writeAdminAudit(req.user!.id, 'UPDATE_COMPANY', 'companies', req.params.id, original.rows[0], { status, name }, req.ip);
 
     return res.json({ success: true });
   } catch (err) {
@@ -241,17 +243,20 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
   const id = `lic-${Date.now()}`;
   const licenseKey = `KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
   
+  const days = expires_in_days ? parseInt(expires_in_days, 10) : 365;
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + (expires_in_days ? parseInt(expires_in_days, 10) : 365));
+  expiresAt.setDate(expiresAt.getDate() + days);
+
+  const limit = allowed_devices_count ? parseInt(allowed_devices_count, 10) : 1;
 
   try {
     await runBypassingRLS(
       `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
        VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
-      [id, company_id, licenseKey, tier, allowed_devices_count || 1, expiresAt]
+      [id, company_id, licenseKey, tier, limit, expiresAt]
     );
 
-    await writeAdminAudit(req.user!.id, 'CREATE_LICENSE', 'licenses', id, null, { licenseKey, tier, company_id });
+    await writeAdminAudit(req.user!.id, 'CREATE_LICENSE', 'licenses', id, null, { licenseKey, tier, company_id }, req.ip);
 
     return res.status(201).json({ success: true, license_id: id, license_key: licenseKey });
   } catch (err) {
@@ -278,7 +283,7 @@ router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Respon
       [newExpiry, req.params.id]
     );
 
-    await writeAdminAudit(req.user!.id, 'RENEW_LICENSE', 'licenses', req.params.id, license.rows[0], { new_expiry: newExpiry });
+    await writeAdminAudit(req.user!.id, 'RENEW_LICENSE', 'licenses', req.params.id, license.rows[0], { new_expiry: newExpiry }, req.ip);
 
     return res.json({ success: true, new_expiry: newExpiry });
   } catch (err) {
@@ -300,7 +305,7 @@ router.post('/licenses/:id/suspend', async (req: AuthenticatedRequest, res: Resp
       [newStatus, req.params.id]
     );
 
-    await writeAdminAudit(req.user!.id, suspend ? 'SUSPEND_LICENSE' : 'ACTIVATE_LICENSE', 'licenses', req.params.id, license.rows[0], { status: newStatus });
+    await writeAdminAudit(req.user!.id, suspend ? 'SUSPEND_LICENSE' : 'ACTIVATE_LICENSE', 'licenses', req.params.id, license.rows[0], { status: newStatus }, req.ip);
 
     return res.json({ success: true });
   } catch (err) {
@@ -320,7 +325,7 @@ router.post('/licenses/:id/revoke', async (req: AuthenticatedRequest, res: Respo
       [req.params.id]
     );
 
-    await writeAdminAudit(req.user!.id, 'REVOKE_LICENSE', 'licenses', req.params.id, license.rows[0], { status: 'revoked' });
+    await writeAdminAudit(req.user!.id, 'REVOKE_LICENSE', 'licenses', req.params.id, license.rows[0], { status: 'revoked' }, req.ip);
 
     return res.json({ success: true });
   } catch (err) {
@@ -889,7 +894,7 @@ router.post('/invoices/:id/approve', async (req: AuthenticatedRequest, res: Resp
       const subRes = await runBypassingRLS('SELECT plan_id FROM subscriptions WHERE id = $1', [invoice.subscription_id]);
       if (subRes.rows.length > 0) {
         const planId = subRes.rows[0].plan_id;
-        const allowedDevices = planId === 'plan-free' ? 1 : (planId === 'plan-basic' ? 2 : (planId === 'plan-pro' ? 5 : 99));
+        const allowedDevices = planId === 'plan-free' ? 1 : (planId === 'plan-basic' ? 1 : (planId === 'plan-pro' ? 3 : 99));
         const tier = planId === 'plan-free' ? 'trial' : (planId === 'plan-enterprise' ? 'enterprise' : 'pro');
 
         await runBypassingRLS(`
@@ -901,7 +906,7 @@ router.post('/invoices/:id/approve', async (req: AuthenticatedRequest, res: Resp
     }
 
     // 3. Write Admin Audit Log
-    await writeAdminAudit(req.user!.id, 'APPROVED_BANK_WIRE_PAYMENT', 'invoices', req.params.id, invoice, { ...invoice, status: 'paid' });
+    await writeAdminAudit(req.user!.id, 'APPROVED_BANK_WIRE_PAYMENT', 'invoices', req.params.id, invoice, { ...invoice, status: 'paid' }, req.ip);
 
     // 4. Send Notification (SMS/Mail Queue)
     const notifId = `notif-${Date.now()}`;
@@ -1217,11 +1222,18 @@ router.post('/licenses/:id/offline-activation', async (req: AuthenticatedRequest
       allowed_devices: license.allowed_devices_count,
     };
 
-    const secret = process.env.JWT_SECRET || 'fallback-activation-secret-key-2026';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('JWT_SECRET is missing in production! Blocking license activation signing.');
+        return res.status(500).json({ error: 'server_error', message: 'Lisans imzalama anahtarı eksik (JWT_SECRET).' });
+      }
+    }
+    const signSecret = secret || 'fallback-activation-secret-key-2026';
     const dataToSign = `${payload.license_key}|${payload.company_id}|${payload.device_hash}|${payload.tier}|${payload.expires_at}`;
     
     const signature = crypto
-      .createHmac('sha256', secret)
+      .createHmac('sha256', signSecret)
       .update(dataToSign)
       .digest('hex');
 
@@ -1524,7 +1536,7 @@ router.post('/security/ban-ip', async (req: AuthenticatedRequest, res: Response)
       [ip, reason, req.user!.id]
     );
 
-    await writeAdminAudit(req.user!.id, 'BAN_IP', 'security', ip, null, { reason });
+    await writeAdminAudit(req.user!.id, 'BAN_IP', 'security', ip, null, { reason }, req.ip);
 
     return res.json({ success: true, message: `IP ${ip} banned.` });
   } catch (err) {
@@ -1545,7 +1557,7 @@ router.get('/security/blacklist', async (req: AuthenticatedRequest, res: Respons
 router.delete('/security/ban-ip/:ip', async (req: AuthenticatedRequest, res: Response) => {
   try {
     await runBypassingRLS('DELETE FROM ip_blacklist WHERE ip = $1', [req.params.ip]);
-    await writeAdminAudit(req.user!.id, 'UNBAN_IP', 'security', req.params.ip);
+    await writeAdminAudit(req.user!.id, 'UNBAN_IP', 'security', req.params.ip, null, null, req.ip);
 
     return res.json({ success: true, message: `IP ${req.params.ip} unbanned.` });
   } catch (err) {
@@ -2173,6 +2185,51 @@ router.get('/dashboard/support-sla', async (req: AuthenticatedRequest, res: Resp
     });
   } catch (err) {
     console.error('Support SLA statistics failed:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// [ADMIN-15-settings] Get system settings
+router.get('/settings', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await runBypassingRLS('SELECT key, value, updated_at FROM system_settings ORDER BY key ASC');
+    const settings: Record<string, string> = {};
+    result.rows.forEach(row => {
+      settings[row.key] = row.value;
+    });
+    return res.json({ success: true, settings });
+  } catch (err) {
+    console.error('Failed to get system settings:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// [ADMIN-16-settings] Save system settings
+router.put('/settings', async (req: AuthenticatedRequest, res: Response) => {
+  const { settings } = req.body;
+  if (!settings || typeof settings !== 'object') {
+    return res.status(400).json({ error: 'bad_request', message: 'Settings nesnesi eksik veya hatalı.' });
+  }
+
+  try {
+    const keys = Object.keys(settings);
+    for (const key of keys) {
+      const val = String(settings[key]);
+      await runBypassingRLS(
+        `INSERT INTO system_settings (key, value, updated_at) 
+         VALUES ($1, $2, NOW()) 
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, val]
+      );
+    }
+
+    // Reload dynamic payment configs in memory
+    await loadIyzicoConfig(pgPool);
+
+    await writeAdminAudit(req.user!.id, 'UPDATE_SYSTEM_SETTINGS', 'system_settings', 'bulk', null, settings, req.ip);
+    return res.json({ success: true, message: 'Sistem ayarları başarıyla güncellendi.' });
+  } catch (err) {
+    console.error('Failed to save system settings:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });

@@ -103,7 +103,7 @@ export class InvoiceGeneratorService {
       // Header row
       yOffset += 10;
       doc.fillColor('#475569').fontSize(9)
-         .text('Açıklama / Paket', 60, yOffset)
+         .text('Açıklama / Plan', 60, yOffset)
          .text('Miktar', 280, yOffset, { width: 50, align: 'center' })
          .text('Birim Fiyat', 340, yOffset, { width: 70, align: 'right' })
          .text('KDV', 420, yOffset, { width: 50, align: 'center' })

@@ -86,7 +86,7 @@ async function runTests() {
 
   // Try to acquire the same lock on LockManager (which runs in session B from pool)
   // This should be rejected since Session A holds it exclusively database-wide!
-  const secondAcquire = await LockManager.tryAcquireLock(lockKey);
+  const secondAcquire = await LockManager.tryAcquireLock(lockKey, 'token-1');
   assert(secondAcquire === false, 'LockManager: duplicate acquire from different session rejected correctly (locked)');
 
   // Disconnect Client A (terminates session A, automatically releasing the lock!)
@@ -94,11 +94,11 @@ async function runTests() {
   console.log('  [Session A] Disconnected (lock auto-released).');
 
   // Now, session B should be able to acquire the lock successfully!
-  const thirdAcquire = await LockManager.tryAcquireLock(lockKey);
+  const thirdAcquire = await LockManager.tryAcquireLock(lockKey, 'token-2');
   assert(thirdAcquire === true, 'LockManager: acquiring after session release succeeded');
   
   // Clean release on session B
-  await LockManager.releaseLock(lockKey);
+  await LockManager.releaseLock(lockKey, 'token-2');
 
   // --- 2. Alerting System Test ---
   console.log('\n▶️ Verification: Alerting System & Incident Logging...');

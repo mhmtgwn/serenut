@@ -45,6 +45,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
   late final TextEditingController _businessNameCtrl;
   late final TextEditingController _ownerNameCtrl;
   late final TextEditingController _phoneCtrl;
+  late final TextEditingController _taxNoCtrl;
   late final TextEditingController _emailCtrl;
 
   List<String> _cities     = [];
@@ -59,6 +60,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
     _businessNameCtrl = TextEditingController(text: _data.businessName);
     _ownerNameCtrl    = TextEditingController(text: _data.ownerName);
     _phoneCtrl        = TextEditingController(text: _data.phone);
+    _taxNoCtrl        = TextEditingController(text: _data.taxNumber);
     _emailCtrl        = TextEditingController(text: _data.email);
     _loadCities();
   }
@@ -100,6 +102,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
     _businessNameCtrl.dispose();
     _ownerNameCtrl.dispose();
     _phoneCtrl.dispose();
+    _taxNoCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
   }
@@ -127,6 +130,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
       businessName: _businessNameCtrl.text.trim(),
       ownerName:    _ownerNameCtrl.text.trim(),
       phone:        _phoneCtrl.text.trim(),
+      taxNumber:    _taxNoCtrl.text.trim(),
       email:        _emailCtrl.text.trim(),
     ));
   }
@@ -198,6 +202,16 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                                 if ((v?.trim().length ?? 0) < 10) return 'Geçerli bir numara girin';
                                 return null;
                               },
+                            ),
+                            const SizedBox(height: 12),
+                            _Field(
+                              controller: _taxNoCtrl,
+                              label: 'Vergi No',
+                              hint: '1234567890',
+                              icon: Icons.badge_rounded,
+                              required: true,
+                              keyboard: TextInputType.number,
+                              validator: (v) => (v?.trim().isEmpty ?? true) ? 'Vergi no gerekli (fişe yazılır)' : null,
                             ),
                             const SizedBox(height: 12),
                             _Field(

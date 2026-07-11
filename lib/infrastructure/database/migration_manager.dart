@@ -4,7 +4,7 @@
 // Created: 04 Jul 2026
 
 import 'dart:io';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/backup_service.dart';
