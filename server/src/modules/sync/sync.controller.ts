@@ -1,36 +1,14 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { pgPool } from '../../config/database';
-import { AuthService } from '../auth/auth.service';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
-
 import { syncLimiter } from '../../middleware/rate-limit.middleware';
+import { authenticateUser } from '../../middleware/auth.middleware';
 
 const router = Router();
 router.use(syncLimiter);
 
-// Middleware to enforce authentication on sync endpoints
-const authMiddleware = async (req: Request, res: Response, next: any) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'unauthorized', message: 'Bearer token gereklidir.' });
-  }
-  
-  const token = authHeader.split(' ')[1];
-  try {
-    const isBlacklisted = await AuthService.isTokenBlacklisted(token);
-    if (isBlacklisted) {
-      return res.status(401).json({ error: 'unauthorized', message: 'Token geçersiz kılınmıştır.' });
-    }
-
-    const decoded = AuthService.verifyAccessToken(token);
-    (req as any).user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'unauthorized', message: 'Geçersiz veya süresi dolmuş token.' });
-  }
-};
-
-router.use(authMiddleware);
+router.use(authenticateUser);
 
 router.post('/push', async (req: Request, res: Response) => {
   const user = (req as any).user;

@@ -4,6 +4,7 @@
 // Created: 04 Jul 2026
 
 import { pgPool } from '../../config/database';
+import { PoolClient } from 'pg';
 import { logger } from '../../config/logger';
 
 async function runBypassingRLS(sql: string, params: any[] = []) {
@@ -53,22 +54,35 @@ export async function executeBillingCron(): Promise<void> {
           const newEnd = new Date();
           newEnd.setMonth(newStart.getMonth() + 1);
 
-          await runBypassingRLS(`
-            UPDATE subscriptions 
-            SET current_period_start = $1, current_period_end = $2, last_payment_status = 'success', grace_period_until = null
-            WHERE id = $3
-          `, [newStart, newEnd, sub.id]);
+          const renewalClient = await pgPool.connect();
+          try {
+            await renewalClient.query('BEGIN');
+            await renewalClient.query("SET LOCAL app.bypass_rls = 'true'");
 
-          // Also extend the license validity
-          await runBypassingRLS(`
-            UPDATE licenses SET status = 'active', expires_at = $1 WHERE company_id = $2
-          `, [newEnd, sub.company_id]);
+            await renewalClient.query(`
+              UPDATE subscriptions 
+              SET current_period_start = $1, current_period_end = $2, last_payment_status = 'success', grace_period_until = null
+              WHERE id = $3
+            `, [newStart, newEnd, sub.id]);
 
-          await runBypassingRLS(`
-            UPDATE license_entitlements 
-            SET status = 'active', valid_until = $1, token_version = token_version + 1, updated_at = NOW()
-            WHERE company_id = $2 AND status IN ('trial', 'active')
-          `, [newEnd, sub.company_id]);
+            // Also extend the license validity
+            await renewalClient.query(`
+              UPDATE licenses SET status = 'active', expires_at = $1 WHERE company_id = $2
+            `, [newEnd, sub.company_id]);
+
+            await renewalClient.query(`
+              UPDATE license_entitlements 
+              SET status = 'active', valid_until = $1, token_version = token_version + 1, updated_at = NOW()
+              WHERE company_id = $2 AND status IN ('trial', 'active')
+            `, [newEnd, sub.company_id]);
+
+            await renewalClient.query('COMMIT');
+          } catch (txnErr) {
+            await renewalClient.query('ROLLBACK').catch(() => {});
+            throw txnErr;
+          } finally {
+            renewalClient.release();
+          }
 
         } else {
           // Payment failed: grant 7-day grace period
@@ -76,17 +90,30 @@ export async function executeBillingCron(): Promise<void> {
           const graceUntil = new Date();
           graceUntil.setDate(graceUntil.getDate() + 7);
 
-          await runBypassingRLS(`
-            UPDATE subscriptions 
-            SET status = 'grace_period', grace_period_until = $1, last_payment_status = 'failed'
-            WHERE id = $2
-          `, [graceUntil, sub.id]);
+          const graceClient = await pgPool.connect();
+          try {
+            await graceClient.query('BEGIN');
+            await graceClient.query("SET LOCAL app.bypass_rls = 'true'");
 
-          // Log warning/incident via SMS gateway logs mock
-          await runBypassingRLS(`
-            INSERT INTO sms_logs (id, company_id, phone, message, status)
-            VALUES ($1, $2, 'sys', 'Abonelik yenileme ödemeniz başarısız oldu. Son 7 gün tolerans süreniz.', 'sent')
-          `, [`sms-${Date.now()}-${Math.floor(Math.random()*1000)}`, sub.company_id]);
+            await graceClient.query(`
+              UPDATE subscriptions 
+              SET status = 'grace_period', grace_period_until = $1, last_payment_status = 'failed'
+              WHERE id = $2
+            `, [graceUntil, sub.id]);
+
+            // Log warning/incident via SMS gateway logs mock
+            await graceClient.query(`
+              INSERT INTO sms_logs (id, company_id, phone, message, status)
+              VALUES ($1, $2, 'sys', 'Abonelik yenileme ödemeniz başarısız oldu. Son 7 gün tolerans süreniz.', 'sent')
+            `, [`sms-${Date.now()}-${Math.floor(Math.random()*1000)}`, sub.company_id]);
+
+            await graceClient.query('COMMIT');
+          } catch (txnErr) {
+            await graceClient.query('ROLLBACK').catch(() => {});
+            throw txnErr;
+          } finally {
+            graceClient.release();
+          }
         }
       }
     }
@@ -110,19 +137,32 @@ export async function executeBillingCron(): Promise<void> {
 
 // Helper: suspend subscription and disable licenses (blocks POS usage)
 async function suspendSubscription(companyId: string, subscriptionId: string) {
-  await runBypassingRLS(`
-    UPDATE subscriptions SET status = 'suspended' WHERE id = $1
-  `, [subscriptionId]);
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-  await runBypassingRLS(`
-    UPDATE licenses SET status = 'suspended' WHERE company_id = $1
-  `, [companyId]);
+    await client.query(`
+      UPDATE subscriptions SET status = 'suspended' WHERE id = $1
+    `, [subscriptionId]);
 
-  await runBypassingRLS(`
-    UPDATE license_entitlements 
-    SET status = 'expired', token_version = token_version + 1, updated_at = NOW()
-    WHERE company_id = $1 AND status IN ('trial', 'active')
-  `, [companyId]);
+    await client.query(`
+      UPDATE licenses SET status = 'suspended' WHERE company_id = $1
+    `, [companyId]);
+
+    await client.query(`
+      UPDATE license_entitlements 
+      SET status = 'expired', token_version = token_version + 1, updated_at = NOW()
+      WHERE company_id = $1 AND status IN ('trial', 'active')
+    `, [companyId]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // Mock payment helper
