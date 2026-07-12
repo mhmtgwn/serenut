@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/sqlite_report_repository.dart
+// lib/infrastructure/repositories/sqlite_report_repository.dart
 // Phase 2.3 — Analytics Engine SQLite Implementation
 // Uses raw SQL aggregation queries against existing schema
 // Generated: 21 Jun 2026
@@ -349,4 +349,22 @@ class SqliteReportRepository implements IReportRepository {
     final s = val.toString().trim();
     return s.isEmpty ? 'Bilinmeyen' : s;
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getVatBreakdown(DateTime start, DateTime end) async {
+    return await _gateway.rawQuery('''
+      SELECT 
+        COALESCE(p.vat, 0) as vat_rate,
+        SUM(si.subtotal / (1.0 + COALESCE(p.vat, 0) / 100.0)) as taxable_amount,
+        SUM(si.subtotal - (si.subtotal / (1.0 + COALESCE(p.vat, 0) / 100.0))) as vat_amount
+      FROM sale_items si
+      JOIN products p ON si.product_id = p.id
+      JOIN sales s ON si.sale_id = s.id
+      WHERE s.status != 'cancelled'
+        AND s.created_at >= ?
+        AND s.created_at <= ?
+      GROUP BY COALESCE(p.vat, 0)
+    ''', [start.toIso8601String(), end.toIso8601String()]);
+  }
 }
+

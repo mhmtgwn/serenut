@@ -228,4 +228,8 @@ abstract class IReportRepository {
 
   /// Dönem özet metrikleri
   Future<ReportSummary> getSummary(DateRange range);
+
+  /// KDV Oranlarına göre matrah ve vergi kırılımını döndürür.
+  Future<List<Map<String, dynamic>>> getVatBreakdown(DateTime start, DateTime end);
 }
+

@@ -1078,7 +1078,47 @@ class InMemoryReportRepository implements IReportRepository {
       range: range,
     );
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getVatBreakdown(DateTime start, DateTime end) async {
+    final Map<double, Map<String, dynamic>> vatGroups = {};
+    for (final s in InMemoryDb.sales) {
+      if ((s.createdAt.isAtSameMomentAs(start) || s.createdAt.isAfter(start)) &&
+          (s.createdAt.isAtSameMomentAs(end) || s.createdAt.isBefore(end)) &&
+          s.status != 'cancelled') {
+        for (final item in s.items) {
+          final prodId = item['product_id'] as String;
+          final prod = InMemoryDb.products.firstWhere(
+            (p) => p.id == prodId,
+            orElse: () => ProductEntity(
+              id: '',
+              name: 'Other',
+              description: '',
+              price: 0,
+              quantity: 0,
+              category: 'Other',
+              vat: 0,
+            ),
+          );
+          final vatRate = (prod.vat ?? 0).toDouble();
+          final subtotal = (item['subtotal'] as num?)?.toDouble() ?? 0.0;
+          final taxable = subtotal / (1.0 + vatRate / 100.0);
+          final vatAmount = subtotal - taxable;
+
+          final group = vatGroups.putIfAbsent(vatRate, () => {
+            'vat_rate': vatRate,
+            'taxable_amount': 0.0,
+            'vat_amount': 0.0,
+          });
+          group['taxable_amount'] = (group['taxable_amount'] as double) + taxable;
+          group['vat_amount'] = (group['vat_amount'] as double) + vatAmount;
+        }
+      }
+    }
+    return vatGroups.values.toList();
+  }
 }
+
 
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�
 /// Dashboard Repository

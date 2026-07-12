@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/reports_page.dart
+// lib/presentation/pages/reports_page.dart
 // Phase 2.3 — Analytics Engine UI
 // 3-tab layout: Sales | Products | Customer Debt + Cloud BI
 // Generated: 21 Jun 2026
@@ -17,8 +17,6 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:serenutos/domain/services/document_export_service.dart';
-import 'package:serenutos/providers/database_provider.dart';
-
 // Sprint 7 Cloud BI Imports
 import 'package:serenutos/domain/models/analytics_models.dart';
 import 'package:serenutos/infrastructure/repositories/cloud_analytics_repository.dart';
@@ -150,20 +148,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         subject = 'Gün Sonu Raporu - ${DateFormat('dd.MM.yyyy').format(today)}';
         await exportService.shareFile(filePath, subject);
       } else if (type == 'vat') {
-        final gateway = ref.read(dbGatewayProvider);
-        final rows = await gateway.rawQuery('''
-          SELECT 
-            COALESCE(p.vat, 0) as vat_rate,
-            SUM(si.subtotal / (1.0 + COALESCE(p.vat, 0) / 100.0)) as taxable_amount,
-            SUM(si.subtotal - (si.subtotal / (1.0 + COALESCE(p.vat, 0) / 100.0))) as vat_amount
-          FROM sale_items si
-          JOIN products p ON si.product_id = p.id
-          JOIN sales s ON si.sale_id = s.id
-          WHERE s.status != 'cancelled'
-            AND s.created_at >= ?
-            AND s.created_at <= ?
-          GROUP BY COALESCE(p.vat, 0)
-        ''', [_selectedRange.from.toIso8601String(), _selectedRange.to.toIso8601String()]);
+        final reportRepo = await ref.read(reportRepositoryProvider.future);
+        final rows = await reportRepo.getVatBreakdown(_selectedRange.from, _selectedRange.to);
+
 
         filePath = await exportService.exportVatReportExcel(
           startDate: _selectedRange.from,
