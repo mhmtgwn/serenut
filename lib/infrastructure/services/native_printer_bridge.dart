@@ -5,16 +5,240 @@
 // Updated: 24 Jun 2026
 
 import 'dart:io';
+import 'dart:ffi';
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+// FFI helper signatures for winspool.drv raw printing
+typedef OpenPrinterWUtf16Func = Int32 Function(
+  Pointer<Utf16> pPrinterName,
+  Pointer<IntPtr> phPrinter,
+  Pointer<Void> pDefault,
+);
+typedef OpenPrinterWFunc = int Function(
+  Pointer<Utf16> pPrinterName,
+  Pointer<IntPtr> phPrinter,
+  Pointer<Void> pDefault,
+);
+
+typedef ClosePrinterFunc = Int32 Function(
+  IntPtr hPrinter,
+);
+typedef ClosePrinterDartFunc = int Function(
+  int hPrinter,
+);
+
+final class DocInfo1W extends Struct {
+  external Pointer<Utf16> pDocName;
+  external Pointer<Utf16> pOutputFile;
+  external Pointer<Utf16> pDataType;
+}
+
+typedef StartDocPrinterWFunc = Uint32 Function(
+  IntPtr hPrinter,
+  Uint32 level,
+  Pointer<DocInfo1W> pDocInfo,
+);
+typedef StartDocPrinterWDartFunc = int Function(
+  int hPrinter,
+  int level,
+  Pointer<DocInfo1W> pDocInfo,
+);
+
+typedef EndDocPrinterFunc = Int32 Function(
+  IntPtr hPrinter,
+);
+typedef EndDocPrinterDartFunc = int Function(
+  int hPrinter,
+);
+
+typedef StartPagePrinterFunc = Int32 Function(
+  IntPtr hPrinter,
+);
+typedef StartPagePrinterDartFunc = int Function(
+  int hPrinter,
+);
+
+typedef EndPagePrinterFunc = Int32 Function(
+  IntPtr hPrinter,
+);
+typedef EndPagePrinterDartFunc = int Function(
+  int hPrinter,
+);
+
+typedef WritePrinterFunc = Int32 Function(
+  IntPtr hPrinter,
+  Pointer<Uint8> pBuf,
+  Uint32 cbBuf,
+  Pointer<Uint32> pcWritten,
+);
+typedef WritePrinterDartFunc = int Function(
+  int hPrinter,
+  Pointer<Uint8> pBuf,
+  int cbBuf,
+  Pointer<Uint32> pcWritten,
+);
+
 class NativePrinterBridge {
+  final WinspoolWrapper _winspool;
+
+  NativePrinterBridge([WinspoolWrapper? winspool])
+      : _winspool = winspool ?? WinspoolWrapperImpl();
+
+  static NativePrinterBridge _defaultInstance = NativePrinterBridge();
+
+  @visibleForTesting
+  static set defaultInstance(NativePrinterBridge instance) {
+    _defaultInstance = instance;
+  }
+
   static const MethodChannel _bluetoothChannel =
       MethodChannel('com.serenutos.printer/bluetooth');
   static const MethodChannel _sunmiChannel =
       MethodChannel('com.serenutos.printer/sunmi');
   static const MethodChannel _usbChannel =
       MethodChannel('com.serenutos.printer/usb');
+
+  static bool usePowerShellFallback = false;
+
+  static Future<bool> _printUsbPowerShellFallback(String printerName, List<int> bytes) async {
+    try {
+      final tempFile = File('${Directory.systemTemp.path}/print_raw_${DateTime.now().microsecondsSinceEpoch}.bin');
+      await tempFile.writeAsBytes(bytes);
+      
+      final psScript = '''
+\$code = @'
+using System;
+using System.Runtime.InteropServices;
+public class RawPrinter {
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+    public struct DOCINFO {
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+        [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+    }
+    [DllImport("winspool.drv", CharSet=CharSet.Unicode, SetLastError=true)]
+    public static extern bool OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool ClosePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", CharSet=CharSet.Unicode, SetLastError=true)]
+    public static extern int StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFO pDocInfo);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool EndDocPrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool StartPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool EndPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.drv", SetLastError=true)]
+    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBuf, int cbBuf, out int pcWritten);
+}
+'@
+Add-Type -TypeDefinition \$code
+  \$success = \$false
+if ([RawPrinter]::OpenPrinter("$printerName", [ref] \$hPrinter, [IntPtr]::Zero)) {
+    try {
+        \$docInfo = New-Object RawPrinter+DOCINFO
+        \$docInfo.pDocName = "Serenut POS Fallback Receipt"
+        \$docInfo.pDataType = "RAW"
+        if ([RawPrinter]::StartDocPrinter(\$hPrinter, 1, [ref] \$docInfo) -ne 0) {
+            if ([RawPrinter]::StartPagePrinter(\$hPrinter)) {
+                \$bytes = [System.IO.File]::ReadAllBytes("${tempFile.path.replaceAll('\\', '\\\\')}")
+                \$pinnedArray = [System.Runtime.InteropServices.GCHandle]::Alloc(\$bytes, "Pinned")
+                \$pBuf = \$pinnedArray.AddrOfPinnedObject()
+                \$written = 0
+                if ([RawPrinter]::WritePrinter(\$hPrinter, \$pBuf, \$bytes.Length, [ref] \$written)) {
+                    \$success = \$true
+                }
+                \$pinnedArray.Free()
+                [RawPrinter]::EndPagePrinter(\$hPrinter)
+            }
+            [RawPrinter]::EndDocPrinter(\$hPrinter)
+        }
+    } finally {
+        [RawPrinter]::ClosePrinter(\$hPrinter)
+    }
+}
+if (-not \$success) {
+    exit 1
+}
+
+''';
+
+      final res = await Process.run('powershell', ['-Command', psScript]);
+      try {
+        await tempFile.delete();
+      } catch (_) {}
+      return res.exitCode == 0;
+    } catch (e) {
+      debugPrint('PowerShell fallback printing failed: $e');
+      return false;
+    }
+  }
+
+  @visibleForTesting
+  Future<bool> printUsbFfi(String printerName, List<int> bytes) async {
+    Pointer<Utf16>? pPrinterName;
+    Pointer<IntPtr>? phPrinter;
+    Pointer<DocInfo1W>? docInfo;
+    Pointer<Uint8>? pBytes;
+    Pointer<Uint32>? pcWritten;
+    int hPrinter = 0;
+
+    try {
+      pPrinterName = printerName.toNativeUtf16();
+      phPrinter = calloc<IntPtr>();
+      
+      final openRes = _winspool.openPrinter(pPrinterName, phPrinter, nullptr);
+      if (openRes == 0) return false;
+      
+      hPrinter = phPrinter.value;
+      
+      docInfo = calloc<DocInfo1W>();
+      docInfo.ref.pDocName = 'Serenut POS Raw Receipt'.toNativeUtf16();
+      docInfo.ref.pOutputFile = nullptr;
+      docInfo.ref.pDataType = 'RAW'.toNativeUtf16();
+      
+      final docId = _winspool.startDocPrinter(hPrinter, 1, docInfo);
+      if (docId == 0) return false;
+      
+      bool printSuccess = false;
+      try {
+        final pageRes = _winspool.startPagePrinter(hPrinter);
+        if (pageRes != 0) {
+          try {
+            pBytes = calloc<Uint8>(bytes.length);
+            for (var i = 0; i < bytes.length; i++) {
+              pBytes[i] = bytes[i];
+            }
+            pcWritten = calloc<Uint32>();
+            
+            final writeRes = _winspool.writePrinter(hPrinter, pBytes, bytes.length, pcWritten);
+            printSuccess = writeRes != 0;
+          } finally {
+            if (pBytes != null) calloc.free(pBytes);
+            if (pcWritten != null) calloc.free(pcWritten);
+          }
+          _winspool.endPagePrinter(hPrinter);
+        }
+      } finally {
+        _winspool.endDocPrinter(hPrinter);
+      }
+      
+      return printSuccess;
+    } finally {
+      if (pPrinterName != null) calloc.free(pPrinterName);
+      if (phPrinter != null) calloc.free(phPrinter);
+      if (docInfo != null) {
+        if (docInfo.ref.pDocName != nullptr) calloc.free(docInfo.ref.pDocName);
+        if (docInfo.ref.pDataType != nullptr) calloc.free(docInfo.ref.pDataType);
+        calloc.free(docInfo);
+      }
+      if (hPrinter != 0) {
+        _winspool.closePrinter(hPrinter);
+      }
+    }
+  }
 
   // ── Platform guards ────────────────────────────────────────────────────────
 
@@ -30,86 +254,19 @@ class NativePrinterBridge {
 
     // Windows spooler raw printing
     if (Platform.isWindows) {
+      if (usePowerShellFallback) {
+        return _printUsbPowerShellFallback(printerName, bytes);
+      }
       try {
-        final tempDir = Directory.systemTemp;
-        final timeToken = DateTime.now().microsecondsSinceEpoch;
-        final bytesFile = File('${tempDir.path}/serenut_print_$timeToken.bin');
-        await bytesFile.writeAsBytes(bytes);
-
-        final cleanPath = bytesFile.path.replaceAll('\\', '/');
-
-        final psScript = '''
-\$code = @"
-using System;
-using System.Runtime.InteropServices;
-public class RawPrinter {
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-    public class DOCINFOA {
-        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
-        [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
-        [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
-    }
-    [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
-    [DllImport("winspool.Drv", EntryPoint = "ClosePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool ClosePrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
-    [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool EndDocPrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv", EntryPoint = "StartPagePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool StartPagePrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv", EntryPoint = "EndPagePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool EndPagePrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
-
-    public static bool SendBytesToPrinter(string szPrinterName, byte[] bytes) {
-        IntPtr hPrinter = new IntPtr(0);
-        DOCINFOA di = new DOCINFOA();
-        di.pDocName = "Serenut POS Raw Receipt";
-        di.pDataType = "RAW";
-        if (OpenPrinter(szPrinterName, out hPrinter, IntPtr.Zero)) {
-            if (StartDocPrinter(hPrinter, 1, di)) {
-                if (StartPagePrinter(hPrinter)) {
-                    IntPtr pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
-                    Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
-                    Int32 dwWritten = 0;
-                    WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out dwWritten);
-                    EndPagePrinter(hPrinter);
-                    Marshal.FreeCoTaskMem(pUnmanagedBytes);
-                }
-                EndDocPrinter(hPrinter);
-            }
-            ClosePrinter(hPrinter);
+        final success = await _defaultInstance.printUsbFfi(printerName, bytes);
+        if (!success) {
+          debugPrint('WinSpool FFI returned false. Trying PowerShell fallback...');
+          return _printUsbPowerShellFallback(printerName, bytes);
         }
-        return true;
-    }
-}
-"@
-Add-Type -TypeDefinition \$code
-[RawPrinter]::SendBytesToPrinter("$printerName", [System.IO.File]::ReadAllBytes("$cleanPath"))
-''';
-
-        final scriptFile = File('${tempDir.path}/serenut_print_$timeToken.ps1');
-        await scriptFile.writeAsString(psScript);
-
-        final result = await Process.run('powershell', [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-File',
-          scriptFile.path
-        ]);
-
-        try {
-          await bytesFile.delete();
-          await scriptFile.delete();
-        } catch (_) {}
-
-        return result.exitCode == 0;
-      } catch (_) {
-        return false;
+        return success;
+      } catch (e) {
+        debugPrint('WinSpool FFI crashed. Trying PowerShell fallback...');
+        return _printUsbPowerShellFallback(printerName, bytes);
       }
     }
 
@@ -285,3 +442,75 @@ Add-Type -TypeDefinition \$code
     }
   }
 }
+
+/// Arayüz: Windows Spooler raw yazdırma FFI çağrıları için mock'lanabilir soyut sınıf
+abstract class WinspoolWrapper {
+  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter, Pointer<Void> pDefault);
+  int closePrinter(int hPrinter);
+  int startDocPrinter(int hPrinter, int level, Pointer<DocInfo1W> pDocInfo);
+  int endDocPrinter(int hPrinter);
+  int startPagePrinter(int hPrinter);
+  int endPagePrinter(int hPrinter);
+  int writePrinter(int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten);
+}
+
+/// Üretim Uygulaması: winspool.drv DLL FFI çağrılarını gerçekleştiren gerçek wrapper
+class WinspoolWrapperImpl implements WinspoolWrapper {
+  late final DynamicLibrary _dylib;
+  late final OpenPrinterWFunc _openPrinter;
+  late final ClosePrinterDartFunc _closePrinter;
+  late final StartDocPrinterWDartFunc _startDocPrinter;
+  late final EndDocPrinterDartFunc _endDocPrinter;
+  late final StartPagePrinterDartFunc _startPagePrinter;
+  late final EndPagePrinterDartFunc _endPagePrinter;
+  late final WritePrinterDartFunc _writePrinter;
+
+  WinspoolWrapperImpl() {
+    if (Platform.isWindows) {
+      _dylib = DynamicLibrary.open('winspool.drv');
+      _openPrinter = _dylib.lookupFunction<OpenPrinterWUtf16Func, OpenPrinterWFunc>('OpenPrinterW');
+      _closePrinter = _dylib.lookupFunction<ClosePrinterFunc, ClosePrinterDartFunc>('ClosePrinter');
+      _startDocPrinter = _dylib.lookupFunction<StartDocPrinterWFunc, StartDocPrinterWDartFunc>('StartDocPrinterW');
+      _endDocPrinter = _dylib.lookupFunction<EndDocPrinterFunc, EndDocPrinterDartFunc>('EndDocPrinter');
+      _startPagePrinter = _dylib.lookupFunction<StartPagePrinterFunc, StartPagePrinterDartFunc>('StartPagePrinter');
+      _endPagePrinter = _dylib.lookupFunction<EndPagePrinterFunc, EndPagePrinterDartFunc>('EndPagePrinter');
+      _writePrinter = _dylib.lookupFunction<WritePrinterFunc, WritePrinterDartFunc>('WritePrinter');
+    }
+  }
+
+  @override
+  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter, Pointer<Void> pDefault) {
+    return _openPrinter(pPrinterName, phPrinter, pDefault);
+  }
+
+  @override
+  int closePrinter(int hPrinter) {
+    return _closePrinter(hPrinter);
+  }
+
+  @override
+  int startDocPrinter(int hPrinter, int level, Pointer<DocInfo1W> pDocInfo) {
+    return _startDocPrinter(hPrinter, level, pDocInfo);
+  }
+
+  @override
+  int endDocPrinter(int hPrinter) {
+    return _endDocPrinter(hPrinter);
+  }
+
+  @override
+  int startPagePrinter(int hPrinter) {
+    return _startPagePrinter(hPrinter);
+  }
+
+  @override
+  int endPagePrinter(int hPrinter) {
+    return _endPagePrinter(hPrinter);
+  }
+
+  @override
+  int writePrinter(int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten) {
+    return _writePrinter(hPrinter, pBuf, cbBuf, pcWritten);
+  }
+}
+
