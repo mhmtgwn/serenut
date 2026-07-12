@@ -329,15 +329,19 @@ class _SalesPageState extends ConsumerState<SalesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isProcessing        = ref.watch(salesFlowProvider.select((state) => state.status == SalesFlowStatus.processing));
-
     return Scaffold(
       backgroundColor: _kSurface,
       body: SafeArea(
         child: Stack(
           children: [
-            AbsorbPointer(
-              absorbing: isProcessing,
+            Consumer(
+              builder: (context, ref, child) {
+                final isProcessing = ref.watch(salesFlowProvider.select((state) => state.status == SalesFlowStatus.processing));
+                return AbsorbPointer(
+                  absorbing: isProcessing,
+                  child: child!,
+                );
+              },
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 900;
