@@ -30,6 +30,10 @@ class SqliteProductRepository implements IProductRepository {
       final args = <Object?>[_market];
       
       if (where != null) {
+        // GÜVENLİK/SAĞLAMLIK NOTU: rewrittenWhere değişkeni yalnızca repository içindeki hardcoded (sabit) WHERE 
+        // şablonları üzerinde yapısal dönüşümler (sütun adı eşlemeleri gibi) yapar. Arama terimi, kategori veya ID 
+        // gibi kullanıcı girdileri asla doğrudan bu stringe eklenmez (SQL injection riski yoktur). Tüm dinamik girdiler 
+        // placeholders (?) aracılığıyla whereArgs/args listesiyle rawQuery'ye parametre olarak güvenle bağlanır.
         String rewrittenWhere = where
             .replaceAll('is_active = 1', '1=1')
             .replaceAll('id = ?', 'p.barcode = ?')

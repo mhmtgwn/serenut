@@ -250,13 +250,21 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<Map<String, int>> getStatusCounts({String? searchQuery}) async {
-    final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
-    final searchCondition = hasSearch ? 'AND id LIKE \'%${searchQuery.replaceAll("'", "''")}%\'' : '';
-    final baseWhere = '(is_deleted = 0 OR is_deleted IS NULL) $searchCondition';
+    final conditions = <String>['(is_deleted = 0 OR is_deleted IS NULL)'];
+    final args = <dynamic>[];
 
+    final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
+    if (hasSearch) {
+      conditions.add('id LIKE ?');
+      args.add('%$searchQuery%');
+    }
+
+    final where = conditions.join(' AND ');
     final rows = await _executor.rawQuery(
-      "SELECT status, COUNT(*) as cnt FROM orders WHERE $baseWhere GROUP BY status",
+      'SELECT status, COUNT(*) as cnt FROM orders WHERE $where GROUP BY status',
+      args,
     );
+
 
     final counts = <String, int>{
       'all': 0,
