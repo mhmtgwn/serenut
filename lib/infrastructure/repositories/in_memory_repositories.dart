@@ -422,6 +422,21 @@ class InMemorySaleRepository implements ISaleRepository {
   }
 
   @override
+  Future<List<SaleEntity>> findFiltered({
+    String? searchQuery,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    var list = InMemoryDb.sales.where((s) =>
+        searchQuery == null || searchQuery.isEmpty ||
+        s.id.toLowerCase().contains(searchQuery.toLowerCase())
+    ).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (offset >= list.length) return [];
+    return list.skip(offset).take(limit).toList();
+  }
+
+  @override
   Future<int> create(SaleEntity entity) async {
     InMemoryDb.sales.add(entity);
     return 1;

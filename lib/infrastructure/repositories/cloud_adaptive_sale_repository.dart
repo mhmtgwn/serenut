@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/cloud_adaptive_sale_repository.dart
+// lib/infrastructure/repositories/cloud_adaptive_sale_repository.dart
 // Serenut Platform — Cloud Adaptive Sale Repository
 // Implements Repository Pattern, coordinating Local SQLite and Remote Data Source.
 // Created: 04 Jul 2026
@@ -48,6 +48,16 @@ class CloudAdaptiveSaleRepository implements ISaleRepository {
 
   @override
   Future<int> getTotalItemsSold() => _localRepo.getTotalItemsSold();
+
+  @override
+  Future<List<SaleEntity>> findUnsynced() => _localRepo.findUnsynced();
+
+  @override
+  Future<List<SaleEntity>> findFiltered({
+    String? searchQuery,
+    int limit = 25,
+    int offset = 0,
+  }) => _localRepo.findFiltered(searchQuery: searchQuery, limit: limit, offset: offset);
 
   // ── Write operations (Offline first: write local, then sync remote in bg) ──
   @override

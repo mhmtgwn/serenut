@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/sales_history_page.dart
+// lib/presentation/pages/sales_history_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,16 +31,31 @@ class SalesHistoryPage extends ConsumerStatefulWidget {
 class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(salesHistoryControllerProvider.notifier).loadNextPage();
+    }
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final salesAsync = ref.watch(salesControllerProvider);
+    final salesAsync = ref.watch(salesHistoryControllerProvider);
     final customersVal = ref.watch(customersControllerProvider);
 
     // Build customer map for fast lookups
@@ -70,7 +85,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: TextField(
               controller: _searchController,
-              onChanged: (val) => setState(() => _searchQuery = val),
+              onChanged: (val) {
+                setState(() => _searchQuery = val);
+                ref.read(salesHistoryControllerProvider.notifier).applySearch(val);
+              },
               decoration: InputDecoration(
                 hintText: 'Satış no veya müşteri adı ara...',
                 hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 13),
@@ -81,6 +99,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
+                          ref.read(salesHistoryControllerProvider.notifier).applySearch(null);
                         },
                       )
                     : null,
@@ -117,15 +136,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 ),
               ),
               data: (salesList) {
-                final filteredSales = salesList.where((sale) {
-                  final saleIdMatch = sale.id.toLowerCase().contains(_searchQuery.toLowerCase());
-                  final customerName = customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
-                  final customerMatch = customerName.toLowerCase().contains(_searchQuery.toLowerCase());
-                  return saleIdMatch || customerMatch;
-                }).toList();
-
-                // Sort by date descending (latest first)
-                filteredSales.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                // No Dart-side filtering: controller returns the correct page
+                final filteredSales = salesList;
 
                 if (filteredSales.isEmpty) {
                   return Center(
@@ -144,9 +156,18 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 }
 
                 return ListView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  itemCount: filteredSales.length,
+                  itemCount: filteredSales.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == filteredSales.length) {
+                      final hasMore = ref.read(salesHistoryControllerProvider.notifier).hasMore;
+                      if (!hasMore) return const SizedBox.shrink();
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
                     final sale = filteredSales[index];
                     final customerName = customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
                     final dateStr = DateFormat('dd.MM.yyyy HH:mm', 'tr_TR').format(sale.createdAt);

@@ -93,6 +93,63 @@ class SqliteSaleRepository implements ISaleRepository {
   }
 
   @override
+  Future<List<SaleEntity>> findUnsynced() async {
+    List<Map<String, dynamic>> rows;
+    try {
+      rows = await _executor.query(
+        'sales',
+        where: 'is_synced = 0 AND (is_deleted = 0 OR is_deleted IS NULL)',
+      );
+    } catch (_) {
+      rows = await _executor.query('sales', where: 'is_synced = 0');
+    }
+    final sales = <SaleEntity>[];
+    for (final row in rows) {
+      final sale = SaleEntity.fromMap(row);
+      final items = await _executor.query(
+        'sale_items',
+        where: 'sale_id = ?',
+        whereArgs: [sale.id],
+      );
+      sale.items.addAll(items);
+      sales.add(sale);
+    }
+    return sales;
+  }
+
+  @override
+  Future<List<SaleEntity>> findFiltered({
+    String? searchQuery,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final conditions = <String>['(is_deleted = 0 OR is_deleted IS NULL)'];
+    final args = <dynamic>[];
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      conditions.add('id LIKE ?');
+      args.add('%$searchQuery%');
+    }
+
+    final where = conditions.join(' AND ');
+    args.addAll([limit, offset]);
+
+    final rows = await _executor.rawQuery(
+      'SELECT * FROM sales WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      args,
+    );
+
+    final sales = <SaleEntity>[];
+    for (final row in rows) {
+      final sale = SaleEntity.fromMap(row);
+      final items = await _executor.query('sale_items', where: 'sale_id = ?', whereArgs: [sale.id]);
+      sale.items.addAll(items);
+      sales.add(sale);
+    }
+    return sales;
+  }
+
+  @override
   Future<int> create(SaleEntity entity) async {
     await _executor.insert('sales', {
       'id': entity.id,
@@ -303,6 +360,27 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
     );
     if (rows.isEmpty) return null;
     return FinancialTransactionEntity.fromMap(rows.first);
+  }
+
+  /// YÜKSEK A DÜZELTMESİ: Tek bir MAX() sorgusu — tüm listeyi RAM'e çekmez.
+  @override
+  Future<int> getMaxLogicalClock() async {
+    final result = await _executor.rawQuery(
+      'SELECT MAX(logical_clock) as max_clock FROM financial_transactions',
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// İSTEK 3 DÜZELTMESİ: findAll().any() Dart filtresi yerine COUNT(*) SQL sorgusu.
+  /// payment_service.dart duplicate check'i için O(n) RAM → O(1) SQL EXISTS.
+  @override
+  Future<bool> existsByReferenceId(String referenceId, String type) async {
+    if (referenceId.isEmpty) return false;
+    final result = await _executor.rawQuery(
+      'SELECT COUNT(*) as cnt FROM financial_transactions WHERE reference_id = ? AND type = ?',
+      [referenceId, type],
+    );
+    return (Sqflite.firstIntValue(result) ?? 0) > 0;
   }
 
   @override

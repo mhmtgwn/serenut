@@ -1,4 +1,4 @@
-﻿// lib/presentation/controllers/sales_controller.dart
+// lib/presentation/controllers/sales_controller.dart
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/services/sales_service.dart';
@@ -238,4 +238,81 @@ final salesControllerProvider =
 final saleDetailProvider = FutureProvider.family<SaleEntity?, String>((ref, saleId) async {
   final repo = await ref.watch(saleRepositoryProvider.future);
   return repo.findById(saleId);
+});
+
+// ─── Sales History — Paginated Controller ────────────────────────────────────
+
+const _kSalesHistoryPageSize = 25;
+
+/// Dedicated paginated controller for the Sales History page.
+/// Keeps the existing [SalesController] untouched so that the sales flow,
+/// dashboard, and reports pages are not affected.
+class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
+  late ISaleRepository _repository;
+
+  int _offset = 0;
+  bool _hasMore = true;
+  String? _searchQuery;
+
+  bool get hasMore => _hasMore;
+
+  @override
+  FutureOr<List<SaleEntity>> build() async {
+    _repository = await ref.watch(saleRepositoryProvider.future);
+    _offset = 0;
+    _hasMore = true;
+    final page = await _repository.findFiltered(
+      searchQuery: _searchQuery,
+      limit: _kSalesHistoryPageSize,
+      offset: 0,
+    );
+    _offset = page.length;
+    _hasMore = (page.length == _kSalesHistoryPageSize);
+    return page;
+  }
+
+  Future<void> applySearch(String? query) async {
+    _searchQuery = (query == null || query.isEmpty) ? null : query;
+    _offset = 0;
+    _hasMore = true;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _repository.findFiltered(
+          searchQuery: _searchQuery,
+          limit: _kSalesHistoryPageSize,
+          offset: 0,
+        ));
+    _offset = state.valueOrNull?.length ?? 0;
+    _hasMore = (_offset == _kSalesHistoryPageSize);
+  }
+
+  Future<void> loadNextPage() async {
+    if (!_hasMore) return;
+    final current = state.valueOrNull ?? [];
+    final next = await _repository.findFiltered(
+      searchQuery: _searchQuery,
+      limit: _kSalesHistoryPageSize,
+      offset: _offset,
+    );
+    if (next.length < _kSalesHistoryPageSize) _hasMore = false;
+    _offset += next.length;
+    state = AsyncValue.data([...current, ...next]);
+  }
+
+  Future<void> refresh() async {
+    _offset = 0;
+    _hasMore = true;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _repository.findFiltered(
+          searchQuery: _searchQuery,
+          limit: _kSalesHistoryPageSize,
+          offset: 0,
+        ));
+    _offset = state.valueOrNull?.length ?? 0;
+    _hasMore = (_offset == _kSalesHistoryPageSize);
+  }
+}
+
+final salesHistoryControllerProvider =
+    AsyncNotifierProvider<SalesHistoryController, List<SaleEntity>>(() {
+  return SalesHistoryController();
 });

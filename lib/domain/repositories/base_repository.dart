@@ -136,6 +136,15 @@ abstract class ISaleRepository implements BaseRepository<SaleEntity> {
   /// İSTEK 3 DÜZELTMESİ: Sadece is_synced = 0 olan satışları döner.
   /// findAll().where() Dart-tarafı filtreleme yerine SQL WHERE kullanır (O(n) RAM → O(k) RAM).
   Future<List<SaleEntity>> findUnsynced();
+
+  /// Paginated filtered query — used by sales history UI.
+  /// [searchQuery] matches on sale id (case-insensitive).
+  /// [limit] / [offset] control the page window.
+  Future<List<SaleEntity>> findFiltered({
+    String? searchQuery,
+    int limit = 25,
+    int offset = 0,
+  });
 }
 
 /// Financial transaction repository
