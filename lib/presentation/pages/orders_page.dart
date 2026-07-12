@@ -63,9 +63,10 @@ class OrdersPage extends ConsumerStatefulWidget {
 class _OrdersPageState extends ConsumerState<OrdersPage> {
   String _statusFilter = 'all';
   bool _isSearching = false;
-  String _orderQuery = '';
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   bool _showFilters = false;
+  Map<String, int> _statusCounts = {'all': 0, 'created': 0, 'preparing': 0, 'ready': 0, 'delivered': 0, 'cancelled': 0};
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -74,12 +75,30 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    _scrollController.addListener(_onScroll);
+    // Load initial status counts
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshCounts());
+  }
+
+  Future<void> _refreshCounts() async {
+    try {
+      final counts = await ref.read(ordersControllerProvider.notifier).getStatusCounts();
+      if (mounted) setState(() => _statusCounts = counts);
+    } catch (_) {}
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(ordersControllerProvider.notifier).loadNextPage();
+    }
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -127,8 +146,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     setState(() {
       _isSearching = true;
       _searchController.text = barcode;
-      _orderQuery = barcode;
     });
+    ref.read(ordersControllerProvider.notifier).applySearch(barcode);
+    _refreshCounts();
   }
 
   String _statusLabel(String status) {
@@ -241,38 +261,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         ),
       ),
       data: (ordersList) {
-        // ── Sayaçlar ──
-        final counts = {
-          'all':       ordersList.length,
-          'created':   ordersList.where((o) => o.status == 'created').length,
-          'preparing': ordersList.where((o) => o.status == 'preparing').length,
-          'ready':     ordersList.where((o) => o.status == 'ready').length,
-          'delivered': ordersList.where((o) => o.status == 'delivered').length,
-          'cancelled': ordersList.where((o) => o.status == 'cancelled').length,
-        };
-
-        final filtered = ordersList.where((o) {
-          final matchesStatus = _statusFilter == 'all' || o.status == _statusFilter;
-          if (_orderQuery.isEmpty) return matchesStatus;
-
-          final query = _orderQuery.toLowerCase();
-          final matchesId = o.id.toLowerCase().contains(query);
-
-          // Find customer name
-          final customerName = customersVal.maybeWhen(
-            data: (list) {
-              final c = list.firstWhere(
-                (c) => c.id == o.customerId,
-                orElse: () => CustomerEntity(id: '', name: '', email: '', phone: '', balance: 0, createdAt: DateTime.now()),
-              );
-              return c.name;
-            },
-            orElse: () => '',
-          ).toLowerCase();
-
-          final matchesCustomer = customerName.contains(query);
-          return matchesStatus && (matchesId || matchesCustomer);
-        }).toList();
+        // Status counts come from controller (server-side) — refreshed on filter/search change
+        final counts = _statusCounts;
+        // No client-side filtering — the controller already returned the correct page
+        final filtered = ordersList;
 
         return PosPageLayout(
           title: 'Siparişler',
@@ -280,7 +272,10 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
           onSearchToggled: (val) => setState(() => _isSearching = val),
           searchController: _searchController,
           searchHint: 'Sipariş veya müşteri ara...',
-          onSearchChanged: (val) => setState(() => _orderQuery = val),
+          onSearchChanged: (val) {
+            ref.read(ordersControllerProvider.notifier).applySearch(val);
+            _refreshCounts();
+          },
           showRefresh: true,
           onRefresh: () => ref.read(ordersControllerProvider.notifier).refresh(),
           filterWidget: Column(
@@ -342,16 +337,18 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                   ),
                   child: Column(
                     children: [
-                      _buildFilterRow(
+                       _buildFilterRow(
                         context,
                         label: 'Tümü',
-                        count: counts['all']!,
+                        count: counts['all'] ?? 0,
                         isSelected: _statusFilter == 'all',
                         onTap: () {
                           setState(() {
                             _statusFilter = 'all';
                             _showFilters = false;
                           });
+                          ref.read(ordersControllerProvider.notifier).applyFilter('all');
+                          _refreshCounts();
                         },
                         statusColor: const Color(0xFF64748B),
                         icon: Icons.grid_view_rounded,
@@ -359,13 +356,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                       _buildFilterRow(
                         context,
                         label: 'Yeni',
-                        count: counts['created']!,
+                        count: counts['created'] ?? 0,
                         isSelected: _statusFilter == 'created',
                         onTap: () {
                           setState(() {
                             _statusFilter = 'created';
                             _showFilters = false;
                           });
+                          ref.read(ordersControllerProvider.notifier).applyFilter('created');
+                          _refreshCounts();
                         },
                         statusColor: const Color(0xFF3B82F6),
                         icon: Icons.fiber_new_rounded,
@@ -373,13 +372,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                       _buildFilterRow(
                         context,
                         label: 'Hazırlanıyor',
-                        count: counts['preparing']!,
+                        count: counts['preparing'] ?? 0,
                         isSelected: _statusFilter == 'preparing',
                         onTap: () {
                           setState(() {
                             _statusFilter = 'preparing';
                             _showFilters = false;
                           });
+                          ref.read(ordersControllerProvider.notifier).applyFilter('preparing');
+                          _refreshCounts();
                         },
                         statusColor: const Color(0xFFFF9500),
                         icon: Icons.soup_kitchen_rounded,
@@ -387,13 +388,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                       _buildFilterRow(
                         context,
                         label: 'Hazır',
-                        count: counts['ready']!,
+                        count: counts['ready'] ?? 0,
                         isSelected: _statusFilter == 'ready',
                         onTap: () {
                           setState(() {
                             _statusFilter = 'ready';
                             _showFilters = false;
                           });
+                          ref.read(ordersControllerProvider.notifier).applyFilter('ready');
+                          _refreshCounts();
                         },
                         statusColor: const Color(0xFF10B981),
                         icon: Icons.check_circle_outline_rounded,
@@ -401,13 +404,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                       _buildFilterRow(
                         context,
                         label: 'Teslim Edildi',
-                        count: counts['delivered']!,
+                        count: counts['delivered'] ?? 0,
                         isSelected: _statusFilter == 'delivered',
                         onTap: () {
                           setState(() {
                             _statusFilter = 'delivered';
                             _showFilters = false;
                           });
+                          ref.read(ordersControllerProvider.notifier).applyFilter('delivered');
+                          _refreshCounts();
                         },
                         statusColor: const Color(0xFF6366F1),
                         icon: Icons.local_shipping_rounded,
@@ -415,13 +420,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                       _buildFilterRow(
                         context,
                         label: 'İptal',
-                        count: counts['cancelled']!,
+                        count: counts['cancelled'] ?? 0,
                         isSelected: _statusFilter == 'cancelled',
                         onTap: () {
                           setState(() {
                             _statusFilter = 'cancelled';
                             _showFilters = false;
                           });
+                          ref.read(ordersControllerProvider.notifier).applyFilter('cancelled');
+                          _refreshCounts();
                         },
                         statusColor: const Color(0xFFEF4444),
                         icon: Icons.cancel_rounded,
@@ -448,9 +455,19 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                   ),
                 )
               : ListView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
+                  itemCount: filtered.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == filtered.length) {
+                      // Pagination footer
+                      final hasMore = ref.read(ordersControllerProvider.notifier).hasMore;
+                      if (!hasMore) return const SizedBox.shrink();
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
                     final order = filtered[index];
                     final customerName = customersVal.maybeWhen(
                       data: (list) {

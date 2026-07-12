@@ -213,4 +213,66 @@ class SqliteOrderRepository implements IOrderRepository {
     );
     return _enrichOrders(rows);
   }
+
+  @override
+  Future<List<OrderEntity>> findFiltered({
+    String? searchQuery,
+    String? status,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final conditions = <String>[];
+    final args = <dynamic>[];
+
+    conditions.add('(is_deleted = 0 OR is_deleted IS NULL)');
+
+    final hasStatus = status != null && status != 'all' && status.isNotEmpty;
+    if (hasStatus) {
+      conditions.add('status = ?');
+      args.add(status);
+    }
+
+    final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
+    if (hasSearch) {
+      conditions.add('id LIKE ?');
+      args.add('%$searchQuery%');
+    }
+
+    final where = conditions.join(' AND ');
+    args.addAll([limit, offset]);
+
+    final rows = await _executor.rawQuery(
+      'SELECT * FROM orders WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      args,
+    );
+    return _enrichOrders(rows);
+  }
+
+  @override
+  Future<Map<String, int>> getStatusCounts({String? searchQuery}) async {
+    final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
+    final searchCondition = hasSearch ? 'AND id LIKE \'%${searchQuery.replaceAll("'", "''")}%\'' : '';
+    final baseWhere = '(is_deleted = 0 OR is_deleted IS NULL) $searchCondition';
+
+    final rows = await _executor.rawQuery(
+      "SELECT status, COUNT(*) as cnt FROM orders WHERE $baseWhere GROUP BY status",
+    );
+
+    final counts = <String, int>{
+      'all': 0,
+      'created': 0,
+      'preparing': 0,
+      'ready': 0,
+      'delivered': 0,
+      'cancelled': 0,
+    };
+
+    for (final row in rows) {
+      final s = row['status'] as String? ?? '';
+      final c = (row['cnt'] as num?)?.toInt() ?? 0;
+      if (counts.containsKey(s)) counts[s] = c;
+      counts['all'] = (counts['all'] ?? 0) + c;
+    }
+    return counts;
+  }
 }

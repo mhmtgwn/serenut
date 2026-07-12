@@ -415,6 +415,12 @@ class InMemorySaleRepository implements ISaleRepository {
     }
   }
 
+  /// İSTEK 3 DÜZELTMESİ: In-memory implementasyon — is_synced == 0 filtresi.
+  @override
+  Future<List<SaleEntity>> findUnsynced() async {
+    return InMemoryDb.sales.where((s) => s.isSynced == 0).toList();
+  }
+
   @override
   Future<int> create(SaleEntity entity) async {
     InMemoryDb.sales.add(entity);
@@ -531,6 +537,23 @@ class InMemoryFinancialTransactionRepository implements IFinancialTransactionRep
     } catch (_) {
       return null;
     }
+  }
+
+  /// YÜKSEK A DÜZELTMESİ: In-memory implementasyon — sadece max clock döner.
+  @override
+  Future<int> getMaxLogicalClock() async {
+    if (InMemoryDb.transactions.isEmpty) return 0;
+    return InMemoryDb.transactions
+        .map((t) => t.logicalClock)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  /// İSTEK 3 DÜZELTMESİ: In-memory duplicate check implementasyonu.
+  @override
+  Future<bool> existsByReferenceId(String referenceId, String type) async {
+    if (referenceId.isEmpty) return false;
+    return InMemoryDb.transactions
+        .any((t) => t.referenceId == referenceId && t.type == type);
   }
 
   double _getCustomerBalance(String customerId) {
@@ -783,6 +806,40 @@ class InMemoryOrderRepository implements IOrderRepository {
     return InMemoryDb.orders
         .where((o) => o.expectedDeliveryDate != null && o.expectedDeliveryDate!.isBefore(now) && o.status != 'delivered')
         .toList();
+  }
+
+  @override
+  Future<List<OrderEntity>> findFiltered({
+    String? searchQuery,
+    String? status,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    var list = InMemoryDb.orders.where((o) {
+      final matchesStatus = status == null || status == 'all' || status.isEmpty || o.status == status;
+      final matchesSearch = searchQuery == null || searchQuery.isEmpty ||
+          o.id.toLowerCase().contains(searchQuery.toLowerCase());
+      return matchesStatus && matchesSearch;
+    }).toList();
+    if (offset >= list.length) return [];
+    return list.skip(offset).take(limit).toList();
+  }
+
+  @override
+  Future<Map<String, int>> getStatusCounts({String? searchQuery}) async {
+    final filtered = InMemoryDb.orders.where((o) =>
+        searchQuery == null || searchQuery.isEmpty ||
+        o.id.toLowerCase().contains(searchQuery.toLowerCase())).toList();
+
+    final counts = <String, int>{
+      'all': filtered.length,
+      'created': filtered.where((o) => o.status == 'created').length,
+      'preparing': filtered.where((o) => o.status == 'preparing').length,
+      'ready': filtered.where((o) => o.status == 'ready').length,
+      'delivered': filtered.where((o) => o.status == 'delivered').length,
+      'cancelled': filtered.where((o) => o.status == 'cancelled').length,
+    };
+    return counts;
   }
 }
 

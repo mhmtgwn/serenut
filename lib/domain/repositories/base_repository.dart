@@ -132,6 +132,10 @@ abstract class ISaleRepository implements BaseRepository<SaleEntity> {
 
   /// Get total items sold
   Future<int> getTotalItemsSold();
+
+  /// İSTEK 3 DÜZELTMESİ: Sadece is_synced = 0 olan satışları döner.
+  /// findAll().where() Dart-tarafı filtreleme yerine SQL WHERE kullanır (O(n) RAM → O(k) RAM).
+  Future<List<SaleEntity>> findUnsynced();
 }
 
 /// Financial transaction repository
@@ -147,6 +151,14 @@ abstract class IFinancialTransactionRepository implements BaseRepository<Financi
 
   /// Get ledger balance for customer
   Future<double> getBalance(String customerId);
+
+  /// YÜKSEK A DÜZELTMESİ: Get the maximum logical clock value from all local transactions.
+  /// O(1) SQL query — avoids loading all transactions into memory just to find the max.
+  Future<int> getMaxLogicalClock();
+
+  /// İSTEK 3 DÜZELTMESİ: Belirtilen referenceId + type ikilisine sahip kayıt var mı?
+  /// payment_service.dart'taki findAll().any() Dart filtresi yerine EXISTS SQL sorgusu kullanır.
+  Future<bool> existsByReferenceId(String referenceId, String type);
 }
 
 /// Order repository
@@ -165,6 +177,21 @@ abstract class IOrderRepository implements BaseRepository<OrderEntity> {
 
   /// Get overdue orders
   Future<List<OrderEntity>> getOverdue();
+
+  /// Paginated filtered query — used by orders list UI.
+  /// [searchQuery] matches on order id (case-insensitive).
+  /// [status] filters by exact status; null or 'all' returns all statuses.
+  /// [limit] / [offset] control the page window.
+  Future<List<OrderEntity>> findFiltered({
+    String? searchQuery,
+    String? status,
+    int limit = 25,
+    int offset = 0,
+  });
+
+  /// Returns the count of orders per status key.
+  /// Keys: 'all', 'created', 'preparing', 'ready', 'delivered', 'cancelled'.
+  Future<Map<String, int>> getStatusCounts({String? searchQuery});
 }
 
 /// Settings repository interface
