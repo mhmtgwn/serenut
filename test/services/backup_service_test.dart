@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/infrastructure/services/backup_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -66,7 +66,29 @@ void main() {
         await db.execute('CREATE TABLE settings (id INTEGER PRIMARY KEY, business_name TEXT)');
         await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT)');
         await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY)');
-        await db.execute('CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, created_at TEXT)');
+        await db.execute('''
+          CREATE TABLE financial_transactions (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL DEFAULT 'sale',
+            customer_id TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            paid_amount REAL NOT NULL DEFAULT 0,
+            debt_amount REAL NOT NULL DEFAULT 0,
+            reference_id TEXT,
+            metadata TEXT,
+            created_at TEXT NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE customers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT,
+            phone TEXT,
+            balance REAL NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+          )
+        ''');
         await db.execute('CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT)');
         await db.insert('settings', {'business_name': 'Test Market A.S.'});
       });
