@@ -11,7 +11,7 @@ import 'package:pointycastle/export.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_file/open_file.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:serenutos/config/environment.dart';
 
@@ -295,7 +295,7 @@ class ReleaseManagerService {
     final path = file.path;
 
     if (Platform.isAndroid) {
-      final result = await OpenFile.open(path, type: 'application/vnd.android.package-archive');
+      final result = await OpenFilex.open(path, type: 'application/vnd.android.package-archive');
       return result.type == ResultType.done ? InstallResult.success : InstallResult.openFileFailed;
     } else if (Platform.isWindows) {
       final result = await Process.run('start', [path], runInShell: true);
@@ -364,7 +364,9 @@ class ReleaseManagerService {
   // ── PRIVATE ─────────────────────────────────────────────────────────────────
 
   Future<String> _computeSha256(File file) async {
-    final bytes = await file.readAsBytes();
-    return sha256.convert(bytes).toString();
+    // Stream-based hashing prevents loading large APKs into memory (OOM safety)
+    final stream = file.openRead();
+    final hash = await sha256.bind(stream).first;
+    return hash.toString();
   }
 }

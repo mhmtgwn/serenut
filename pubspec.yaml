@@ -43,7 +43,6 @@ dependencies:
   
   # Database
   sqflite: ^2.4.2
-  sqflite_common_ffi: ^2.3.6
   path_provider: ^2.1.5
   
   # Localization
@@ -86,7 +85,7 @@ dependencies:
   url_launcher: ^6.3.2
   archive: ^3.6.1
   sqlite3_flutter_libs: ^0.5.24
-  open_file: ^3.3.2  # APK / EXE kurulum başlatma (Sprint 6 Update Platform)
+  open_filex: ^4.5.0
   sentry_flutter: ^9.23.0
   web_socket_channel: ^3.0.1
 
@@ -94,6 +93,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  sqflite_common_ffi: ^2.3.6
+  ffi: ^2.1.2
   
   # Code generation
   riverpod_generator: ^2.4.0
