@@ -50,10 +50,11 @@ void main() async {
 
       // Initialize AuthService with required dependencies
       final IUserRepository userRepository;
+      DatabaseManager? dbManager;
       if (kIsWeb) {
         userRepository = InMemoryUserRepository();
       } else {
-        final dbManager = DatabaseManager();
+        dbManager = DatabaseManager();
         final gateway = DbGatewayImpl(dbManager);
         userRepository = SqliteUserRepository(gateway);
       }
@@ -61,6 +62,7 @@ void main() async {
       final apiClient = ApiClient();
 
       final licenseService = LicenseService(prefs);
+      await licenseService.initialize();
       if (licenseService.getLicenseInfo() != null) {
         licenseService.startHeartbeat(apiClient);
       }
@@ -77,7 +79,9 @@ void main() async {
         try {
           final users = await authService.getUsers();
           if (users.isEmpty) {
-            await prefs.remove('admin_pin_code');
+            // Clear admin PIN from SQLite settings (single source of truth)
+            final db = await dbManager!.getDatabase();
+            await db.update('settings', {'admin_pin_code': null, 'updated_at': DateTime.now().toIso8601String()});
           }
         } catch (_) {}
       }
