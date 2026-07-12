@@ -2,6 +2,7 @@
 // Serenut OS — Initial Bootstrap Sync Service (Sprint 2)
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../infrastructure/network/api_client.dart';
@@ -141,7 +142,11 @@ class BootstrapSyncService {
             map['type'] ?? '',
             map['currency'] ?? '₺'
           ]);
-        } catch (_) {}
+        } catch (e) {
+          // Non-fatal: settings table sync after company bootstrap failed.
+          // Business profile data is still saved to business_profile table above.
+          debugPrint('[BootstrapSync] ⚠️ Settings sync after company bootstrap failed: $e');
+        }
       }
       else if (module == 'stores') {
         // Store details inside business_profile or local storage
@@ -224,11 +229,45 @@ class BootstrapSyncService {
       }
       else if (module == 'settings') {
         final map = payload as Map<String, dynamic>;
-        await _prefs.setString('nutopiano_general_settings', json.encode(map));
+        // Write directly to SQLite settings table (single source of truth)
+        final existing = await txn.query('settings', limit: 1);
+        if (existing.isEmpty) {
+          await txn.insert('settings', {
+            'business_name': map['business_name'] ?? map['businessName'] ?? '',
+            'business_phone': map['business_phone'] ?? map['businessPhone'] ?? '',
+            'business_address': map['business_address'] ?? map['businessAddress'] ?? '',
+            'currency': map['currency'] ?? '₺',
+            'vat_categories': map['vat_categories'] ?? map['vatCategories'] ?? '[]',
+            'qr_format': map['qr_format'] ?? map['qrFormat'] ?? 'type|id|timestamp|customerId|amount|hash',
+            'debug_mode': ((map['debug_mode'] ?? map['debugMode']) == true) ? 1 : 0,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } else {
+          final existingId = existing.first['id'];
+          await txn.update('settings', {
+            'business_name': map['business_name'] ?? map['businessName'] ?? existing.first['business_name'],
+            'currency': map['currency'] ?? existing.first['currency'],
+            'vat_categories': map['vat_categories'] ?? map['vatCategories'] ?? existing.first['vat_categories'],
+            'updated_at': DateTime.now().toIso8601String(),
+          }, where: 'id = ?', whereArgs: [existingId]);
+        }
       }
       else if (module == 'printer-config') {
         final map = payload as Map<String, dynamic>;
-        await _prefs.setString('printer_settings', json.encode(map));
+        // Write printer config fields into the SQLite settings table
+        final existing = await txn.query('settings', limit: 1);
+        if (existing.isNotEmpty) {
+          final existingId = existing.first['id'];
+          await txn.update('settings', {
+            'printer_name': map['printer_name'] ?? map['printerName'],
+            'printer_ip': map['printer_ip'] ?? map['printerIp'],
+            'printer_port': (map['printer_port'] ?? map['printerPort'] as num?)?.toInt() ?? 9100,
+            'paper_width': (map['paper_width'] ?? map['paperWidth'] as num?)?.toInt() ?? 80,
+            'print_receipt': ((map['print_receipt'] ?? map['printReceipt']) == true) ? 1 : 0,
+            'print_copies': (map['print_copies'] ?? map['printCopies'] as num?)?.toInt() ?? 1,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, where: 'id = ?', whereArgs: [existingId]);
+        }
       }
       else if (module == 'license-config') {
         final map = payload as Map<String, dynamic>;

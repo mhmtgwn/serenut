@@ -15,6 +15,7 @@ import 'package:serenutos/config/router.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
@@ -125,7 +126,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       if (matched != null && mounted) {
         context.push('/products/edit/${matched.id}', extra: matched);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[ProductsPage] ⚠️ Barcode lookup failed for "$cleanBarcode": $e');
+      TelemetryService().logError(e, st, context: 'products_page_barcode_lookup');
+    }
   }
 
   void _onScroll() {

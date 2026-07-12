@@ -172,7 +172,10 @@ class DatabaseManager {
           final tempDb = await openDatabase(path, readOnly: true, singleInstance: false);
           currentVersion = await tempDb.getVersion();
           await tempDb.close();
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('[DatabaseManager] ⚠️ Pre-upgrade version check failed: $e');
+          TelemetryService().logError(e, st, context: 'db_pre_upgrade_version_check');
+        }
 
         if (currentVersion > 0 && currentVersion < _databaseVersion) {
           final dbDir = dirname(path);
@@ -282,7 +285,10 @@ class DatabaseManager {
               } catch (_) {}
             },
           );
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('[DatabaseManager] ❌ Self-heal re-open failed after decryption error: $e');
+          TelemetryService().logError(e, st, context: 'db_selfheal_reopen_failed');
+        }
       }
 
       if (isDiskDb && backupPath != null) {
@@ -1243,7 +1249,10 @@ class DatabaseManager {
         await _createAuditLogsTable(db);
         await _createTriggers(db);
         debugPrint('Self-Healing: Recreated missing or tampered database triggers successfully.');
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('[DatabaseManager] ❌ Trigger self-healing failed: $e');
+        TelemetryService().logError(e, st, context: 'db_trigger_selfheal_failed');
+      }
     }
   }
 
