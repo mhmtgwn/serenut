@@ -20,7 +20,7 @@ import 'package:serenutos/infrastructure/services/integrity_check_service.dart';
 import 'package:serenutos/infrastructure/services/central_background_scheduler.dart';
 import 'package:serenutos/infrastructure/services/rollback_manager.dart';
 import 'package:serenutos/infrastructure/services/remote_config_service.dart';
-import 'package:serenutos/infrastructure/services/telemetry_service.dart';
+import 'package:serenutos/infrastructure/services/telemetry_upload_service.dart';
 import 'package:serenutos/infrastructure/services/log_collection_service.dart';
 import 'package:serenutos/infrastructure/services/client_health_service.dart';
 import 'package:serenutos/infrastructure/services/crash_recovery_manager.dart';
@@ -144,10 +144,10 @@ final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
   return RemoteConfigService(prefs, apiClient);
 });
 
-/// Provides TelemetryService instance.
-final telemetryServiceProvider = Provider<TelemetryService>((ref) {
+/// Provides TelemetryUploadService instance (SQLite buffering + API batch upload).
+final telemetryUploadServiceProvider = Provider<TelemetryUploadService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return TelemetryService(apiClient);
+  return TelemetryUploadService(apiClient);
 });
 
 /// Provides LogCollectionService instance.

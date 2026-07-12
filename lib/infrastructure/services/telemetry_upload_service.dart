@@ -1,16 +1,16 @@
-// lib/infrastructure/services/telemetry_service.dart
+// lib/infrastructure/services/telemetry_upload_service.dart
 // Serenut OS — Client Telemetry buffering service (Sprint 9)
+// Renamed from TelemetryService to TelemetryUploadService to avoid class
+// name collision with domain/services/telemetry_service.dart (LocalLoggingService).
 
-import 'dart:convert';
-import 'package:sqflite/sqflite.dart';
 import '../../infrastructure/database/database_provider.dart';
 import '../../infrastructure/network/api_client.dart';
 import 'package:flutter/foundation.dart';
 
-class TelemetryService {
+class TelemetryUploadService {
   final ApiClient _apiClient;
 
-  TelemetryService(this._apiClient);
+  TelemetryUploadService(this._apiClient);
 
   /// Buffer metric record into local SQLite database
   Future<void> recordMetric(String name, double value, {String? metadata}) async {
@@ -22,9 +22,9 @@ class TelemetryService {
         'timestamp': DateTime.now().toIso8601String(),
         'metadata': metadata ?? '',
       });
-      debugPrint('[Telemetry] Recorded local metric: $name = $value');
+      debugPrint('[TelemetryUpload] Recorded local metric: $name = $value');
     } catch (e) {
-      debugPrint('[Telemetry] Failed to record local metric: $e');
+      debugPrint('[TelemetryUpload] Failed to record local metric: $e');
     }
   }
 
@@ -59,12 +59,12 @@ class TelemetryService {
           'client_telemetry_logs',
           where: 'id IN (${ids.join(",")})',
         );
-        debugPrint('[Telemetry] Batch batch-uploaded ${ids.length} metrics to SaaS platform.');
+        debugPrint('[TelemetryUpload] Batch-uploaded ${ids.length} metrics to SaaS platform.');
       } else {
-        debugPrint('[Telemetry] Failed to upload batch: ${response.statusCode}');
+        debugPrint('[TelemetryUpload] Failed to upload batch: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('[Telemetry] Error uploading telemetry batch: $e');
+      debugPrint('[TelemetryUpload] Error uploading telemetry batch: $e');
     }
   }
 }
