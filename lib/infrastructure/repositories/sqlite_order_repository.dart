@@ -12,11 +12,28 @@ class SqliteOrderRepository implements IOrderRepository {
   DbExecutor get _executor => _gateway;
 
   Future<List<OrderEntity>> _enrichOrders(List<Map<String, dynamic>> rows) async {
-    final List<OrderEntity> list = [];
+    if (rows.isEmpty) return [];
+
+    // Optimized: single bulk IN query instead of N+1 per-order subqueries
+    final orderIds = rows.map((r) => r['id'].toString()).toList();
+    final placeholders = List.filled(orderIds.length, '?').join(',');
+    final itemRows = await _executor.query(
+      'order_items',
+      where: 'order_id IN ($placeholders)',
+      whereArgs: orderIds,
+    );
+
+    // Group items by order_id for O(1) lookup
+    final itemsByOrderId = <String, List<Map<String, dynamic>>>{};
+    for (final item in itemRows) {
+      final orderId = item['order_id'] as String;
+      itemsByOrderId.putIfAbsent(orderId, () => []).add(item);
+    }
+
+    final list = <OrderEntity>[];
     for (final row in rows) {
       final order = OrderEntity.fromMap(row);
-      final itemRows = await _executor.query('order_items', where: 'order_id = ?', whereArgs: [order.id]);
-      order.items.addAll(itemRows);
+      order.items.addAll(itemsByOrderId[order.id] ?? []);
       list.add(order);
     }
     return list;

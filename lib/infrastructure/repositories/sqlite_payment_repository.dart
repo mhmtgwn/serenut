@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -12,6 +12,35 @@ class SqliteSaleRepository implements ISaleRepository {
 
   DbExecutor get _executor => _gateway;
 
+  /// Loads [sale_items] for a list of sales using a single bulk IN query
+  /// instead of N individual per-sale subqueries (eliminates N+1 pattern).
+  Future<List<SaleEntity>> _enrichSales(List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return [];
+
+    final saleIds = rows.map((r) => r['id'] as String).toList();
+    final placeholders = List.filled(saleIds.length, '?').join(',');
+    final itemRows = await _executor.query(
+      'sale_items',
+      where: 'sale_id IN ($placeholders)',
+      whereArgs: saleIds,
+    );
+
+    // Group items by sale_id for O(1) lookup
+    final itemsBySaleId = <String, List<Map<String, dynamic>>>{};
+    for (final item in itemRows) {
+      final saleId = item['sale_id'] as String;
+      itemsBySaleId.putIfAbsent(saleId, () => []).add(item);
+    }
+
+    final sales = <SaleEntity>[];
+    for (final row in rows) {
+      final sale = SaleEntity.fromMap(row);
+      sale.items.addAll(itemsBySaleId[sale.id] ?? []);
+      sales.add(sale);
+    }
+    return sales;
+  }
+
   @override
   Future<List<SaleEntity>> findAll() async {
     List<Map<String, dynamic>> rows;
@@ -20,18 +49,7 @@ class SqliteSaleRepository implements ISaleRepository {
     } catch (_) {
       rows = await _executor.query('sales');
     }
-    final sales = <SaleEntity>[];
-    for (final row in rows) {
-      final sale = SaleEntity.fromMap(row);
-      final items = await _executor.query(
-        'sale_items',
-        where: 'sale_id = ?',
-        whereArgs: [sale.id],
-      );
-      sale.items.addAll(items);
-      sales.add(sale);
-    }
-    return sales;
+    return _enrichSales(rows);
   }
 
   @override
@@ -103,18 +121,7 @@ class SqliteSaleRepository implements ISaleRepository {
     } catch (_) {
       rows = await _executor.query('sales', where: 'is_synced = 0');
     }
-    final sales = <SaleEntity>[];
-    for (final row in rows) {
-      final sale = SaleEntity.fromMap(row);
-      final items = await _executor.query(
-        'sale_items',
-        where: 'sale_id = ?',
-        whereArgs: [sale.id],
-      );
-      sale.items.addAll(items);
-      sales.add(sale);
-    }
-    return sales;
+    return _enrichSales(rows);
   }
 
   @override
@@ -139,14 +146,7 @@ class SqliteSaleRepository implements ISaleRepository {
       args,
     );
 
-    final sales = <SaleEntity>[];
-    for (final row in rows) {
-      final sale = SaleEntity.fromMap(row);
-      final items = await _executor.query('sale_items', where: 'sale_id = ?', whereArgs: [sale.id]);
-      sale.items.addAll(items);
-      sales.add(sale);
-    }
-    return sales;
+    return _enrichSales(rows);
   }
 
   @override
@@ -362,7 +362,7 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
     return FinancialTransactionEntity.fromMap(rows.first);
   }
 
-  /// YÜKSEK A DÜZELTMESİ: Tek bir MAX() sorgusu — tüm listeyi RAM'e çekmez.
+  /// YÃœKSEK A DÃœZELTMESÄ°: Tek bir MAX() sorgusu â€” tÃ¼m listeyi RAM'e Ã§ekmez.
   @override
   Future<int> getMaxLogicalClock() async {
     final result = await _executor.rawQuery(
@@ -371,8 +371,8 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  /// İSTEK 3 DÜZELTMESİ: findAll().any() Dart filtresi yerine COUNT(*) SQL sorgusu.
-  /// payment_service.dart duplicate check'i için O(n) RAM → O(1) SQL EXISTS.
+  /// Ä°STEK 3 DÃœZELTMESÄ°: findAll().any() Dart filtresi yerine COUNT(*) SQL sorgusu.
+  /// payment_service.dart duplicate check'i iÃ§in O(n) RAM â†’ O(1) SQL EXISTS.
   @override
   Future<bool> existsByReferenceId(String referenceId, String type) async {
     if (referenceId.isEmpty) return false;
@@ -412,14 +412,14 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
   @override
   Future<int> update(FinancialTransactionEntity entity) async {
     throw UnsupportedError(
-      'Finansal defter kayıtları güncellenemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.'
+      'Finansal defter kayÄ±tlarÄ± gÃ¼ncellenemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.'
     );
   }
 
   @override
   Future<int> delete(dynamic id) async {
     throw UnsupportedError(
-      'Finansal defter kayıtları silinemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.'
+      'Finansal defter kayÄ±tlarÄ± silinemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.'
     );
   }
 
