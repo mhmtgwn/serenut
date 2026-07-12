@@ -3,487 +3,18 @@ part of '../../settings_page.dart';
 // Extracted Backup and SMS Settings Card sheets for SettingsPage
 extension SettingsBackupSmsSheets on _SettingsPageState {
   void _showSmsSettingsSheet(Settings settings) {
-    final formKey = GlobalKey<FormState>();
-    final listTemplates = _parseFlexibleSmsTemplates(settings.smsTemplate);
-    
-    final apiKeyCtrl = TextEditingController(text: settings.smsApiKey ?? '');
-    bool smsEnabled = settings.smsEnabled;
-    String selectedProvider = settings.smsProvider ?? 'sim';
-
-    final prefs = ref.read(sharedPreferencesProvider);
-    bool autoDebtReminderEnabled = prefs.getBool('sms_auto_debt_reminder_enabled') ?? false;
-    final minAmountCtrl = TextEditingController(text: (prefs.getDouble('sms_auto_debt_reminder_min_amount') ?? 100.0).toStringAsFixed(0));
-    final ageDaysCtrl = TextEditingController(text: (prefs.getInt('sms_auto_debt_reminder_days') ?? 15).toString());
-
-    bool isSendingBulk = false;
-
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (context) => StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return FullScreenSettingsPage(
-              title: 'SMS Servis Ayarları',
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildSwitchRow(
-                      title: 'SMS Bildirimlerini Etkinleştir',
-                      subtitle: 'İşlem sonrası otomatik mesaj gönderimi',
-                      icon: Icons.message_rounded,
-                      color: _kOrange,
-                      value: smsEnabled,
-                      onChanged: (val) {
-                        setModalState(() => smsEnabled = val);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // SMS Sağlayıcı Dropdown (Cihazın SIM Kartı, NetGSM, Twilio, Diğer)
-                    DropdownButtonFormField<String>(
-                      value: selectedProvider,
-                      dropdownColor: Colors.white,
-                      style: const TextStyle(color: _kTextPrimary, fontSize: 14),
-                      decoration: InputDecoration(
-                        labelText: 'SMS Servis Sağlayıcı',
-                        prefixIcon: const Icon(Icons.business_center_rounded, size: 18, color: _kTextSecondary),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'sim', child: Text('Cihazın SIM Kartı (Yerel / SIM)')),
-                        DropdownMenuItem(value: 'netgsm', child: Text('NetGSM')),
-                        DropdownMenuItem(value: 'twilio', child: Text('Twilio')),
-                        DropdownMenuItem(value: 'custom', child: Text('Diğer Gateway')),
-                      ],
-                      onChanged: smsEnabled ? (val) {
-                        if (val != null) {
-                          setModalState(() => selectedProvider = val);
-                        }
-                      } : null,
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // API Şifre alanı (Local SIM kart seçili ise gizle/devre dışı bırak)
-                    _buildFormTextField(
-                      controller: apiKeyCtrl,
-                      label: selectedProvider == 'sim' 
-                          ? 'API Anahtarı / Şifre (SIM Kart için gerekli değil)' 
-                          : 'API Anahtarı / Şifre',
-                      icon: Icons.key_rounded,
-                      enabled: smsEnabled && selectedProvider != 'sim',
-                    ),
-                    const SizedBox(height: 16),
-
-                    // SMS History Log Trigger Button
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.history_toggle_off_rounded, size: 18),
-                      label: const Text('SMS Gönderim Geçmişini Görüntüle'),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const SmsHistoryPage()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kTextPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Tetikleyiciler & Otomatik Kurallar
-                    const Text(
-                      'Tetikleyiciler & Kurallar',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
-                    ),
-                    const Divider(color: _kBorderColor),
-                    _buildSwitchRow(
-                      title: 'Otomatik Borç Hatırlatıcısı Gönder',
-                      subtitle: 'Belirli koşullara göre müşteriye otomatik hatırlatma gönderimi',
-                      icon: Icons.notifications_active_rounded,
-                      color: _kBlue,
-                      value: autoDebtReminderEnabled,
-                      onChanged: (val) {
-                        if (smsEnabled) {
-                          setModalState(() => autoDebtReminderEnabled = val);
-                        }
-                      },
-                    ),
-                    if (autoDebtReminderEnabled && smsEnabled) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: minAmountCtrl,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14),
-                              decoration: InputDecoration(
-                                labelText: 'Min Borç Tutarı (TL)',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: ageDaysCtrl,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14),
-                              decoration: InputDecoration(
-                                labelText: 'Hatırlatma Yaşı (Gün)',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-
-                    // Toplu SMS İşlemleri
-                    const Text(
-                      'Toplu SMS İşlemleri',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
-                    ),
-                    const Divider(color: _kBorderColor),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: isSendingBulk 
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple))
-                                : const Icon(Icons.people_alt_rounded, size: 16, color: _kPurple),
-                            label: Text(isSendingBulk ? 'Gönderiliyor...' : 'Borçlulara SMS', style: const TextStyle(color: _kTextPrimary, fontSize: 12)),
-                            onPressed: (smsEnabled && !isSendingBulk) ? () async {
-                              setModalState(() => isSendingBulk = true);
-                              await _sendBulkDebtReminder(context);
-                              setModalState(() => isSendingBulk = false);
-                            } : null,
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: _kBorderColor),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: isSendingBulk 
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _kGreen))
-                                : const Icon(Icons.campaign_rounded, size: 16, color: _kGreen),
-                            label: Text(isSendingBulk ? 'Gönderiliyor...' : 'Toplu Duyuru SMS', style: const TextStyle(color: _kTextPrimary, fontSize: 12)),
-                            onPressed: (smsEnabled && !isSendingBulk) ? () async {
-                              setModalState(() => isSendingBulk = true);
-                              await _sendBulkAnnouncement(context);
-                              setModalState(() => isSendingBulk = false);
-                            } : null,
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: _kBorderColor),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Flexible Templates Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Esnek SMS Şablonları',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
-                        ),
-                        if (smsEnabled)
-                          TextButton.icon(
-                            icon: const Icon(Icons.add_circle_outline_rounded, size: 18, color: _kGreen),
-                            label: const Text('Şablon Ekle', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13)),
-                            onPressed: () => _showEditTemplateDialog(null, (newTpl) {
-                              setModalState(() {
-                                listTemplates.add(newTpl);
-                              });
-                            }),
-                          ),
-                      ],
-                    ),
-                    const Divider(color: _kBorderColor),
-                    
-                    // Templates list view
-                    if (!smsEnabled)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Text('SMS etkinleştirildiğinde şablonlar görüntülenebilir.', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
-                      )
-                    else if (listTemplates.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Text('Tanımlı şablon bulunamadı. Lütfen yeni şablon ekleyin.', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
-                      )
-                    else
-                      Column(
-                        children: [
-                          for (int i = 0; i < listTemplates.length; i++) ...[
-                            Builder(
-                              builder: (context) {
-                                final tpl = listTemplates[i];
-                                final isEnabled = tpl['enabled'] == true;
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(vertical: 4),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: _kBorderColor),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              tpl['name'] ?? 'İsimsiz Şablon',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kTextPrimary),
-                                            ),
-                                          ),
-                                          Switch.adaptive(
-                                            value: isEnabled,
-                                            activeColor: _kGreen,
-                                            onChanged: (val) {
-                                              setModalState(() {
-                                                listTemplates[i]['enabled'] = val;
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        tpl['template'] ?? '',
-                                        style: const TextStyle(fontSize: 12, color: _kTextSecondary),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          TextButton.icon(
-                                            icon: const Icon(Icons.edit_rounded, size: 14, color: _kBlue),
-                                            label: const Text('Düzenle', style: TextStyle(fontSize: 12, color: _kBlue)),
-                                            onPressed: () => _showEditTemplateDialog(tpl, (updatedTpl) {
-                                              setModalState(() {
-                                                listTemplates[i] = updatedTpl;
-                                              });
-                                            }),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          if (tpl['id'] != 'sale' &&
-                                              tpl['id'] != 'discount' &&
-                                              tpl['id'] != 'debt' &&
-                                              tpl['id'] != 'collection' &&
-                                              tpl['id'] != 'order')
-                                            TextButton.icon(
-                                              icon: const Icon(Icons.delete_outline_rounded, size: 14, color: _kPink),
-                                              label: const Text('Sil', style: TextStyle(fontSize: 12, color: _kPink)),
-                                              onPressed: () {
-                                                setModalState(() {
-                                                  listTemplates.removeAt(i);
-                                                });
-                                              },
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-                            ),
-                          ]
-                        ],
-                      ),
-                    
-                    const SizedBox(height: 24),
-                    _buildModalSaveButton(onTap: () async {
-                      if (formKey.currentState!.validate()) {
-                        final templateJson = jsonEncode(listTemplates);
-                        final updated = settings.copyWith(
-                          smsEnabled: smsEnabled,
-                          smsProvider: selectedProvider,
-                          smsApiKey: apiKeyCtrl.text.trim().isEmpty ? null : apiKeyCtrl.text.trim(),
-                          smsTemplate: templateJson,
-                        );
-                        await _updateSettingField(updated);
-
-                        // Save automated reminder settings to SharedPreferences
-                        final prefs = ref.read(sharedPreferencesProvider);
-                        await prefs.setBool('sms_auto_debt_reminder_enabled', autoDebtReminderEnabled);
-                        final minAmt = double.tryParse(minAmountCtrl.text) ?? 100.0;
-                        await prefs.setDouble('sms_auto_debt_reminder_min_amount', minAmt);
-                        final ageDays = int.tryParse(ageDaysCtrl.text) ?? 15;
-                        await prefs.setInt('sms_auto_debt_reminder_days', ageDays);
-
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    }),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
+        builder: (context) => _SmsSettingsSheet(settings: settings, pageState: this),
       ),
     );
   }
 
   void _showEditTemplateDialog(Map<String, dynamic>? existingTpl, ValueChanged<Map<String, dynamic>> onSave) {
-    final isNew = existingTpl == null;
-    final nameCtrl = TextEditingController(text: existingTpl?['name'] ?? '');
-    final templateCtrl = TextEditingController(text: existingTpl?['template'] ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    String selectedEvent = existingTpl?['id'] ?? 'sale_created';
-    if (selectedEvent == 'sale') selectedEvent = 'sale_created';
-    if (selectedEvent == 'discount') selectedEvent = 'discount_applied';
-    if (selectedEvent == 'debt') selectedEvent = 'debt_created';
-    if (selectedEvent == 'collection') selectedEvent = 'collection_recorded';
-    if (selectedEvent == 'order') selectedEvent = 'order_created';
-
-    const validEvents = [
-      'sale_created',
-      'discount_applied',
-      'debt_created',
-      'collection_recorded',
-      'order_created',
-      'order_preparing',
-      'order_ready',
-      'order_delivered',
-      'order_cancelled',
-    ];
-    if (!validEvents.contains(selectedEvent)) {
-      selectedEvent = 'sale_created';
-    }
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(isNew ? 'Yeni Şablon Ekle' : 'Şablonu Düzenle', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Şablon Adı',
-                  prefixIcon: const Icon(Icons.title_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                validator: (v) => v!.trim().isEmpty ? 'Şablon adı gerekli' : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedEvent,
-                style: const TextStyle(fontSize: 14, color: Colors.black),
-                decoration: InputDecoration(
-                  labelText: 'Tetikleyici Durum (Olay)',
-                  prefixIcon: const Icon(Icons.flash_on_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'sale_created', child: Text('Satış Tamamlandığında')),
-                  DropdownMenuItem(value: 'discount_applied', child: Text('İndirim Yapıldığında')),
-                  DropdownMenuItem(value: 'debt_created', child: Text('Borç Eklendiğinde')),
-                  DropdownMenuItem(value: 'collection_recorded', child: Text('Tahsilat Yapıldığında')),
-                  DropdownMenuItem(value: 'order_created', child: Text('Sipariş Alındığında')),
-                  DropdownMenuItem(value: 'order_preparing', child: Text('Sipariş Hazırlanmaya Başladığında')),
-                  DropdownMenuItem(value: 'order_ready', child: Text('Sipariş Hazırlandığında')),
-                  DropdownMenuItem(value: 'order_delivered', child: Text('Sipariş Teslim Edildiğinde')),
-                  DropdownMenuItem(value: 'order_cancelled', child: Text('Sipariş İptal Edildiğinde')),
-                ],
-                onChanged: (val) {
-                  if (val != null) {
-                    selectedEvent = val;
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: templateCtrl,
-                maxLines: 3,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Mesaj Şablonu',
-                  hintText: 'örn: Sn. {customer}, {amount} TL ödemeniz alındı.',
-                  prefixIcon: const Icon(Icons.text_snippet_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                validator: (v) => v!.trim().isEmpty ? 'Şablon içeriği gerekli' : null,
-              ),
-              const SizedBox(height: 12),
-              
-              // Değişken Token Çipleri
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Kullanılabilir Değişkenler:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _kTextSecondary)),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  _buildVariableChip(templateCtrl, '{customer}', 'Müşteri'),
-                  _buildVariableChip(templateCtrl, '{amount}', 'Tutar'),
-                  _buildVariableChip(templateCtrl, '{discount}', 'İndirim'),
-                  _buildVariableChip(templateCtrl, '{debt}', 'Borç/Bakiye'),
-                  _buildVariableChip(templateCtrl, '{id}', 'Fiş/İşlem No'),
-                  _buildVariableChip(templateCtrl, '{business}', 'İşletme Adı'),
-                  _buildVariableChip(templateCtrl, '{date}', 'İşlem Tarihi'),
-                  _buildVariableChip(templateCtrl, '{items}', 'Ürünler'),
-                  _buildVariableChip(templateCtrl, '{phone}', 'Telefon'),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal', style: TextStyle(color: _kTextSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                final result = {
-                  'id': selectedEvent,
-                  'name': nameCtrl.text.trim(),
-                  'template': templateCtrl.text.trim(),
-                  'enabled': existingTpl?['enabled'] ?? true,
-                };
-                onSave(result);
-                Navigator.pop(ctx);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+      builder: (ctx) => _EditTemplateDialog(existingTpl: existingTpl, onSave: onSave, pageState: this),
     );
   }
 
@@ -984,43 +515,9 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
   }
 
   Future<void> _sendBulkAnnouncement(BuildContext context) async {
-    final msgCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
     final confirmText = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Toplu Mesaj Gönder'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: msgCtrl,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Duyuru Mesajı',
-              hintText: 'Tüm müşterilere gönderilecek mesajı yazın...',
-              border: OutlineInputBorder(),
-            ),
-            validator: (val) => val == null || val.trim().isEmpty ? 'Boş bırakılamaz' : null,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Vazgeç', style: TextStyle(color: _kTextSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, msgCtrl.text.trim());
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _kTextPrimary, foregroundColor: Colors.white),
-            child: const Text('Gönder'),
-          ),
-        ],
-      ),
+      builder: (ctx) => const _BulkAnnouncementDialog(),
     );
 
     if (confirmText == null || confirmText.isEmpty) return;
@@ -1088,4 +585,629 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
       }
     }
   }
+}
+
+class _SmsSettingsSheet extends ConsumerStatefulWidget {
+  final Settings settings;
+  final _SettingsPageState pageState;
+
+  const _SmsSettingsSheet({required this.settings, required this.pageState});
+
+  @override
+  ConsumerState<_SmsSettingsSheet> createState() => _SmsSettingsSheetState();
+}
+
+class _SmsSettingsSheetState extends ConsumerState<_SmsSettingsSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late List<Map<String, dynamic>> listTemplates;
+  late final TextEditingController apiKeyCtrl;
+  late final TextEditingController minAmountCtrl;
+  late final TextEditingController ageDaysCtrl;
+  late bool smsEnabled;
+  late String selectedProvider;
+  late bool autoDebtReminderEnabled;
+  bool isSendingBulk = false;
+
+  @override
+  void initState() {
+    super.initState();
+    listTemplates = widget.pageState._parseFlexibleSmsTemplates(widget.settings.smsTemplate);
+    apiKeyCtrl = TextEditingController(text: widget.settings.smsApiKey ?? '');
+    smsEnabled = widget.settings.smsEnabled;
+    selectedProvider = widget.settings.smsProvider ?? 'sim';
+    autoDebtReminderEnabled = widget.settings.smsAutoDebtReminderEnabled;
+    minAmountCtrl = TextEditingController(text: widget.settings.smsAutoDebtReminderMinAmount.toStringAsFixed(0));
+    ageDaysCtrl = TextEditingController(text: widget.settings.smsAutoDebtReminderDays.toString());
+  }
+
+  @override
+  void dispose() {
+    apiKeyCtrl.dispose();
+    minAmountCtrl.dispose();
+    ageDaysCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FullScreenSettingsPage(
+      title: 'SMS Servis Ayarları',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            widget.pageState._buildSwitchRow(
+              title: 'SMS Bildirimlerini Etkinleştir',
+              subtitle: 'İşlem sonrası otomatik mesaj gönderimi',
+              icon: Icons.message_rounded,
+              color: _kOrange,
+              value: smsEnabled,
+              onChanged: (val) {
+                setState(() => smsEnabled = val);
+              },
+            ),
+            const SizedBox(height: 12),
+            
+            // SMS Sağlayıcı Dropdown
+            DropdownButtonFormField<String>(
+              value: selectedProvider,
+              dropdownColor: Colors.white,
+              style: const TextStyle(color: _kTextPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'SMS Servis Sağlayıcı',
+                prefixIcon: const Icon(Icons.business_center_rounded, size: 18, color: _kTextSecondary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'sim', child: Text('Cihazın SIM Kartı (Yerel / SIM)')),
+                DropdownMenuItem(value: 'netgsm', child: Text('NetGSM')),
+                DropdownMenuItem(value: 'twilio', child: Text('Twilio')),
+                DropdownMenuItem(value: 'custom', child: Text('Diğer Gateway')),
+              ],
+              onChanged: smsEnabled ? (val) {
+                if (val != null) {
+                  setState(() => selectedProvider = val);
+                }
+              } : null,
+            ),
+            const SizedBox(height: 12),
+            
+            // API Şifre alanı
+            widget.pageState._buildFormTextField(
+              controller: apiKeyCtrl,
+              label: selectedProvider == 'sim' 
+                  ? 'API Anahtarı / Şifre (SIM Kart için gerekli değil)' 
+                  : 'API Anahtarı / Şifre',
+              icon: Icons.key_rounded,
+              enabled: smsEnabled && selectedProvider != 'sim',
+            ),
+            const SizedBox(height: 16),
+
+            // SMS History Log Trigger Button
+            ElevatedButton.icon(
+              icon: const Icon(Icons.history_toggle_off_rounded, size: 18),
+              label: const Text('SMS Gönderim Geçmişini Görüntüle'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SmsHistoryPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kTextPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Tetikleyiciler & Otomatik Kurallar
+            const Text(
+              'Tetikleyiciler & Kurallar',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
+            ),
+            const Divider(color: _kBorderColor),
+            widget.pageState._buildSwitchRow(
+              title: 'Otomatik Borç Hatırlatıcısı Gönder',
+              subtitle: 'Belirli koşullara göre müşteriye otomatik hatırlatma gönderimi',
+              icon: Icons.notifications_active_rounded,
+              color: _kBlue,
+              value: autoDebtReminderEnabled,
+              onChanged: (val) {
+                if (smsEnabled) {
+                  setState(() => autoDebtReminderEnabled = val);
+                }
+              },
+            ),
+            if (autoDebtReminderEnabled && smsEnabled) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: minAmountCtrl,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Min Borç Tutarı (TL)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: ageDaysCtrl,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        labelText: 'Hatırlatma Yaşı (Gün)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // Toplu SMS İşlemleri
+            const Text(
+              'Toplu SMS İşlemleri',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
+            ),
+            const Divider(color: _kBorderColor),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: isSendingBulk 
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _kPurple))
+                        : const Icon(Icons.people_alt_rounded, size: 16, color: _kPurple),
+                    label: Text(isSendingBulk ? 'Gönderiliyor...' : 'Borçlulara SMS', style: const TextStyle(color: _kTextPrimary, fontSize: 12)),
+                    onPressed: (smsEnabled && !isSendingBulk) ? () async {
+                      setState(() => isSendingBulk = true);
+                      await widget.pageState._sendBulkDebtReminder(context);
+                      if (mounted) setState(() => isSendingBulk = false);
+                    } : null,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBorderColor),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: isSendingBulk 
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _kGreen))
+                        : const Icon(Icons.campaign_rounded, size: 16, color: _kGreen),
+                    label: Text(isSendingBulk ? 'Gönderiliyor...' : 'Toplu Duyuru SMS', style: const TextStyle(color: _kTextPrimary, fontSize: 12)),
+                    onPressed: (smsEnabled && !isSendingBulk) ? () async {
+                      setState(() => isSendingBulk = true);
+                      await widget.pageState._sendBulkAnnouncement(context);
+                      if (mounted) setState(() => isSendingBulk = false);
+                    } : null,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBorderColor),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Flexible Templates Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Esnek SMS Şablonları',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
+                ),
+                if (smsEnabled)
+                  TextButton.icon(
+                    icon: const Icon(Icons.add_circle_outline_rounded, size: 18, color: _kGreen),
+                    label: const Text('Şablon Ekle', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13)),
+                    onPressed: () => widget.pageState._showEditTemplateDialog(null, (newTpl) {
+                      setState(() {
+                        listTemplates.add(newTpl);
+                      });
+                    }),
+                  ),
+              ],
+            ),
+            const Divider(color: _kBorderColor),
+            
+            // Templates list view
+            if (!smsEnabled)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('SMS etkinleştirildiğinde şablonlar görüntülenebilir.', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+              )
+            else if (listTemplates.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('Tanımlı şablon bulunamadı. Lütfen yeni şablon ekleyin.', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+              )
+            else
+              Column(
+                children: [
+                  for (int i = 0; i < listTemplates.length; i++) ...[
+                    Builder(
+                      builder: (context) {
+                        final tpl = listTemplates[i];
+                        final isEnabled = tpl['enabled'] == true;
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: isEnabled ? const Color(0xFFF8FAFC) : Colors.grey[50]!,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: isEnabled ? _kBorderColor : Colors.grey[200]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    tpl['name'] ?? '',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isEnabled ? _kTextPrimary : Colors.grey[400]!,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Switch.adaptive(
+                                        value: isEnabled,
+                                        activeColor: _kGreen,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            listTemplates[i]['enabled'] = val;
+                                          });
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.edit_rounded, size: 18, color: isEnabled ? _kBlue : Colors.grey[300]!),
+                                        onPressed: isEnabled ? () {
+                                          widget.pageState._showEditTemplateDialog(tpl, (updatedTpl) {
+                                            setState(() {
+                                              listTemplates[i] = updatedTpl;
+                                            });
+                                          });
+                                        } : null,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                tpl['template'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isEnabled ? _kTextSecondary : Colors.grey[400]!,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isEnabled ? _kBlue.withOpacity(0.08) : Colors.grey[100]!,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      tpl['id'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isEnabled ? _kBlue : Colors.grey[400]!,
+                                      ),
+                                    ),
+                                  ),
+                                  if (tpl['id'] != 'sale' &&
+                                      tpl['id'] != 'discount' &&
+                                      tpl['id'] != 'debt' &&
+                                      tpl['id'] != 'collection' &&
+                                      tpl['id'] != 'order')
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 14, color: _kPink),
+                                      label: const Text('Sil', style: TextStyle(fontSize: 12, color: _kPink)),
+                                      onPressed: () {
+                                        setState(() {
+                                          listTemplates.removeAt(i);
+                                        });
+                                      },
+                                    ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                            ),
+                          ]
+                        ],
+                      ),
+                    
+                    const SizedBox(height: 24),
+                    widget.pageState._buildModalSaveButton(onTap: () async {
+                      if (_formKey.currentState!.validate()) {
+                        final templateJson = jsonEncode(listTemplates);
+                        final updated = widget.settings.copyWith(
+                          smsEnabled: smsEnabled,
+                          smsProvider: selectedProvider,
+                          smsApiKey: apiKeyCtrl.text.trim().isEmpty ? null : apiKeyCtrl.text.trim(),
+                          smsTemplate: templateJson,
+                        );
+                        // Save SMS reminder settings to SQLite settings (single source of truth)
+                        final minAmt = double.tryParse(minAmountCtrl.text) ?? 100.0;
+                        final ageDays = int.tryParse(ageDaysCtrl.text) ?? 15;
+                        final updatedWithReminder = updated.copyWith(
+                          smsAutoDebtReminderEnabled: autoDebtReminderEnabled,
+                          smsAutoDebtReminderMinAmount: minAmt,
+                          smsAutoDebtReminderDays: ageDays,
+                        );
+                        try {
+                          await ref.read(settingsNotifierProvider.notifier).updateSettings(updatedWithReminder);
+                          if (mounted) Navigator.pop(context);
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Hata: $e'), backgroundColor: _kPink),
+                            );
+                          }
+                        }
+                      }
+                    }),
+                  ],
+                ),
+              ),
+            );
+          }
+}
+
+class _EditTemplateDialog extends StatefulWidget {
+  final Map<String, dynamic>? existingTpl;
+  final ValueChanged<Map<String, dynamic>> onSave;
+  final _SettingsPageState pageState;
+
+  const _EditTemplateDialog({
+    required this.existingTpl,
+    required this.onSave,
+    required this.pageState,
+  });
+
+  @override
+  State<_EditTemplateDialog> createState() => _EditTemplateDialogState();
+}
+
+class _EditTemplateDialogState extends State<_EditTemplateDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController nameCtrl;
+  late final TextEditingController templateCtrl;
+  late String selectedEvent;
+
+  @override
+  void initState() {
+    super.initState();
+    nameCtrl = TextEditingController(text: widget.existingTpl?['name'] ?? '');
+    templateCtrl = TextEditingController(text: widget.existingTpl?['template'] ?? '');
+    
+    selectedEvent = widget.existingTpl?['id'] ?? 'sale_created';
+    if (selectedEvent == 'sale') selectedEvent = 'sale_created';
+    if (selectedEvent == 'discount') selectedEvent = 'discount_applied';
+    if (selectedEvent == 'debt') selectedEvent = 'debt_created';
+    if (selectedEvent == 'collection') selectedEvent = 'collection_recorded';
+    if (selectedEvent == 'order') selectedEvent = 'order_created';
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    templateCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.existingTpl == null;
+    const validEvents = [
+      'sale_created',
+      'discount_applied',
+      'debt_created',
+      'collection_recorded',
+      'order_created',
+      'order_preparing',
+      'order_ready',
+      'order_delivered',
+      'order_cancelled',
+    ];
+    if (!validEvents.contains(selectedEvent)) {
+      selectedEvent = 'sale_created';
+    }
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(isNew ? 'Yeni Şablon Ekle' : 'Şablonu Düzenle', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameCtrl,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Şablon Adı',
+                  prefixIcon: const Icon(Icons.title_rounded, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                validator: (v) => v!.trim().isEmpty ? 'Şablon adı gerekli' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedEvent,
+                style: const TextStyle(fontSize: 14, color: Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Tetikleyici Durum (Olay)',
+                  prefixIcon: const Icon(Icons.flash_on_rounded, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'sale_created', child: Text('Satış Tamamlandığında')),
+                  DropdownMenuItem(value: 'discount_applied', child: Text('İndirim Yapıldığında')),
+                  DropdownMenuItem(value: 'debt_created', child: Text('Borç Eklendiğinde')),
+                  DropdownMenuItem(value: 'collection_recorded', child: Text('Tahsilat Yapıldığında')),
+                  DropdownMenuItem(value: 'order_created', child: Text('Sipariş Alındığında')),
+                  DropdownMenuItem(value: 'order_preparing', child: Text('Sipariş Hazırlanmaya Başladığında')),
+                  DropdownMenuItem(value: 'order_ready', child: Text('Sipariş Hazırlandığında')),
+                  DropdownMenuItem(value: 'order_delivered', child: Text('Sipariş Teslim Edildiğinde')),
+                  DropdownMenuItem(value: 'order_cancelled', child: Text('Sipariş İptal Edildiğinde')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      selectedEvent = val;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: templateCtrl,
+                maxLines: 3,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Mesaj Şablonu',
+                  hintText: 'örn: Sn. {customer}, {amount} TL ödemeniz alındı.',
+                  prefixIcon: const Icon(Icons.text_snippet_rounded, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                validator: (v) => v!.trim().isEmpty ? 'Şablon içeriği gerekli' : null,
+              ),
+              const SizedBox(height: 12),
+              
+              // Değişken Token Çipleri
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Kullanılabilir Değişkenler:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _kTextSecondary)),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  widget.pageState._buildVariableChip(templateCtrl, '{customer}', 'Müşteri'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{amount}', 'Tutar'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{discount}', 'İndirim'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{debt}', 'Borç/Bakiye'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{id}', 'Fiş/İşlem No'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{business}', 'İşletme Adı'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{date}', 'İşlem Tarihi'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{items}', 'Ürünler'),
+                  widget.pageState._buildVariableChip(templateCtrl, '{phone}', 'Telefon'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal', style: TextStyle(color: _kTextSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              final result = {
+                'id': selectedEvent,
+                'name': nameCtrl.text.trim(),
+                'template': templateCtrl.text.trim(),
+                'enabled': widget.existingTpl?['enabled'] ?? true,
+              };
+              widget.onSave(result);
+              Navigator.pop(context);
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _kGreen,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
+
+class _BulkAnnouncementDialog extends StatefulWidget {
+  const _BulkAnnouncementDialog();
+
+  @override
+  State<_BulkAnnouncementDialog> createState() => _BulkAnnouncementDialogState();
+}
+
+class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final msgCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    msgCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Toplu Mesaj Gönder'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: msgCtrl,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'Duyuru Mesajı',
+            hintText: 'Tüm müşterilere gönderilecek mesajı yazın...',
+            border: OutlineInputBorder(),
+          ),
+          validator: (val) => val == null || val.trim().isEmpty ? 'Boş bırakılamaz' : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Vazgeç', style: TextStyle(color: _kTextSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.pop(context, msgCtrl.text.trim());
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: _kTextPrimary, foregroundColor: Colors.white),
+          child: const Text('Gönder'),
+        ),
+      ],
+    );
+  }
+}
 }

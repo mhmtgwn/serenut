@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/sale_details_page.dart
+// lib/presentation/pages/sale_details_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -434,90 +434,9 @@ class SaleDetailsPage extends ConsumerWidget {
   }
 
   void _showPartialPaymentDialog(BuildContext context, WidgetRef ref, SaleEntity sale, double remaining) {
-    final amtCtrl = TextEditingController(text: remaining.toStringAsFixed(2));
-    String method = 'cash';
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-               Icon(Icons.payments, color: Color(0xFF16A34A)),
-              SizedBox(width: 8),
-              Text('Kısmi Ödeme'),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Kalan borç: ${remaining.toStringAsFixed(2)} TL',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: amtCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Ödenecek Tutar (TL)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Tutar girin';
-                    final d = double.tryParse(v);
-                    if (d == null || d <= 0) return 'Geçerli tutar';
-                    if (d > remaining) return 'Borçtan fazla olamaz';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: method,
-                  decoration: InputDecoration(
-                    labelText: 'Yöntem',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'cash', child: Text('Nakit')),
-                    DropdownMenuItem(value: 'card', child: Text('Kart')),
-                    DropdownMenuItem(value: 'transfer', child: Text('Havale')),
-                  ],
-                  onChanged: (v) => setDialog(() => method = v ?? 'cash'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
-            ElevatedButton(
-              onPressed: () async {
-                if (!(formKey.currentState?.validate() ?? false)) return;
-                final amount = double.parse(amtCtrl.text);
-                Navigator.pop(ctx);
-                await ref.read(salesControllerProvider.notifier)
-                    .recordPartialPayment(saleId: sale.id, amount: amount, method: method);
-                ref.invalidate(saleDetailProvider(sale.id));
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF16A34A),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Öde'),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _PartialPaymentDialog(sale: sale, remaining: remaining, parentContext: context),
     );
   }
 
@@ -672,4 +591,117 @@ class _ReturnItem {
     required this.unitPrice,
     required this.returnQty,
   });
+}
+
+class _PartialPaymentDialog extends ConsumerStatefulWidget {
+  final SaleEntity sale;
+  final double remaining;
+  final BuildContext parentContext;
+
+  const _PartialPaymentDialog({
+    required this.sale,
+    required this.remaining,
+    required this.parentContext,
+  });
+
+  @override
+  ConsumerState<_PartialPaymentDialog> createState() => _PartialPaymentDialogState();
+}
+
+class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController amtCtrl;
+  String method = 'cash';
+
+  @override
+  void initState() {
+    super.initState();
+    amtCtrl = TextEditingController(text: widget.remaining.toStringAsFixed(2));
+  }
+
+  @override
+  void dispose() {
+    amtCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Row(
+        children: [
+          Icon(Icons.payments, color: Color(0xFF16A34A)),
+          SizedBox(width: 8),
+          Text('Kısmi Ödeme'),
+        ],
+      ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Kalan borç: ${widget.remaining.toStringAsFixed(2)} TL',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: amtCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Ödenecek Tutar (TL)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Tutar girin';
+                final d = double.tryParse(v);
+                if (d == null || d <= 0) return 'Geçerli tutar';
+                if (d > widget.remaining) return 'Borçtan fazla olamaz';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: method,
+              decoration: InputDecoration(
+                labelText: 'Yöntem',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'cash', child: Text('Nakit')),
+                DropdownMenuItem(value: 'card', child: Text('Kart')),
+                DropdownMenuItem(value: 'transfer', child: Text('Havale')),
+              ],
+              onChanged: (v) => setState(() => method = v ?? 'cash'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+        ElevatedButton(
+          onPressed: () async {
+            if (!(_formKey.currentState?.validate() ?? false)) return;
+            final amount = double.parse(amtCtrl.text);
+            Navigator.pop(context);
+            await ref.read(salesControllerProvider.notifier)
+                .recordPartialPayment(saleId: widget.sale.id, amount: amount, method: method);
+            ref.invalidate(saleDetailProvider(widget.sale.id));
+            if (widget.parentContext.mounted) {
+              ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+                SnackBar(
+                  content: Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF16A34A),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Öde'),
+        ),
+      ],
+    );
+  }
 }

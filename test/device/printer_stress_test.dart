@@ -15,11 +15,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences.setMockInitialValues({});
-  
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
-  DatabaseManager.overrideDatabasePath = inMemoryDatabasePath;
+
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.overrideDatabasePath = inMemoryDatabasePath;
+  });
   // ── PersistentPrintQueue Tests ────────────────────────────────────────────
 
   group('PersistentPrintQueue — Crash Safety', () {
@@ -27,6 +28,7 @@ void main() {
     int testCounter = 0;
 
     setUp(() async {
+      SharedPreferences.setMockInitialValues({});
       // Each test gets a unique SP key → fully isolated, no cross-test pollution
       testCounter++;
       queue = PersistentPrintQueue(testKey: 'test_queue_$testCounter');
@@ -224,7 +226,8 @@ void main() {
     });
 
     test('queue enqueue does not throw on repeated calls', () async {
-      final q = PersistentPrintQueue();
+      SharedPreferences.setMockInitialValues({});
+      final q = PersistentPrintQueue(testKey: 'test_stress_enqueue');
       expect(
         () async {
           for (int i = 0; i < 20; i++) {
