@@ -1,7 +1,27 @@
-// lib/infrastructure/services/financial_integrity_service.dart
+import 'dart:async';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+
+// Lightweight in-house AsyncLock for serializing read-modify-write operations
+class AsyncLock {
+  Future<void> _last = Future.value();
+
+  Future<T> run<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _last.then((_) async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e, stack) {
+        completer.completeError(e, stack);
+      }
+    });
+    _last = completer.future.then<void>((_) {}).catchError((_) {});
+    return completer.future;
+  }
+}
 
 // ── Event Model for Audit Logging ──
 class AuditLogEntry {
@@ -64,36 +84,65 @@ class SyncOperation {
   );
 }
 
-// ── Audit Logger Service ──
+// ── Audit Logger Service (Sprint 4: writes to SQLite audit_logs) ──
 class AuditLogger {
-  final SharedPreferences _prefs;
-  static const String _kAuditLogKey = 'serenut_audit_logs';
+  final DatabaseManager _dbManager;
+  final _lock = AsyncLock();
 
-  AuditLogger(this._prefs);
+  AuditLogger(this._dbManager);
 
   Future<void> logAction({
     required String action,
     required String beforeState,
     required String afterState,
     Map<String, dynamic> metadata = const {},
-  }) async {
-    final entry = AuditLogEntry(
-      id: const Uuid().v4(),
-      timestamp: DateTime.now(),
-      action: action,
-      beforeState: beforeState,
-      afterState: afterState,
-      metadata: metadata,
-    );
-
-    final logsRaw = _prefs.getStringList(_kAuditLogKey) ?? [];
-    logsRaw.add(jsonEncode(entry.toMap()));
-    await _prefs.setStringList(_kAuditLogKey, logsRaw);
+  }) {
+    return _lock.run(() async {
+      try {
+        final db = await _dbManager.getDatabase();
+        final details = jsonEncode({
+          'before': beforeState,
+          'after': afterState,
+          'metadata': metadata,
+        });
+        await db.insert('audit_logs', {
+          'id': const Uuid().v4(),
+          'user_id': 'system',
+          'user_name': 'AuditLogger',
+          'action': action,
+          'details': details,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {
+        // Non-fatal — do not crash caller
+      }
+    });
   }
 
-  List<Map<String, dynamic>> getLogs() {
-    final logsRaw = _prefs.getStringList(_kAuditLogKey) ?? [];
-    return logsRaw.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+  Future<List<Map<String, dynamic>>> getLogs({int limit = 200}) async {
+    try {
+      final db = await _dbManager.getDatabase();
+      final rows = await db.query(
+        'audit_logs',
+        orderBy: 'created_at DESC',
+        limit: limit,
+      );
+      return rows.map((r) {
+        final detailsRaw = r['details'] as String? ?? '{}';
+        Map<String, dynamic> parsed = {};
+        try { parsed = jsonDecode(detailsRaw) as Map<String, dynamic>; } catch (_) {}
+        return {
+          'id': r['id'],
+          'action': r['action'],
+          'beforeState': parsed['before'] ?? '',
+          'afterState': parsed['after'] ?? '',
+          'metadata': parsed['metadata'] ?? {},
+          'timestamp': r['created_at'],
+        };
+      }).toList();
+    } catch (_) {
+      return [];
+    }
   }
 }
 
@@ -108,6 +157,7 @@ class IdempotencyKeyGenerator {
 class OperationQueueService {
   final SharedPreferences _prefs;
   static const String _kQueueKey = 'serenut_sync_queue';
+  static final _lock = AsyncLock();
 
   OperationQueueService(this._prefs);
 
@@ -115,17 +165,19 @@ class OperationQueueService {
     required String type,
     required Map<String, dynamic> payload,
     required String idempotencyKey,
-  }) async {
-    final op = SyncOperation(
-      id: const Uuid().v4(),
-      type: type,
-      payload: payload,
-      idempotencyKey: idempotencyKey,
-    );
+  }) {
+    return _lock.run(() async {
+      final op = SyncOperation(
+        id: const Uuid().v4(),
+        type: type,
+        payload: payload,
+        idempotencyKey: idempotencyKey,
+      );
 
-    final queueRaw = _prefs.getStringList(_kQueueKey) ?? [];
-    queueRaw.add(jsonEncode(op.toMap()));
-    await _prefs.setStringList(_kQueueKey, queueRaw);
+      final queueRaw = _prefs.getStringList(_kQueueKey) ?? [];
+      queueRaw.add(jsonEncode(op.toMap()));
+      await _prefs.setStringList(_kQueueKey, queueRaw);
+    });
   }
 
   List<SyncOperation> getQueue() {
@@ -133,28 +185,32 @@ class OperationQueueService {
     return queueRaw.map((e) => SyncOperation.fromMap(jsonDecode(e))).toList();
   }
 
-  Future<void> removeOperation(String opId) async {
-    final queue = getQueue();
-    queue.removeWhere((op) => op.id == opId);
-    final queueRaw = queue.map((op) => jsonEncode(op.toMap())).toList();
-    await _prefs.setStringList(_kQueueKey, queueRaw);
-  }
-
-  Future<void> incrementRetry(String opId) async {
-    final queue = getQueue();
-    final idx = queue.indexWhere((op) => op.id == opId);
-    if (idx != -1) {
-      final oldOp = queue[idx];
-      queue[idx] = SyncOperation(
-        id: oldOp.id,
-        type: oldOp.type,
-        payload: oldOp.payload,
-        idempotencyKey: oldOp.idempotencyKey,
-        retryCount: oldOp.retryCount + 1,
-      );
+  Future<void> removeOperation(String opId) {
+    return _lock.run(() async {
+      final queue = getQueue();
+      queue.removeWhere((op) => op.id == opId);
       final queueRaw = queue.map((op) => jsonEncode(op.toMap())).toList();
       await _prefs.setStringList(_kQueueKey, queueRaw);
-    }
+    });
+  }
+
+  Future<void> incrementRetry(String opId) {
+    return _lock.run(() async {
+      final queue = getQueue();
+      final idx = queue.indexWhere((op) => op.id == opId);
+      if (idx != -1) {
+        final oldOp = queue[idx];
+        queue[idx] = SyncOperation(
+          id: oldOp.id,
+          type: oldOp.type,
+          payload: oldOp.payload,
+          idempotencyKey: oldOp.idempotencyKey,
+          retryCount: oldOp.retryCount + 1,
+        );
+        final queueRaw = queue.map((op) => jsonEncode(op.toMap())).toList();
+        await _prefs.setStringList(_kQueueKey, queueRaw);
+      }
+    });
   }
 }
 

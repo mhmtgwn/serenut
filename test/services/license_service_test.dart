@@ -1,24 +1,11 @@
-// test/services/license_service_test.dart
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/models/license_model.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:pointycastle/export.dart';
-
-class MockSharedPreferences {
-  final Map<String, dynamic> _data = {};
-
-  String? getString(String key) => _data[key] as String?;
-  Future<bool> setString(String key, String value) async {
-    _data[key] = value;
-    return true;
-  }
-  Future<bool> remove(String key) async {
-    _data.remove(key);
-    return true;
-  }
-}
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 String generateLicenseTokenHelper({
   required String merchantId,
@@ -63,6 +50,16 @@ String generateLicenseTokenHelper({
 }
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.overrideDatabasePath = inMemoryDatabasePath;
+  });
+
+  tearDownAll(() {
+    DatabaseManager.overrideDatabasePath = null;
+  });
+
   group('LicenseService Tests', () {
     late SharedPreferences prefs;
     late LicenseService licenseService;
@@ -71,6 +68,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
       licenseService = LicenseService(prefs);
+      // Clean database connection for each test run
+      await DatabaseManager().close();
     });
 
     test('getDeviceUuid returns stored or newly generated UUID', () {
@@ -176,12 +175,65 @@ void main() {
       // Check initially succeeds and saves last time
       expect(licenseService.checkLicenseStatus(), 'valid');
 
-      // Simulate time traveling backwards (manually modify stored last system time to future)
-      final futureTime = DateTime.now().add(const Duration(hours: 2));
+      // Simulate time traveling backwards by 2 hours (more than 5 mins limit)
+      final futureTime = DateTime.now().toUtc().add(const Duration(hours: 2));
       await prefs.setString('last_system_time', futureTime.toIso8601String());
+
+      // Re-create to force reading SharedPreferences without memory cache
+      licenseService = LicenseService(prefs);
 
       // Next check fails with 'tampered'
       expect(licenseService.checkLicenseStatus(), 'tampered');
+    });
+
+    test('checkClockIntegrity is immune to DST transitions (1 hour back)', () async {
+      final uuid = licenseService.getDeviceUuid();
+      final futureExpiry = DateTime.now().add(const Duration(days: 30));
+      final token = generateLicenseTokenHelper(
+        merchantId: 'M123',
+        allowedDevices: [uuid],
+        expiryDate: futureExpiry,
+      );
+      await licenseService.saveLicenseToken(token);
+
+      // Write last system time in UTC (e.g. 50 minutes ago in UTC)
+      final pastUtc = DateTime.now().toUtc().subtract(const Duration(minutes: 50));
+      await prefs.setString('last_system_time', pastUtc.toIso8601String());
+
+      // Re-create to force reading SharedPreferences without memory cache
+      licenseService = LicenseService(prefs);
+
+      // Simulate a local clock going back by 1 hour (DST transition)
+      // Since UTC remains correct, the UTC-based checks pass and status remains 'valid'
+      expect(licenseService.checkLicenseStatus(), 'valid');
+    });
+
+    test('checkClockIntegrity correctly parses legacy local timestamps and migrates them to UTC', () async {
+      final uuid = licenseService.getDeviceUuid();
+      final futureExpiry = DateTime.now().add(const Duration(days: 30));
+      final token = generateLicenseTokenHelper(
+        merchantId: 'M123',
+        allowedDevices: [uuid],
+        expiryDate: futureExpiry,
+      );
+      await licenseService.saveLicenseToken(token);
+
+      // Save time in legacy format (local time string without 'Z')
+      // To simulate compatibility, we write a time from 10 minutes ago
+      final legacyTimeLocalStr = DateTime.now().subtract(const Duration(minutes: 10)).toIso8601String();
+      // Ensure it has no 'Z' suffix (representing legacy local time)
+      final legacyCleanStr = legacyTimeLocalStr.replaceAll('Z', '');
+      await prefs.setString('last_system_time', legacyCleanStr);
+
+      // Re-create to force reading SharedPreferences without memory cache
+      licenseService = LicenseService(prefs);
+
+      // Check should succeed because legacy parses properly and uses the 2-hour grace margin
+      expect(licenseService.checkLicenseStatus(), 'valid');
+
+      // Verify that after checking, the value in SharedPreferences is updated to new UTC format (has 'Z')
+      final updatedTimeStr = prefs.getString('last_system_time')!;
+      expect(updatedTimeStr.endsWith('Z'), isTrue);
     });
   });
 }

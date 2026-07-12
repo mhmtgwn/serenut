@@ -1,11 +1,12 @@
 // lib/infrastructure/services/persistent_print_queue.dart
-// Serenut POS — Crash-safe Persistent Print Queue
+// Serenut POS — Crash-safe Persistent Print Queue (SQLite-backed)
 // Survives app kill, power loss, and device restarts
-// Created: 24 Jun 2026
+// Created: 12 Jul 2026 (Migrated to SQLite)
 
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
+import 'package:sqflite/sqflite.dart';
 
 // ── Print Job Status ──────────────────────────────────────────────────────────
 
@@ -51,54 +52,64 @@ class PersistedPrintJob {
   Map<String, dynamic> toMap() => {
         'id': id,
         'title': title,
-        'receiptJson': receiptJson,
-        'createdAt': createdAt.toIso8601String(),
-        'retryCount': retryCount,
+        'receipt_json': receiptJson,
+        'created_at': createdAt.toIso8601String(),
+        'retry_count': retryCount,
         'status': status.name,
-        'lastError': lastError,
+        'last_error': lastError,
       };
 
   factory PersistedPrintJob.fromMap(Map<String, dynamic> map) {
     return PersistedPrintJob(
       id: map['id'] as String,
       title: (map['title'] as String?) ?? 'Fis',
-      receiptJson: map['receiptJson'] as String,
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      retryCount: (map['retryCount'] as int?) ?? 0,
+      receiptJson: (map['receipt_json'] ?? map['receiptJson']) as String,
+      createdAt: DateTime.parse((map['created_at'] ?? map['createdAt']) as String),
+      retryCount: (map['retry_count'] ?? map['retryCount'] ?? 0) as int,
       status: PrintJobStatus.values.firstWhere(
         (s) => s.name == (map['status'] as String?),
         orElse: () => PrintJobStatus.pending,
       ),
-      lastError: map['lastError'] as String?,
+      lastError: (map['last_error'] ?? map['lastError']) as String?,
     );
   }
 }
 
 // ── Persistent Print Queue ────────────────────────────────────────────────────
 
-/// Crash-safe print queue backed by SharedPreferences.
-///
-/// Design guarantees:
-/// - Jobs survive app kill / power loss
-/// - Atomically updates job status before and after printing
-/// - After 5 failed retries → abandoned (not lost from log)
-/// - Max 200 jobs stored (older completed jobs pruned)
+/// Crash-safe print queue backed by SQLite database.
 class PersistentPrintQueue {
-  static const String _defaultQueueKey = 'serenut_print_queue';
   static const int _maxRetries = 5;
   static const int _maxJobs = 200;
   static int _idCounter = 0; // Monotonic counter — guarantees unique IDs in tight loops
+  static final _lock = AsyncLock();
 
-  final String _queueKey;
+  final String? testKey;
+  final String? _testTableName;
 
-  /// [testKey] — pass a unique key per test to achieve full isolation.
-  PersistentPrintQueue({String? testKey})
-      : _queueKey = testKey ?? _defaultQueueKey;
+  PersistentPrintQueue({this.testKey})
+      : _testTableName = testKey != null ? 'print_queue_$testKey' : null;
 
-  /// Exposed for tests that need to share the same key across instances
-  /// (e.g., simulating an app restart loading from same persisted storage).
-  @visibleForTesting
-  String get testKey => _queueKey;
+  String get _tableName => _testTableName ?? 'print_queue';
+
+  Future<Database> _getDb() => DatabaseManager().getDatabase();
+
+  /// Helper to ensure custom test tables exist (mostly for tests using unique keys)
+  Future<void> _ensureTable(Database db) async {
+    if (_testTableName != null) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS $_tableName (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          receipt_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          retry_count INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL,
+          last_error TEXT
+        )
+      ''');
+    }
+  }
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -106,133 +117,162 @@ class PersistentPrintQueue {
   Future<PersistedPrintJob> enqueue({
     required String title,
     required String receiptJson,
-  }) async {
-    final job = PersistedPrintJob(
-      id: '${DateTime.now().microsecondsSinceEpoch}_${++_idCounter}',
-      title: title,
-      receiptJson: receiptJson,
-      createdAt: DateTime.now(),
-    );
-    final jobs = await _load();
-    jobs.add(job);
-    await _save(jobs);
-    return job;
+  }) {
+    return _lock.run(() async {
+      final job = PersistedPrintJob(
+        id: '${DateTime.now().microsecondsSinceEpoch}_${++_idCounter}',
+        title: title,
+        receiptJson: receiptJson,
+        createdAt: DateTime.now(),
+      );
+      
+      final db = await _getDb();
+      await _ensureTable(db);
+      
+      await db.insert(_tableName, {
+        'id': job.id,
+        'title': job.title,
+        'receipt_json': job.receiptJson,
+        'created_at': job.createdAt.toIso8601String(),
+        'retry_count': job.retryCount,
+        'status': job.status.name,
+        'last_error': job.lastError,
+      });
+
+      // Prune: keep newest _maxJobs
+      final count = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT COUNT(*) FROM $_tableName')
+      ) ?? 0;
+      
+      if (count > _maxJobs) {
+        final deleteCount = count - _maxJobs;
+        await db.execute('''
+          DELETE FROM $_tableName WHERE id IN (
+            SELECT id FROM $_tableName ORDER BY created_at ASC LIMIT $deleteCount
+          )
+        ''');
+      }
+
+      return job;
+    });
   }
 
   /// Load all pending jobs (status = pending, retryCount < maxRetries).
   Future<List<PersistedPrintJob>> loadPending() async {
-    final jobs = await _load();
-    return jobs
-        .where((j) =>
-            j.status == PrintJobStatus.pending &&
-            j.retryCount < _maxRetries)
-        .toList();
+    final db = await _getDb();
+    await _ensureTable(db);
+    final rows = await db.query(
+      _tableName,
+      where: 'status = ? AND retry_count < ?',
+      whereArgs: [PrintJobStatus.pending.name, _maxRetries],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map((r) => PersistedPrintJob.fromMap(r)).toList();
   }
 
   /// Load all jobs for display (full history).
-  Future<List<PersistedPrintJob>> loadAll() async => _load();
+  Future<List<PersistedPrintJob>> loadAll() async {
+    final db = await _getDb();
+    await _ensureTable(db);
+    final rows = await db.query(_tableName, orderBy: 'created_at ASC');
+    return rows.map((r) => PersistedPrintJob.fromMap(r)).toList();
+  }
 
   /// Mark a job as currently printing (prevents duplicate processing).
   Future<void> markPrinting(String id) async {
-    await _updateJob(id, (j) => j.copyWith(status: PrintJobStatus.printing));
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.update(
+      _tableName,
+      {'status': PrintJobStatus.printing.name},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   /// Mark a job as successfully printed.
   Future<void> markDone(String id) async {
-    await _updateJob(id, (j) => j.copyWith(status: PrintJobStatus.success));
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.update(
+      _tableName,
+      {'status': PrintJobStatus.success.name},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   /// Mark a job as failed and increment retry count.
   /// If retryCount >= maxRetries, marks as abandoned.
   Future<void> markFailed(String id, {String? error}) async {
-    await _updateJob(id, (j) {
-      final newRetryCount = j.retryCount + 1;
+    final db = await _getDb();
+    await _ensureTable(db);
+    
+    final rows = await db.query(
+      _tableName,
+      columns: ['retry_count'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (rows.isNotEmpty) {
+      final currentRetryCount = rows.first['retry_count'] as int;
+      final newRetryCount = currentRetryCount + 1;
       final newStatus = newRetryCount >= _maxRetries
-          ? PrintJobStatus.abandoned
-          : PrintJobStatus.pending; // Reset to pending for next retry cycle
-      return j.copyWith(
-        retryCount: newRetryCount,
-        status: newStatus,
-        lastError: error,
+          ? PrintJobStatus.abandoned.name
+          : PrintJobStatus.pending.name;
+          
+      await db.update(
+        _tableName,
+        {
+          'retry_count': newRetryCount,
+          'status': newStatus,
+          'last_error': error,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
       );
-    });
+    }
   }
 
   /// Reset a printing job back to pending (e.g., after crash mid-print).
   Future<void> resetStuckJobs() async {
-    final jobs = await _load();
-    final reset = jobs.map((j) {
-      if (j.status == PrintJobStatus.printing) {
-        // Was stuck mid-print at app kill — reset to pending for retry
-        return j.copyWith(status: PrintJobStatus.pending);
-      }
-      return j;
-    }).toList();
-    await _save(reset);
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.update(
+      _tableName,
+      {'status': PrintJobStatus.pending.name},
+      where: 'status = ?',
+      whereArgs: [PrintJobStatus.printing.name],
+    );
   }
 
   /// Get count of jobs waiting to print.
   Future<int> pendingCount() async {
-    final pending = await loadPending();
-    return pending.length;
+    final db = await _getDb();
+    await _ensureTable(db);
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) FROM $_tableName WHERE status = ? AND retry_count < ?',
+      [PrintJobStatus.pending.name, _maxRetries],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   /// Clear ALL jobs (including pending) — for test isolation and factory reset.
   Future<void> clearAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_queueKey);
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.delete(_tableName);
   }
 
   /// Clear all completed/abandoned jobs (housekeeping).
   Future<void> clearCompleted() async {
-    final jobs = await _load();
-    final active = jobs
-        .where((j) =>
-            j.status != PrintJobStatus.success &&
-            j.status != PrintJobStatus.abandoned)
-        .toList();
-    await _save(active);
-  }
-
-  // ── Private ─────────────────────────────────────────────────────────────────
-
-  Future<void> _updateJob(
-    String id,
-    PersistedPrintJob Function(PersistedPrintJob) updater,
-  ) async {
-    final jobs = await _load();
-    final idx = jobs.indexWhere((j) => j.id == id);
-    if (idx != -1) {
-      jobs[idx] = updater(jobs[idx]);
-      await _save(jobs);
-    }
-  }
-
-  Future<List<PersistedPrintJob>> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_queueKey) ?? [];
-    final result = <PersistedPrintJob>[];
-    for (final item in raw) {
-      try {
-        result.add(PersistedPrintJob.fromMap(
-          jsonDecode(item) as Map<String, dynamic>,
-        ));
-      } catch (_) {
-        // Skip corrupt entries
-      }
-    }
-    return result;
-  }
-
-  Future<void> _save(List<PersistedPrintJob> jobs) async {
-    final prefs = await SharedPreferences.getInstance();
-    // Prune: keep newest _maxJobs
-    final trimmed = jobs.length > _maxJobs
-        ? jobs.sublist(jobs.length - _maxJobs)
-        : jobs;
-    await prefs.setStringList(
-      _queueKey,
-      trimmed.map((j) => jsonEncode(j.toMap())).toList(),
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.delete(
+      _tableName,
+      where: 'status = ? OR status = ?',
+      whereArgs: [PrintJobStatus.success.name, PrintJobStatus.abandoned.name],
     );
   }
 }

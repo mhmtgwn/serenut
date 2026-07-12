@@ -1,8 +1,16 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.overrideDatabasePath = inMemoryDatabasePath;
+  });
+
   group('Financial Integrity Service Tests', () {
     late SharedPreferences prefs;
     late AuditLogger auditLogger;
@@ -12,7 +20,7 @@ void main() {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
-      auditLogger = AuditLogger(prefs);
+      auditLogger = AuditLogger(DatabaseManager());
       operationQueue = OperationQueueService(prefs);
       reconciliationService = PaymentReconciliationService(auditLogger);
     });
@@ -25,7 +33,7 @@ void main() {
         metadata: {'test_key': 'test_val'},
       );
 
-      final logs = auditLogger.getLogs();
+      final logs = await auditLogger.getLogs();
       expect(logs, hasLength(1));
       expect(logs.first['action'], 'test_action');
       expect(logs.first['beforeState'], 'idle');
@@ -82,7 +90,7 @@ void main() {
       expect(statusMismatch, ReconciliationStatus.needsReview);
 
       // Verify that mismatch was logged to audit log
-      final logs = auditLogger.getLogs();
+      final logs = await auditLogger.getLogs();
       expect(logs.any((log) => log['action'] == 'reconcile_mismatch_detected'), isTrue);
     });
   });

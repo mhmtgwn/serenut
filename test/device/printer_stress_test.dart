@@ -1,4 +1,4 @@
-﻿// test/device/printer_stress_test.dart
+// test/device/printer_stress_test.dart
 // Serenut POS — Printer Stress & Resilience Tests
 // Tests: 100-receipt loop, mid-print disconnect, network outage recovery,
 //        failover chain, persistent queue, stuck job reset
@@ -10,9 +10,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
+  
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+  DatabaseManager.overrideDatabasePath = inMemoryDatabasePath;
   // ── PersistentPrintQueue Tests ────────────────────────────────────────────
 
   group('PersistentPrintQueue — Crash Safety', () {

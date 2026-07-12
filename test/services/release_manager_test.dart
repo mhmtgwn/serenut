@@ -240,6 +240,62 @@ void main() {
     });
   });
 
+  group('ReleaseManagerService._computeSha256 (OOM fix – stream tabanlı)', () {
+    // KRİTİK A DOĞRULAMA: Stream tabanlı hash hesaplamasının readAsBytes() ile aynı
+    // sonucu ürettiğini ve büyük dosyalarda RAM tahsisatı yapmadığını kanıtlar.
+
+    test('stream tabanlı hash, 4-byte dosyada readAsBytes() ile aynı sonucu üretmeli', () async {
+      final svc = ReleaseManagerService(config: testConfig);
+      final tempFile = File('${Directory.systemTemp.path}/test_stream_hash_small.bin');
+      await tempFile.writeAsBytes([0x01, 0x02, 0x03, 0x04]);
+
+      // Eski yöntem: readAsBytes() – referans hash
+      final bytes = await tempFile.readAsBytes();
+      final expectedHash = sha256.convert(bytes).toString();
+
+      // Yeni yöntem: verifyDownload içinde _computeSha256 stream kullanıyor
+      final signature = signHash(expectedHash);
+      final isValid = await svc.verifyDownload(tempFile, expectedHash, signature);
+      expect(isValid, isTrue,
+          reason: 'Stream tabanlı hash, byte bazlı hash ile tutarlı olmalı');
+
+      await tempFile.delete();
+    });
+
+    test('256 KB sahte dosyada stream tabanlı hash doğru hesaplanmalı (bellek sızıntısı yok)', () async {
+      final svc = ReleaseManagerService(config: testConfig);
+      final tempFile = File('${Directory.systemTemp.path}/test_stream_hash_256kb.bin');
+
+      // 256 KB sahte ikili veri yaz (0x00-0xFF döngülü)
+      final data = List<int>.generate(256 * 1024, (i) => i % 256);
+      await tempFile.writeAsBytes(data);
+
+      // Referans hash (küçük test dosyası için readAsBytes hâlâ güvenli)
+      final bytes = await tempFile.readAsBytes();
+      final expectedHash = sha256.convert(bytes).toString();
+
+      final signature = signHash(expectedHash);
+      final isValid = await svc.verifyDownload(tempFile, expectedHash, signature);
+      expect(isValid, isTrue,
+          reason: '256 KB dosyada stream hash doğru hesaplanmalı');
+
+      await tempFile.delete();
+    });
+
+    test('bozuk/değiştirilmiş dosyada hash uyuşmazlığı false döndürmeli', () async {
+      final svc = ReleaseManagerService(config: testConfig);
+      final tempFile = File('${Directory.systemTemp.path}/test_stream_hash_tampered.bin');
+      await tempFile.writeAsBytes([0xDE, 0xAD, 0xBE, 0xEF]);
+
+      // Yanlış hash ile doğrulama yapılınca false dönmeli
+      final isValid = await svc.verifyDownload(tempFile, 'yanlis_hash_degeri_abc123', '');
+      expect(isValid, isFalse,
+          reason: 'Hash uyuşmazlığında doğrulama başarısız olmalı');
+
+      await tempFile.delete();
+    });
+  });
+
   group('DownloadProgress', () {
     test('percentage is correctly clamped to 0.0-1.0', () {
       final p1 = DownloadProgress(bytesDownloaded: 0, totalBytes: 1000, percentage: 0.0);

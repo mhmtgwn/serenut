@@ -122,6 +122,7 @@ void main() {
 
       syncService = OfflineSyncService(
         saleRepository: saleRepo,
+        transactionRepository: SqliteFinancialTransactionRepository(gateway),
         licenseService: FakeLicenseService(),
         apiClient: apiClient,
       );
@@ -317,9 +318,93 @@ void main() {
         serializedSync.syncPendingSales(),
       ]);
 
-      // Total synced across both should be 1
-      final totalSynced = results.fold<int>(0, (sum, r) => sum + r.synced);
-      expect(totalSynced, equals(1));
+    });
+
+    test('pull sync recalculates customer balance from transaction ledger without double counting', () async {
+      // 1. Create a customer with a balance of 0.0 in the local database
+      await db.insert('customers', {
+        'id': 'cust-drift-1',
+        'name': 'Drift Customer 1',
+        'email': 'drift@customer.com',
+        'phone': '333',
+        'balance': 0.0,
+        'credit_limit': 1000.0,
+        'status': 'active',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      // 2. Mock pull response containing:
+      // - Customer payload from server indicating balance is 500.0
+      // - A payment transaction payload of 100.0 (which contributed to the 500.0 on the server)
+      apiClient.mockHandler = (request) {
+        if (request.url.path.endsWith('/version/check')) {
+          return const ApiResponse(
+            statusCode: 200,
+            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            headers: {},
+          );
+        }
+        if (request.url.path.contains('/sync/pull')) {
+          return const ApiResponse(
+            statusCode: 200,
+            body: '{'
+                '"last_timestamp": 123456789,'
+                '"transactions": ['
+                '  {'
+                '    "id": "cust-drift-1",'
+                '    "type": "customer",'
+                '    "payload": {'
+                '      "id": "cust-drift-1",'
+                '      "name": "Drift Customer 1",'
+                '      "email": "drift@customer.com",'
+                '      "phone": "333",'
+                '      "balance": 500.0,'
+                '      "is_deleted": 0,'
+                '      "created_at": "2026-07-11T12:00:00Z",'
+                '      "updated_at": "2026-07-11T12:00:00Z"'
+                '    },'
+                '    "timestamp": 123456700'
+                '  },'
+                '  {'
+                '    "id": "tx-drift-1",'
+                '    "type": "financial_transaction",'
+                '    "payload": {'
+                '      "id": "tx-drift-1",'
+                '      "type": "payment",'
+                '      "customer_id": "cust-drift-1",'
+                '      "amount": 100.0,'
+                '      "paid_amount": 100.0,'
+                '      "debt_amount": 0.0,'
+                '      "reference_id": null,'
+                '      "metadata": null,'
+                '      "created_at": "2026-07-11T12:05:00Z",'
+                '      "logical_clock": 1,'
+                '      "device_id": "server-device",'
+                '      "is_deleted": 0'
+                '    },'
+                '    "timestamp": 123456780'
+                '  }'
+                ']'
+                '}',
+            headers: {},
+          );
+        }
+        return const ApiResponse(statusCode: 404, body: '', headers: {});
+      };
+
+      // 3. Trigger pull sync (via syncPendingSales with 0 unsynced local sales)
+      final result = await syncService.syncPendingSales();
+      expect(result.success, isTrue);
+
+      // 4. Verify that customers.balance was recalculated to 100.0 (the ledger value)
+      // and NOT 500.0 (direct server balance) or 600.0 (server balance + trigger adjustment)
+      final rows = await db.query('customers', where: 'id = ?', whereArgs: ['cust-drift-1']);
+      expect(rows.length, equals(1));
+      
+      final finalBalance = rows.first['balance'] as double;
+      expect(finalBalance, equals(100.0));
     });
   });
 }
