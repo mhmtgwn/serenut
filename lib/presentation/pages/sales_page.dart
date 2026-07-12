@@ -223,8 +223,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
 
       // Play audio notification if enabled
       try {
-        final prefs = ref.read(sharedPreferencesProvider);
-        if (prefs.getBool('sound_notification_enabled') ?? false) {
+        final settings = ref.read(settingsNotifierProvider).valueOrNull;
+        if (settings?.soundNotificationEnabled ?? false) {
           SystemSound.play(SystemSoundType.click);
         }
       } catch (_) {}
@@ -329,9 +329,6 @@ class _SalesPageState extends ConsumerState<SalesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredProductsVal = ref.watch(salesProductsControllerProvider);
-    final categoriesVal       = ref.watch(productCategoriesProvider);
-    final selectedCategory    = ref.watch(salesProductCategoryFilterProvider);
     final isProcessing        = ref.watch(salesFlowProvider.select((state) => state.status == SalesFlowStatus.processing));
 
     return Scaffold(
@@ -351,9 +348,6 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                         Expanded(
                           flex: 3,
                           child: CatalogPanel(
-                            filteredProductsVal: filteredProductsVal,
-                            categories: categoriesVal,
-                            selectedCategory: selectedCategory,
                             searchController: _searchController,
                             barcodeController: _barcodeController,
                             barcodeFocusNode: _barcodeFocusNode,
@@ -407,9 +401,6 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                       body: TabBarView(
                         children: [
                           CatalogPanel(
-                            filteredProductsVal: filteredProductsVal,
-                            categories: categoriesVal,
-                            selectedCategory: selectedCategory,
                             searchController: _searchController,
                             barcodeController: _barcodeController,
                             barcodeFocusNode: _barcodeFocusNode,

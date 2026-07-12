@@ -29,9 +29,6 @@ const _kTextSecondary = Color(0xFF64748B);
 const _kBorder     = Color(0xFFE2E8F0);
 
 class CatalogPanel extends ConsumerStatefulWidget {
-  final AsyncValue<List<ProductEntity>> filteredProductsVal;
-  final List<String> categories;
-  final String? selectedCategory;
   final TextEditingController searchController;
   final TextEditingController barcodeController;
   final FocusNode? barcodeFocusNode;
@@ -40,9 +37,6 @@ class CatalogPanel extends ConsumerStatefulWidget {
 
   const CatalogPanel({
     super.key,
-    required this.filteredProductsVal,
-    required this.categories,
-    required this.selectedCategory,
     required this.searchController,
     required this.barcodeController,
     this.barcodeFocusNode,
@@ -162,6 +156,10 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredProductsVal = ref.watch(salesProductsControllerProvider);
+    final categoriesVal       = ref.watch(productCategoriesProvider);
+    final selectedCategory    = ref.watch(salesProductCategoryFilterProvider);
+
     return Column(
       children: [
         PosHeader(
@@ -183,7 +181,7 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                 BarcodeScannerDialog.show(
                   context,
                   onBarcodeScanned: (code) {
-                    widget.filteredProductsVal.whenData((list) {
+                    filteredProductsVal.whenData((list) {
                       widget.onBarcodeSubmit(code, list);
                     });
                   },
@@ -222,7 +220,7 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          widget.selectedCategory == null ? 'Kategori: Tümü' : 'Kategori: ${widget.selectedCategory}',
+                          selectedCategory == null ? 'Kategori: Tümü' : 'Kategori: $selectedCategory',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -275,7 +273,7 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                               ),
                             ),
                           ),
-                          if (widget.selectedCategory != null)
+                          if (selectedCategory != null)
                             TextButton(
                               onPressed: () {
                                 ref.read(salesProductCategoryFilterProvider.notifier).state = null;
@@ -293,10 +291,10 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                       ),
                       const SizedBox(height: 4),
                       Column(
-                        children: List.generate(widget.categories.length + 1, (index) {
+                        children: List.generate(categoriesVal.length + 1, (index) {
                           final isAll = index == 0;
-                          final catName = isAll ? 'Tümü' : widget.categories[index - 1];
-                          final isSelected = isAll ? widget.selectedCategory == null : widget.selectedCategory == catName;
+                          final catName = isAll ? 'Tümü' : categoriesVal[index - 1];
+                          final isSelected = isAll ? selectedCategory == null : selectedCategory == catName;
                           final icon = isAll ? Icons.grid_view_rounded : _getCategoryIcon(catName);
 
                           return _buildCategoryListRow(
@@ -324,7 +322,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
 
         // ── ÜRÜN GRİDİ ───────────────────────────────────────────────────
         Expanded(
-          child: widget.filteredProductsVal.when(
+          child: filteredProductsVal.when(
+
             loading: () => const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation(_kGreen),
