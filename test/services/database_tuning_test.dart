@@ -1,4 +1,4 @@
-﻿// test/services/database_tuning_test.dart
+// test/services/database_tuning_test.dart
 // SQLite performance tuning, explain query plan, and write lock concurrency simulation tests.
 
 import 'dart:io';
@@ -61,6 +61,16 @@ void main() {
       final explainFt = await db.rawQuery('EXPLAIN QUERY PLAN SELECT * FROM financial_transactions WHERE reference_id = "ft_abc"');
       final ftPlan = explainFt.map((r) => r['detail'].toString()).join(' | ');
       expect(ftPlan, contains('idx_ft_reference'));
+
+      // 4. Verify idx_orders_customer on orders(customer_id)
+      final explainOrders = await db.rawQuery('EXPLAIN QUERY PLAN SELECT * FROM orders WHERE customer_id = "cust_abc"');
+      final ordersPlan = explainOrders.map((r) => r['detail'].toString()).join(' | ');
+      expect(ordersPlan, contains('idx_orders_customer'));
+
+      // 5. Verify idx_order_items_order on order_items(order_id)
+      final explainOrderItems = await db.rawQuery('EXPLAIN QUERY PLAN SELECT * FROM order_items WHERE order_id = "ord_abc"');
+      final orderItemsPlan = explainOrderItems.map((r) => r['detail'].toString()).join(' | ');
+      expect(orderItemsPlan, contains('idx_order_items_order'));
     });
 
     test('SQLite Concurrency Simulation — Simultaneous imports and sales flow', () async {

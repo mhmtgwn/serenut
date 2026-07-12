@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
@@ -43,10 +43,11 @@ void main() {
       // 1. Create a version 3 mock database
       final db = await openDatabase(dbPath, version: 3, onCreate: (db, version) async {
         await db.execute('CREATE TABLE settings (id INTEGER PRIMARY KEY, business_name TEXT)');
-        await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT)');
+        await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT, customer_id TEXT)');
         await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY)');
-        await db.execute('CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, created_at TEXT)');
-        await db.execute('CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT)');
+        await db.execute('CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT)');
+        await db.execute('CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT, product_id TEXT)');
+        await db.execute('CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT)');
         await db.insert('settings', {'business_name': 'Test Store V3'});
       });
       await db.close();

@@ -4,10 +4,14 @@
 // Updated: SQLCipher removed — using standard sqflite
 
 import 'dart:io' show Platform, File, Directory;
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, kDebugMode;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 /// ════════════════════════════════════════════════════════════
 /// Database Manager
@@ -21,8 +25,23 @@ class DatabaseManager {
   factory DatabaseManager() => _instance;
   DatabaseManager._();
 
+  static const String customerBalanceSql = '''
+    SELECT COALESCE(SUM(
+      CASE 
+        WHEN type = 'sale' THEN -debt_amount
+        WHEN type = 'payment' THEN paid_amount
+        WHEN type = 'cancellation' THEN debt_amount
+        WHEN type = 'collection' THEN paid_amount
+        WHEN type = 'refund' AND paid_amount = 0 THEN amount
+        ELSE 0
+      END
+    ), 0.0) as expected
+    FROM financial_transactions
+    WHERE customer_id = ?
+  ''';
+
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 18;
+  static const int _databaseVersion = 23;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -92,14 +111,21 @@ class DatabaseManager {
             final backupDb = await openDatabase(backupPath, readOnly: true, singleInstance: false);
             try {
               pendingSales = await backupDb.query('sales', where: 'is_synced = 0');
-            } catch (_) {}
+            } catch (e, st) {
+              debugPrint('[DatabaseManager] ❌ Sales recovery query failed: $e');
+              await TelemetryService().logError(e, st, context: 'db_recovery_sales_query');
+            }
             try {
               pendingTransactions = await backupDb.query('financial_transactions', where: 'is_synced = 0');
-            } catch (_) {}
+            } catch (e, st) {
+              debugPrint('[DatabaseManager] ❌ Financial transactions recovery query failed: $e');
+              await TelemetryService().logError(e, st, context: 'db_recovery_tx_query');
+            }
             await backupDb.close();
             debugPrint('[DatabaseManager] 📥 Recovered ${pendingSales.length} sales and ${pendingTransactions.length} pending transactions.');
-          } catch (err) {
+          } catch (err, st) {
             debugPrint('[DatabaseManager] ❌ Recovery reading failed: $err');
+            await TelemetryService().logError(err, st, context: 'db_recovery_failed');
           }
         }
         
@@ -575,6 +601,114 @@ class DatabaseManager {
             'status': 'success'
           });
         }
+        if (oldVersion < 19) {
+          try {
+            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
+          } catch (e) {
+            final msg = e.toString().toLowerCase();
+            // 'duplicate column'/'already exists': kolон zaten var (idempotent)
+            // 'no such table': taze DB'de tablo henuz olusturulmamis, CREATE TABLE'da gelecek
+            if (!msg.contains('duplicate column') &&
+                !msg.contains('already exists') &&
+                !msg.contains('no such table')) {
+              rethrow;
+            }
+          }
+          try {
+            await txn.execute('ALTER TABLE customers ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
+          } catch (e) {
+            final msg = e.toString().toLowerCase();
+            if (!msg.contains('duplicate column') &&
+                !msg.contains('already exists') &&
+                !msg.contains('no such table')) {
+              rethrow;
+            }
+          }
+          try {
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_customer_id ON financial_transactions(customer_id)');
+          } catch (e) {
+            rethrow;
+          }
+          await txn.insert('app_migration_history', {
+            'version': 19,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 20) {
+          try {
+            await txn.execute('ALTER TABLE settings ADD COLUMN license_token TEXT');
+            await txn.execute('ALTER TABLE settings ADD COLUMN last_system_time TEXT');
+            await txn.execute('ALTER TABLE settings ADD COLUMN max_timestamp_seen TEXT');
+          } catch (_) {}
+          await txn.insert('app_migration_history', {
+            'version': 20,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 21) {
+          try {
+            await txn.execute('''
+              CREATE TABLE IF NOT EXISTS print_queue (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                receipt_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL,
+                last_error TEXT
+              )
+            ''');
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
+          } catch (_) {}
+          await txn.insert('app_migration_history', {
+            'version': 21,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 22) {
+          // Add 9 new columns to settings table (idempotent: catch duplicate column errors)
+          for (final col in [
+            'ALTER TABLE settings ADD COLUMN sound_notification_enabled INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE settings ADD COLUMN sms_auto_debt_reminder_enabled INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE settings ADD COLUMN sms_auto_debt_reminder_days INTEGER NOT NULL DEFAULT 15',
+            'ALTER TABLE settings ADD COLUMN sms_auto_debt_reminder_min_amount REAL NOT NULL DEFAULT 100.0',
+            'ALTER TABLE settings ADD COLUMN label_printer_enabled INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE settings ADD COLUMN label_printer_ip TEXT',
+            'ALTER TABLE settings ADD COLUMN label_printer_port INTEGER NOT NULL DEFAULT 9100',
+            'ALTER TABLE settings ADD COLUMN label_printer_copies INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN admin_pin_code TEXT',
+          ]) {
+            try {
+              await txn.execute(col);
+            } catch (e) {
+              final msg = e.toString().toLowerCase();
+              if (!msg.contains('duplicate column') && !msg.contains('already exists')) rethrow;
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 22,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 23) {
+          try {
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
+            await txn.execute('CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
+          } catch (_) {}
+          await txn.insert('app_migration_history', {
+            'version': 23,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       } catch (err) {
         // Log migration error to history before throwing
         try {
@@ -588,6 +722,88 @@ class DatabaseManager {
         rethrow;
       }
     });
+
+    // ── One-time SharedPreferences → SQLite migration (runs after the transaction) ──
+    // This cannot run inside a transaction because SharedPreferences is async/external.
+    if (oldVersion < 22) {
+      await _migrateSharedPrefsToSqlite(db);
+    }
+  }
+
+  /// Migrate 9 settings fields and legacy SharedPreferences audit logs to SQLite.
+  /// Runs exactly once when upgrading from a version < 22.
+  Future<void> _migrateSharedPrefsToSqlite(Database db) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // ── 1. Migrate 9 settings values ──────────────────────────────────────────
+      final settingsRows = await db.query('settings', limit: 1);
+      if (settingsRows.isNotEmpty) {
+        final existingId = settingsRows.first['id'];
+        await db.update('settings', {
+          'sound_notification_enabled': (prefs.getBool('sound_notification_enabled') ?? false) ? 1 : 0,
+          'sms_auto_debt_reminder_enabled': (prefs.getBool('sms_auto_debt_reminder_enabled') ?? false) ? 1 : 0,
+          'sms_auto_debt_reminder_days': prefs.getInt('sms_auto_debt_reminder_days') ?? 15,
+          'sms_auto_debt_reminder_min_amount': prefs.getDouble('sms_auto_debt_reminder_min_amount') ?? 100.0,
+          'label_printer_enabled': (prefs.getBool('label_printer_enabled') ?? false) ? 1 : 0,
+          'label_printer_ip': prefs.getString('label_printer_ip') ?? '',
+          'label_printer_port': int.tryParse(prefs.getString('label_printer_port') ?? '9100') ?? 9100,
+          'label_printer_copies': prefs.getInt('label_printer_copies') ?? 1,
+          'admin_pin_code': prefs.getString('admin_pin_code'),
+          'updated_at': DateTime.now().toIso8601String(),
+        }, where: 'id = ?', whereArgs: [existingId]);
+      }
+
+      // Clean up migrated SharedPreferences settings keys
+      for (final key in [
+        'sound_notification_enabled',
+        'sms_auto_debt_reminder_enabled',
+        'sms_auto_debt_reminder_days',
+        'sms_auto_debt_reminder_min_amount',
+        'label_printer_enabled',
+        'label_printer_ip',
+        'label_printer_port',
+        'label_printer_copies',
+        'admin_pin_code',
+      ]) {
+        await prefs.remove(key);
+      }
+
+      // ── 2. Migrate legacy SharedPreferences audit logs → SQLite audit_logs ──
+      final rawLogs = prefs.getStringList('serenut_audit_logs');
+      if (rawLogs != null && rawLogs.isNotEmpty) {
+        for (final rawLog in rawLogs) {
+          try {
+            final map = jsonDecode(rawLog) as Map<String, dynamic>;
+            // Each entry has: id, timestamp, action, beforeState, afterState, metadata
+            final logId = map['id'] as String? ?? const Uuid().v4();
+            final details = jsonEncode({
+              'before': map['beforeState'] ?? '',
+              'after': map['afterState'] ?? '',
+              'metadata': map['metadata'] ?? {},
+            });
+            await db.insert('audit_logs', {
+              'id': logId,
+              'user_id': 'system',
+              'user_name': 'Migrated (SharedPrefs)',
+              'action': map['action'] ?? 'unknown',
+              'details': details,
+              'created_at': map['timestamp'] ?? DateTime.now().toIso8601String(),
+            }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          } catch (_) {
+            // Malformed entry — skip
+          }
+        }
+        // Remove migrated audit log key
+        await prefs.remove('serenut_audit_logs');
+        debugPrint('[DB Migration v22] Migrated ${rawLogs.length} SharedPreferences audit logs to SQLite audit_logs.');
+      }
+
+      debugPrint('[DB Migration v22] SharedPreferences → SQLite migration complete.');
+    } catch (e) {
+      debugPrint('[DB Migration v22] Migration failed (non-fatal): $e');
+    }
+
   }
 
   /// Create all tables
@@ -651,7 +867,8 @@ class DatabaseManager {
         updated_at TEXT NOT NULL,
         is_deleted INTEGER NOT NULL DEFAULT 0,
         deleted_at TEXT,
-        deleted_by TEXT
+        deleted_by TEXT,
+        is_synced INTEGER NOT NULL DEFAULT 1
       )
     ''');
 
@@ -709,6 +926,7 @@ class DatabaseManager {
         is_deleted INTEGER NOT NULL DEFAULT 0,
         deleted_at TEXT,
         deleted_by TEXT,
+        is_synced INTEGER NOT NULL DEFAULT 1,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
@@ -780,6 +998,11 @@ class DatabaseManager {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_ft_reference ON financial_transactions(reference_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
 
     // Create financial ledger view
     await db.execute('''
@@ -841,8 +1064,20 @@ class DatabaseManager {
         qr_enabled INTEGER NOT NULL DEFAULT 1,
         qr_format TEXT NOT NULL DEFAULT 'type|id|timestamp|customerId|amount|hash',
         debug_mode INTEGER NOT NULL DEFAULT 0,
+        license_token TEXT,
+        last_system_time TEXT,
+        max_timestamp_seen TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT
+        updated_at TEXT,
+        sound_notification_enabled INTEGER NOT NULL DEFAULT 0,
+        sms_auto_debt_reminder_enabled INTEGER NOT NULL DEFAULT 0,
+        sms_auto_debt_reminder_days INTEGER NOT NULL DEFAULT 15,
+        sms_auto_debt_reminder_min_amount REAL NOT NULL DEFAULT 100.0,
+        label_printer_enabled INTEGER NOT NULL DEFAULT 0,
+        label_printer_ip TEXT,
+        label_printer_port INTEGER NOT NULL DEFAULT 9100,
+        label_printer_copies INTEGER NOT NULL DEFAULT 1,
+        admin_pin_code TEXT
       )
     ''');
 
@@ -895,6 +1130,21 @@ class DatabaseManager {
     ''');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_status ON sms_logs(status)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_created ON sms_logs(created_at)');
+
+    // Create print_queue table and indexes
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS print_queue (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        receipt_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL,
+        last_error TEXT
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
 
     // Audit Events table
     await db.execute('''
@@ -1153,6 +1403,16 @@ class DatabaseManager {
       'qr_enabled': 0,
       'qr_format': 'type|id|timestamp|customerId|amount|hash',
       'debug_mode': 0,
+      // Sprint 4 — new settings columns (default values)
+      'sound_notification_enabled': 0,
+      'sms_auto_debt_reminder_enabled': 0,
+      'sms_auto_debt_reminder_days': 15,
+      'sms_auto_debt_reminder_min_amount': 100.0,
+      'label_printer_enabled': 0,
+      'label_printer_ip': '',
+      'label_printer_port': 9100,
+      'label_printer_copies': 1,
+      'admin_pin_code': null,
       'created_at': DateTime.now().toIso8601String(),
     });
 
