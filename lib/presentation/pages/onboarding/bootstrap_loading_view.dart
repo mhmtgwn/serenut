@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/service_providers.dart';
+import '../../../providers/audit_provider.dart';
 import '../../../config/theme.dart';
 
 class BootstrapLoadingView extends ConsumerStatefulWidget {
@@ -56,7 +57,20 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
         await Future.delayed(const Duration(milliseconds: 800));
         widget.onCompleted();
       }
-    } catch (e) {
+    } catch (e, st) {
+      // Log bootstrap failure to audit trail for telemetry / support diagnostics
+      try {
+        final audit = await ref.read(auditServiceProvider.future);
+        await audit.logEvent(
+          eventType: 'bootstrap_sync_failed',
+          entityType: 'system',
+          entityId: 'bootstrap',
+          newValue: e.toString(),
+          notes: 'Bootstrap senkronizasyonu başarısız: ${e.toString()}\n${st.toString().substring(0, st.toString().length.clamp(0, 500))}',
+        );
+      } catch (_) {
+        // Audit service may not be available during very early onboarding — fail silently
+      }
       if (mounted) {
         setState(() {
           _isSyncing = false;
