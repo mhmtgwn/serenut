@@ -35,7 +35,7 @@ class CentralBackgroundScheduler {
 
   void start() {
     _schedulerTimer?.cancel();
-    _schedulerTimer = Timer.periodic(const Duration(seconds: 10), (_) => _tick());
+    _schedulerTimer = Timer.periodic(const Duration(seconds: 10), (_) => tick());
   }
 
   void stop() {
@@ -60,7 +60,7 @@ class CentralBackgroundScheduler {
   }
 
   /// Run diagnostics loop tick
-  Future<void> _tick() async {
+  Future<void> tick() async {
     if (_isPaused) return;
 
     // Adjust job runtime check intervals if battery level is low (Power Saving Mode)
@@ -101,4 +101,10 @@ class CentralBackgroundScheduler {
       }
     }
   }
+
+  @visibleForTesting
+  Map<String, int> get backoffFactors => _backoffFactors;
+
+  @visibleForTesting
+  Map<String, DateTime> get lastRunTimes => _lastRunTimes;
 }
