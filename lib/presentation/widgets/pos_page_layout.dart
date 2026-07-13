@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ class PosHeader extends StatelessWidget {
   final bool showSettings;
   final bool showRefresh;
   final VoidCallback? onRefresh;
+  final bool showStatusIndicator;
 
   const PosHeader({
     super.key,
@@ -43,6 +44,7 @@ class PosHeader extends StatelessWidget {
     this.showSettings = true,
     this.showRefresh = false,
     this.onRefresh,
+    this.showStatusIndicator = true,
   });
 
   @override
@@ -131,18 +133,20 @@ class PosHeader extends StatelessWidget {
                     icon: const Icon(Icons.refresh_rounded, color: _kTextSecondary, size: 22),
                     tooltip: 'Yenile',
                   ),
-                const RealtimeStatusIndicator(compact: true),
-                const SizedBox(width: 4),
+                if (showStatusIndicator) ...[
+                  const RealtimeStatusIndicator(compact: true),
+                  const SizedBox(width: 4),
+                ],
                 if (showSettings)
                   IconButton(
                     padding: const EdgeInsets.all(6),
                     constraints: const BoxConstraints(),
                     icon: const Icon(Icons.settings_outlined, color: _kTextSecondary, size: 22),
                     tooltip: 'Ayarlar',
-                    onPressed: () => PinGateDialog.checkAndShow(
+                    onPressed: () => requireAdminAccess(
                       context,
                       title: 'Ayarlar Yetkisi',
-                      onVerified: () => context.push(AppRoutes.settings),
+                      onGranted: (_, __) => context.push(AppRoutes.settings),
                     ),
                   ),
               ],

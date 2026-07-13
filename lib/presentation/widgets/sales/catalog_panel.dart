@@ -172,6 +172,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
             ref.read(salesProductSearchQueryProvider.notifier).state = val;
             setState(() {});
           },
+          showSettings: false,
+          showStatusIndicator: false,
           actions: [
             // Barkod tarama ikonu - Kamera
             IconButton(
