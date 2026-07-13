@@ -129,27 +129,43 @@ export class CommercialLifecycleService {
     ]);
 
     // 4b. Sync legacy licenses table for backward compatibility
-    await client.query(`
-      INSERT INTO licenses (
-        id, company_id, license_key, tier,
-        allowed_devices_count, status, expires_at, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, 'active', $6, NOW(), NOW())
-      ON CONFLICT (company_id) DO UPDATE SET
-        license_key = EXCLUDED.license_key,
-        tier = EXCLUDED.tier,
-        allowed_devices_count = EXCLUDED.allowed_devices_count,
-        status = 'active',
-        expires_at = EXCLUDED.expires_at,
-        updated_at = NOW()
-    `, [
-      `lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
-      companyId,
-      licenseKey,
-      plan.name.toLowerCase().includes('pro') ? 'pro' : 'basic',
-      plan.device_limit,
-      periodEnd
-    ]);
+    const existingLicense = await client.query(
+      `SELECT id FROM licenses WHERE company_id = $1 LIMIT 1`,
+      [companyId]
+    );
+
+    if (existingLicense.rows.length > 0) {
+      await client.query(`
+        UPDATE licenses SET
+          license_key = $1,
+          tier = $2,
+          allowed_devices_count = $3,
+          status = 'active',
+          expires_at = $4
+        WHERE company_id = $5
+      `, [
+        licenseKey,
+        plan.name.toLowerCase().includes('pro') ? 'pro' : 'basic',
+        plan.device_limit,
+        periodEnd,
+        companyId
+      ]);
+    } else {
+      await client.query(`
+        INSERT INTO licenses (
+          id, company_id, license_key, tier,
+          allowed_devices_count, status, expires_at, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, 'active', $6, NOW())
+      `, [
+        `lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+        companyId,
+        licenseKey,
+        plan.name.toLowerCase().includes('pro') ? 'pro' : 'basic',
+        plan.device_limit,
+        periodEnd
+      ]);
+    }
 
     // 5. Audit log
     await client.query(`

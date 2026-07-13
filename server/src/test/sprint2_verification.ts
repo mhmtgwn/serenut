@@ -239,6 +239,49 @@ async function runTests() {
     clientSync.release();
   }
 
+  // Test 4: RTR Grace Period Verification
+  console.log('\n▶️ Test 4: RTR Grace Period Verification...');
+  // 1. Initial Login
+  const loginRes = await AuthService.login('ahmet@owner.com', 'passA1');
+  const initialRefresh = loginRes.refresh_token;
+
+  // 2. Perform first refresh -> should succeed
+  const refreshRes1 = await AuthService.refresh(initialRefresh);
+  const nextRefresh = refreshRes1.refresh_token;
+  console.log('  ✔️ First refresh succeeded.');
+
+  // 3. Immediate retry with the same initialRefresh (within grace period) -> should succeed and return nextRefresh
+  const refreshRes2 = await AuthService.refresh(initialRefresh);
+  if (refreshRes2.refresh_token !== nextRefresh) {
+    throw new Error('Test 4 Failed: Grace period retry did not return the latest active refresh token.');
+  }
+  console.log('  ✔️ Retry within grace period succeeded.');
+
+  // 4. Wait for 22 seconds (exceeding grace period) and try refreshing with initialRefresh again -> should fail and revoke all sessions
+  console.log('  ⏳ Waiting 22 seconds to test grace period expiration...');
+  await new Promise((resolve) => setTimeout(resolve, 22000));
+
+  try {
+    await AuthService.refresh(initialRefresh);
+    throw new Error('Test 4 Failed: Stale refresh token was accepted after grace period expired.');
+  } catch (err: any) {
+    if (err.message !== 'refresh_token_expired') {
+      throw err;
+    }
+    console.log('  ✔️ Stale token after grace period rejected as expected.');
+  }
+
+  // 5. Verify all user sessions are now revoked (nextRefresh should be invalid now)
+  try {
+    await AuthService.refresh(nextRefresh);
+    throw new Error('Test 4 Failed: User session was not revoked after replay attack detection.');
+  } catch (err: any) {
+    if (err.message !== 'refresh_token_expired') {
+      throw err;
+    }
+    console.log('  ✔️ Replay attack successfully revoked all user sessions.');
+  }
+
   console.log('\n🏆 ALL SPRINT 2 SYNC INTEGRATION TESTS PASSED SUCCESSFULLY! 🏆');
 }
 

@@ -235,12 +235,19 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     if (updates.length > 0) {
+      updates.push(`token_version = token_version + 1`);
       updates.push(`updated_at = CURRENT_TIMESTAMP`);
       values.push(targetId);
       await runWithTenantContext(
         user.company_id,
         `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`,
         values
+      );
+    } else if (role_id !== undefined) {
+      await runWithTenantContext(
+        user.company_id,
+        'UPDATE users SET token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [targetId]
       );
     }
 

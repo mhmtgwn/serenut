@@ -23,6 +23,20 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     }
 
     const decoded = AuthService.verifyAccessToken(token);
+
+    // Dynamic database check for active status and token version
+    const resUser = await pgPool.query('SELECT is_active, token_version FROM users WHERE id = $1', [decoded.id]);
+    if (resUser.rows.length === 0 || !resUser.rows[0].is_active) {
+      incrementJwtFailures();
+      return res.status(403).json({ error: 'user_suspended', message: 'Hesabınız askıya alınmıştır.' });
+    }
+
+    const dbTokenVersion = resUser.rows[0].token_version;
+    if (decoded.token_version !== undefined && dbTokenVersion !== decoded.token_version) {
+      incrementJwtFailures();
+      return res.status(401).json({ error: 'unauthorized', message: 'Yetkileriniz veya şifreniz güncellendi. Lütfen tekrar giriş yapın.' });
+    }
+
     req.user = decoded;
     
     // Bind context of PG RLS for asynchronous callbacks
@@ -35,15 +49,22 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
   }
 }
 
-// Checks dynamic database active status to catch immediately banned users
+// Checks dynamic database active status and token version to catch immediately banned users or revoked sessions
 export async function verifyUserActiveStatus(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   if (!req.user) return res.status(401).json({ error: 'unauthorized' });
 
   try {
-    const resUser = await pgPool.query('SELECT is_active FROM users WHERE id = $1', [req.user.id]);
+    const resUser = await pgPool.query('SELECT is_active, token_version FROM users WHERE id = $1', [req.user.id]);
     if (resUser.rows.length === 0 || !resUser.rows[0].is_active) {
       return res.status(403).json({ error: 'user_suspended', message: 'Hesabınız askıya alınmıştır.' });
     }
+
+    const dbTokenVersion = resUser.rows[0].token_version;
+    const tokenVersion = req.user.token_version;
+    if (tokenVersion !== undefined && dbTokenVersion !== tokenVersion) {
+      return res.status(401).json({ error: 'unauthorized', message: 'Yetkileriniz değiştirildi, lütfen tekrar giriş yapın.' });
+    }
+
     next();
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });

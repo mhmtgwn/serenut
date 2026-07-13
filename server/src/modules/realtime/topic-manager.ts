@@ -122,4 +122,11 @@ export class TopicManager {
     }
     return count;
   }
+
+  /**
+   * Get all topics a client socket is subscribed to
+   */
+  public static getClientTopics(ws: WebSocket): Set<string> {
+    return this.socketSubscriptions.get(ws) || new Set();
+  }
 }

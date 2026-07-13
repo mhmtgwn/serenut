@@ -12,20 +12,41 @@ export type BrokerCallback = (topic: string, message: string) => void;
 export interface EventBroker {
   publish(topic: string, message: string): Promise<void>;
   subscribe(topic: string, callback: BrokerCallback): Promise<void>;
+  unsubscribe(topic: string, callback: BrokerCallback): Promise<void>;
 }
 
 // ── LOCAL EVENT BROKER (FALLBACK) ─────────────────────────────────────────────
 class LocalEventBroker implements EventBroker {
   private emitter = new EventEmitter();
+  private wrappedListeners = new Map<string, Map<BrokerCallback, (msg: string) => void>>();
 
   public async publish(topic: string, message: string): Promise<void> {
     this.emitter.emit(topic, message);
   }
 
   public async subscribe(topic: string, callback: BrokerCallback): Promise<void> {
-    this.emitter.on(topic, (msg: string) => {
+    const wrapper = (msg: string) => {
       callback(topic, msg);
-    });
+    };
+    if (!this.wrappedListeners.has(topic)) {
+      this.wrappedListeners.set(topic, new Map());
+    }
+    this.wrappedListeners.get(topic)!.set(callback, wrapper);
+    this.emitter.on(topic, wrapper);
+  }
+
+  public async unsubscribe(topic: string, callback: BrokerCallback): Promise<void> {
+    const topicListeners = this.wrappedListeners.get(topic);
+    if (topicListeners) {
+      const wrapper = topicListeners.get(callback);
+      if (wrapper) {
+        this.emitter.off(topic, wrapper);
+        topicListeners.delete(callback);
+      }
+      if (topicListeners.size === 0) {
+        this.wrappedListeners.delete(topic);
+      }
+    }
   }
 }
 
@@ -60,20 +81,42 @@ class RedisEventBroker implements EventBroker {
   }
 
   public async subscribe(topic: string, callback: BrokerCallback): Promise<void> {
-    if (!this.subCallbacks.has(topic)) {
-      this.subCallbacks.set(topic, []);
-    }
-    this.subCallbacks.get(topic)!.push(callback);
+    let callbacks = this.subCallbacks.get(topic);
+    const isFirst = !callbacks || callbacks.length === 0;
 
-    if (this.subClient && this.subClient.isOpen) {
+    if (!callbacks) {
+      callbacks = [];
+      this.subCallbacks.set(topic, callbacks);
+    }
+    callbacks.push(callback);
+
+    if (isFirst && this.subClient && this.subClient.isOpen) {
       await this.subClient.subscribe(topic, (message: string) => {
-        const callbacks = this.subCallbacks.get(topic);
-        if (callbacks) {
-          callbacks.forEach((cb) => cb(topic, message));
+        const cbs = this.subCallbacks.get(topic);
+        if (cbs) {
+          cbs.forEach((cb) => cb(topic, message));
         }
       });
-    } else {
+    } else if (isFirst) {
       logger.warn(`Redis Broker sub client is closed. Queuing subscription callback for topic: ${topic}`);
+    }
+  }
+
+  public async unsubscribe(topic: string, callback: BrokerCallback): Promise<void> {
+    const callbacks = this.subCallbacks.get(topic);
+    if (callbacks) {
+      const index = callbacks.indexOf(callback);
+      if (index !== -1) {
+        callbacks.splice(index, 1);
+      }
+
+      if (callbacks.length === 0) {
+        this.subCallbacks.delete(topic);
+        if (this.subClient && this.subClient.isOpen) {
+          await this.subClient.unsubscribe(topic);
+          logger.info(`RedisEventBroker: Unsubscribed client from Redis channel: ${topic}`);
+        }
+      }
     }
   }
 }

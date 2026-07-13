@@ -237,29 +237,80 @@ router.get('/licenses', async (req: AuthenticatedRequest, res: Response) => {
 router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
   const { company_id, tier, allowed_devices_count, expires_in_days } = req.body;
   if (!company_id || !tier) {
-    return res.status(400).json({ error: 'missing_fields' });
+    return res.status(400).json({ error: 'missing_fields', message: 'company_id ve tier alanları zorunludur.' });
   }
 
-  const id = `lic-${Date.now()}`;
-  const licenseKey = `KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-  
   const days = expires_in_days ? parseInt(expires_in_days, 10) : 365;
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + days);
+  if (isNaN(days) || days <= 0) {
+    return res.status(400).json({ error: 'invalid_expiry', message: 'Geçersiz lisans süresi gün değeri.' });
+  }
 
   const limit = allowed_devices_count ? parseInt(allowed_devices_count, 10) : 1;
+  if (isNaN(limit) || limit <= 0 || limit > 1000) {
+    return res.status(400).json({ error: 'invalid_device_limit', message: 'Geçersiz cihaz limiti (1-1000 arası olmalıdır).' });
+  }
 
   try {
-    await runBypassingRLS(
-      `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
-       VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
-      [id, company_id, licenseKey, tier, limit, expiresAt]
-    );
+    // 1. Verify company exists
+    const company = await runBypassingRLS('SELECT id FROM companies WHERE id = $1', [company_id]);
+    if (company.rows.length === 0) {
+      return res.status(400).json({ error: 'company_not_found', message: 'Şirket bulunamadı.' });
+    }
+
+    const id = `lic-${Date.now()}`;
+    const licenseKey = `KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + days);
+
+    // Resolve plan ID & limits
+    let planId = 'plan-basic';
+    let storeLimit = 1;
+    if (tier === 'trial') {
+      planId = 'plan-free';
+      storeLimit = 1;
+    } else if (tier === 'pro') {
+      planId = 'plan-pro';
+      storeLimit = 3;
+    } else if (tier === 'pro_plus') {
+      planId = 'plan-enterprise';
+      storeLimit = 99;
+    }
+
+    const entitlementId = `ent-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+    // Write to both tables inside a transaction
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      // Insert legacy license
+      await client.query(
+        `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
+         VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
+        [id, company_id, licenseKey, tier, limit, expiresAt]
+      );
+
+      // Insert new entitlement
+      await client.query(
+        `INSERT INTO license_entitlements (id, company_id, plan_id, status, device_limit, store_limit, valid_from, valid_until, token_version, license_key, created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', $4, $5, NOW(), $6, 1, $7, NOW(), NOW())`,
+        [entitlementId, company_id, planId, limit, storeLimit, expiresAt, licenseKey]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
 
     await writeAdminAudit(req.user!.id, 'CREATE_LICENSE', 'licenses', id, null, { licenseKey, tier, company_id }, req.ip);
 
     return res.status(201).json({ success: true, license_id: id, license_key: licenseKey });
   } catch (err) {
+    console.error('Create manual license error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -267,6 +318,9 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
 router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Response) => {
   const { additional_days } = req.body;
   const days = additional_days ? parseInt(additional_days, 10) : 365;
+  if (isNaN(days) || days <= 0) {
+    return res.status(400).json({ error: 'invalid_days', message: 'Geçersiz yenileme süresi gün değeri.' });
+  }
 
   try {
     const license = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
@@ -274,19 +328,40 @@ router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ error: 'license_not_found' });
     }
 
+    const licenseKey = license.rows[0].license_key;
     const currentExpiry = new Date(license.rows[0].expires_at);
     const newExpiry = new Date(Math.max(currentExpiry.getTime(), Date.now()));
     newExpiry.setDate(newExpiry.getDate() + days);
 
-    await runBypassingRLS(
-      'UPDATE licenses SET expires_at = $1, status = \'active\' WHERE id = $2',
-      [newExpiry, req.params.id]
-    );
+    // Update both tables inside transaction
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      await client.query(
+        'UPDATE licenses SET expires_at = $1, status = \'active\' WHERE id = $2',
+        [newExpiry, req.params.id]
+      );
+
+      await client.query(
+        "UPDATE license_entitlements SET valid_until = $1, status = 'active', token_version = token_version + 1, updated_at = NOW() WHERE license_key = $2",
+        [newExpiry, licenseKey]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
 
     await writeAdminAudit(req.user!.id, 'RENEW_LICENSE', 'licenses', req.params.id, license.rows[0], { new_expiry: newExpiry }, req.ip);
 
     return res.json({ success: true, new_expiry: newExpiry });
   } catch (err) {
+    console.error('Renew license error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -300,15 +375,37 @@ router.post('/licenses/:id/suspend', async (req: AuthenticatedRequest, res: Resp
       return res.status(404).json({ error: 'license_not_found' });
     }
 
-    await runBypassingRLS(
-      'UPDATE licenses SET status = $1 WHERE id = $2',
-      [newStatus, req.params.id]
-    );
+    const licenseKey = license.rows[0].license_key;
+
+    // Update both tables inside transaction
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      await client.query(
+        'UPDATE licenses SET status = $1 WHERE id = $2',
+        [newStatus, req.params.id]
+      );
+
+      await client.query(
+        "UPDATE license_entitlements SET status = $1, token_version = token_version + 1, updated_at = NOW() WHERE license_key = $2",
+        [newStatus, licenseKey]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
 
     await writeAdminAudit(req.user!.id, suspend ? 'SUSPEND_LICENSE' : 'ACTIVATE_LICENSE', 'licenses', req.params.id, license.rows[0], { status: newStatus }, req.ip);
 
     return res.json({ success: true });
   } catch (err) {
+    console.error('Suspend license error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -320,15 +417,43 @@ router.post('/licenses/:id/revoke', async (req: AuthenticatedRequest, res: Respo
       return res.status(404).json({ error: 'license_not_found' });
     }
 
-    await runBypassingRLS(
-      'UPDATE licenses SET status = \'revoked\' WHERE id = $2',
-      [req.params.id]
-    );
+    const licenseKey = license.rows[0].license_key;
+    const companyId = license.rows[0].company_id;
+
+    // Update licenses, license_entitlements, and device_activations inside transaction
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      await client.query(
+        'UPDATE licenses SET status = \'revoked\' WHERE id = $1',
+        [req.params.id]
+      );
+
+      await client.query(
+        "UPDATE license_entitlements SET status = 'revoked', token_version = token_version + 1, updated_at = NOW() WHERE license_key = $1",
+        [licenseKey]
+      );
+
+      await client.query(
+        "UPDATE device_activations SET status = 'revoked', revoked_at = NOW(), revoked_by = 'sysadmin' WHERE company_id = $1",
+        [companyId]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
 
     await writeAdminAudit(req.user!.id, 'REVOKE_LICENSE', 'licenses', req.params.id, license.rows[0], { status: 'revoked' }, req.ip);
 
     return res.json({ success: true });
   } catch (err) {
+    console.error('Revoke license error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });

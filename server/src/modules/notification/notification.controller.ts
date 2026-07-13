@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { pgPool, redisClient } from '../../config/database';
-import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission } from '../../middleware/auth.middleware';
 import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
 import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate_limit.middleware';
@@ -148,11 +148,64 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
 
 /**
  * @openapi
+ * /api/v1/notifications/sync-local:
+ *   post:
+ *     summary: Log a local SMS attempt from the client to the cloud database
+ */
+router.post('/sync-local', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { recipient, body, status, error_message, channel, created_at, client_message_id } = req.body;
+
+  if (!recipient || !body || !status) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Alıcı, mesaj içeriği ve durum zorunludur.' });
+  }
+
+  try {
+    const id = `notif-loc-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+    const parsedCreatedAt = created_at ? new Date(created_at) : new Date();
+
+    const result = await runWithTenantContext(
+      user.company_id,
+      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, error_message, created_at, delivered_at, client_message_id)
+       VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (company_id, client_message_id)
+       WHERE client_message_id IS NOT NULL
+       DO NOTHING
+       RETURNING id`,
+      [
+        id,
+        user.company_id,
+        channel || 'sms',
+        recipient,
+        body,
+        status,
+        error_message || null,
+        parsedCreatedAt,
+        status === 'sent' ? new Date() : null,
+        client_message_id || null,
+      ]
+    );
+
+    const wasDeduplicated = !result.rows || result.rows.length === 0;
+    return res.status(201).json({
+      success: true,
+      queue_id: wasDeduplicated ? null : id,
+      deduplicated: wasDeduplicated,
+    });
+  } catch (err) {
+    logger.error('Failed to sync local notification:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+
+/**
+ * @openapi
  * /api/v1/notifications/queue:
  *   get:
  *     summary: Get message queue delivery history
  */
-router.get('/queue', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/queue', requirePermission('notifications.history.read'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const history = await runWithTenantContext(
@@ -200,7 +253,7 @@ router.get('/credits', async (req: AuthenticatedRequest, res: Response) => {
  *   post:
  *     summary: Create or update notification template
  */
-router.post('/templates', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/templates', requirePermission('notifications.templates.manage'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { name, channel, title, body } = req.body;
 
@@ -234,7 +287,7 @@ router.post('/templates', async (req: AuthenticatedRequest, res: Response) => {
  *   get:
  *     summary: List templates
  */
-router.get('/templates', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/templates', requirePermission('notifications.templates.manage'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const list = await runWithTenantContext(user.company_id, 'SELECT * FROM notification_templates ORDER BY name ASC');
@@ -250,7 +303,7 @@ router.get('/templates', async (req: AuthenticatedRequest, res: Response) => {
  *   post:
  *     summary: Trigger targeted marketing campaigns (segmentation)
  */
-router.post('/campaign', enforceCampaignAbuseLimit, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/campaign', enforceCampaignAbuseLimit, requirePermission('notifications.campaign.send'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { segment, channel, template_name } = req.body;
 

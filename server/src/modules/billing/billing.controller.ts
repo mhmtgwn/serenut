@@ -811,12 +811,12 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     return res.status(400).json({ error: 'missing_signature' });
   }
 
-  if (!req.rawBody && process.env.NODE_ENV !== 'test') {
+  if (!(req as any).rawBody && process.env.NODE_ENV !== 'test') {
     logger.error('[Iyzico Webhook] Raw body buffer is missing. Express parser verify config is incorrect.');
     return res.status(500).json({ error: 'internal_error' });
   }
 
-  const rawPayload = req.rawBody || Buffer.from(JSON.stringify(payload));
+  const rawPayload = (req as any).rawBody || Buffer.from(JSON.stringify(payload));
   const computedSignature = crypto
     .createHmac('sha256', IYZICO_SECRET)
     .update(rawPayload)
@@ -838,21 +838,44 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     return res.status(400).json({ error: 'invalid_signature_format' });
   }
 
-  // Replay protection: Check webhook timestamp payload if present (iyziEventTime or standard timestamp)
-  // Ensure the difference is not more than 5 minutes (300 seconds)
+  // Replay protection: Check webhook timestamp payload (iyziEventTime or standard timestamp)
+  // Fail-closed: Reject if missing or invalid, or if difference is more than 5 minutes (300 seconds)
   const eventTime = payload.iyziEventTime || payload.timestamp;
-  if (eventTime) {
-    const eventMs = isNaN(Number(eventTime)) ? Date.parse(eventTime) : Number(eventTime);
-    if (!isNaN(eventMs)) {
-      const diffSec = Math.abs(Date.now() - eventMs) / 1000;
-      if (diffSec > 300) {
-        logger.warn(`[Iyzico Webhook] Replay attack alert: event older than 300s (diff: ${diffSec}s).`);
-        return res.status(400).json({ error: 'stale_webhook_event' });
-      }
-    }
+  if (!eventTime) {
+    logger.warn('[Iyzico Webhook] Webhook request rejected: missing eventTime/timestamp.');
+    return res.status(400).json({ error: 'missing_event_time' });
+  }
+
+  const eventMs = isNaN(Number(eventTime)) ? Date.parse(eventTime) : Number(eventTime);
+  if (isNaN(eventMs)) {
+    logger.warn(`[Iyzico Webhook] Webhook request rejected: invalid eventTime format (${eventTime}).`);
+    return res.status(400).json({ error: 'invalid_event_time' });
+  }
+
+  const diffSec = Math.abs(Date.now() - eventMs) / 1000;
+  if (diffSec > 300) {
+    logger.warn(`[Iyzico Webhook] Replay attack alert: event older than 300s (diff: ${diffSec}s).`);
+    return res.status(400).json({ error: 'stale_webhook_event' });
   }
 
   const { eventType, token, status, conversationId } = payload;
+  const eventId = payload.iyziReferenceCode || payload.paymentId || token;
+  const redisKey = eventId ? `webhook:processed:${eventId}` : null;
+
+  if (redisKey && redisClient && redisClient.isOpen) {
+    try {
+      const setSuccess = await redisClient.set(redisKey, 'true', {
+        NX: true,
+        EX: 86400
+      });
+      if (!setSuccess) {
+        logger.info(`[Iyzico Webhook] Event already processed or being processed: ${eventId}`);
+        return res.json({ status: 'OK', message: 'already_processed' });
+      }
+    } catch (redisErr) {
+      logger.error('[Iyzico Webhook] Redis idempotency check error:', redisErr);
+    }
+  }
 
   // Idempotency check: If invoice is already marked as paid, return OK early without processing database updates
   if (token) {
@@ -930,8 +953,11 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     }
     
     return res.json({ status: 'OK' });
-  } catch (err) {
+  } catch (err: any) {
     logger.error('[Iyzico Webhook] Error processing event:', err);
+    if (redisKey && redisClient && redisClient.isOpen) {
+      await redisClient.del(redisKey).catch(() => {});
+    }
     return res.status(500).json({ error: 'server_error' });
   }
 });

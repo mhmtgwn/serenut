@@ -31,22 +31,87 @@ export function initRealtimeWebSocket(server: Server) {
     }
   };
 
-  // Bind broker subscribe hook in TopicManager
+  // Bind broker subscribe/unsubscribe hooks in TopicManager
   const originalSubscribe = TopicManager.subscribe;
-  const activeBrokerSubscriptions = new Set<string>();
+  const originalUnsubscribe = TopicManager.unsubscribe;
+  const originalUnsubscribeAll = TopicManager.unsubscribeAll;
   
+  // Topic -> Callback mapping to support correct eventBroker unsubscribe matching
+  const activeBrokerSubscriptions = new Map<string, (topic: string, message: string) => void>();
+
+  // Per-topic serialized async task chains (prevent subscription race conditions)
+  const topicPromiseChains = new Map<string, Promise<any>>();
+
+  function runOnTopicChain(topic: string, operation: () => Promise<any>): Promise<any> {
+    const currentChain = topicPromiseChains.get(topic) || Promise.resolve();
+    const nextChain = currentChain.then(operation).catch(() => {});
+    topicPromiseChains.set(topic, nextChain);
+    return nextChain;
+  }
+
+  // Recursive unsubscribe helper with up to 3 retry attempts and exponential backoff
+  async function unsubscribeWithRetry(topic: string, cb: (topic: string, message: string) => void, attempt = 1, delay = 100): Promise<void> {
+    try {
+      await eventBroker.unsubscribe(topic, cb);
+      logger.info(`Unsubscribed from EventBroker for topic: ${topic}`);
+      activeBrokerSubscriptions.delete(topic);
+    } catch (err: any) {
+      if (attempt < 3) {
+        logger.warn(`Broker unsubscribe attempt ${attempt} failed for topic ${topic}: ${err.message}. Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        await unsubscribeWithRetry(topic, cb, attempt + 1, delay * 2);
+      } else {
+        logger.error(`🚨 ALARM: EventBroker unsubscribe failed after all retries for topic ${topic}: ${err.message}`);
+        // Delete anyway to prevent local memory leaks of the callback
+        activeBrokerSubscriptions.delete(topic);
+      }
+    }
+  }
+
+  function checkAndCleanupTopic(topic: string) {
+    runOnTopicChain(topic, async () => {
+      const subscribers = TopicManager.getSubscribers(topic);
+      if ((!subscribers || subscribers.size === 0) && activeBrokerSubscriptions.has(topic)) {
+        const cb = activeBrokerSubscriptions.get(topic);
+        if (cb) {
+          await unsubscribeWithRetry(topic, cb);
+        }
+      }
+    });
+  }
+
   TopicManager.subscribe = async function (ws: WebSocket, topic: string, correlationId?: string): Promise<boolean> {
     const success = await originalSubscribe.call(TopicManager, ws, topic, correlationId);
-    if (success && !activeBrokerSubscriptions.has(topic)) {
-      activeBrokerSubscriptions.add(topic);
-      eventBroker.subscribe(topic, (t, message) => {
-        (TopicManager as any).broadcastLocal(t, message);
-      }).catch((err) => {
-        logger.error(`Broker subscription failed for topic ${topic}: ${err.message}`);
-        activeBrokerSubscriptions.delete(topic);
+    if (success) {
+      await runOnTopicChain(topic, async () => {
+        if (!activeBrokerSubscriptions.has(topic)) {
+          const cb = (t: string, message: string) => {
+            (TopicManager as any).broadcastLocal(t, message);
+          };
+          activeBrokerSubscriptions.set(topic, cb);
+          try {
+            await eventBroker.subscribe(topic, cb);
+          } catch (err: any) {
+            logger.error(`Broker subscription failed for topic ${topic}: ${err.message}`);
+            activeBrokerSubscriptions.delete(topic);
+          }
+        }
       });
     }
     return success;
+  };
+
+  TopicManager.unsubscribe = function (ws: WebSocket, topic: string) {
+    originalUnsubscribe.call(TopicManager, ws, topic);
+    checkAndCleanupTopic(topic);
+  };
+
+  TopicManager.unsubscribeAll = function (ws: WebSocket) {
+    const clientTopics = Array.from(TopicManager.getClientTopics(ws));
+    originalUnsubscribeAll.call(TopicManager, ws);
+    for (const topic of clientTopics) {
+      checkAndCleanupTopic(topic);
+    }
   };
 
   server.on('upgrade', async (request, socket, head) => {

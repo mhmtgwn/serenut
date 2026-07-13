@@ -5,7 +5,7 @@
 import { Router, Response } from 'express';
 import os from 'os';
 import { pgPool } from '../../config/database';
-import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission } from '../../middleware/auth.middleware';
 import { logger } from '../../config/logger';
 
 const router = Router();
@@ -88,7 +88,7 @@ export async function writeAuditLog(
  *   get:
  *     summary: Retrieve real-time CPU, DB connection pools, Queue volumes and Gateway healths
  */
-router.get('/health-status', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/health-status', requirePermission('telemetry.view'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     // 1. CPU & RAM Metrics
     const freeMem = os.freemem();
@@ -156,7 +156,7 @@ router.get('/health-status', async (req: AuthenticatedRequest, res: Response) =>
  *   get:
  *     summary: Retrieve RLS-scoped audit trails for this tenant
  */
-router.get('/audit-logs', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/audit-logs', requirePermission('telemetry.view'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const logs = await runWithTenantContext(

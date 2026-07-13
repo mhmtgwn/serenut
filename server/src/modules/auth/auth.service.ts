@@ -40,6 +40,7 @@ export interface UserPayload {
   company_id: string;
   roles: string[];
   permissions: string[];
+  token_version?: number;
 }
 
 export class AuthService {
@@ -153,7 +154,7 @@ export class AuthService {
 
       // 5. Fetch full user profile (roles + permissions)
       const profileRes = await client.query(
-        `SELECT u.id, u.name, u.email, u.company_id,
+        `SELECT u.id, u.name, u.email, u.company_id, u.token_version,
                 ARRAY_AGG(DISTINCT r.name) AS roles
          FROM users u
          LEFT JOIN user_roles ur ON u.id = ur.user_id
@@ -187,6 +188,7 @@ export class AuthService {
         company_id: userRow.company_id,
         roles,
         permissions,
+        token_version: userRow.token_version,
       };
 
       // 6. Issue token pair
@@ -248,7 +250,7 @@ export class AuthService {
       await client.query("SET LOCAL app.bypass_rls = 'true'");
 
       const sessRes = await client.query(
-        'SELECT id, user_id, company_id, is_revoked, expires_at FROM sessions WHERE refresh_token = $1',
+        'SELECT id, user_id, company_id, is_revoked, expires_at, updated_at, replaced_by FROM sessions WHERE refresh_token = $1',
         [oldRefreshToken]
       );
 
@@ -258,20 +260,88 @@ export class AuthService {
 
       const session = sessRes.rows[0];
 
-      // RTR: Replay attack — revoke ALL user sessions
+      // RTR: Replay attack or legitimate network retry check
       if (session.is_revoked || new Date(session.expires_at) < new Date()) {
+        const gracePeriodMs = 20000; // 20 seconds grace period
+        const isWithinGrace = session.is_revoked && 
+          session.replaced_by &&
+          (new Date().getTime() - new Date(session.updated_at).getTime() < gracePeriodMs);
+
+        if (isWithinGrace) {
+          logger.info(`Refresh token retry detected within grace period for user: ${session.user_id}`);
+          // Retrieve the specific active session that replaced this one
+          const activeSessRes = await client.query(
+            `SELECT refresh_token FROM sessions 
+             WHERE id = $1 AND is_revoked = FALSE AND expires_at > NOW()`,
+            [session.replaced_by]
+          );
+
+          if (activeSessRes.rows.length > 0) {
+            // Re-fetch user details to sign access token
+            const userRes = await client.query(
+              `SELECT u.id, u.name, u.email, u.company_id, u.is_active, u.token_version,
+                      ARRAY_AGG(DISTINCT r.name) AS roles
+               FROM users u
+               LEFT JOIN user_roles ur ON u.id = ur.user_id
+               LEFT JOIN roles r ON ur.role_id = r.id
+               WHERE u.id = $1
+               GROUP BY u.id`,
+              [session.user_id]
+            );
+
+            if (userRes.rows.length > 0 && userRes.rows[0].is_active) {
+              const userRow = userRes.rows[0];
+              const roles: string[] = userRow.roles.filter((r: any) => r !== null);
+              
+              let permissions: string[] = [];
+              if (roles.length > 0) {
+                const permRes = await client.query(
+                  `SELECT DISTINCT p.code
+                   FROM permissions p
+                   JOIN role_permissions rp ON p.id = rp.permission_id
+                   JOIN roles r ON rp.role_id = r.id
+                   WHERE r.name = ANY($1)`,
+                  [roles]
+                );
+                permissions = permRes.rows.map((row: any) => row.code);
+              }
+
+              const payload: UserPayload = {
+                jti: crypto.randomUUID(),
+                id: userRow.id,
+                name: userRow.name,
+                email: userRow.email,
+                company_id: userRow.company_id,
+                roles,
+                permissions,
+                token_version: userRow.token_version,
+              };
+
+              const accessToken = jwt.sign(payload, JWT_SECRET!, {
+                expiresIn: ACCESS_TOKEN_EXPIRY,
+                issuer: JWT_ISSUER,
+                audience: JWT_AUDIENCE,
+              });
+
+              await client.query('COMMIT');
+              return {
+                access_token: accessToken,
+                refresh_token: activeSessRes.rows[0].refresh_token,
+                expires_in: 3600,
+              };
+            }
+          }
+        }
+
         logger.warn(`Refresh token replay detected! Revoking all sessions for user: ${session.user_id}`);
-        await client.query('UPDATE sessions SET is_revoked = TRUE WHERE user_id = $1', [session.user_id]);
+        await client.query('UPDATE sessions SET is_revoked = TRUE, updated_at = NOW() WHERE user_id = $1', [session.user_id]);
         await client.query('COMMIT');
         throw new Error('refresh_token_expired');
       }
 
-      // Revoke old token
-      await client.query('UPDATE sessions SET is_revoked = TRUE WHERE id = $1', [session.id]);
-
       // Re-fetch user
       const userRes = await client.query(
-        `SELECT u.id, u.name, u.email, u.company_id, u.is_active,
+        `SELECT u.id, u.name, u.email, u.company_id, u.is_active, u.token_version,
                 ARRAY_AGG(DISTINCT r.name) AS roles
          FROM users u
          LEFT JOIN user_roles ur ON u.id = ur.user_id
@@ -310,6 +380,7 @@ export class AuthService {
         company_id: userRow.company_id,
         roles,
         permissions,
+        token_version: userRow.token_version,
       };
 
       const newAccessToken = jwt.sign(payload, JWT_SECRET!, {
@@ -325,6 +396,12 @@ export class AuthService {
         `INSERT INTO sessions (id, user_id, company_id, refresh_token, ip_address, user_agent, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [newSessionId, session.user_id, session.company_id, newRefreshToken, ipAddress || null, userAgent || null, expiresAt]
+      );
+
+      // Revoke old token and set updated_at, link replaced_by to newSessionId
+      await client.query(
+        'UPDATE sessions SET is_revoked = TRUE, updated_at = NOW(), replaced_by = $1 WHERE id = $2',
+        [newSessionId, session.id]
       );
 
       await client.query('COMMIT');
@@ -624,7 +701,7 @@ export class AuthService {
 
       // 7. Fetch roles + permissions
       const profileRes = await client.query(
-        `SELECT u.id, u.name, u.email, u.username, u.company_id,
+        `SELECT u.id, u.name, u.email, u.username, u.company_id, u.token_version,
                 c.business_code,
                 COALESCE(json_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL), '[]') AS roles,
                 COALESCE(json_agg(DISTINCT p.code)  FILTER (WHERE p.code IS NOT NULL),  '[]') AS permissions
@@ -635,7 +712,7 @@ export class AuthService {
          LEFT JOIN role_permissions rp ON rp.role_id = r.id
          LEFT JOIN permissions p ON p.id = rp.permission_id
          WHERE u.id = $1
-         GROUP BY u.id, u.name, u.email, u.username, u.company_id, c.business_code`,
+         GROUP BY u.id, u.name, u.email, u.username, u.company_id, u.token_version, c.business_code`,
         [user.id]
       );
       const profile = profileRes.rows[0];
@@ -649,6 +726,7 @@ export class AuthService {
           company_id: profile.company_id,
           roles: profile.roles,
           permissions: profile.permissions,
+          token_version: profile.token_version,
           login_type: 'sub_user',
         },
         JWT_SECRET as string,
