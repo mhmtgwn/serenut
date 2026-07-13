@@ -534,26 +534,35 @@ class OfflineSyncService {
     }
   }
 
-  Map<String, dynamic> _buildPayload(SaleEntity sale) => {
-        'id':              sale.id,
-        'idempotency_key': sale.idempotencyKey,
-        'customer_id':     sale.customerId,
-        'total_amount':    sale.totalAmount,
-        'paid_amount':     sale.paidAmount,
-        'payment_method':  sale.paymentMethod,
-        'status':          sale.status,
-        'created_at':      sale.createdAt.toIso8601String(),
-        'items':           sale.items.map((item) {
-          if (item is Map<String, dynamic>) {
-            return {
-              'productId': item['product_id'],
-              'qty': item['quantity'] ?? item['qty'],
-              'unitPrice': item['unit_price'] ?? item['unitPrice'],
-            };
-          }
-          return item;
-        }).toList(),
-      };
+  Map<String, dynamic> _buildPayload(SaleEntity sale) {
+    String serverPaymentMethod = sale.paymentMethod;
+    if (serverPaymentMethod == 'debt') {
+      serverPaymentMethod = 'credit';
+    } else if (serverPaymentMethod == 'karma') {
+      serverPaymentMethod = 'cash';
+    }
+
+    return {
+      'id':              sale.id,
+      'idempotency_key': sale.idempotencyKey,
+      'customer_id':     sale.customerId,
+      'total_amount':    sale.totalAmount,
+      'paid_amount':     sale.paidAmount,
+      'payment_method':  serverPaymentMethod,
+      'status':          sale.status,
+      'created_at':      sale.createdAt.toIso8601String(),
+      'items':           sale.items.map((item) {
+        if (item is Map<String, dynamic>) {
+          return {
+            'productId': item['product_id'],
+            'qty': item['quantity'] ?? item['qty'],
+            'unitPrice': item['unit_price'] ?? item['unitPrice'],
+          };
+        }
+        return item;
+      }).toList(),
+    };
+  }
 
   void dispose() {}
 }
