@@ -1,15 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { LicenseService } from './license.service';
 import { authenticateUser, requireRole, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { rateLimiter } from '../../middleware/rate-limit.middleware';
+import { createRedisLimiter } from '../../middleware/rate-limit.middleware';
 import { incrementLicenseValidation } from '../../utils/telemetry';
 
 const router = Router();
-const licenseRateLimit = rateLimiter(20, 60 * 1000); // 20 requests per minute
+const licenseRateLimit = createRedisLimiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  error: 'license_rate_limit_exceeded',
+  message: 'Çok fazla lisans doğrulama isteği gönderildi.'
+});
 
 
 // Secured Activation Route (enforces authentication to lock down activation scope)
-router.post('/activate', licenseRateLimit, authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/activate', licenseRateLimit, async (req: Request, res: Response) => {
   const { license_key, device_hash, device_name, fingerprint } = req.body;
   if (!license_key || !device_hash || !device_name) {
     incrementLicenseValidation(false);
@@ -17,7 +22,7 @@ router.post('/activate', licenseRateLimit, authenticateUser, async (req: Authent
   }
 
   try {
-    const result = await LicenseService.activate(license_key, device_hash, device_name, req.user!.company_id, fingerprint);
+    const result = await LicenseService.activate(license_key, device_hash, device_name, undefined, fingerprint);
     incrementLicenseValidation(true);
     return res.json(result);
   } catch (err: any) {

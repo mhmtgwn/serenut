@@ -85,7 +85,9 @@ void main() async {
           final db = await dbManager!.getDatabase();
           await db.update('settings', {'admin_pin_code': null, 'updated_at': DateTime.now().toIso8601String()});
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Failed to check or reset onboarding status: $e');
+      }
 
       // Initialize DatasetLoaderService
       final datasetLoader = DatasetLoaderService(prefs);

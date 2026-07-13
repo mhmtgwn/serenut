@@ -62,8 +62,8 @@ class LogCollectionService {
   /// Encrypt helper using AES-CBC via PointyCastle
   List<int> _encryptAes(List<int> plainText) {
     // 128-bit key derived from shared secret
-    final keyBytes = utf8.encode('serenut_log_sec_key_128b_!!'); // 32 bytes key
-    final ivBytes = utf8.encode('serenut_log_iv!!'); // 16 bytes IV
+    final keyBytes = utf8.encode(const String.fromEnvironment('LOG_SEC_KEY', defaultValue: 'default_log_sec_key_128b_!!_12345').padRight(32, '0')); // ensure at least 32 bytes
+    final ivBytes = utf8.encode(const String.fromEnvironment('LOG_SEC_IV', defaultValue: 'default_log_iv!!').padRight(16, '0')); // ensure at least 16 bytes
 
     final keyParam = KeyParameter(Uint8List.fromList(keyBytes.sublist(0, 16)));
     final params = ParametersWithIV(keyParam, Uint8List.fromList(ivBytes.sublist(0, 16)));

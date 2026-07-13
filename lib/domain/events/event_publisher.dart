@@ -153,6 +153,7 @@ class SaleCreatedEventHandler {
     // print('   Payment methods: ${event.paymentMethods}');
 
     // TODO: Send SMS to customer
+    debugPrint('[EventPublisher] TODO: Send SMS to customer (Sale ID: ${event.saleId})');
     // TODO: Send notification to customers
     // TODO: Update inventory
   }
@@ -173,6 +174,7 @@ class OrderCreatedEventHandler {
     // print('   Expected delivery: ${event.expectedDeliveryDate}');
 
     // TODO: Send SMS to customer with tracking
+    debugPrint('[EventPublisher] TODO: Send SMS tracking (Order ID: ${event.orderId})');
     // TODO: Update manager dashboard
   }
 }
@@ -190,6 +192,7 @@ class OrderDeliveredEventHandler {
     // print('   Stock changes: ${event.stockChanges?.length ?? 0} items');
 
     // TODO: Update inventory
+    debugPrint('[EventPublisher] TODO: Handle inventory update & SMS (Order: ${event.orderId})');
     // TODO: Send SMS confirmation
     // TODO: Record financial transaction
   }
@@ -209,6 +212,7 @@ class PaymentRecordedEventHandler {
     // print('   Method: ${event.paymentMethod}');
 
     // TODO: Update customer balance
+    debugPrint('[EventPublisher] TODO: Handle payment consequences (Payment: ${event.paymentId})');
     // TODO: Send SMS confirmation
     // TODO: Update reports
   }
@@ -227,6 +231,7 @@ class PaymentFailedEventHandler {
     // print('   Reason: ${event.reason}');
 
     // TODO: Alert manager
+    debugPrint('[EventPublisher] TODO: Handle payment failure alerts (Payment: ${event.paymentId})');
     // TODO: Log incident
     // TODO: Notify customer
   }
@@ -246,6 +251,7 @@ class RefundIssuedEventHandler {
     // print('   Reference: ${event.refundReason}');
 
     // TODO: Update customer balance
+    debugPrint('[EventPublisher] TODO: Handle refund consequences (Refund: ${event.refundId})');
     // TODO: Cancel related orders
     // TODO: Send SMS confirmation
   }

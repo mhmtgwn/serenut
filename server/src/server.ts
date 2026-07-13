@@ -265,6 +265,7 @@ app.use('/api/v1/releases', releaseRouter);
 app.use('/api/v1/sync', syncRouter);
 app.use('/api/v1/telemetry', telemetryRouter);
 app.use('/api/v1/analytics', biRouter);
+app.use('/api/v1/analytics', analyticsRouter);
 app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1/notifications', notificationRouter);
 app.use('/api/v1/remote-config', remoteConfigRouter);

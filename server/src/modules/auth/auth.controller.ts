@@ -4,6 +4,7 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.mi
 import { authLimiter, passwordResetLimiter, signupLimiter } from '../../middleware/rate-limit.middleware';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { createError } from '../../config/error-codes';
+import { logger } from '../../config/logger';
 
 const router = Router();
 
@@ -184,11 +185,13 @@ router.post('/logout', async (req: Request, res: Response) => {
           RealtimeBroadcastService.publishEvent(decoded.company_id, 'UserLoggedOut', {
             userId: decoded.id,
             email: decoded.email,
-          }).catch(() => {});
-        } catch (_) {}
+          }).catch((err) => { logger.warn('Failed to publish logout event:', err); });
+        } catch (err) { logger.warn('Failed to verify access token during logout:', err); }
       }
       await AuthService.logout(refresh_token, accessToken);
-    } catch (_) {}
+    } catch (err) {
+      logger.error('Logout failure:', err);
+    }
   }
   return res.json({ success: true });
 });

@@ -112,9 +112,10 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
               entityType: 'sale',
               entityId: created!.id,
               newValue: 'Miktar: ₺${created!.totalAmount.toStringAsFixed(2)}, Yöntem: ${created!.paymentMethod}',
-              notes: 'Yeni satış kaydedildi: ${created!.id}',
             );
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Failed to log sale_created audit event: $e');
+          }
         }
       } catch (e, st) {
         // print('🔴 EXCEPTION inside SalesService.createSale: $e\n$st');
@@ -140,9 +141,10 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       final sale = await _saleRepository.findById(saleId);
       await _salesService.cancelSale(saleId);
       try {
-        final auditService = await ref.read(auditServiceProvider.future);
         await auditService.logDelete('sale', saleId, 'Satış İptali: ₺${sale?.totalAmount.toStringAsFixed(2)}');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Failed to log sale cancellation audit event: $e');
+      }
       if (sale != null && sale.customerId.isNotEmpty) {
         ref.invalidate(customersControllerProvider);
         ref.invalidate(customerTransactionsProvider(sale.customerId));
@@ -176,7 +178,9 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           entityId: saleId,
           notes: 'Satıştan iade alındı: $saleId, Yöntem: $refundMethod',
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Failed to log items_returned audit event: $e');
+      }
       if (sale != null && sale.customerId.isNotEmpty) {
         ref.invalidate(customersControllerProvider);
         ref.invalidate(customerTransactionsProvider(sale.customerId));
@@ -209,7 +213,9 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           amount,
           'Kısmi Ödeme ($method) - Satış ID: $saleId',
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Failed to log partial payment audit event: $e');
+      }
 
       if (sale != null && sale.customerId.isNotEmpty) {
         ref.invalidate(customersControllerProvider);

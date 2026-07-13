@@ -57,7 +57,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'beta',
-          sentryDsn: const String.fromEnvironment('SENTRY_DSN', defaultValue: 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632'),
+          sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
         );
       case AppEnvironment.prod:
         return const EnvironmentConfig(
@@ -68,7 +68,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'stable',
-          sentryDsn: const String.fromEnvironment('SENTRY_DSN', defaultValue: 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632'),
+          sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
         );
     }
   }

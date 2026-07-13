@@ -1,5 +1,5 @@
 // lib/presentation/pages/settings_page.dart
-// Phase 2.5 �€” Premium iOS-Style Settings & Configurations Screen
+// Phase 2.5 - Premium iOS-Style Settings & Configurations Screen
 // Completely redesigned: 24 Jun 2026
 
 import 'dart:convert';
@@ -50,7 +50,7 @@ part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
 part 'settings/widgets/system_config_section.dart';
 
-// �”€�”€ Design Theme Sabitleri �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
+// ─── Design Theme Sabitleri ───────────────────────────────────────────────────
 const _kBgColor = Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
 const _kCardBg = Colors.white;
 const _kBorderColor = Color(0xFFF0F0F3); // Faint, subtle border

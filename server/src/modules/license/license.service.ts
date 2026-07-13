@@ -82,7 +82,7 @@ export class LicenseService {
     licenseKey: string, 
     deviceHash: string, 
     deviceName: string, 
-    companyId: string, 
+    companyId?: string, 
     fingerprint?: any
   ): Promise<LicenseActivationResult> {
     const client = await pgPool.connect();
@@ -103,8 +103,8 @@ export class LicenseService {
 
       const entitlement = entRes.rows[0];
 
-      // Enforce company scope to prevent cross-tenant activation
-      if (entitlement.company_id !== companyId) {
+      // Enforce company scope to prevent cross-tenant activation if companyId is provided
+      if (companyId && entitlement.company_id !== companyId) {
         throw new Error('company_mismatch');
       }
 

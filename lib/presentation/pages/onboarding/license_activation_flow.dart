@@ -46,6 +46,9 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
       
       final fingerprintService = ref.read(deviceFingerprintServiceProvider);
       final fingerprint = await fingerprintService.getFingerprint();
+      
+      // Get device name fallback
+      final deviceName = Platform.isAndroid ? 'Android POS' : (Platform.isWindows ? 'Windows POS' : 'POS Cihazı');
 
       final response = await apiClient.send(
         'POST',
@@ -53,6 +56,7 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
         body: {
           'license_key': rawKey,
           'device_id': deviceId,
+          'device_name': deviceName,
           'fingerprint': fingerprint.toJson(),
         },
       );

@@ -35,15 +35,16 @@ router.post('/upload', authenticateUser, async (req: AuthenticatedRequest, res: 
 
     // We can handle raw binary body or multi-part
     const fileData = req.body;
-    if (!fileData) {
+    if (!fileData || !fileData.encrypted_data) {
       return res.status(400).json({ error: 'empty_payload', message: 'Boş dosya yüklenemez.' });
     }
 
     const filename = `logs_${user.company_id}_${deviceId}_${Date.now()}.zip.enc`;
     const targetPath = path.join(uploadDir, filename);
 
-    // Save encrypted package to disk
-    fs.writeFileSync(targetPath, JSON.stringify(fileData));
+    // Decode base64 and save binary encrypted package to disk
+    const buffer = Buffer.from(fileData.encrypted_data, 'base64');
+    fs.writeFileSync(targetPath, buffer);
 
     logger.info(`Diagnostic logs uploaded successfully for company ${user.company_id} (Device: ${deviceId}).`);
     return res.json({ success: true, filename });
