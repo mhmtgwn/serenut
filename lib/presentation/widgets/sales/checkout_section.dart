@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/sales/checkout_section.dart
+// lib/presentation/widgets/sales/checkout_section.dart
 // Serenut POS — Ödeme & Checkout Paneli
 // UX Redesign v3: KARMA split payment, 64px buttons, inline print status
 // Preserved: all FSM calls, controller calls, provider reads
@@ -940,7 +940,7 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
   }
 
   Widget _buildSelectionView() {
-    final customersAsync = ref.watch(customersControllerProvider);
+    final customersAsync = ref.watch(salesCustomersControllerProvider);
 
     return Column(
       key: const ValueKey('selection_view'),
@@ -1334,7 +1334,7 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
         createdAt: DateTime.now(),
       );
 
-      await ref.read(customersControllerProvider.notifier).addCustomer(newCust);
+      await ref.read(salesCustomersControllerProvider.notifier).addCustomer(newCust);
       ref.invalidate(dashboardProvider);
       widget.onCustomerChanged(newCust);
 

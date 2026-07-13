@@ -1,4 +1,4 @@
-﻿// lib/presentation/controllers/customers_controller.dart
+// lib/presentation/controllers/customers_controller.dart
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -65,6 +65,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
+    _invalidateAll();
   }
 
   Future<void> updateCustomer(CustomerEntity customer) async {
@@ -83,20 +84,28 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
+    _invalidateAll();
   }
 
-  Future<void> deleteCustomer(String id) async {
+  Future<void> deleteCustomer(String id, {String? approvedByUserId, String? approvedByUserName}) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(id);
       await _repository.delete(id);
       try {
         final auditService = await ref.read(auditServiceProvider.future);
-        await auditService.logDelete('customer', id, original?.name ?? 'Bilinmeyen Müşteri');
+        await auditService.logDelete(
+          'customer',
+          id,
+          original?.name ?? 'Bilinmeyen Müşteri',
+          approvedByUserId: approvedByUserId,
+          approvedByUserName: approvedByUserName,
+        );
       } catch (_) {}
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
+    _invalidateAll();
   }
 
   Future<void> updateBalance(String id, double amount) async {
@@ -108,6 +117,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     });
     ref.invalidate(customerTransactionsProvider(id));
     ref.invalidate(customerBalanceDetailsProvider(id));
+    _invalidateAll();
   }
 
   Future<void> recordCollection({
@@ -142,6 +152,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
+    _invalidateAll();
   }
 
   Future<void> refresh() async {
@@ -151,11 +162,112 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       return _paginationService?.items ?? [];
     });
   }
+
+  void _invalidateAll() {
+    Future.microtask(() {
+      ref.invalidate(customersControllerProvider);
+      ref.invalidate(salesCustomersControllerProvider);
+      ref.invalidate(ordersCustomersControllerProvider);
+      ref.invalidate(collectionCustomersControllerProvider);
+    });
+  }
 }
 
 final customersControllerProvider =
     AsyncNotifierProvider<CustomersController, List<CustomerEntity>>(() {
   return CustomersController();
+});
+
+// Screen-specific Customer Search Providers
+final salesCustomerSearchQueryProvider = StateProvider<String>((ref) => '');
+final ordersCustomerSearchQueryProvider = StateProvider<String>((ref) => '');
+final collectionCustomerSearchQueryProvider = StateProvider<String>((ref) => '');
+
+// Sales-specific customers list notifier and provider
+class SalesCustomersController extends CustomersController {
+  @override
+  FutureOr<List<CustomerEntity>> build() async {
+    _repository = await ref.watch(customerRepositoryProvider.future);
+    
+    final searchQuery = ref.watch(salesCustomerSearchQueryProvider);
+    
+    _paginationService = PaginationService<CustomerEntity>(
+      dataLoader: (offset, limit, query) async {
+        return _repository.findFiltered(
+          searchQuery: query,
+          offset: offset,
+          limit: limit,
+        );
+      },
+      pageSize: 50,
+    );
+    
+    await _paginationService!.loadFirstPage(searchQuery: searchQuery);
+    return _paginationService!.items;
+  }
+}
+
+final salesCustomersControllerProvider =
+    AsyncNotifierProvider<SalesCustomersController, List<CustomerEntity>>(() {
+  return SalesCustomersController();
+});
+
+// Orders-specific customers list notifier and provider
+class OrdersCustomersController extends CustomersController {
+  @override
+  FutureOr<List<CustomerEntity>> build() async {
+    _repository = await ref.watch(customerRepositoryProvider.future);
+    
+    final searchQuery = ref.watch(ordersCustomerSearchQueryProvider);
+    
+    _paginationService = PaginationService<CustomerEntity>(
+      dataLoader: (offset, limit, query) async {
+        return _repository.findFiltered(
+          searchQuery: query,
+          offset: offset,
+          limit: limit,
+        );
+      },
+      pageSize: 50,
+    );
+    
+    await _paginationService!.loadFirstPage(searchQuery: searchQuery);
+    return _paginationService!.items;
+  }
+}
+
+final ordersCustomersControllerProvider =
+    AsyncNotifierProvider<OrdersCustomersController, List<CustomerEntity>>(() {
+  return OrdersCustomersController();
+});
+
+// Collection-specific customers list notifier and provider
+class CollectionCustomersController extends CustomersController {
+  @override
+  FutureOr<List<CustomerEntity>> build() async {
+    _repository = await ref.watch(customerRepositoryProvider.future);
+    
+    final searchQuery = ref.watch(collectionCustomerSearchQueryProvider);
+    
+    _paginationService = PaginationService<CustomerEntity>(
+      dataLoader: (offset, limit, query) async {
+        return _repository.findFiltered(
+          searchQuery: query,
+          offset: offset,
+          limit: limit,
+        );
+      },
+      pageSize: 50,
+    );
+    
+    await _paginationService!.loadFirstPage(searchQuery: searchQuery);
+    return _paginationService!.items;
+  }
+}
+
+final collectionCustomersControllerProvider =
+    AsyncNotifierProvider<CollectionCustomersController, List<CustomerEntity>>(() {
+  return CollectionCustomersController();
 });
 
 /// Per-customer transactions provider

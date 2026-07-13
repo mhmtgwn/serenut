@@ -365,7 +365,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                           child: Consumer(
                             builder: (context, ref, child) {
                               final flowState = ref.watch(salesFlowProvider);
-                              final customersAsyncVal = ref.watch(customersControllerProvider);
+                              final customersAsyncVal = ref.watch(salesCustomersControllerProvider);
 
                               final checkoutWidget = CheckoutSection(
                                 total: flowState.total,
@@ -414,7 +414,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                           Consumer(
                             builder: (context, ref, child) {
                               final flowState = ref.watch(salesFlowProvider);
-                              final customersAsyncVal = ref.watch(customersControllerProvider);
+                              final customersAsyncVal = ref.watch(salesCustomersControllerProvider);
 
                               final checkoutWidget = CheckoutSection(
                                 total: flowState.total,

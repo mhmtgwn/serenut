@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/orders/widgets/order_creation_dialog.dart
+// lib/presentation/pages/orders/widgets/order_creation_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -167,7 +167,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       _expectedDelivery = order.expectedDeliveryDate ?? DateTime.now().add(const Duration(days: 1));
       
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final customers = ref.read(customersControllerProvider).value;
+        final customers = ref.read(ordersCustomersControllerProvider).value;
         if (customers != null) {
           setState(() {
             _selectedCustomer = customers.firstWhere(
@@ -250,11 +250,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   Future<void> _loadLabelPrinterSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      setState(() {
-        _printLabel = prefs.getBool('label_printer_enabled') ?? false;
-        _labelCopies = prefs.getInt('label_printer_copies') ?? 1;
-      });
+      // Read label printer settings from SQLite settings (single source of truth)
+      final settings = ref.read(settingsNotifierProvider).valueOrNull;
+      if (settings != null && mounted) {
+        setState(() {
+          _printLabel = settings.labelPrinterEnabled;
+          _labelCopies = settings.labelPrinterCopies;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading label printer settings: $e');
     }
@@ -262,9 +265,15 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   Future<void> _saveLabelPrinterSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('label_printer_enabled', _printLabel);
-      await prefs.setInt('label_printer_copies', _labelCopies);
+      // Write label printer settings to SQLite settings (single source of truth)
+      final current = ref.read(settingsNotifierProvider).valueOrNull;
+      if (current != null) {
+        await ref.read(settingsNotifierProvider.notifier)
+            .updateSettings(current.copyWith(
+              labelPrinterEnabled: _printLabel,
+              labelPrinterCopies: _labelCopies,
+            ));
+      }
     } catch (e) {
       debugPrint('Error saving label printer settings: $e');
     }
@@ -495,7 +504,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       return _buildAddCustomerForm();
     }
 
-    final customersVal = ref.watch(customersControllerProvider);
+    final customersVal = ref.watch(ordersCustomersControllerProvider);
 
     return customersVal.when(
       loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen))),
@@ -770,11 +779,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         createdAt: DateTime.now(),
       );
 
-      await ref.read(customersControllerProvider.notifier).addCustomer(newCust);
-      await ref.read(customersControllerProvider.notifier).refresh();
+      await ref.read(ordersCustomersControllerProvider.notifier).addCustomer(newCust);
+      await ref.read(ordersCustomersControllerProvider.notifier).refresh();
 
       // Find the newly added customer in the reloaded list to have matching object reference if needed
-      final updatedList = ref.read(customersControllerProvider).value ?? [];
+      final updatedList = ref.read(ordersCustomersControllerProvider).value ?? [];
       final createdCust = updatedList.firstWhere((c) => c.id == newCust.id, orElse: () => newCust);
 
       setState(() {
@@ -2019,7 +2028,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       }
 
       // Refresh customers state so updated balance displays on screens
-      await ref.read(customersControllerProvider.notifier).refresh();
+      await ref.read(ordersCustomersControllerProvider.notifier).refresh();
       ref.invalidate(customerTransactionsProvider(_selectedCustomer!.id));
       ref.invalidate(customerBalanceDetailsProvider(_selectedCustomer!.id));
       if (isEdit && _selectedCustomer!.id != widget.existingOrder!.customerId) {
@@ -2056,10 +2065,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
         // 2. Print label stickers if label printer toggle is enabled
         if (_printLabel) {
-          final prefs = await SharedPreferences.getInstance();
-          final labelIp = prefs.getString('label_printer_ip') ?? '';
-          final labelPort = int.tryParse(prefs.getString('label_printer_port') ?? '9100') ?? 9100;
+          // Read label printer config from SQLite settings (single source of truth)
+          final labelIp = settings.labelPrinterIp ?? '';
+          final labelPort = settings.labelPrinterPort ?? 9100;
           final labelSettings = settings.copyWith(
+            printerName: 'network',
             printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
             printerPort: labelPort,
           );

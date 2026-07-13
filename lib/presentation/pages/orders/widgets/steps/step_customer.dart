@@ -7,7 +7,7 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
       return _buildAddCustomerForm();
     }
 
-    final customersVal = ref.watch(customersControllerProvider);
+    final customersVal = ref.watch(ordersCustomersControllerProvider);
 
     return customersVal.when(
       loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen))),
@@ -301,7 +301,7 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
       );
 
       // Save customer to local database
-      await ref.read(customersControllerProvider.notifier).addCustomer(newCustomer);
+      await ref.read(ordersCustomersControllerProvider.notifier).addCustomer(newCustomer);
       
       // If there's initial balance (either positive or negative), record initial ledger transaction
       if (balance != 0) {
@@ -322,7 +322,7 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
         );
       }
 
-      await ref.read(customersControllerProvider.notifier).refresh();
+      await ref.read(ordersCustomersControllerProvider.notifier).refresh();
 
       if (mounted) {
         updateState(() {

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/collection_page.dart
+// lib/presentation/pages/collection_page.dart
 // Serenut POS — Müşteri Tahsilat Sayfası (Tam Ekran)
 // UX Redesign v3: Full-screen, no dialog, live balance preview
 
@@ -69,7 +69,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final customersAsync = ref.watch(customersControllerProvider);
+    final customersAsync = ref.watch(collectionCustomersControllerProvider);
 
     return customersAsync.when(
       loading: () => const Scaffold(
@@ -606,7 +606,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     setState(() => _isSaving = true);
 
     try {
-      await ref.read(customersControllerProvider.notifier).recordCollection(
+      await ref.read(collectionCustomersControllerProvider.notifier).recordCollection(
             customerId: widget.customerId,
             amount: _enteredAmount,
             method: _selectedMethod,
@@ -617,7 +617,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
       // Get the settings and the updated customer (which now has updated balance)
       final settings = ref.read(settingsNotifierProvider).value;
-      final updatedCustomers = ref.read(customersControllerProvider).value;
+      final updatedCustomers = ref.read(collectionCustomersControllerProvider).value;
       final updatedCustomer = updatedCustomers
           ?.where((c) => c.id == widget.customerId)
           .firstOrNull;
