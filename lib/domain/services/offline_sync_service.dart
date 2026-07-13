@@ -4,6 +4,7 @@
 // Updated: 24 Jun 2026
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -147,8 +148,9 @@ class OfflineSyncService {
         await _stateMachine!.transition(SyncTrigger.startSync);
       }
 
-      final allSales = await _saleRepository.findAll();
-      final unsynced = allSales.where((s) => s.isSynced == 0).toList();
+      // İSTEK 3 DÜZELTMESİ: findAll().where(isSynced==0) yerine findUnsynced() SQL filtresi.
+      // Sadece bekleyen satışlar çekilir; tüm satış geçmişi RAM'e yüklenmiyor.
+      final unsynced = await _saleRepository.findUnsynced();
 
       if (unsynced.isEmpty) {
         if (_chaosInjector != null) {
@@ -263,16 +265,14 @@ class OfflineSyncService {
         if (data is Map<String, dynamic> && data.containsKey('transactions')) {
           final txs = data['transactions'] as List<dynamic>;
           final db = await DatabaseManager().getDatabase();
+          final affectedCustomerIds = <String>{};
           
-          // Get local maximum logical clock once before processing batch (for financial transactions clock security check)
+          // YÜKSEK A DÜZELTMESİ: findAll() + döngü (O(n) RAM) yerine tek SQL MAX() sorgusu.
+          // Önceki kod: tüm yerel transaction listesini RAM'e çekip döngüyle max'ı arıyordu.
+          // Yeni kod: getMaxLogicalClock() → SELECT MAX(logical_clock) FROM financial_transactions
           int maxLocalClock = 0;
           if (_transactionRepository != null) {
-            final localTxs = await _transactionRepository!.findAll();
-            for (final tx in localTxs) {
-              if (tx.logicalClock > maxLocalClock) {
-                maxLocalClock = tx.logicalClock;
-              }
-            }
+            maxLocalClock = await _transactionRepository!.getMaxLogicalClock();
           }
 
           for (final txMap in txs) {
@@ -301,6 +301,10 @@ class OfflineSyncService {
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
               } else if (type == 'customer') {
+                final customerId = payload['id'] as String?;
+                if (customerId != null && customerId.isNotEmpty) {
+                  affectedCustomerIds.add(customerId);
+                }
                 await db.insert(
                   'customers',
                   {
@@ -357,6 +361,10 @@ class OfflineSyncService {
                   }
                 }
               } else if (type == 'financial_transaction') {
+                final customerId = payload['customer_id'] as String?;
+                if (customerId != null && customerId.isNotEmpty) {
+                  affectedCustomerIds.add(customerId);
+                }
                 if (_transactionRepository != null) {
                   final exists = await _transactionRepository!.exists(id);
                   
@@ -395,6 +403,32 @@ class OfflineSyncService {
                 }
               }
             }
+          }
+
+          if (affectedCustomerIds.isNotEmpty) {
+            await db.transaction((txn) async {
+              for (final customerId in affectedCustomerIds) {
+                final expectedResult = await txn.rawQuery(DatabaseManager.customerBalanceSql, [customerId]);
+                
+                final expectedBalance = (expectedResult.first['expected'] as num?)?.toDouble() ?? 0.0;
+                await txn.update(
+                  'customers',
+                  {'balance': expectedBalance},
+                  where: 'id = ?',
+                  whereArgs: [customerId],
+                );
+                
+                await TelemetryService().logStructured(
+                  event: 'sync_customer_balance_updated',
+                  level: LogLevel.info,
+                  correlationId: _stateMachine?.sessionId,
+                  metadata: {
+                    'customerId': customerId,
+                    'balance': expectedBalance,
+                  },
+                );
+              }
+            });
           }
 
           // 2. Save next timestamp to preferences
@@ -476,6 +510,7 @@ class OfflineSyncService {
       final response = await _apiClient.post('/sales', payload, idempotency: true);
       return response.statusCode == 200 || response.statusCode == 201;
     } on ApiException catch (e) {
+      debugPrint('[OfflineSync] ❌ ApiException pushing sale: status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
       if (e.statusCode == 409) {
         if (_stateMachine != null) {
           await _stateMachine!.transition(
@@ -493,7 +528,8 @@ class OfflineSyncService {
         return true;
       }
       return false;
-    } catch (_) {
+    } catch (err) {
+      debugPrint('[OfflineSync] ❌ Unhandled error pushing sale: $err');
       return false;
     }
   }
