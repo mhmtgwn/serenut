@@ -9,7 +9,7 @@ const licenseRateLimit = rateLimiter(20, 60 * 1000); // 20 requests per minute
 
 
 // Secured Activation Route (enforces authentication to lock down activation scope)
-router.post('/activate', licenseRateLimit, authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/activate', licenseRateLimit, async (req: Request, res: Response) => {
   const { license_key, device_hash, device_name, fingerprint } = req.body;
   if (!license_key || !device_hash || !device_name) {
     incrementLicenseValidation(false);
@@ -17,7 +17,7 @@ router.post('/activate', licenseRateLimit, authenticateUser, async (req: Authent
   }
 
   try {
-    const result = await LicenseService.activate(license_key, device_hash, device_name, req.user!.company_id, fingerprint);
+    const result = await LicenseService.activate(license_key, device_hash, device_name, undefined, fingerprint);
     incrementLicenseValidation(true);
     return res.json(result);
   } catch (err: any) {
