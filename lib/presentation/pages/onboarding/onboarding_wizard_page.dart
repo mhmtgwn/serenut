@@ -134,10 +134,18 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     final dbManager   = DatabaseManager();
     final gateway     = DbGatewayImpl(dbManager);
 
-    // 1. Admin kimlik bilgilerini SharedPreferences'a kaydet
-    // PIN: basit SHA-256 (gerçek authService entegrasyonu için burayı genişletin)
+    // 1. Admin kimlik bilgilerini kaydet
+    // PIN: SQLite settings tablosuna yaz (tek kaynak)
     final pinHash = _hashPin(state.admin.pin);
-    await prefs.setString('admin_pin_code', pinHash);
+    // Write admin PIN to SQLite settings table (single source of truth)
+    final db = await dbManager.getDatabase();
+    final existingSettings = await db.query('settings', limit: 1);
+    if (existingSettings.isNotEmpty) {
+      await db.update('settings', {
+        'admin_pin_code': pinHash,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    }
     await prefs.setString('admin_username', state.admin.username);
     await prefs.setString('admin_full_name', state.admin.adminFullName);
     if (state.admin.password.isNotEmpty) {
@@ -191,6 +199,9 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       currency:        state.business.currency,
       createdAt:       DateTime.now(),
     ));
+
+    // Mark company patch as pending so it gets synced to the server on initial sync
+    await prefs.setBool('serenut_pending_company_patch', true);
 
     // 4. Sektör şablonundaki ürünleri SQLite'a tohumla (seed)
     final template = IndustryTemplateRegistry.getTemplate(state.business.businessType);

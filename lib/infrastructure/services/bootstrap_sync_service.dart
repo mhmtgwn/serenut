@@ -52,6 +52,66 @@ class BootstrapSyncService {
     }
 
     final db = await DatabaseManager().getDatabase();
+
+    if (_prefs.getBool('serenut_pending_company_patch') == true) {
+      try {
+        final settingsRows = await db.query('settings', limit: 1);
+        if (settingsRows.isNotEmpty) {
+          final row = settingsRows.first;
+          final profileRows = await db.query('business_profile', limit: 1);
+          int expectedVersion = 1;
+          if (profileRows.isNotEmpty) {
+            expectedVersion = profileRows.first['version'] as int? ?? 1;
+          }
+
+          final response = await _apiClient.send(
+            'PATCH',
+            '/api/v1/company',
+            body: {
+              'expected_version': expectedVersion,
+              'name': row['business_name'],
+              'phone': row['business_phone'],
+              'address': row['business_address'],
+              'owner_name': row['owner_name'],
+              'type': row['business_type'],
+              'city': row['business_city'],
+              'district': row['business_district'],
+              'currency': row['currency'],
+              'logo_url': row['business_logo'],
+            },
+          );
+          if (response.isSuccess) {
+            final updatedMap = response.json as Map<String, dynamic>;
+            final newVersion = updatedMap['version'] as int? ?? (expectedVersion + 1);
+            await db.update(
+              'business_profile',
+              {
+                'name': updatedMap['name'] ?? row['business_name'],
+                'owner_name': updatedMap['owner_name'] ?? row['owner_name'],
+                'type': updatedMap['type'] ?? row['business_type'],
+                'phone': updatedMap['phone'] ?? row['business_phone'],
+                'email': updatedMap['email'] ?? '',
+                'tax_number': updatedMap['tax_number'] ?? '',
+                'city': updatedMap['city'] ?? row['business_city'],
+                'district': updatedMap['district'] ?? row['business_district'],
+                'currency': updatedMap['currency'] ?? row['currency'],
+                'version': newVersion,
+                'updated_at': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [1],
+            );
+            await _prefs.setBool('serenut_pending_company_patch', false);
+          }
+        }
+      } on ApiException catch (e) {
+        if (e.statusCode == 409) {
+          await _prefs.setBool('serenut_pending_company_patch', false);
+          debugPrint('[BootstrapSync] ⚠️ Settings patch version conflict: 409 returned.');
+        }
+      } catch (_) {}
+    }
+
     int startIndex = getProgressIndex();
 
     for (int i = startIndex; i < _modules.length; i++) {
@@ -101,6 +161,11 @@ class BootstrapSyncService {
     await db.transaction((txn) async {
       if (module == 'company') {
         final map = payload as Map<String, dynamic>;
+        final incomingName = map['name'] as String? ?? '';
+        if (incomingName.trim().isEmpty) {
+          debugPrint('[BootstrapSync] ⚠️ Server returned empty company payload. Skipping local override.');
+          return;
+        }
         await txn.insert('business_profile', {
           'id': 1,
           'name': map['name'] ?? '',
@@ -113,8 +178,10 @@ class BootstrapSyncService {
           'district': map['district'] ?? '',
           'currency': map['currency'] ?? '₺',
           'tax_included': 1,
+          'version': map['version'] ?? 1,
           'created_at': DateTime.now().toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
+        debugPrint('[Bootstrap] ✅ business_profile yazıldı: ${map['name']}');
 
         // Sync with settings table for settings screen
         try {
@@ -142,6 +209,7 @@ class BootstrapSyncService {
             map['type'] ?? '',
             map['currency'] ?? '₺'
           ]);
+          debugPrint('[Bootstrap] ✅ settings.business_name güncellendi: ${map['name']}');
         } catch (e) {
           // Non-fatal: settings table sync after company bootstrap failed.
           // Business profile data is still saved to business_profile table above.
@@ -160,16 +228,47 @@ class BootstrapSyncService {
         final list = payload as List<dynamic>;
         for (final item in list) {
           final map = item as Map<String, dynamic>;
-          await txn.insert('users', {
-            'id': map['id'],
-            'name': map['name'],
-            'email': map['email'],
-            'password_hash': map['password_hash'] ?? 'pbkdf2_sha256\$dummy_hash',
-            'role': map['role'] ?? 'cashier',
-            'is_active': map['is_active'] ? 1 : 0,
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          final userId = map['id'] as String;
+          
+          final existing = await txn.query(
+            'users',
+            columns: ['id'],
+            where: 'id = ?',
+            whereArgs: [userId],
+          );
+
+          if (existing.isNotEmpty) {
+            await txn.update(
+              'users',
+              {
+                'name': map['name'],
+                'email': map['email'],
+                'password_hash': map['password_hash'] ?? 'pbkdf2_sha256\$dummy_hash',
+                'role': map['role'] ?? 'cashier',
+                'is_active': map['is_active'] ? 1 : 0,
+                'updated_at': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [userId],
+            );
+          } else {
+            await txn.insert('users', {
+              'id': userId,
+              'name': map['name'],
+              'email': map['email'],
+              'password_hash': map['password_hash'] ?? 'pbkdf2_sha256\$dummy_hash',
+              'role': map['role'] ?? 'cashier',
+              'is_active': map['is_active'] ? 1 : 0,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+              'username': null,
+              'pin_hash': null,
+              'business_code': null,
+              'device_token_version': 1,
+              'failed_pin_attempts': 0,
+              'locked_until': null,
+            });
+          }
         }
       }
       else if (module == 'categories') {
@@ -229,6 +328,11 @@ class BootstrapSyncService {
       }
       else if (module == 'settings') {
         final map = payload as Map<String, dynamic>;
+        final incomingName = (map['business_name'] ?? map['businessName']) as String? ?? '';
+        if (incomingName.trim().isEmpty) {
+          debugPrint('[BootstrapSync] ⚠️ Server returned empty settings payload. Skipping local override.');
+          return;
+        }
         // Write directly to SQLite settings table (single source of truth)
         final existing = await txn.query('settings', limit: 1);
         if (existing.isEmpty) {
@@ -271,6 +375,18 @@ class BootstrapSyncService {
       }
       else if (module == 'license-config') {
         final map = payload as Map<String, dynamic>;
+        if (map['license_key'] != null) {
+          await _prefs.setString('activated_license_key', map['license_key'] as String);
+        }
+        if (map['license_token'] != null) {
+          await _prefs.setString('license_token', map['license_token'] as String);
+          try {
+            await txn.rawUpdate(
+              'UPDATE settings SET license_token = ? WHERE id = 1',
+              [map['license_token'] as String],
+            );
+          } catch (_) {}
+        }
         await _prefs.setString('nutopiano_license_config', json.encode(map));
       }
     });
