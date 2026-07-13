@@ -235,8 +235,19 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       });
       if (res.isSuccess) {
         final data = res.json;
-        await prefs.setString('auth_jwt_token', data['access_token'] as String? ?? '');
-        await prefs.setString('auth_refresh_token', data['refresh_token'] as String? ?? '');
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+        if (accessToken != null && accessToken.isNotEmpty) {
+          await prefs.setString('auth_jwt_token', accessToken);
+          ref.read(apiClientProvider).setJwtToken(accessToken);
+        }
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await prefs.setString('auth_refresh_token', refreshToken);
+        }
+        final licenseKey = data['license_key'] as String?;
+        if (licenseKey != null && licenseKey.isNotEmpty) {
+          await prefs.setString('pending_license_key', licenseKey);
+        }
         debugPrint('Onboarding: Backend kayıt başarılı ✓');
       }
     } catch (e) {

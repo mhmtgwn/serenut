@@ -52,7 +52,8 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
         '/api/v1/licenses/activate',
         body: {
           'license_key': rawKey,
-          'device_id': deviceId,
+          'device_hash': deviceId,
+          'device_name': fingerprint.deviceName ?? 'Serenut POS',
           'fingerprint': fingerprint.toJson(),
         },
       );
@@ -135,6 +136,15 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final pendingKey = ref.read(sharedPreferencesProvider).getString('pending_license_key');
+    if (pendingKey != null && pendingKey.isNotEmpty) {
+      _ctrl.text = pendingKey;
+    }
   }
 
   @override

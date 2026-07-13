@@ -487,9 +487,13 @@
         <div class="success-icon">✓</div>
         <h2 class="success-title">Hoş Geldiniz! 🎉</h2>
         <p class="success-sub">
-          Hesabınız oluşturuldu. Lisans anahtarı ve kurulum bağlantısı<br>
-          <strong id="success-email"></strong> adresine gönderildi.
+          Hesabınız oluşturuldu.           Hesabınız ve 30 günlük deneme lisansınız oluşturuldu.<br>
+          Lisans anahtarınızı uygulamadaki aktivasyon ekranına girin.
         </p>
+        <div style="margin:16px 0; padding:14px; border:1px dashed #10b981; border-radius:10px; background:#ecfdf5;">
+          <div style="font-size:.75rem; color:#047857; margin-bottom:6px;">LİSANS ANAHTARINIZ</div>
+          <strong id="success-license-key" style="font-family:monospace; font-size:1.1rem; letter-spacing:.08em; color:#065f46;"></strong>
+        </div>
         <div class="steps-list">
           <div class="step-item">
             <span class="step-num">1</span>
@@ -851,8 +855,7 @@
       document.getElementById('register-form-wrap').style.display = 'none';
       const ss = document.getElementById('success-screen');
       ss.style.display = 'block';
-      document.getElementById('success-email').textContent =
-        document.getElementById('r-email').value;
+      document.getElementById('success-license-key').textContent = data.license_key || 'Anahtar oluşturulamadı';
 
     } catch (err) {
       showToast('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.', 'error');

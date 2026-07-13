@@ -160,7 +160,7 @@ export class AuthService {
          LEFT JOIN user_roles ur ON u.id = ur.user_id
          LEFT JOIN roles r ON ur.role_id = r.id
          WHERE u.id = $1
-         GROUP BY u.id`,
+         GROUP BY u.id, u.name, u.email, u.company_id, u.is_active, u.token_version`,
         [user.id]
       );
 
@@ -285,7 +285,7 @@ export class AuthService {
                LEFT JOIN user_roles ur ON u.id = ur.user_id
                LEFT JOIN roles r ON ur.role_id = r.id
                WHERE u.id = $1
-               GROUP BY u.id`,
+               GROUP BY u.id, u.name, u.email, u.company_id, u.is_active, u.token_version`,
               [session.user_id]
             );
 

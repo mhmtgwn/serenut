@@ -197,7 +197,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       // 4. Backend'e kayıt (opsiyonel — network yoksa silent fail)
       try {
         final apiClient = ref.read(apiClientProvider);
-        await apiClient.post('/auth/register', {
+        final response = await apiClient.post('/auth/register', {
           'company_name': _bizNameCtrl.text.trim(),
           'name':         _ownerNameCtrl.text.trim(),
           'username':     _usernameCtrl.text.trim(),
@@ -205,6 +205,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           'password':     _passwordCtrl.text,
           'phone':        _phoneCtrl.text.trim(),
         });
+        final data = response.json as Map<String, dynamic>;
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+        if (accessToken != null && accessToken.isNotEmpty) {
+          await prefs.setString('auth_jwt_token', accessToken);
+          apiClient.setJwtToken(accessToken);
+        }
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await prefs.setString('auth_refresh_token', refreshToken);
+        }
+        final licenseKey = data['license_key'] as String?;
+        if (licenseKey != null && licenseKey.isNotEmpty) {
+          await prefs.setString('pending_license_key', licenseKey);
+        }
       } catch (_) {
         // Network yoksa local'e devam
       }

@@ -261,10 +261,10 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     });
   }
 
-  if (password.length < 4) {
+  if (password.length < 8) {
     return res.status(400).json({
       error: 'weak_password',
-      message: 'Şifre veya PIN en az 4 karakter olmalıdır.'
+      message: 'Şifre en az 8 karakter olmalıdır.'
     });
   }
 
@@ -272,6 +272,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   const { pgPool } = require('../../config/database');
 
   const client = await pgPool.connect();
+  let generatedLicenseKey: string | undefined;
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
@@ -320,48 +321,41 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     // Create subscription with trial_started_at = NULL (AC 1.1)
     // Trial does NOT start at registration — it starts on FIRST LOGIN.
     // auth.service.ts login() checks trial_started_at IS NULL and sets it.
-    try {
-      const subId = `sub-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-      await client.query(
-        `INSERT INTO subscriptions
-           (id, company_id, plan_id, status, current_period_start, current_period_end,
-            trial_started_at, trial_ends_at, payment_retry_count)
-         VALUES ($1, $2, 'plan-free', 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
-                 NULL, NULL, 0)`,
-        [subId, companyId]
-      );
+    const subId = `sub-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    await client.query(
+      `INSERT INTO subscriptions
+         (id, company_id, plan_id, status, current_period_start, current_period_end,
+          trial_started_at, trial_ends_at, payment_retry_count)
+       VALUES ($1, $2, 'plan-free', 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
+               NULL, NULL, 0)`,
+      [subId, companyId]
+    );
 
-      // Generate a canonical license key and trial entitlement during registration!
-      const parts = [];
-      for (let i = 0; i < 4; i++) {
-        parts.push(crypto.randomBytes(2).toString('hex').toUpperCase());
-      }
-      const licenseKey = `SRNT-${parts.join('-')}`;
-
-      // Insert into license_entitlements
-      const entId = `ent-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-      await client.query(`
-        INSERT INTO license_entitlements (
-          id, company_id, subscription_id, plan_id,
-          status, device_limit, store_limit,
-          valid_from, valid_until, token_version,
-          license_key, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), NOW() + INTERVAL '30 days', 1, $4, NOW(), NOW())
-      `, [entId, companyId, subId, licenseKey]);
-
-      // Sync legacy licenses table
-      await client.query(`
-        INSERT INTO licenses (
-          id, company_id, license_key, tier,
-          allowed_devices_count, status, expires_at, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, 'trial', 2, 'active', NOW() + INTERVAL '30 days', NOW(), NOW())
-      `, [`lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, companyId, licenseKey]);
-
-    } catch (e) {
-      console.error('Failed to create subscription or trial licenses:', e);
+    // Generate and provision the trial license in the same transaction as the account.
+    const parts = [];
+    for (let i = 0; i < 4; i++) {
+      parts.push(crypto.randomBytes(2).toString('hex').toUpperCase());
     }
+    generatedLicenseKey = `SRNT-${parts.join('-')}`;
+
+    const entId = `ent-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    await client.query(`
+      INSERT INTO license_entitlements (
+        id, company_id, subscription_id, plan_id,
+        status, device_limit, store_limit,
+        valid_from, valid_until, token_version,
+        license_key, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), NOW() + INTERVAL '30 days', 1, $4, NOW(), NOW())
+    `, [entId, companyId, subId, generatedLicenseKey]);
+
+    await client.query(`
+      INSERT INTO licenses (
+        id, company_id, license_key, tier,
+        allowed_devices_count, status, expires_at, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, 'trial', 2, 'active', NOW() + INTERVAL '30 days', NOW(), NOW())
+    `, [`lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, companyId, generatedLicenseKey]);
 
     await client.query('COMMIT');
 
@@ -372,6 +366,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
 
     return res.status(201).json({
       ...loginResult,
+      license_key: generatedLicenseKey,
       message: 'Hesabınız oluşturuldu. 30 günlük ücretsiz deneme başladı!'
     });
   } catch (err: any) {
