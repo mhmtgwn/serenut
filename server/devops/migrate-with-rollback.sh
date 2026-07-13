@@ -8,6 +8,8 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
+BACKUP_FILE="/tmp/serenut_pre_migrate_$(date +%Y%m%d_%H%M%S).sql"
+
 # Check if pg_dump is available on host
 if command -v pg_dump &> /dev/null; then
   echo "📦 Creating pre-migration database snapshot..."

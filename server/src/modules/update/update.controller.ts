@@ -49,6 +49,27 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
   }
 });
 
+router.get('/latest-metadata', async (req: Request, res: Response) => {
+  try {
+    const query = `
+      (SELECT id, version_code, platform, sha256_hash, file_path, file_size_bytes, release_notes, created_at
+       FROM app_versions
+       WHERE platform = 'windows' AND status = 'active' AND channel = 'stable'
+       ORDER BY created_at DESC LIMIT 1)
+      UNION ALL
+      (SELECT id, version_code, platform, sha256_hash, file_path, file_size_bytes, release_notes, created_at
+       FROM app_versions
+       WHERE platform = 'android' AND status = 'active' AND channel = 'stable'
+       ORDER BY created_at DESC LIMIT 1)
+    `;
+    const result = await pgPool.query(query);
+    return res.json(result.rows);
+  } catch (err: any) {
+    console.error('Latest metadata error:', err);
+    return res.status(500).json({ error: 'server_error', message: err.message });
+  }
+});
+
 router.get('/debug/db-state', async (req: Request, res: Response) => {
   try {
     const query = `

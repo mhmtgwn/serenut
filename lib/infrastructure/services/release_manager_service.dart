@@ -192,8 +192,17 @@ class ReleaseManagerService {
       existingLength = await tmpFile.length();
     }
 
-    final fullUrl = '${_config.apiBaseUrl}${_config.releaseEndpoint}${downloadPath}'
-        '${deviceId != null ? '?device_id=$deviceId' : ''}';
+    final String fullUrl;
+    if (downloadPath.startsWith('http')) {
+      fullUrl = downloadPath;
+    } else if (downloadPath.startsWith('/api')) {
+      final uri = Uri.parse(_config.apiBaseUrl);
+      final origin = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+      fullUrl = '$origin$downloadPath${deviceId != null ? "?device_id=$deviceId" : ""}';
+    } else {
+      fullUrl = '${_config.apiBaseUrl}${_config.releaseEndpoint}$downloadPath'
+          '${deviceId != null ? "?device_id=$deviceId" : ""}';
+    }
 
     final request = http.Request('GET', Uri.parse(fullUrl));
     if (jwtToken != null) {

@@ -237,8 +237,8 @@
         <div class="download-card">
           <div class="os-icon">🖥️</div>
           <h3>Windows Masaüstü</h3>
-          <span class="version-tag">v1.0.0 .EXE</span>
-          <div style="font-size:0.7rem; color:var(--text-muted); font-family:monospace; margin-bottom:14px; word-break:break-all; background:var(--bg-soft); padding:4px 8px; border-radius:4px; border:1px solid var(--border);">SHA-256: 94DACCA2B0C5605F960C6DE74D8B23A8B44D59AEAB79DC9A3C91EA3A19859B9D</div>
+          <span class="version-tag" id="win-version">v1.0.0 .EXE</span>
+          <div id="win-hash" style="font-size:0.7rem; color:var(--text-muted); font-family:monospace; margin-bottom:14px; word-break:break-all; background:var(--bg-soft); padding:4px 8px; border-radius:4px; border:1px solid var(--border);">SHA-256: 94DACCA2B0C5605F960C6DE74D8B23A8B44D59AEAB79DC9A3C91EA3A19859B9D</div>
           <p>Windows 10 ve Windows 11 x64 sistemler için tasarlanmıştır. Termal fiş yazıcıları ve yerel ağ donanımları ile tam uyumludur.</p>
           <a href="/api/v1/updates/download/windows/latest" class="btn btn-primary btn-download">Windows İçin İndir</a>
         </div>
@@ -247,8 +247,8 @@
         <div class="download-card featured">
           <div class="os-icon">📱</div>
           <h3>Android El Terminali / Tablet</h3>
-          <span class="version-tag">v1.0.0 .APK</span>
-          <div style="font-size:0.7rem; color:var(--primary); font-family:monospace; margin-bottom:14px; word-break:break-all; background:var(--primary-bg); padding:4px 8px; border-radius:4px; border:1px solid var(--green-100);">SHA-256: 36DA4BD533E1973B9A3A1ECFC1A59EE8F1D9B54F629857ADE78FBAC99D172C9B</div>
+          <span class="version-tag" id="android-version">v1.0.0 .APK</span>
+          <div id="android-hash" style="font-size:0.7rem; color:var(--primary); font-family:monospace; margin-bottom:14px; word-break:break-all; background:var(--primary-bg); padding:4px 8px; border-radius:4px; border:1px solid var(--green-100);">SHA-256: 36DA4BD533E1973B9A3A1ECFC1A59EE8F1D9B54F629857ADE78FBAC99D172C9B</div>
           <p>Sunmi, Beko ve diğer Android tabanlı el terminalleri ile entegre çalışabilir. Taşınabilir hızlı satış ve garson sipariş cihazları içindir.</p>
           <a href="/api/v1/updates/download/android/latest" class="btn btn-primary btn-download">Android İçin İndir</a>
         </div>
@@ -292,7 +292,7 @@
               <tr><td>İşletim Sistemi:</td><td>Windows 10 / 11 (64-bit)</td></tr>
               <tr><td>Bellek (RAM):</td><td>Minimum 4 GB RAM (8 GB Önerilir)</td></tr>
               <tr><td>Disk Alanı:</td><td>100 MB Boş Disk Alanı</td></tr>
-              <tr><td>Dosya Boyutu:</td><td>14.0 MB (.exe)</td></tr>
+              <tr><td>Dosya Boyutu:</td><td id="win-size">14.0 MB (.exe)</td></tr>
             </table>
           </div>
           <!-- Android specs -->
@@ -302,7 +302,7 @@
               <tr><td>İşletim Sistemi:</td><td>Android 7.0 veya Üzeri</td></tr>
               <tr><td>Bellek (RAM):</td><td>Minimum 2 GB RAM</td></tr>
               <tr><td>Disk Alanı:</td><td>50 MB Boş Disk Alanı</td></tr>
-              <tr><td>Dosya Boyutu:</td><td>142.6 MB (.apk)</td></tr>
+              <tr><td>Dosya Boyutu:</td><td id="android-size">142.6 MB (.apk)</td></tr>
             </table>
           </div>
         </div>
@@ -357,6 +357,38 @@
     </div>
   </footer>
 
+  <script>
+    async function loadLatestReleaseMetadata() {
+      try {
+        const response = await fetch('/api/v1/updates/latest-metadata');
+        if (!response.ok) return;
+        const releases = await response.json();
+        
+        const winRelease = releases.find(r => r.platform === 'windows');
+        const androidRelease = releases.find(r => r.platform === 'android');
+        
+        if (winRelease) {
+          document.getElementById('win-version').textContent = 'v' + winRelease.version_code + ' .EXE';
+          document.getElementById('win-hash').textContent = 'SHA-256: ' + winRelease.sha256_hash.toUpperCase();
+          if (winRelease.file_size_bytes) {
+            const sizeMb = (winRelease.file_size_bytes / (1024 * 1024)).toFixed(1);
+            document.getElementById('win-size').textContent = sizeMb + ' MB (.exe)';
+          }
+        }
+        if (androidRelease) {
+          document.getElementById('android-version').textContent = 'v' + androidRelease.version_code + ' .APK';
+          document.getElementById('android-hash').textContent = 'SHA-256: ' + androidRelease.sha256_hash.toUpperCase();
+          if (androidRelease.file_size_bytes) {
+            const sizeMb = (androidRelease.file_size_bytes / (1024 * 1024)).toFixed(1);
+            document.getElementById('android-size').textContent = sizeMb + ' MB (.apk)';
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load release metadata:', e);
+      }
+    }
+    document.addEventListener('DOMContentLoaded', loadLatestReleaseMetadata);
+  </script>
   <script src="js/main.js"></script>
 </body>
 </html>

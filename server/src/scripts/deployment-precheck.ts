@@ -1,6 +1,8 @@
 import { Client } from 'pg';
 import { createClient } from 'redis';
 import os from 'os';
+import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -36,8 +38,24 @@ async function runPrecheck() {
       const migRes = await client.query('SELECT MAX(version) as current_version FROM schema_migrations');
       const maxVersion = migRes.rows[0].current_version || 0;
       
-      // Expected version is 12
-      const expectedVersion = 12;
+      // Dynamically scan the db directory for the highest expected migration version
+      const dbDir = path.join(__dirname, '../../db');
+      let expectedVersion = 1;
+      if (fs.existsSync(dbDir)) {
+        const files = fs.readdirSync(dbDir);
+        for (const file of files) {
+          const match = file.match(/^schema_v(\d+)\.sql$/);
+          if (match) {
+            const ver = parseInt(match[1], 10);
+            if (ver > expectedVersion) {
+              expectedVersion = ver;
+            }
+          }
+        }
+      } else {
+        expectedVersion = 32;
+      }
+
       if (maxVersion < expectedVersion) {
         console.error(`❌ [FAIL] Migrations Check: Database schema version (${maxVersion}) is behind expected version (${expectedVersion}). Please run migrations.`);
         failed = true;
