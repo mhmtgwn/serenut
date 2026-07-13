@@ -135,6 +135,8 @@ jobs:
             cd /opt/serenut-os/server
             git fetch --all
             git reset --hard origin/master
+            sed -i '/^GIT_COMMIT=/d' .env.production || true
+            echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
             docker compose -f docker-compose.prod.yml build
             # Execute Rollback & Schema integrity validation
             bash devops/migrate-with-rollback.sh || exit 1
