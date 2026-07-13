@@ -346,6 +346,83 @@ router.put('/plans/:id', authenticateUser, requireRole('sysadmin'), async (req: 
  *     security:
  *       - BearerAuth: []
  */
+
+/**
+ * @swagger
+ * /api/v1/billing/subscription:
+ *   get:
+ *     summary: Get current subscription details for the tenant
+ *     tags: [Billing]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/subscription', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const companyId = req.user!.company_id;
+    
+    const subRes = await runBypassingRLS(`
+      SELECT s.*, p.name as plan_name, p.price as plan_price, p.currency as plan_currency
+      FROM subscriptions s
+      JOIN plans p ON s.plan_id = p.id
+      WHERE s.company_id = $1
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `, [companyId]);
+
+    if (subRes.rows.length === 0) {
+      return res.status(200).json({ status: 'no_subscription' });
+    }
+
+    const sub = subRes.rows[0];
+    res.json(sub);
+  } catch (error) {
+    logger.error('Error fetching subscription:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/v1/billing/reactivate:
+ *   post:
+ *     summary: Reactivate a cancelled but still active subscription
+ *     tags: [Billing]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/reactivate', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const companyId = req.user!.company_id;
+    
+    const subRes = await runBypassingRLS(`
+      SELECT * FROM subscriptions 
+      WHERE company_id = $1 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `, [companyId]);
+
+    if (subRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+
+    const sub = subRes.rows[0];
+    
+    if (sub.status !== 'cancelled' && sub.cancel_at_period_end !== true) {
+      return res.status(400).json({ error: 'Subscription is not pending cancellation' });
+    }
+
+    await runBypassingRLS(
+      "UPDATE subscriptions SET status = 'active', cancel_at_period_end = FALSE, updated_at = NOW() WHERE id = $1",
+      [sub.id]
+    );
+
+    res.json({ message: 'Subscription reactivated successfully' });
+  } catch (error) {
+    logger.error('Error reactivating subscription:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { plan_id, payment_method } = req.body;
