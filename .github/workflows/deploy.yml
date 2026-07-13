@@ -137,9 +137,13 @@ jobs:
             git reset --hard origin/master
             sed -i '/^GIT_COMMIT=/d' .env.production || true
             echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
-            docker compose -f docker-compose.prod.yml build
+            npm ci --only=production
+            set -a
+            [ -f .env.production ] && . .env.production
+            set +a
             # Execute Rollback & Schema integrity validation
             bash devops/migrate-with-rollback.sh || exit 1
+            docker compose -f docker-compose.prod.yml build
             # Restart Services with resource limits
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
