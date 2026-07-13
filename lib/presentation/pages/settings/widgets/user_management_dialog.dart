@@ -75,7 +75,9 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                                 final u = users[idx];
                                 final initials = u.name.isNotEmpty ? u.name[0].toUpperCase() : 'U';
                                 final roleLabel = switch (u.role) {
+                                  UserRole.owner => 'Kurucu/Sahip',
                                   UserRole.admin => 'Yönetici',
+                                  UserRole.sysadmin => 'Sistem Yöneticisi',
                                   UserRole.manager => 'Müdür',
                                   UserRole.cashier => 'Kasiyer',
                                   UserRole.staff => 'Personel',
@@ -422,9 +424,15 @@ extension SettingsUserManagementSheets on _SettingsPageState {
     final settingsState = ref.read(settingsNotifierProvider);
     final currentPin = settingsState.valueOrNull?.adminPinCode;
     if (currentPin != null && currentPin.isNotEmpty) {
-      PinGateDialog.checkAndShow(context, title: 'Güvenlik Doğrulaması', onVerified: () {
-        _showPinEntryOptionsSheet();
-      });
+      requirePermissionAccess(
+        context,
+        permission: Permission.settingsUsers,
+        title: 'Güvenlik Doğrulaması',
+        requirePin: true,
+        onGranted: (approvedByUserId, approvedByUserName) {
+          _showPinEntryOptionsSheet();
+        },
+      );
     } else {
       _showNewPinEntrySheet();
     }
@@ -459,7 +467,6 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                     await ref.read(settingsNotifierProvider.notifier)
                         .updateSettings(settingsState.value!.copyWith(adminPinCode: null));
                   }
-                  PinSessionCache.instance.invalidate();
                   _loadAdminPin();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -515,6 +522,8 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
+  final usernameCtrl = TextEditingController();
+  final pinCtrl = TextEditingController();
   UserRole selectedRole = UserRole.cashier;
   bool obscureText = true;
 
@@ -523,6 +532,8 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
     nameCtrl.dispose();
     emailCtrl.dispose();
     passCtrl.dispose();
+    usernameCtrl.dispose();
+    pinCtrl.dispose();
     super.dispose();
   }
 
@@ -576,7 +587,9 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                 ),
                 items: UserRole.values.map((role) {
                   final label = switch (role) {
+                    UserRole.owner => 'Kurucu/Sahip',
                     UserRole.admin => 'Yönetici',
+                    UserRole.sysadmin => 'Sistem Yöneticisi',
                     UserRole.manager => 'Müdür',
                     UserRole.cashier => 'Kasiyer',
                     UserRole.staff => 'Personel',
@@ -590,6 +603,32 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                     });
                   }
                 },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: usernameCtrl,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Kullanıcı Adı (Opsiyonel)',
+                  hintText: 'örn: kasiyer1',
+                  prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: pinCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                obscureText: obscureText,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'PIN (Opsiyonel)',
+                  hintText: 'Sadece rakam',
+                  prefixIcon: const Icon(Icons.dialpad_rounded, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  counterText: '',
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -628,15 +667,18 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
             if (_formKey.currentState!.validate()) {
               final authService = ref.read(authServiceProvider);
               final id = 'user-${DateTime.now().millisecondsSinceEpoch}';
+              final businessCode = ref.read(currentUserProvider)?.businessCode ?? 'DEFAULT';
               final newUser = AuthUser(
                 id: id,
                 name: nameCtrl.text.trim(),
                 email: emailCtrl.text.trim(),
+                username: usernameCtrl.text.trim().isEmpty ? null : usernameCtrl.text.trim(),
+                businessCode: businessCode,
                 role: selectedRole,
                 permissions: AuthService.getPermissionsForRole(selectedRole),
                 createdAt: DateTime.now(),
               );
-              await authService.createUser(newUser, passCtrl.text.trim());
+              await authService.createUser(newUser, passCtrl.text.trim(), pin: pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim());
               ref.read(auditLogServiceProvider).log(
                 action: 'user_created',
                 details: '{"id":"${newUser.id}","name":"${newUser.name}","role":"${newUser.role.name}"}',
@@ -678,6 +720,8 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
   late final TextEditingController nameCtrl;
   late final TextEditingController emailCtrl;
   late final TextEditingController passCtrl;
+  late final TextEditingController usernameCtrl;
+  late final TextEditingController pinCtrl;
   late UserRole selectedRole;
   bool obscureText = true;
 
@@ -686,6 +730,8 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
     super.initState();
     nameCtrl = TextEditingController(text: widget.user.name);
     emailCtrl = TextEditingController(text: widget.user.email);
+    usernameCtrl = TextEditingController(text: widget.user.username);
+    pinCtrl = TextEditingController(); // Don't prefill pin for security
     passCtrl = TextEditingController();
     selectedRole = widget.user.role;
   }
@@ -695,6 +741,8 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
     nameCtrl.dispose();
     emailCtrl.dispose();
     passCtrl.dispose();
+    usernameCtrl.dispose();
+    pinCtrl.dispose();
     super.dispose();
   }
 
@@ -740,7 +788,9 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
               DropdownButtonFormField<UserRole>(
                 value: selectedRole,
                 disabledHint: Text(switch (selectedRole) {
+                  UserRole.owner => 'Kurucu/Sahip',
                   UserRole.admin => 'Yönetici',
+                  UserRole.sysadmin => 'Sistem Yöneticisi',
                   UserRole.manager => 'Müdür',
                   UserRole.cashier => 'Kasiyer',
                   UserRole.staff => 'Personel',
@@ -760,13 +810,41 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                 ),
                 items: UserRole.values.map((role) {
                   final label = switch (role) {
+                    UserRole.owner => 'Kurucu/Sahip',
                     UserRole.admin => 'Yönetici',
+                    UserRole.sysadmin => 'Sistem Yöneticisi',
                     UserRole.manager => 'Müdür',
                     UserRole.cashier => 'Kasiyer',
                     UserRole.staff => 'Personel',
                   };
                   return DropdownMenuItem(value: role, child: Text(label));
                 }).toList(),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: usernameCtrl,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Kullanıcı Adı (Opsiyonel)',
+                  hintText: 'örn: kasiyer1',
+                  prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: pinCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                obscureText: obscureText,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Yeni PIN (İsteğe Bağlı)',
+                  hintText: 'Değiştirmek istemiyorsanız boş bırakın',
+                  prefixIcon: const Icon(Icons.dialpad_rounded, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  counterText: '',
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -817,10 +895,17 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
               final updated = widget.user.copyWith(
                 name: nameCtrl.text.trim(),
                 email: emailCtrl.text.trim(),
+                username: usernameCtrl.text.trim().isEmpty ? null : usernameCtrl.text.trim(),
                 role: selectedRole,
-                permissions: AuthService.getPermissionsForRole(selectedRole),
+                permissions: selectedRole == widget.user.role 
+                    ? widget.user.permissions 
+                    : AuthService.getPermissionsForRole(selectedRole),
               );
-              await authService.updateUser(updated, password: passCtrl.text.trim());
+              await authService.updateUser(
+                updated, 
+                password: passCtrl.text.trim().isEmpty ? null : passCtrl.text.trim(),
+                pin: pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim()
+              );
               widget.onSaved();
               if (mounted) Navigator.pop(context);
             }
@@ -935,7 +1020,6 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                           .updateSettings(settingsState.value!.copyWith(adminPinCode: hashedPin));
                     }
                     // PIN değiştiğinde session cache'i sıfırla
-                    PinSessionCache.instance.invalidate();
                     widget.pageState._loadAdminPin();
                     if (mounted) {
                       Navigator.pop(context);
@@ -954,6 +1038,5 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
       ),
     );
   }
-}
 }
 

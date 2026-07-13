@@ -1,4 +1,4 @@
-﻿// lib/domain/services/dataset_import_service.dart
+// lib/domain/services/dataset_import_service.dart
 // Product Catalog & Images Import Service
 // Decodes ZIP archives, extracts images to local directories (native), parses Excel files, and inserts into IProductRepository.
 
@@ -63,8 +63,41 @@ class DatasetImportService {
 
   /// CPU-heavy ZIP decoding and Excel parsing executed in a background Isolate.
   static ParsedCatalogData _parseZipInIsolate(Uint8List zipBytes) {
-    // 1. Decode ZIP archive
-    final archive = ZipDecoder().decodeBytes(zipBytes);
+    // 1. Pre-decompression limit checks via ZipDirectory (Zip Bomb Mitigation)
+    final inputStream = InputStream(zipBytes);
+    final zipDirectory = ZipDirectory.read(inputStream);
+
+    int totalUncompressedSize = 0;
+    int fileCount = 0;
+    for (final header in zipDirectory.fileHeaders) {
+      fileCount++;
+      if (fileCount > 10000) {
+        throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
+      }
+      
+      final filename = header.filename.toLowerCase();
+      if (filename.endsWith('.zip') || filename.endsWith('.tar') || filename.endsWith('.gz')) {
+        throw Exception('İç içe arşiv dosyaları desteklenmiyor.');
+      }
+
+      final uncompressed = header.uncompressedSize ?? 0;
+      totalUncompressedSize += uncompressed;
+      
+      if (header.compressedSize != null && header.compressedSize! > 0) {
+        final ratio = uncompressed / header.compressedSize!;
+        if (ratio > 100) {
+          throw Exception('Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
+        }
+      }
+    }
+
+    if (totalUncompressedSize > 100 * 1024 * 1024) {
+      throw Exception('Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
+    }
+
+    // Decode ZIP archive after checks
+    final archive = ZipDecoder().decodeBuffer(InputStream(zipBytes));
+
 
     // 2. Identify Excel file and images
     bool isRawExcel = true;
@@ -179,10 +212,43 @@ class DatasetImportService {
     Uint8List zipBytes, 
     void Function(double progress, String status) onProgress,
   ) async {
-    // Step 1: Decode ZIP
+    // Step 1: Pre-decompression checks & Decode ZIP
     onProgress(0.06, 'Dosya açılıyor...');
     await Future.delayed(const Duration(milliseconds: 50));
-    final archive = ZipDecoder().decodeBytes(zipBytes);
+    
+    final inputStream = InputStream(zipBytes);
+    final zipDirectory = ZipDirectory.read(inputStream);
+
+    int totalUncompressedSize = 0;
+    int fileCount = 0;
+    for (final header in zipDirectory.fileHeaders) {
+      fileCount++;
+      if (fileCount > 10000) {
+        throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
+      }
+      
+      final filename = header.filename.toLowerCase();
+      if (filename.endsWith('.zip') || filename.endsWith('.tar') || filename.endsWith('.gz')) {
+        throw Exception('İç içe arşiv dosyaları desteklenmiyor.');
+      }
+
+      final uncompressed = header.uncompressedSize ?? 0;
+      totalUncompressedSize += uncompressed;
+      
+      if (header.compressedSize != null && header.compressedSize! > 0) {
+        final ratio = uncompressed / header.compressedSize!;
+        if (ratio > 100) {
+          throw Exception('Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
+        }
+      }
+    }
+
+    if (totalUncompressedSize > 100 * 1024 * 1024) {
+      throw Exception('Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
+    }
+
+    final archive = ZipDecoder().decodeBuffer(InputStream(zipBytes));
+
 
     // Step 2: Identify files & images
     onProgress(0.12, 'Katalog dosyaları ve görseller ayrıştırılıyor...');
@@ -307,6 +373,19 @@ class DatasetImportService {
     return ParsedCatalogData(products: parsedProducts, images: imageMap);
   }
 
+  /// Decodes and parses ZIP/Excel catalog without inserting into DB (for wizard preview).
+  Future<ParsedCatalogData> analyzeZip(
+    Uint8List zipBytes, 
+    void Function(double progress, String status) onProgress,
+  ) async {
+    if (zipBytes.length > 100 * 1024 * 1024) {
+      throw Exception('Dosya boyutu sınırlandırılmıştır (Maks 100MB).');
+    }
+    return kIsWeb
+        ? await _parseZipAsync(zipBytes, onProgress)
+        : await _parseZipInSeparateIsolate(zipBytes);
+  }
+
   /// Imports product catalog and images from a ZIP archive bytes.
   /// 
   /// Calls [onProgress] with progress fraction and informative status messages.
@@ -316,6 +395,9 @@ class DatasetImportService {
     void Function(double progress, String status) onProgress, [
     ImportStrategy strategy = const ImportStrategy(),
   ]) async {
+    if (zipBytes.length > 100 * 1024 * 1024) {
+      throw Exception('Dosya boyutu sınırlandırılmıştır (Maks 100MB).');
+    }
     int importedCount = 0;
     int errorCount = 0;
     final stopwatch = Stopwatch()..start();
@@ -329,6 +411,8 @@ class DatasetImportService {
         peakRss = current;
       }
     }
+
+    final List<String> writtenImagePaths = [];
 
     try {
       onProgress(0.05, 'Katalog ayrıştırılması başlatılıyor...');
@@ -357,8 +441,10 @@ class DatasetImportService {
         for (final entry in imageMap.entries) {
           final barcode = entry.key;
           final bytes = entry.value;
-          final imageFile = File(p.join(localImagesDirPath, '$barcode.jpg'));
+          final imagePath = p.join(localImagesDirPath, '$barcode.jpg');
+          final imageFile = File(imagePath);
           await imageFile.writeAsBytes(bytes);
+          writtenImagePaths.add(imagePath);
           
           savedImages++;
           if (savedImages % 50 == 0 && totalImages > 0) {
@@ -606,6 +692,14 @@ class DatasetImportService {
         'status': 'success',
       });
     } catch (e) {
+      for (final path in writtenImagePaths) {
+        try {
+          final f = File(path);
+          if (await f.exists()) {
+            await f.delete();
+          }
+        } catch (_) {}
+      }
       await TelemetryService().logEvent('import', {
         'time_ms': stopwatch.elapsedMilliseconds,
         'start_rss_mb': kIsWeb ? '0.00' : (startRss / (1024 * 1024)).toStringAsFixed(2),

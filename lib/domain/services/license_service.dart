@@ -1,10 +1,13 @@
 // lib/domain/services/license_service.dart
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/models/license_model.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:pointycastle/export.dart';
 
 class LicenseInfo {
@@ -43,7 +46,6 @@ class LicenseInfo {
         ? List<String>.from(json['features'])
         : [];
 
-    // V1 legacy: allowed_devices list
     List<String>? legacyDevices;
     if (json['allowed_devices'] != null) {
       legacyDevices = List<String>.from(json['allowed_devices']);
@@ -86,9 +88,68 @@ class LicenseService {
   static const String _rsaModulusHex = '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
   static const String _rsaExponentHex = '65537';
 
+  String? _cachedLicenseToken;
+  String? _cachedLastSystemTime;
+  String? _cachedMaxTimestampSeen;
+  bool _isTampered = false;
+
   LicenseService(this._prefs);
 
   SharedPreferences get prefs => _prefs;
+
+  Future<Database> _getDb() => DatabaseManager().getDatabase();
+
+  Future<String?> _getSettingsValue(String column) async {
+    try {
+      final db = await _getDb();
+      final rows = await db.query('settings', columns: [column], limit: 1);
+      if (rows.isNotEmpty) {
+        return rows.first[column] as String?;
+      }
+    } catch (e) {
+      debugPrint('Failed to read settings column $column: $e');
+    }
+    return null;
+  }
+
+  Future<void> _setSettingsValue(String column, String? value) async {
+    try {
+      final db = await _getDb();
+      final rows = await db.query('settings', columns: ['id'], limit: 1);
+      if (rows.isNotEmpty) {
+        final id = rows.first['id'] as int;
+        await db.update('settings', {column: value}, where: 'id = ?', whereArgs: [id]);
+      } else {
+        await db.insert('settings', {
+          column: value,
+          'business_name': '',
+          'business_phone': '',
+          'business_address': '',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to update settings column $column: $e');
+    }
+  }
+
+  /// Load values from database to memory cache and check clock integrity
+  Future<void> initialize() async {
+    try {
+      final db = await _getDb();
+      final rows = await db.query('settings', columns: ['license_token', 'last_system_time', 'max_timestamp_seen'], limit: 1);
+      if (rows.isNotEmpty) {
+        final row = rows.first;
+        _cachedLicenseToken = row['license_token'] as String?;
+        _cachedLastSystemTime = row['last_system_time'] as String?;
+        _cachedMaxTimestampSeen = row['max_timestamp_seen'] as String?;
+      }
+    } catch (e) {
+      debugPrint('LicenseService: database query during initialize failed: $e');
+    }
+
+    _isTampered = !await verifyClockIntegrityAsync();
+  }
 
   /// Ensure local device has a persistent unique hardware ID
   String getDeviceUuid() {
@@ -101,8 +162,6 @@ class LicenseService {
   }
 
   /// Validates a license token string cryptographically and verifies if local device matches.
-  /// V2 tokens: device_id must match local UUID.
-  /// V1 legacy tokens: allowed_devices wildcard '[*]' accepted during grace period.
   bool verifyLicenseToken(String tokenStr) {
     try {
       final decodedJson = utf8.decode(base64.decode(tokenStr.trim()));
@@ -113,12 +172,10 @@ class LicenseService {
 
       // 1. Device binding check
       if (info.tokenVersion >= 2) {
-        // V2: must match exact device_id
         if (info.deviceId == null || info.deviceId != localUuid) {
           return false;
         }
       } else {
-        // V1 legacy: wildcard grace period
         final devices = info.allowedDevices ?? [];
         if (!devices.contains('*') && !devices.contains(localUuid)) {
           return false;
@@ -128,7 +185,6 @@ class LicenseService {
       // 2. Verify signature integrity using RSA-2048 Public Key in Canonical JSON format
       final signatureBytes = base64.decode(info.signature);
 
-      // Construct the same canonical payload as the backend (alphabetical key order)
       final Map<String, dynamic> payloadMap;
       if (info.tokenVersion >= 2) {
         payloadMap = {
@@ -141,7 +197,6 @@ class LicenseService {
           'token_version': info.tokenVersion,
         };
       } else {
-        // V1 canonical payload
         payloadMap = {
           'allowed_devices': info.allowedDevices ?? ['*'],
           'expiry_date': info.expiryDate.toIso8601String(),
@@ -151,7 +206,6 @@ class LicenseService {
         };
       }
 
-      // Sort keys alphabetically to match backend canonical ordering
       final sortedKeys = payloadMap.keys.toList()..sort();
       final sortedMap = {for (final k in sortedKeys) k: payloadMap[k]};
       final payload = json.encode(sortedMap);
@@ -171,20 +225,23 @@ class LicenseService {
     }
   }
 
-  /// Saves the license token to preferences
+  /// Saves the license token
   Future<bool> saveLicenseToken(String tokenStr, [String? licenseKey]) async {
     if (verifyLicenseToken(tokenStr)) {
       if (licenseKey != null) {
         await _prefs.setString('activated_license_key', licenseKey);
       }
-      return await _prefs.setString(_licenseTokenKey, tokenStr.trim());
+      _cachedLicenseToken = tokenStr.trim();
+      await _prefs.setString(_licenseTokenKey, tokenStr.trim());
+      await _setSettingsValue('license_token', tokenStr.trim());
+      return true;
     }
     return false;
   }
 
   /// Get decoded LicenseInfo if a valid license exists
   LicenseInfo? getLicenseInfo() {
-    final tokenStr = _prefs.getString(_licenseTokenKey);
+    final tokenStr = getLicenseToken();
     if (tokenStr == null || tokenStr.isEmpty) return null;
     
     try {
@@ -198,71 +255,224 @@ class LicenseService {
 
   /// Get the raw license token string
   String? getLicenseToken() {
-    return _prefs.getString(_licenseTokenKey);
+    return _cachedLicenseToken ?? _prefs.getString(_licenseTokenKey);
+  }
+
+  /// Helper to parse timestamps in either legacy local time format (no timezone suffix)
+  /// or new UTC format (with 'Z' suffix).
+  DateTime _parseLegacyOrUtc(String timeStr) {
+    if (timeStr.endsWith('Z')) {
+      return DateTime.parse(timeStr); // Parsed directly as UTC
+    } else {
+      // Legacy format (local time). Parse as local and convert to UTC
+      return DateTime.parse(timeStr).toUtc();
+    }
   }
 
   /// Updates the max observed timestamp seen from any source (sales, backups, clocks)
   void updateMaxTimestampSeen(DateTime time) {
-    final maxTimeStr = _prefs.getString(_maxTimestampSeenKey);
+    final utcTime = time.toUtc();
+    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
     if (maxTimeStr != null) {
       try {
-        final currentMax = DateTime.parse(maxTimeStr);
-        if (time.isAfter(currentMax)) {
-          _prefs.setString(_maxTimestampSeenKey, time.toIso8601String());
+        final currentMax = _parseLegacyOrUtc(maxTimeStr);
+        if (utcTime.isAfter(currentMax)) {
+          final utcStr = utcTime.toIso8601String();
+          _cachedMaxTimestampSeen = utcStr;
+          _prefs.setString(_maxTimestampSeenKey, utcStr);
+          _setSettingsValue('max_timestamp_seen', utcStr);
         }
       } catch (_) {}
     } else {
-      _prefs.setString(_maxTimestampSeenKey, time.toIso8601String());
+      final utcStr = utcTime.toIso8601String();
+      _cachedMaxTimestampSeen = utcStr;
+      _prefs.setString(_maxTimestampSeenKey, utcStr);
+      _setSettingsValue('max_timestamp_seen', utcStr);
     }
   }
 
-  /// Strong clock integrity check (checks last system time AND max timestamp seen across all events)
-  bool checkClockIntegrity() {
-    final now = DateTime.now();
+  Future<DateTime?> getMaxOperationalTimestamp() async {
+    try {
+      final db = await _getDb();
+      final results = await db.rawQuery('''
+        SELECT MAX(max_date) as max_date FROM (
+          SELECT MAX(created_at) as max_date FROM sales UNION ALL
+          SELECT MAX(created_at) as max_date FROM orders UNION ALL
+          SELECT MAX(created_at) as max_date FROM financial_transactions
+        )
+      ''');
+      if (results.isNotEmpty && results.first['max_date'] != null) {
+        final dateStr = results.first['max_date'] as String;
+        return DateTime.tryParse(dateStr);
+      }
+    } catch (e) {
+      debugPrint('Failed to query max operational timestamp: $e');
+    }
+    return null;
+  }
+
+  Future<bool> verifyClockIntegrityAsync() async {
+    if (_isTampered) return false;
+
+    final now = DateTime.now().toUtc();
     
     // 1. Check last recorded system time
-    final lastTimeStr = _prefs.getString(_lastSystemTimeKey);
+    final lastTimeStr = _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
     if (lastTimeStr != null) {
       try {
-        final lastTime = DateTime.parse(lastTimeStr);
-        // Allow a small 5 minute grace margin for minor NTP drift
-        if (now.add(const Duration(minutes: 5)).isBefore(lastTime)) {
-          return false; // Time travel / clock tempering!
+        final lastTime = _parseLegacyOrUtc(lastTimeStr);
+        final isLegacy = !lastTimeStr.endsWith('Z');
+        // Legacy local times get a wider 2-hour grace margin to absorb timezone/DST shifts on first-run migration.
+        // New UTC times get a precise 5-minute margin.
+        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        if (now.add(grace).isBefore(lastTime)) {
+          _isTampered = true;
+          return false;
         }
       } catch (_) {
+        _isTampered = true;
         return false;
       }
     }
 
-    // 2. Check max observed timestamp seen from sales/backups
-    final maxTimeStr = _prefs.getString(_maxTimestampSeenKey);
+    // 2. Check max observed timestamp seen
+    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
     if (maxTimeStr != null) {
       try {
-        final maxTime = DateTime.parse(maxTimeStr);
-        if (now.add(const Duration(minutes: 5)).isBefore(maxTime)) {
-          return false; // Time travel / clock tempering!
+        final maxTime = _parseLegacyOrUtc(maxTimeStr);
+        final isLegacy = !maxTimeStr.endsWith('Z');
+        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        if (now.add(grace).isBefore(maxTime)) {
+          _isTampered = true;
+          return false;
         }
       } catch (_) {
+        _isTampered = true;
         return false;
       }
     }
 
-    // Update both trackers with current time
-    _prefs.setString(_lastSystemTimeKey, now.toIso8601String());
+    // 3. Check SQLite operational database max timestamp
+    final maxOpTime = await getMaxOperationalTimestamp();
+    if (maxOpTime != null) {
+      // DB stores local times. Convert it to UTC and apply a 2-hour timezone/DST safety buffer
+      final maxOpTimeUtc = maxOpTime.toUtc();
+      if (now.add(const Duration(hours: 2)).isBefore(maxOpTimeUtc)) {
+        _isTampered = true;
+        return false;
+      }
+      // Auto-update max seen timestamp if operational data has a newer one
+      updateMaxTimestampSeen(maxOpTimeUtc);
+    }
+
+    // Update both trackers in UTC format (with 'Z' suffix)
+    final nowStr = now.toIso8601String();
+    _cachedLastSystemTime = nowStr;
+    _prefs.setString(_lastSystemTimeKey, nowStr);
+    await _setSettingsValue('last_system_time', nowStr);
+    
     updateMaxTimestampSeen(now);
     return true;
   }
 
-  /// Clear stored license (for license renewal or resetting)
-  Future<void> clearLicense() async {
-    await _prefs.remove(_licenseTokenKey);
+  bool _checkClockIntegritySync() {
+    final now = DateTime.now().toUtc();
+    
+    // 1. Check last recorded system time
+    final lastTimeStr = _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
+    if (lastTimeStr != null) {
+      try {
+        final lastTime = _parseLegacyOrUtc(lastTimeStr);
+        final isLegacy = !lastTimeStr.endsWith('Z');
+        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        if (now.add(grace).isBefore(lastTime)) {
+          return false;
+        }
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // 2. Check max observed timestamp seen
+    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
+    if (maxTimeStr != null) {
+      try {
+        final maxTime = _parseLegacyOrUtc(maxTimeStr);
+        final isLegacy = !maxTimeStr.endsWith('Z');
+        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        if (now.add(grace).isBefore(maxTime)) {
+          return false;
+        }
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // Update both trackers in UTC format
+    final nowStr = now.toIso8601String();
+    _cachedLastSystemTime = nowStr;
+    _prefs.setString(_lastSystemTimeKey, nowStr);
+    _setSettingsValue('last_system_time', nowStr);
+    
+    updateMaxTimestampSeen(now);
+    return true;
   }
 
-  /// Get status of license. Returns:
-  /// - 'valid': License is cryptographically signed, matches UUID, and in future.
-  /// - 'expired': License is valid but date has passed.
-  /// - 'unlicensed': No license installed or invalid signature.
-  /// - 'tampered': Clock manipulation detected.
+  /// Strong clock integrity check
+  bool checkClockIntegrity() {
+    if (_isTampered) return false;
+    
+    final now = DateTime.now().toUtc();
+    
+    final lastTimeStr = _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
+    if (lastTimeStr != null) {
+      try {
+        final lastTime = _parseLegacyOrUtc(lastTimeStr);
+        final isLegacy = !lastTimeStr.endsWith('Z');
+        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        if (now.add(grace).isBefore(lastTime)) {
+          _isTampered = true;
+          return false;
+        }
+      } catch (_) {
+        _isTampered = true;
+        return false;
+      }
+    }
+
+    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
+    if (maxTimeStr != null) {
+      try {
+        final maxTime = _parseLegacyOrUtc(maxTimeStr);
+        final isLegacy = !maxTimeStr.endsWith('Z');
+        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        if (now.add(grace).isBefore(maxTime)) {
+          _isTampered = true;
+          return false;
+        }
+      } catch (_) {
+        _isTampered = true;
+        return false;
+      }
+    }
+
+    final nowStr = now.toIso8601String();
+    _cachedLastSystemTime = nowStr;
+    _prefs.setString(_lastSystemTimeKey, nowStr);
+    _setSettingsValue('last_system_time', nowStr);
+    
+    updateMaxTimestampSeen(now);
+    return true;
+  }
+
+  /// Clear stored license
+  Future<void> clearLicense() async {
+    _cachedLicenseToken = null;
+    await _prefs.remove(_licenseTokenKey);
+    await _setSettingsValue('license_token', null);
+  }
+
+  /// Get status of license
   String checkLicenseStatus() {
     if (!checkClockIntegrity()) {
       return 'tampered';
@@ -273,16 +483,13 @@ class LicenseService {
       return 'unlicensed';
     }
 
-    // Verify key holds true integrity checks
-    final tokenStr = _prefs.getString(_licenseTokenKey)!;
+    final tokenStr = getLicenseToken()!;
     if (!verifyLicenseToken(tokenStr)) {
       return 'unlicensed';
     }
 
     final now = DateTime.now();
     if (now.isAfter(info.expiryDate)) {
-      // Emergency Offline Grace Mode: Allow a 7-day grace period for offline POS cash registers
-      // if licensing server heartbeats fail or are temporarily unreachable.
       final graceEnd = info.expiryDate.add(const Duration(days: 7));
       if (now.isAfter(graceEnd)) {
         return 'expired';
@@ -308,7 +515,6 @@ class LicenseService {
     _heartbeatTimer = Timer.periodic(const Duration(hours: 12), (_) async {
       await performHeartbeatCheck(apiClient);
     });
-    // Trigger initial run in background after a brief startup delay
     Future.delayed(const Duration(seconds: 5), () => performHeartbeatCheck(apiClient));
   }
 
@@ -358,12 +564,34 @@ class LicenseService {
           return await saveLicenseToken(tokenStr);
         }
       } else if (response.statusCode == 403 || response.statusCode == 404) {
-        // Blocked, revoked or expired — clear license token locally to force paywall/deactivation!
         await clearLicense();
         return false;
       }
-    } catch (_) {
-      // In case of network errors or server downtime, allow offline grace checks (7-day grace period)
+    } catch (_) {}
+    return false;
+  }
+
+  /// Sync license from server bootstrap and perform heartbeat validation
+  Future<bool> syncLicenseFromServer(ApiClient apiClient) async {
+    try {
+      final response = await apiClient.send('GET', '/api/v1/sync/bootstrap/license-config');
+      debugPrint('[LicenseSync] GET /sync/bootstrap/license-config → ${response.statusCode}');
+      if (response.isSuccess) {
+        final payload = response.json;
+        final data = payload['data'] as Map<String, dynamic>?;
+        if (data != null && data.containsKey('license_key')) {
+          final licenseKey = data['license_key'] as String?;
+          if (licenseKey != null && licenseKey.isNotEmpty) {
+            debugPrint('[LicenseSync] license_key alındı: ${licenseKey.substring(0, licenseKey.length > 8 ? 8 : licenseKey.length)}...');
+            await _prefs.setString('activated_license_key', licenseKey);
+            final result = await performHeartbeatCheck(apiClient);
+            debugPrint('[LicenseSync] Heartbeat sonucu: $result');
+            return result;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Sync license from server failed: $e');
     }
     return false;
   }

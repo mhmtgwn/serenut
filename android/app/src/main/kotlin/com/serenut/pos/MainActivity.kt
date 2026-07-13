@@ -62,6 +62,9 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
+        // SMS Gönderici kanalı
+        SmsSenderPlugin.register(flutterEngine.dartExecutor.binaryMessenger, this)
+        
         // Sunmi yazıcısına bağlan
         connectPrinter()
         

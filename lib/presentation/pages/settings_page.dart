@@ -5,7 +5,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,8 +25,9 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
 import 'dart:io';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
+import 'package:serenutos/presentation/pages/settings/widgets/sms_settings_sheet.dart';
 import 'package:serenutos/presentation/pages/settings/backup_manage_page.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 import 'package:serenutos/presentation/pages/data_transfer_page.dart';
 import 'package:serenutos/providers/repository_providers.dart';
@@ -81,14 +82,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Map<String, List<String>> _cityMap = {};
   bool _citiesLoaded = false;
 
-  void _runGuardedAction(VoidCallback action) {
+  void _runGuardedAction(Permission permission, VoidCallback action, {String title = 'İşlem Doğrulaması', List<UserRole>? allowedRoles}) {
+    final currentUser = ref.read(currentUserProvider);
+    final isAllowedRole = allowedRoles == null || (currentUser != null && allowedRoles.contains(currentUser.role));
+
+    if (!isAllowedRole) {
+      _showAccessDeniedDialog(title);
+      return;
+    }
+
     if (_isUnlocked) {
-      action();
+      final hasAccess = currentUser != null && (
+        currentUser.role == UserRole.sysadmin ||
+        currentUser.role == UserRole.owner ||
+        currentUser.hasPermission(permission.value)
+      );
+      if (hasAccess) {
+        action();
+      } else {
+        _showAccessDeniedDialog(title);
+      }
     } else {
-      PinGateDialog.checkAndShow(
+      requirePermissionAccess(
         context,
-        title: 'Yönetim Doğrulaması',
-        onVerified: () {
+        permission: permission,
+        title: title,
+        onGranted: (_, __) {
           if (mounted) {
             setState(() {
               _isUnlocked = true;
@@ -98,6 +117,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         },
       );
     }
+  }
+
+  void _showAccessDeniedDialog(String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.gpp_bad_rounded, color: Colors.redAccent, size: 28),
+            SizedBox(width: 10),
+            Text('Yetki Hatası', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Bu işlem için gerekli yetkiye sahip değilsiniz.\n(İşlem: $title)',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Kapat', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void updateState(VoidCallback fn) {
@@ -144,11 +189,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _loadSettingsAndPin() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _adminPinCode = prefs.getString('admin_pin_code');
-      _soundNotificationEnabled = prefs.getBool('sound_notification_enabled') ?? false;
-    });
+    // Settings are now stored in SQLite — settingsNotifierProvider loads them.
+    // No SharedPreferences read needed; values are available from settings object in build.
   }
 
   Future<void> _loadAdminPin() async {
@@ -162,6 +204,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  bool _hasPermission(AuthUser? user, Permission permission) {
+    if (user == null) return false;
+    if (user.role == UserRole.sysadmin || user.role == UserRole.owner) {
+      return true;
+    }
+    return user.hasPermission(permission.value);
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -172,6 +222,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final settingsAsyncValue = ref.watch(settingsNotifierProvider);
     final currentUser = ref.watch(currentUserProvider);
+
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -294,7 +352,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _buildProfileCard(AuthUser user) {
     final initials = user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U';
     final roleLabel = switch (user.role) {
+      UserRole.owner => 'Kurucu/Sahip',
       UserRole.admin => 'Yönetici',
+      UserRole.sysadmin => 'Sistem Yöneticisi',
       UserRole.manager => 'Müdür',
       UserRole.cashier => 'Kasiyer',
       UserRole.staff => 'Personel',
@@ -392,65 +452,68 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 1: İşletme Ayarları
     final group1 = <Widget>[];
-    if (_matchesQuery('işletme', 'bilgiler', settings.businessName)) {
+    if (_hasPermission(currentUser, Permission.settingsReceipt) && _matchesQuery('işletme', 'bilgiler', settings.businessName)) {
       group1.add(_buildCategoryRow(
         title: 'İşletme Bilgileri',
         subtitle: settings.businessName.isNotEmpty ? settings.businessName : 'Ayarlanmadı',
         icon: Icons.storefront_rounded,
         color: _kGreen,
-        onTap: () => _showBusinessInfoSheet(settings),
+        onTap: () => _runGuardedAction(Permission.settingsReceipt, () => _showBusinessInfoSheet(settings), title: 'İşletme Bilgileri'),
       ));
     }
-    if (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') || _matchesQuery('müşteri', 'rehber')) {
+    if (_hasPermission(currentUser, Permission.settingsDatabase) && (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') || _matchesQuery('müşteri', 'rehber'))) {
       if (group1.isNotEmpty) group1.add(const _IOSDivider());
       group1.add(_buildCategoryRow(
         title: 'Veri İçeri / Dışarı Aktar',
         subtitle: 'Katalog, Yedek & Müşteriler',
         icon: Icons.import_export_rounded,
         color: _kTeal,
-        onTap: () => _runGuardedAction(() {
+        onTap: () => _runGuardedAction(Permission.settingsDatabase, () {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const DataTransferPage(),
             ),
           );
-        }),
+        }, title: 'Veri İçeri / Dışarı Aktar'),
       ));
     }
-    if (currentUser != null && currentUser.role == UserRole.admin && _matchesQuery('kullanıcı', 'yetki', 'çalışan', 'personel', 'user')) {
+    if (_hasPermission(currentUser, Permission.settingsUsers) &&
+        _matchesQuery('kullanıcı', 'yetki', 'çalışan', 'personel', 'user')) {
       if (group1.isNotEmpty) group1.add(const _IOSDivider());
       group1.add(_buildCategoryRow(
         title: 'Kullanıcı Yönetimi',
         subtitle: 'Çalışanlar ve Yetkilendirme',
         icon: Icons.people_alt_rounded,
         color: _kOrange,
-        onTap: () => _runGuardedAction(() => _showUserManagementPage()),
+        onTap: () => _runGuardedAction(Permission.settingsUsers, () => _showUserManagementPage(), title: 'Kullanıcı Yönetimi'),
       ));
     }
-    if (currentUser != null && currentUser.role == UserRole.admin && (_matchesQuery('bütünlük', 'audit', 'drift', 'ledger') || _matchesQuery('replay', 'cari', 'bakiye'))) {
+    if (_hasPermission(currentUser, Permission.settingsFinance) &&
+        (_matchesQuery('bütünlük', 'audit', 'drift', 'ledger') || _matchesQuery('replay', 'cari', 'bakiye'))) {
       if (group1.isNotEmpty) group1.add(const _IOSDivider());
       group1.add(_buildCategoryRow(
         title: 'Cari Hesap Bütünlüğü & Replay',
         subtitle: 'Bakiye Sapmalarını Denetle ve Onar',
         icon: Icons.account_balance_rounded,
         color: _kPurple,
-        onTap: () => _runGuardedAction(() => _showLedgerReplayDialog()),
+        onTap: () => _runGuardedAction(Permission.settingsFinance, () => _showLedgerReplayDialog(), title: 'Cari Hesap Bütünlüğü & Replay'),
       ));
     }
-    if (currentUser != null && currentUser.role == UserRole.admin && (_matchesQuery('sağlık', 'health', 'veritabanı', 'db', 'check'))) {
+    if (_hasPermission(currentUser, Permission.settingsDatabase) &&
+        (_matchesQuery('sağlık', 'health', 'veritabanı', 'db', 'check'))) {
       if (group1.isNotEmpty) group1.add(const _IOSDivider());
       group1.add(_buildCategoryRow(
         title: 'Veritabanı Sağlık Kontrolü',
         subtitle: 'Yetim Kayıtlar & Negatif Stok Denetimi',
         icon: Icons.health_and_safety_rounded,
         color: _kTeal,
-        onTap: () => _runGuardedAction(() {
+        onTap: () => _runGuardedAction(Permission.settingsDatabase, () {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const DbHealthPage(),
             ),
           );
-        }),
+        }, title: 'Veritabanı Sağlık Kontrolü'),
       ));
     }
 
@@ -461,9 +524,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     // Grup 2: Donanım ve Bağlantılar
-
     final group2 = <Widget>[];
-    if (_matchesQuery('yazıcı', 'bağlantı', 'ip', settings.printerIp ?? '')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('yazıcı', 'bağlantı', 'ip', settings.printerIp ?? '')) {
       group2.add(_buildCategoryRow(
         title: 'Fiş Yazıcı Ayarları',
         subtitle: settings.printerIp ?? 'Tanımlı Değil',
@@ -472,7 +534,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onTap: () => _showReceiptPrinterSheet(settings),
       ));
     }
-    if (_matchesQuery('etiket yazıcı', 'barkod yazıcı', 'ip')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('etiket yazıcı', 'barkod yazıcı', 'ip')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'Etiket Yazıcı Ayarları',
@@ -482,7 +544,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onTap: () => _showLabelPrinterSheet(settings),
       ));
     }
-    if (_matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
+    if (_hasPermission(currentUser, Permission.settingsFinance) && _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'SMS Servis Ayarları',
@@ -492,7 +554,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onTap: () => _showSmsSettingsSheet(settings),
       ));
     }
-    if (_matchesQuery('test', 'diagnostics', 'donanım', 'yazıcı', 'barkod', 'hardware')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('test', 'diagnostics', 'donanım', 'yazıcı', 'barkod', 'hardware')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'Donanım Diagnostics Testleri',
@@ -517,7 +579,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 4: Sistem
     final group4 = <Widget>[];
-    if (_matchesQuery('hata ayıklama', 'debug', 'sistem')) {
+    if (currentUser != null && _matchesQuery('hata ayıklama', 'debug', 'sistem')) {
       group4.add(_buildSwitchRow(
         title: 'Hata Ayıklama Modu (Debug)',
         subtitle: 'Sistem loglarını ve detayları aktif eder',
@@ -528,32 +590,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (_matchesQuery('ses', 'bildirim', 'sound', 'sesli')) {
+    if (currentUser != null && _matchesQuery('ses', 'bildirim', 'sound', 'sesli')) {
       if (group4.isNotEmpty) group4.add(const _IOSDivider());
       group4.add(_buildSwitchRow(
         title: 'Satışta Sesli Bildirim',
         subtitle: 'Satış başarıyla tamamlandığında sesli uyarı verir',
         icon: Icons.volume_up_rounded,
         color: _kBlue,
-        value: _soundNotificationEnabled,
+        value: settings.soundNotificationEnabled,
         onChanged: (val) async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('sound_notification_enabled', val);
-          setState(() {
-            _soundNotificationEnabled = val;
-          });
+          await ref.read(settingsNotifierProvider.notifier)
+              .updateSettings(settings.copyWith(soundNotificationEnabled: val));
         },
-      ));
-    }
-
-    if (_matchesQuery('pin', 'şifre', 'güvenlik')) {
-      if (group4.isNotEmpty) group4.add(const _IOSDivider());
-      group4.add(_buildCategoryRow(
-        title: 'Yönetici PIN Kodu',
-        subtitle: (_adminPinCode != null && _adminPinCode!.isNotEmpty) ? 'Aktif' : 'Devre Dışı',
-        icon: Icons.lock_rounded,
-        color: _kTeal,
-        onTap: () => _showPinConfigDialog(),
       ));
     }
 
@@ -566,21 +614,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Grup 5: Ürün & Operasyon Merkezi (Phase 4-6)
     final group5 = <Widget>[];
 
-    if (_matchesQuery('lisans', 'license', 'abonelik', 'tier', 'plan', 'cihaz')) {
+    if (_hasPermission(currentUser, Permission.settingsLicense) && _matchesQuery('lisans', 'license', 'abonelik', 'tier', 'plan', 'cihaz')) {
       group5.add(_buildCategoryRow(
         title: 'Lisans Yönetimi',
         subtitle: _buildLicenseSubtitleFromRef(),
         icon: Icons.verified_rounded,
         color: _kGreen,
-        onTap: () => _runGuardedAction(() {
+        onTap: () => _runGuardedAction(Permission.settingsLicense, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const LicenseManagementPage()),
           );
-        }),
+        }, title: 'Lisans Yönetimi'),
       ));
     }
 
-    if (_matchesQuery('yazıcı', 'kuyruk', 'fiş', 'print', 'queue', 'baskı')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('yazıcı', 'kuyruk', 'fiş', 'print', 'queue', 'baskı')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
         title: 'Yazıcı Kuyruğu',
@@ -595,7 +643,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (_matchesQuery('sms', 'mesaj', 'geçmiş', 'history', 'bildirim')) {
+    if (_hasPermission(currentUser, Permission.settingsAudit) && _matchesQuery('sms', 'mesaj', 'geçmiş', 'history', 'bildirim')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
         title: 'SMS Geçmişi',
@@ -610,7 +658,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (currentUser != null && currentUser.role == UserRole.admin &&
+    if (currentUser?.role == UserRole.sysadmin &&
         _matchesQuery('admin', 'kontrol', 'merkezi', 'observability', 'sistem', 'operasyon')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
@@ -618,11 +666,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         subtitle: 'Sistem izleme, sync, incident ve daha fazlası',
         icon: Icons.admin_panel_settings_rounded,
         color: _kPurple,
-        onTap: () => _runGuardedAction(() {
+        onTap: () => _runGuardedAction(Permission.settingsView, () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AdminPage()),
           );
-        }),
+        }, title: 'Admin Kontrol Merkezi', allowedRoles: [UserRole.sysadmin]),
       ));
     }
 
@@ -634,42 +682,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 6: Gelişmiş Yönetim (PIN Korumalı)
     final group6 = <Widget>[];
-    if (currentUser != null && currentUser.role == UserRole.admin) {
-      if (_matchesQuery('finans', 'hub', 'cari', 'raporlar', 'excel', 'kdv')) {
-        group6.add(_buildCategoryRow(
-          title: 'Finans Hub & Raporlar',
-          subtitle: 'Ciro raporu, KDV analizleri ve Excel çıktısı',
-          icon: Icons.account_balance_wallet_rounded,
-          color: _kGreen,
-          onTap: () => context.push(AppRoutes.finance),
-        ));
-      }
-      if (_matchesQuery('denetim', 'merkezi', 'audit', 'fiyat', 'log')) {
-        if (group6.isNotEmpty) group6.add(const _IOSDivider());
-        group6.add(_buildCategoryRow(
-          title: 'Denetim Merkezi (Audit Center)',
-          subtitle: 'Fiyat değişimleri, silmeler ve sistem logları',
-          icon: Icons.assignment_turned_in_rounded,
-          color: _kBlue,
-          onTap: () => _runGuardedAction(() {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditCenterPage()));
-          }),
-        ));
-      }
-      if (_matchesQuery('kurtarma', 'recovery', 'çöp', 'silinen')) {
-        if (group6.isNotEmpty) group6.add(const _IOSDivider());
-        group6.add(_buildCategoryRow(
-          title: 'Veri Kurtarma Merkezi',
-          subtitle: 'Silinen ürünleri, müşterileri ve satışları kurtarın',
-          icon: Icons.restore_from_trash_rounded,
-          color: _kPink,
-          onTap: () => _runGuardedAction(() {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryCenterPage()));
-          }),
-        ));
-      }
+    if (_hasPermission(currentUser, Permission.settingsFinance) && _matchesQuery('finans', 'hub', 'cari', 'raporlar', 'excel', 'kdv')) {
+      group6.add(_buildCategoryRow(
+        title: 'Finans Hub & Raporlar',
+        subtitle: 'Ciro raporu, KDV analizleri ve Excel çıktısı',
+        icon: Icons.account_balance_wallet_rounded,
+        color: _kGreen,
+        onTap: () => _runGuardedAction(Permission.settingsFinance, () => context.push(AppRoutes.finance), title: 'Finans Hub & Raporlar'),
+      ));
     }
-    
+    if (_hasPermission(currentUser, Permission.settingsAudit) && _matchesQuery('denetim', 'merkezi', 'audit', 'fiyat', 'log')) {
+      if (group6.isNotEmpty) group6.add(const _IOSDivider());
+      group6.add(_buildCategoryRow(
+        title: 'Denetim Merkezi (Audit Center)',
+        subtitle: 'Fiyat değişimleri, silmeler ve sistem logları',
+        icon: Icons.assignment_turned_in_rounded,
+        color: _kBlue,
+        onTap: () => _runGuardedAction(Permission.settingsAudit, () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditCenterPage()));
+        }, title: 'Denetim Merkezi'),
+      ));
+    }
+    if (_hasPermission(currentUser, Permission.settingsRecovery) && _matchesQuery('kurtarma', 'recovery', 'çöp', 'silinen')) {
+      if (group6.isNotEmpty) group6.add(const _IOSDivider());
+      group6.add(_buildCategoryRow(
+        title: 'Veri Kurtarma Merkezi',
+        subtitle: 'Silinen ürünleri, müşterileri ve satışları kurtarın',
+        icon: Icons.restore_from_trash_rounded,
+        color: _kPink,
+        onTap: () => _runGuardedAction(Permission.settingsRecovery, () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryCenterPage()));
+        }, title: 'Veri Kurtarma Merkezi'),
+      ));
+    }
+
     if (group6.isNotEmpty) {
       groups.add(_buildSectionHeader('GELİŞMİŞ YÖNETİM VE FİNANS'));
       groups.add(_buildRoundedCard(group6));
@@ -877,7 +923,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ”€”€ Yetki / Profil Detay Modalı ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   void _showProfileDetails(AuthUser user) {
     final roleLabel = switch (user.role) {
+      UserRole.owner => 'Kurucu/Sahip',
       UserRole.admin => 'Yönetici',
+      UserRole.sysadmin => 'Sistem Yöneticisi',
       UserRole.manager => 'Müdür',
       UserRole.cashier => 'Kasiyer',
       UserRole.staff => 'Personel',

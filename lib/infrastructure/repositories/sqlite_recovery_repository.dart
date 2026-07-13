@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/sqlite_recovery_repository.dart
+// lib/infrastructure/repositories/sqlite_recovery_repository.dart
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/recovery_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -79,8 +79,8 @@ class SqliteRecoveryRepository implements IRecoveryRepository {
         );
         // Also restore related financial transactions if soft-deleted
         await db.transaction((txn) async {
-          await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
           try {
+            await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
             await txn.update(
               'financial_transactions',
               {
@@ -124,9 +124,9 @@ class SqliteRecoveryRepository implements IRecoveryRepository {
           // Delete sale items
           await txn.delete('sale_items', where: 'sale_id = ?', whereArgs: [id]);
           
-          // Delete related financial transactions (requires immutability bypass)
-          await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
           try {
+            // Delete related financial transactions (requires immutability bypass)
+            await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
             await txn.delete('financial_transactions', where: 'reference_id = ?', whereArgs: [id]);
           } finally {
             await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');

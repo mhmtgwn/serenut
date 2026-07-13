@@ -163,7 +163,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       createdAt: DateTime.now(),
     );
     final rawPassword = state.admin.password.isNotEmpty ? state.admin.password : state.admin.pin;
-    await authService.createUser(adminUser, rawPassword);
+    await authService.createUser(adminUser, rawPassword, pin: state.admin.pin);
 
     // 2. İşletme profilini DB'ye kaydet
     final profileRepo = SqliteBusinessProfileRepository(gateway);

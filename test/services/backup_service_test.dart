@@ -49,9 +49,8 @@ void main() {
     setUpAll(() async {
       SharedPreferences.setMockInitialValues({});
       backupService = BackupService();
-      dbPath = join(await getDatabasesPath(), 'serenut_pos.db');
+      dbPath = join(await getDatabasesPath(), 'serenut_pos_backup_test.db');
 
-      // Delete old database files to ensure onCreate runs cleanly
       final file = File(dbPath);
       if (await file.exists()) await file.delete();
       final walFile = File('$dbPath-wal');
@@ -60,39 +59,16 @@ void main() {
       if (await shmFile.exists()) await shmFile.delete();
 
       DatabaseManager.overrideDatabasePath = dbPath;
+      DatabaseManager().reset();
 
-      // Create a mock active database with mandatory tables
-      final db = await openDatabase(dbPath, version: 3, onCreate: (db, version) async {
-        await db.execute('CREATE TABLE settings (id INTEGER PRIMARY KEY, business_name TEXT)');
-        await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT)');
-        await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY)');
-        await db.execute('''
-          CREATE TABLE financial_transactions (
-            id TEXT PRIMARY KEY,
-            type TEXT NOT NULL DEFAULT 'sale',
-            customer_id TEXT NOT NULL,
-            amount REAL NOT NULL DEFAULT 0,
-            paid_amount REAL NOT NULL DEFAULT 0,
-            debt_amount REAL NOT NULL DEFAULT 0,
-            reference_id TEXT,
-            metadata TEXT,
-            created_at TEXT NOT NULL
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE customers (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT,
-            phone TEXT,
-            balance REAL NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
-          )
-        ''');
-        await db.execute('CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT)');
-        await db.insert('settings', {'business_name': 'Test Market A.S.'});
+      // Open via DatabaseManager to create clean, real database structure
+      final db = await DatabaseManager().getDatabase();
+      await db.update('settings', {
+        'business_name': 'Test Market A.S.',
+        'business_phone': '555',
+        'business_address': 'address',
       });
-      await db.close();
+      DatabaseManager().reset(); // Reset to close cache
     });
 
     tearDownAll(() async {

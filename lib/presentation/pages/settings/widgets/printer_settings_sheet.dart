@@ -339,6 +339,19 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () async {
+                final currentUser = ref.read(currentUserProvider);
+                final hasAccess = currentUser != null && (
+                  currentUser.role == UserRole.sysadmin ||
+                  currentUser.role == UserRole.owner ||
+                  currentUser.role == UserRole.admin ||
+                  currentUser.hasPermission(Permission.settingsPrinter.value)
+                );
+                if (!hasAccess) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Yazıcı ayarlarını test etmek için yetkiniz yok.'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                  );
+                  return;
+                }
                 final testSet = widget.settings.copyWith(
                   printerName: connectionType == 'sunmi' ? 'sunmi' : (connectionType == 'bluetooth' ? selectedDeviceMac : nameCtrl.text.trim()),
                   printerIp: connectionType == 'network' ? ipCtrl.text.trim() : null,
@@ -367,6 +380,19 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
             const SizedBox(height: 12),
 
             widget.pageState._buildModalSaveButton(onTap: () async {
+              final currentUser = ref.read(currentUserProvider);
+              final hasAccess = currentUser != null && (
+                currentUser.role == UserRole.sysadmin ||
+                currentUser.role == UserRole.owner ||
+                currentUser.role == UserRole.admin ||
+                currentUser.hasPermission(Permission.settingsPrinter.value)
+              );
+              if (!hasAccess) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Yazıcı ayarlarını kaydetmek için yetkiniz yok.'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                );
+                return;
+              }
               if (_formKey.currentState!.validate()) {
                 final updated = widget.settings.copyWith(
                   printerName: connectionType == 'sunmi' ? 'sunmi' : (connectionType == 'bluetooth' ? selectedDeviceMac : nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim()),
@@ -455,6 +481,19 @@ class _LabelPrinterSheetState extends ConsumerState<_LabelPrinterSheet> {
             ),
             const SizedBox(height: 24),
             widget.pageState._buildModalSaveButton(onTap: () async {
+              final currentUser = ref.read(currentUserProvider);
+              final hasAccess = currentUser != null && (
+                currentUser.role == UserRole.sysadmin ||
+                currentUser.role == UserRole.owner ||
+                currentUser.role == UserRole.admin ||
+                currentUser.hasPermission(Permission.settingsPrinter.value)
+              );
+              if (!hasAccess) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Yazıcı ayarlarını kaydetmek için yetkiniz yok.'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                );
+                return;
+              }
               if (_formKey.currentState!.validate()) {
                 try {
                   final port = int.tryParse(portCtrl.text.trim()) ?? 9100;

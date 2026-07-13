@@ -1431,4 +1431,30 @@ class InMemoryUserRepository implements IUserRepository {
       'pin_hash': _passwordHashes['${userId}_pin'],
     };
   }
+
+  static final Map<String, int> _failedAttempts = {};
+  static final Map<String, String?> _lockedUntil = {};
+
+  @override
+  Future<Map<String, dynamic>> getFailedPinAttempts(String userId) async {
+    return {
+      'failed_pin_attempts': _failedAttempts[userId] ?? 0,
+      'locked_until': _lockedUntil[userId],
+    };
+  }
+
+  @override
+  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5}) async {
+    final attempts = (_failedAttempts[userId] ?? 0) + 1;
+    _failedAttempts[userId] = attempts;
+    if (attempts >= maxAttempts) {
+      _lockedUntil[userId] = DateTime.now().add(Duration(minutes: lockoutMinutes)).toIso8601String();
+    }
+  }
+
+  @override
+  Future<void> resetPinAttempts(String userId) async {
+    _failedAttempts[userId] = 0;
+    _lockedUntil[userId] = null;
+  }
 }

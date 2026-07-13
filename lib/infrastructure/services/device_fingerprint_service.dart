@@ -54,11 +54,14 @@ class DeviceFingerprintService {
     return sha256.convert(bytes).toString();
   }
 
-  /// Computes a hardware hash that is slightly more robust (e.g. CPU + OS arch)
+  /// Computes a hardware hash that is slightly more robust (e.g. CPU + OS arch).
+  /// NOTE: Platform.version (Dart SDK) intentionally excluded — it changes on
+  /// every app update and would trigger false-positive hardware-change events.
   String getHardwareHash() {
     final buffer = StringBuffer();
     buffer.write(Platform.numberOfProcessors);
-    buffer.write(Platform.version); // Dart version and target architecture
+    buffer.write(Platform.operatingSystemVersion); // OS version — SDK-independent
+    buffer.write(Platform.localHostname);           // Machine name — stable across updates
     if (Platform.isWindows) {
       buffer.write(Platform.environment['PROCESSOR_ARCHITECTURE'] ?? '');
     }

@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/config/router.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/providers/repository_providers.dart';
@@ -547,37 +547,45 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   }
 
   void _confirmDelete(BuildContext context, ProductEntity product) {
-    PinGateDialog.checkAndShow(context, title: 'Ürün Silme Yetkisi', onVerified: () {
-      showDialog(
-        context: context,
-        builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Ürünü Sil'),
-          content: Text('"${product.name}" ürününü silmek istediğinize emin misiniz?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kRed,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {
-                ref.read(productsControllerProvider.notifier).deleteProduct(product.id);
-                ref.invalidate(dashboardProvider);
-                Navigator.pop(context);
-              },
-              child: const Text('Sil'),
-            ),
-          ],
+    requireAdminAccess(
+      context,
+      title: 'Ürün Silme Yetkisi',
+      requirePin: true,
+      onGranted: (approvedByUserId, approvedByUserName) {
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Ürünü Sil'),
+              content: Text('"${product.name}" ürününü silmek istediğinize emin misiniz?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('İptal'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kRed,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    ref.read(productsControllerProvider.notifier).deleteProduct(
+                      product.id,
+                      approvedByUserId: approvedByUserId,
+                      approvedByUserName: approvedByUserName,
+                    );
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Sil'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-    });
   }
 
   Widget _buildCategoryListRow(

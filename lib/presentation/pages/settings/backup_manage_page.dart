@@ -1,11 +1,14 @@
-﻿// lib/presentation/pages/settings/backup_manage_page.dart
+// lib/presentation/pages/settings/backup_manage_page.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/domain/models/permission.dart';
 
 class BackupManagePage extends ConsumerStatefulWidget {
   const BackupManagePage({super.key});
@@ -92,7 +95,12 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
     if (confirm != true) return;
 
     if (!mounted) return;
-    PinGateDialog.checkAndShow(context, title: 'Yedek Geri Yükleme Yetkisi', onVerified: () async {
+    requirePermissionAccess(
+      context,
+      permission: Permission.settingsDatabase,
+      title: 'Yedek Geri Yükleme Yetkisi',
+      requirePin: true,
+      onGranted: (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
         await ref.read(backupServiceProvider).restoreDatabase(file.path);
@@ -130,6 +138,22 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider);
+    final hasAccess = currentUser != null && (
+      currentUser.role == UserRole.sysadmin ||
+      currentUser.role == UserRole.owner ||
+      currentUser.role == UserRole.admin ||
+      currentUser.hasPermission(Permission.settingsDatabase.value)
+    );
+
+    if (!hasAccess) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Bu sayfaya erişim yetkiniz bulunmuyor.'),
+        ),
+      );
+    }
+
     return FullScreenSettingsPage(
       title: 'Yedekleme ve Geri Yükleme',
       actions: [

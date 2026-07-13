@@ -32,6 +32,8 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/pages/sync_conflict_page.dart';
 import 'package:serenutos/presentation/pages/license_page.dart' show LicenseManagementPage;
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
+import 'package:serenutos/presentation/pages/settings/catalog_import_wizard_page.dart';
+import 'package:serenutos/domain/models/permission.dart' show UserRole, Permission;
 import 'package:serenutos/presentation/pages/operations_hub_page.dart';
 import 'package:serenutos/presentation/pages/finance_hub_page.dart';
 import 'package:serenutos/presentation/pages/system_hub_page.dart';
@@ -65,23 +67,43 @@ class AppRoutes {
   static const reports = '/reports';
   static const orders = '/orders';
   static const orderDetail = '/orders/detail';
-  static const saleDetail = '/sales/detail';
+  static const orderAdd = '/orders/add';
+  static const orderEdit = '/orders/edit';
   static const settings = '/settings';
-
-  // ── Phase 4-6 New Routes ──────────────────────────────────────────────
-  static const syncConflict = '/sync-conflict';
-  static const license     = '/license';
-  static const admin       = '/admin';
+  static const catalogImportWizard = '/settings/catalog-import';
+  static const syncConflict = '/settings/sync-conflict';
+  static const license = '/settings/license';
+  static const admin = '/admin';
+  static const finance = '/finance';
+  static const printing = '/printing';
+  static const operations  = '/operations';
+  static const system      = '/system';
   static const printQueue  = '/settings/print-queue';
   static const smsHistory  = '/settings/sms-history';
   static const dbHealth    = '/settings/db-health';
-  // ── Phase A Hub Routes ────────────────────────────────────────────────
-  static const operations  = '/operations';
-  static const finance     = '/finance';
-  static const system      = '/system';
   static const management  = '/management';
   static const mobileAdmin = '/admin/mobile-dashboard';
   static const ticketChat  = '/admin/mobile-dashboard/ticket';
+}
+
+String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
+  final user = ProviderScope.containerOf(context).read(currentUserProvider);
+  if (user == null || !(user.role == UserRole.admin || user.role == UserRole.owner || user.role == UserRole.sysadmin)) {
+    return AppRoutes.home;
+  }
+  return null;
+}
+
+String? _roleOrPermissionRedirect(BuildContext context, Permission permission) {
+  final user = ProviderScope.containerOf(context).read(currentUserProvider);
+  if (user == null) return AppRoutes.login;
+  if (user.role == UserRole.sysadmin || user.role == UserRole.owner) {
+    return null;
+  }
+  if (user.hasPermission(permission.value)) {
+    return null;
+  }
+  return AppRoutes.home;
 }
 
 /// GoRouter configuration provider
@@ -204,6 +226,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.settings,
         name: 'settings',
         builder: (context, state) => const SettingsPage(),
+        redirect: (context, state) {
+          final user = ProviderScope.containerOf(context).read(currentUserProvider);
+          return user == null ? AppRoutes.login : null;
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.catalogImportWizard,
+        name: 'catalogImportWizard',
+        builder: (context, state) => const CatalogImportWizardPage(),
+        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsDatabase),
       ),
 
       // ── Phase 4-6 New Free Routes ─────────────────────────────────────
@@ -216,16 +248,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.license,
         name: 'license',
         builder: (context, state) => const LicenseManagementPage(),
+        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsLicense),
       ),
       GoRoute(
         path: AppRoutes.admin,
         name: 'admin',
         builder: (context, state) => const AdminPage(),
+        redirect: _adminOnlyRedirect,
       ),
       GoRoute(
         path: AppRoutes.mobileAdmin,
         name: 'mobileAdmin',
         builder: (context, state) => const MobileAdminDashboard(),
+        redirect: _adminOnlyRedirect,
       ),
       GoRoute(
         path: '${AppRoutes.ticketChat}/:id',
@@ -240,16 +275,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.printQueue,
         name: 'printQueue',
         builder: (context, state) => const PrintQueuePage(),
+        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsPrinter),
       ),
       GoRoute(
         path: AppRoutes.smsHistory,
         name: 'smsHistory',
         builder: (context, state) => const SmsHistoryPage(),
+        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsAudit),
       ),
       GoRoute(
         path: AppRoutes.dbHealth,
         name: 'dbHealth',
         builder: (context, state) => const DbHealthPage(),
+        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsDatabase),
       ),
 
       // ── Reports (free route — no navbar tab) ─────────────────────────

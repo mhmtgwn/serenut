@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/license_page.dart
+// lib/presentation/pages/license_page.dart
 // Serenut POS — Lisans Yönetim Ekranı
 // NOTE: Named LicenseManagementPage to avoid conflict with Flutter Material's LicensePage
 // Created: Phase 6 — 01 Jul 2026
@@ -87,11 +87,7 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
           _buildFeatureMatrix(info?.tier ?? LicenseTier.basic),
           const SizedBox(height: 16),
 
-          // ── License Token Entry ─────────────────────────────────────────
-          _buildSectionHeader('LİSANS ANAHTARI GİR'),
-          const SizedBox(height: 8),
-          _buildTokenEntryCard(),
-          const SizedBox(height: 16),
+
 
           // ── Device UUID ─────────────────────────────────────────────────
           _buildSectionHeader('CİHAZ KİMLİĞİ'),

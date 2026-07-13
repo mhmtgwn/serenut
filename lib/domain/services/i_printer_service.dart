@@ -1,10 +1,13 @@
-﻿// lib/domain/services/i_printer_service.dart
+// lib/domain/services/i_printer_service.dart
 // PHASE 0 — Printer Service Domain Contract
 
 import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart'; // Will be updated to domain-level later
+
+/// Printer purpose distinguishing between receipt and label printing
+enum PrinterPurpose { receipt, label }
 
 /// Print Queue Job Model
 class PrintJob {
@@ -80,4 +83,10 @@ abstract class IPrinterService implements Listenable {
 
   /// Prints a diagnostics self-test receipt
   Future<void> printDiagnosticsTest(Settings settings, int paperWidth);
+
+  /// Retries a persisted print job by sending it back to the active failover chain
+  Future<void> retryPersistedJob(dynamic job, Settings settings);
+
+  /// Automatically scans and retries all pending jobs in the persistent queue
+  Future<void> processPendingQueue(Settings settings);
 }

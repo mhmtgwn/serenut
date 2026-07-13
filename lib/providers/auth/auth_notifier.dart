@@ -8,7 +8,6 @@ import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/services/auth_service.dart' hide AuthException;
 import 'package:serenutos/presentation/state/app_state.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
 
 
 /// Riverpod StateNotifier wrapping AuthService
@@ -34,6 +33,15 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
 
   AppAuthNotifier(this._authService)
     : super(AppState.loading()) {
+    // Bind session expiration to trigger state updates & routing redirects
+    _authService.onSessionExpiredCallback = () {
+      state = AppState.error(
+        AuthException(message: 'Oturum süresi doldu. Lütfen tekrar giriş yapın.', code: 'AUTH_003'),
+      );
+    };
+    _authService.onUserUpdatedCallback = (updatedUser) {
+      state = AppState.success(updatedUser);
+    };
     // Initialize: load stored user on startup
     _initializeUser();
   }
@@ -97,7 +105,6 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   /// Throws: Never
   Future<void> logout() async {
     try {
-      PinSessionCache.instance.invalidate(); // Oturum cache'ini sıfırla
       await _authService.logout();
       state = AppState.error(
         AuthException(message: 'User logged out', code: 'AUTH_002'),
@@ -126,7 +133,6 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
 
   /// Directly set authenticated user state (used after setup/activation on Web)
   Future<void> loginWithUser(AuthUser user) async {
-    PinSessionCache.instance.invalidate(); // Kullanıcı değişiminde cache'i sıfırla
     await _authService.setCurrentUser(user);
     state = AppState.success(user);
   }

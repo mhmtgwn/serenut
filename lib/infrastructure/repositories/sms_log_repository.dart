@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/sms_log_repository.dart
+// lib/infrastructure/repositories/sms_log_repository.dart
 // Serenut POS — SMS Log Repository
 // Persists SMS send attempts to SQLite sms_logs table.
 // Created: 01 Jul 2026
@@ -149,6 +149,49 @@ class SmsLogRepository {
     }
   }
 
+  /// Fetch all active campaign logs (status: pending or sending) for bulk_debt_reminder.
+  Future<List<SmsLogEntry>> getActiveCampaignLogs() async {
+    if (kIsWeb) {
+      return _inMemoryLogs
+          .where((e) => (e.status == SmsLogStatus.pending || e.status == SmsLogStatus.sending) && e.eventType == 'bulk_debt_reminder')
+          .toList();
+    }
+    try {
+      final database = await _db.getDatabase();
+      final rows = await database.query(
+        'sms_logs',
+        where: "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
+        orderBy: 'created_at ASC',
+      );
+      return rows.map(SmsLogEntry.fromMap).toList();
+    } catch (e) {
+      print('⚠️ SmsLogRepository.getActiveCampaignLogs error: $e');
+      return [];
+    }
+  }
+
+  /// Mark all active campaign logs as cancelled.
+  Future<void> cancelActiveCampaignLogs() async {
+    if (kIsWeb) {
+      for (var i = 0; i < _inMemoryLogs.length; i++) {
+        if ((_inMemoryLogs[i].status == SmsLogStatus.pending || _inMemoryLogs[i].status == SmsLogStatus.sending) && _inMemoryLogs[i].eventType == 'bulk_debt_reminder') {
+          _inMemoryLogs[i] = _inMemoryLogs[i].copyWith(status: SmsLogStatus.cancelled);
+        }
+      }
+      return;
+    }
+    try {
+      final database = await _db.getDatabase();
+      await database.update(
+        'sms_logs',
+        {'status': 'cancelled'},
+        where: "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
+      );
+    } catch (e) {
+      print('⚠️ SmsLogRepository.cancelActiveCampaignLogs error: $e');
+    }
+  }
+
   /// Delete log entries older than [days] days.
   Future<void> pruneOldLogs({int days = 90}) async {
     if (kIsWeb) {
@@ -166,6 +209,49 @@ class SmsLogRepository {
       );
     } catch (e) {
       print('⚠️ SmsLogRepository.pruneOldLogs error: $e');
+    }
+  }
+
+  /// Reset stuck SMS logs (status: sending) to interrupted status.
+  Future<void> resetStuckJobs() async {
+    if (kIsWeb) {
+      for (var i = 0; i < _inMemoryLogs.length; i++) {
+        if (_inMemoryLogs[i].status == SmsLogStatus.sending) {
+          _inMemoryLogs[i] = _inMemoryLogs[i].copyWith(status: SmsLogStatus.interrupted);
+        }
+      }
+      return;
+    }
+    try {
+      final database = await _db.getDatabase();
+      await database.update(
+        'sms_logs',
+        {'status': SmsLogStatus.interrupted.value},
+        where: "status = ?",
+        whereArgs: ['sending'],
+      );
+    } catch (e) {
+      print('⚠️ SmsLogRepository.resetStuckJobs error: $e');
+    }
+  }
+
+  /// Fetch entries with status 'interrupted'.
+  Future<List<SmsLogEntry>> getUnknownLogs() async {
+    if (kIsWeb) {
+      return _inMemoryLogs.where((e) => e.status == SmsLogStatus.interrupted).toList();
+    }
+    try {
+      final database = await _db.getDatabase();
+      final rows = await database.query(
+        'sms_logs',
+        where: 'status = ?',
+        whereArgs: [SmsLogStatus.interrupted.value],
+        orderBy: 'created_at ASC',
+      );
+      return rows.map(SmsLogEntry.fromMap).toList();
+    } catch (e) {
+      print('⚠️ SmsLogRepository.getUnknownLogs error: $e');
+      return [];
     }
   }
 }

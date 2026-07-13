@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/realtime/connection_manager.dart
+// lib/infrastructure/realtime/connection_manager.dart
 // Central coordinator of the real-time websocket client
 
 import 'dart:async';
@@ -11,6 +11,7 @@ import 'package:serenutos/infrastructure/realtime/websocket_manager.dart';
 import 'package:serenutos/infrastructure/realtime/heartbeat_manager.dart';
 import 'package:serenutos/infrastructure/realtime/reconnect_manager.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
+import 'package:serenutos/infrastructure/network/api_client.dart';
 
 class ConnectionManager {
   final WebSocketManager wsManager;
@@ -65,36 +66,53 @@ class ConnectionManager {
 
   Future<void> connect() async {
     _explicitClose = false;
-    if (_status == RealtimeStatus.connected || _status == RealtimeStatus.connecting) return;
+    if (_status == RealtimeStatus.connected || 
+        _status == RealtimeStatus.connecting || 
+        _status == RealtimeStatus.reconnecting) return;
+
+    if (_reconnectTimer != null) {
+      _reconnectTimer!.cancel();
+      _reconnectTimer = null;
+    }
 
     _setStatus(reconnectManager.attempts > 0 ? RealtimeStatus.reconnecting : RealtimeStatus.connecting);
 
-    final user = await authService.getCurrentUser();
-    if (user == null) {
-      _setStatus(RealtimeStatus.disconnected);
-      return;
-    }
+    try {
+      final user = await authService.getCurrentUser();
+      if (user == null) {
+        _setStatus(RealtimeStatus.disconnected);
+        return;
+      }
 
-    String? token = authService.getJwtToken();
-    if (token == null) {
-      final refreshed = await authService.refreshToken();
-      if (refreshed) {
-        token = authService.getJwtToken();
+      String? token = authService.getJwtToken();
+      if (token == null) {
+        final refreshed = await authService.refreshToken();
+        if (refreshed) {
+          token = authService.getJwtToken();
+        }
+      }
+
+      if (token == null) {
+        _setStatus(RealtimeStatus.disconnected);
+        authService.triggerSessionExpired();
+        return;
+      }
+
+      final uri = Uri.parse(wsBaseUrl);
+      final wsUrlWithParams = uri.replace(queryParameters: {
+        'token': token,
+        'reconnectCount': reconnectManager.attempts.toString(),
+      }).toString();
+
+      wsManager.connect(wsUrlWithParams);
+    } catch (e) {
+      _setStatus(RealtimeStatus.disconnected);
+      if (e is ApiException && (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
+        authService.triggerSessionExpired();
+      } else {
+        _scheduleReconnect();
       }
     }
-
-    if (token == null) {
-      _setStatus(RealtimeStatus.disconnected);
-      return;
-    }
-
-    final uri = Uri.parse(wsBaseUrl);
-    final wsUrlWithParams = uri.replace(queryParameters: {
-      'token': token,
-      'reconnectCount': reconnectManager.attempts.toString(),
-    }).toString();
-
-    wsManager.connect(wsUrlWithParams);
   }
 
   void subscribe(String topic) {
@@ -168,12 +186,29 @@ class ConnectionManager {
     _setStatus(RealtimeStatus.reconnecting);
 
     _reconnectTimer = Timer(delay, () async {
-      final refreshed = await authService.refreshToken();
-      if (!refreshed) {
+      _reconnectTimer = null;
+      try {
+        final refreshed = await authService.refreshToken();
+        if (!refreshed) {
+          // Permanent auth error (invalid/expired refresh token, session revoked, replay attack)
+          // Set status and trigger immediate session expired redirect to login page.
+          _setStatus(RealtimeStatus.disconnected);
+          authService.triggerSessionExpired();
+          return;
+        }
+        
+        // Reset status to disconnected temporarily so connect() isn't filtered out
+        if (_status == RealtimeStatus.reconnecting) {
+          _status = RealtimeStatus.disconnected;
+        }
+        
+        connect();
+      } catch (e) {
+        // Temporary network / connection error (timeout, SocketException, offline)
+        // Keep attempting reconnection. We do not abort the reconnect loop.
         _setStatus(RealtimeStatus.disconnected);
-        return;
+        _scheduleReconnect();
       }
-      connect();
     });
   }
 

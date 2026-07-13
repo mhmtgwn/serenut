@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/management_hub_page.dart
+// lib/presentation/pages/management_hub_page.dart
 // Serenut OS — Admin Control Plane & Management Hub
 // Redesigned to match SettingsPage design guidelines: 01 Jul 2026
 
@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/license_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
@@ -43,10 +43,10 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
     if (_isUnlocked) {
       action();
     } else {
-      PinGateDialog.checkAndShow(
+      requireAdminAccess(
         context,
         title: 'Yönetim Doğrulaması',
-        onVerified: () {
+        onGranted: (approvedByUserId, approvedByUserName) {
           if (mounted) {
             setState(() {
               _isUnlocked = true;

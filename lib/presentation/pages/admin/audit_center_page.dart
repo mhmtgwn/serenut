@@ -1,9 +1,12 @@
-﻿// lib/presentation/pages/admin/audit_center_page.dart
+// lib/presentation/pages/admin/audit_center_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
 import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/domain/models/permission.dart';
 
 class AuditCenterPage extends ConsumerStatefulWidget {
   const AuditCenterPage({super.key});
@@ -84,6 +87,26 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider);
+    final hasAccess = currentUser != null && (
+      currentUser.role == UserRole.sysadmin ||
+      currentUser.role == UserRole.owner ||
+      currentUser.role == UserRole.admin ||
+      currentUser.hasPermission(Permission.settingsAudit.value)
+    );
+
+    if (!hasAccess) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: Text(
+            'Bu sayfaya erişim yetkiniz bulunmuyor.',
+            style: TextStyle(color: Colors.white, fontSize: 16),
+          ),
+        ),
+      );
+    }
+
     const kDarkBackground = Color(0xFF0F172A); // Slate 900
     const kCardBg = Color(0xFF1E293B); // Slate 800
     const kBorderColor = Color(0xFF334155); // Slate 700

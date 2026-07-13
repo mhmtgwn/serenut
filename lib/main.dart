@@ -159,6 +159,14 @@ class _MyAppState extends ConsumerState<MyApp> {
       if (crashed) {
         await recovery.recoverInterruptedSyncJobs();
       }
+
+      // Sweep stuck sending SMS logs to interrupted state
+      try {
+        final smsLogRepo = ref.read(smsLogRepositoryProvider);
+        await smsLogRepo.resetStuckJobs();
+      } catch (e) {
+        debugPrint('Failed to reset stuck SMS jobs at startup: $e');
+      }
     } catch (e) {
       debugPrint('Integrity diagnostics run failure: $e');
     }

@@ -214,6 +214,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       final trialManager = ref.read(trialManagerProvider);
       await trialManager.startTrial(DateTime.now());
 
+      // Establish Auth State locally so the router doesn't redirect back to login
+      await authService.setCurrentUser(adminUser);
+
       if (mounted) context.go(AppRoutes.home);
     } catch (e) {
       setState(() {

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/order_details_page.dart
+// lib/presentation/pages/order_details_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -1044,17 +1044,24 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
   Future<void> _loadLabelPrinterSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      setState(() {
-        _printLabel = prefs.getBool('label_printer_enabled') ?? false;
-      });
+      // Read label_printer_enabled from SQLite settings (single source of truth)
+      final settings = ref.read(settingsNotifierProvider).valueOrNull;
+      if (settings != null && mounted) {
+        setState(() {
+          _printLabel = settings.labelPrinterEnabled;
+        });
+      }
     } catch (_) {}
   }
 
   Future<void> _saveLabelPrinterSettings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('label_printer_enabled', _printLabel);
+      // Write label_printer_enabled to SQLite settings (single source of truth)
+      final current = ref.read(settingsNotifierProvider).valueOrNull;
+      if (current != null) {
+        await ref.read(settingsNotifierProvider.notifier)
+            .updateSettings(current.copyWith(labelPrinterEnabled: _printLabel));
+      }
     } catch (_) {}
   }
 
@@ -1209,10 +1216,11 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final settingsAsync = ref.read(settingsNotifierProvider);
         final settings = settingsAsync.value;
         if (settings != null) {
-          final prefs = await SharedPreferences.getInstance();
-          final labelIp = prefs.getString('label_printer_ip') ?? '';
-          final labelPort = int.tryParse(prefs.getString('label_printer_port') ?? '9100') ?? 9100;
+          // Read label printer config from SQLite settings (single source of truth)
+          final labelIp = settings.labelPrinterIp ?? '';
+          final labelPort = settings.labelPrinterPort ?? 9100;
           final labelSettings = settings.copyWith(
+            printerName: 'network',
             printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
             printerPort: labelPort,
           );

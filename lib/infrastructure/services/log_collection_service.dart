@@ -16,10 +16,10 @@ class LogCollectionService {
   /// Zips, encrypts, and uploads local logs to SaaS platform
   Future<bool> zipAndUploadLogs({required String deviceId}) async {
     try {
-      final appSupportDir = await getApplicationSupportDirectory();
+      final appDocsDir = await getApplicationDocumentsDirectory();
       
-      // Let's mock finding log outputs
-      final logDir = Directory('${appSupportDir.path}/logs');
+      // Look for telemetry logs
+      final logDir = Directory('${appDocsDir.path}/telemetry');
       final logFiles = <File>[];
       if (logDir.existsSync()) {
         logFiles.addAll(logDir.listSync().whereType<File>());

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/customer_details_page.dart
+// lib/presentation/pages/customer_details_page.dart
 // Serenut POS — Müşteri Detay Sayfası (Bankacılık Stili)
 // UX Redesign v3: Hero gradient card, bank-statement transaction list, 
 // full-screen collection push (no dialog). Uses existing providers — zero backend changes.
@@ -10,7 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
 import 'package:serenutos/presentation/pages/customer/ledger_explainability_sheet.dart';
 
@@ -397,28 +397,36 @@ class CustomerDetailsPage extends ConsumerWidget {
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref, CustomerEntity customer) {
-    PinGateDialog.checkAndShow(context, title: 'Müşteri Silme Yetkisi', onVerified: () {
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Müşteriyi Sil'),
-            content: Text('"${customer.name}" müşterisini sistemden silmek istediğinize emin misiniz?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('İptal'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kRed,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    requireAdminAccess(
+      context,
+      title: 'Müşteri Silme Yetkisi',
+      requirePin: true,
+      onGranted: (approvedByUserId, approvedByUserName) {
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Müşteriyi Sil'),
+              content: Text('"${customer.name}" müşterisini sistemden silmek istediğinize emin misiniz?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('İptal'),
                 ),
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await ref.read(customersControllerProvider.notifier).deleteCustomer(customer.id);
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kRed,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await ref.read(customersControllerProvider.notifier).deleteCustomer(
+                      customer.id,
+                      approvedByUserId: approvedByUserId,
+                      approvedByUserName: approvedByUserName,
+                    );
                   final state = ref.read(customersControllerProvider);
                   if (state.hasError) {
                     if (context.mounted) {

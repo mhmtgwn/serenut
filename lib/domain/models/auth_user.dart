@@ -1,4 +1,4 @@
-﻿// lib/domain/models/auth_user.dart
+// lib/domain/models/auth_user.dart
 // PHASE 0 - Auth Contract (Day 1)
 // Generated: 20 Jun 2026
 
@@ -10,6 +10,9 @@ class AuthUser {
   final String companyId;
   final String name;
   final String email;
+  final String? username;
+  final String? pin;
+  final String? businessCode;
   final UserRole role;
   final List<String> permissions;
   final DateTime createdAt;
@@ -19,6 +22,9 @@ class AuthUser {
     this.companyId = 'TEST_COMPANY',
     required this.name,
     required this.email,
+    this.username,
+    this.pin,
+    this.businessCode,
     required this.role,
     required this.permissions,
     required this.createdAt,
@@ -44,6 +50,9 @@ class AuthUser {
     'companyId': companyId,
     'name': name,
     'email': email,
+    'username': username,
+    'pin': pin,
+    'businessCode': businessCode,
     'role': role.name,
     'permissions': permissions,
     'created_at': createdAt.toIso8601String(),
@@ -55,6 +64,9 @@ class AuthUser {
     companyId: map['companyId'] as String? ?? 'TEST_COMPANY',
     name: map['name'] as String,
     email: map['email'] as String? ?? '',
+    username: map['username'] as String?,
+    pin: map['pin'] as String?,
+    businessCode: map['businessCode'] as String?,
     role: UserRole.values.firstWhere(
       (r) => r.name == map['role'],
       orElse: () => UserRole.cashier,
@@ -71,13 +83,16 @@ class AuthUser {
       AuthUser.fromMap(jsonDecode(source) as Map<String, dynamic>);
 
   @override
-  String toString() => 'AuthUser(id: $id, companyId: $companyId, name: $name, email: $email, role: ${role.name})';
+  String toString() => 'AuthUser(id: $id, companyId: $companyId, name: $name, email: $email, username: $username, role: ${role.name})';
 
   AuthUser copyWith({
     String? id,
     String? companyId,
     String? name,
     String? email,
+    String? username,
+    String? pin,
+    String? businessCode,
     UserRole? role,
     List<String>? permissions,
     DateTime? createdAt,
@@ -87,6 +102,9 @@ class AuthUser {
       companyId: companyId ?? this.companyId,
       name: name ?? this.name,
       email: email ?? this.email,
+      username: username ?? this.username,
+      pin: pin ?? this.pin,
+      businessCode: businessCode ?? this.businessCode,
       role: role ?? this.role,
       permissions: permissions ?? this.permissions,
       createdAt: createdAt ?? this.createdAt,
@@ -102,6 +120,9 @@ class AuthUser {
           companyId == other.companyId &&
           name == other.name &&
           email == other.email &&
+          username == other.username &&
+          pin == other.pin &&
+          businessCode == other.businessCode &&
           role == other.role;
 
   @override

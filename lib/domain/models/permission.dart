@@ -55,7 +55,18 @@ enum Permission {
 
   // Admin (2)
   adminSettings('admin:settings', 'Manage settings', PermissionCategory.admin),
-  adminUsers('admin:users', 'Manage users', PermissionCategory.admin);
+  adminUsers('admin:users', 'Manage users', PermissionCategory.admin),
+
+  // Settings (9)
+  settingsView('settings:view', 'Giriş Yetkisi', PermissionCategory.admin),
+  settingsPrinter('settings:printer', 'Yazıcı Tercihleri', PermissionCategory.admin),
+  settingsReceipt('settings:receipt', 'Fiş Şablon Yönetimi', PermissionCategory.admin),
+  settingsUsers('settings:users', 'Kullanıcı Yetkilendirme', PermissionCategory.admin),
+  settingsFinance('settings:finance', 'Finans & Cari Ayarlar', PermissionCategory.admin),
+  settingsAudit('settings:audit', 'Log & Audit İzleme', PermissionCategory.admin),
+  settingsDatabase('settings:database', 'Veritabanı Bakım & Sağlık', PermissionCategory.admin),
+  settingsRecovery('settings:recovery', 'Veri Kurtarma', PermissionCategory.admin),
+  settingsLicense('settings:license', 'Lisans & Abonelik', PermissionCategory.admin);
 
   final String value;      // e.g., 'sales:view'
   final String label;      // e.g., 'View sales'
@@ -74,6 +85,8 @@ enum Permission {
   /// Get all permissions for a specific role
   static List<Permission> forRole(UserRole userRole) {
     return switch (userRole) {
+      UserRole.sysadmin => Permission.values,
+      UserRole.owner => Permission.values,
       UserRole.admin => Permission.values,
       UserRole.manager => [
         // Sales (view + print only, no create/edit)
@@ -104,6 +117,10 @@ enum Permission {
         Permission.reportsView,
         Permission.reportsFinancial,
         Permission.reportsInventory,
+
+        // Settings (base)
+        Permission.settingsView,
+        Permission.settingsPrinter,
       ],
       UserRole.cashier => [
         // Sales (view + create + print)
@@ -116,6 +133,10 @@ enum Permission {
 
         // Payments (record only)
         Permission.paymentsRecord,
+
+        // Settings (base)
+        Permission.settingsView,
+        Permission.settingsPrinter,
       ],
       UserRole.staff => [
         // Sales (view + create only)
@@ -124,6 +145,10 @@ enum Permission {
 
         // Customers (view only)
         Permission.customersView,
+
+        // Settings (base)
+        Permission.settingsView,
+        Permission.settingsPrinter,
       ],
     };
   }
@@ -156,7 +181,9 @@ enum PermissionCategory {
 
 /// User role enum (from AuthUser)
 enum UserRole {
+  owner('Owner'),
   admin('Admin'),
+  sysadmin('Sysadmin'),
   manager('Manager'),
   cashier('Cashier'),
   staff('Staff');
@@ -166,7 +193,9 @@ enum UserRole {
 
   /// Get color for UI display (hex)
   String get colorHex => switch (this) {
+    UserRole.owner => 'FF8C00',      // Dark Orange
     UserRole.admin => 'FF6B6B',      // Red
+    UserRole.sysadmin => '8A2BE2',   // BlueViolet
     UserRole.manager => '4ECDC4',    // Teal
     UserRole.cashier => 'FFD93D',    // Yellow
     UserRole.staff => '95E1D3',      // Light green
@@ -174,7 +203,9 @@ enum UserRole {
 
   /// Get icon emoji
   String get icon => switch (this) {
+    UserRole.owner => '💼',
     UserRole.admin => '👑',
+    UserRole.sysadmin => '⚡',
     UserRole.manager => '📋',
     UserRole.cashier => '💵',
     UserRole.staff => '👤',

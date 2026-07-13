@@ -1,14 +1,18 @@
-﻿// lib/presentation/pages/admin/recovery_center_page.dart
+// lib/presentation/pages/admin/recovery_center_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/repositories/recovery_repository.dart';
 import 'package:serenutos/providers/recovery_provider.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/domain/models/permission.dart';
 
 class RecoveryCenterPage extends ConsumerStatefulWidget {
   const RecoveryCenterPage({super.key});
@@ -64,25 +68,37 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
     }
   }
 
-  void _runPinGuardedAction(String actionTitle, VoidCallback action) {
-    PinGateDialog.checkAndShow(
+  void _runPinGuardedAction(String actionTitle, void Function(String? approvedByUserId, String? approvedByUserName) action) {
+    requirePermissionAccess(
       context,
+      permission: Permission.settingsRecovery,
       title: actionTitle,
-      onVerified: () {
+      requirePin: true,
+      onGranted: (approvedByUserId, approvedByUserName) {
         if (mounted) {
-          action();
+          action(approvedByUserId, approvedByUserName);
         }
       },
     );
   }
 
   Future<void> _restoreItem(String type, String id, String name) async {
-    _runPinGuardedAction('Kaydı Kurtar: $name', () async {
+    _runPinGuardedAction('Kaydı Kurtar: $name', (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
         final repo = ref.read(recoveryRepositoryProvider);
         await repo.restore(type, id);
         
+        try {
+          final auditService = await ref.read(auditServiceProvider.future);
+          await auditService.logSystemAction(
+            'entity_restored',
+            'Tur: $type, ID: $id, Name: $name',
+            approvedByUserId: approvedByUserId,
+            approvedByUserName: approvedByUserName,
+          );
+        } catch (_) {}
+
         // Invalidate corresponding controller to sync UI
         _invalidateControllerForType(type);
 
@@ -101,12 +117,22 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
   }
 
   Future<void> _purgeItem(String type, String id, String name) async {
-    _runPinGuardedAction('Kaydı Kalıcı Olarak Sil: $name', () async {
+    _runPinGuardedAction('Kaydı Kalıcı Olarak Sil: $name', (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
         final repo = ref.read(recoveryRepositoryProvider);
         await repo.purge(type, id);
         
+        try {
+          final auditService = await ref.read(auditServiceProvider.future);
+          await auditService.logSystemAction(
+            'entity_purged',
+            'Tur: $type, ID: $id, Name: $name',
+            approvedByUserId: approvedByUserId,
+            approvedByUserName: approvedByUserName,
+          );
+        } catch (_) {}
+
         // Invalidate corresponding controller to sync UI
         _invalidateControllerForType(type);
 
@@ -143,6 +169,22 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider);
+    final hasAccess = currentUser != null && (
+      currentUser.role == UserRole.sysadmin ||
+      currentUser.role == UserRole.owner ||
+      currentUser.role == UserRole.admin ||
+      currentUser.hasPermission(Permission.settingsRecovery.value)
+    );
+
+    if (!hasAccess) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Bu sayfaya erişim yetkiniz bulunmuyor.'),
+        ),
+      );
+    }
+
     const kDarkBackground = Color(0xFF0F172A); // Slate 900
     const kCardBg = Color(0xFF1E293B); // Slate 800
     const kBorderColor = Color(0xFF334155); // Slate 700

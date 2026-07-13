@@ -1,4 +1,4 @@
-﻿// lib/domain/services/audit_service.dart
+// lib/domain/services/audit_service.dart
 import 'package:serenutos/domain/models/audit_event.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:uuid/uuid.dart';
@@ -26,14 +26,16 @@ class AuditService {
     String? oldValue,
     String? newValue,
     String? notes,
+    String? approvedByUserId,
+    String? approvedByUserName,
   }) async {
     final event = AuditEvent(
       id: const Uuid().v4(),
       eventType: eventType,
       entityType: entityType,
       entityId: entityId,
-      userId: _currentUserId,
-      userName: _currentUserName,
+      userId: approvedByUserId ?? _currentUserId,
+      userName: approvedByUserName ?? _currentUserName,
       oldValue: oldValue,
       newValue: newValue,
       timestamp: DateTime.now(),
@@ -74,20 +76,24 @@ class AuditService {
     );
   }
 
-  Future<void> logDelete(String entityType, String entityId, String entityName) async {
+  Future<void> logDelete(String entityType, String entityId, String entityName, {String? approvedByUserId, String? approvedByUserName}) async {
     await logEvent(
       eventType: 'entity_deleted',
       entityType: entityType,
       entityId: entityId,
       notes: 'Varlık Silindi ($entityType): $entityName',
+      approvedByUserId: approvedByUserId,
+      approvedByUserName: approvedByUserName,
     );
   }
 
-  Future<void> logSystemAction(String action, String details) async {
+  Future<void> logSystemAction(String action, String details, {String? approvedByUserId, String? approvedByUserName}) async {
     await logEvent(
       eventType: 'system_action',
       entityType: 'system',
       notes: 'Sistem İşlemi ($action): $details',
+      approvedByUserId: approvedByUserId,
+      approvedByUserName: approvedByUserName,
     );
   }
 }

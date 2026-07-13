@@ -1,4 +1,4 @@
-﻿// lib/providers/device_status_provider.dart
+// lib/providers/device_status_provider.dart
 // Serenut POS — Device Status Provider (Printer + Scanner heartbeat)
 // Polls device health every 30s; shows banner on failure
 // Created: 24 Jun 2026
@@ -122,6 +122,14 @@ class DeviceStatusNotifier extends StateNotifier<DeviceState> {
       pendingPrintJobs: pending,
       lastChecked:      DateTime.now(),
     );
+
+    // Auto-retry pending jobs if printer is connected
+    if (printerStatus == PrinterConnectionStatus.connected && pending > 0 && settings != null) {
+      _ref.read(printerServiceProvider).processPendingQueue(settings).then((_) async {
+        final updatedPending = await _printQueue.pendingCount();
+        state = state.copyWith(pendingPrintJobs: updatedPending);
+      }).catchError((_) {});
+    }
   }
 
   Future<PrinterConnectionStatus> _checkPrinter(settings) async {

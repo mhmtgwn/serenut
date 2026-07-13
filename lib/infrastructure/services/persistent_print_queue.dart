@@ -247,6 +247,22 @@ class PersistentPrintQueue {
     );
   }
 
+  /// Reset a specific job to pending so it can be retried.
+  Future<void> resetJob(String id) async {
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.update(
+      _tableName,
+      {
+        'status': PrintJobStatus.pending.name,
+        'retry_count': 0,
+        'last_error': null,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   /// Get count of jobs waiting to print.
   Future<int> pendingCount() async {
     final db = await _getDb();

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/admin/admin_page.dart
+// lib/presentation/pages/admin/admin_page.dart
 // Serenut POS — Admin Control Center
 // Access: Settings > Admin Panel (admin role only)
 // Created: Phase 5 — 01 Jul 2026
@@ -41,8 +41,8 @@ class AdminPage extends ConsumerWidget {
     final licStatus   = ref.watch(licenseStatusProvider);
     final printQueue  = ref.watch(persistentPrintQueueProvider);
 
-    // Guard — admin only
-    if (currentUser == null || currentUser.role != UserRole.admin) {
+    // Guard — admin, owner, or sysadmin only
+    if (currentUser == null || !(currentUser.role == UserRole.admin || currentUser.role == UserRole.owner || currentUser.role == UserRole.sysadmin)) {
       return Scaffold(
         backgroundColor: _kBgColor,
         appBar: AppBar(

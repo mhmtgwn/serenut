@@ -51,7 +51,7 @@ class AuthService {
         return await refreshToken();
       };
       _apiClient!.onSessionExpired = () {
-        logout();
+        triggerSessionExpired();
       };
     }
   }
@@ -61,7 +61,12 @@ class AuthService {
     final userJson = _prefs.getString(_userStorageKey);
     if (userJson != null) {
       try {
-        _currentUser = AuthUser.fromJson(userJson);
+        final user = AuthUser.fromJson(userJson);
+        final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+        if (lastVerifiedStr != null) {
+          // Lease check removed from here to allow offline POS sales.
+        }
+        _currentUser = user;
       } catch (e) {
         // Corrupt or outdated session — clear it
         await _prefs.remove(_userStorageKey);
@@ -115,7 +120,8 @@ class AuthService {
             await trialManager.startTrial(DateTime.now());
           }
 
-          final roleStr = userMap['role'] as String? ?? 'cashier';
+          final roles = userMap['roles'] as List<dynamic>? ?? [];
+          final roleStr = roles.isNotEmpty ? roles.first.toString() : (userMap['role'] as String? ?? 'cashier');
           final role = UserRole.values.firstWhere(
             (r) => r.name == roleStr.toLowerCase(),
             orElse: () => UserRole.cashier,
@@ -144,6 +150,7 @@ class AuthService {
 
           _currentUser = user;
           await _prefs.setString(_userStorageKey, user.toJson());
+          await _prefs.setString('serenut_last_authz_verified_at_${user.id}', DateTime.now().toUtc().toIso8601String());
           return user;
         }
       } catch (e) {
@@ -177,6 +184,8 @@ class AuthService {
           final isValid = _hashService.verifyPassword(password, hash);
 
           if (isValid) {
+            final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+            // Lease check removed from here to allow offline POS sales.
             await _onLoginSuccess(user);
 
             // Rehash on first login if legacy format detected
@@ -266,6 +275,7 @@ class AuthService {
 
           _currentUser = user;
           await _prefs.setString(_userStorageKey, user.toJson());
+          await _prefs.setString('serenut_last_authz_verified_at_${user.id}', DateTime.now().toUtc().toIso8601String());
           return user;
         }
       } catch (e) {
@@ -292,14 +302,38 @@ class AuthService {
         username.trim(),
       );
       if (user != null) {
+        // Check brute-force lockout
+        final lockoutData = await _userRepository.getFailedPinAttempts(user.id);
+        final lockedUntilStr = lockoutData['locked_until'] as String?;
+        if (lockedUntilStr != null) {
+          final lockedUntil = DateTime.tryParse(lockedUntilStr);
+          if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
+            final remaining = lockedUntil.difference(DateTime.now()).inSeconds;
+            throw AuthException('Hesap çok fazla başarısız deneme nedeniyle kilitlendi. Lütfen $remaining saniye bekleyin.');
+          }
+        }
+
         final hashes = await _userRepository.getCredentialHashes(user.id);
         final pinHash = hashes['pin_hash'];
         if (pinHash != null) {
           final isValid = _hashService.verifyPassword(pin, pinHash);
           if (isValid) {
+            final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+            // Lease check removed from here to allow offline POS sales.
+            await _userRepository.resetPinAttempts(user.id);
             await _onLoginSuccess(user);
             await _userRepository.updateLastLogin(user.id);
             return user;
+          } else {
+            await _userRepository.incrementFailedPinAttempts(user.id);
+            final updated = await _userRepository.getFailedPinAttempts(user.id);
+            final attempts = updated['failed_pin_attempts'] as int? ?? 0;
+            final remainingAttempts = 5 - attempts;
+            if (remainingAttempts <= 0) {
+              throw AuthException('Çok fazla başarısız deneme. Hesap 5 dakika süreyle kilitlendi.');
+            } else {
+              throw AuthException('İşletme kodu, kullanıcı adı veya PIN hatalı. Kalan deneme hakkı: $remainingAttempts');
+            }
           }
         }
       }
@@ -308,6 +342,57 @@ class AuthService {
     }
 
     throw AuthException('İşletme kodu, kullanıcı adı veya PIN hatalı.');
+  }
+
+  /// Verifies a sub-user PIN for the currently logged-in user or an admin/manager.
+  /// Used for gated action verification with brute-force lockout.
+  Future<({bool success, String? approverUserId, String? approverUserName})> verifyCurrentUserPin(String pin) async {
+    final user = await getCurrentUser();
+    if (user == null) {
+      return (success: false, approverUserId: null, approverUserName: null);
+    }
+
+    // Offline lease check for admin-gated actions
+    final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+    if (lastVerifiedStr != null) {
+      final lastVerified = DateTime.tryParse(lastVerifiedStr);
+      final leaseDays = _prefs.getInt('offline_auth_lease_days') ?? 7;
+      if (lastVerified != null && DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
+        throw AuthException('Oturum süresi (offline lease) dolmuştur. Hassas yetkili işlemler için lütfen internete bağlanın.');
+      }
+    }
+
+    // Check brute-force lockout first
+    final lockoutData = await _userRepository.getFailedPinAttempts(user.id);
+    final lockedUntilStr = lockoutData['locked_until'] as String?;
+    if (lockedUntilStr != null) {
+      final lockedUntil = DateTime.tryParse(lockedUntilStr);
+      if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
+        return (success: false, approverUserId: null, approverUserName: null);
+      }
+    }
+
+    final hashes = await _userRepository.getCredentialHashes(user.id);
+    final pinHash = hashes['pin_hash'];
+    bool isValid = false;
+
+    if (pinHash != null && pinHash.isNotEmpty) {
+      isValid = _hashService.verifyPassword(pin, pinHash);
+    } else {
+      // Fallback to password hash if PIN is not configured
+      final passwordHash = hashes['password_hash'];
+      if (passwordHash != null && passwordHash.isNotEmpty) {
+        isValid = _hashService.verifyPassword(pin, passwordHash);
+      }
+    }
+
+    if (isValid) {
+      await _userRepository.resetPinAttempts(user.id);
+      return (success: true, approverUserId: user.id, approverUserName: user.name);
+    } else {
+      await _userRepository.incrementFailedPinAttempts(user.id);
+      return (success: false, approverUserId: null, approverUserName: null);
+    }
   }
 
   /// Rehash a legacy password with PBKDF2 after successful login.
@@ -362,7 +447,15 @@ class AuthService {
         _apiClient!.setJwtToken(token);
         return true;
       }
-    } catch (_) {}
+    } on ApiException catch (e) {
+      // 400/401/403 are permanent authentication failures (stale token, session revoked, replay attack)
+      if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
+        return false;
+      }
+      rethrow;
+    } catch (_) {
+      rethrow;
+    }
     return false;
   }
 
@@ -371,7 +464,60 @@ class AuthService {
     _currentUser = null;
     await _prefs.remove(_userStorageKey);
     await _prefs.remove('auth_jwt_token');
+    await _prefs.remove('auth_refresh_token');
     _apiClient?.setJwtToken(null);
+  }
+
+  void Function()? onSessionExpiredCallback;
+  void Function(AuthUser user)? onUserUpdatedCallback;
+
+  void triggerSessionExpired() {
+    logout();
+    if (onSessionExpiredCallback != null) {
+      onSessionExpiredCallback!();
+    }
+  }
+
+  Future<void> checkCurrentUserSessionOnline() async {
+    if (_currentUser == null || _apiClient == null || _apiClient!.jwtToken == null) return;
+    try {
+      final response = await _apiClient!.get('/auth/me');
+      if (response.statusCode == 200) {
+        await _prefs.setString('serenut_last_authz_verified_at_${_currentUser!.id}', DateTime.now().toUtc().toIso8601String());
+        final data = response.json;
+        final userMap = data['user'] as Map<String, dynamic>;
+        
+        final isActive = userMap['is_active'] as bool? ?? true;
+        if (!isActive) {
+          triggerSessionExpired();
+          return;
+        }
+
+        final roles = userMap['roles'] as List<dynamic>? ?? [];
+        final roleStr = roles.isNotEmpty ? roles.first.toString() : (userMap['role'] as String? ?? 'cashier');
+        final role = UserRole.values.firstWhere(
+          (r) => r.name == roleStr.toLowerCase(),
+          orElse: () => UserRole.cashier,
+        );
+
+        if (role != _currentUser!.role) {
+          final updatedUser = _currentUser!.copyWith(
+            role: role,
+            permissions: getPermissionsForRole(role),
+          );
+          _currentUser = updatedUser;
+          await _prefs.setString(_userStorageKey, updatedUser.toJson());
+          await _userRepository.updateUserFields(updatedUser);
+          if (onUserUpdatedCallback != null) {
+            onUserUpdatedCallback!(updatedUser);
+          }
+        }
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        triggerSessionExpired();
+      }
+    } catch (_) {
+      // Offline fallback: keep cached credentials
+    }
   }
 
   /// Offline login başarısında çağrılır.
@@ -410,15 +556,43 @@ class AuthService {
     }
   }
 
+  bool _isLeaseExpired(AuthUser user) {
+    final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+    if (lastVerifiedStr != null) {
+      final lastVerified = DateTime.tryParse(lastVerifiedStr);
+      final leaseDays = _prefs.getInt('offline_auth_lease_days') ?? 7;
+      if (lastVerified != null && DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<bool> hasPermission(String permission) async {
     final user = await getCurrentUser();
-    return user?.hasPermission(permission) ?? false;
+    if (user == null) return false;
+    
+    // Only allow cashier permissions if lease expired
+    if (_isLeaseExpired(user) && !_getCashierPermissions().contains(permission)) {
+      return false;
+    }
+    
+    return user.hasPermission(permission);
   }
 
   /// Check if current user has all permissions
   Future<bool> hasAllPermissions(List<String> permissions) async {
     final user = await getCurrentUser();
-    return user?.hasAllPermissions(permissions) ?? false;
+    if (user == null) return false;
+    
+    if (_isLeaseExpired(user)) {
+      final cashierPerms = _getCashierPermissions();
+      if (!permissions.every((p) => cashierPerms.contains(p))) {
+        return false;
+      }
+    }
+    
+    return user.hasAllPermissions(permissions);
   }
 
   /// Get all permission names for current user
@@ -468,23 +642,45 @@ class AuthService {
     }
   }
 
-  Future<void> createUser(AuthUser user, String password) async {
+  Future<void> createUser(AuthUser user, String password, {String? pin}) async {
     if (password.isEmpty) {
       throw AuthException('Şifre boş olamaz.');
     }
-    await _userRepository.insertUser(user, _hashService.hashPassword(password));
+    String? pinHash;
+    if (pin != null && pin.isNotEmpty) {
+      pinHash = _hashService.hashPassword(pin);
+    }
+    await _userRepository.insertUser(
+      user, 
+      _hashService.hashPassword(password),
+      username: user.username,
+      businessCode: user.businessCode,
+      pinHash: pinHash,
+    );
   }
 
   Future<void> updateUser(
     AuthUser user, {
     String? password,
+    String? pin,
     bool? isActive,
   }) async {
     String? passwordHash;
     if (password != null && password.isNotEmpty) {
       passwordHash = _hashService.hashPassword(password);
     }
-    await _userRepository.updateUserFields(user, isActive: isActive, passwordHash: passwordHash);
+    String? pinHash;
+    if (pin != null && pin.isNotEmpty) {
+      pinHash = _hashService.hashPassword(pin);
+    }
+    await _userRepository.updateUserFields(
+      user, 
+      isActive: isActive, 
+      passwordHash: passwordHash,
+      username: user.username,
+      businessCode: user.businessCode,
+      pinHash: pinHash,
+    );
   }
 
   Future<void> deleteUser(String id) async {
@@ -511,7 +707,9 @@ class AuthService {
   }
 
   static List<String> getPermissionsForRole(UserRole role) => switch (role) {
+        UserRole.owner   => _getAllPermissions(),
         UserRole.admin   => _getAllPermissions(),
+        UserRole.sysadmin => _getAllPermissions(),
         UserRole.manager => _getManagerPermissions(),
         UserRole.cashier => _getCashierPermissions(),
         UserRole.staff   => _getCashierPermissions(),

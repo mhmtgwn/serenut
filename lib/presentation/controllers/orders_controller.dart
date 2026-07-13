@@ -169,7 +169,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     await refresh();
   }
 
-  Future<void> deleteOrder(String id) async {
+  Future<void> deleteOrder(String id, {String? approvedByUserId, String? approvedByUserName}) async {
     await future;
     final order = await _repository.findById(id);
     await _repository.delete(id);
@@ -181,6 +181,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         'order',
         id,
         'Sipariş Silindi - ID: $id (Müşteri ID: ${order?.customerId ?? 'Bilinmeyen'})',
+        approvedByUserId: approvedByUserId,
+        approvedByUserName: approvedByUserName,
       );
     } catch (_) {}
 

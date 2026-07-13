@@ -1,10 +1,11 @@
-﻿// lib/presentation/controllers/sales_flow_controller.dart
+// lib/presentation/controllers/sales_flow_controller.dart
 // Serenut POS — Sales Flow FSM Controller
 // Revized: 22 Jun 2026
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/cart_persistence_service.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 
@@ -18,8 +19,7 @@ final cartPersistenceServiceProvider = Provider<CartPersistenceService>((ref) {
 });
 
 final auditLoggerProvider = Provider<AuditLogger>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return AuditLogger(prefs);
+  return AuditLogger(DatabaseManager());
 });
 
 final syncQueueProvider = Provider<OperationQueueService>((ref) {

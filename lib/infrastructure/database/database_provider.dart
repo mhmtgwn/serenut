@@ -41,7 +41,7 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 26;
+  static const int _databaseVersion = 27;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -73,7 +73,7 @@ class DatabaseManager {
       'users': [
         'id', 'name', 'email', 'password_hash', 'role', 'is_active',
         'username', 'pin_hash', 'business_code', 'device_token_version',
-        'failed_pin_attempts', 'locked_until'
+        'failed_pin_attempts', 'locked_until', 'permissions'
       ],
       'settings': [
         'id', 'business_name', 'sound_notification_enabled',
@@ -846,6 +846,18 @@ class DatabaseManager {
             'status': 'success'
           });
         }
+        if (oldVersion < 27) {
+          try {
+            await txn.execute('ALTER TABLE users ADD COLUMN permissions TEXT');
+          } catch (e) {
+            handleMigrationError(e, 27);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 27,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing
@@ -962,7 +974,8 @@ class DatabaseManager {
         business_code TEXT,
         device_token_version INTEGER DEFAULT 1,
         failed_pin_attempts INTEGER NOT NULL DEFAULT 0,
-        locked_until TEXT
+        locked_until TEXT,
+        permissions TEXT
       )
     ''');
     await db.execute('''

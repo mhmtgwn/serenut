@@ -8,9 +8,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
 
 // ── SMS Provider Enum ─────────────────────────────────────────────────────────
-enum SmsProvider { netgsm, twilio, none }
+enum SmsProvider { sim, netgsm, twilio, custom, none }
 
 // ── SMS Queue Item ─────────────────────────────────────────────────────────────
 class SmsQueueItem {
@@ -56,6 +59,12 @@ class SmsConfig {
   final String username;   // Netgsm: kullanıcı adı | Twilio: accountSid
   final String sender;     // Netgsm: başlık | Twilio: phone number
   final String? apiSecret; // Twilio only
+  
+  // SIM Specifics
+  final int? simSubscriptionId;
+  final int? monthlyLimit;
+  final int sentThisMonth;
+  final int? limitResetMonth;
 
   const SmsConfig({
     required this.provider,
@@ -63,6 +72,10 @@ class SmsConfig {
     required this.username,
     required this.sender,
     this.apiSecret,
+    this.simSubscriptionId,
+    this.monthlyLimit,
+    this.sentThisMonth = 0,
+    this.limitResetMonth,
   });
 }
 
@@ -75,13 +88,33 @@ class SmsService {
 
   final SmsConfig? _config;
   final http.Client _httpClient;
+  final Future<void> Function()? onSmsSent;
+  final Future<void> Function(String phone, String message, String status, String? errorMessage, String messageId)? onSmsDispatched;
   bool _isSending = false;
 
-  SmsService({SmsConfig? config, http.Client? httpClient})
-      : _config = config,
+  SmsService({
+    SmsConfig? config,
+    http.Client? httpClient,
+    this.onSmsSent,
+    this.onSmsDispatched,
+  })  : _config = config,
         _httpClient = httpClient ?? http.Client();
 
   // ── Public API ──────────────────────────────────────────────────────────────
+  
+  /// Request permissions required for local SIM SMS sending (SMS & Phone state/numbers)
+  Future<bool> requestSimPermissions() async {
+    final statusSms = await Permission.sms.request();
+    final statusPhone = await Permission.phone.request();
+    return statusSms.isGranted && statusPhone.isGranted;
+  }
+
+  /// Check if permissions are already granted for SIM SMS sending
+  Future<bool> hasSimPermissions() async {
+    final statusSms = await Permission.sms.status;
+    final statusPhone = await Permission.phone.status;
+    return statusSms.isGranted && statusPhone.isGranted;
+  }
 
   /// Send an SMS immediately. Falls back to queue if offline or fails.
   Future<bool> sendSms(String phone, String message) async {
@@ -91,7 +124,7 @@ class SmsService {
     }
 
     final item = SmsQueueItem(
-      id: '${DateTime.now().millisecondsSinceEpoch}',
+      id: const Uuid().v4(),
       phone: _normalizePhone(phone),
       message: message,
       createdAt: DateTime.now(),
@@ -109,7 +142,7 @@ class SmsService {
   /// Queue an SMS without sending (for offline scenarios).
   Future<void> queueSms(String phone, String message) async {
     final item = SmsQueueItem(
-      id: '${DateTime.now().millisecondsSinceEpoch}',
+      id: const Uuid().v4(),
       phone: _normalizePhone(phone),
       message: message,
       createdAt: DateTime.now(),
@@ -200,19 +233,32 @@ class SmsService {
   // ── Private — Provider Dispatch ────────────────────────────────────────────
 
   Future<bool> _dispatch(SmsQueueItem item, SmsConfig config) async {
+    if (config.provider == SmsProvider.sim &&
+        config.monthlyLimit != null &&
+        config.sentThisMonth >= config.monthlyLimit!) {
+      await _logDelivery(item, success: false);
+      unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed', 'Aylık SMS limiti aşıldı.', item.id) ?? Future.value());
+      return false;
+    }
+
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
         bool success;
         switch (config.provider) {
+          case SmsProvider.sim:
+            success = await _sendSim(item.phone, item.message, config);
           case SmsProvider.netgsm:
             success = await _sendNetgsm(item.phone, item.message, config);
           case SmsProvider.twilio:
             success = await _sendTwilio(item.phone, item.message, config);
+          case SmsProvider.custom:
+            success = false;
           case SmsProvider.none:
             return false;
         }
         if (success) {
           await _logDelivery(item, success: true);
+          unawaited(onSmsDispatched?.call(item.phone, item.message, 'sent', null, item.id) ?? Future.value());
           return true;
         }
       } catch (_) {
@@ -223,6 +269,7 @@ class SmsService {
       }
     }
     await _logDelivery(item, success: false);
+    unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed', 'Operatör/Sağlayıcı hatası veya sinyal yok.', item.id) ?? Future.value());
     return false;
   }
 
@@ -336,6 +383,28 @@ class SmsService {
 
   String _buildQuery(Map<String, String> params) =>
       params.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&');
+
+  Future<bool> _sendSim(String phone, String message, SmsConfig config) async {
+    try {
+      final Map<String, dynamic> args = {
+        'phone': phone,
+        'message': message,
+      };
+      if (config.simSubscriptionId != null) {
+        args['subscriptionId'] = config.simSubscriptionId;
+      }
+      final bool? result = await const MethodChannel('serenut/sms_sender')
+          .invokeMethod<bool>('sendSmsViaSim', args);
+      
+      final success = result ?? false;
+      if (success) {
+        await onSmsSent?.call();
+      }
+      return success;
+    } catch (e) {
+      return false;
+    }
+  }
 
   void dispose() {
     _httpClient.close();

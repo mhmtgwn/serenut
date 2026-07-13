@@ -1,4 +1,4 @@
-﻿// lib/providers/sms_provider.dart
+// lib/providers/sms_provider.dart
 // Serenut POS — SMS Service Riverpod Provider
 // Created: 24 Jun 2026
 
@@ -11,7 +11,9 @@ import 'package:serenutos/infrastructure/repositories/sms_log_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/event_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 /// Builds SmsConfig from the current app Settings.
 SmsConfig? _buildSmsConfig(Settings? settings) {
@@ -21,27 +23,41 @@ SmsConfig? _buildSmsConfig(Settings? settings) {
   final provider = settings.smsProvider?.toLowerCase();
   SmsProvider smsProvider;
   switch (provider) {
-    case 'twilio':
-      smsProvider = SmsProvider.twilio;
+    case 'sim':
+      smsProvider = SmsProvider.sim;
     case 'netgsm':
       smsProvider = SmsProvider.netgsm;
+    case 'twilio':
+      smsProvider = SmsProvider.twilio;
+    case 'custom':
+      smsProvider = SmsProvider.custom;
     default:
       smsProvider = SmsProvider.none;
   }
 
   if (smsProvider == SmsProvider.none) return null;
-  if (settings.smsApiKey == null || settings.smsApiKey!.isEmpty) return null;
+  
+  if (smsProvider != SmsProvider.sim) {
+    if (settings.smsApiKey == null || settings.smsApiKey!.isEmpty) return null;
+  }
+
+  final apiKey = settings.smsApiKey ?? '';
+  final username = apiKey.isNotEmpty ? apiKey.split(':').first : '';
 
   return SmsConfig(
     provider:  smsProvider,
-    apiKey:    settings.smsApiKey!,
-    username:  settings.smsApiKey!.split(':').first,  // Netgsm: apiKey IS the key; Twilio: accountSid:authToken
+    apiKey:    apiKey,
+    username:  username,
     sender:    settings.businessPhone.isNotEmpty ? settings.businessPhone : 'SERENUT',
     apiSecret: smsProvider == SmsProvider.twilio
-        ? (settings.smsApiKey!.contains(':')
-            ? settings.smsApiKey!.split(':').last
+        ? (apiKey.contains(':')
+            ? apiKey.split(':').last
             : null)
         : null,
+    simSubscriptionId: settings.smsSimSubscriptionId,
+    monthlyLimit: settings.smsMonthlyLimit,
+    sentThisMonth: settings.smsSentThisMonth,
+    limitResetMonth: settings.smsLimitResetMonth,
   );
 }
 
@@ -50,7 +66,34 @@ final smsServiceProvider = Provider<SmsService>((ref) {
   final settingsAsync = ref.watch(settingsNotifierProvider);
   final settings = settingsAsync.value;
   final config   = _buildSmsConfig(settings);
-  return SmsService(config: config);
+  final apiClient = ref.watch(apiClientProvider);
+
+  return SmsService(
+    config: config,
+    onSmsSent: () async {
+      await ref.read(settingsNotifierProvider.notifier).incrementSmsCounter();
+    },
+    onSmsDispatched: (phone, message, status, errorMessage, messageId) async {
+      try {
+        await apiClient.send(
+          'POST',
+          '/api/v1/notifications/sync-local',
+          body: {
+            'recipient': phone,
+            'body': message,
+            'status': status,
+            'error_message': errorMessage,
+            'channel': 'sms',
+            'client_message_id': messageId,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+        );
+      } catch (e) {
+        // Silently catch sync errors to prevent blocking the UI/operation
+        debugPrint('❌ SMS Sync failed (usually offline): $e');
+      }
+    },
+  );
 });
 
 /// Provider to expose pending SMS queue count.

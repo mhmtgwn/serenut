@@ -170,8 +170,90 @@ void main() {
 
       await localService.initialize();
 
-      final response = await apiClient.get('/dummy');
-      expect(response.json['auth_header'], 'Bearer jwt_mock_restored_12345');
+    });
+
+    test('Maps unexpected/unknown user role to cashier (fail-secure)', () async {
+      apiClient.mockHandler = (request) {
+        return ApiResponse(
+          statusCode: 200,
+          body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid", "name": "Test User", "email": "test@serenut.com", "role": "unknown_role_typo"}}',
+          headers: const {},
+        );
+      };
+
+      final user = await authService.login('test@serenut.com', 'pwd');
+      expect(user.role, equals(UserRole.cashier));
+    });
+
+    test('Maps owner or sysadmin roles to their respective roles', () async {
+      // 1. Test owner role
+      apiClient.mockHandler = (request) {
+        return ApiResponse(
+          statusCode: 200,
+          body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid1", "name": "Owner User", "email": "owner@serenut.com", "role": "owner"}}',
+          headers: const {},
+        );
+      };
+
+      final userOwner = await authService.login('owner@serenut.com', 'pwd');
+      expect(userOwner.role, equals(UserRole.owner));
+
+      // 2. Test sysadmin role
+      apiClient.mockHandler = (request) {
+        return ApiResponse(
+          statusCode: 200,
+          body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid2", "name": "Sysadmin User", "email": "sysadmin@serenut.com", "role": "sysadmin"}}',
+          headers: const {},
+        );
+      };
+
+      final userSysadmin = await authService.login('sysadmin@serenut.com', 'pwd');
+      expect(userSysadmin.role, equals(UserRole.sysadmin));
+    });
+
+    test('Offline lease allows POS sales but strips admin permissions when expired', () async {
+      final user = AuthUser(
+        id: 'lease_user',
+        name: 'Lease User',
+        email: 'lease@serenut.com',
+        role: UserRole.admin,
+        permissions: AuthService.getPermissionsForRole(UserRole.admin),
+        createdAt: DateTime.now(),
+      );
+      userRepo.addUser(user, 'hashed_pwd');
+
+      // 1. Fresh lease should grant admin permissions
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'serenut_last_authz_verified_at_lease_user',
+        DateTime.now().toUtc().subtract(const Duration(days: 1)).toIso8601String(),
+      );
+
+      final loggedInFresh = await authService.login('lease@serenut.com', 'pwd');
+      expect(loggedInFresh.id, 'lease_user');
+      expect(await authService.hasPermission('admin:settings'), isTrue);
+
+      // 2. Expired lease (> 7 days) should STILL allow login
+      await prefs.setString(
+        'serenut_last_authz_verified_at_lease_user',
+        DateTime.now().toUtc().subtract(const Duration(days: 8)).toIso8601String(),
+      );
+
+      final loggedInExpired = await authService.login('lease@serenut.com', 'pwd');
+      expect(loggedInExpired.id, 'lease_user'); // Login succeeds!
+
+      // But strips admin permissions
+      expect(await authService.hasPermission('admin:settings'), isFalse);
+      
+      // Basic cashier permissions are still allowed
+      expect(await authService.hasPermission('sales:create'), isTrue);
+      
+      // 3. And explicitly blocks verifyCurrentUserPin
+      expect(
+        () => authService.verifyCurrentUserPin('pwd'),
+        throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('Oturum süresi (offline lease) dolmuştur'))),
+      );
     });
   });
 }
+

@@ -499,6 +499,11 @@ abstract class IUserRepository implements BaseRepository<AuthUser> {
     String? businessCode,
     int? deviceTokenVersion,
   });
+
+  /// Brute-force lockout support (offline PIN protection)
+  Future<Map<String, dynamic>> getFailedPinAttempts(String userId);
+  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5});
+  Future<void> resetPinAttempts(String userId);
 }
 
 /// DTO representing the counts of database health anomalies

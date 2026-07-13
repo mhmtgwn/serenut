@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -15,15 +16,20 @@ class SqliteUserRepository implements IUserRepository {
   AuthUser _mapRowToAuthUser(Map<String, dynamic> row) {
     final roleStr = row['role'] as String;
     final role = UserRole.values.firstWhere(
-      (r) => r.name == roleStr,
+      (r) => r.name == roleStr.toLowerCase(),
       orElse: () => UserRole.cashier,
     );
     return AuthUser(
       id: row['id'] as String,
       name: row['name'] as String,
       email: row['email'] as String? ?? '',
+      username: row['username'] as String?,
+      pin: row['pin_hash'] as String?,
+      businessCode: row['business_code'] as String?,
       role: role,
-      permissions: Permission.forRole(role).map((p) => p.value).toList(),
+      permissions: row['permissions'] != null 
+          ? List<String>.from(jsonDecode(row['permissions'] as String))
+          : Permission.forRole(role).map((p) => p.value).toList(),
       createdAt: DateTime.parse(
         (row['created_at'] ?? DateTime.now().toIso8601String()) as String,
       ),
@@ -111,6 +117,7 @@ class SqliteUserRepository implements IUserRepository {
       if (pinHash != null) 'pin_hash': pinHash,
       if (businessCode != null) 'business_code': businessCode,
       if (deviceTokenVersion != null) 'device_token_version': deviceTokenVersion,
+      'permissions': jsonEncode(user.permissions),
     });
   }
 
@@ -129,6 +136,7 @@ class SqliteUserRepository implements IUserRepository {
       'email': user.email,
       'role': user.role.name,
       'updated_at': DateTime.now().toIso8601String(),
+      'permissions': jsonEncode(user.permissions),
     };
     if (passwordHash != null) {
       values['password_hash'] = passwordHash;
@@ -206,4 +214,50 @@ class SqliteUserRepository implements IUserRepository {
       'pin_hash': rows.first['pin_hash'] as String?,
     };
   }
+
+  // ── Brute-Force Lockout ───────────────────────────────────────────────────
+
+  @override
+  Future<Map<String, dynamic>> getFailedPinAttempts(String userId) async {
+    final rows = await _executor.query(
+      'users',
+      columns: ['failed_pin_attempts', 'locked_until'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    if (rows.isEmpty) return {'failed_pin_attempts': 0, 'locked_until': null};
+    return {
+      'failed_pin_attempts': rows.first['failed_pin_attempts'] as int? ?? 0,
+      'locked_until': rows.first['locked_until'] as String?,
+    };
+  }
+
+  @override
+  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5}) async {
+    final current = await getFailedPinAttempts(userId);
+    final newCount = ((current['failed_pin_attempts'] as int?) ?? 0) + 1;
+    final values = <String, dynamic>{
+      'failed_pin_attempts': newCount,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (newCount >= maxAttempts) {
+      values['locked_until'] = DateTime.now().add(Duration(minutes: lockoutMinutes)).toIso8601String();
+    }
+    await _executor.update('users', values, where: 'id = ?', whereArgs: [userId]);
+  }
+
+  @override
+  Future<void> resetPinAttempts(String userId) async {
+    await _executor.update(
+      'users',
+      {
+        'failed_pin_attempts': 0,
+        'locked_until': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
 }
+

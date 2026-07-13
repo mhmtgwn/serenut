@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
@@ -28,8 +28,9 @@ class PaymentService {
 
   Future<bool> _isDuplicateTransaction(String referenceId, String type) async {
     if (referenceId.isEmpty) return false;
-    final all = await _transactionRepository.findAll();
-    return all.any((t) => t.referenceId == referenceId && t.type == type);
+    // İSTEK 3 DÜZELTMESİ: findAll().any() yerine existsByReferenceId() SQL sorgusu.
+    // Tüm transaction geçmişi RAM'e yüklenmiyor; COUNT(*) ile O(1) duplicate check.
+    return _transactionRepository.existsByReferenceId(referenceId, type);
   }
 
   /// Processes payments for a sale.

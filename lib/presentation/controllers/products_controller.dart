@@ -1,4 +1,4 @@
-﻿// lib/presentation/controllers/products_controller.dart
+// lib/presentation/controllers/products_controller.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -146,14 +146,20 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     });
   }
 
-  Future<void> deleteProduct(String id) async {
+  Future<void> deleteProduct(String id, {String? approvedByUserId, String? approvedByUserName}) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(id);
       await _repository.delete(id);
       try {
         final auditService = await ref.read(auditServiceProvider.future);
-        await auditService.logDelete('product', id, original?.name ?? 'Bilinmeyen Ürün');
+        await auditService.logDelete(
+          'product',
+          id,
+          original?.name ?? 'Bilinmeyen Ürün',
+          approvedByUserId: approvedByUserId,
+          approvedByUserName: approvedByUserName,
+        );
       } catch (_) {}
       ref.read(auditLogServiceProvider).log(
         action: 'product_deleted',

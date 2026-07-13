@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/settings/print_queue_page.dart
+// lib/presentation/pages/settings/print_queue_page.dart
 // Serenut POS — Yazıcı Kuyruğu İzleme Ekranı
 // Backend: PersistentPrintQueue — crash-safe, retry logic bağlı
 // Created: Phase 4 — 01 Jul 2026
@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/settings_provider.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
 const _kBgColor       = Color(0xFFF8FAFC);
@@ -140,20 +141,41 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
     final failed    = jobs.where((j) => j.status == PrintJobStatus.failed).length;
     final abandoned = jobs.where((j) => j.status == PrintJobStatus.abandoned).length;
 
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        children: [
-          _SummaryChip(count: pending,   label: 'Bekliyor',  color: _kAmber),
-          const SizedBox(width: 8),
-          _SummaryChip(count: success,   label: 'Başarılı',  color: _kGreen),
-          const SizedBox(width: 8),
-          _SummaryChip(count: failed,    label: 'Başarısız', color: _kRed),
-          const SizedBox(width: 8),
-          _SummaryChip(count: abandoned, label: 'İptal',     color: _kGray),
-        ],
-      ),
+    return Column(
+      children: [
+        if (abandoned > 0)
+          Container(
+            color: const Color(0xFFFEF2F2),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$abandoned adet fiş basılamadı ve iptal edildi. Lütfen yazıcıyı kontrol edin.',
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              _SummaryChip(count: pending,   label: 'Bekliyor',  color: _kAmber),
+              const SizedBox(width: 8),
+              _SummaryChip(count: success,   label: 'Başarılı',  color: _kGreen),
+              const SizedBox(width: 8),
+              _SummaryChip(count: failed,    label: 'Başarısız', color: _kRed),
+              const SizedBox(width: 8),
+              _SummaryChip(count: abandoned, label: 'İptal',     color: _kGray),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -254,16 +276,48 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
 
   Future<void> _retryJob(PersistedPrintJob job) async {
     final queue = ref.read(persistentPrintQueueProvider);
-    await queue.resetStuckJobs();
+    final printerService = ref.read(printerServiceProvider);
+    final settingsAsync = ref.read(settingsNotifierProvider);
+    final settings = settingsAsync.value;
+    if (settings == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ayarlar yüklenemedi, tekrar deneyin'),
+            backgroundColor: _kRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    await queue.resetJob(job.id);
     ref.invalidate(_printJobsProvider);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('İş yeniden kuyruğa alındı'),
-          backgroundColor: _kBlue,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+
+    try {
+      await printerService.retryPersistedJob(job, settings);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fiş başarıyla yazdırıldı'),
+            backgroundColor: _kGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Yazdırma hatası: $e'),
+            backgroundColor: _kRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      ref.invalidate(_printJobsProvider);
     }
   }
 
@@ -275,18 +329,35 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
 
   Future<void> _retryAllPending() async {
     final queue = ref.read(persistentPrintQueueProvider);
+    final printerService = ref.read(printerServiceProvider);
+    final settingsAsync = ref.read(settingsNotifierProvider);
+    final settings = settingsAsync.value;
+    if (settings == null) return;
+
     final jobs = await queue.loadPending();
+    if (jobs.isEmpty) return;
+
     await queue.resetStuckJobs();
+    for (final job in jobs) {
+      await queue.resetJob(job.id);
+    }
     ref.invalidate(_printJobsProvider);
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${jobs.length} iş yeniden denemeye alındı'),
-          backgroundColor: _kGreen,
+          content: Text('${jobs.length} iş yeniden yazdırılıyor...'),
+          backgroundColor: _kBlue,
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
+
+    try {
+      await printerService.processPendingQueue(settings);
+    } catch (_) {}
+
+    ref.invalidate(_printJobsProvider);
   }
 
   Future<void> _clearCompleted() async {

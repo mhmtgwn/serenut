@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:uuid/uuid.dart';
 // Complies with Clean Architecture dependency inversion rules
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -295,6 +295,7 @@ class SalesService {
     required double amount,
     required String method,
   }) async {
+    _checkSecurityGate();
     final sale = await _saleRepository.findById(saleId);
     if (sale == null) {
       throw SaleNotFoundException('Sale $saleId not found');
@@ -367,6 +368,7 @@ class SalesService {
 
   /// Cancel a sale — restores stock and reverses customer debt
   Future<void> cancelSale(String saleId) async {
+    _checkSecurityGate();
     final sale = await _saleRepository.findById(saleId);
     if (sale == null) throw SaleNotFoundException('Sale $saleId not found');
     if (sale.status == 'cancelled') return;

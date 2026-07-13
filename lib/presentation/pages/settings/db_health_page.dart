@@ -1,9 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/domain/models/permission.dart';
 
 class DbHealthPage extends ConsumerStatefulWidget {
   const DbHealthPage({super.key});
@@ -43,10 +46,12 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
   }
 
   Future<void> _repairHealth() async {
-    PinGateDialog.checkAndShow(
+    requirePermissionAccess(
       context,
+      permission: Permission.settingsDatabase,
       title: 'Veritabanı Onarım Yetkisi',
-      onVerified: () async {
+      requirePin: true,
+      onGranted: (approvedByUserId, approvedByUserName) async {
         setState(() {
           _isLoading = true;
         });
@@ -86,6 +91,22 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider);
+    final hasAccess = currentUser != null && (
+      currentUser.role == UserRole.sysadmin ||
+      currentUser.role == UserRole.owner ||
+      currentUser.role == UserRole.admin ||
+      currentUser.hasPermission(Permission.settingsDatabase.value)
+    );
+
+    if (!hasAccess) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Bu sayfaya erişim yetkiniz bulunmuyor.'),
+        ),
+      );
+    }
+
     return FullScreenSettingsPage(
       title: 'Veritabanı Sağlık Kontrolü',
       child: Column(

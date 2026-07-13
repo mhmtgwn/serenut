@@ -13,7 +13,7 @@ import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/domain/services/dashboard_service.dart';
@@ -24,6 +24,8 @@ import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/domain/models/permission.dart' show UserRole;
 
 // ── System Trust Metrics Provider ─────────────────────────────────────────────
 
@@ -271,14 +273,11 @@ class HomePage extends ConsumerWidget {
               },
             ),
             const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.settings_outlined, color: Color(0xFF475569), size: 24),
-              onPressed: () => PinGateDialog.checkAndShow(
-                context,
-                title: 'Ayarlar Yetkisi',
-                onVerified: () => context.push(AppRoutes.settings),
+            if (ref.watch(currentUserProvider) != null)
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, color: Color(0xFF475569), size: 24),
+                onPressed: () => context.push(AppRoutes.settings),
               ),
-            ),
           ],
         ),
       ],
@@ -600,10 +599,10 @@ class HomePage extends ConsumerWidget {
                 return InkWell(
                   onTap: () {
                     if (item.route == AppRoutes.reports) {
-                      PinGateDialog.checkAndShow(
+                      requireAdminAccess(
                         context,
                         title: 'Rapor Yetkisi',
-                        onVerified: () => context.push(item.route),
+                        onGranted: (_, __) => context.push(item.route),
                       );
                     } else {
                       context.go(item.route);
@@ -702,10 +701,10 @@ class HomePage extends ConsumerWidget {
           bgColor: const Color(0xFFFFF7ED),
           message: 'Gecikmiş Ödeme: $overdueCount müşterinin vadesi geçmiş borcu bulunuyor.',
           actionLabel: 'Detay',
-          onTap: () => PinGateDialog.checkAndShow(
+          onTap: () => requireAdminAccess(
             context,
             title: 'Rapor Yetkisi',
-            onVerified: () => context.push(AppRoutes.reports),
+            onGranted: (_, __) => context.push(AppRoutes.reports),
           ),
         ),
       );

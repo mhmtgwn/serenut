@@ -80,8 +80,12 @@ class SmsLogEntry {
 
 enum SmsLogStatus {
   pending('pending'),
+  sending('sending'),
   sent('sent'),
-  failed('failed');
+  failed('failed'),
+  cancelled('cancelled'),
+  interrupted('interrupted'),
+  unknown('unknown');
 
   final String value;
   const SmsLogStatus(this.value);
