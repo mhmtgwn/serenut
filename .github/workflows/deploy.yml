@@ -108,14 +108,40 @@ jobs:
       - name: Run Widget & Logic Tests
         run: flutter test --fail-fast
 
-      - name: Build Web Application Bundle
-        run: flutter build web --release
+      - name: Build Android Application Package
+        run: flutter build apk --release
 
-      - name: Upload Web Application Artifact
+      - name: Upload Android Application Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: serenut-pos-web-bundle
-          path: build/web/
+          name: serenut-pos-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  windows-ci:
+    name: Windows Desktop Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build Windows Application
+        run: flutter build windows --release
+
+      - name: Upload Windows Application Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: serenut-pos-windows-bundle
+          path: build/windows/x64/runner/Release/
 
   deploy-staging:
     name: Continuous Staging Deployment (VPS)
