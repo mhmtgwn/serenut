@@ -1004,6 +1004,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       'Büfe', 'Kasap', 'Manav', 'Eczane', 'Diğer',
     ];
 
+    // DÜZELTME: Controller'lar push dönünce dispose ediliyor
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -1499,7 +1500,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      // DÜZELTME: Dialog kapanınca controller'lar dispose ediliyor
+      nameCtrl.dispose();
+      rateCtrl.dispose();
+    });
   }
 
   void _showEditVatDialog(
@@ -1558,8 +1563,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      // DÜZELTME: Dialog kapanınca controller dispose ediliyor
+      rateCtrl.dispose();
+    });
   }
+
 
 
 

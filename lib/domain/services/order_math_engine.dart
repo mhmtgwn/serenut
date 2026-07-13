@@ -1,4 +1,4 @@
-﻿// lib/domain/services/order_math_engine.dart
+// lib/domain/services/order_math_engine.dart
 import 'package:serenutos/domain/services/math_engine.dart';
 
 class OrderMathEngine {
@@ -12,7 +12,9 @@ class OrderMathEngine {
     double sum = 0.0;
     for (final item in items) {
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = (item['unit_price'] ?? item['unitPrice'] as num?)?.toDouble() ?? 0.0;
+      // DÜZELTME: `as` operatörü `??`'den önce bağlanır — parantez eklenerek önce ?? uygulanıyor.
+      final rawPrice = item['unit_price'] ?? item['unitPrice'];
+      final price = (rawPrice as num?)?.toDouble() ?? 0.0;
       sum += calculateItemSubtotal(price, qty);
     }
     return MathEngine.roundTL(sum);

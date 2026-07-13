@@ -3,7 +3,7 @@
 // Persists SMS send attempts to SQLite sms_logs table.
 // Created: 01 Jul 2026
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 
@@ -26,7 +26,7 @@ class SmsLogRepository {
       await database.insert('sms_logs', entry.toMap());
     } catch (e) {
       // Non-fatal: logging failures must not crash the app
-      print('⚠️ SmsLogRepository.insertLog error: $e');
+      debugPrint('⚠️ SmsLogRepository.insertLog error: $e');
     }
   }
 
@@ -62,7 +62,7 @@ class SmsLogRepository {
         whereArgs: [id],
       );
     } catch (e) {
-      print('⚠️ SmsLogRepository.updateStatus error: $e');
+      debugPrint('⚠️ SmsLogRepository.updateStatus error: $e');
     }
   }
 
@@ -84,7 +84,7 @@ class SmsLogRepository {
         [id],
       );
     } catch (e) {
-      print('⚠️ SmsLogRepository.incrementRetry error: $e');
+      debugPrint('⚠️ SmsLogRepository.incrementRetry error: $e');
     }
   }
 
@@ -106,7 +106,7 @@ class SmsLogRepository {
       );
       return rows.map(SmsLogEntry.fromMap).toList();
     } catch (e) {
-      print('⚠️ SmsLogRepository.getRecentLogs error: $e');
+      debugPrint('⚠️ SmsLogRepository.getRecentLogs error: $e');
       return [];
     }
   }
@@ -128,7 +128,7 @@ class SmsLogRepository {
       );
       return rows.map(SmsLogEntry.fromMap).toList();
     } catch (e) {
-      print('⚠️ SmsLogRepository.getPendingLogs error: $e');
+      debugPrint('⚠️ SmsLogRepository.getPendingLogs error: $e');
       return [];
     }
   }
@@ -165,7 +165,7 @@ class SmsLogRepository {
       );
       return rows.map(SmsLogEntry.fromMap).toList();
     } catch (e) {
-      print('⚠️ SmsLogRepository.getActiveCampaignLogs error: $e');
+      debugPrint('⚠️ SmsLogRepository.getActiveCampaignLogs error: $e');
       return [];
     }
   }
@@ -188,7 +188,7 @@ class SmsLogRepository {
         where: "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
       );
     } catch (e) {
-      print('⚠️ SmsLogRepository.cancelActiveCampaignLogs error: $e');
+      debugPrint('⚠️ SmsLogRepository.cancelActiveCampaignLogs error: $e');
     }
   }
 
@@ -208,7 +208,7 @@ class SmsLogRepository {
         whereArgs: [cutoff],
       );
     } catch (e) {
-      print('⚠️ SmsLogRepository.pruneOldLogs error: $e');
+      debugPrint('⚠️ SmsLogRepository.pruneOldLogs error: $e');
     }
   }
 
@@ -231,7 +231,7 @@ class SmsLogRepository {
         whereArgs: ['sending'],
       );
     } catch (e) {
-      print('⚠️ SmsLogRepository.resetStuckJobs error: $e');
+      debugPrint('⚠️ SmsLogRepository.resetStuckJobs error: $e');
     }
   }
 
@@ -250,7 +250,7 @@ class SmsLogRepository {
       );
       return rows.map(SmsLogEntry.fromMap).toList();
     } catch (e) {
-      print('⚠️ SmsLogRepository.getUnknownLogs error: $e');
+      debugPrint('⚠️ SmsLogRepository.getUnknownLogs error: $e');
       return [];
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
@@ -60,7 +61,9 @@ class PaymentService {
       } else {
         await prefs.setString('max_timestamp_seen', now.toIso8601String());
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PaymentService] Timestamp güncelleme hatası: $e');
+    }
 
     final debt = totalAmount - paidAmount;
 
@@ -82,7 +85,9 @@ class PaymentService {
       int parsedPaymentId = 0;
       try {
         parsedPaymentId = int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[PaymentService] ID parse hatası: $e');
+      }
 
       _eventPublisher.publish(PaymentRecordedEvent(
         paymentId: parsedPaymentId,
@@ -103,7 +108,12 @@ class PaymentService {
     required double totalAmount,
   }) async {
     final newPaidAmount = currentPaidAmount + amount;
-    final remainingDebt = (totalAmount - newPaidAmount).abs();
+    // DÜZELTME: .abs() kaldırıldı — fazla ödeme (overpayment) borç olarak kayıt edilmemeliydi.
+    // remaining > 0  → hâlâ borç var
+    // remaining <= 0 → ya tam ödeme ya da fazla ödeme (alacak)
+    final remaining = totalAmount - newPaidAmount;
+    final remainingDebt = remaining > 0 ? remaining : 0.0;
+    final overpayment  = remaining < 0 ? remaining.abs() : 0.0;
 
     final transactionId = _generateTxId('trans');
     await _transactionRepository.create(
@@ -113,16 +123,19 @@ class PaymentService {
         customerId: customerId,
         amount: amount,
         paidAmount: amount,
-        debtAmount: remainingDebt > 0 ? remainingDebt : 0,
+        debtAmount: remainingDebt,
         date: DateTime.now(),
         referenceId: saleId,
+        metadata: overpayment > 0 ? {'overpayment': overpayment} : null,
       ),
     );
 
     int parsedPaymentId = 0;
     try {
       parsedPaymentId = int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PaymentService] ID parse hatası (partial): $e');
+    }
 
     _eventPublisher.publish(PaymentRecordedEvent(
       paymentId: parsedPaymentId,
@@ -192,7 +205,9 @@ class PaymentService {
     int parsedPaymentId = 0;
     try {
       parsedPaymentId = int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PaymentService] ID parse hatası (collection): $e');
+    }
 
     _eventPublisher.publish(PaymentRecordedEvent(
       paymentId: parsedPaymentId,
@@ -207,7 +222,9 @@ class PaymentService {
       if (customer != null && customer.balance < 0) {
         remainingDebt = customer.balance.abs();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PaymentService] Müşteri bakiye sorgulama hatası: $e');
+    }
 
     _eventPublisher.publish(CollectionRecordedEvent(
       collectionIdStr: transactionId,

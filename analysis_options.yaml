@@ -10,11 +10,8 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
-  exclude:
-    - 'lib/data/**'            # Legacy data layer (replaced by infrastructure/repositories)
-    - 'lib/domain/service/**'  # Legacy service layer (replaced by domain/services/)
-    - 'lib/modules/**'         # Legacy modules (replaced by new architecture)
-    - 'lib_backup*/**'         # Backup directories
+  # exclude: Bu dizinler artık repoda mevcut değil, ölü konfigürasyon kaldırıldı.
+
 
 linter:
   rules:

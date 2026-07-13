@@ -3,7 +3,9 @@
 // 3-tab layout: Sales | Products | Customer Debt + Cloud BI
 // Generated: 21 Jun 2026
 
+import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -42,6 +44,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   bool _isLoading = false;
   AnalyticsWsService? _wsService;
   DashboardMetrics? _liveMetrics;
+  // DÜZELTME: StreamSubscription tutularak dispose'da cancel() çağrılabilsin
+  StreamSubscription<dynamic>? _wsSub;
 
   @override
   void initState() {
@@ -58,7 +62,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         if (token != null) {
           _wsService = ref.read(analyticsWsServiceProvider);
           await _wsService!.connect(jwtToken: token);
-          _wsService!.eventStream.listen((event) {
+          // DÜZELTME: mounted kontrolü connect()'ten SONRA yapılıyor
+          if (!mounted) return;
+          _wsSub = _wsService!.eventStream.listen((event) {
             if (event['event'] == 'sale_sync' && mounted) {
               // Trigger reload of Cloud BI data or update local cache
               setState(() {
@@ -84,8 +90,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
             }
           });
         }
-      } catch (_) {
-        // Silent failure if offline
+      } catch (e) {
+        debugPrint('[ReportsPage] WebSocket bağlantı hatası: $e');
       }
     });
   }
@@ -93,6 +99,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   @override
   void dispose() {
     _tabController.dispose();
+    // DÜZELTME: StreamSubscription cancel eklendi — bellek sızıntısı giderildi
+    _wsSub?.cancel();
     _wsService?.disconnect();
     super.dispose();
   }

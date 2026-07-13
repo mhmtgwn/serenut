@@ -38,8 +38,15 @@ class TrialManager {
 
   /// Trial timestamp için HMAC-SHA256 checksum üretir
   String _buildChecksum(int timestampMs) {
-    const secret = 'serenut_trial_integrity_v1';
+    // DÜZELTME: Sabit string yerine derleme zamanı sabiti kullanılıyor.
+    // CI'da: flutter build apk --dart-define=TRIAL_SECRET=<gizli-anahtar>
+    // Yerel geliştirme için varsayılan değer (prod'da değiştirilmeli).
+    const secret = String.fromEnvironment(
+      'TRIAL_SECRET',
+      defaultValue: 'serenut_trial_integrity_v1',
+    );
     final hmac = Hmac(sha256, utf8.encode(secret));
+
     final digest = hmac.convert(utf8.encode('$timestampMs'));
     return digest.toString();
   }

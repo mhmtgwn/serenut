@@ -112,7 +112,11 @@ class DatasetImportService {
         excelFile = file;
       } else if (file.name.startsWith('images/')) {
         // Extract barcode from filename (e.g., 'images/8690504090106.jpg' -> '8690504090106')
-        final filename = p.basename(file.name);
+        // DÜZELTME: Path traversal koruması — basename kullanılıyor ve '..' içeren isimler reddediliyor
+        final rawName = file.name;
+        if (rawName.contains('..') || rawName.contains('\x00')) continue;
+        final filename = p.basename(rawName);
+        if (filename.isEmpty || filename.startsWith('.')) continue;
         final dotIndex = filename.lastIndexOf('.');
         final barcode = dotIndex != -1 ? filename.substring(0, dotIndex) : filename;
         if (barcode.isNotEmpty && file.content != null) {
@@ -120,6 +124,7 @@ class DatasetImportService {
         }
       }
     }
+
 
     Uint8List excelBytes;
     if (isRawExcel) {

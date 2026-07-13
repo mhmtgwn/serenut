@@ -65,3 +65,8 @@ server/db/
 *.exe
 server/public/website/downloads/
 web/marketing/downloads/
+
+# Flutter debug screenshots
+flutter_*.png
+android/key.properties
+

@@ -482,7 +482,10 @@ class SalesService {
     for (final item in sale.items) {
       final productId = item['product_id'] as String;
       final originalQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = (item['unit_price'] ?? item['unitPrice'] as num?)?.toDouble() ?? 0.0;
+      // DÜZELTME: `as` operatörü `??`'den önce bağlanır — parantez eklenerek önce ?? uygulanıyor.
+      final rawPrice = item['unit_price'] ?? item['unitPrice'];
+      final price = (rawPrice as num?)?.toDouble() ?? 0.0;
+
       
       final returnMatchIndex = itemsToReturn.indexWhere((ri) => ri.productId == productId);
       if (returnMatchIndex != -1) {
