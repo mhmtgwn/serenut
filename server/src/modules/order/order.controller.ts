@@ -108,30 +108,33 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    // Calculate total
     const subtotal = items.reduce((sum: number, item: any) => sum + item.qty * item.unitPrice, 0);
     const discountAmount = discount ?? 0;
-    const total = Math.max(0, subtotal - discountAmount);
+    const computedTotal = Math.max(0, subtotal - discountAmount);
+    
+    const finalTotal = req.body.totalAmount ?? computedTotal;
+    const finalPaid = req.body.paidAmount ?? finalTotal;
+    const finalStatus = req.body.status ?? 'completed';
 
-    const orderId = `ord-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const orderId = req.body.id || `ord-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
     // Insert sale
     await client.query(
       `INSERT INTO sales
          (id, company_id, branch_id, customer_id, payment_method,
-          total_amount, paid_amount, fsm_state, idempotency_key, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, CURRENT_TIMESTAMP)`,
+          total_amount, paid_amount, status, fsm_state, idempotency_key, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'completed', $9, COALESCE($10, CURRENT_TIMESTAMP))`,
       [
-        orderId, user.company_id, branchId ?? null,
-        customerId ?? null, paymentMethod, total, total,
-        idempotencyKey ?? null,
+        orderId, user.company_id, req.body.branchId ?? null,
+        req.body.customerId ?? null, paymentMethod, finalTotal, finalPaid,
+        finalStatus, req.body.idempotencyKey ?? null, req.body.createdAt ?? null
       ]
     );
 
     // Insert sale items
     for (const item of items) {
       await client.query(
-        `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, total_price)
+        `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           crypto.randomUUID(), orderId, item.productId,
@@ -151,8 +154,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
 
     return res.status(201).json({
       orderId,
-      total,
-      status: 'completed',
+      total: finalTotal,
+      status: finalStatus,
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
