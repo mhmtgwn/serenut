@@ -38,30 +38,24 @@ class IdempotencyCache {
   }
 
   public async get(key: string): Promise<CachedResponse | null> {
-    if (this.useRedis && this.redisClient.isOpen) {
-      try {
-        const raw = await this.redisClient.get(`idemp:${key}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed.expiresAt < Date.now()) {
-            await this.redisClient.del(`idemp:${key}`);
-            return null;
-          }
-          return parsed;
-        }
-      } catch (err) {
-        logger.error('Failed to get from Redis:', err);
-      }
+    if (!this.useRedis || !this.redisClient?.isOpen) {
+      logger.error('Idempotency Redis is not available. Failing strict idempotency request.');
+      throw new Error('idempotency_redis_unavailable');
     }
 
-    // Fallback to local memory cache
-    const cached = this.localCache.get(key);
-    if (cached) {
-      if (cached.expiresAt < Date.now()) {
-        this.localCache.delete(key);
-        return null;
+    try {
+      const raw = await this.redisClient.get(`idemp:${key}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.expiresAt < Date.now()) {
+          await this.redisClient.del(`idemp:${key}`);
+          return null;
+        }
+        return parsed;
       }
-      return cached;
+    } catch (err) {
+      logger.error('Failed to get from Redis:', err);
+      throw new Error('idempotency_redis_unavailable');
     }
 
     return null;
@@ -70,34 +64,24 @@ class IdempotencyCache {
   public async set(key: string, value: CachedResponse, ttlSeconds: number = 86400): Promise<void> {
     value.expiresAt = Date.now() + ttlSeconds * 1000;
 
-    if (this.useRedis && this.redisClient.isOpen) {
-      try {
-        if (ttlSeconds <= 0) {
-          await this.redisClient.del(`idemp:${key}`);
-        } else {
-          await this.redisClient.set(
-            `idemp:${key}`,
-            JSON.stringify(value),
-            { EX: ttlSeconds }
-          );
-        }
-        return;
-      } catch (err) {
-        logger.error('Failed to set/delete in Redis:', err);
-      }
+    if (!this.useRedis || !this.redisClient?.isOpen) {
+      logger.error('Idempotency Redis is not available. Failing strict idempotency request.');
+      throw new Error('idempotency_redis_unavailable');
     }
 
-    if (ttlSeconds <= 0) {
-      this.localCache.delete(key);
-    } else {
-      this.localCache.set(key, value);
-      // Cleanup local cache entry after expiration
-      setTimeout(() => {
-        const current = this.localCache.get(key);
-        if (current && current.expiresAt <= Date.now()) {
-          this.localCache.delete(key);
-        }
-      }, ttlSeconds * 1000);
+    try {
+      if (ttlSeconds <= 0) {
+        await this.redisClient.del(`idemp:${key}`);
+      } else {
+        await this.redisClient.set(
+          `idemp:${key}`,
+          JSON.stringify(value),
+          { EX: ttlSeconds }
+        );
+      }
+    } catch (err) {
+      logger.error('Failed to set/delete in Redis:', err);
+      throw new Error('idempotency_redis_unavailable');
     }
   }
 }

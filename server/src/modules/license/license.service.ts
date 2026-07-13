@@ -226,10 +226,12 @@ export class LicenseService {
     }
   }
 
-  public static async validate(deviceHash: string): Promise<boolean> {
+  public static async validate(licenseKey: string, deviceHash: string): Promise<boolean> {
     const res = await pgPool.query(
-      "SELECT status FROM device_activations WHERE device_hash = $1 AND status = 'active'",
-      [deviceHash]
+      `SELECT da.status FROM device_activations da
+       JOIN license_entitlements le ON da.entitlement_id = le.id
+       WHERE le.license_key = $1 AND da.device_hash = $2 AND da.status = 'active' AND le.status = 'active'`,
+      [licenseKey, deviceHash]
     );
     return res.rows.length > 0;
   }

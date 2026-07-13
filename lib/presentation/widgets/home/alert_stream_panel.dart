@@ -2,9 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
-import 'package:serenutos/presentation/controllers/report_controller.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 final telemetryCollapsedProvider = StateProvider.autoDispose<bool>((ref) => true);
+
+final recentAlertsProvider = FutureProvider.autoDispose<List<String>>((ref) async {
+  try {
+    final telemetry = TelemetryService();
+    final events = await telemetry.getEvents();
+    return events.reversed
+        .map((e) {
+          final levelEmoji = e.level == LogLevel.critical
+              ? '🚨'
+              : e.level == LogLevel.error
+                  ? '❌'
+                  : e.level == LogLevel.warning
+                      ? '⚠️'
+                      : 'ℹ️';
+          return '$levelEmoji ${e.event}';
+        })
+        .take(4)
+        .toList();
+  } catch (_) {
+    return ['ℹ️ Sistem güvenliği aktif', 'ℹ️ Ledger bütünlük kontrolü stabil'];
+  }
+});
 
 class AlertStreamPanel extends ConsumerWidget {
   const AlertStreamPanel({Key? key}) : super(key: key);

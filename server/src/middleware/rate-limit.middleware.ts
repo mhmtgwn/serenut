@@ -73,7 +73,7 @@ export const generalApiLimiter = createRedisLimiter({
 // ── KİMLİK DOĞRULAMA LİMİTER ─────────────────────────────────────────────────
 export const authLimiter = createRedisLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 200, // Geliştirme & test kolaylığı için artırıldı (üretimde düşürülmeli)
+  max: process.env.NODE_ENV === 'production' ? 10 : 200, // Üretimde daha sıkı, testte esnek
   error: 'too_many_auth_attempts',
   message: 'Çok fazla giriş denemesi yapıldı. 15 dakika bekleyin.'
 });

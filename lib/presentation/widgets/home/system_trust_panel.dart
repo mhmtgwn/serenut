@@ -8,6 +8,8 @@ import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/domain/services/license_manager.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── System Trust Metrics Provider ─────────────────────────────────────────────
 

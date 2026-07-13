@@ -74,11 +74,8 @@ void main() async {
       );
       // Global event publisher will be eagerly initialized in MyApp build
 
-      // Initialize API client and Auth service concurrently
-      await Future.wait([
-        apiClient.initialize(),
-        authService.initialize(),
-      ]);
+      // Initialize Auth service
+      await authService.initialize();
       
       // If database contains no users, reset onboarding status to show the wizard
       try {

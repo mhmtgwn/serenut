@@ -50,14 +50,14 @@ router.post('/activate', licenseRateLimit, authenticateUser, async (req: Authent
 
 // Public Validation Route
 router.post('/validate', licenseRateLimit, async (req: Request, res: Response) => {
-  const { device_hash } = req.body;
-  if (!device_hash) {
+  const { license_key, device_hash } = req.body;
+  if (!license_key || !device_hash) {
     incrementLicenseValidation(false);
-    return res.status(400).json({ error: 'missing_device_hash', message: 'Cihaz imzası zorunludur.' });
+    return res.status(400).json({ error: 'missing_fields', message: 'Lisans anahtarı ve cihaz imzası zorunludur.' });
   }
 
   try {
-    const isValid = await LicenseService.validate(device_hash);
+    const isValid = await LicenseService.validate(license_key, device_hash);
     incrementLicenseValidation(isValid);
     return res.json({ valid: isValid });
   } catch (err) {

@@ -159,10 +159,23 @@ router.get('/users', async (req: AuthenticatedRequest, res: Response) => {
 
 router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
+  
+  // Privilege check: only owners/admins can create new users
+  const isOwnerOrAdmin = user.roles?.includes('owner') || user.roles?.includes('admin');
+  if (!isOwnerOrAdmin) {
+    return res.status(403).json({ error: 'forbidden', message: 'Sadece yetkili yöneticiler kullanıcı oluşturabilir.' });
+  }
+
   const { name, email, password, role_id } = req.body;
   if (!name || !email || !password || !role_id) {
     return res.status(400).json({ error: 'missing_fields', message: 'Ad, e-posta, şifre ve rol zorunludur.' });
   }
+
+  // Prevent assigning 'sysadmin' role unless the requester is also a sysadmin
+  if (role_id === 'sysadmin' && !user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Sysadmin yetkisi atanamaz.' });
+  }
+
   if (password.length < 8) {
     return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
   }
@@ -207,6 +220,11 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
   const { name, email, is_active, new_password, role_id } = req.body;
   const targetId = req.params.id;
 
+  // Prevent assigning 'sysadmin' role unless the requester is also a sysadmin
+  if (role_id === 'sysadmin' && !user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Sysadmin yetkisi atanamaz.' });
+  }
+
   // Verify user belongs to this company
   const check = await runWithTenantContext(
     user.company_id,
@@ -217,7 +235,12 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(404).json({ error: 'user_not_found' });
   }
 
+  // We need to use a single connection for multiple queries inside a single transaction
+  const client = await pgPool.connect();
   try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+
     const updates: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -227,6 +250,8 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
     if (is_active !== undefined) { updates.push(`is_active = $${idx++}`); values.push(Boolean(is_active)); }
     if (new_password !== undefined) {
       if (new_password.length < 8) {
+        await client.query('ROLLBACK');
+        client.release();
         return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
       }
       const hash = await AuthService.hashPassword(new_password);
@@ -238,33 +263,36 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
       updates.push(`token_version = token_version + 1`);
       updates.push(`updated_at = CURRENT_TIMESTAMP`);
       values.push(targetId);
-      await runWithTenantContext(
-        user.company_id,
+      await client.query(
         `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx}`,
         values
       );
     } else if (role_id !== undefined) {
-      await runWithTenantContext(
-        user.company_id,
+      await client.query(
         'UPDATE users SET token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
         [targetId]
       );
     }
 
     if (role_id !== undefined) {
-      await runWithTenantContext(user.company_id, 'DELETE FROM user_roles WHERE user_id = $1', [targetId]);
-      await runWithTenantContext(user.company_id, 'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [targetId, role_id]);
+      await client.query('DELETE FROM user_roles WHERE user_id = $1', [targetId]);
+      await client.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [targetId, role_id]);
     }
+
+    await client.query('COMMIT');
 
     await writeTenantAudit(user.company_id, user.id, 'UPDATE_USER', 'users', targetId, null, { name, email, is_active, role_id });
 
     return res.json({ success: true, message: 'Kullanıcı güncellendi.' });
   } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
     if (err.code === '23505') {
       return res.status(409).json({ error: 'email_exists', message: 'Bu e-posta adresi zaten kayıtlı.' });
     }
     console.error('Update portal user error:', err);
     return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -444,6 +472,11 @@ router.post('/tickets/:id/reply', async (req: AuthenticatedRequest, res: Respons
 const BACKUP_DIR = process.env.NODE_ENV === 'production' ? '/var/backups/serenut' : path.join(__dirname, '../../../backups');
 
 router.get('/backups', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (!user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Yedekleme yönetimi sadece sistem yöneticilerine açıktır.' });
+  }
+
   try {
     if (!fs.existsSync(BACKUP_DIR)) {
       fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -472,6 +505,10 @@ router.get('/backups', async (req: AuthenticatedRequest, res: Response) => {
 
 router.post('/backups', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
+  if (!user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Yedekleme yönetimi sadece sistem yöneticilerine açıktır.' });
+  }
+
   try {
     const scriptPath = process.env.NODE_ENV === 'production'
       ? '/var/www/serenut-api/scripts/backup.sh'
@@ -504,6 +541,11 @@ router.post('/backups', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 router.get('/backups/download/:filename', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (!user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Yedekleme yönetimi sadece sistem yöneticilerine açıktır.' });
+  }
+
   const { filename } = req.params;
   // Prevent directory traversal
   if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {

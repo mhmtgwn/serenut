@@ -20,6 +20,7 @@ import {
 } from '../notifications/email.templates';
 import crypto from 'crypto';
 import fs from 'fs';
+import path from 'path';
 import { CommercialLifecycleService } from './commercial_lifecycle.service';
 
 const router = Router();
@@ -709,14 +710,20 @@ router.get('/invoices/:id/pdf', authenticateUser, async (req: AuthenticatedReque
       return res.status(404).json({ error: 'invoice_not_found' });
     }
 
-    const path = invoiceRes.rows[0].pdf_path;
-    if (!path || !fs.existsSync(path)) {
+    const pdfPath = invoiceRes.rows[0].pdf_path;
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
       return res.status(404).json({ error: 'pdf_not_found', message: 'Fatura PDF dosyası henüz üretilmemiş veya silinmiş.' });
+    }
+
+    const resolvedPath = path.resolve(pdfPath);
+    const invoicesDir = path.resolve(process.env.INVOICES_DIR || path.join(__dirname, '../../../../invoices'));
+    if (!resolvedPath.startsWith(invoicesDir) && !resolvedPath.startsWith('/var/invoices')) {
+      return res.status(403).json({ error: 'forbidden', message: 'Geçersiz fatura dizini.' });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${invoiceRes.rows[0].invoice_number}.pdf"`);
-    return fs.createReadStream(path).pipe(res);
+    return fs.createReadStream(resolvedPath).pipe(res);
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
   }

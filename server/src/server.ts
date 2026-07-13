@@ -109,7 +109,10 @@ app.use(
       if (!origin) return callback(null, true);
       const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
       const isSerenutDomain = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*serenut\.(?:com|com\.tr|az|de|net|org)(?::\d+)?$/.test(origin);
-      if (allowedOrigins.includes(origin) || isLocal || isSerenutDomain) {
+      
+      const allowLocal = isLocal && process.env.NODE_ENV !== 'production';
+
+      if (allowedOrigins.includes(origin) || isSerenutDomain || allowLocal) {
         callback(null, true);
       } else {
         logger.warn(`CORS blocked request from: ${origin}`);

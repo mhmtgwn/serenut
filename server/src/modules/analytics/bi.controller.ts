@@ -127,11 +127,11 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
         },
         week: {
           revenue: parseFloat(weekRes.rows[0].revenue),
-          growth_pct: 5.4 // Placeholder for comparison
+          growth_pct: 0 // TODO: Geçmiş hafta ile karşılaştırma algoritması eklenecek
         },
         month: {
           revenue: parseFloat(monthRes.rows[0].revenue),
-          growth_pct: 12.8
+          growth_pct: 0 // TODO: Geçmiş ay ile karşılaştırma algoritması eklenecek
         },
         topProduct: topProdRes.rows.length > 0 ? {
           name: topProdRes.rows[0].name,
