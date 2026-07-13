@@ -419,93 +419,7 @@ extension SettingsUserManagementSheets on _SettingsPageState {
     );
   }
 
-  void _showPinConfigDialog() {
-    // Read PIN from SQLite settings via notifier
-    final settingsState = ref.read(settingsNotifierProvider);
-    final currentPin = settingsState.valueOrNull?.adminPinCode;
-    if (currentPin != null && currentPin.isNotEmpty) {
-      requirePermissionAccess(
-        context,
-        permission: Permission.settingsUsers,
-        title: 'Güvenlik Doğrulaması',
-        requirePin: true,
-        onGranted: (approvedByUserId, approvedByUserName) {
-          _showPinEntryOptionsSheet();
-        },
-      );
-    } else {
-      _showNewPinEntrySheet();
-    }
-  }
 
-  void _showPinEntryOptionsSheet() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 16),
-              const Text(
-                'PIN Yönetimi',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.lock_open_rounded, color: Colors.red),
-                title: const Text('PIN Kilidini Kaldır', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Admin korumasını devre dışı bırakır'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  // Write null PIN to SQLite settings (single source of truth)
-                  final settingsState = ref.read(settingsNotifierProvider);
-                  if (settingsState.hasValue) {
-                    await ref.read(settingsNotifierProvider.notifier)
-                        .updateSettings(settingsState.value!.copyWith(adminPinCode: null));
-                  }
-                  _loadAdminPin();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Yönetici PIN kilidi kaldırıldı.')),
-                    );
-                  }
-                },
-              ),
-              const _IOSDivider(),
-              ListTile(
-                leading: const Icon(Icons.mode_edit_outline_outlined, color: _kBlue),
-                title: const Text('PIN Kodunu Değiştir', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Yeni 4 haneli PIN belirleyin'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showNewPinEntrySheet();
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showNewPinEntrySheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return _NewPinEntrySheet(pageState: this);
-      },
-    );
-  }
-}
 
 class _AddUserDialog extends ConsumerStatefulWidget {
   final _SettingsPageState pageState;
@@ -1019,13 +933,14 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                       await ref.read(settingsNotifierProvider.notifier)
                           .updateSettings(settingsState.value!.copyWith(adminPinCode: hashedPin));
                     }
-                    // PIN değiştiğinde session cache'i sıfırla
                     widget.pageState._loadAdminPin();
                     if (mounted) {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Yönetici PIN kodu başarıyla güncellendi.')),
-                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Yönetici PIN kodu başarıyla güncellendi.')),
+                        );
+                      }
                     }
                   }
                 },

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 
 class PinVerificationResult {
@@ -52,7 +51,7 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
     final user = await authService.getCurrentUser();
     if (user == null) return;
 
-    final repo = await ref.read(userRepositoryProvider);
+    final repo = ref.read(userRepositoryProvider);
     final lockoutData = await repo.getFailedPinAttempts(user.id);
     final lockedUntilStr = lockoutData['locked_until'] as String?;
     if (lockedUntilStr != null) {
@@ -132,7 +131,7 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
       // Check if it got locked
       final user = await authService.getCurrentUser();
       if (user != null) {
-        final repo = await ref.read(userRepositoryProvider);
+        final repo = ref.read(userRepositoryProvider);
         final lockoutData = await repo.getFailedPinAttempts(user.id);
         final attempts = lockoutData['failed_pin_attempts'] as int? ?? 0;
         final lockedUntilStr = lockoutData['locked_until'] as String?;

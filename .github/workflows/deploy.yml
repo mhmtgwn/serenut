@@ -132,9 +132,9 @@ jobs:
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           port: ${{ secrets.STAGING_VPS_PORT || 22 }}
           script: |
-            cd /opt/serenut-os/server
+            cd /var/www/serenut/server
             git fetch --all
-            git reset --hard origin/master
+            git reset --hard origin/main
             sed -i '/^GIT_COMMIT=/d' .env.production || true
             echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
             npm ci --only=production
