@@ -32,10 +32,19 @@ const upload = multer({
   limits: { fileSize: MAX_FILE_SIZE_MB * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (ALLOWED_EXTENSIONS.includes(ext)) {
+    const mime = file.mimetype;
+
+    const validMimes: Record<string, string[]> = {
+      '.apk': ['application/vnd.android.package-archive', 'application/octet-stream'],
+      '.aab': ['application/octet-stream'],
+      '.exe': ['application/x-msdownload', 'application/octet-stream', 'application/x-msdos-program'],
+      '.msix': ['application/vnc.ms-appx', 'application/octet-stream', 'application/zip']
+    };
+
+    if (ALLOWED_EXTENSIONS.includes(ext) && validMimes[ext]?.includes(mime)) {
       cb(null, true);
     } else {
-      cb(new Error(`invalid_file_type: Only ${ALLOWED_EXTENSIONS.join(', ')} allowed`));
+      cb(new Error(`invalid_file_type: Invalid extension (${ext}) or MIME (${mime})`));
     }
   }
 });
@@ -55,8 +64,7 @@ function computeFileSha256(filePath: string): Promise<string> {
 function signReleaseFile(sha256Hash: string): string {
   const privateKey = process.env.RSA_PRIVATE_KEY;
   if (!privateKey) {
-    console.warn('⚠️ Warning: RSA_PRIVATE_KEY is not defined. Skipping release digital signature.');
-    return '';
+    throw new Error('RSA_PRIVATE_KEY is not defined in environment. Digital signature is mandatory for releases.');
   }
   try {
     const sign = crypto.createSign('SHA256');

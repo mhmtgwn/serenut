@@ -544,7 +544,7 @@ class OfflineSyncService {
     }
 
     try {
-      final response = await _apiClient.post('/sales', payload, idempotency: true);
+      final response = await _apiClient.post('/sales', payload, idempotencyKey: sale.id);
       return response.statusCode == 200 || response.statusCode == 201;
     } on ApiException catch (e) {
       debugPrint('[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['paymentMethod']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');

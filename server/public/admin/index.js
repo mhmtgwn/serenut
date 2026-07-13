@@ -1,7 +1,18 @@
 /* index.js — Serenut Cloud Admin Control Center Engine */
 
 const BASE_URL = '/api/v1';
-let authToken = localStorage.getItem('admin_token') || '';
+let authToken = sessionStorage.getItem('admin_token') || '';
+
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 let selectedTicketId = null;
 let charts = {};
 
@@ -120,7 +131,7 @@ async function handleLogin() {
     }
 
     authToken = data.access_token;
-    localStorage.setItem('admin_token', authToken);
+    sessionStorage.setItem('admin_token', authToken);
     showAdminApp();
   } catch (err) {
     errorEl.innerText = 'Bağlantı hatası oluştu.';
@@ -129,7 +140,7 @@ async function handleLogin() {
 
 function handleLogout() {
   authToken = '';
-  localStorage.removeItem('admin_token');
+  sessionStorage.removeItem('admin_token');
   showLoginCard();
 }
 
@@ -376,16 +387,16 @@ async function loadCompanies() {
         : 'Yok';
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${comp.id}</strong></td>
-        <td>${comp.name}</td>
-        <td>${comp.tax_number} / ${comp.tax_office || '-'}</td>
-        <td>${comp.phone || '-'} <br> <span style="font-size:0.8rem;color:var(--text-secondary);">${comp.email || '-'}</span></td>
-        <td>${comp.store_count} Mağaza</td>
-        <td>${comp.device_count} Terminal</td>
-        <td><span class="badge badge-${comp.status}">${comp.status}</span></td>
+        <td><strong>${escapeHTML(comp.id)}</strong></td>
+        <td>${escapeHTML(comp.name)}</td>
+        <td>${escapeHTML(comp.tax_number)} / ${escapeHTML(comp.tax_office || "-")}</td>
+        <td>${escapeHTML(comp.phone || "-")} <br> <span style="font-size:0.8rem;color:var(--text-secondary);">${escapeHTML(comp.email || "-")}</span></td>
+        <td>${escapeHTML(comp.store_count)} Mağaza</td>
+        <td>${escapeHTML(comp.device_count)} Terminal</td>
+        <td><span class="badge badge-${escapeHTML(comp.status)}">${escapeHTML(comp.status)}</span></td>
         <td>
-          <button class="btn-secondary" onclick="viewCompanyDetails('${comp.id}')" title="Şirketin adres, vergi dairesi, şube, cihaz ve lisans detaylarını gösterir.">Detay</button>
-          <button class="btn-secondary text-red" onclick="toggleCompanyStatus('${comp.id}', '${comp.status}')" title="${comp.status === 'active' ? 'Şirketi askıya alır: Kullanıcı girişini, senkronizasyonu ve cihaz satış yetkisini dondurur.' : 'Şirketi aktifleştirir: Giriş ve satış yetkilerini normale döndürür.'}">
+          <button class="btn-secondary" onclick="viewCompanyDetails('${escapeHTML(comp.id)}')" title="Şirketin adres, vergi dairesi, şube, cihaz ve lisans detaylarını gösterir.">Detay</button>
+          <button class="btn-secondary text-red" onclick="toggleCompanyStatus('${escapeHTML(comp.id)}', '${escapeHTML(comp.status)}')" title="${comp.status === 'active' ? 'Şirketi askıya alır: Kullanıcı girişini, senkronizasyonu ve cihaz satış yetkisini dondurur.' : 'Şirketi aktifleştirir: Giriş ve satış yetkilerini normale döndürür.'}">
             ${comp.status === 'active' ? 'Askıya Al' : 'Aktifleştir'}
           </button>
         </td>
@@ -410,19 +421,19 @@ window.viewCompanyDetails = async function(id) {
   Kayıt Tarihi: ${new Date(details.company.created_at).toLocaleString('tr-TR')}
 
 🏢 MAĞAZALAR (${details.stores.length}):
-${details.stores.map(s => `  - [${s.id}] ${s.name} (${s.address || 'Adres belirtilmemiş'})`).join('\n')}
+${details.stores.map(s => `  - [${escapeHTML(s.id)}] ${escapeHTML(s.name)} (${escapeHTML(s.address || "-")})`).join('\n')}
 
 📱 CİHAZLAR (${details.devices.length}):
-${details.devices.map(d => `  - [${d.id}] ${d.name} (${d.status}) - Son Aktiflik: ${d.last_active_at ? new Date(d.last_active_at).toLocaleString('tr-TR') : 'Hiç'}`).join('\n')}
+${details.devices.map(d => `  - [${escapeHTML(d.id)}] ${escapeHTML(d.name)} (${escapeHTML(d.status)}) - Son Aktiflik: ${d.last_active_at ? new Date(d.last_active_at).toLocaleString('tr-TR') : 'Hiç'}`).join('\n')}
 
 🔑 LİSANSLAR (${details.licenses.length}):
-${details.licenses.map(l => `  - ${l.license_key} [${l.tier.toUpperCase()}] status: ${l.status} - Bitiş: ${new Date(l.expires_at).toLocaleDateString('tr-TR')}`).join('\n')}
+${details.licenses.map(l => `  - ${escapeHTML(l.license_key)} [${l.tier.toUpperCase()}] status: ${escapeHTML(l.status)} - Bitiş: ${new Date(l.expires_at).toLocaleDateString('tr-TR')}`).join('\n')}
 
 👥 KULLANICILAR (${details.users.length}):
-${details.users.map(u => `  - ${u.name} (${u.email}) - is_active: ${u.is_active}`).join('\n')}
+${details.users.map(u => `  - ${escapeHTML(u.name)} (${escapeHTML(u.email)}) - is_active: ${escapeHTML(u.is_active)}`).join('\n')}
 
 🧾 FATURALAR (${details.invoices.length}):
-${details.invoices.map(i => `  - Fatura No: ${i.id} - Tutar: ${i.amount} TRY - Durum: ${i.status}`).join('\n')}
+${details.invoices.map(i => `  - Fatura No: ${escapeHTML(i.id)} - Tutar: ${escapeHTML(i.amount)} TRY - Durum: ${escapeHTML(i.status)}`).join('\n')}
     `;
 
     openTextViewer('Şirket Entegrasyon Detayları', formatted);
@@ -464,19 +475,19 @@ async function loadLicenses() {
       const expires = new Date(l.expires_at).toLocaleDateString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${l.license_key}</strong></td>
-        <td>${l.company_name}</td>
-        <td><span class="badge badge-${l.tier}">${l.tier}</span></td>
-        <td>${l.allowed_devices_count} Cihaz</td>
+        <td><strong>${escapeHTML(l.license_key)}</strong></td>
+        <td>${escapeHTML(l.company_name)}</td>
+        <td><span class="badge badge-${escapeHTML(l.tier)}">${escapeHTML(l.tier)}</span></td>
+        <td>${escapeHTML(l.allowed_devices_count)} Cihaz</td>
         <td>${expires}</td>
-        <td><span class="badge badge-${l.status}">${l.status}</span></td>
+        <td><span class="badge badge-${escapeHTML(l.status)}">${escapeHTML(l.status)}</span></td>
         <td>
-          <button class="btn-secondary text-green" onclick="renewLicense('${l.id}')" title="Lisansın geçerlilik süresini +365 gün (1 yıl) uzatır.">Yenile (+1 Yıl)</button>
-          <button class="btn-secondary" onclick="toggleLicenseStatus('${l.id}', '${l.status}')" title="${l.status === 'active' ? 'Lisansı askıya alır: Tanımlı cihazın satış ve senkronizasyonunu geçici olarak dondurur.' : 'Lisansı etkinleştirir: Tanımlı cihazın satış yetkisini açar.'}">
+          <button class="btn-secondary text-green" onclick="renewLicense('${escapeHTML(l.id)}')" title="Lisansın geçerlilik süresini +365 gün (1 yıl) uzatır.">Yenile (+1 Yıl)</button>
+          <button class="btn-secondary" onclick="toggleLicenseStatus('${escapeHTML(l.id)}', '${escapeHTML(l.status)}')" title="${l.status === 'active' ? 'Lisansı askıya alır: Tanımlı cihazın satış ve senkronizasyonunu geçici olarak dondurur.' : 'Lisansı etkinleştirir: Tanımlı cihazın satış yetkisini açar.'}">
             ${l.status === 'active' ? 'Askıya Al' : 'Etkinleştir'}
           </button>
-          <button class="btn-secondary" onclick="triggerOfflineActivation('${l.id}', '${l.license_key}')" style="background:#10B981;color:white;border:none;" title="İnterneti olmayan POS cihazlarını yerinde (offline) aktifleştirmek için aktivasyon QR kodunu açar.">Offline QR</button>
-          <button class="btn-secondary text-red" onclick="revokeLicense('${l.id}')" title="Lisans anahtarını kalıcı olarak iptal eder. Bu işlem geri alınamaz ve cihazın bulutla olan bağlantısı kesilir!">İptal Et</button>
+          <button class="btn-secondary" onclick="triggerOfflineActivation('${escapeHTML(l.id)}', '${escapeHTML(l.license_key)}')" style="background:#10B981;color:white;border:none;" title="İnterneti olmayan POS cihazlarını yerinde (offline) aktifleştirmek için aktivasyon QR kodunu açar.">Offline QR</button>
+          <button class="btn-secondary text-red" onclick="revokeLicense('${escapeHTML(l.id)}')" title="Lisans anahtarını kalıcı olarak iptal eder. Bu işlem geri alınamaz ve cihazın bulutla olan bağlantısı kesilir!">İptal Et</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -571,16 +582,16 @@ async function loadDevices() {
         : 'Yok';
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${d.id}</strong></td>
-        <td>${d.company_name}</td>
-        <td>${d.store_name || '-'}</td>
+        <td><strong>${escapeHTML(d.id)}</strong></td>
+        <td>${escapeHTML(d.company_name)}</td>
+        <td>${escapeHTML(d.store_name || "-")}</td>
         <td><span style="font-family:monospace;font-size:0.8rem;">${d.device_hash.substring(0, 16)}...</span></td>
-        <td><span class="badge badge-${d.status}">${d.status}</span></td>
+        <td><span class="badge badge-${escapeHTML(d.status)}">${escapeHTML(d.status)}</span></td>
         <td>${activeTime}</td>
         <td><span class="indicator ${d.is_online ? 'online' : 'offline'}">${d.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}</span></td>
         <td>
-          <button class="btn-secondary" onclick="openDeviceSwapModal('${d.company_id}', '${d.id}', '${d.name || 'Terminal'}')" style="background:#8B5CF6;color:white;border:none;">Değiştir</button>
-          <button class="btn-secondary text-red" onclick="toggleDeviceStatus('${d.id}')">
+          <button class="btn-secondary" onclick="openDeviceSwapModal('${escapeHTML(d.company_id)}', '${escapeHTML(d.id)}', '${escapeHTML(d.name || "-")}')" style="background:#8B5CF6;color:white;border:none;">Değiştir</button>
+          <button class="btn-secondary text-red" onclick="toggleDeviceStatus('${escapeHTML(d.id)}')">
             ${d.status === 'active' ? 'Engelle' : 'Etkinleştir'}
           </button>
         </td>
@@ -614,14 +625,14 @@ async function loadUpdates() {
       const created = new Date(u.created_at).toLocaleDateString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${u.version_code}</strong></td>
+        <td><strong>${escapeHTML(u.version_code)}</strong></td>
         <td>${u.platform.toUpperCase()}</td>
-        <td><a href="${u.download_url}" target="_blank" style="color:var(--neon-cyan);">Dosyayı İndir</a></td>
+        <td><a href="${escapeHTML(u.download_url)}" target="_blank" style="color:var(--neon-cyan);">Dosyayı İndir</a></td>
         <td><span style="font-family:monospace;font-size:0.8rem;">${u.sha256_hash.substring(0, 16)}...</span></td>
         <td>${u.is_mandatory ? 'Zorunlu' : 'İsteğe Bağlı'}</td>
         <td>${created}</td>
         <td>
-          <button class="btn-secondary text-red" onclick="deleteUpdate('${u.id}')">Sil</button>
+          <button class="btn-secondary text-red" onclick="deleteUpdate('${escapeHTML(u.id)}')">Sil</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -659,11 +670,11 @@ async function loadSyncMonitor() {
       const created = new Date(job.created_at).toLocaleString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${job.company_name}</td>
-        <td>${job.device_name}</td>
-        <td><strong>${job.entity_type}</strong></td>
-        <td>${job.entity_id}</td>
-        <td class="text-red">${job.error_message || 'Bilinmeyen Hata'}</td>
+        <td>${escapeHTML(job.company_name)}</td>
+        <td>${escapeHTML(job.device_name)}</td>
+        <td><strong>${escapeHTML(job.entity_type)}</strong></td>
+        <td>${escapeHTML(job.entity_id)}</td>
+        <td class="text-red">${escapeHTML(job.error_message || "-")}</td>
         <td>${created}</td>
       `;
       tbody.appendChild(tr);
@@ -688,14 +699,14 @@ async function loadTickets() {
       const created = new Date(t.created_at).toLocaleDateString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${t.id}</strong></td>
-        <td>${t.company_name}</td>
-        <td>${t.title}</td>
-        <td><span class="badge border-amber">${t.priority}</span></td>
-        <td><span class="badge badge-${t.status}">${t.status}</span></td>
+        <td><strong>${escapeHTML(t.id)}</strong></td>
+        <td>${escapeHTML(t.company_name)}</td>
+        <td>${escapeHTML(t.title)}</td>
+        <td><span class="badge border-amber">${escapeHTML(t.priority)}</span></td>
+        <td><span class="badge badge-${escapeHTML(t.status)}">${escapeHTML(t.status)}</span></td>
         <td>${created}</td>
         <td>
-          <button class="btn-secondary" onclick="openSupportChat('${t.id}', '${t.title}', '${t.status}')">Yanıtla / Detay</button>
+          <button class="btn-secondary" onclick="openSupportChat('${escapeHTML(t.id)}', '${escapeHTML(t.title)}', '${escapeHTML(t.status)}')">Yanıtla / Detay</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -726,8 +737,8 @@ async function loadTicketMessages(ticketId) {
       const div = document.createElement('div');
       div.className = `chat-msg ${isSystemAdmin ? 'chat-msg-admin' : 'chat-msg-user'}`;
       div.innerHTML = `
-        <strong>${msg.sender_name}</strong>
-        <p>${msg.message}</p>
+        <strong>${escapeHTML(msg.sender_name)}</strong>
+        <p>${escapeHTML(msg.message)}</p>
         <span class="chat-msg-time">${new Date(msg.created_at).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}</span>
       `;
       container.appendChild(div);
@@ -774,12 +785,12 @@ async function loadCrashLogs() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${created}</td>
-        <td>${l.company_name}</td>
-        <td>${l.device_name || '-'}</td>
+        <td>${escapeHTML(l.company_name)}</td>
+        <td>${escapeHTML(l.device_name || "-")}</td>
         <td class="text-red"><strong>${l.error_message.substring(0, 60)}...</strong></td>
-        <td>${l.app_version || '1.0.0'}</td>
+        <td>${escapeHTML(l.app_version || "-")}</td>
         <td>
-          <button class="btn-secondary" onclick="viewCrashStackTrace('${l.id}')">Stack Trace</button>
+          <button class="btn-secondary" onclick="viewCrashStackTrace('${escapeHTML(l.id)}')">Stack Trace</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -816,11 +827,11 @@ async function loadAuditLogs() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${created}</td>
-        <td><strong>${l.user_name || 'Sistem'}</strong></td>
-        <td>${l.action}</td>
-        <td>${l.entity || '-'}</td>
-        <td>${l.entity_id || '-'}</td>
-        <td><span style="font-family:monospace;font-size:0.8rem;">${l.ip_address}</span></td>
+        <td><strong>${escapeHTML(l.user_name || "-")}</strong></td>
+        <td>${escapeHTML(l.action)}</td>
+        <td>${escapeHTML(l.entity || "-")}</td>
+        <td>${escapeHTML(l.entity_id || "-")}</td>
+        <td><span style="font-family:monospace;font-size:0.8rem;">${escapeHTML(l.ip_address)}</span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -850,10 +861,10 @@ async function loadSmsLogs() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${created}</td>
-        <td>${l.company_name}</td>
-        <td>${l.phone}</td>
-        <td>${l.message}</td>
-        <td><span class="badge badge-${l.status}">${l.status}</span></td>
+        <td>${escapeHTML(l.company_name)}</td>
+        <td>${escapeHTML(l.phone)}</td>
+        <td>${escapeHTML(l.message)}</td>
+        <td><span class="badge badge-${escapeHTML(l.status)}">${escapeHTML(l.status)}</span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -952,7 +963,7 @@ async function submitCreateCompany() {
     }
 
     const payload = await res.json();
-    alert(`Firma başarıyla oluşturuldu!\nİlk POS Deneme Lisans Anahtarı: ${payload.license_key}`);
+    alert(`Firma başarıyla oluşturuldu!\nİlk POS Deneme Lisans Anahtarı: ${escapeHTML(payload.license_key)}`);
     loadCompanies();
     return true;
   } catch (_) {
@@ -967,7 +978,7 @@ async function loadCompanySelectOptions() {
   try {
     const res = await adminFetch('/admin/companies');
     const companies = await res.json();
-    select.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    select.innerHTML = companies.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)}</option>`).join('');
   } catch (_) {
     select.innerHTML = '<option value="">Hata oluştu.</option>';
   }
@@ -1063,10 +1074,10 @@ async function loadSubscriptions() {
         : 'Yok';
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${c.id}</strong></td>
-        <td>${c.name}</td>
-        <td>${c.email || '-'}</td>
-        <td><span class="badge badge-suspended">${c.status}</span></td>
+        <td><strong>${escapeHTML(c.id)}</strong></td>
+        <td>${escapeHTML(c.name)}</td>
+        <td>${escapeHTML(c.email || "-")}</td>
+        <td><span class="badge badge-suspended">${escapeHTML(c.status)}</span></td>
         <td>${graceEnd}</td>
         <td>${c.unpaid_invoice_count || 1} Adet</td>
         <td class="text-red">${c.debt_amount || 0} TRY</td>
@@ -1096,15 +1107,15 @@ async function loadIncidents() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${inc.id.substring(0, 8)}...</strong></td>
-        <td>${inc.company_name || 'Genel (Platform)'}</td>
-        <td><span class="badge border-amber">${inc.severity}</span></td>
-        <td><strong>${inc.title}</strong></td>
-        <td>${inc.description || '-'}</td>
-        <td><span class="badge badge-${inc.status}">${inc.status}</span></td>
+        <td>${escapeHTML(inc.company_name || "-")}</td>
+        <td><span class="badge border-amber">${escapeHTML(inc.severity)}</span></td>
+        <td><strong>${escapeHTML(inc.title)}</strong></td>
+        <td>${escapeHTML(inc.description || "-")}</td>
+        <td><span class="badge badge-${escapeHTML(inc.status)}">${escapeHTML(inc.status)}</span></td>
         <td>${date}</td>
         <td>
-          ${inc.status === 'open' ? `<button class="btn-secondary" onclick="assignIncident('${inc.id}')">Üstlen</button>` : ''}
-          ${inc.status !== 'resolved' ? `<button class="btn-secondary text-green" onclick="resolveIncident('${inc.id}')">Çözüldü</button>` : '✓ Çözüldü'}
+          ${inc.status === 'open' ? `<button class="btn-secondary" onclick="assignIncident('${escapeHTML(inc.id)}')">Üstlen</button>` : ''}
+          ${inc.status !== 'resolved' ? `<button class="btn-secondary text-green" onclick="resolveIncident('${escapeHTML(inc.id)}')">Çözüldü</button>` : '✓ Çözüldü'}
         </td>
       `;
       tbody.appendChild(tr);
@@ -1181,12 +1192,12 @@ async function loadSecurity() {
       const date = new Date(b.created_at).toLocaleString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${b.ip_address}</strong></td>
-        <td>${b.reason || '-'}</td>
-        <td>${b.banned_by_name || 'System'}</td>
+        <td><strong>${escapeHTML(b.ip_address)}</strong></td>
+        <td>${escapeHTML(b.reason || "-")}</td>
+        <td>${escapeHTML(b.banned_by_name || "-")}</td>
         <td>${date}</td>
         <td>
-          <button class="btn-secondary text-green" onclick="unbanIp('${b.ip_address}')">Engeli Kaldır</button>
+          <button class="btn-secondary text-green" onclick="unbanIp('${escapeHTML(b.ip_address)}')">Engeli Kaldır</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -1271,7 +1282,7 @@ async function loadBulkCompanySelectOptions() {
   try {
     const res = await adminFetch('/admin/companies');
     const companies = await res.json();
-    select.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    select.innerHTML = companies.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)}</option>`).join('');
   } catch (_) {
     select.innerHTML = '<option value="">Hata oluştu.</option>';
   }
@@ -1355,10 +1366,10 @@ async function loadTicketInternalNotes(ticketId) {
       div.style.color = '#E2E8F0';
       div.innerHTML = `
         <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; color: #38BDF8;">
-          <span>${n.author_name}</span>
+          <span>${escapeHTML(n.author_name)}</span>
           <span style="font-size: 0.75rem; color: #64748B;">${date}</span>
         </div>
-        <p style="margin: 0;">${n.note}</p>
+        <p style="margin: 0;">${escapeHTML(n.note)}</p>
       `;
       container.appendChild(div);
     });
@@ -1435,7 +1446,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await adminFetch('/admin/companies');
         const companies = await res.json();
         companies.forEach(c => {
-          select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+          select.innerHTML += `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)}</option>`;
         });
       } catch (_) {}
       document.getElementById('modal-incident').classList.add('active');
@@ -1592,13 +1603,13 @@ async function loadPlans() {
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${plan.id}</strong></td>
-        <td>${plan.name}</td>
-        <td>${plan.price} ${plan.currency}</td>
-        <td>${plan.currency}</td>
+        <td><strong>${escapeHTML(plan.id)}</strong></td>
+        <td>${escapeHTML(plan.name)}</td>
+        <td>${escapeHTML(plan.price)} ${escapeHTML(plan.currency)}</td>
+        <td>${escapeHTML(plan.currency)}</td>
         <td>${devicesLimit}</td>
         <td class="text-right">
-          <button class="btn-secondary btn-sm" onclick="openEditPlanModal('${plan.id}')">Düzenle</button>
+          <button class="btn-secondary btn-sm" onclick="openEditPlanModal('${escapeHTML(plan.id)}')">Düzenle</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -1692,7 +1703,7 @@ async function savePlanDetails() {
       loadPlans();
     } else {
       const errData = await res.json();
-      alert(`Hata: ${errData.message || 'Plan güncellenemedi.'}`);
+      alert(`Hata: ${escapeHTML(errData.message || "-")}`);
     }
   } catch (err) {
     console.error(err);
@@ -1770,7 +1781,7 @@ async function saveSettings(e) {
       alert('Sistem ayarları başarıyla güncellendi!');
       loadSettings();
     } else {
-      alert(`Hata: ${data.message || 'Ayarlar kaydedilemedi.'}`);
+      alert(`Hata: ${escapeHTML(data.message || "-")}`);
     }
   } catch (err) {
     console.error('saveSettings error:', err);

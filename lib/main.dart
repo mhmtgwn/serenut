@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:serenutos/config/environment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,9 +32,10 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
 
 void main() async {
+  final envConfig = EnvironmentConfig.current;
   await SentryFlutter.init(
     (options) {
-      options.dsn = 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632';
+      options.dsn = envConfig.sentryDsn ?? '';
       options.tracesSampleRate = 0.1;
       options.environment = kReleaseMode ? 'production' : 'development';
     },
@@ -71,9 +74,11 @@ void main() async {
       );
       // Global event publisher will be eagerly initialized in MyApp build
 
-      // Initialize API client
-      await apiClient.initialize();
-      await authService.initialize();
+      // Initialize API client and Auth service concurrently
+      await Future.wait([
+        apiClient.initialize(),
+        authService.initialize(),
+      ]);
       
       // If database contains no users, reset onboarding status to show the wizard
       try {

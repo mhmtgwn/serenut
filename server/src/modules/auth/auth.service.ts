@@ -746,8 +746,8 @@ export class AuthService {
       await client.query('COMMIT');
 
       return {
-        accessToken,
-        refreshToken,
+        access_token: accessToken,
+        refresh_token: refreshToken,
         user: {
           id: profile.id,
           name: profile.name,

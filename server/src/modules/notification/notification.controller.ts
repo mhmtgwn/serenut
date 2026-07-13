@@ -3,7 +3,7 @@ import { pgPool, redisClient } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission } from '../../middleware/auth.middleware';
 import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
-import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate_limit.middleware';
+import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate-limit.middleware';
 
 const router = Router();
 

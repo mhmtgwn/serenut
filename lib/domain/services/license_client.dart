@@ -1,4 +1,4 @@
-﻿// lib/domain/services/license_client.dart
+// lib/domain/services/license_client.dart
 // Serenut Platform — Cloud License Client
 // Defines the contract and mock client implementations for remote licensing synchronization.
 // Created: 04 Jul 2026
@@ -21,7 +21,7 @@ class CloudLicenseClient implements LicenseClient {
 
   @override
   Future<CompanyLicense?> activate(String token, String deviceId) async {
-    final response = await _apiClient.post('/license/activate', {
+    final response = await _apiClient.post('/licenses/activate', {
       'token': token,
       'deviceId': deviceId,
     });
@@ -34,7 +34,7 @@ class CloudLicenseClient implements LicenseClient {
   @override
   Future<bool> validate(String licenseId) async {
     try {
-      final response = await _apiClient.get('/license/validate?id=$licenseId');
+      final response = await _apiClient.get('/licenses/validate?id=$licenseId');
       return response.isSuccess && response.json['valid'] == true;
     } catch (_) {
       return false;
@@ -43,8 +43,8 @@ class CloudLicenseClient implements LicenseClient {
 
   @override
   Future<CompanyLicense?> refresh(String licenseId) async {
-    final response = await _apiClient.post('/license/refresh', {
-      'licenseId': licenseId,
+    final response = await _apiClient.post('/licenses/refresh', {
+      'license_id': licenseId,
     });
     if (response.isSuccess) {
       return CompanyLicense.fromJson(response.json);
@@ -55,8 +55,8 @@ class CloudLicenseClient implements LicenseClient {
   @override
   Future<bool> deactivate(String licenseId, String deviceId) async {
     try {
-      final response = await _apiClient.post('/license/deactivate', {
-        'licenseId': licenseId,
+      final response = await _apiClient.post('/licenses/deactivate', {
+        'license_id': licenseId,
         'deviceId': deviceId,
       });
       return response.isSuccess && response.json['deactivated'] == true;
@@ -68,8 +68,8 @@ class CloudLicenseClient implements LicenseClient {
   @override
   Future<bool> syncLicense(String licenseId) async {
     try {
-      final response = await _apiClient.post('/license/sync', {
-        'licenseId': licenseId,
+      final response = await _apiClient.post('/licenses/sync', {
+        'license_id': licenseId,
       });
       return response.isSuccess && response.json['synced'] == true;
     } catch (_) {

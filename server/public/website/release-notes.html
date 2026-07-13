@@ -215,6 +215,16 @@
   </footer>
 
   <script>
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     async function fetchReleases() {
       try {
         const res = await fetch('/api/v1/releases/history');
@@ -249,12 +259,12 @@
             <div class="release-card">
               <div class="release-header">
                 <div>
-                  <span class="version-tag">v${rel.version_code}</span>
-                  <span class="platform-badge ${platformClass}">${platformLabel}</span>
+                  <span class="version-tag">v${escapeHTML(rel.version_code)}</span>
+                  <span class="platform-badge ${escapeHTML(platformClass)}">${escapeHTML(platformLabel)}</span>
                 </div>
-                <span class="release-date">${dateStr}</span>
+                <span class="release-date">${escapeHTML(dateStr)}</span>
               </div>
-              <div class="release-body">${rel.release_notes || 'Detay belirtilmemiş.'}</div>
+              <div class="release-body">${escapeHTML(rel.release_notes || 'Detay belirtilmemiş.')}</div>
             </div>
           `;
           listDiv.appendChild(item);

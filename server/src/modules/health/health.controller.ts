@@ -8,6 +8,12 @@ import { logger } from '../../config/logger';
 
 const router = Router();
 
+router.get('/', (req, res) => {
+  // Sync client expects /api/v1/health to return status
+  // We'll redirect to the main health check or return simple json
+  res.redirect('/health');
+});
+
 /**
  * @openapi
  * /api/v1/health/report:

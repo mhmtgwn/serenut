@@ -185,7 +185,15 @@ class AuthService {
 
           if (isValid) {
             final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
-            // Lease check removed from here to allow offline POS sales.
+            if (lastVerifiedStr != null) {
+              final lastVerified = DateTime.parse(lastVerifiedStr);
+              if (DateTime.now().toUtc().difference(lastVerified).inDays >= 7) {
+                throw AuthException('Güvenlik nedeniyle (offline policy) 7 günde bir çevrimiçi giriş yapmalısınız.');
+              }
+            } else {
+              throw AuthException('Çevrimdışı giriş için önceden senkronizasyon gereklidir.');
+            }
+
             await _onLoginSuccess(user);
 
             // Rehash on first login if legacy format detected
@@ -225,8 +233,8 @@ class AuthService {
 
         if (response.isSuccess) {
           final data = response.json;
-          final token = data['accessToken'] as String;
-          final refreshToken = data['refreshToken'] as String;
+          final token = (data['access_token'] ?? data['accessToken']) as String;
+          final refreshToken = (data['refresh_token'] ?? data['refreshToken']) as String;
           final userMap = data['user'] as Map<String, dynamic>;
 
           await _prefs.setString('auth_jwt_token', token);

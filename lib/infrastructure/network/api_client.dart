@@ -63,18 +63,19 @@ class ApiClient {
   String? get jwtToken => _jwtToken;
 
   /// Helper to build request headers.
-  Map<String, String> _buildHeaders({bool includeIdempotency = false}) {
+  Map<String, String> _buildHeaders({String? idempotencyKey}) {
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'x-schema-version': '1',
     };
 
     if (_jwtToken != null) {
       headers['Authorization'] = 'Bearer $_jwtToken';
     }
 
-    if (includeIdempotency) {
-      headers['Idempotency-Key'] = const Uuid().v4();
+    if (idempotencyKey != null) {
+      headers['Idempotency-Key'] = idempotencyKey;
     }
 
     return headers;
@@ -85,14 +86,14 @@ class ApiClient {
     String method,
     String path, {
     Map<String, dynamic>? body,
-    bool includeIdempotency = false,
+    String? idempotencyKey,
   }) async {
     String cleanPath = path;
     if (cleanPath.startsWith('/api/v1') && _config.apiBaseUrl.endsWith('/api/v1')) {
       cleanPath = cleanPath.substring(7);
     }
     final uri = Uri.parse('${_config.apiBaseUrl}$cleanPath');
-    final headers = _buildHeaders(includeIdempotency: includeIdempotency);
+    final headers = _buildHeaders(idempotencyKey: idempotencyKey);
     final String? bodyString = body != null ? jsonEncode(body) : null;
 
     final request = http.Request(method, uri);
@@ -132,7 +133,7 @@ class ApiClient {
         _refreshFuture = null; // reset for next time
 
         if (success) {
-          final newHeaders = _buildHeaders(includeIdempotency: includeIdempotency);
+          final newHeaders = _buildHeaders(idempotencyKey: idempotencyKey);
           final retryRequest = http.Request(method, uri);
           retryRequest.headers.addAll(newHeaders);
           if (bodyString != null) {
@@ -183,12 +184,12 @@ class ApiClient {
   Future<ApiResponse> get(String path) => send('GET', path);
 
   /// Helper for POST requests.
-  Future<ApiResponse> post(String path, Map<String, dynamic> body, {bool idempotency = true}) =>
-      send('POST', path, body: body, includeIdempotency: idempotency);
+  Future<ApiResponse> post(String path, Map<String, dynamic> body, {String? idempotencyKey}) =>
+      send('POST', path, body: body, idempotencyKey: idempotencyKey);
 
   /// Helper for PUT requests.
-  Future<ApiResponse> put(String path, Map<String, dynamic> body, {bool idempotency = true}) =>
-      send('PUT', path, body: body, includeIdempotency: idempotency);
+  Future<ApiResponse> put(String path, Map<String, dynamic> body, {String? idempotencyKey}) =>
+      send('PUT', path, body: body, idempotencyKey: idempotencyKey);
 
   /// Helper for DELETE requests.
   Future<ApiResponse> delete(String path) => send('DELETE', path);

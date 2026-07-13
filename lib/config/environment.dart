@@ -15,6 +15,7 @@ class EnvironmentConfig {
   final String updateEndpoint;
   final String releaseEndpoint;
   final String releaseChannel; // 'stable' | 'beta' | 'alpha' | 'nightly' | 'internal'
+  final String? sentryDsn;
 
   const EnvironmentConfig({
     required this.environment,
@@ -24,6 +25,7 @@ class EnvironmentConfig {
     required this.updateEndpoint,
     required this.releaseEndpoint,
     required this.releaseChannel,
+    this.sentryDsn,
   });
 
   String get wsBaseUrl {
@@ -44,6 +46,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'stable',
+          sentryDsn: null,
         );
       case AppEnvironment.test:
         return const EnvironmentConfig(
@@ -54,6 +57,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'beta',
+          sentryDsn: const String.fromEnvironment('SENTRY_DSN', defaultValue: 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632'),
         );
       case AppEnvironment.prod:
         return const EnvironmentConfig(
@@ -64,6 +68,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'stable',
+          sentryDsn: const String.fromEnvironment('SENTRY_DSN', defaultValue: 'https://637bf7c98099e289bf650ccb646c05ef@o4507542289657856.ingest.us.sentry.io/4507542295621632'),
         );
     }
   }

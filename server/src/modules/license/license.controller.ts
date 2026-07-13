@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { LicenseService } from './license.service';
 import { authenticateUser, requireRole, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { rateLimiter } from '../../middleware/rate_limiter';
+import { rateLimiter } from '../../middleware/rate-limit.middleware';
 import { incrementLicenseValidation } from '../../utils/telemetry';
 
 const router = Router();
