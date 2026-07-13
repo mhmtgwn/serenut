@@ -95,8 +95,8 @@ class AuthService {
         
         if (response.isSuccess) {
           final data = response.json;
-          final token = data['access_token'] as String;
-          final refreshToken = data['refresh_token'] as String;
+          final token = _readString(data, const ['access_token', 'accessToken']);
+          final refreshToken = _readString(data, const ['refresh_token', 'refreshToken']);
           final userMap = data['user'] as Map<String, dynamic>;
 
           await _prefs.setString('auth_jwt_token', token);
@@ -115,20 +115,17 @@ class AuthService {
             await trialManager.startTrial(DateTime.now());
           }
 
-          final roleStr = userMap['role'] as String? ?? 'cashier';
-          final role = UserRole.values.firstWhere(
-            (r) => r.name == roleStr.toLowerCase(),
-            orElse: () => UserRole.cashier,
-          );
+          final role = _extractRole(userMap);
+          final permissions = _extractPermissions(userMap, role);
           
           final user = AuthUser(
             id: userMap['id'] as String,
-            companyId: userMap['company_id'] as String? ?? 'TEST_COMPANY',
+            companyId: (userMap['company_id'] ?? userMap['companyId']) as String? ?? 'TEST_COMPANY',
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
-            permissions: getPermissionsForRole(role),
-            createdAt: DateTime.tryParse(userMap['created_at'] as String? ?? '') ?? DateTime.now(),
+            permissions: permissions,
+            createdAt: DateTime.tryParse((userMap['created_at'] ?? userMap['createdAt']) as String? ?? '') ?? DateTime.now(),
           );
 
           // Cache credentials in local sqlite for offline login
@@ -216,28 +213,24 @@ class AuthService {
 
         if (response.isSuccess) {
           final data = response.json;
-          final token = data['accessToken'] as String;
-          final refreshToken = data['refreshToken'] as String;
+          final token = _readString(data, const ['access_token', 'accessToken']);
+          final refreshToken = _readString(data, const ['refresh_token', 'refreshToken']);
           final userMap = data['user'] as Map<String, dynamic>;
 
           await _prefs.setString('auth_jwt_token', token);
           await _prefs.setString('auth_refresh_token', refreshToken);
           _apiClient!.setJwtToken(token);
 
-          final roles = userMap['roles'] as List<dynamic>? ?? [];
-          final roleStr = roles.isNotEmpty ? roles.first.toString() : 'cashier';
-          final role = UserRole.values.firstWhere(
-            (r) => r.name == roleStr.toLowerCase(),
-            orElse: () => UserRole.cashier,
-          );
+          final role = _extractRole(userMap);
+          final permissions = _extractPermissions(userMap, role);
 
           final user = AuthUser(
             id: userMap['id'] as String,
-            companyId: userMap['company_id'] as String? ?? 'TEST_COMPANY',
+            companyId: (userMap['company_id'] ?? userMap['companyId']) as String? ?? 'TEST_COMPANY',
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
-            permissions: getPermissionsForRole(role),
+            permissions: permissions,
             createdAt: DateTime.now(),
           );
 
@@ -545,4 +538,55 @@ class AuthService {
         'payments:record',
         'customers:view',
       ];
+
+  static String _readString(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final value = map[key];
+      if (value is String && value.isNotEmpty) return value;
+    }
+    throw AuthException('Kimlik doğrulama yanıtı eksik veya geçersiz.');
+  }
+
+  static UserRole _extractRole(Map<String, dynamic> userMap) {
+    final roleRaw = userMap['role'];
+    if (roleRaw is String && roleRaw.trim().isNotEmpty) {
+      return _parseRoleName(roleRaw);
+    }
+
+    final rolesRaw = userMap['roles'];
+    if (rolesRaw is List && rolesRaw.isNotEmpty) {
+      final first = rolesRaw.first;
+      if (first is String && first.trim().isNotEmpty) {
+        return _parseRoleName(first);
+      }
+    }
+
+    return UserRole.cashier;
+  }
+
+  static UserRole _parseRoleName(String roleName) {
+    final normalized = roleName.trim().toLowerCase();
+    switch (normalized) {
+      case 'admin':
+      case 'owner':
+      case 'sysadmin':
+        return UserRole.admin;
+      case 'manager':
+        return UserRole.manager;
+      case 'staff':
+        return UserRole.staff;
+      case 'cashier':
+      default:
+        return UserRole.cashier;
+    }
+  }
+
+  static List<String> _extractPermissions(Map<String, dynamic> userMap, UserRole role) {
+    final raw = userMap['permissions'];
+    if (raw is List) {
+      final permissions = raw.whereType<String>().where((p) => p.isNotEmpty).toSet().toList();
+      if (permissions.isNotEmpty) return permissions;
+    }
+    return getPermissionsForRole(role);
+  }
 }

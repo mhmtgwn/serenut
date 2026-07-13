@@ -16,19 +16,27 @@ class PinSessionCache {
   static PinSessionCache get instance => _instance;
 
   DateTime? _verifiedAt;
+  String? _verifiedUserId;
+  String? _verifiedPinHash;
   static const _cacheDuration = Duration(minutes: 30);
 
-  bool get isValid {
+  bool isValidFor({required String? userId, required String? pinHash}) {
     if (_verifiedAt == null) return false;
-    return DateTime.now().difference(_verifiedAt!) < _cacheDuration;
+    final isFresh = DateTime.now().difference(_verifiedAt!) < _cacheDuration;
+    if (!isFresh) return false;
+    return _verifiedUserId == userId && _verifiedPinHash == pinHash;
   }
 
-  void markVerified() {
+  void markVerified({required String? userId, required String? pinHash}) {
     _verifiedAt = DateTime.now();
+    _verifiedUserId = userId;
+    _verifiedPinHash = pinHash;
   }
 
   void invalidate() {
     _verifiedAt = null;
+    _verifiedUserId = null;
+    _verifiedPinHash = null;
   }
 }
 
@@ -38,43 +46,51 @@ class PinGateDialog extends StatefulWidget {
   final String savedPin;
   final VoidCallback onVerified;
   final String title;
+  final String? currentUserId;
 
   const PinGateDialog({
     super.key,
     required this.savedPin,
     required this.onVerified,
     this.title = 'Yönetici Doğrulaması',
+    this.currentUserId,
   });
 
   /// Gated check: Session cache'i kontrol eder; geçerliyse PIN göstermez.
-  /// PIN yoksa, ya da cache süresi dolmuşsa diyalog gösterir.
+  /// PIN yoksa işlemi engeller; cache süresi dolmuşsa diyalog gösterir.
   static Future<void> checkAndShow(
     BuildContext context, {
     required VoidCallback onVerified,
     String title = 'Yönetici Doğrulaması',
   }) async {
-    // Test ortamında PIN'i atla
-    if (const bool.fromEnvironment('FLUTTER_TEST')) {
-      onVerified();
-      return;
-    }
-
-    // Session cache geçerliyse tekrar sorma
-    if (PinSessionCache.instance.isValid) {
-      onVerified();
-      return;
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final pin = prefs.getString('admin_pin_code');
-    if (pin == null || pin.isEmpty) {
-      // PIN tanımlı değil, doğrudan geç
+    String? userId;
+    final userJson = prefs.getString('auth_user_json');
+    if (userJson != null && userJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(userJson);
+        if (decoded is Map<String, dynamic>) {
+          userId = decoded['id'] as String?;
+        }
+      } catch (_) {}
+    }
+
+    if (PinSessionCache.instance.isValidFor(userId: userId, pinHash: pin)) {
       onVerified();
+      return;
+    }
+
+    if (pin == null || pin.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bu işlem için önce yönetici PIN ayarlanmalıdır.')),
+      );
     } else {
       if (!context.mounted) return;
       showGeneralDialog(
         context: context,
-        barrierDismissible: true,
+        barrierDismissible: false,
         barrierLabel: 'PIN Gate',
         barrierColor: Colors.black.withOpacity(0.6),
         transitionDuration: const Duration(milliseconds: 250),
@@ -89,6 +105,7 @@ class PinGateDialog extends StatefulWidget {
             savedPin: pin,
             onVerified: onVerified,
             title: title,
+            currentUserId: userId,
           );
         },
       );
@@ -244,7 +261,7 @@ class _PinGateDialogState extends State<PinGateDialog> with SingleTickerProvider
         metadata: {'title': widget.title},
       );
 
-      PinSessionCache.instance.markVerified();
+      PinSessionCache.instance.markVerified(userId: widget.currentUserId, pinHash: widget.savedPin);
       if (mounted) {
         Navigator.pop(context);
         widget.onVerified();
