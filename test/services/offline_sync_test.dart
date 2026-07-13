@@ -406,5 +406,74 @@ void main() {
       final finalBalance = rows.first['balance'] as double;
       expect(finalBalance, equals(100.0));
     });
+
+    test('syncPendingSales should fail and halt when payment mapping fails', () async {
+      final invalidSale = SaleEntity(
+        id: 'sale-invalid-method',
+        customerId: 'cust-1',
+        totalAmount: 100.0,
+        paidAmount: 100.0,
+        paymentMethod: 'invalid_method_value',
+        status: 'completed',
+        createdAt: DateTime.now(),
+        isSynced: 0,
+        items: const [],
+      );
+
+      await saleRepo.create(invalidSale);
+
+      final result = await syncService.syncPendingSales();
+      expect(result.failed, equals(1));
+      expect(result.synced, equals(0));
+      expect(result.errors.first, contains('Remote sync failed for sale'));
+    });
+
+    test('syncPendingSales should abort retrying on permanent 400 Bad Request', () async {
+      final badRequestClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      int requestCount = 0;
+      badRequestClient.mockHandler = (request) {
+        if (request.url.path.endsWith('/version/check')) {
+          return const ApiResponse(
+            statusCode: 200,
+            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            headers: {},
+          );
+        }
+        if (request.url.path.endsWith('/sales')) {
+          requestCount++;
+          return const ApiResponse(
+            statusCode: 400,
+            body: '{"error":{"code":"VALIDATION","message":"Geçersiz veri"}}',
+            headers: {},
+          );
+        }
+        return const ApiResponse(statusCode: 404, body: '', headers: {});
+      };
+
+      final customSyncService = OfflineSyncService(
+        saleRepository: saleRepo,
+        licenseService: FakeLicenseService(),
+        apiClient: badRequestClient,
+      );
+
+      final sale = SaleEntity(
+        id: 'sale-400-fail',
+        customerId: 'cust-1',
+        totalAmount: 100.0,
+        paidAmount: 100.0,
+        paymentMethod: 'cash',
+        status: 'completed',
+        createdAt: DateTime.now(),
+        isSynced: 0,
+        items: const [],
+      );
+
+      await saleRepo.create(sale);
+
+      final result = await customSyncService.syncPendingSales();
+      expect(result.failed, equals(1));
+      expect(result.synced, equals(0));
+      expect(requestCount, equals(1)); // Aborted after 1st attempt, did not retry 3 times!
+    });
   });
 }

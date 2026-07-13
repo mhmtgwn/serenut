@@ -10,6 +10,7 @@ import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
+import { logger } from '../../config/logger';
 import crypto from 'crypto';
 
 const router = Router();
@@ -118,6 +119,10 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
 
     const orderId = req.body.id || `ord-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
+    // Normalize customerId (nullify walkin or empty)
+    const rawCustomerId = req.body.customerId;
+    const finalCustomerId = (rawCustomerId && rawCustomerId !== 'walkin' && rawCustomerId !== '') ? rawCustomerId : null;
+
     // Insert sale
     await client.query(
       `INSERT INTO sales
@@ -126,7 +131,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'completed', $9, COALESCE($10, CURRENT_TIMESTAMP))`,
       [
         orderId, user.company_id, req.body.branchId ?? null,
-        req.body.customerId ?? null, paymentMethod, finalTotal, finalPaid,
+        finalCustomerId, paymentMethod, finalTotal, finalPaid,
         finalStatus, req.body.idempotencyKey ?? null, req.body.createdAt ?? null
       ]
     );
@@ -159,7 +164,29 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
-    console.error('Create order error:', err);
+    logger.error('Create order transaction failed', {
+      error: err.message,
+      stack: err.stack,
+      code: err.code,
+      constraint: err.constraint,
+      companyId: user.company_id,
+      body: req.body
+    });
+
+    if (err.code === '23503') {
+      if (err.constraint === 'sales_customer_id_fkey') {
+        return res.status(400).json({ error: { code: 'VALIDATION', message: 'Belirtilen müşteri bulunamadı.' } });
+      }
+      if (err.constraint === 'sale_items_product_id_fkey') {
+        return res.status(400).json({ error: { code: 'VALIDATION', message: 'Belirtilen ürün bulunamadı.' } });
+      }
+      return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçersiz referans (ilişkili kayıt bulunamadı).' } });
+    }
+
+    if (err.code === '23505') {
+      return res.status(409).json({ error: { code: 'CONFLICT', message: 'Bu sipariş veya işlem anahtarı zaten mevcut.' } });
+    }
+
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Sipariş oluşturulamadı.' } });
   } finally {
     client.release();

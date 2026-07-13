@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'dart:convert';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/license_service.dart';
@@ -275,100 +276,106 @@ class OfflineSyncService {
             maxLocalClock = await _transactionRepository!.getMaxLogicalClock();
           }
 
-          for (final txMap in txs) {
-            if (txMap is Map<String, dynamic>) {
-              final type = txMap['type'] as String? ?? 'financial_transaction';
-              final payload = txMap['payload'] as Map<String, dynamic>;
-              final id = payload['id'] as String;
+          await db.transaction((txn) async {
+            for (final txMap in txs) {
+              if (txMap is Map<String, dynamic>) {
+                final type = txMap['type'] as String? ?? 'financial_transaction';
+                final payload = txMap['payload'] as Map<String, dynamic>;
+                final id = payload['id'] as String;
 
-              if (type == 'product') {
-                await db.insert(
-                  'products',
-                  {
-                    'id': payload['id'],
-                    'name': payload['name'],
-                    'barcode': payload['barcode'],
-                    'price': payload['price'] != null ? (payload['price'] as num).toDouble() : 0.0,
-                    'cost': payload['cost'] != null ? (payload['cost'] as num).toDouble() : 0.0,
-                    'vat_rate': payload['vat_rate'] != null ? (payload['vat_rate'] as num).toDouble() : 0.0,
-                    'category': payload['category'],
-                    'image_url': payload['image_url'],
-                    'stock': payload['stock'] != null ? (payload['stock'] as num).toInt() : 0,
-                    'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
-                    'created_at': payload['created_at'],
-                    'updated_at': payload['updated_at'],
-                  },
-                  conflictAlgorithm: ConflictAlgorithm.replace,
-                );
-              } else if (type == 'customer') {
-                final customerId = payload['id'] as String?;
-                if (customerId != null && customerId.isNotEmpty) {
-                  affectedCustomerIds.add(customerId);
-                }
-                await db.insert(
-                  'customers',
-                  {
-                    'id': payload['id'],
-                    'name': payload['name'],
-                    'email': payload['email'],
-                    'phone': payload['phone'],
-                    'balance': payload['balance'] != null ? (payload['balance'] as num).toDouble() : 0.0,
-                    'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
-                    'created_at': payload['created_at'],
-                    'updated_at': payload['updated_at'],
-                  },
-                  conflictAlgorithm: ConflictAlgorithm.replace,
-                );
-              } else if (type == 'sale') {
-                await db.insert(
-                  'sales',
-                  {
-                    'id': payload['id'],
-                    'customer_id': payload['customer_id'],
-                    'total_amount': payload['total_amount'] != null ? (payload['total_amount'] as num).toDouble() : 0.0,
-                    'paid_amount': payload['paid_amount'] != null ? (payload['paid_amount'] as num).toDouble() : 0.0,
-                    'payment_method': payload['payment_method'],
-                    'status': payload['status'],
-                    'created_at': payload['created_at'],
-                    'updated_at': payload['updated_at'],
-                    'idempotency_key': payload['idempotency_key'],
-                    'is_synced': 1,
-                    'created_by': payload['created_by'],
-                    'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
-                  },
-                  conflictAlgorithm: ConflictAlgorithm.replace,
-                );
+                if (type == 'product') {
+                  await txn.insert(
+                    'products',
+                    {
+                      'id': payload['id'],
+                      'name': payload['name'],
+                      'barcode': payload['barcode'],
+                      'price': payload['price'] != null ? (payload['price'] as num).toDouble() : 0.0,
+                      'cost': payload['cost'] != null ? (payload['cost'] as num).toDouble() : 0.0,
+                      'vat_rate': payload['vat_rate'] != null ? (payload['vat_rate'] as num).toDouble() : 0.0,
+                      'category': payload['category'],
+                      'image_url': payload['image_url'],
+                      'stock': payload['stock'] != null ? (payload['stock'] as num).toInt() : 0,
+                      'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                      'created_at': payload['created_at'],
+                      'updated_at': payload['updated_at'],
+                    },
+                    conflictAlgorithm: ConflictAlgorithm.replace,
+                  );
+                } else if (type == 'customer') {
+                  final customerId = payload['id'] as String?;
+                  if (customerId != null && customerId.isNotEmpty) {
+                    affectedCustomerIds.add(customerId);
+                  }
+                  await txn.insert(
+                    'customers',
+                    {
+                      'id': payload['id'],
+                      'name': payload['name'],
+                      'email': payload['email'],
+                      'phone': payload['phone'],
+                      'balance': payload['balance'] != null ? (payload['balance'] as num).toDouble() : 0.0,
+                      'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                      'created_at': payload['created_at'],
+                      'updated_at': payload['updated_at'],
+                    },
+                    conflictAlgorithm: ConflictAlgorithm.replace,
+                  );
+                } else if (type == 'sale') {
+                  await txn.insert(
+                    'sales',
+                    {
+                      'id': payload['id'],
+                      'customer_id': payload['customer_id'],
+                      'total_amount': payload['total_amount'] != null ? (payload['total_amount'] as num).toDouble() : 0.0,
+                      'paid_amount': payload['paid_amount'] != null ? (payload['paid_amount'] as num).toDouble() : 0.0,
+                      'payment_method': payload['payment_method'],
+                      'status': payload['status'],
+                      'created_at': payload['created_at'],
+                      'updated_at': payload['updated_at'],
+                      'idempotency_key': payload['idempotency_key'],
+                      'is_synced': 1,
+                      'created_by': payload['created_by'],
+                      'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                    },
+                    conflictAlgorithm: ConflictAlgorithm.replace,
+                  );
 
-                if (payload['items'] != null) {
-                  final items = payload['items'] as List<dynamic>;
-                  await db.delete('sale_items', where: 'sale_id = ?', whereArgs: [payload['id']]);
-                  
-                  for (final item in items) {
-                    if (item is Map<String, dynamic>) {
-                      await db.insert(
-                        'sale_items',
-                        {
-                          'id': item['id'] ?? 'si-${payload['id']}-${item['product_id'] ?? item['productId']}',
-                          'sale_id': payload['id'],
-                          'product_id': item['product_id'] ?? item['productId'],
-                          'quantity': item['quantity'] != null ? (item['quantity'] as num).toDouble() : (item['qty'] != null ? (item['qty'] as num).toDouble() : 0.0),
-                          'unit_price': item['unit_price'] != null ? (item['unit_price'] as num).toDouble() : (item['unitPrice'] != null ? (item['unitPrice'] as num).toDouble() : 0.0),
-                          'total_price': item['total_price'] != null ? (item['total_price'] as num).toDouble() : 0.0,
-                        },
-                        conflictAlgorithm: ConflictAlgorithm.replace,
-                      );
+                  if (payload['items'] != null) {
+                    final items = payload['items'] as List<dynamic>;
+                    await txn.delete('sale_items', where: 'sale_id = ?', whereArgs: [payload['id']]);
+                    
+                    for (final item in items) {
+                      if (item is Map<String, dynamic>) {
+                        await txn.insert(
+                          'sale_items',
+                          {
+                            'id': item['id'] ?? 'si-${payload['id']}-${item['product_id'] ?? item['productId']}',
+                            'sale_id': payload['id'],
+                            'product_id': item['product_id'] ?? item['productId'],
+                            'quantity': item['quantity'] != null ? (item['quantity'] as num).toDouble() : (item['qty'] != null ? (item['qty'] as num).toDouble() : 0.0),
+                            'unit_price': item['unit_price'] != null ? (item['unit_price'] as num).toDouble() : (item['unitPrice'] != null ? (item['unitPrice'] as num).toDouble() : 0.0),
+                            'total_price': item['total_price'] != null ? (item['total_price'] as num).toDouble() : 0.0,
+                          },
+                          conflictAlgorithm: ConflictAlgorithm.replace,
+                        );
+                      }
                     }
                   }
-                }
-              } else if (type == 'financial_transaction') {
-                final customerId = payload['customer_id'] as String?;
-                if (customerId != null && customerId.isNotEmpty) {
-                  affectedCustomerIds.add(customerId);
-                }
-                if (_transactionRepository != null) {
-                  final exists = await _transactionRepository!.exists(id);
+                } else if (type == 'financial_transaction') {
+                  final customerId = payload['customer_id'] as String?;
+                  if (customerId != null && customerId.isNotEmpty) {
+                    affectedCustomerIds.add(customerId);
+                  }
                   
-                  if (!exists) {
+                  final existing = await txn.query(
+                    'financial_transactions',
+                    where: 'id = ?',
+                    whereArgs: [id],
+                    limit: 1,
+                  );
+                  
+                  if (existing.isEmpty) {
                     final entity = FinancialTransactionEntity.fromMap(payload);
 
                     // Validation Guard 1: Logical Clock Spoofing Check
@@ -398,15 +405,34 @@ class OfflineSyncService {
                       continue;
                     }
 
-                    await _transactionRepository!.create(entity);
+                    int nextClock = entity.logicalClock;
+                    if (nextClock == 0) {
+                      final result = await txn.rawQuery('SELECT MAX(logical_clock) as max_clock FROM financial_transactions');
+                      final maxClock = Sqflite.firstIntValue(result) ?? 0;
+                      nextClock = maxClock + 1;
+                    }
+
+                    final txDeviceId = entity.deviceId ?? 'unknown-device';
+
+                    await txn.insert('financial_transactions', {
+                      'id': entity.id,
+                      'type': entity.type,
+                      'customer_id': entity.customerId,
+                      'amount': entity.amount,
+                      'paid_amount': entity.paidAmount,
+                      'debt_amount': entity.debtAmount,
+                      'reference_id': entity.referenceId,
+                      'metadata': entity.metadata != null ? jsonEncode(entity.metadata) : null,
+                      'created_at': entity.date.toIso8601String(),
+                      'logical_clock': nextClock,
+                      'device_id': txDeviceId,
+                    });
                   }
                 }
               }
             }
-          }
 
-          if (affectedCustomerIds.isNotEmpty) {
-            await db.transaction((txn) async {
+            if (affectedCustomerIds.isNotEmpty) {
               for (final customerId in affectedCustomerIds) {
                 final expectedResult = await txn.rawQuery(DatabaseManager.customerBalanceSql, [customerId]);
                 
@@ -428,8 +454,8 @@ class OfflineSyncService {
                   },
                 );
               }
-            });
-          }
+            }
+          });
 
           // 2. Save next timestamp to preferences
           final nextTimestamp = data['last_timestamp'] as int?;
@@ -467,8 +493,19 @@ class OfflineSyncService {
         return false;
       } on TimeoutException {
         // Timeout — retry with backoff
-      } catch (_) {
-        // Unknown error — retry
+      } on ArgumentError catch (e) {
+        debugPrint('[OfflineSync] ❌ Non-retryable mapping error: $e');
+        return false; // Stop retrying immediately
+      } on ApiException catch (e) {
+        // Permanent 4xx validation or auth errors (excluding 408/429) shouldn't be retried
+        if (e.statusCode != null && e.statusCode! >= 400 && e.statusCode! < 500 && e.statusCode! != 408 && e.statusCode! != 429) {
+          debugPrint('[OfflineSync] ❌ Permanent client error (${e.statusCode}). Skipping retry.');
+          return false;
+        }
+        // Otherwise (5xx, 408, 429) retry
+      } catch (err) {
+        // Other unexpected errors — retry
+        debugPrint('[OfflineSync] ❌ Unexpected retryable error: $err');
       }
 
       if (attempt < _maxRetries) {
@@ -510,7 +547,7 @@ class OfflineSyncService {
       final response = await _apiClient.post('/sales', payload, idempotency: true);
       return response.statusCode == 200 || response.statusCode == 201;
     } on ApiException catch (e) {
-      debugPrint('[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['payment_method']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
+      debugPrint('[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['paymentMethod']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
       if (e.statusCode == 409) {
         if (_stateMachine != null) {
           await _stateMachine!.transition(
@@ -527,21 +564,28 @@ class OfflineSyncService {
         }
         return true;
       }
-      return false;
-    } catch (err) {
-      debugPrint('[OfflineSync] ❌ Unhandled error pushing sale: $err');
-      return false;
+      rethrow;
     }
   }
 
   Map<String, dynamic> _buildPayload(SaleEntity sale) {
-    String serverPaymentMethod = sale.paymentMethod;
-    if (!['cash', 'card', 'credit', 'debt', 'mixed'].contains(serverPaymentMethod)) {
-      if (serverPaymentMethod == 'karma') {
-        serverPaymentMethod = 'mixed';
-      } else {
-        serverPaymentMethod = 'cash';
-      }
+    final String serverPaymentMethod = sale.paymentMethod.toLowerCase().trim();
+    
+    const methodMapping = {
+      'cash': 'cash',
+      'nakit': 'cash',
+      'card': 'card',
+      'kart': 'card',
+      'credit': 'credit',
+      'debt': 'debt',
+      'veresiye': 'debt',
+      'mixed': 'mixed',
+      'karma': 'mixed',
+    };
+
+    final mapped = methodMapping[serverPaymentMethod];
+    if (mapped == null) {
+      throw ArgumentError('Belirtilen ödeme yöntemi backend şemasına eşlenemedi (Geçersiz yöntem: ${sale.paymentMethod})');
     }
 
     return {
@@ -550,7 +594,7 @@ class OfflineSyncService {
       'customerId':      sale.customerId,
       'totalAmount':     sale.totalAmount,
       'paidAmount':      sale.paidAmount,
-      'paymentMethod':   serverPaymentMethod,
+      'paymentMethod':   mapped,
       'status':          sale.status,
       'createdAt':       sale.createdAt.toIso8601String(),
       'items':           sale.items.map((item) {
