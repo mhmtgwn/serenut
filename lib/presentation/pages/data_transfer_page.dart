@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/data_transfer_page.dart
+// lib/presentation/pages/data_transfer_page.dart
 // Dedicated Data Import & Export Console (Sub-Page of Settings)
 // Redesigned: 25 Jun 2026
 
@@ -14,7 +14,7 @@ import 'package:serenutos/providers/dataset_import_provider.dart';
 import 'package:serenutos/infrastructure/services/file_saver_helper.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/settings/backup_manage_page.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -23,6 +23,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
 import 'package:excel/excel.dart' hide Border;
 import 'package:go_router/go_router.dart';
+import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
@@ -31,6 +32,9 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
+import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 
 // ── Design Theme Sabitleri ───────────────────────────────────────────────────
 const _kBgColor = Color(0xFFF2F2F7);
@@ -274,34 +278,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
   }
 
   // ── 1. ÜRÜN KATALOĞU İÇE AKTAR ──────────────────────────────────────────────
-  Future<void> _handleImportZipCatalog(BuildContext context) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['zip', 'xlsx'],
-        withData: true, // Always load bytes to avoid file system permission/path issues on mobile
-      );
-
-      if (result == null || result.files.isEmpty) return;
-
-      final file = result.files.first;
-      
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => ImportProgressDialog(
-          zipBytes: file.bytes,
-          filePath: kIsWeb ? null : file.path,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Hata: $e'),
-          backgroundColor: _kPink,
-        ),
-      );
-    }
+  void _handleImportZipCatalog(BuildContext context) {
+    context.push(AppRoutes.catalogImportWizard);
   }
 
   Future<void> _resetAllUserData() async {
@@ -431,31 +409,58 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
     if (confirmed != true || !mounted) return;
 
-    PinGateDialog.checkAndShow(context, title: 'Sıfırlama Yetkisi', onVerified: () async {
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(_kPink),
+    requireAdminAccess(
+      context,
+      title: 'Sıfırlama Yetkisi',
+      requirePin: true,
+      requireConfirm: true,
+      onGranted: (approvedByUserId, approvedByUserName) async {
+        // Show loading
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(_kPink),
+            ),
           ),
-        ),
-      );
+        );
 
-      try {
+        try {
+          final auditService = await ref.read(auditServiceProvider.future);
+          await auditService.logSystemAction(
+            'database_reset',
+            'Sıfırlama Tipi: $resetType',
+            approvedByUserId: approvedByUserId,
+            approvedByUserName: approvedByUserName,
+          );
         if (resetType == 'standard') {
           // ── Standart Sıfırlama: Sadece operasyonel veri ──
+          // KRİTİK C DÜZELTMESİ: Tüm silme işlemleri tek bir SQLite transaction
+          // içinde yapılır. Herhangi bir adım hata verirse işlemin tamamı geri alınır.
           if (!kIsWeb) {
-            // Mobile/Desktop: Tabloları temizle ama ayarları koru
-            final productRepo = await ref.read(productRepositoryProvider.future);
-            final products = await productRepo.findAll();
-            for (final p in products) {
-              await productRepo.delete(p.id);
-            }
-            // Customer reset (keep peşin müşteri)
-            final customerRepo = ref.read(customerRepositoryProvider);
-            // Note: full DB reset handled via InMemoryDb on web
+            final db = await DatabaseManager().getDatabase();
+            await db.transaction((txn) async {
+              try {
+                // Enable ledger bypass flag to allow deletion of financial_transactions
+                await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
+                // 1. Satış kalemleri (sales'den önce — FK kısıtlaması)
+                await txn.rawDelete('DELETE FROM sale_items');
+                // 2. Satışlar
+                await txn.rawDelete('DELETE FROM sales');
+                // 3. Siparişler
+                await txn.rawDelete('DELETE FROM orders');
+                // 5. Ürünler
+                await txn.rawDelete('DELETE FROM products');
+                // 4. Finansal işlemler (borç/tahsilat)
+                await txn.rawDelete('DELETE FROM financial_transactions');
+                // 6. Müşteriler — peşin müşteri (id='' veya id='default') korunur
+                await txn.rawDelete("DELETE FROM customers WHERE id != '' AND id != 'default'");
+              } finally {
+                // Disable ledger bypass flag to restore immutability
+                await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
+              }
+            });
           } else {
             // Web: Sadece operasyonel tabloları sıfırla
             InMemoryDb.products.clear();
@@ -467,8 +472,20 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             InMemoryDb.customers.addAll(defaultCust);
           }
 
+          // Riverpod cache'lerini temizle — TÜM temizlenen tablolar ve türetilmiş controller'lar kapsanıyor
+          // Repository provider'ları (SQLite gateway cache'ini sıfırlar)
           ref.invalidate(productRepositoryProvider);
+          ref.invalidate(saleRepositoryProvider);
+          ref.invalidate(financialTransactionRepositoryProvider);
+          ref.invalidate(orderRepositoryProvider);
+          ref.invalidate(customerRepositoryProvider);
+          // UI controller provider'ları (Riverpod AsyncNotifier state'leri sıfırlar)
           ref.invalidate(productsControllerProvider);
+          ref.invalidate(salesControllerProvider);
+          ref.invalidate(ordersControllerProvider);
+          ref.invalidate(customersControllerProvider);
+          // Dashboard ve derived provider'lar (satış/sipariş toplamlarını gösterir)
+          ref.invalidate(dashboardProvider);
           ref.read(productCategoriesStateProvider.notifier).state = [];
 
           if (mounted) Navigator.pop(context);
@@ -606,14 +623,19 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
   // ── 4. YEDEKLEME VE GERİ YÜKLEME ───────────────────────────────────────────
   void _showBackupRestoreSheet() {
-    PinGateDialog.checkAndShow(context, title: 'Yedekleme Yönetimi', onVerified: () {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (context) => const BackupManagePage(),
-        ),
-      );
-    });
+    requireAdminAccess(
+      context,
+      title: 'Yedekleme Yönetimi',
+      requirePin: true,
+      onGranted: (approvedByUserId, approvedByUserName) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (context) => const BackupManagePage(),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1173,7 +1195,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx', 'xls', 'csv', 'vcf'],
-        withData: true,
+        withData: false,
       );
 
       if (result == null || result.files.isEmpty) return;
@@ -1184,7 +1206,12 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       });
 
       final file = result.files.first;
-      final bytes = file.bytes;
+      final Uint8List? bytes;
+      if (kIsWeb) {
+        bytes = file.bytes;
+      } else {
+        bytes = await File(file.path!).readAsBytes();
+      }
       if (bytes == null) {
         throw Exception('Dosya içeriği okunamadı.');
       }
