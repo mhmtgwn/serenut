@@ -87,7 +87,11 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool includeIdempotency = false,
   }) async {
-    final uri = Uri.parse('${_config.apiBaseUrl}$path');
+    String cleanPath = path;
+    if (cleanPath.startsWith('/api/v1') && _config.apiBaseUrl.endsWith('/api/v1')) {
+      cleanPath = cleanPath.substring(7);
+    }
+    final uri = Uri.parse('${_config.apiBaseUrl}$cleanPath');
     final headers = _buildHeaders(includeIdempotency: includeIdempotency);
     final String? bodyString = body != null ? jsonEncode(body) : null;
 

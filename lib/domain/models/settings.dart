@@ -1,6 +1,12 @@
 // lib/domain/models/settings.dart
 // Settings = Runtime configuration (Domain Model)
 
+/// Sentinel value used to distinguish between "not provided" and explicitly null
+/// in [Settings.copyWith] for nullable fields.
+class _Unset {
+  const _Unset();
+}
+
 class Settings {
   final int? id;
   
@@ -46,6 +52,24 @@ class Settings {
   final DateTime createdAt;
   final DateTime? updatedAt;
 
+  // Yeni eklenen ayarlar (Sprint 4)
+  final bool soundNotificationEnabled;
+  final bool smsAutoDebtReminderEnabled;
+  final int smsAutoDebtReminderDays;
+  final double smsAutoDebtReminderMinAmount;
+  final bool labelPrinterEnabled;
+  final String? labelPrinterIp;
+  final int labelPrinterPort;
+  final int labelPrinterCopies;
+  final String? adminPinCode;
+
+  // SMS SIM ve Limit Ayarları (Sprint 10)
+  final int? smsSimSubscriptionId;
+  final int? smsSimSlotIndex;
+  final int? smsMonthlyLimit;
+  final int smsSentThisMonth;
+  final int? smsLimitResetMonth;
+
   Settings({
     this.id,
     required this.businessName,
@@ -78,6 +102,21 @@ class Settings {
     this.debugMode = false,
     DateTime? createdAt,
     this.updatedAt,
+    // Sprint 4 defaults
+    this.soundNotificationEnabled = false,
+    this.smsAutoDebtReminderEnabled = false,
+    this.smsAutoDebtReminderDays = 15,
+    this.smsAutoDebtReminderMinAmount = 100.0,
+    this.labelPrinterEnabled = false,
+    this.labelPrinterIp,
+    this.labelPrinterPort = 9100,
+    this.labelPrinterCopies = 1,
+    this.adminPinCode,
+    this.smsSimSubscriptionId,
+    this.smsSimSlotIndex,
+    this.smsMonthlyLimit,
+    this.smsSentThisMonth = 0,
+    this.smsLimitResetMonth,
   }) : createdAt = createdAt ?? DateTime.now();
 
   // Validation
@@ -86,9 +125,9 @@ class Settings {
   factory Settings.fromMap(Map<String, dynamic> map) {
     return Settings(
       id: map['id'] as int?,
-      businessName: map['business_name'] ?? map['company_name'] as String,
-      businessPhone: map['business_phone'] ?? map['company_phone'] as String,
-      businessAddress: map['business_address'] ?? map['company_address'] as String,
+      businessName: (map['business_name'] as String?) ?? (map['company_name'] as String?) ?? 'Serenut OS',
+      businessPhone: (map['business_phone'] as String?) ?? (map['company_phone'] as String?) ?? '',
+      businessAddress: (map['business_address'] as String?) ?? (map['company_address'] as String?) ?? '',
       businessTaxId: map['business_tax_id'] ?? map['company_tax_number'] as String?,
       businessLogo: map['business_logo'] as String?,
       ownerName: map['owner_name'] as String? ?? '',
@@ -117,6 +156,24 @@ class Settings {
       debugMode: (map['debug_mode'] as int?) == 1,
       createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()),
       updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null,
+
+      // Sprint 4 mappings
+      soundNotificationEnabled: (map['sound_notification_enabled'] as int?) == 1,
+      smsAutoDebtReminderEnabled: (map['sms_auto_debt_reminder_enabled'] as int?) == 1,
+      smsAutoDebtReminderDays: (map['sms_auto_debt_reminder_days'] as int?) ?? 15,
+      smsAutoDebtReminderMinAmount: (map['sms_auto_debt_reminder_min_amount'] as num?)?.toDouble() ?? 100.0,
+      labelPrinterEnabled: (map['label_printer_enabled'] as int?) == 1,
+      labelPrinterIp: map['label_printer_ip'] as String?,
+      labelPrinterPort: (map['label_printer_port'] as int?) ?? 9100,
+      labelPrinterCopies: (map['label_printer_copies'] as int?) ?? 1,
+      adminPinCode: map['admin_pin_code'] as String?,
+
+      // Sprint 10 SIM SMS and Limits
+      smsSimSubscriptionId: map['sms_sim_subscription_id'] as int?,
+      smsSimSlotIndex: map['sms_sim_slot_index'] as int?,
+      smsMonthlyLimit: map['sms_monthly_limit'] as int?,
+      smsSentThisMonth: (map['sms_sent_this_month'] as int?) ?? 0,
+      smsLimitResetMonth: map['sms_limit_reset_month'] as int?,
     );
   }
 
@@ -153,6 +210,22 @@ class Settings {
       'debug_mode': debugMode ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+
+      // Sprint 4 serialization
+      'sound_notification_enabled': soundNotificationEnabled ? 1 : 0,
+      'sms_auto_debt_reminder_enabled': smsAutoDebtReminderEnabled ? 1 : 0,
+      'sms_auto_debt_reminder_days': smsAutoDebtReminderDays,
+      'sms_auto_debt_reminder_min_amount': smsAutoDebtReminderMinAmount,
+      'label_printer_enabled': labelPrinterEnabled ? 1 : 0,
+      'label_printer_ip': labelPrinterIp,
+      'label_printer_port': labelPrinterPort,
+      'label_printer_copies': labelPrinterCopies,
+      'admin_pin_code': adminPinCode,
+      'sms_sim_subscription_id': smsSimSubscriptionId,
+      'sms_sim_slot_index': smsSimSlotIndex,
+      'sms_monthly_limit': smsMonthlyLimit,
+      'sms_sent_this_month': smsSentThisMonth,
+      'sms_limit_reset_month': smsLimitResetMonth,
     };
     if (includeId && id != null) {
       map['id'] = id;
@@ -193,6 +266,22 @@ class Settings {
     bool? debugMode,
     DateTime? createdAt,
     DateTime? updatedAt,
+
+    // Sprint 4 copyWith parameters
+    bool? soundNotificationEnabled,
+    bool? smsAutoDebtReminderEnabled,
+    int? smsAutoDebtReminderDays,
+    double? smsAutoDebtReminderMinAmount,
+    bool? labelPrinterEnabled,
+    String? labelPrinterIp,
+    int? labelPrinterPort,
+    int? labelPrinterCopies,
+    Object? adminPinCode = const _Unset(),
+    int? smsSimSubscriptionId,
+    int? smsSimSlotIndex,
+    int? smsMonthlyLimit,
+    int? smsSentThisMonth,
+    int? smsLimitResetMonth,
   }) {
     return Settings(
       id: id ?? this.id,
@@ -227,6 +316,22 @@ class Settings {
       debugMode: debugMode ?? this.debugMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+
+      // Sprint 4 copyWith updates
+      soundNotificationEnabled: soundNotificationEnabled ?? this.soundNotificationEnabled,
+      smsAutoDebtReminderEnabled: smsAutoDebtReminderEnabled ?? this.smsAutoDebtReminderEnabled,
+      smsAutoDebtReminderDays: smsAutoDebtReminderDays ?? this.smsAutoDebtReminderDays,
+      smsAutoDebtReminderMinAmount: smsAutoDebtReminderMinAmount ?? this.smsAutoDebtReminderMinAmount,
+      labelPrinterEnabled: labelPrinterEnabled ?? this.labelPrinterEnabled,
+      labelPrinterIp: labelPrinterIp ?? this.labelPrinterIp,
+      labelPrinterPort: labelPrinterPort ?? this.labelPrinterPort,
+      labelPrinterCopies: labelPrinterCopies ?? this.labelPrinterCopies,
+      adminPinCode: adminPinCode is _Unset ? this.adminPinCode : adminPinCode as String?,
+      smsSimSubscriptionId: smsSimSubscriptionId ?? this.smsSimSubscriptionId,
+      smsSimSlotIndex: smsSimSlotIndex ?? this.smsSimSlotIndex,
+      smsMonthlyLimit: smsMonthlyLimit ?? this.smsMonthlyLimit,
+      smsSentThisMonth: smsSentThisMonth ?? this.smsSentThisMonth,
+      smsLimitResetMonth: smsLimitResetMonth ?? this.smsLimitResetMonth,
     );
   }
 

@@ -1,4 +1,4 @@
-﻿// lib/domain/services/printer_service.dart
+// lib/domain/services/printer_service.dart
 // Phase 4 — ESC/POS Thermal Printer Service
 // Updated: 24 Jun 2026 — Failover chain + persistent queue + platform guards
 
@@ -150,20 +150,36 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     return PrinterBackend.none;
   }
 
+  /// Settings helper based on purpose
+  Settings _getSettingsForPurpose(Settings settings, PrinterPurpose purpose) {
+    if (purpose == PrinterPurpose.label) {
+      final labelIp = settings.labelPrinterIp ?? '';
+      final labelPort = settings.labelPrinterPort;
+      return settings.copyWith(
+        printerName: 'network',
+        printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
+        printerPort: labelPort,
+      );
+    }
+    return settings;
+  }
+
   /// Helper to send bytes with Sunmi → Network → Bluetooth → PersistentQueue failover.
-  Future<void> _sendBytes(List<int> bytes, Settings settings) async {
-    if (_socketConnector != null) {
+  Future<void> _sendBytes(List<int> bytes, Settings settings, {PrinterPurpose purpose = PrinterPurpose.receipt}) async {
+    final targetSettings = _getSettingsForPurpose(settings, purpose);
+
+    if (_socketConnector != null && _persistentQueue == null) {
       // Test mode — use mock socket directly
-      await _sendViaTcp(bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
+      await _sendViaTcp(bytes, targetSettings.printerIp ?? '127.0.0.1', targetSettings.printerPort);
       return;
     }
 
     // Failover chain: Sunmi → Network → Bluetooth → PersistentQueue
-    final backends = await _buildFailoverChain(settings);
+    final backends = await _buildFailoverChain(targetSettings);
 
     for (final backend in backends) {
       try {
-        await _sendViaBackend(bytes, backend, settings);
+        await _sendViaBackend(bytes, backend, targetSettings);
         return; // Success
       } catch (_) {
         // Try next backend
@@ -175,7 +191,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final queue = _persistentQueue;
     if (queue != null) {
       await queue.enqueue(
-        title: 'Fis (failover)',
+        title: purpose == PrinterPurpose.label ? 'Etiket (failover)' : 'Fis (failover)',
         receiptJson: bytes.join(','), // Compact byte list
       );
     }
@@ -272,6 +288,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   bool _hasPrinter(Settings settings) {
+    if (!kIsWeb && Platform.isAndroid) {
+      return true; // Android devices always support local/built-in printing fallbacks
+    }
     return (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
            (settings.printerName != null && settings.printerName!.isNotEmpty);
   }
@@ -934,10 +953,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<Map<String, dynamic>> items,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    final targetSettings = _getSettingsForPurpose(settings, PrinterPurpose.label);
+    if (!_hasPrinter(targetSettings)) return;
 
-    final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58) ? 32 : 48;
+    final backend = await _detectBackend(targetSettings);
+    final width = (backend == PrinterBackend.sunmi || targetSettings.paperWidth == 58) ? 32 : 48;
     final List<int> allBytes = [];
 
     for (final item in items) {
@@ -957,7 +977,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       allBytes.addAll(labelBytes);
     }
 
-    await _sendBytes(allBytes, settings);
+    await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);
   }
 
   String _formatQty(double qty) {
@@ -1033,5 +1053,62 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.cut);
 
     await _sendBytes(bytes, settings);
+  }
+
+  @override
+  Future<void> retryPersistedJob(dynamic job, Settings settings) async {
+    final persistedJob = job as PersistedPrintJob;
+    final bytes = persistedJob.receiptJson.split(',').map((s) => int.parse(s.trim())).toList();
+
+    final queue = _persistentQueue;
+    if (queue != null) {
+      await queue.markPrinting(persistedJob.id);
+    }
+    try {
+      if (_socketConnector != null) {
+        // Test mode — use mock socket directly
+        await _sendViaTcp(bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
+      } else {
+        final backends = await _buildFailoverChain(settings);
+        bool sent = false;
+        for (final backend in backends) {
+          try {
+            await _sendViaBackend(bytes, backend, settings);
+            sent = true;
+            break;
+          } catch (_) {
+            continue;
+          }
+        }
+        if (!sent) {
+          throw Exception('Bütün fiziksel yazıcı yolları başarısız oldu.');
+        }
+      }
+      if (queue != null) {
+        await queue.markDone(persistedJob.id);
+      }
+    } catch (e) {
+      if (queue != null) {
+        await queue.markFailed(persistedJob.id, error: e.toString());
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> processPendingQueue(Settings settings) async {
+    final queue = _persistentQueue;
+    if (queue == null) return;
+
+    final pendingJobs = await queue.loadPending();
+    if (pendingJobs.isEmpty) return;
+
+    for (final job in pendingJobs) {
+      try {
+        await retryPersistedJob(job, settings);
+      } catch (_) {
+        // Continue processing others
+      }
+    }
   }
 }
