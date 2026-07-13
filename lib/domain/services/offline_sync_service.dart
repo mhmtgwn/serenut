@@ -536,23 +536,23 @@ class OfflineSyncService {
 
   Map<String, dynamic> _buildPayload(SaleEntity sale) {
     String serverPaymentMethod = sale.paymentMethod;
-    if (serverPaymentMethod == 'debt') {
-      serverPaymentMethod = 'credit';
-    } else if (serverPaymentMethod == 'karma' || serverPaymentMethod == 'mixed') {
-      serverPaymentMethod = 'cash';
-    } else if (!['cash', 'card', 'credit'].contains(serverPaymentMethod)) {
-      serverPaymentMethod = 'cash';
+    if (!['cash', 'card', 'credit', 'debt', 'mixed'].contains(serverPaymentMethod)) {
+      if (serverPaymentMethod == 'karma') {
+        serverPaymentMethod = 'mixed';
+      } else {
+        serverPaymentMethod = 'cash';
+      }
     }
 
     return {
       'id':              sale.id,
-      'idempotency_key': sale.idempotencyKey,
-      'customer_id':     sale.customerId,
-      'total_amount':    sale.totalAmount,
-      'paid_amount':     sale.paidAmount,
-      'payment_method':  serverPaymentMethod,
+      'idempotencyKey':  sale.idempotencyKey,
+      'customerId':      sale.customerId,
+      'totalAmount':     sale.totalAmount,
+      'paidAmount':      sale.paidAmount,
+      'paymentMethod':   serverPaymentMethod,
       'status':          sale.status,
-      'created_at':      sale.createdAt.toIso8601String(),
+      'createdAt':       sale.createdAt.toIso8601String(),
       'items':           sale.items.map((item) {
         if (item is Map<String, dynamic>) {
           return {

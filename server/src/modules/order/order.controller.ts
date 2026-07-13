@@ -73,8 +73,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'Sipariş kalemleri zorunludur.' } });
   }
-  if (!paymentMethod || !['cash', 'card', 'credit'].includes(paymentMethod)) {
-    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçerli ödeme yöntemi: cash, card, credit.' } });
+  if (!paymentMethod || !['cash', 'card', 'credit', 'debt', 'mixed'].includes(paymentMethod)) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçerli ödeme yöntemi: cash, card, credit, debt, mixed.' } });
   }
 
   // Validate items structure
@@ -118,13 +118,13 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     // Insert sale
     await client.query(
       `INSERT INTO sales
-         (id, company_id, branch_id, device_uuid, customer_id, payment_method,
-          total_amount, discount, note, fsm_state, idempotency_key, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed', $10, CURRENT_TIMESTAMP)`,
+         (id, company_id, branch_id, customer_id, payment_method,
+          total_amount, paid_amount, fsm_state, idempotency_key, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, CURRENT_TIMESTAMP)`,
       [
-        orderId, user.company_id, branchId ?? null, deviceUuid ?? null,
-        customerId ?? null, paymentMethod, total, discountAmount,
-        note ?? null, idempotencyKey ?? null,
+        orderId, user.company_id, branchId ?? null,
+        customerId ?? null, paymentMethod, total, total,
+        idempotencyKey ?? null,
       ]
     );
 
