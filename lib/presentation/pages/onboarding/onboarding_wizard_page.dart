@@ -148,9 +148,8 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     }
     await prefs.setString('admin_username', state.admin.username);
     await prefs.setString('admin_full_name', state.admin.adminFullName);
-    if (state.admin.password.isNotEmpty) {
-      await prefs.setString('admin_password_hash', _hashPin(state.admin.password));
-    }
+    // Güvenlik Düzeltmesi: admin_password_hash SharedPreferences'a SHA-256 olarak kaydedilmez.
+    // AuthService üzerinden bcrypt/scrypt ile SQLite'a kaydediliyor.
 
     // Create admin user in SQLite database to support logins
     final authService = ref.read(authServiceProvider);
@@ -238,10 +237,16 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
         await prefs.setString('auth_jwt_token', data['access_token'] as String? ?? '');
         await prefs.setString('auth_refresh_token', data['refresh_token'] as String? ?? '');
         debugPrint('Onboarding: Backend kayıt başarılı ✓');
+      } else {
+        throw Exception(res.json['error']?['message'] ?? 'Sunucu kayıt hatası.');
       }
     } catch (e) {
-      // Network yoksa veya backend hata verirse — local devam eder
-      debugPrint('Onboarding: Backend kayıt atlandı (network/hata): $e');
+      // Split-brain oluşmasını engellemek için işlem yarıda kesiliyor.
+      debugPrint('Onboarding: Backend kayıt başarısız: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kayıt başarısız: $e. İnternet bağlantınızı kontrol edin.')));
+      }
+      return;
     }
 
     // 6. Onboarding tamamlandı

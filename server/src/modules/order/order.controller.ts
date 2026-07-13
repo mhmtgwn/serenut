@@ -61,14 +61,14 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const {
     branchId,
-    deviceUuid,
     items,
     paymentMethod,
     customerId,
-    idempotencyKey,
     discount,
+    deviceUuid,
     note,
   } = req.body;
+  const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
 
   // Input validation
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -113,9 +113,10 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const discountAmount = discount ?? 0;
     const computedTotal = Math.max(0, subtotal - discountAmount);
     
-    const finalTotal = req.body.totalAmount ?? computedTotal;
-    const finalPaid = req.body.paidAmount ?? finalTotal;
-    const finalStatus = req.body.status ?? 'completed';
+    // Security Fix: Do not trust totalAmount and status from client
+    const finalTotal = computedTotal;
+    const finalPaid = req.body.paidAmount != null ? Math.min(req.body.paidAmount, finalTotal) : finalTotal;
+    const finalStatus = 'completed';
 
     const orderId = req.body.id || `ord-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -132,7 +133,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       [
         orderId, user.company_id, req.body.branchId ?? null,
         finalCustomerId, paymentMethod, finalTotal, finalPaid,
-        finalStatus, req.body.idempotencyKey ?? null, req.body.createdAt ?? null
+        finalStatus, idempotencyKey ?? null, req.body.createdAt ?? null
       ]
     );
 
@@ -148,11 +149,16 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       );
 
       // Update stock
-      await client.query(
-        `UPDATE products SET quantity = GREATEST(0, quantity - $1), updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2 AND company_id = $3`,
+      // Update stock with strict rollback on insufficient quantity
+      const stockRes = await client.query(
+        `UPDATE products SET quantity = quantity - $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND company_id = $3 AND quantity >= $1 RETURNING id`,
         [item.qty, item.productId, user.company_id]
       );
+      if (stockRes.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: { code: 'INSUFFICIENT_STOCK', message: `Product ${item.productId} is out of stock or insufficient.` } });
+      }
     }
 
     await client.query('COMMIT');
@@ -242,12 +248,14 @@ router.post('/:id/refund', async (req: AuthenticatedRequest, res: Response) => {
     );
 
     if (saleRes.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Sipariş bulunamadı.' } });
     }
 
     const sale = saleRes.rows[0];
 
     if (!['completed', 'partially_refunded'].includes(sale.fsm_state)) {
+      await client.query('ROLLBACK');
       return res.status(409).json({
         error: { code: 'INVALID_STATE', message: `${sale.fsm_state} durumundaki sipariş iade edilemez.` },
       });
@@ -257,6 +265,7 @@ router.post('/:id/refund', async (req: AuthenticatedRequest, res: Response) => {
     const refundAmount = amount ?? maxRefundable;
 
     if (refundAmount <= 0 || refundAmount > maxRefundable) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         error: { code: 'VALIDATION', message: `İade tutarı 0 ile ${maxRefundable} arasında olmalıdır.` },
       });
@@ -271,8 +280,8 @@ router.post('/:id/refund', async (req: AuthenticatedRequest, res: Response) => {
     await client.query(
       `UPDATE sales
        SET fsm_state = $1, refunded_amount = $2, refund_reason = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4`,
-      [newState, newRefunded, reason ?? null, id]
+       WHERE id = $4 AND company_id = $5`,
+      [newState, newRefunded, reason ?? null, id, user.company_id]
     );
 
     await client.query('COMMIT');

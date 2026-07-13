@@ -1235,7 +1235,6 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
         _contacts = parsed;
         _selectedIndices.clear();
         _loadedFileName = file.name;
-        _hasPermission = true; // Bypass permission check
         _isLoading = false;
       });
 

@@ -133,7 +133,7 @@ class AuthService {
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
-            permissions: getPermissionsForRole(role),
+            permissions: (userMap['permissions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? getPermissionsForRole(role),
             createdAt: DateTime.tryParse(userMap['created_at'] as String? ?? '') ?? DateTime.now(),
           );
 
@@ -254,7 +254,7 @@ class AuthService {
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
-            permissions: getPermissionsForRole(role),
+            permissions: (userMap['permissions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? getPermissionsForRole(role),
             createdAt: DateTime.now(),
           );
 
