@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/datasources/remote_data_sources.dart
+// lib/infrastructure/datasources/remote_data_sources.dart
 // Serenut Platform — Remote Data Source Interfaces and Mock Implementations
 // Decoupled remote data logic using ApiClient, ready for Faz 2 VPS integration.
 // Created: 04 Jul 2026
@@ -123,10 +123,19 @@ class CloudSalesRemoteDataSource implements SalesRemoteDataSource {
 
   @override
   Future<void> pushSale(SaleEntity sale) async {
+    String serverPaymentMethod = sale.paymentMethod;
+    if (serverPaymentMethod == 'debt') {
+      serverPaymentMethod = 'credit';
+    } else if (serverPaymentMethod == 'karma' || serverPaymentMethod == 'mixed') {
+      serverPaymentMethod = 'cash';
+    } else if (!['cash', 'card', 'credit'].contains(serverPaymentMethod)) {
+      serverPaymentMethod = 'cash';
+    }
+
     await _apiClient.post('/sales', {
       'id': sale.id,
       'customer_id': sale.customerId,
-      'payment_method': sale.paymentMethod,
+      'payment_method': serverPaymentMethod,
       'total_amount': sale.totalAmount,
       'paid_amount': sale.paidAmount,
       'created_at': sale.createdAt.toIso8601String(),

@@ -510,7 +510,7 @@ class OfflineSyncService {
       final response = await _apiClient.post('/sales', payload, idempotency: true);
       return response.statusCode == 200 || response.statusCode == 201;
     } on ApiException catch (e) {
-      debugPrint('[OfflineSync] ❌ ApiException pushing sale: status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
+      debugPrint('[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['payment_method']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
       if (e.statusCode == 409) {
         if (_stateMachine != null) {
           await _stateMachine!.transition(
@@ -538,7 +538,9 @@ class OfflineSyncService {
     String serverPaymentMethod = sale.paymentMethod;
     if (serverPaymentMethod == 'debt') {
       serverPaymentMethod = 'credit';
-    } else if (serverPaymentMethod == 'karma') {
+    } else if (serverPaymentMethod == 'karma' || serverPaymentMethod == 'mixed') {
+      serverPaymentMethod = 'cash';
+    } else if (!['cash', 'card', 'credit'].contains(serverPaymentMethod)) {
       serverPaymentMethod = 'cash';
     }
 
