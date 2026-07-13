@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 // lib/config/environment.dart
 // Serenut Platform — Environment Configuration Management
 // Resolves settings for dev, test, and prod builds from launch arguments.
@@ -70,7 +72,10 @@ class EnvironmentConfig {
   /// Reads variables passed via '--dart-define=ENVIRONMENT=prod/test/dev'.
   /// Defaults to dev if not specified.
   static EnvironmentConfig get current {
-    const envString = String.fromEnvironment('ENVIRONMENT', defaultValue: 'prod');
+    const envString = String.fromEnvironment('ENVIRONMENT', defaultValue: '');
+    if (envString.isEmpty) {
+      return EnvironmentConfig.fromEnv(kDebugMode ? AppEnvironment.dev : AppEnvironment.prod);
+    }
     switch (envString.toLowerCase()) {
       case 'prod':
       case 'production':
