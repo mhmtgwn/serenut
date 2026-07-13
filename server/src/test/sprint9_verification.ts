@@ -185,14 +185,21 @@ async function main() {
   console.log(`\n🏆 Sprint 9 Verification Complete`);
   console.log(`   Passed: ${passed}  |  Failed: ${failed}\n`);
 
+  await pool.end();
+
+  // Also close pgPool imported by notifications modules
+  try {
+    const { pgPool } = require('../config/database');
+    await pgPool.end();
+  } catch (_) {}
+
   if (failed === 0) {
     console.log('✅ ALL SPRINT 9 NOTIFICATION ENGINE TESTS PASSED!\n');
+    process.exit(0);
   } else {
     console.log(`⚠️  ${failed} test(s) failed. Review output above.\n`);
     process.exit(1);
   }
-
-  await pool.end();
 }
 
 main().catch((e) => {
