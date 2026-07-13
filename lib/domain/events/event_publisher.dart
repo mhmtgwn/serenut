@@ -1,9 +1,10 @@
-﻿// lib/domain/events/event_publisher.dart
+// lib/domain/events/event_publisher.dart
 // PHASE 0 Day 3 - Event System Implementation
 // Domain event publishing for notifications + audit trail
 // Generated: 21 Jun 2026
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 
 typedef EventListener<T extends DomainEvent> = void Function(T event);
@@ -63,8 +64,11 @@ class EventPublisher {
       return;
     }
 
-    // Add to history (audit trail)
+    // Add to history (audit trail) with max capacity 200
     _eventHistory.add(event);
+    if (_eventHistory.length > 200) {
+      _eventHistory.removeAt(0);
+    }
     
     // Broadcast to stream
     _eventStreamController.add(event);
@@ -77,7 +81,7 @@ class EventPublisher {
           try {
             (listener)(event);
           } catch (e, stack) {
-            // print('Error in event listener: $e\n$stack');
+            debugPrint('Error in event listener for ${event.runtimeType}: $e\n$stack');
           }
         }
       }
@@ -89,7 +93,7 @@ class EventPublisher {
             try {
               (listener)(event);
             } catch (e, stack) {
-              // print('Error in event listener: $e\n$stack');
+              debugPrint('Error in event listener for ${event.runtimeType}: $e\n$stack');
             }
           }
         }

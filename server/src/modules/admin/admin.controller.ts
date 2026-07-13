@@ -3,6 +3,7 @@ import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middl
 import { pgPool, redisClient } from '../../config/database';
 import os from 'os';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 import { getNotificationQueue } from '../../workers/notification.worker';
 import { getBillingQueue } from '../../workers/billing.scheduler';
 import { enqueueNotification } from '../../workers/notification.worker';
@@ -87,6 +88,14 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
     const usedMemPercentage = ((totalMem - freeMem) / totalMem) * 100;
     const cpuLoad = os.loadavg()[0];
 
+    let diskUsage = 0;
+    try {
+      const dfOut = execSync("df -h / | awk 'NR==2 {print $5}' | sed 's/%//'").toString().trim();
+      diskUsage = parseFloat(dfOut) || 0;
+    } catch (_) {
+      diskUsage = 0;
+    }
+
     return res.json({
       metrics: {
         activeCompanies: parseInt(companiesCount.rows[0].count, 10),
@@ -101,7 +110,7 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
         redis: redisStatus,
         cpuUsage: parseFloat(cpuLoad.toFixed(1)),
         ramUsage: parseFloat(usedMemPercentage.toFixed(1)),
-        diskUsage: 37.4, // Realistic mock disk space used percentage
+        diskUsage: diskUsage,
       }
     });
   } catch (err) {

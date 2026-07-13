@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
+import 'package:serenutos/providers/event_providers.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
@@ -51,13 +52,9 @@ void main() async {
       // Initialize AuthService with required dependencies
       final IUserRepository userRepository;
       DatabaseManager? dbManager;
-      if (kIsWeb) {
-        userRepository = InMemoryUserRepository();
-      } else {
-        dbManager = DatabaseManager();
-        final gateway = DbGatewayImpl(dbManager);
-        userRepository = SqliteUserRepository(gateway);
-      }
+      dbManager = DatabaseManager();
+      final gateway = DbGatewayImpl(dbManager);
+      userRepository = SqliteUserRepository(gateway);
       final hashService = PasswordHashServiceImpl();
       final apiClient = ApiClient();
 
@@ -72,19 +69,21 @@ void main() async {
         hashService: hashService,
         apiClient: apiClient,
       );
+      // Global event publisher will be eagerly initialized in MyApp build
+
+      // Initialize API client
+      await apiClient.initialize();
       await authService.initialize();
       
       // If database contains no users, reset onboarding status to show the wizard
-      if (!kIsWeb) {
-        try {
-          final users = await authService.getUsers();
-          if (users.isEmpty) {
-            // Clear admin PIN from SQLite settings (single source of truth)
-            final db = await dbManager!.getDatabase();
-            await db.update('settings', {'admin_pin_code': null, 'updated_at': DateTime.now().toIso8601String()});
-          }
-        } catch (_) {}
-      }
+      try {
+        final users = await authService.getUsers();
+        if (users.isEmpty) {
+          // Clear admin PIN from SQLite settings (single source of truth)
+          final db = await dbManager!.getDatabase();
+          await db.update('settings', {'admin_pin_code': null, 'updated_at': DateTime.now().toIso8601String()});
+        }
+      } catch (_) {}
 
       // Initialize DatasetLoaderService
       final datasetLoader = DatasetLoaderService(prefs);
@@ -129,14 +128,6 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _runIntegrityDiagnostics() async {
-    if (kIsWeb) {
-      setState(() {
-        _checkingIntegrity = false;
-      });
-      _checkVersion();
-      _triggerAutoBackup();
-      return;
-    }
 
     try {
       final diag = ref.read(integrityCheckServiceProvider);
@@ -179,11 +170,9 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   void _triggerAutoBackup() {
-    if (!kIsWeb) {
-      ref.read(backupServiceProvider).autoBackupIfNeeded().catchError((e) {
-        debugPrint('Otomatik yedekleme hatası: $e');
-      });
-    }
+    ref.read(backupServiceProvider).autoBackupIfNeeded().catchError((e) {
+      debugPrint('Otomatik yedekleme hatası: $e');
+    });
   }
 
   Future<void> _checkVersion() async {
@@ -304,6 +293,9 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     final router = ref.watch(routerProvider);
     
+    // Eagerly initialize global event publisher
+    ref.watch(eventPublisherProvider);
+
     // Eagerly initialize sync provider so AppLifecycle observer is registered
     // and auto-sync fires when app resumes from background.
     ref.watch(syncProvider);

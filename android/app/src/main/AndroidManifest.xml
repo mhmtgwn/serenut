@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Bluetooth izinleri -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-    
-    <!-- Konum izinleri (Bluetooth taraması için gerekli) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     
     <!-- Wifi izinleri -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -24,28 +15,19 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     
-    <!-- Kişiler izni -->
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+
     
     <!-- Kamera izni -->
     <uses-permission android:name="android.permission.CAMERA" />
     
     <!-- SMS izinleri -->
     <uses-permission android:name="android.permission.SEND_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
-    
-    <!-- NFC izinleri -->
-    <uses-permission android:name="android.permission.NFC" />
     
     <!-- APK Kurulum izni (OTA Update Platform - Sprint 6) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     
     <!-- Sunmi scanner ve donanım izinleri -->
-    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     
     <application

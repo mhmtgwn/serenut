@@ -108,14 +108,51 @@ jobs:
       - name: Run Widget & Logic Tests
         run: flutter test --fail-fast
 
-      - name: Build Web Application Bundle
-        run: flutter build web --release
+      - name: Create keystore properties
+        run: |
+          echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=serenut" >> android/key.properties
+          echo "storeFile=serenut-release.jks" >> android/key.properties
 
-      - name: Upload Web Application Artifact
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: serenut-pos-web-bundle
-          path: build/web/
+          name: serenut-pos-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  windows-ci:
+    name: Windows Installer Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build Windows Executable
+        run: flutter build windows --release
+
+      - name: Compile Inno Setup Installer
+        run: iscc windows\installer\serenut_installer.iss
+        continue-on-error: true
+
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: serenut-pos-windows-build
+          path: build/windows/x64/runner/Release/
 
   deploy-staging:
     name: Continuous Staging Deployment (VPS)

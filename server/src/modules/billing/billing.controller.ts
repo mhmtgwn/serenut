@@ -370,7 +370,7 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
     return res.json({
       success: true,
       sessionToken,
-      checkoutUrl: `/api/v1/billing/mock-checkout-portal?session=${sessionToken}&plan=${plan_id}&company=${user.company_id}&token=${req.headers.authorization?.split(' ')[1]}`
+      checkoutUrl: `/api/v1/billing/mock-checkout-portal?session=${sessionToken}&plan=${plan_id}&company=${user.company_id}`
     });
   } catch (err) {
     logger.error('Subscribe setup failed:', err);
@@ -383,7 +383,7 @@ router.get('/mock-checkout-portal', async (req, res: Response) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).send('<h2>Mock checkout portal is disabled in production.</h2>');
   }
-  const { session, plan, company, token } = req.query;
+  const { session, plan, company } = req.query;
 
   let IBAN_BANK = process.env.SYSTEM_IBAN_BANK || 'Yapı Kredi Bankası A.Ş.';
   let IBAN_BRANCH = process.env.SYSTEM_IBAN_BRANCH || 'İstanbul Kozyatağı Ticari Şubesi';
@@ -458,7 +458,6 @@ router.get('/mock-checkout-portal', async (req, res: Response) => {
             <input type="hidden" name="sessionToken" value="${session}">
             <input type="hidden" name="planId" value="${plan}">
             <input type="hidden" name="companyId" value="${company}">
-            <input type="hidden" name="jwtToken" value="${token}">
             <input type="hidden" name="payment_method" value="bank_wire">
             <input type="hidden" name="status" value="pending">
             
@@ -487,7 +486,6 @@ router.get('/mock-checkout-portal', async (req, res: Response) => {
             <input type="hidden" name="sessionToken" value="${session}">
             <input type="hidden" name="planId" value="${plan}">
             <input type="hidden" name="companyId" value="${company}">
-            <input type="hidden" name="jwtToken" value="${token}">
             <input type="hidden" name="payment_method" value="credit_card">
             <input type="hidden" name="status" value="success">
             
@@ -499,7 +497,6 @@ router.get('/mock-checkout-portal', async (req, res: Response) => {
           <input type="hidden" name="sessionToken" value="${session}">
           <input type="hidden" name="planId" value="${plan}">
           <input type="hidden" name="companyId" value="${company}">
-          <input type="hidden" name="jwtToken" value="${token}">
           <input type="hidden" name="status" value="failed">
           <button type="submit" class="btn" style="background-color: #EF4444; margin-top: 8px;">ÖDEMEYİ İPTAL ET / PENCEREYİ KAPAT</button>
         </form>
@@ -515,7 +512,7 @@ router.post('/mock-checkout-callback', async (req, res: Response) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({ error: 'forbidden', message: 'Mock callback is disabled in production.' });
   }
-  const { sessionToken, planId, companyId, jwtToken, status, payment_method, senderName, senderBank } = req.body;
+  const { sessionToken, planId, companyId, status, payment_method, senderName, senderBank } = req.body;
 
   if (status === 'failed') {
     return res.send(`

@@ -226,10 +226,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.settings,
         name: 'settings',
         builder: (context, state) => const SettingsPage(),
-        redirect: (context, state) {
-          final user = ProviderScope.containerOf(context).read(currentUserProvider);
-          return user == null ? AppRoutes.login : null;
-        },
+        redirect: _adminOnlyRedirect,
       ),
       GoRoute(
         path: AppRoutes.catalogImportWizard,
@@ -270,6 +267,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           final ticketTitle = state.uri.queryParameters['title'] ?? 'Destek Talebi';
           return TicketChatPage(ticketId: ticketId, ticketTitle: ticketTitle);
         },
+        redirect: _adminOnlyRedirect,
       ),
       GoRoute(
         path: AppRoutes.printQueue,

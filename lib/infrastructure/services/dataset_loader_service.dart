@@ -59,11 +59,7 @@ class DatasetLoaderService {
   }
 
   Future<Directory> get _datasetsDirectory async {
-    // Standard workspace location for shared access on Windows, fallback to standard docs
-    const customPath = r'c:\Users\notop\AndroidStudioProjects\data\datasets';
-    if (Directory(customPath).existsSync()) {
-      return Directory(customPath);
-    }
+
     final appDocDir = await getApplicationDocumentsDirectory();
     final path = join(appDocDir.path, 'datasets');
     return Directory(path)..createSync(recursive: true);

@@ -1,4 +1,4 @@
-﻿// lib/providers/repository_providers.dart
+// lib/providers/repository_providers.dart
 // PHASE 0 Day 3 - Repository Dependency Injection
 // Riverpod providers for repository access
 // Generated: 21 Jun 2026
@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
-import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_report_repository.dart';
 import 'package:serenutos/domain/services/report_service.dart';
@@ -51,33 +50,24 @@ final salesRemoteDataSourceProvider = Provider<SalesRemoteDataSource>((ref) {
 
 // ── Repository Providers ──
 final productRepositoryProvider = FutureProvider<IProductRepository>((ref) async {
-  final localRepo = kIsWeb
-      ? InMemoryProductRepository()
-      : SqliteProductRepository(ref.watch(dbGatewayProvider), ref.watch(datasetLoaderServiceProvider));
+  final localRepo = SqliteProductRepository(ref.watch(dbGatewayProvider), ref.watch(datasetLoaderServiceProvider));
   final remoteDS = ref.watch(productRemoteDataSourceProvider);
   return CloudAdaptiveProductRepository(localRepo, remoteDS);
 });
 
 final customerRepositoryProvider = FutureProvider<ICustomerRepository>((ref) async {
-  final localRepo = kIsWeb
-      ? InMemoryCustomerRepository()
-      : SqliteCustomerRepository(ref.watch(dbGatewayProvider));
+  final localRepo = SqliteCustomerRepository(ref.watch(dbGatewayProvider));
   final remoteDS = ref.watch(customerRemoteDataSourceProvider);
   return CloudAdaptiveCustomerRepository(localRepo, remoteDS);
 });
 
 final saleRepositoryProvider = FutureProvider<ISaleRepository>((ref) async {
-  final localRepo = kIsWeb
-      ? InMemorySaleRepository()
-      : SqliteSaleRepository(ref.watch(dbGatewayProvider));
+  final localRepo = SqliteSaleRepository(ref.watch(dbGatewayProvider));
   final remoteDS = ref.watch(salesRemoteDataSourceProvider);
   return CloudAdaptiveSaleRepository(localRepo, remoteDS);
 });
 
 final financialTransactionRepositoryProvider = FutureProvider<IFinancialTransactionRepository>((ref) async {
-  if (kIsWeb) {
-    return InMemoryFinancialTransactionRepository(deviceId: 'web-device');
-  }
   final gateway = ref.watch(dbGatewayProvider);
   final licenseService = ref.watch(licenseServiceProvider);
   final deviceId = licenseService.getDeviceUuid();
@@ -85,9 +75,6 @@ final financialTransactionRepositoryProvider = FutureProvider<IFinancialTransact
 });
 
 final orderRepositoryProvider = FutureProvider<IOrderRepository>((ref) async {
-  if (kIsWeb) {
-    return InMemoryOrderRepository();
-  }
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteOrderRepository(gateway);
 });
@@ -132,9 +119,6 @@ final debtorsProvider = FutureProvider<List<CustomerEntity>>((ref) async {
 /// ════════════════════════════════════════════════════════════
 
 final reportRepositoryProvider = FutureProvider<IReportRepository>((ref) async {
-  if (kIsWeb) {
-    return InMemoryReportRepository();
-  }
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteReportRepository(gateway);
 });
@@ -150,17 +134,11 @@ final reportServiceProvider = FutureProvider<ReportService>((ref) async {
 /// ════════════════════════════════════════════════════════════
 
 final dashboardRepositoryProvider = FutureProvider<IDashboardRepository>((ref) async {
-  if (kIsWeb) {
-    return InMemoryDashboardRepository();
-  }
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteDashboardRepository(gateway);
 });
 
 final userRepositoryProvider = Provider<IUserRepository>((ref) {
-  if (kIsWeb) {
-    return InMemoryUserRepository();
-  }
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteUserRepository(gateway);
 });
@@ -172,54 +150,18 @@ final dashboardServiceProvider = FutureProvider<DashboardService>((ref) async {
 });
 
 final databaseHealthRepositoryProvider = Provider<IDatabaseHealthRepository>((ref) {
-  if (kIsWeb) {
-    return const _MockDatabaseHealthRepository();
-  }
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteDatabaseHealthRepository(gateway);
 });
 
-class _MockDatabaseHealthRepository implements IDatabaseHealthRepository {
-  const _MockDatabaseHealthRepository();
 
-  @override
-  Future<DatabaseHealthReport> checkHealth() async {
-    return const DatabaseHealthReport(
-      orphanedSaleItemsCount: 0,
-      orphanedOrderItemsCount: 0,
-      orphanedOrderPaymentsCount: 0,
-      orphanedTransactionsCount: 0,
-      negativeStockProductsCount: 0,
-      customerBalanceDriftsCount: 0,
-      duplicateUuidsCount: 0,
-    );
-  }
-
-  @override
-  Future<void> repairHealth() async {}
-}
 
 final globalSearchRepositoryProvider = Provider<IGlobalSearchRepository>((ref) {
-  if (kIsWeb) {
-    return const _MockGlobalSearchRepository();
-  }
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteGlobalSearchRepository(gateway);
 });
 
-class _MockGlobalSearchRepository implements IGlobalSearchRepository {
-  const _MockGlobalSearchRepository();
 
-  @override
-  Future<GlobalSearchResult> searchAll(String query) async {
-    return const GlobalSearchResult(
-      customers: [],
-      products: [],
-      sales: [],
-      transactions: [],
-    );
-  }
-}
 
 // ── Cloud BI Analytics Providers (Sprint 7) ──
 final cloudAnalyticsRepositoryProvider = Provider<CloudAnalyticsRepository>((ref) {
