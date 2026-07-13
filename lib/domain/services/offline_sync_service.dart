@@ -577,8 +577,8 @@ class OfflineSyncService {
       'card': 'card',
       'kart': 'card',
       'credit': 'credit',
-      'debt': 'debt',
-      'veresiye': 'debt',
+      'debt': 'credit',
+      'veresiye': 'credit',
       'mixed': 'mixed',
       'karma': 'mixed',
     };

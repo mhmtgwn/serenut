@@ -47,7 +47,7 @@ router.use(authenticateUser);
  *                     productId: { type: string }
  *                     qty: { type: integer }
  *                     unitPrice: { type: number }
- *               paymentMethod: { type: string, enum: [cash, card, credit] }
+ *               paymentMethod: { type: string, enum: [cash, card, credit, mixed] }
  *               customerId: { type: string, nullable: true }
  *               idempotencyKey: { type: string }
  *               discount: { type: number }
@@ -74,8 +74,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'Sipariş kalemleri zorunludur.' } });
   }
-  if (!paymentMethod || !['cash', 'card', 'credit', 'debt', 'mixed'].includes(paymentMethod)) {
-    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçerli ödeme yöntemi: cash, card, credit, debt, mixed.' } });
+  if (!paymentMethod || !['cash', 'card', 'credit', 'mixed'].includes(paymentMethod)) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçerli ödeme yöntemi: cash, card, credit, mixed.' } });
   }
 
   // Validate items structure
