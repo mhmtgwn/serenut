@@ -26,12 +26,18 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
     final orphanedOrderItems = Sqflite.firstIntValue(orphanOrderItemsResult) ?? 0;
 
     // 3. Orphaned Order Payments
-    final orphanOrderPaymentsResult = await _gateway.rawQuery('''
-      SELECT COUNT(*) as cnt 
-      FROM order_payments 
-      WHERE order_id NOT IN (SELECT id FROM orders)
-    ''');
-    final orphanedOrderPayments = Sqflite.firstIntValue(orphanOrderPaymentsResult) ?? 0;
+    int orphanedOrderPayments = 0;
+    try {
+      final orphanOrderPaymentsResult = await _gateway.rawQuery('''
+        SELECT COUNT(*) as cnt 
+        FROM order_payments 
+        WHERE order_id NOT IN (SELECT id FROM orders)
+      ''');
+      orphanedOrderPayments = Sqflite.firstIntValue(orphanOrderPaymentsResult) ?? 0;
+    } catch (_) {
+      // order_payments table does not exist in production POS schema
+      orphanedOrderPayments = 0;
+    }
 
     // 4. Orphaned Transactions
     final orphanTransactionsResult = await _gateway.rawQuery('''
@@ -69,6 +75,7 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
     final driftsResult = await _gateway.rawQuery('''
       SELECT COUNT(*) as cnt FROM (
         SELECT c.id, c.balance,
+               -- NOT: Bu bakiye toplama formulu DatabaseManager.customerBalanceSql ile senkron tutulmalidir.
                COALESCE(SUM(
                  CASE 
                    WHEN ft.type = 'sale' THEN -ft.debt_amount
@@ -114,10 +121,14 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       ''');
 
       // 3. Delete orphaned order payments
-      await _gateway.execute('''
-        DELETE FROM order_payments 
-        WHERE order_id NOT IN (SELECT id FROM orders)
-      ''');
+      try {
+        await _gateway.execute('''
+          DELETE FROM order_payments 
+          WHERE order_id NOT IN (SELECT id FROM orders)
+        ''');
+      } catch (_) {
+        // order_payments table does not exist in production POS schema
+      }
 
 
 
@@ -131,6 +142,7 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       // 6. Recalculate and update customer balance drifts
       final driftsResult = await _gateway.rawQuery('''
         SELECT c.id,
+               -- NOT: Bu bakiye toplama formulu DatabaseManager.customerBalanceSql ile senkron tutulmalidir.
                COALESCE(SUM(
                  CASE 
                    WHEN ft.type = 'sale' THEN -ft.debt_amount
