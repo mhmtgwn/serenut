@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/portal_billing_tab.dart
+// lib/presentation/widgets/portal_billing_tab.dart
 // Serenut Platform — Portal Billing & Invoices Tab (Sprint 8)
 // Displays invoice list and triggers server-side PDF invoice download.
 // Created: 04 Jul 2026
@@ -10,8 +10,10 @@ import 'package:serenutos/infrastructure/repositories/billing_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/auth_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:serenutos/config/environment.dart';
 class PortalBillingTab extends ConsumerStatefulWidget {
   const PortalBillingTab({super.key});
 
@@ -29,19 +31,19 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
       final token = ref.read(authProvider).token;
       if (token == null) throw Exception('Yetkilendirme anahtarı bulunamadı.');
 
-      // In production, we request the PDF stream and share/save it.
-      // We will trigger launching the secure download URL directly in browser:
-      final uri = Uri.parse(
-        'http://185.255.93.94:3000/api/v1/billing/invoices/${invoice.id}/pdf',
+      final url = '${EnvironmentConfig.current.apiBaseUrl}/billing/invoices/${invoice.id}/pdf';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
-      // Add authorization token parameter for query simulation in mockup browser
-      final authUri = uri.replace(queryParameters: {'token': token});
-
-      if (await canLaunchUrl(authUri)) {
-        await launchUrl(authUri, mode: LaunchMode.externalApplication);
+      if (response.statusCode == 200) {
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/Fatura_${invoice.id}.pdf');
+        await file.writeAsBytes(response.bodyBytes);
+        await Share.shareXFiles([XFile(file.path)], subject: 'Fatura');
       } else {
-        throw Exception('Fatura PDF bağlantısı açılamadı.');
+        throw Exception('Fatura PDF indirilemedi (Hata: ${response.statusCode})');
       }
     } catch (e) {
       if (mounted) {

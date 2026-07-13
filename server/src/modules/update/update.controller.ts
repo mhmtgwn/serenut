@@ -21,13 +21,22 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       LIMIT 1
     `;
     const result = await pgPool.query(query, [platform]);
-    
+    if (result.rows.length === 0 || !result.rows[0].file_path) {
+      return res.status(404).send(`
+        <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
+          <h2 style="color: #ef4444;">Dosya Bulunamadı</h2>
+          <p>${platform} için henüz yüklenmiş bir release dosyası bulunmamaktadır.</p>
+          <a href="/" style="color: #10b981; text-decoration: none; font-weight: bold;">Ana Sayfaya Dön</a>
+        </div>
+      `);
+    }
+
     const release = result.rows[0];
     const resolvedPath = path.isAbsolute(release.file_path) 
       ? release.file_path 
       : path.resolve(process.cwd(), release.file_path);
 
-    if (result.rows.length === 0 || !release.file_path || !fs.existsSync(resolvedPath)) {
+    if (!fs.existsSync(resolvedPath)) {
       return res.status(404).send(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
           <h2 style="color: #ef4444;">Dosya Bulunamadı</h2>
@@ -70,19 +79,7 @@ router.get('/latest-metadata', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/debug/db-state', async (req: Request, res: Response) => {
-  try {
-    const query = `
-      SELECT id, version_code, platform, sha256_hash, file_path, status, created_at
-      FROM app_versions
-      ORDER BY created_at DESC;
-    `;
-    const result = await pgPool.query(query);
-    return res.json(result.rows);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
+
 
 router.get('/check', async (req: Request, res: Response) => {
   const platform = req.query.platform as string;

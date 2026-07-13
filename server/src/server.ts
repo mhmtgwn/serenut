@@ -105,11 +105,11 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,ht
 app.use(
   cors({
     origin: (origin, callback) => {
-      // API istemcileri (Flutter desktop) veya form post yönlendirmelerinde origin boş/null gelebilir — izin ver
-      if (!origin || origin === 'null') return callback(null, true);
+      // API istemcileri (Flutter desktop vb.) origin göndermeyebilir.
+      if (!origin) return callback(null, true);
       const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
       const isSerenutDomain = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*serenut\.(?:com|com\.tr|az|de|net|org)(?::\d+)?$/.test(origin);
-      if (allowedOrigins.includes(origin) || isLocal || isSerenutDomain || process.env.NODE_ENV !== 'production') {
+      if (allowedOrigins.includes(origin) || isLocal || isSerenutDomain) {
         callback(null, true);
       } else {
         logger.warn(`CORS blocked request from: ${origin}`);
@@ -122,18 +122,18 @@ app.use(
   })
 );
 
-// Trust Nginx proxy (X-Forwarded-For için gerekli — rate limiter doğru IP'yi okusun)
-app.set('trust proxy', true);
+// Trust proxy: yalnızca bilinen proxy/loopback IP'lerini güven.
+app.set('trust proxy', 'loopback');
 
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-eval kaldırıldı
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://*"]
+      connectSrc: ["'self'", "https://api.serenut.com"] // Geniş bağlantı kısıtlandı
     }
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },

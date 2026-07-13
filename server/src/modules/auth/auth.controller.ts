@@ -320,7 +320,6 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     // Create subscription with trial_started_at = NULL (AC 1.1)
     // Trial does NOT start at registration — it starts on FIRST LOGIN.
     // auth.service.ts login() checks trial_started_at IS NULL and sets it.
-    try {
       const subId = `sub-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
       await client.query(
         `INSERT INTO subscriptions
@@ -359,9 +358,6 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
         VALUES ($1, $2, $3, 'trial', 2, 'active', NOW() + INTERVAL '30 days', NOW(), NOW())
       `, [`lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, companyId, licenseKey]);
 
-    } catch (e) {
-      console.error('Failed to create subscription or trial licenses:', e);
-    }
 
     await client.query('COMMIT');
 

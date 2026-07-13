@@ -380,8 +380,8 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
 
 // Mockup 3D Secure Checkout HTML Portal (interactive UI shown inside POS or Customer Portal webview)
 router.get('/mock-checkout-portal', async (req, res: Response) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).send('<h2>Mock checkout portal is disabled in production.</h2>');
+  if (process.env.ENABLE_MOCK_PAYMENTS !== 'true') {
+    return res.status(403).send('<h2>Mock checkout portal is disabled.</h2>');
   }
   const { session, plan, company } = req.query;
 
@@ -509,8 +509,8 @@ router.get('/mock-checkout-portal', async (req, res: Response) => {
 
 // Checkout Mockup Callback
 router.post('/mock-checkout-callback', async (req, res: Response) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ error: 'forbidden', message: 'Mock callback is disabled in production.' });
+  if (process.env.ENABLE_MOCK_PAYMENTS !== 'true') {
+    return res.status(403).json({ error: 'forbidden', message: 'Mock callback is disabled.' });
   }
   const { sessionToken, planId, companyId, status, payment_method, senderName, senderBank } = req.body;
 

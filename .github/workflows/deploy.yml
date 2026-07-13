@@ -54,30 +54,14 @@ jobs:
           cd server
           npm run migrate
 
-      - name: Run Sprint 2 Verification Tests (Sync, Idempotency, Triggers)
-        env:
-          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
-          JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
-        run: |
-          cd server
-          npx ts-node src/test/sprint2_verification.ts
-
-      - name: Run Sprint 8 Verification Tests (Billing, Grace Period, Suspension)
+      - name: Run All Verification Tests
         env:
           DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
           JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
           INVOICES_DIR: ./invoices
         run: |
           cd server
-          npx ts-node src/test/sprint8_verification.ts
-
-      - name: Run Sprint 9 Verification Tests (Notification Gateways, Caching)
-        env:
-          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
-          JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
-        run: |
-          cd server
-          npx ts-node src/test/sprint9_verification.ts
+          npm run test
 
   frontend-ci:
     name: Frontend CI & Build Compilation
@@ -146,7 +130,6 @@ jobs:
 
       - name: Compile Inno Setup Installer
         run: iscc windows\installer\serenut_installer.iss
-        continue-on-error: true
 
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4

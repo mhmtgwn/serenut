@@ -1,7 +1,18 @@
 /* index.js — Customer Self-Service Portal Engine */
 
 const BASE_URL = '/api/v1';
-let authToken = localStorage.getItem('portal_token') || '';
+let authToken = sessionStorage.getItem('portal_token') || '';
+
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 let selectedTicketId = null;
 
 // ── 1. SETUP EVENT LISTENERS & CLOCK ─────────────────────────────────────────
@@ -346,7 +357,7 @@ async function handleLogin() {
     }
 
     authToken = data.access_token;
-    localStorage.setItem('portal_token', authToken);
+    sessionStorage.setItem('portal_token', authToken);
     showPortalApp();
   } catch (err) {
     errorEl.innerText = 'Bağlantı hatası oluştu.';
@@ -355,7 +366,7 @@ async function handleLogin() {
 
 function handleLogout() {
   authToken = '';
-  localStorage.removeItem('portal_token');
+  sessionStorage.removeItem('portal_token');
   showLoginCard();
 }
 
@@ -418,7 +429,7 @@ async function handleRegister() {
     }
 
     authToken = data.access_token;
-    localStorage.setItem('portal_token', authToken);
+    sessionStorage.setItem('portal_token', authToken);
     showPortalApp();
   } catch (err) {
     errorEl.innerText = 'Bağlantı hatası oluştu.';
@@ -562,11 +573,11 @@ async function loadDashboard() {
       const expires = new Date(l.expires_at).toLocaleDateString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${l.license_key}</strong></td>
-        <td><span class="badge badge-${l.tier}">${l.tier}</span></td>
-        <td>${l.allowed_devices_count} Cihaz</td>
+        <td><strong></strong></td>
+        <td><span class="badge badge-"></span></td>
+        <td> Cihaz</td>
         <td>${expires}</td>
-        <td><span class="badge badge-${l.status}">${l.status}</span></td>
+        <td><span class="badge badge-"></span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -593,9 +604,9 @@ async function loadStores() {
       const created = new Date(s.created_at).toLocaleDateString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${s.id}</strong></td>
-        <td>${s.name}</td>
-        <td>${s.address || 'Adres girilmemiş'}</td>
+        <td><strong></strong></td>
+        <td></td>
+        <td></td>
         <td>${created}</td>
       `;
       tbody.appendChild(tr);
@@ -620,13 +631,13 @@ async function loadDevices() {
       const active = d.last_active_at ? new Date(d.last_active_at).toLocaleString('tr-TR') : 'Hiç';
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${d.id}</strong></td>
+        <td><strong></strong></td>
         <td>${d.name || 'Terminal'}</td>
         <td>${d.store_name || '-'}</td>
         <td><span style="font-family:monospace;font-size:0.8rem;">${d.device_hash.substring(0, 16)}...</span></td>
         <td><span class="indicator ${d.is_online ? 'online' : 'offline'}">${d.is_online ? 'Çevrimiçi' : 'Çevrimdışı'}</span></td>
         <td>${active}</td>
-        <td><span class="badge badge-${d.status}">${d.status}</span></td>
+        <td><span class="badge badge-"></span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -678,8 +689,8 @@ async function loadUsers() {
             ${roleName.startsWith('👑') ? '👑' : roleName.startsWith('🏪') ? '🏪' : '🧾'}
           </div>
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:600;color:var(--text-primary);font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name}</div>
-            <div style="color:var(--text-secondary);font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.email}</div>
+            <div style="font-weight:600;color:var(--text-primary);font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            <div style="color:var(--text-secondary);font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
           </div>
           <span style="font-size:0.7rem;padding:3px 10px;border-radius:12px;font-weight:700;background:${isActive ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isActive ? '#10b981' : '#ef4444'};">
             ${isActive ? '● AKTİF' : '● PASİF'}
@@ -690,9 +701,9 @@ async function loadUsers() {
           <span>Eklendi: ${created}</span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="openResetPasswordModal('${u.id}','${u.name.replace(/'/g,"&#39;")}')" style="flex:1;padding:8px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:var(--text-primary);cursor:pointer;">🔑 Şifre Sıfırla</button>
-          <button onclick="togglePortalUserActive('${u.id}', ${isActive})" style="flex:1;padding:8px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:${isActive ? '#f59e0b' : '#10b981'};cursor:pointer;">${isActive ? '⏸ Pasife Al' : '▶ Aktifleştir'}</button>
-          <button onclick="deletePortalUser('${u.id}','${u.name.replace(/'/g,"&#39;")}')" style="flex:1;padding:8px;font-size:0.78rem;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:#ef4444;cursor:pointer;">🗑 Sil</button>
+          <button onclick="openResetPasswordModal('','${u.name.replace(/'/g,"&#39;")}')" style="flex:1;padding:8px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:var(--text-primary);cursor:pointer;">🔑 Şifre Sıfırla</button>
+          <button onclick="togglePortalUserActive('', ${isActive})" style="flex:1;padding:8px;font-size:0.78rem;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:${isActive ? '#f59e0b' : '#10b981'};cursor:pointer;">${isActive ? '⏸ Pasife Al' : '▶ Aktifleştir'}</button>
+          <button onclick="deletePortalUser('','${u.name.replace(/'/g,"&#39;")}')" style="flex:1;padding:8px;font-size:0.78rem;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:#ef4444;cursor:pointer;">🗑 Sil</button>
         </div>
       `;
       grid.appendChild(card);
@@ -818,13 +829,13 @@ async function loadTickets() {
       const updated = new Date(t.updated_at).toLocaleDateString('tr-TR');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${t.id}</strong></td>
-        <td>${t.title}</td>
-        <td><span class="badge border-amber">${t.priority}</span></td>
-        <td><span class="badge badge-${t.status}">${t.status}</span></td>
+        <td><strong></strong></td>
+        <td></td>
+        <td><span class="badge border-amber"></span></td>
+        <td><span class="badge badge-"></span></td>
         <td>${updated}</td>
         <td>
-          <button class="btn-secondary" onclick="openTicketChat('${t.id}', '${t.title}', '${t.status}')">Yanıtlar / Oku</button>
+          <button class="btn-secondary" onclick="openTicketChat('', '', '')">Yanıtlar / Oku</button>
         </td>
       `;
       tbody.appendChild(tr);
