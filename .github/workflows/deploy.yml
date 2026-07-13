@@ -120,6 +120,8 @@ jobs:
   windows-ci:
     name: Windows Desktop Build
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout Code
