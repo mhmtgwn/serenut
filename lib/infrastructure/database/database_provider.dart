@@ -41,7 +41,7 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 23;
+  static const int _databaseVersion = 26;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -49,16 +49,68 @@ class DatabaseManager {
   Database? _database;
   Future<Database>? _databaseFuture;
 
+  /// Reset database connection cache (used in testing)
+  void reset() {
+    _database = null;
+    _databaseFuture = null;
+  }
+
   /// Get database instance (lazy initialization)
   Future<Database> getDatabase() async {
     if (_database != null) {
-      await _verifyAndRepairTriggers(_database!);
       return _database!;
     }
     _databaseFuture ??= _initializeDatabase();
     _database = await _databaseFuture;
+    await _verifyDatabaseSchemaInvariants(_database!);
     await _verifyAndRepairTriggers(_database!);
     return _database!;
+  }
+
+  /// Verify that crucial tables and columns exist using sqlite_master and PRAGMA table_info
+  Future<void> _verifyDatabaseSchemaInvariants(Database db) async {
+    final Map<String, List<String>> expectedColumns = {
+      'users': [
+        'id', 'name', 'email', 'password_hash', 'role', 'is_active',
+        'username', 'pin_hash', 'business_code', 'device_token_version',
+        'failed_pin_attempts', 'locked_until'
+      ],
+      'settings': [
+        'id', 'business_name', 'sound_notification_enabled',
+        'label_printer_ip', 'sms_sim_subscription_id'
+      ],
+      'business_profile': [
+        'id', 'version'
+      ],
+      'sms_logs': [
+        'id', 'status', 'event_type'
+      ],
+      'print_queue': [
+        'id', 'status'
+      ],
+    };
+
+    for (final table in expectedColumns.keys) {
+      // 1. Check table existence using sqlite_master
+      final tableCheck = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        [table]
+      );
+      if (tableCheck.isEmpty) {
+        throw StateError('Database invariant violation: Table $table is missing from database schema.');
+      }
+
+      // 2. Check column existence using PRAGMA table_info
+      final List<Map<String, dynamic>> columnsInfo = await db.rawQuery('PRAGMA table_info($table)');
+      final existingColumns = columnsInfo.map((c) => c['name'] as String).toList();
+
+      for (final expectedCol in expectedColumns[table]!) {
+        if (!existingColumns.contains(expectedCol)) {
+          throw StateError('Database invariant violation: Column $expectedCol is missing from table $table.');
+        }
+      }
+    }
+    debugPrint('[DatabaseManager] 🛡️ All schema invariants verified successfully.');
   }
 
   /// Check if the database file is a valid SQLite database
@@ -369,8 +421,19 @@ class DatabaseManager {
       )
     ''');
 
-    await db.transaction((txn) async {
-      try {
+    try {
+      await db.transaction((txn) async {
+        void handleMigrationError(dynamic e, int version) {
+          debugPrint('Migration warning/error at version $version: $e');
+          final msg = e.toString().toLowerCase();
+          if (!msg.contains('duplicate column') &&
+              !msg.contains('already exists') &&
+              !msg.contains('no such table') &&
+              !msg.contains('no such column')) {
+            throw e;
+          }
+        }
+
         if (oldVersion < 4) {
           await txn.execute('CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)');
           await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_created ON financial_transactions(created_at)');
@@ -394,7 +457,9 @@ class DatabaseManager {
         if (oldVersion < 6) {
           try {
             await txn.execute('ALTER TABLE products ADD COLUMN image_url TEXT');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 6);
+          }
           await txn.insert('app_migration_history', {
             'version': 6,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -404,16 +469,24 @@ class DatabaseManager {
         if (oldVersion < 7) {
           try {
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_sales_synced ON sales(is_synced)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 7);
+          }
           try {
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 7);
+          }
           try {
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_reference ON financial_transactions(reference_id)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 7);
+          }
           try {
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 7);
+          }
           await txn.insert('app_migration_history', {
             'version': 7,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -437,7 +510,9 @@ class DatabaseManager {
             ''');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_status ON sms_logs(status)');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_created ON sms_logs(created_at)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 8);
+          }
           await txn.insert('app_migration_history', {
             'version': 8,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -470,7 +545,9 @@ class DatabaseManager {
             await txn.execute('ALTER TABLE financial_transactions ADD COLUMN logical_clock INTEGER NOT NULL DEFAULT 0');
             await txn.execute('ALTER TABLE financial_transactions ADD COLUMN device_id TEXT');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_logical ON financial_transactions(logical_clock, device_id)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 12);
+          }
           await txn.insert('app_migration_history', {
             'version': 12,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -516,7 +593,9 @@ class DatabaseManager {
             await txn.execute('ALTER TABLE financial_transactions ADD COLUMN is_deleted INTEGER DEFAULT 0');
             await txn.execute('ALTER TABLE financial_transactions ADD COLUMN deleted_at TEXT');
             await txn.execute('ALTER TABLE financial_transactions ADD COLUMN deleted_by TEXT');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 13);
+          }
           await txn.insert('app_migration_history', {
             'version': 13,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -559,7 +638,9 @@ class DatabaseManager {
                 created_at TEXT NOT NULL
               )
             ''');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 15);
+          }
           await txn.insert('app_migration_history', {
             'version': 15,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -573,7 +654,9 @@ class DatabaseManager {
             await txn.execute('ALTER TABLE settings ADD COLUMN business_city TEXT DEFAULT ""');
             await txn.execute('ALTER TABLE settings ADD COLUMN business_district TEXT DEFAULT ""');
             await txn.execute('ALTER TABLE settings ADD COLUMN business_type TEXT DEFAULT ""');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 16);
+          }
           await txn.insert('app_migration_history', {
             'version': 16,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -584,7 +667,9 @@ class DatabaseManager {
           try {
             await txn.execute('ALTER TABLE products ADD COLUMN is_synced INTEGER DEFAULT 1');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_products_synced ON products(is_synced)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 17);
+          }
           await txn.insert('app_migration_history', {
             'version': 17,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -592,15 +677,19 @@ class DatabaseManager {
           });
         }
         if (oldVersion < 18) {
-          try {
-            await txn.execute('ALTER TABLE users ADD COLUMN username TEXT');
-            await txn.execute('ALTER TABLE users ADD COLUMN pin_hash TEXT');
-            await txn.execute('ALTER TABLE users ADD COLUMN business_code TEXT');
-            await txn.execute(
-              'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(business_code, username) WHERE username IS NOT NULL'
-            );
-            await txn.execute('ALTER TABLE users ADD COLUMN device_token_version INTEGER DEFAULT 1');
-          } catch (_) {}
+          for (final col in [
+            'ALTER TABLE users ADD COLUMN username TEXT',
+            'ALTER TABLE users ADD COLUMN pin_hash TEXT',
+            'ALTER TABLE users ADD COLUMN business_code TEXT',
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(business_code, username) WHERE username IS NOT NULL',
+            'ALTER TABLE users ADD COLUMN device_token_version INTEGER DEFAULT 1',
+          ]) {
+            try {
+              await txn.execute(col);
+            } catch (e) {
+              handleMigrationError(e, 18);
+            }
+          }
           await txn.insert('app_migration_history', {
             'version': 18,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -611,29 +700,17 @@ class DatabaseManager {
           try {
             await txn.execute('ALTER TABLE financial_transactions ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
           } catch (e) {
-            final msg = e.toString().toLowerCase();
-            // 'duplicate column'/'already exists': kolон zaten var (idempotent)
-            // 'no such table': taze DB'de tablo henuz olusturulmamis, CREATE TABLE'da gelecek
-            if (!msg.contains('duplicate column') &&
-                !msg.contains('already exists') &&
-                !msg.contains('no such table')) {
-              rethrow;
-            }
+            handleMigrationError(e, 19);
           }
           try {
             await txn.execute('ALTER TABLE customers ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
           } catch (e) {
-            final msg = e.toString().toLowerCase();
-            if (!msg.contains('duplicate column') &&
-                !msg.contains('already exists') &&
-                !msg.contains('no such table')) {
-              rethrow;
-            }
+            handleMigrationError(e, 19);
           }
           try {
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_customer_id ON financial_transactions(customer_id)');
           } catch (e) {
-            rethrow;
+            handleMigrationError(e, 19);
           }
           await txn.insert('app_migration_history', {
             'version': 19,
@@ -646,7 +723,9 @@ class DatabaseManager {
             await txn.execute('ALTER TABLE settings ADD COLUMN license_token TEXT');
             await txn.execute('ALTER TABLE settings ADD COLUMN last_system_time TEXT');
             await txn.execute('ALTER TABLE settings ADD COLUMN max_timestamp_seen TEXT');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 20);
+          }
           await txn.insert('app_migration_history', {
             'version': 20,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -668,7 +747,9 @@ class DatabaseManager {
             ''');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 21);
+          }
           await txn.insert('app_migration_history', {
             'version': 21,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -691,8 +772,7 @@ class DatabaseManager {
             try {
               await txn.execute(col);
             } catch (e) {
-              final msg = e.toString().toLowerCase();
-              if (!msg.contains('duplicate column') && !msg.contains('already exists')) rethrow;
+              handleMigrationError(e, 22);
             }
           }
           await txn.insert('app_migration_history', {
@@ -708,26 +788,77 @@ class DatabaseManager {
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
             await txn.execute('CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
-          } catch (_) {}
+          } catch (e) {
+            handleMigrationError(e, 23);
+          }
           await txn.insert('app_migration_history', {
             'version': 23,
             'migrated_at': DateTime.now().toIso8601String(),
             'status': 'success'
           });
         }
-      } catch (err) {
-        // Log migration error to history before throwing
-        try {
+        if (oldVersion < 24) {
+          for (final col in [
+            'ALTER TABLE settings ADD COLUMN sms_sim_subscription_id INTEGER',
+            'ALTER TABLE settings ADD COLUMN sms_sim_slot_index INTEGER',
+            'ALTER TABLE settings ADD COLUMN sms_monthly_limit INTEGER',
+            'ALTER TABLE settings ADD COLUMN sms_sent_this_month INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE settings ADD COLUMN sms_limit_reset_month INTEGER',
+          ]) {
+            try {
+              await txn.execute(col);
+            } catch (e) {
+              handleMigrationError(e, 24);
+            }
+          }
           await txn.insert('app_migration_history', {
-            'version': newVersion,
+            'version': 24,
             'migrated_at': DateTime.now().toIso8601String(),
-            'status': 'failed',
-            'error_message': err.toString()
+            'status': 'success'
           });
-        } catch (_) {}
-        rethrow;
-      }
-    });
+        }
+        if (oldVersion < 25) {
+          for (final col in [
+            'ALTER TABLE users ADD COLUMN failed_pin_attempts INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE users ADD COLUMN locked_until TEXT',
+          ]) {
+            try {
+              await txn.execute(col);
+            } catch (e) {
+              handleMigrationError(e, 25);
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 25,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 26) {
+          try {
+            await txn.execute('ALTER TABLE business_profile ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+          } catch (e) {
+            handleMigrationError(e, 26);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 26,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+      });
+    } catch (err) {
+      // Log migration error to history outside transaction before throwing
+      try {
+        await db.insert('app_migration_history', {
+          'version': newVersion,
+          'migrated_at': DateTime.now().toIso8601String(),
+          'status': 'failed',
+          'error_message': err.toString()
+        });
+      } catch (_) {}
+      rethrow;
+    }
 
     // ── One-time SharedPreferences → SQLite migration (runs after the transaction) ──
     // This cannot run inside a transaction because SharedPreferences is async/external.
@@ -829,7 +960,9 @@ class DatabaseManager {
         username TEXT,
         pin_hash TEXT,
         business_code TEXT,
-        device_token_version INTEGER DEFAULT 1
+        device_token_version INTEGER DEFAULT 1,
+        failed_pin_attempts INTEGER NOT NULL DEFAULT 0,
+        locked_until TEXT
       )
     ''');
     await db.execute('''
@@ -1083,7 +1216,12 @@ class DatabaseManager {
         label_printer_ip TEXT,
         label_printer_port INTEGER NOT NULL DEFAULT 9100,
         label_printer_copies INTEGER NOT NULL DEFAULT 1,
-        admin_pin_code TEXT
+        admin_pin_code TEXT,
+        sms_sim_subscription_id INTEGER,
+        sms_sim_slot_index INTEGER,
+        sms_monthly_limit INTEGER,
+        sms_sent_this_month INTEGER NOT NULL DEFAULT 0,
+        sms_limit_reset_month INTEGER
       )
     ''');
 
@@ -1186,6 +1324,7 @@ class DatabaseManager {
         currency TEXT NOT NULL DEFAULT '₺',
         tax_included INTEGER NOT NULL DEFAULT 1,
         logo_path TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT
       )
