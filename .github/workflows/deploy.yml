@@ -193,7 +193,6 @@ jobs:
 
   deploy-staging:
     name: Continuous Staging Deployment (VPS)
-    needs: [backend-ci]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
 
