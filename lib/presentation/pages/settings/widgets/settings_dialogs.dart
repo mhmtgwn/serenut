@@ -1,7 +1,11 @@
 part of '../../settings_page.dart';
 
 extension SettingsPageDialogs on _SettingsPageState {
-  void _showBusinessInfoSheet(Settings settings) {
+  void _showBusinessInfoSheet(Settings settings) async {
+    if (!_citiesLoaded) {
+      await _loadCities();
+    }
+    if (!mounted) return;
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: settings.businessName);
     final phoneCtrl = TextEditingController(text: settings.businessPhone);

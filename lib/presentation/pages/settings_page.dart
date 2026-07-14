@@ -160,7 +160,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void initState() {
     super.initState();
     _loadSettingsAndPin();
-    _loadCities();
   }
 
   Future<void> _loadCities() async {
