@@ -70,6 +70,8 @@ void main() {
       expect(find.text('Denetim Merkezi (Audit Center)'), findsOneWidget);
       expect(find.text('Veri Kurtarma Merkezi'), findsOneWidget);
       expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
+      
+      await tester.pump();
     });
 
     testWidgets('Owner sees all tenant-level sections but NOT Admin Kontrol Merkezi (platform level)', (WidgetTester tester) async {
@@ -110,6 +112,8 @@ void main() {
       expect(find.text('Denetim Merkezi (Audit Center)'), findsOneWidget);
       expect(find.text('Veri Kurtarma Merkezi'), findsOneWidget);
       expect(find.text('Admin Kontrol Merkezi'), findsNothing);
+      
+      await tester.pump();
     });
 
     testWidgets('Admin with all permissions sees all tenant-level sections but NOT Admin Kontrol Merkezi', (WidgetTester tester) async {
@@ -146,6 +150,8 @@ void main() {
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
       expect(find.text('Veritabanı Sağlık Kontrolü'), findsOneWidget);
       expect(find.text('Admin Kontrol Merkezi'), findsNothing);
+      
+      await tester.pump();
     });
 
     testWidgets('Admin with customized restricted permissions cannot see options without permission', (WidgetTester tester) async {
@@ -187,6 +193,8 @@ void main() {
 
       // Allowed options visible
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
+      
+      await tester.pump();
     });
 
     testWidgets('Cashier with printer permission sees Settings & Printer options, but Admin options are hidden', (WidgetTester tester) async {
@@ -230,6 +238,8 @@ void main() {
       expect(find.text('Cari Hesap Bütünlüğü & Replay'), findsNothing);
       expect(find.text('Veritabanı Sağlık Kontrolü'), findsNothing);
       expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
+      
+      await tester.pump();
     });
 
     testWidgets('Staff without printer permission sees Settings & Safe settings, but Printer options are hidden', (WidgetTester tester) async {
@@ -270,6 +280,8 @@ void main() {
       // Printer options are hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
       expect(find.text('Etiket Yazıcı Ayarları'), findsNothing);
+      
+      await tester.pump();
     });
 
     testWidgets('User with empty/restricted permissions can still access Settings shell for safe/local settings', (WidgetTester tester) async {
@@ -313,6 +325,8 @@ void main() {
       // Sensitive modules hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
+      
+      await tester.pump();
     });
 
     testWidgets('Action bypass protection: direct navigation to DbHealthPage without database permission blocks access', (WidgetTester tester) async {
@@ -343,6 +357,8 @@ void main() {
 
       // Assert DbHealthPage is blocked because of missing settings:database permission
       expect(find.text('Bu sayfaya erişim yetkiniz bulunmuyor.'), findsOneWidget);
+      
+      await tester.pump();
     });
   });
 }
