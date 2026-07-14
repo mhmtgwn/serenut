@@ -163,7 +163,9 @@ jobs:
             cd /var/www/serenut
             if [ ! -d .git ]; then
               git init
-              git remote add origin https://github.com/mhmtgwn/serenut.git
+              git remote add origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
+            else
+              git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
             fi
             git fetch --all
             git reset --hard origin/main
@@ -202,7 +204,9 @@ jobs:
             cd /var/www/serenut-staging
             if [ ! -d .git ]; then
               git init
-              git remote add origin https://github.com/mhmtgwn/serenut.git
+              git remote add origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
+            else
+              git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
             fi
             git fetch --all
             git reset --hard origin/staging
