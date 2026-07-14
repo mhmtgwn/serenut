@@ -131,7 +131,9 @@ EOT
 fi
 
 # Validate required variables
+set -a
 source ${TARGET_DIR}/.env
+set +a
 REQUIRED_VARS=("DATABASE_URL" "JWT_SECRET" "REFRESH_SECRET" "REDIS_URL" "DOMAIN")
 for var in "${REQUIRED_VARS[@]}"; do
   if [ -z "${!var}" ]; then
