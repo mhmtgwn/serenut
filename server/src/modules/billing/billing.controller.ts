@@ -440,6 +440,13 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
 
     const plan = planRes.rows[0];
 
+    if (process.env.ENABLE_MOCK_PAYMENTS !== 'true') {
+      return res.status(501).json({
+        error: 'not_implemented',
+        message: 'Kredi kartı tahsilat altyapısı şu anda entegre edilmemiştir. Lütfen banka havalesi ile ödeme yapınız.'
+      });
+    }
+
     // Mockup 3D Secure Webview payment session URL creation
     const sessionToken = `mock-session-${Date.now()}-${Math.floor(Math.random()*1000)}`;
     

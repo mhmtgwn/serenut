@@ -64,15 +64,15 @@ router.post('/push', async (req: Request, res: Response) => {
             user.id
           ]);
 
-          // Insert sale items
+          // Insert sale items and update stock if new
           if (payload.items && Array.isArray(payload.items)) {
             for (const itemObj of payload.items) {
               const qty = parseFloat(itemObj.quantity) || 0.0;
               const price = parseFloat(itemObj.unit_price) || 0.0;
-              await client.query(
+              const insertItemRes = await client.query(
                 `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal)
                  VALUES ($1, $2, $3, $4, $5, $6)
-                 ON CONFLICT (id) DO NOTHING`,
+                 ON CONFLICT (id) DO NOTHING RETURNING id`,
                 [
                   itemObj.id || `item-${payload.id}-${itemObj.product_id}`,
                   payload.id,
@@ -82,6 +82,16 @@ router.post('/push', async (req: Request, res: Response) => {
                   qty * price
                 ]
               );
+              
+              if (insertItemRes.rows.length > 0) {
+                // Deduct stock for new sale item
+                await client.query(
+                  `UPDATE products 
+                   SET quantity = quantity - $1, updated_at = CURRENT_TIMESTAMP 
+                   WHERE id = $2 AND company_id = $3`,
+                  [qty, itemObj.product_id, user.company_id]
+                );
+              }
             }
           }
         } 

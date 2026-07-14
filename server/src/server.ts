@@ -388,6 +388,11 @@ app.get('/api/v1/version', versionHandler);
 
 // ── PROMETHEUS METRICS EXPORTER ──────────────────────────────────────────────
 app.get('/metrics', async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${process.env.METRICS_TOKEN || 'secure-metrics-token'}`) {
+    return res.status(401).send('Unauthorized');
+  }
+
   const activeWs = getActiveWebSocketCount ? getActiveWebSocketCount() : 0;
   const memory = process.memoryUsage();
   const uptime = process.uptime();
@@ -482,11 +487,16 @@ if (process.env.SENTRY_DSN) {
 
 // ── GLOBAL ERROR HANDLER ─────────────────────────────────────────────────────
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  console.error('Unhandled error details:', err);
   logger.error('Unhandled error:', { error: err.message, stack: err.stack, url: req.originalUrl });
 
   // CORS hataları özel mesaj
   if (err.message && err.message.startsWith('CORS')) {
     return res.status(403).json({ error: 'cors_error', message: err.message });
+  }
+
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: 'invalid_json', message: 'Geçersiz JSON formatı.' });
   }
 
   res.status(err.status || 500).json({
