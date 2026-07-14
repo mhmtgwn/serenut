@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Serenut Platform Özellikleri — POS, Stok ve Şube Çözümleri</title>
   <meta name="description" content="Serenut OS'un POS satış, stok kontrolü, adisyon takibi, müşteri sadakati ve offline delta eşitleme mimarisini keşfedin." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/website.css" />
 </head>
 <body>
@@ -13,7 +14,7 @@
   <header class="nav-landing nav-scrolled" id="main-header">
     <div class="nav-container">
       <a href="index.html" class="brand">
-        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+        <svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
           <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
         </svg>
@@ -28,7 +29,9 @@
       <div class="nav-auth" id="nav-auth">
         <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
         <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
-        <button class="menu-toggle" id="nav-toggle">&equiv;</button>
+        <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
+          <svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
       </div>
     </div>
   </header>
@@ -49,7 +52,9 @@
       
       <!-- 1. POS -->
       <article class="card border-teal">
-        <span style="font-size:2rem;">🧾</span>
+        <div class="trust-icon text-primary mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"></path><path d="M6 8h12M6 12h12M6 16h8"></path></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">1. Hızlı POS Satış Yönetimi</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Yoğun saatlerde kasadaki donmalar ve yavaş faturalandırma kuyruklara neden olur.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> SQLite üzerinde çalışan, dokunmatik ekran uyumlu, anlık barkod tarama destekleyen hızlı satış arayüzü.</p>
@@ -58,7 +63,9 @@
 
       <!-- 2. STOCK -->
       <article class="card border-purple">
-        <span style="font-size:2rem;">📦</span>
+        <div class="trust-icon text-info mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><polygon points="12 22.08 12 12 3 6.92 3 17.08 12 22.08"></polygon><polygon points="12 22.08 21 17.08 21 6.92 12 12 12 22.08"></polygon><polygon points="12 12 21 6.92 12 2 3 6.92 12 12"></polygon></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">2. Akıllı Stok & Envanter</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Eksilen ürünlerin fark edilmemesi nedeniyle sipariş kayıpları yaşanır.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> Kritik stok eşikleri tanımlama, otomatik sayım mutabakatı ve şubeler arası anlık stok transfer takibi.</p>
@@ -67,7 +74,9 @@
 
       <!-- 3. ORDERS -->
       <article class="card border-amber">
-        <span style="font-size:2rem;">🍽️</span>
+        <div class="trust-icon text-amber mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><path d="M18 8A6 6 0 0 1 6 8c0-3.3 2.7-6 6-6s6 2.7 6 6Z"></path><line x1="12" y1="2" x2="12" y2="8"></line><path d="M2 20h20M5 16v4M19 16v4M9 16v4M15 16v4"></path></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">3. Adisyon & Sipariş Akışı</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Mutfak ile kasa arasındaki iletişim kopukluğu hatalı siparişlere yol açar.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> Mutfak ekranı (KDS) entegrasyonu, masa adisyon taşıma/bölme ve kurye takip otomasyonu.</p>
@@ -76,7 +85,9 @@
 
       <!-- 4. CUSTOMERS -->
       <article class="card border-red">
-        <span style="font-size:2rem;">👥</span>
+        <div class="trust-icon text-danger mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">4. Müşteri İlişkileri & Sadakat</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Tek seferlik gelen müşterileri sadık ziyaretçilere dönüştürme yöntemi eksiktir.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> Müşteri kartı profilleri, anlık puan kazanım/harcama motoru ve özel indirim kampanyaları.</p>
@@ -85,7 +96,9 @@
 
       <!-- 5. FINANCE -->
       <article class="card border-teal">
-        <span style="font-size:2rem;">💰</span>
+        <div class="trust-icon text-primary mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">5. Nakit Akışı & Kasa Mutabakatı</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Gün sonu kasa sayımlarındaki kuruşluk açıklar ve kayıp takibi zorlaştırır.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> Kasiyer bazlı oturum açma, nakit/kredi kartı ayrımı ve otomatik gün sonu (Z Raporu) e-posta bildirimleri.</p>
@@ -94,7 +107,9 @@
 
       <!-- 6. REPORTING -->
       <article class="card border-purple">
-        <span style="font-size:2rem;">📈</span>
+        <div class="trust-icon text-info mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">6. Raporlama & Kar/Zarar Zekası</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Kar marjlarını görebilmek için Excel tablolarıyla saatlerce uğraşmak gerekir.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> En çok satan ürün grupları, saatlik ciro yoğunluk grafikleri ve anlık kar/zarar maliyet analizleri.</p>
@@ -103,7 +118,9 @@
 
       <!-- 7. OFFLINE -->
       <article class="card border-amber">
-        <span style="font-size:2rem;">📡</span>
+        <div class="trust-icon text-amber mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5M5 12.5a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"></path></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">7. İnternetsiz (Offline) Çalışma</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> İnternet altyapı arızalarında kasaların kilitlenmesi ticari faaliyeti durdurur.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> Cihazda yerel SQLite veritabanı kullanımı sayesinde ağ bağlantısı kopsa dahi tam sürat satış imkanı.</p>
@@ -112,7 +129,9 @@
 
       <!-- 8. CLOUD SYNC -->
       <article class="card border-red">
-        <span style="font-size:2rem;">☁️</span>
+        <div class="trust-icon text-danger mb-2">
+          <svg class="icon" viewBox="0 0 24 24" width="32" height="32" stroke-width="2"><path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.42 0-.83.04-1.24.12A7 7 0 0 0 2 12c0 3.31 2.69 6 6 6h9.5z"></path></svg>
+        </div>
         <h3 class="font-bold mt-2 mb-2">8. Delta Bulut Eşitlemesi</h3>
         <p class="text-sm text-muted"><strong>Problem:</strong> Çevrimdışı verilerin elle yüklenmesi zahmetlidir ve veri çakışmalarına neden olur.</p>
         <p class="text-sm text-muted mt-2"><strong>Serenut Çözümü:</strong> Bağlantı kurulduğu an kuyruktaki yerel işlemlerin otomatik olarak buluta aktarılmasını sağlayan Delta Sync motoru.</p>
@@ -128,7 +147,7 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <a href="index.html" class="brand">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
               <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
             </svg>

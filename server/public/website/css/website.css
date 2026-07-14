@@ -73,8 +73,23 @@
 /* Mobile Nav Drawer */
 .menu-toggle {
   display: none;
-  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
   color: var(--neutral-300);
+  transition: all var(--transition-fast);
+}
+.menu-toggle:hover {
+  color: var(--primary-400);
+  transform: scale(1.05);
+}
+svg.icon {
+  display: inline-block;
+  vertical-align: middle;
+  stroke: currentColor;
+  fill: none;
+  transition: all var(--transition-normal);
 }
 
 /* ── 2. HERO SECTION ──────────────────────────────────────────────────────── */
@@ -515,6 +530,22 @@
 @media (max-width: 768px) {
   .nav-links {
     display: none;
+  }
+  .nav-links.active {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    background: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: var(--space-6) var(--space-8);
+    gap: var(--space-4);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
   }
   .menu-toggle {
     display: block;
