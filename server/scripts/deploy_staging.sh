@@ -144,7 +144,7 @@ done
 echo "🚀 [Backend] Synchronizing repository files..."
 # For local validation, assume script runs inside active workspace directory
 # In a real environment, git checkout is performed here.
-# cp -r . ${TARGET_DIR}/
+cp -r server/* ${TARGET_DIR}/
 
 echo "🚀 [Backend] Installing packages and executing TypeScript build..."
 cd ${TARGET_DIR}
