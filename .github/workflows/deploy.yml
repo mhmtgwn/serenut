@@ -147,10 +147,16 @@ jobs:
       - name: Deploy to Staging VPS via SSH
         uses: appleboy/ssh-action@master
         with:
-          # TODO: LÜTFEN AŞAĞIDAKİ ALANLARA VPS BİLGİLERİNİZİ GİRİN VEYA GITHUB SECRETS KULLANIN
-          host: "VPS_IP_ADRESINIZI_GIRIN"
-          username: "VPS_KULLANICI_ADINIZI_GIRIN"
-          key: "SSH_PRIVATE_KEYINIZI_GIRIN"
+          host: "185.255.93.94"
+          username: "root"
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACDAUAZVBGx/uZMjvl6CCmFZb2wZ4kEZ0aRQz3yTEImtHQAAAJi2hGXLtoRl
+            ywAAAAtzc2gtZWQyNTUxOQAAACDAUAZVBGx/uZMjvl6CCmFZb2wZ4kEZ0aRQz3yTEImtHQ
+            AAAEDqFwaBfVpVAtI/tjbKE8TJCuvhcCowW/N8YImQTPefRMBQBlUEbH+5kyO+XoIKYVlv
+            bBniQRnRpFDPfJMQia0dAAAAEW1obXRnd25AZ21haWwuY29tAQIDBA==
+            -----END OPENSSH PRIVATE KEY-----
           port: ${{ secrets.STAGING_VPS_PORT || 22 }}
           script: |
             cd /var/www/serenut/server
