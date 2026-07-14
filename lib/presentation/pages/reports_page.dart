@@ -1421,6 +1421,7 @@ class _MetricCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.bg,
+    this.subtitle,
   });
 
   @override
