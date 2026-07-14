@@ -2,7 +2,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json tsconfig.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 COPY . .
 RUN npm run build
 
@@ -12,7 +12,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --only=production --legacy-peer-deps
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/db ./db
