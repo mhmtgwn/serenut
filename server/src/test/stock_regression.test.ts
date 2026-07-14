@@ -21,9 +21,8 @@ async function setup() {
     await client.query('DELETE FROM companies WHERE id = $1', [mockCompanyId]);
 
     const hash = await AuthService.hashPassword('password123');
-    await client.query(`INSERT INTO companies (id, name, status) VALUES ($1, 'Test Company', 'active')`, [mockCompanyId]);
+    await client.query(`INSERT INTO companies (id, name, tax_number, status) VALUES ($1, 'Test Company', '1234567890', 'active')`, [mockCompanyId]);
     await client.query(`INSERT INTO users (id, company_id, name, email, password_hash, is_active) VALUES ($1, $2, 'Test User', 'testuser@stock.com', $3, true)`, [mockUserId, mockCompanyId, hash]);
-    await client.query(`UPDATE companies SET owner_id = $1 WHERE id = $2`, [mockUserId, mockCompanyId]);
 
     await client.query(`
       INSERT INTO products (id, company_id, name, price, quantity, status) 
@@ -144,7 +143,7 @@ async function run() {
 
     res = await fetch('http://localhost:9999/api/v1/sync/push', { method: 'POST', headers, body: JSON.stringify(payload3) });
     // Expect failure since NON_EXISTENT_PRODUCT should throw DB error that is caught and sent as JSON error array
-    const jsonBody = await res.json();
+    const jsonBody = await res.json() as any;
     if (!jsonBody.errors || jsonBody.errors.length === 0) throw new Error('STOCK-04 FAILED: Expected error on invalid product');
     
     prodRes = await pgPool.query('SELECT quantity FROM products WHERE id = $1', [productId]);
@@ -191,7 +190,6 @@ async function run() {
     await pgPool.query('DELETE FROM sale_items WHERE product_id = $1 OR product_id = $2', [productId, prod2Id]);
     await pgPool.query('DELETE FROM sales WHERE company_id = $1', [mockCompanyId]);
     await pgPool.query('DELETE FROM products WHERE id = $1 OR id = $2', [productId, prod2Id]);
-    await pgPool.query('UPDATE companies SET owner_id = NULL WHERE id = $1', [mockCompanyId]);
     await pgPool.query('DELETE FROM user_roles WHERE user_id = $1', [mockUserId]);
     await pgPool.query('DELETE FROM users WHERE id = $1', [mockUserId]);
     await pgPool.query('DELETE FROM companies WHERE id = $1', [mockCompanyId]);
