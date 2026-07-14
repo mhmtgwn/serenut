@@ -1,0 +1,105 @@
+/* ==========================================================================
+   SERENUT OS V2 - DESIGN TOKENS
+   ========================================================================== */
+
+:root {
+  /* HSL Color System */
+  /* Neutrals (Sleek Slates) */
+  --neutral-950: hsl(224, 71%, 4%);
+  --neutral-900: hsl(222, 47%, 11%);
+  --neutral-800: hsl(217, 33%, 17%);
+  --neutral-700: hsl(215, 25%, 27%);
+  --neutral-600: hsl(215, 16%, 47%);
+  --neutral-500: hsl(215, 16%, 57%);
+  --neutral-400: hsl(214, 32%, 72%);
+  --neutral-300: hsl(213, 27%, 84%);
+  --neutral-200: hsl(214, 32%, 91%);
+  --neutral-100: hsl(210, 40%, 96%);
+  --neutral-50:  hsl(210, 40%, 98%);
+
+  /* Primary Brand Accent (Neon Teal/Emerald) */
+  --primary-hue: 162;
+  --primary-50:  hsl(var(--primary-hue), 85%, 97%);
+  --primary-100: hsl(var(--primary-hue), 79%, 92%);
+  --primary-200: hsl(var(--primary-hue), 75%, 80%);
+  --primary-300: hsl(var(--primary-hue), 70%, 65%);
+  --primary-400: hsl(var(--primary-hue), 68%, 50%);
+  --primary-500: hsl(var(--primary-hue), 76%, 43%);
+  --primary-600: hsl(var(--primary-hue), 80%, 35%);
+  --primary-700: hsl(var(--primary-hue), 85%, 28%);
+  --primary-800: hsl(var(--primary-hue), 90%, 20%);
+  --primary-900: hsl(var(--primary-hue), 95%, 12%);
+
+  /* Secondary Accent (Orchid Purple) */
+  --secondary-hue: 285;
+  --secondary-300: hsl(var(--secondary-hue), 80%, 75%);
+  --secondary-400: hsl(var(--secondary-hue), 85%, 65%);
+  --secondary-500: hsl(var(--secondary-hue), 90%, 55%);
+  --secondary-600: hsl(var(--secondary-hue), 90%, 45%);
+
+  /* Utility Accents */
+  /* Neon Cyan */
+  --info-hue: 188;
+  --info-400: hsl(var(--info-hue), 95%, 60%);
+  --info-500: hsl(var(--info-hue), 95%, 45%);
+  --info-600: hsl(var(--info-hue), 90%, 35%);
+  --info-glow: rgba(0, 240, 255, 0.15);
+
+  /* Success Green */
+  --success-hue: 142;
+  --success-500: hsl(var(--success-hue), 76%, 43%);
+  --success-glow: rgba(16, 185, 129, 0.15);
+
+  /* Warning Amber */
+  --warning-hue: 35;
+  --warning-500: hsl(var(--warning-hue), 92%, 50%);
+  --warning-glow: rgba(245, 158, 11, 0.15);
+
+  /* Danger Red */
+  --danger-hue: 350;
+  --danger-500: hsl(var(--danger-hue), 89%, 60%);
+  --danger-glow: rgba(239, 68, 68, 0.15);
+
+  /* Ambient Glassmorphism Tokens */
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(16, 185, 129, 0.25);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+
+  /* Fonts */
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', var(--font-family);
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.25);
+  --shadow-primary-glow: 0 0 24px rgba(16, 185, 129, 0.25);
+  --shadow-secondary-glow: 0 0 24px rgba(189, 0, 255, 0.25);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-Index Hierarchy */
+  --z-base: 1;
+  --z-nav: 100;
+  --z-dropdown: 200;
+  --z-drawer: 1000;
+  --z-modal: 1100;
+  --z-toast: 1200;
+
+  /* Global Layout Config */
+  --sidebar-w: 260px;
+  --header-h: 70px;
+  --container-max-w: 1280px;
+}

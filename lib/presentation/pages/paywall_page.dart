@@ -31,11 +31,13 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
     });
 
     try {
-      final licenseService = ref.read(licenseServiceProvider);
-      final apiClient = ref.read(apiClientProvider);
+      final authService = ref.read(authServiceProvider);
       
-      final success = await licenseService.syncLicenseFromServer(apiClient);
+      final success = await authService.refreshEntitlement();
       if (success) {
+        // Router will automatically re-evaluate state based on TrialManager via authNotifierProvider
+        // But we can explicitly force a refresh just in case
+        ref.read(authNotifierProvider.notifier).checkAuth();
         setState(() {
           _successMessage = 'Lisans durumu başarıyla yenilendi! Giriş yapılıyor...';
         });
@@ -44,7 +46,7 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
           context.go('/');
         }
       } else {
-        throw Exception('Aktif lisans bulunamadı veya doğrulanamadı. Lütfen müşteri portalını kontrol edin.');
+        throw Exception('Aktif lisans bulunamadı veya doğrulanamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.');
       }
     } catch (e) {
       setState(() {

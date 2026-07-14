@@ -10,7 +10,8 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/i_hash_service.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:serenutos/domain/services/device_manager.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 
 class AuthException implements Exception {
   final String message;
@@ -26,15 +27,18 @@ class AuthService {
   final IUserRepository _userRepository;
   final IHashService _hashService;
   final ApiClient? _apiClient;
+  final DeviceManager _deviceManager;
   late SharedPreferences _prefs;
   AuthUser? _currentUser;
 
   AuthService({
     required IUserRepository userRepository,
     required IHashService hashService,
+    required DeviceManager deviceManager,
     ApiClient? apiClient,
   })  : _userRepository = userRepository,
         _hashService = hashService,
+        _deviceManager = deviceManager,
         _apiClient = apiClient;
 
   /// Initialize service (call once on app startup)
@@ -110,15 +114,11 @@ class AuthService {
 
           // Synchronize trial starting date from server (AC 1.2)
           final trialManager = TrialManager(_prefs);
-          final trialStartedAtStr = data['trial_started_at'] as String?;
-          if (trialStartedAtStr != null) {
-            final trialStartedAt = DateTime.tryParse(trialStartedAtStr);
-            if (trialStartedAt != null) {
-              await trialManager.startTrial(trialStartedAt);
-            }
-          } else if (data['trial_started'] == true) {
-            await trialManager.startTrial(DateTime.now());
+          final subscription = data['subscription'] as Map<String, dynamic>?;
+          if (subscription != null) {
+            await trialManager.cacheSubscription(subscription);
           }
+
 
           final roles = userMap['roles'] as List<dynamic>? ?? [];
           final roleStr = roles.isNotEmpty ? roles.first.toString() : (userMap['role'] as String? ?? 'cashier');
@@ -136,6 +136,20 @@ class AuthService {
             permissions: (userMap['permissions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? getPermissionsForRole(role),
             createdAt: DateTime.tryParse(userMap['created_at'] as String? ?? '') ?? DateTime.now(),
           );
+
+          // PHASE 3: Device Lifecycle - Auto Activate
+          try {
+            if (!kIsWeb) {
+              final deviceId = _deviceManager.getDeviceId();
+              final deviceName = 'POS Cihazı - $deviceId';
+              await _apiClient!.post('/licenses/auto-activate', {
+                'device_hash': deviceId,
+                'device_name': deviceName,
+              });
+            }
+          } catch (e) {
+            debugPrint('Auto-activation failed, device might already be active or limit reached: $e');
+          }
 
           // Cache credentials in local sqlite for offline login
           try {
@@ -240,6 +254,12 @@ class AuthService {
           await _prefs.setString('auth_jwt_token', token);
           await _prefs.setString('auth_refresh_token', refreshToken);
           _apiClient!.setJwtToken(token);
+
+          final subscription = data['subscription'] as Map<String, dynamic>?;
+          if (subscription != null) {
+            final trialManager = TrialManager(_prefs);
+            await trialManager.cacheSubscription(subscription);
+          }
 
           final roles = userMap['roles'] as List<dynamic>? ?? [];
           final roleStr = roles.isNotEmpty ? roles.first.toString() : 'cashier';
@@ -564,6 +584,46 @@ class AuthService {
     }
   }
 
+  /// Phase 5: Entitlement Recovery 
+  /// Forces a token refresh to fetch the latest subscription status, updates TrialManager,
+  /// and potentially triggers sync resumption.
+  Future<bool> refreshEntitlement() async {
+    if (_apiClient == null) return false;
+    final refreshToken = _prefs.getString('auth_refresh_token');
+    if (refreshToken == null) return false;
+
+    try {
+      final response = await _apiClient!.post('/auth/refresh', {
+        'refresh_token': refreshToken,
+      });
+
+      if (response.isSuccess) {
+        final data = response.json;
+        final newAccessToken = data['access_token'] as String?;
+        final newRefreshToken = data['refresh_token'] as String?;
+        final subscription = data['subscription'] as Map<String, dynamic>?;
+
+        if (newAccessToken != null) {
+          await _prefs.setString('auth_jwt_token', newAccessToken);
+          _apiClient!.setJwtToken(newAccessToken);
+        }
+        if (newRefreshToken != null) {
+          await _prefs.setString('auth_refresh_token', newRefreshToken);
+        }
+
+        if (subscription != null) {
+          final trialManager = TrialManager(_prefs);
+          await trialManager.cacheSubscription(subscription);
+        }
+
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Entitlement refresh failed: $e');
+    }
+    return false;
+  }
+
   bool _isLeaseExpired(AuthUser user) {
     final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
     if (lastVerifiedStr != null) {
@@ -715,9 +775,15 @@ class AuthService {
   }
 
   static List<String> getPermissionsForRole(UserRole role) => switch (role) {
-        UserRole.owner   => _getAllPermissions(),
-        UserRole.admin   => _getAllPermissions(),
-        UserRole.sysadmin => _getAllPermissions(),
+        UserRole.owner => _getAllPermissions(),
+        UserRole.admin => _getAllPermissions(),
+        // Sysadmin (Platform role) should not have tenant POS permissions by default
+        UserRole.sysadmin => [
+          'admin.settings',
+          'admin.users',
+          'reports.view',
+          'settings.view'
+        ],
         UserRole.manager => _getManagerPermissions(),
         UserRole.cashier => _getCashierPermissions(),
         UserRole.staff   => _getCashierPermissions(),

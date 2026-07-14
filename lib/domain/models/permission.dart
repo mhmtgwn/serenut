@@ -85,9 +85,15 @@ enum Permission {
   /// Get all permissions for a specific role
   static List<Permission> forRole(UserRole userRole) {
     return switch (userRole) {
-      UserRole.sysadmin => Permission.values,
       UserRole.owner => Permission.values,
       UserRole.admin => Permission.values,
+      // Sysadmin should not have POS permissions
+      UserRole.sysadmin => [
+        Permission.adminSettings,
+        Permission.adminUsers,
+        Permission.reportsView,
+        Permission.settingsView,
+      ],
       UserRole.manager => [
         // Sales (view + print only, no create/edit)
         Permission.salesView,

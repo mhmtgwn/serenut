@@ -61,6 +61,12 @@ router.post('/push', async (req: Request, res: Response) => {
     for (const item of items) {
       console.log(`[DEBUG] Processing item ${item.id}`);
       const { id, entity_type, entity_id, payload } = item;
+      const itemTime = payload.created_at || payload.date || new Date().toISOString();
+      const maxSkewMsGlobal = 60 * 60 * 1000;
+      if (new Date(itemTime).getTime() > Date.now() + maxSkewMsGlobal) {
+         errors.push({ id, error: 'clock_spoofed', message: 'İşlem tarihi gelecekte olamaz (clock_spoofed sunucu zamanına göre geleceğe dönük).' });
+         continue;
+      }
       
       // Prevent clock manipulation attacks: if grace expired, only allow valid historical sales
       if (isGraceExpired) {

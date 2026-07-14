@@ -3,1190 +3,1034 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Serenut Cloud — Admin Control Center</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="index.css?v=1.0.2">
-  <!-- Chart.js for premium analytics graphics -->
+  <title>Serenut OS — Sistem Yönetim Paneli</title>
+  <link rel="stylesheet" href="css/admin.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-  <!-- ── NEON BACKGROUND GLOWS ────────────────────────────────────────────────── -->
-  <div class="background-glow bg-cyan"></div>
-  <div class="background-glow bg-purple"></div>
-
-  <!-- Navigation Bar -->
-  <header class="navbar" id="admin-navbar">
-    <div class="nav-container">
-      <a href="/" class="logo">
-        <span class="logo-icon">
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#10b981" stroke-width="2.5">
+  <!-- 1. LOGIN SCREEN OVERLAY -->
+  <div id="login-container">
+    <div class="card login-card">
+      <div class="auth-header">
+        <a href="/" class="auth-logo">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
             <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
           </svg>
-        </span>
-        <span class="logo-text">Serenut<span>OS</span></span>
-      </a>
-      <nav class="nav-links" id="admin-nav-links">
-        <a href="/features.html">Özellikler</a>
-        <a href="/pricing.html">Fiyatlandırma</a>
-        <a href="/download.html">İndir</a>
-        <a href="/faq.html">S.S.S.</a>
-      </nav>
-      <div class="nav-actions" id="admin-nav-actions">
-        <a href="/" class="btn-login-outline">Ana Sayfa</a>
+          <span style="color:var(--secondary-400);">Admin OS</span>
+        </a>
+        <p class="text-muted text-sm">Serenut OS Cloud Control Center</p>
       </div>
-    </div>
-  </header>
 
-  <!-- ── 1. LOGIN INTERFACE (Displayed when not authenticated) ────────────────── -->
-  <div id="login-container" class="glass-panel login-card">
-    <div class="logo-area">
-      <div class="logo-icon">
-        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-        </svg>
+      <div style="display:flex; flex-direction:column; gap: var(--space-4);">
+        <div class="form-group">
+          <label class="form-label">Yönetici E-posta</label>
+          <input type="email" id="login-email" placeholder="sysadmin@serenut.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Şifreniz</label>
+          <input type="password" id="login-password" placeholder="••••••••" />
+        </div>
+        <div class="text-red text-sm" id="login-error" style="min-height: 20px;"></div>
+        <button class="btn btn-primary w-full" id="btn-login" style="background:var(--secondary-500); border-color:var(--secondary-600);">Sisteme Giriş</button>
       </div>
-      <h2>Serenut Cloud</h2>
-      <p class="tagline">Admin Control Center</p>
     </div>
-    <div class="form-group">
-      <label for="login-email">Yönetici E-Posta</label>
-      <input type="email" id="login-email" placeholder="admin@serenut.com" required>
-    </div>
-    <div class="form-group">
-      <label for="login-password">Şifre</label>
-      <input type="password" id="login-password" placeholder="••••••••" required>
-    </div>
-    <button id="btn-login" class="btn-primary">Sistem Girişi</button>
-    <p id="login-error" class="error-msg"></p>
   </div>
 
-  <!-- ── 2. ADMIN PANEL INTERFACE ─────────────────────────────────────────────── -->
-  <div id="admin-app" class="app-layout" style="display: none;">
+  <!-- 2. APPLICATION SHELL -->
+  <div id="admin-app" style="display:none;">
+    
     <!-- Sidebar Navigation -->
-    <aside class="sidebar glass-panel">
-      <div class="sidebar-user-card" style="padding: 16px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-        <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); color: var(--neon-teal); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700;">
-          🛡️
-        </div>
-        <div>
-          <h4 style="font-size: 1rem; color: var(--text-primary); margin: 0; font-weight: 600;">Serenut Admin</h4>
-          <span class="user-role-badge" style="font-size: 0.65rem; background: #ef4444; color: white; padding: 2px 8px; border-radius: 10px; font-weight: 700; display: inline-block; margin-top: 4px;">SYSADMIN</span>
-        </div>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="/" class="sidebar-brand">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
+            <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
+          </svg>
+          <span>Serenut OS</span>
+        </a>
       </div>
-      <nav class="nav-menu">
-        <a href="#" class="nav-item active" data-tab="dashboard">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-          Panel Özet
-        </a>
-        <a href="#" class="nav-item" data-tab="companies">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          Firmalar
-        </a>
-        <a href="#" class="nav-item" data-tab="licenses">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-          Lisanslar
-        </a>
-        <a href="#" class="nav-item" data-tab="devices">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-          Cihazlar
-        </a>
-        <a href="#" class="nav-item" data-tab="subscriptions">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-          Abonelikler & Gelir
-        </a>
-        <a href="#" class="nav-item" data-tab="plans">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="2" x2="12" y2="22"/>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-          </svg>
-          Plan & Fiyat
-        </a>
-        <a href="#" class="nav-item" data-tab="incidents">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Olay Merkezi
-        </a>
-        <a href="#" class="nav-item" data-tab="security">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Güvenlik Merkezi
-        </a>
-        <a href="#" class="nav-item" data-tab="updates">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-          Güncellemeler
-        </a>
-        <a href="#" class="nav-item" data-tab="sync">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          Senkronizasyon
-        </a>
-        <a href="#" class="nav-item" data-tab="tickets">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          Destek
-        </a>
-        <a href="#" class="nav-item" data-tab="crash-logs">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Crash Raporları
-        </a>
-        <a href="#" class="nav-item" data-tab="audit">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          Audit Log
-        </a>
-        <a href="#" class="nav-item" data-tab="sms">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          SMS İletim
-        </a>
-        <a href="#" class="nav-item" data-tab="settings">
-          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          Sistem Ayarları
-        </a>
+      <nav class="sidebar-nav">
+        <div class="sidebar-item active" data-tab="dashboard">📊 Genel Bakış</div>
+        <div class="sidebar-item" data-tab="companies">🏢 Şirketler</div>
+        <div class="sidebar-item" data-tab="users">👤 Kullanıcılar</div>
+        <div class="sidebar-item" data-tab="subscriptions">💳 Abonelikler</div>
+        <div class="sidebar-item" data-tab="transfers">💸 Havale Onayları</div>
+        <div class="sidebar-item" data-tab="payments">🧾 Ödemeler</div>
+        <div class="sidebar-item" data-tab="plans">📋 Planlar</div>
+        <div class="sidebar-item" data-tab="licenses">🔑 Lisanslar</div>
+        <div class="sidebar-item" data-tab="devices">💻 Cihazlar</div>
+        <div class="sidebar-item" data-tab="releases">📦 Sürümler</div>
+        <div class="sidebar-item" data-tab="support">Destek</div>
+        <div class="sidebar-item" data-tab="audit">📝 Audit Logs</div>
+        <div class="sidebar-item" data-tab="health">🚨 Sistem Durumu</div>
       </nav>
-      <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 8px;">
-        <a href="/" class="btn-secondary" style="text-decoration: none; text-align: center; font-size: 0.9rem; padding: 10px; display: block; font-weight: 600; color: var(--text-primary);">🏠 Web Sitesine Dön</a>
-        <button id="btn-logout" class="btn-secondary" style="font-weight: 600; padding: 10px;">Çıkış Yap ➔</button>
+      <div class="sidebar-footer">
+        <div class="sidebar-profile">
+          <div class="sidebar-profile-avatar" style="color:var(--secondary-400);">A</div>
+          <div class="sidebar-profile-info">
+            <div class="sidebar-profile-name" id="admin-profile-name">Admin</div>
+            <div class="sidebar-profile-role">Root Administrator</div>
+          </div>
+          <button class="text-red font-bold" id="btn-logout" style="margin-left:auto; font-size:1.1rem; background:none; border:none;" title="Güvenli Çıkış">🚪</button>
+        </div>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
-    <main class="main-content">
-      <!-- Top header bar -->
-      <header class="top-header glass-panel">
-        <h2 id="current-tab-title">Yönetim Paneli</h2>
-        <div class="system-time" id="header-clock">--:--:--</div>
+    <!-- Main Panel Viewport -->
+    <main class="main-panel">
+      <!-- Top Header -->
+      <header class="topbar">
+        <div class="flex items-center gap-3">
+          <button class="menu-toggle" id="nav-toggle" style="background:none; border:none; font-size:1.5rem; color:var(--neutral-300);">&equiv;</button>
+          <h2 class="topbar-title" id="current-tab-title">Yönetim Paneli</h2>
+        </div>
+        <div class="topbar-actions">
+          <span>🕒 <span id="header-clock">00:00:00</span></span>
+        </div>
       </header>
 
-      <!-- TAB CONTENT PANELS -->
-
-      <!-- TAB: DASHBOARD -->
-      <section id="tab-dashboard" class="tab-panel active">
-        <!-- Stat Cards Grid -->
-        <div class="stats-grid">
-          <div class="stat-card glass-panel border-cyan">
-            <span class="stat-icon">
-              <svg class="menu-icon icon-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            </span>
-            <div class="stat-info">
-              <span class="stat-label">Aktif Firmalar</span>
-              <h3 id="stat-companies" class="stat-value">-</h3>
+      <!-- Scrollable Panels -->
+      <div class="content-wrapper">
+        
+        <!-- Tab: Dashboard -->
+        <section class="tab-panel active" id="tab-dashboard">
+          <div class="grid grid-cols-4 gap-4">
+            <div class="card border-teal text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">Kayıtlı Firma</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="stat-companies">0</p>
+            </div>
+            <div class="card border-purple text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">Aktif Terminaller</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="stat-devices">0</p>
+            </div>
+            <div class="card border-amber text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">SaaS Lisansları</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="stat-licenses">0</p>
+            </div>
+            <div class="card border-red text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">Kritik Lisanslar</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="stat-expiring">0</p>
             </div>
           </div>
-          <div class="stat-card glass-panel border-purple">
-            <span class="stat-icon">
-              <svg class="menu-icon icon-purple" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            </span>
-            <div class="stat-info">
-              <span class="stat-label">Aktif POS Cihazları</span>
-              <h3 id="stat-devices" class="stat-value">-</h3>
-            </div>
-          </div>
-          <div class="stat-card glass-panel border-emerald">
-            <span class="stat-icon">
-              <svg class="menu-icon icon-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-            </span>
-            <div class="stat-info">
-              <span class="stat-label">Toplam Lisanslar</span>
-              <h3 id="stat-licenses" class="stat-value">-</h3>
-            </div>
-          </div>
-          <div class="stat-card glass-panel border-amber">
-            <span class="stat-icon">
-              <svg class="menu-icon icon-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
-            </span>
-            <div class="stat-info">
-              <span class="stat-label">Süresi Dolan Lisanslar</span>
-              <h3 id="stat-expiring" class="stat-value">-</h3>
-            </div>
-          </div>
-        </div>
 
-        <!-- Charts Section -->
-        <div class="dashboard-charts">
-          <div class="chart-container glass-panel">
-            <h4>📈 Platform Satış Hacmi (Son 30 Gün)</h4>
-            <canvas id="salesChart"></canvas>
-          </div>
-          <div class="chart-container glass-panel flex-30">
-            <h4>📊 Lisans Dağılımı</h4>
-            <canvas id="licenseDistChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Launch Operations Center -->
-        <div class="glass-panel" style="margin-bottom: 24px; padding: 24px;">
-          <h4 style="margin-top: 0; margin-bottom: 16px; color: #38BDF8;">🚀 Launch Operations Center (SaaS İzleme Masası)</h4>
-          <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 0;">
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #06B6D4;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">Yeni Kayıt (7 Gün)</div>
-              <h4 id="ops-new-signups" style="font-size: 1.4rem; color: white; margin-top: 4px; margin-bottom: 0;">-</h4>
-            </div>
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #8B5CF6;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">Aktif Deneme (Trial)</div>
-              <h4 id="ops-active-trials" style="font-size: 1.4rem; color: white; margin-top: 4px; margin-bottom: 0;">-</h4>
-            </div>
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #F59E0B;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">Biten Deneme (48 Saat)</div>
-              <h4 id="ops-expiring-trials" style="font-size: 1.4rem; color: #F59E0B; margin-top: 4px; margin-bottom: 0;">-</h4>
-            </div>
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #10B981;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">Ödemeler (Bugün)</div>
-              <h4 id="ops-payments-today" style="font-size: 1.4rem; color: #10B981; margin-top: 4px; margin-bottom: 0;">-</h4>
-            </div>
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #EF4444;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">Hatalı Ödeme (24 Saat)</div>
-              <h4 id="ops-failed-payments" style="font-size: 1.4rem; color: #EF4444; margin-top: 4px; margin-bottom: 0;">-</h4>
-            </div>
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #38BDF8;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">Açık Destek Talebi</div>
-              <h4 id="ops-open-tickets" style="font-size: 1.4rem; color: white; margin-top: 4px; margin-bottom: 0;">-</h4>
-            </div>
-            <div class="stat-card glass-panel" style="padding: 12px; border-left: 3px solid #EC4899;">
-              <div style="font-size: 0.8rem; color: #94A3B8;">En Son OTA Sürümü</div>
-              <h4 id="ops-latest-ota" style="font-size: 1.1rem; color: white; margin-top: 4px; margin-bottom: 0; font-family: monospace;">-</h4>
-            </div>
-          </div>
-        </div>
-
-        <!-- System Resource Indicators -->
-        <div class="system-resources glass-panel">
-          <h4>💻 Sunucu Sağlık Durumu (Rabisu VPS)</h4>
-          <div class="resource-meters">
-            <div class="meter-group">
-              <span class="meter-label">CPU Kullanımı</span>
-              <div class="meter-track"><div id="cpu-bar" class="meter-fill bar-cyan" style="width: 0%"></div></div>
-              <span id="cpu-text" class="meter-value">0%</span>
-            </div>
-            <div class="meter-group">
-              <span class="meter-label">RAM Kullanımı</span>
-              <div class="meter-track"><div id="ram-bar" class="meter-fill bar-purple" style="width: 0%"></div></div>
-              <span id="ram-text" class="meter-value">0%</span>
-            </div>
-            <div class="meter-group">
-              <span class="meter-label">Disk Kullanımı</span>
-              <div class="meter-track"><div id="disk-bar" class="meter-fill bar-amber" style="width: 37%"></div></div>
-              <span id="disk-text" class="meter-value">37.4%</span>
-            </div>
-          </div>
-          <div class="service-badges">
-            <span class="status-badge" id="db-health-badge">🐘 PostgreSQL: Yükleniyor</span>
-            <span class="status-badge" id="redis-health-badge">🔴 Redis: Yükleniyor</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB: COMPANIES -->
-      <section id="tab-companies" class="tab-panel">
-        <div class="glass-panel" style="padding: 15px; margin-bottom: 20px; border-left: 4px solid var(--neon-cyan); background: var(--bg-tertiary);">
-          <p style="font-size: 0.9rem; line-height: 1.5; color: var(--text-primary); margin: 0;">
-            💡 <strong>Firma Yönetim İpucu:</strong> Bir firmayı <strong>Askıya Al</strong> konumuna getirdiğinizde; o firmaya bağlı tüm kasiyer ve yöneticilerin sisteme girişi engellenir, aktif WebSocket bağlantıları koparılır ve tüm POS terminallerinde lisans doğrulama hatası verilerek satış yapılması durdurulur. <strong>Aktifleştir</strong> ile firmanın tüm operasyonu normale döner.
-          </p>
-        </div>
-        <div class="table-actions glass-panel">
-          <input type="text" id="company-search" class="search-input" placeholder="Firma adı veya vergi no ile ara...">
-          <button id="btn-create-company" class="btn-primary">+ Yeni Firma Tanımla</button>
-        </div>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Şirket Adı</th>
-                <th>Vergi No / Daire</th>
-                <th>Telefon & Email</th>
-                <th>Şubeler</th>
-                <th>Cihazlar</th>
-                <th>Durum</th>
-                <th>Aksiyon</th>
-              </tr>
-            </thead>
-            <tbody id="company-table-body">
-              <tr><td colspan="8" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: LICENSES -->
-      <section id="tab-licenses" class="tab-panel">
-        <div class="glass-panel" style="padding: 15px; margin-bottom: 20px; border-left: 4px solid var(--neon-cyan); background: var(--bg-tertiary);">
-          <p style="font-size: 0.9rem; line-height: 1.5; color: var(--text-primary); margin: 0;">
-            💡 <strong>Lisans Yönetim Kılavuzu:</strong> 
-            <strong>Yenile (+1 Yıl)</strong> lisansa 365 gün ekler. 
-            <strong>Askıya Al</strong> ilgili cihazın satış yetkisini geçici olarak dondurur. 
-            <strong>Offline QR</strong> interneti olmayan POS cihazlarını yerinde aktifleştirmek için QR kod oluşturur. 
-            <strong>İptal Et</strong> ise lisans anahtarını kalıcı olarak siler; cihazın bulut bağlantısını keser (Geri alınamaz!).
-          </p>
-        </div>
-        <div class="table-actions glass-panel">
-          <input type="text" id="license-search" class="search-input" placeholder="Lisans anahtarı ile ara...">
-          <button id="btn-create-license" class="btn-primary">+ Lisans Oluştur</button>
-          <button id="btn-bulk-license-trigger" class="btn-primary" style="margin-left: 10px; background: #8B5CF6;">+ Toplu Üret (Bulk)</button>
-        </div>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Lisans Anahtarı</th>
-                <th>Şirket</th>
-                <th>Paket Seviyesi</th>
-                <th>Cihaz Limiti</th>
-                <th>Bitiş Tarihi</th>
-                <th>Durum</th>
-                <th>Aksiyonlar</th>
-              </tr>
-            </thead>
-            <tbody id="license-table-body">
-              <tr><td colspan="7" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: DEVICES -->
-      <section id="tab-devices" class="tab-panel">
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Cihaz ID</th>
-                <th>Şirket</th>
-                <th>Bağlı Şube</th>
-                <th>Cihaz Hash</th>
-                <th>Durum</th>
-                <th>Son Aktiflik</th>
-                <th>Bağlantı</th>
-                <th>Aksiyon</th>
-              </tr>
-            </thead>
-            <tbody id="device-table-body">
-              <tr><td colspan="8" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: SUBSCRIPTIONS & COMMERCIALS -->
-      <section id="tab-subscriptions" class="tab-panel">
-        <div class="stats-grid" style="margin-bottom: 24px;">
-          <div class="stat-card glass-panel border-cyan">
-            <span class="stat-icon icon-cyan">💰</span>
-            <div class="stat-info">
-              <span class="stat-label">Platform MRR (Aylık)</span>
-              <h3 id="mrr-val" class="stat-value">-</h3>
-            </div>
-          </div>
-          <div class="stat-card glass-panel border-purple">
-            <span class="stat-icon icon-purple">📅</span>
-            <div class="stat-info">
-              <span class="stat-label">Platform ARR (Yıllık)</span>
-              <h3 id="arr-val" class="stat-value">-</h3>
-            </div>
-          </div>
-          <div class="stat-card glass-panel border-emerald">
-            <span class="stat-icon icon-emerald">📉</span>
-            <div class="stat-info">
-              <span class="stat-label">Churn Oranı</span>
-              <h3 id="churn-val" class="stat-value">-</h3>
-            </div>
-          </div>
-          <div class="stat-card glass-panel border-amber">
-            <span class="stat-icon icon-amber">⚠️</span>
-            <div class="stat-info">
-              <span class="stat-label">Ödemesi Geciken (Risk)</span>
-              <h3 id="risk-val" class="stat-value">-</h3>
-            </div>
-          </div>
-        </div>
-
-        <h4>🚨 Ödeme Riski Altındaki Şirketler (Grace Period / Unpaid)</h4>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Firma ID</th>
-                <th>Şirket Ünvanı</th>
-                <th>E-Posta</th>
-                <th>Abonelik Durumu</th>
-                <th>Tolerans Sonu</th>
-                <th>Açık Fatura</th>
-                <th>Geciken Tutar</th>
-              </tr>
-            </thead>
-            <tbody id="risk-table-body">
-              <tr><td colspan="7" class="text-center">Ödeme riski bulunan şirket bulunamadı.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: PLANS -->
-      <section id="tab-plans" class="tab-panel">
-        <div class="table-actions glass-panel" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px;">
-          <h4 style="margin: 0; color: var(--primary-green);">Abonelik Paketleri & Fiyatlandırma Yönetimi</h4>
-          <span style="font-size: 0.85rem; color: var(--text-secondary);">Aktif satış paketlerinin fiyatlarını, limitlerini ve özelliklerini buradan güncelleyebilirsiniz.</span>
-        </div>
-
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Paket ID</th>
-                <th>Paket Adı</th>
-                <th>Fiyat (Aylık)</th>
-                <th>Para Birimi</th>
-                <th>Cihaz Limiti</th>
-                <th class="text-right">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody id="plans-table-body">
-              <tr>
-                <td colspan="6" class="text-center">Yükleniyor...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: INCIDENTS -->
-      <section id="tab-incidents" class="tab-panel">
-        <div class="table-actions glass-panel">
-          <span class="section-desc">Sistem genelindeki SEV-1/2/3/4 olayları izleyin.</span>
-          <button id="btn-create-incident" class="btn-primary">+ Manuel Olay (Incident) Bildir</button>
-        </div>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Olay ID</th>
-                <th>Şirket</th>
-                <th>Seviye</th>
-                <th>Başlık</th>
-                <th>Detay</th>
-                <th>Durum</th>
-                <th>Tarih</th>
-                <th>Aksiyonlar</th>
-              </tr>
-            </thead>
-            <tbody id="incidents-table-body">
-              <tr><td colspan="8" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: SECURITY CENTER -->
-      <section id="tab-security" class="tab-panel">
-        <div class="table-actions glass-panel">
-          <span class="section-desc">Platform IP filtreleme ve güvenlik kuralları</span>
-          <button id="btn-ban-ip" class="btn-primary">+ Yeni IP Yasakla</button>
-        </div>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Yasaklı IP Adresi</th>
-                <th>Yasaklanma Nedeni</th>
-                <th>Yasaklayan Yetkili</th>
-                <th>Tarih</th>
-                <th>Aksiyon</th>
-              </tr>
-            </thead>
-            <tbody id="blacklist-table-body">
-              <tr><td colspan="5" class="text-center">Yasaklı IP adresi bulunmuyor.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: UPDATES -->
-      <section id="tab-updates" class="tab-panel">
-        <div class="table-actions glass-panel">
-          <span class="section-desc">POS Terminalleri OTA Güncelleme Dağıtım Sunucusu</span>
-          <button id="btn-create-update" class="btn-primary">+ Yeni Sürüm Yayınla</button>
-        </div>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Sürüm Kodu</th>
-                <th>Platform</th>
-                <th>İndirme Adresi</th>
-                <th>Checksum (SHA-256)</th>
-                <th>Zorunlu Mu?</th>
-                <th>Yayın Tarihi</th>
-                <th>Aksiyon</th>
-              </tr>
-            </thead>
-            <tbody id="updates-table-body">
-              <tr><td colspan="7" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: SENKRONİZASYON -->
-      <section id="tab-sync" class="tab-panel">
-        <div class="stats-grid">
-          <div class="stat-card glass-panel">
-            <span class="stat-label">Kuyrukta Bekleyen</span>
-            <h4 id="sync-pending">-</h4>
-          </div>
-          <div class="stat-card glass-panel">
-            <span class="stat-label">Hatalı / Askıda</span>
-            <h4 id="sync-failed" class="text-red">-</h4>
-          </div>
-          <div class="stat-card glass-panel">
-            <span class="stat-label">Başarıyla İşlenen</span>
-            <h4 id="sync-completed" class="text-green">-</h4>
-          </div>
-        </div>
-        <h4>🔄 Hata Alan Delta Sync Paketleri</h4>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Şirket</th>
-                <th>Cihaz</th>
-                <th>Tablo</th>
-                <th>Kayıt ID</th>
-                <th>Hata Mesajı</th>
-                <th>Kayıt Zamanı</th>
-              </tr>
-            </thead>
-            <tbody id="sync-table-body">
-              <tr><td colspan="6" class="text-center">Bekleyen hata kaydı bulunamadı.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: TICKETS -->
-      <section id="tab-tickets" class="tab-panel">
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Bilet ID</th>
-                <th>Şirket</th>
-                <th>Konu</th>
-                <th>Öncelik</th>
-                <th>Durum</th>
-                <th>Oluşturulma</th>
-                <th>Aksiyon</th>
-              </tr>
-            </thead>
-            <tbody id="tickets-table-body">
-              <tr><td colspan="7" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: CRASH LOGS -->
-      <section id="tab-crash-logs" class="tab-panel">
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Zaman</th>
-                <th>Şirket</th>
-                <th>Cihaz</th>
-                <th>Hata Mesajı</th>
-                <th>Sürüm</th>
-                <th>Aksiyon</th>
-              </tr>
-            </thead>
-            <tbody id="crash-table-body">
-              <tr><td colspan="6" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: AUDIT LOGS -->
-      <section id="tab-audit" class="tab-panel">
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Zaman</th>
-                <th>Kullanıcı</th>
-                <th>İşlem (Action)</th>
-                <th>Tablo / Nesne</th>
-                <th>Kayıt ID</th>
-                <th>IP Adresi</th>
-              </tr>
-            </thead>
-            <tbody id="audit-table-body">
-              <tr><td colspan="6" class="text-center">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: SMS & STATS -->
-      <section id="tab-sms" class="tab-panel">
-        <div class="stats-grid">
-          <div class="stat-card glass-panel">
-            <span class="stat-label">Toplam Başarılı SMS</span>
-            <h4 id="sms-sent">-</h4>
-          </div>
-          <div class="stat-card glass-panel">
-            <span class="stat-label">Hatalı Gönderim</span>
-            <h4 id="sms-failed" class="text-red">-</h4>
-          </div>
-          <div class="stat-card glass-panel">
-            <span class="stat-label">Bugünkü Kullanım</span>
-            <h4 id="sms-quota">-</h4>
-          </div>
-        </div>
-        <h4>💬 SMS İletim Günlüğü</h4>
-        <div class="table-container glass-panel">
-          <table>
-            <thead>
-              <tr>
-                <th>Zaman</th>
-                <th>Şirket</th>
-                <th>Alıcı Telefon</th>
-                <th>Mesaj İçeriği</th>
-                <th>Durum</th>
-              </tr>
-            </thead>
-            <tbody id="sms-table-body">
-              <tr><td colspan="5" class="text-center">SMS kaydı bulunamadı.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- TAB: SETTINGS -->
-      <section id="tab-settings" class="tab-panel">
-        <div class="table-actions glass-panel" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px;">
-          <h4 style="margin: 0; color: var(--primary-green);">Sistem & Ödeme Ayarları Yönetimi</h4>
-          <span style="font-size: 0.85rem; color: var(--text-secondary);">Müşterilere gösterilen IBAN ve banka hesap bilgilerini buradan canlı olarak düzenleyebilirsiniz.</span>
-        </div>
-
-        <div class="glass-panel" style="max-width: 650px; padding: 24px; border: 1px solid var(--border-color); max-height: 85vh; overflow-y: auto;">
-          <style>
-            .sub-tab-nav {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 8px;
-              margin-bottom: 24px;
-              border-bottom: 1px solid var(--border-color);
-              padding-bottom: 12px;
-            }
-            .btn-sub-tab {
-              background: rgba(255, 255, 255, 0.05);
-              color: var(--text-secondary);
-              border: 1px solid var(--border-color);
-              padding: 10px 16px;
-              border-radius: 6px;
-              cursor: pointer;
-              font-weight: 600;
-              font-size: 0.85rem;
-              transition: all 0.2s ease-in-out;
-              display: flex;
-              align-items: center;
-              gap: 6px;
-            }
-            .btn-sub-tab:hover {
-              color: var(--text-primary);
-              border-color: var(--primary-green);
-              background: rgba(255, 255, 255, 0.1);
-            }
-            .btn-sub-tab.active {
-              background: var(--primary-green);
-              color: #0F172A;
-              border-color: var(--primary-green);
-              box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
-            }
-            .subtab-panel {
-              display: none;
-              animation: settingsFadeIn 0.3s ease-in-out;
-            }
-            .subtab-panel.active {
-              display: block;
-            }
-            @keyframes settingsFadeIn {
-              from { opacity: 0; transform: translateY(4px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-          </style>
-
-          <form id="form-settings">
-            <!-- Sub-tab Navigation Header -->
-            <div class="sub-tab-nav">
-              <button type="button" class="btn-sub-tab active" data-subtab="iban">🏦 Banka Havalesi</button>
-              <button type="button" class="btn-sub-tab" data-subtab="iyzico">💳 iyzico API</button>
-              <button type="button" class="btn-sub-tab" data-subtab="paytr">💳 PayTR API</button>
-              <button type="button" class="btn-sub-tab" data-subtab="provider">⚙️ Aktif Sağlayıcı</button>
-            </div>
-
-            <!-- SUB-TAB: IBAN -->
-            <div id="subtab-panel-iban" class="subtab-panel active">
-              <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
-                <span>🏦 Banka Havalesi / EFT (IBAN) Bilgileri</span>
-              </h4>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">Banka Adı</label>
-                <input type="text" id="setting-iban-bank" class="form-input" style="width: 100%;" required>
-              </div>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">Şube Adı</label>
-                <input type="text" id="setting-iban-branch" class="form-input" style="width: 100%;" required>
-              </div>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">Alıcı Hesap Sahibi (Ünvan)</label>
-                <input type="text" id="setting-iban-owner" class="form-input" style="width: 100%;" required>
-              </div>
-              
-              <div class="form-group" style="margin-bottom: 24px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">IBAN Numarası</label>
-                <input type="text" id="setting-iban-number" class="form-input" style="width: 100%; font-family: monospace; font-weight: bold; color: var(--primary-green);" required>
+          <div class="grid grid-cols-3 gap-6 mt-4">
+            <!-- Systems Operations Center -->
+            <div class="card col-span-2">
+              <h3 class="font-bold mb-4">Operations Center</h3>
+              <div class="grid grid-cols-3 gap-4 text-sm" style="color:var(--neutral-300);">
+                <div><strong>Yeni Kayıtlar (30g):</strong> <span id="ops-new-signups">0</span></div>
+                <div><strong>Aktif Denemeler:</strong> <span id="ops-active-trials">0</span></div>
+                <div><strong>Süresi Bitenler (7g):</strong> <span id="ops-expiring-trials">0</span></div>
+                <div><strong>Günlük Ödemeler:</strong> <span id="ops-payments-today">0</span></div>
+                <div><strong>Hatalı Ödemeler:</strong> <span id="ops-failed-payments">0</span></div>
+                <div><strong>Açık Biletler:</strong> <span id="ops-open-tickets">0</span></div>
+                <div class="col-span-3"><strong>Son OTA Paketi:</strong> <span id="ops-latest-ota" class="badge badge-trial">Yükleniyor...</span></div>
               </div>
             </div>
 
-            <!-- SUB-TAB: IYZICO -->
-            <div id="subtab-panel-iyzico" class="subtab-panel">
-              <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--primary-green);">💳 iyzico Ödeme Entegrasyon Bilgileri</h4>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">iyzico API Key (API Anahtarı)</label>
-                <input type="text" id="setting-iyzico-key" class="form-input" style="width: 100%;">
+            <!-- Telemetry System Health -->
+            <div class="card">
+              <h3 class="font-bold mb-4">Sunucu Kaynak Telemetrisi</h3>
+              <div class="health-bar-container">
+                <div class="health-bar-label"><span>CPU Yükü</span><span id="cpu-text">0%</span></div>
+                <div class="health-bar-track"><div class="health-bar-fill normal" id="cpu-bar" style="width:0%;"></div></div>
               </div>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">iyzico Secret Key (Gizli Anahtar)</label>
-                <input type="password" id="setting-iyzico-secret" class="form-input" style="width: 100%;">
+              <div class="health-bar-container mt-3">
+                <div class="health-bar-label"><span>RAM Kullanımı</span><span id="ram-text">0%</span></div>
+                <div class="health-bar-track"><div class="health-bar-fill normal" id="ram-bar" style="width:0%;"></div></div>
               </div>
-              
-              <div class="form-group" style="margin-bottom: 24px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">iyzico API Base URL</label>
-                <input type="text" id="setting-iyzico-url" class="form-input" style="width: 100%;" placeholder="https://sandbox-api.iyzipay.com">
+              <div class="health-bar-container mt-3">
+                <div class="health-bar-label"><span>Disk Kullanımı</span><span id="disk-text">0%</span></div>
+                <div class="health-bar-track"><div class="health-bar-fill normal" id="disk-bar" style="width:0%;"></div></div>
               </div>
-            </div>
-
-            <!-- SUB-TAB: PAYTR -->
-            <div id="subtab-panel-paytr" class="subtab-panel">
-              <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--primary-green);">💳 PayTR Ödeme Entegrasyon Bilgileri</h4>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">PayTR Merchant ID (Mağaza No)</label>
-                <input type="text" id="setting-paytr-id" class="form-input" style="width: 100%;">
-              </div>
-              
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">PayTR Merchant Key (Mağaza Parolası)</label>
-                <input type="password" id="setting-paytr-key" class="form-input" style="width: 100%;">
-              </div>
-              
-              <div class="form-group" style="margin-bottom: 24px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">PayTR Merchant Salt (Mağaza Gizli Anahtarı)</label>
-                <input type="password" id="setting-paytr-salt" class="form-input" style="width: 100%;">
+              <div class="flex gap-2 mt-4 justify-between">
+                <span class="badge badge-active" id="db-health-badge">PostgreSQL</span>
+                <span class="badge badge-active" id="redis-health-badge">Redis</span>
               </div>
             </div>
+          </div>
 
-            <!-- SUB-TAB: PROVIDER SELECT -->
-            <div id="subtab-panel-provider" class="subtab-panel">
-              <h4 style="margin-top: 0; margin-bottom: 16px; color: var(--primary-green);">⚙️ Aktif Ödeme Sağlayıcı Tercihi</h4>
-              
-              <div class="form-group" style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 6px; font-weight: bold; font-size: 0.9rem;">Portal Üzerinde Aktif Kredi Kartı Sağlayıcısı</label>
-                <select id="setting-active-provider" class="form-input" style="width: 100%; padding: 10px; background: #1E293B; color: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px;">
-                  <option value="bank_wire">Yalnızca Banka Havalesi (EFT/IBAN)</option>
-                  <option value="iyzico">iyzico Entegrasyonu (Kredi Kartı)</option>
-                  <option value="paytr">PayTR Entegrasyonu (Kredi Kartı)</option>
-                  <option value="mock">Simülatör / Test Modu (Hızlı Kart Onayı)</option>
-                </select>
-                <span style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-top: 8px; line-height: 1.4;">
-                  💡 Bu ayar, müşterilerin lisans satın alırken veya yenilerken karşılaştığı ödeme portalındaki Kredi Kartı ödeme altyapısını belirler. Simülatör modu yalnızca test amaçlıdır.
-                </span>
+          <div class="grid grid-cols-2 gap-6 mt-4">
+            <!-- Sales trends charts -->
+            <div class="card chart-card">
+              <h3 class="font-bold mb-2">Platform Ciro Dağılım Trendi (Son 30 Gün)</h3>
+              <div style="flex:1; position:relative;"><canvas id="salesChart"></canvas></div>
+            </div>
+            <!-- License types breakdown -->
+            <div class="card chart-card">
+              <h3 class="font-bold mb-2">Lisans Paketleri Dağılım Oranları</h3>
+              <div style="flex:1; position:relative;"><canvas id="licenseDistChart"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Companies -->
+        <section class="tab-panel" id="tab-companies">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold">Kayıtlı Müşteri Şirketleri</h3>
+            <button class="btn btn-primary btn-sm" id="btn-create-company">+ Yeni Firma Ekle</button>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Şirket ID</th>
+                    <th>Firma Adı (Ünvan)</th>
+                    <th>Vergi No / Daire</th>
+                    <th>Telefon / E-posta</th>
+                    <th>Şube Sayısı</th>
+                    <th>Kasa Sayısı</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="company-table-body">
+                  <!-- Dynamic Companies -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Users -->
+        <section class="tab-panel" id="tab-users">
+          <div class="grid grid-cols-responsive gap-6">
+            <!-- Admin details profile card -->
+            <div class="card border-teal">
+              <h3 class="font-bold mb-4">Yönetici Profil Detayları</h3>
+              <div id="admin-profile-details">
+                <!-- Loaded dynamically -->
               </div>
             </div>
             
-            <button type="submit" id="btn-save-settings" class="btn-primary" style="width: 100%; padding: 12px; font-weight: bold; margin-top: 16px;">AYARLARI KAYDET</button>
-          </form>
-        </div>
-      </section>
+            <!-- Admin sessions tracker checklist -->
+            <div class="card border-purple">
+              <h3 class="font-bold mb-4">Aktif Sistem Oturumları (Giriş Logları)</h3>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>IP Adresi</th>
+                      <th>Tarayıcı Bilgisi</th>
+                      <th>Giriş Tarihi</th>
+                      <th>Durum</th>
+                      <th>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-sessions-tbody">
+                    <!-- Dynamic sessions -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
 
+        <!-- Tab: Subscriptions -->
+        <section class="tab-panel" id="tab-subscriptions">
+          <div class="grid grid-cols-4 gap-4">
+            <div class="card text-center" style="border-color:var(--secondary-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Platform MRR (Aylık)</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="mrr-val">0 ₺</p>
+            </div>
+            <div class="card text-center" style="border-color:var(--secondary-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Platform ARR (Yıllık)</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="arr-val">0 ₺</p>
+            </div>
+            <div class="card text-center" style="border-color:var(--warning-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Churn Kayıp Oranı</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="churn-val">% 0.0</p>
+            </div>
+            <div class="card text-center" style="border-color:var(--danger-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Risk Altındaki Müşteriler</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="risk-val">0</p>
+            </div>
+          </div>
+
+          <div class="card mt-4 border-red">
+            <h3 class="font-bold mb-4">Risk Altındaki & Ödemesi Geciken Müşteriler (Churn Önleme)</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Şirket ID</th>
+                    <th>Şirket Adı</th>
+                    <th>E-posta</th>
+                    <th>Lisans Durumu</th>
+                    <th>Lisans Bitiş</th>
+                    <th>Ödenmemiş Fatura</th>
+                    <th>Toplam Borç</th>
+                  </tr>
+                </thead>
+                <tbody id="risk-table-body">
+                  <!-- Dynamic risk details -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Transfers -->
+        <section class="tab-panel" id="tab-transfers">
+          <div class="card">
+            <h3 class="font-bold mb-4">Onay Bekleyen Banka Havale/EFT Ödeme Bildirimleri</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Referans Kodu</th>
+                    <th>Firma Ünvanı</th>
+                    <th>Havale Sahibi</th>
+                    <th>Gönderen Banka</th>
+                    <th>İlişkili Fatura</th>
+                    <th>Ödeme Tutarı</th>
+                    <th>Bildirim Tarihi</th>
+                    <th class="text-right">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="transfers-table-body">
+                  <!-- Dynamic pending list -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Payments -->
+        <section class="tab-panel" id="tab-payments">
+          <div class="card">
+            <h3 class="font-bold mb-4">Genel Fatura Tahsilat Borç Defteri (Cari Kayıtlar)</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Firma ID</th>
+                    <th>Firma Adı</th>
+                    <th>İletişim E-posta</th>
+                    <th>Ödenmemiş Fatura Sayısı</th>
+                    <th>Toplam Borç Tutarı</th>
+                    <th>Cari Durum</th>
+                  </tr>
+                </thead>
+                <tbody id="payments-table-body">
+                  <!-- Loaded via payments.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Plans -->
+        <section class="tab-panel" id="tab-plans">
+          <div class="card">
+            <h3 class="font-bold mb-4">Abonelik Lisans Plan Ayarları</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Plan ID</th>
+                    <th>Plan İsmi</th>
+                    <th>Aylık Fiyat</th>
+                    <th>Para Birimi</th>
+                    <th>Cihaz Limiti</th>
+                    <th class="text-right">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="plans-table-body">
+                  <!-- Loaded via plans.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Licenses -->
+        <section class="tab-panel" id="tab-licenses">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold">Aktif SaaS Lisans Anahtarları</h3>
+            <div class="flex gap-2">
+              <button class="btn btn-primary btn-sm" id="btn-create-bulk-license">Toplu Lisans Üret</button>
+              <button class="btn btn-primary btn-sm" id="btn-create-license">+ Tekil Lisans Üret</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Lisans Anahtarı</th>
+                    <th>Şirket Ünvanı</th>
+                    <th>Lisans Paketi</th>
+                    <th>Terminal Limiti</th>
+                    <th>Bitiş Tarihi</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="license-table-body">
+                  <!-- Dynamic Licenses -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Devices -->
+        <section class="tab-panel" id="tab-devices">
+          <div class="card">
+            <h3 class="font-bold mb-4">Aktif POS Terminal Cihaz Yönetimi</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cihaz ID</th>
+                    <th>Firma Ünvanı</th>
+                    <th>Şube İsmi</th>
+                    <th>Donanım İmzası (UUID)</th>
+                    <th>Cihaz Durumu</th>
+                    <th>Son Görülme</th>
+                    <th>Ağ Durumu</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="device-table-body">
+                  <!-- Dynamic Devices -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Releases -->
+        <section class="tab-panel" id="tab-releases">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold">OTA Terminal Sürüm Yayınları</h3>
+            <button class="btn btn-primary btn-sm" id="btn-create-update">+ Yeni Sürüm Yayınla</button>
+          </div>
+          <div class="card">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sürüm Kodu</th>
+                    <th>Platform</th>
+                    <th>İndirme Adresi</th>
+                    <th>SHA256 Hash</th>
+                    <th>Kritik Durum</th>
+                    <th>Yayın Tarihi</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="updates-table-body">
+                  <!-- Dynamic updates -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Support -->
+        <section class="tab-panel" id="tab-support">
+          <div class="card">
+            <h3 class="font-bold mb-4">Müşteri Destek Biletleri Yönetimi</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Bilet ID</th>
+                    <th>Şirket</th>
+                    <th>Başlık / Konu</th>
+                    <th>Öncelik</th>
+                    <th>Durum</th>
+                    <th>Güncelleme Tarihi</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="tickets-table-body">
+                  <!-- Dynamic tickets -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Audit -->
+        <section class="tab-panel" id="tab-audit">
+          <div class="card">
+            <h3 class="font-bold mb-4">Sistem Yöneticisi İşlem Günlükleri (Audit Logs)</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>İşlem Tarihi</th>
+                    <th>Yönetici Kullanıcı</th>
+                    <th>Eylem (Action)</th>
+                    <th>Tablo / Model</th>
+                    <th>Kayıt ID</th>
+                    <th>IP Adresi</th>
+                  </tr>
+                </thead>
+                <tbody id="audit-table-body">
+                  <!-- Loaded via audit.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Health -->
+        <section class="tab-panel" id="tab-health">
+          <div class="grid grid-cols-3 gap-4">
+            <div class="card border-teal text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">Bekleyen Sync İşleri</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="sync-pending">0</p>
+            </div>
+            <div class="card border-red text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">Hatalı Sync Kuyruğu</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="sync-failed">0</p>
+            </div>
+            <div class="card border-purple text-center">
+              <h4 class="text-muted text-xs font-semibold uppercase">Başarılı Sync (24s)</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="sync-completed">0</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6 mt-4">
+            <!-- Sync Queue Telemetry -->
+            <div class="card col-span-2">
+              <h3 class="font-bold mb-4">Delta Sync Eşitleme Hata Raporları</h3>
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Firma Adı</th>
+                      <th>Cihaz İsmi</th>
+                      <th>Tablo</th>
+                      <th>Kayıt ID</th>
+                      <th>Hata Detayı</th>
+                      <th>Hata Tarihi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sync-table-body">
+                    <!-- Loaded via system-health.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 mt-6">
+            <div class="card text-center" style="border-color:var(--secondary-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Toplam SMS Gönderilen</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="sms-sent">0</p>
+            </div>
+            <div class="card text-center" style="border-color:var(--danger-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Hatalı SMS Gönderim</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="sms-failed">0</p>
+            </div>
+            <div class="card text-center" style="border-color:var(--secondary-500);">
+              <h4 class="text-muted text-xs font-semibold uppercase">Günlük Kota Aşımı</h4>
+              <p class="font-bold text-light mt-2" style="font-size:2rem;" id="sms-quota">0 / 1000</p>
+            </div>
+          </div>
+
+          <div class="card mt-4 col-span-3">
+            <h3 class="font-bold mb-4">Sistem SMS Gönderim Log Defteri</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tarih</th>
+                    <th>Şirket Adı</th>
+                    <th>Telefon Numarası</th>
+                    <th>İleti Mesaj İçeriği</th>
+                    <th>Durum</th>
+                  </tr>
+                </thead>
+                <tbody id="sms-table-body">
+                  <!-- Loaded via system-health.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center mt-6 mb-2 col-span-3">
+            <h3 class="font-bold">Incident Center (Sistem Arıza Vakaları)</h3>
+            <button class="btn btn-primary btn-sm" id="btn-create-incident">+ Yeni Incident Kaydı</button>
+          </div>
+          <div class="card col-span-3">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Incident ID</th>
+                    <th>Firma Etkisi</th>
+                    <th>Derece</th>
+                    <th>Başlık</th>
+                    <th>Açıklama</th>
+                    <th>Durum</th>
+                    <th>Oluşturma Tarihi</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="incidents-table-body">
+                  <!-- Populated via system-health.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center mt-6 mb-2 col-span-3">
+            <h3 class="font-bold">Güvenlik & IP Kara Listesi (Blacklist)</h3>
+            <button class="btn btn-primary btn-sm" id="btn-create-ipban">+ IP Engelle (BAN)</button>
+          </div>
+          <div class="card col-span-3">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Yasaklanan IP</th>
+                    <th>Yasaklama Gerekçesi</th>
+                    <th>Yasaklayan Yönetici</th>
+                    <th>Yasaklama Tarihi</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="blacklist-table-body">
+                  <!-- Loaded via system-health.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card mt-6 col-span-3 border-red">
+            <h3 class="font-bold mb-4">Cihaz Terminal Crash Log Hata Havuzu (Yığın İzleri)</h3>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hata Tarihi</th>
+                    <th>Şirket Adı</th>
+                    <th>Terminal Adı</th>
+                    <th>Hata Mesajı</th>
+                    <th>Uygulama Versiyonu</th>
+                    <th>Detay</th>
+                  </tr>
+                </thead>
+                <tbody id="crash-table-body">
+                  <!-- Populated via system-health.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </div>
     </main>
   </div>
 
-  <!-- ── 3. MODAL POPUPS ──────────────────────────────────────────────────────── -->
-  
-  <!-- Modal: Create Company -->
-  <div id="modal-company" class="modal-overlay">
-    <div class="modal-card glass-panel">
-      <h3>Yeni Şirket (Tenant) Kaydı</h3>
+  <!-- 3. DIALOGS AND OVERLAY MODALS -->
+  <!-- Create Company modal -->
+  <div class="modal-overlay" id="modal-company">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Yeni Müşteri Şirket Hesabı Kaydet</h3>
+        <button class="modal-close" id="btn-comp-cancel">&times;</button>
+      </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Şirket Ünvanı</label>
-          <input type="text" id="comp-name" placeholder="Serenut Gıda Ltd. Şti." required>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Vergi Numarası</label>
-            <input type="text" id="comp-tax" placeholder="1234567890" required>
-          </div>
-          <div class="form-group">
-            <label>Vergi Dairesi</label>
-            <input type="text" id="comp-tax-office" placeholder="Kadıköy">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Telefon</label>
-            <input type="text" id="comp-phone" placeholder="0555...">
-          </div>
-          <div class="form-group">
-            <label>E-Posta</label>
-            <input type="email" id="comp-email" placeholder="iletisim@sirket.com">
-          </div>
+          <label class="form-label">Şirket Ünvanı <span class="required">*</span></label>
+          <input type="text" id="comp-name" placeholder="Örn: Serenut Gıda Ltd. Şti." />
         </div>
         <div class="form-group">
-          <label>Adres</label>
-          <textarea id="comp-address" rows="2" placeholder="Şirket merkez adresi..."></textarea>
+          <label class="form-label">Vergi Numarası <span class="required">*</span></label>
+          <input type="text" id="comp-tax" placeholder="10 haneli vergi no" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vergi Dairesi</label>
+          <input type="text" id="comp-tax-office" placeholder="Örn: Maslak V.D." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">İletişim Telefonu</label>
+          <input type="tel" id="comp-phone" placeholder="0555 000 00 00" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">İletişim E-postası</label>
+          <input type="email" id="comp-email" placeholder="admin@firma.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Firma Adresi</label>
+          <textarea id="comp-address" rows="3" placeholder="Açık adres..."></textarea>
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-comp-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-comp-submit" class="btn-primary">Kaydet ve Trial Başlat</button>
+        <button class="btn btn-secondary btn-sm" id="btn-comp-cancel-close">İptal</button>
+        <button class="btn btn-primary btn-sm" id="btn-comp-submit">Şirketi Oluştur</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Create License -->
-  <div id="modal-license" class="modal-overlay">
-    <div class="modal-card glass-panel">
-      <h3>Yeni Lisans Anahtarı Üret</h3>
+  <!-- Create License modal -->
+  <div class="modal-overlay" id="modal-license">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Yeni Tekil Lisans Üret</h3>
+        <button class="modal-close" id="btn-lic-cancel">&times;</button>
+      </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Şirket Seçin</label>
-          <select id="lic-comp-select"></select>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Paket Seviyesi</label>
-            <select id="lic-tier">
-              <option value="trial">Trial (Deneme)</option>
-              <option value="pro" selected>Pro (Standart)</option>
-              <option value="pro_plus">Pro Plus (Kurumsal)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Cihaz Kontenjanı (Slots)</label>
-            <input type="number" id="lic-device-limit" value="1" min="1">
-          </div>
+          <label class="form-label">Lisansın Tanımlanacağı Şirket <span class="required">*</span></label>
+          <input type="text" id="lic-comp-select" placeholder="Şirket ID kopyalayıp buraya yazınız" />
         </div>
         <div class="form-group">
-          <label>Geçerlilik Süresi (Gün)</label>
-          <input type="number" id="lic-days" value="365" min="1">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-lic-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-lic-submit" class="btn-primary">Lisans Üret</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Publish Update -->
-  <div id="modal-update" class="modal-overlay">
-    <div class="modal-card glass-panel">
-      <h3>Yeni Sürüm (OTA) Dağıtımı</h3>
-      <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Sürüm Kodu (Version Code)</label>
-            <input type="text" id="up-code" placeholder="1.0.0+5" required>
-          </div>
-          <div class="form-group">
-            <label>Platform</label>
-            <select id="up-platform">
-              <option value="android" selected>Android (APK)</option>
-              <option value="windows">Windows (EXE)</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>İndirme Bağlantısı (URL)</label>
-          <input type="url" id="up-url" placeholder="https://..." required>
-        </div>
-        <div class="form-group">
-          <label>Dosya SHA-256 Hash</label>
-          <input type="text" id="up-hash" placeholder="Dosya bütünlük kontrolü için hash..." required>
-        </div>
-        <div class="form-group check-group">
-          <input type="checkbox" id="up-mandatory">
-          <label for="up-mandatory">Bu güncellemeyi zorunlu kıl (Uygulama açılışında bloklar)</label>
-        </div>
-        <div class="form-group">
-          <label>Sürüm Notları (Release Notes)</label>
-          <textarea id="up-notes" rows="3" placeholder="- Hata düzeltmeleri..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-up-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-up-submit" class="btn-primary">Güncellemeyi Yayınla</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Support Ticket Chat Thread -->
-  <div id="modal-ticket" class="modal-overlay">
-    <div class="modal-card glass-panel chat-modal" style="max-width: 800px; display: flex; flex-direction: row; gap: 20px; width: 90%;">
-      <!-- Left side: Client chat thread -->
-      <div style="flex: 1; display: flex; flex-direction: column;">
-        <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h3 id="ticket-title" style="margin: 0; color: var(--text-primary);">Destek Talebi</h3>
-          <span class="status-badge" id="ticket-status-badge">Açık</span>
-        </div>
-        <div class="chat-messages" id="ticket-chat-messages" style="height: 320px; overflow-y: auto; margin-bottom: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-          <!-- Message bubble flow here -->
-        </div>
-        <div class="chat-input-area" style="display: flex; gap: 8px; margin-bottom: 12px;">
-          <input type="text" id="ticket-reply-text" placeholder="Müşteriye cevap yazın..." style="flex: 1; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-          <button id="btn-ticket-send" class="btn-primary">Müşteriye Gönder</button>
-        </div>
-        <div>
-          <button id="btn-ticket-close" class="btn-secondary" style="width: 100%;">Kapat</button>
-        </div>
-      </div>
-      
-      <!-- Right side: Internal Notes -->
-      <div style="width: 300px; border-left: 1px solid var(--border-color); padding-left: 20px; display: flex; flex-direction: column;">
-        <h4 style="margin-top: 0; color: var(--neon-cyan);">İç Notlar (Sadece Yetkili Görür)</h4>
-        <div id="ticket-internal-notes-list" style="flex: 1; overflow-y: auto; font-size: 0.8rem; margin: 10px 0; max-height: 320px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-secondary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
-          <!-- Notes flow here -->
-        </div>
-        <div style="display: flex; gap: 8px; margin-top: 10px;">
-          <input type="text" id="ticket-internal-note-input" placeholder="Dahili not yazın..." style="flex: 1; font-size: 0.8rem; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-          <button id="btn-ticket-add-note" class="btn-primary" style="font-size: 0.8rem; padding: 10px 16px;">Not Ekle</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Text Viewer (for Crash Trace details) -->
-  <div id="modal-viewer" class="modal-overlay">
-    <div class="modal-card glass-panel wide-modal">
-      <h3 id="viewer-title">Hata İnceleme Detayı</h3>
-      <pre id="viewer-content" class="code-box"></pre>
-      <div class="modal-footer">
-        <button id="btn-viewer-close" class="btn-secondary">Kapat</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Create Incident -->
-  <div id="modal-incident" class="modal-overlay">
-    <div class="modal-card glass-panel">
-      <h3>Yeni Sistem Olayı (Incident) Bildir</h3>
-      <div class="modal-body" style="margin: 20px 0;">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label>Şirket Seçin (Opsiyonel)</label>
-          <select id="inc-comp-select" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-            <option value="">Genel (Tüm Platform)</option>
+          <label class="form-label">Lisans Paket Tipi <span class="required">*</span></label>
+          <select id="lic-tier">
+            <option value="trial">Deneme (Trial)</option>
+            <option value="basic" selected>Basic Plan</option>
+            <option value="pro">Pro Plan</option>
+            <option value="enterprise">Enterprise Plan</option>
           </select>
         </div>
-        <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 16px;">
-          <div class="form-group" style="flex: 1;">
-            <label>Olay Seviyesi (Severity)</label>
-            <select id="inc-severity" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-              <option value="SEV-1">SEV-1 (Kritik - Platform Kapalı)</option>
-              <option value="SEV-2">SEV-2 (Yüksek - Servis Aksıyor)</option>
-              <option value="SEV-3" selected>SEV-3 (Orta - Kısmi Hata)</option>
-              <option value="SEV-4">SEV-4 (Düşük - Bilgi)</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <label>Olay Başlığı</label>
-            <input type="text" id="inc-title" placeholder="Örn: Database replication lag" required style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-          </div>
+        <div class="form-group">
+          <label class="form-label">İzin Verilen POS Cihaz Limiti</label>
+          <input type="number" id="lic-device-limit" value="2" />
         </div>
         <div class="form-group">
-          <label>Açıklama & Detaylar</label>
-          <textarea id="inc-desc" rows="3" placeholder="Hatanın sebebi ve etkilenen alanlar..." required style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary); resize: vertical;"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="btn-inc-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-inc-submit" class="btn-primary">Incident Kaydet</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Ban IP -->
-  <div id="modal-ban-ip" class="modal-overlay">
-    <div class="modal-card glass-panel" style="max-width: 400px;">
-      <h3>Yeni IP Yasaklama</h3>
-      <div class="modal-body" style="margin: 20px 0;">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label>IP Adresi</label>
-          <input type="text" id="ban-ip-val" placeholder="192.168.1.100" required style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-        </div>
-        <div class="form-group">
-          <label>Yasaklama Gerekçesi</label>
-          <textarea id="ban-reason" rows="2" placeholder="Brute-force attack detected..." required style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary); resize: vertical;"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="btn-ban-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-ban-submit" class="btn-primary">IP Engelle</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Device Swap -->
-  <div id="modal-device-swap" class="modal-overlay">
-    <div class="modal-card glass-panel" style="max-width: 440px;">
-      <h3>Cihaz Donanım Değiştirme (Device Swap)</h3>
-      <div class="modal-body" style="margin: 20px 0;">
-        <input type="hidden" id="swap-company-id">
-        <input type="hidden" id="swap-old-device-id">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label>Eski Cihaz</label>
-          <input type="text" id="swap-old-device-name" readonly style="background: var(--bg-secondary); border-color: var(--border-color); width: 100%; padding: 10px; border-radius: 6px; color: var(--text-secondary);">
-        </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label>Yeni Cihaz Adı</label>
-          <input type="text" id="swap-new-device-name" placeholder="Vectron POS 2026" required style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-        </div>
-        <div class="form-group">
-          <label>Yeni Donanım Hash'i (UUID)</label>
-          <input type="text" id="swap-new-device-hash" placeholder="UUID veya donanım kodu girin..." required style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-        </div>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="btn-swap-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-swap-submit" class="btn-primary">Değişimi Kaydet</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Bulk License -->
-  <div id="modal-bulk-license" class="modal-overlay">
-    <div class="modal-card glass-panel">
-      <h3>Toplu Lisans Üretimi</h3>
-      <div class="modal-body" style="margin: 20px 0;">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label>Şirket Seçin</label>
-          <select id="bulk-lic-comp-select" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);"></select>
-        </div>
-        <div class="form-row" style="display: flex; gap: 16px; margin-bottom: 16px;">
-          <div class="form-group" style="flex: 1;">
-            <label>Paket Tipi</label>
-            <select id="bulk-lic-tier" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-              <option value="trial">Trial</option>
-              <option value="pro" selected>Pro</option>
-              <option value="enterprise">Enterprise</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <label>Cihaz Limiti (Her biri)</label>
-            <input type="number" id="bulk-lic-device-limit" value="1" min="1" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-          </div>
-        </div>
-        <div class="form-row" style="display: flex; gap: 16px;">
-          <div class="form-group" style="flex: 1;">
-            <label>Üretilecek Adet</label>
-            <input type="number" id="bulk-lic-count" value="10" min="1" max="100" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <label>Geçerlilik Süresi (Gün)</label>
-            <input type="number" id="bulk-lic-days" value="365" min="1" style="width: 100%; padding: 10px; border-radius: 6px; background: #ffffff; border: 1px solid var(--border-color); color: var(--text-primary);">
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="btn-bulk-lic-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-bulk-lic-submit" class="btn-primary">Lisansları Üret</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Offline Activation Viewer -->
-  <div id="modal-offline-activation" class="modal-overlay">
-    <div class="modal-card glass-panel" style="max-width: 480px;">
-      <h3>Offline Aktivasyon QR Kodu</h3>
-      <div class="modal-body" style="text-align: center; margin: 20px 0;">
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5;">
-          Aşağıdaki offline anahtarı kopyalayarak veya QR kodunu cihazın kamerasından taratarak internet erişimi olmadan POS aktivasyonu yapabilirsiniz.
-        </p>
-        <div style="background: white; padding: 16px; display: inline-block; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-color);">
-          <div id="qr-placeholder-graphics" style="width: 200px; height: 200px; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: bold; border-radius: 4px;">
-            [QR AKTİVASYON KODU]
-          </div>
-        </div>
-        <div class="form-group" style="text-align: left;">
-          <label style="display: block; margin-bottom: 8px; color: var(--text-primary); font-size: 0.85rem;">Offline Aktivasyon Şifreli Token (İmzalı)</label>
-          <textarea id="offline-token-text" readonly rows="4" style="width: 100%; font-family: monospace; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; resize: none;"></textarea>
+          <label class="form-label">Lisans Süresi (Gün Cinsinden)</label>
+          <input type="number" id="lic-days" value="365" />
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-offline-close" class="btn-secondary" style="width: 100%;">Kapat</button>
+        <button class="btn btn-secondary btn-sm" id="btn-lic-cancel-close">İptal</button>
+        <button class="btn btn-primary btn-sm" id="btn-lic-submit">Lisans Üret</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: EDIT PLAN -->
-  <div id="modal-plan" class="modal-overlay">
-    <div class="modal-card glass-panel" style="max-width: 440px;">
+  <!-- Bulk Licenses Modal -->
+  <div class="modal-overlay" id="modal-bulk-license">
+    <div class="modal-card">
       <div class="modal-header">
-        <h4 style="margin: 0; color: var(--primary-green);">Plan Özelliklerini Güncelle</h4>
+        <h3>Çoklu Toplu Lisans Üret</h3>
+        <button class="modal-close" id="btn-bulk-lic-cancel">&times;</button>
       </div>
-      <div class="modal-body" style="margin: 20px 0; text-align: left;">
-        <input type="hidden" id="edit-plan-id">
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Plan Adı</label>
-          <input type="text" id="edit-plan-name" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" required>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Şirket ID <span class="required">*</span></label>
+          <input type="text" id="bulk-lic-comp-select" placeholder="Şirket ID yazınız" />
         </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Aylık Fiyat (TL)</label>
-          <input type="number" id="edit-plan-price" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" required min="0">
+        <div class="form-group">
+          <label class="form-label">Abonelik Seviyesi</label>
+          <select id="bulk-lic-tier">
+            <option value="basic" selected>Basic</option>
+            <option value="pro">Pro</option>
+          </select>
         </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Para Birimi</label>
-          <input type="text" id="edit-plan-currency" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" value="TRY" readonly>
+        <div class="form-group">
+          <label class="form-label">Cihaz Sayısı</label>
+          <input type="number" id="bulk-lic-device-limit" value="2" />
         </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Faturalandırma Sıklığı</label>
-          <input type="text" id="edit-plan-interval" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" value="monthly" readonly>
+        <div class="form-group">
+          <label class="form-label">Süre (Gün)</label>
+          <input type="number" id="bulk-lic-days" value="365" />
         </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Cihaz (POS) Limiti</label>
-          <input type="number" id="edit-plan-devices" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" required min="1">
-        </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Mağaza Limiti</label>
-          <input type="number" id="edit-plan-stores" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" required min="1">
-        </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Senkronizasyon Türü</label>
-          <input type="text" id="edit-plan-sync" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" required>
-        </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Analitik Seviyesi</label>
-          <input type="text" id="edit-plan-analytics" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;" required>
-        </div>
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Paket Özellikleri (Her satıra bir tane, örn: Sınırsız Satış Kaydı)</label>
-          <textarea id="edit-plan-features-list" class="glass-input" style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; min-height: 100px; resize: vertical;" placeholder="Sınırsız Satış Kaydı&#10;Barkod Okuma Desteği&#10;Termal Yazıcı Bağlantısı"></textarea>
+        <div class="form-group">
+          <label class="form-label">Üretilecek Lisans Adeti <span class="required">*</span></label>
+          <input type="number" id="bulk-lic-count" value="5" />
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="btn-plan-cancel" class="btn-secondary">İptal</button>
-        <button id="btn-plan-save" class="btn-primary">Kaydet</button>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-bulk-lic-cancel-close">İptal</button>
+        <button class="btn btn-primary btn-sm" id="btn-bulk-lic-submit">Lisansları Üret</button>
       </div>
     </div>
   </div>
 
-  <script src="index.js?v=1.0.8"></script>
+  <!-- Create Sürüm OTA update package modal -->
+  <div class="modal-overlay" id="modal-update">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Yeni OTA Terminal Sürüm Paketi Yayınla</h3>
+        <button class="modal-close" id="btn-up-cancel">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Sürüm Kodu (Örn: v1.0.0+5) <span class="required">*</span></label>
+          <input type="text" id="up-code" placeholder="Örn: v1.0.1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Platform Türü <span class="required">*</span></label>
+          <select id="up-platform">
+            <option value="android" selected>Android (APK)</option>
+            <option value="windows">Windows Desktop (EXE)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dosya İndirme URL Adresi <span class="required">*</span></label>
+          <input type="url" id="up-url" placeholder="https://cdn.serenut.com/releases/..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dosya SHA256 Hash Kodu <span class="required">*</span></label>
+          <input type="text" id="up-hash" placeholder="Kontrol bütünlüğü için hash girin" />
+        </div>
+        <div class="form-group" style="display:flex; flex-direction:row; align-items:center; gap: 8px;">
+          <input type="checkbox" id="up-mandatory" />
+          <label class="form-label" style="margin:0;">Zorunlu Güncelleme Olarak İşaretle</label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sürüm Değişiklik Notları (Release Notes)</label>
+          <textarea id="up-notes" rows="3" placeholder="Bu sürümde ne yeni?"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-up-cancel-close">Vazgeç</button>
+        <button class="btn btn-primary btn-sm" id="btn-up-submit">Sürümü Yayınla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Incident modal -->
+  <div class="modal-overlay" id="modal-incident">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Sistem Arızası / Incident Oluştur</h3>
+        <button class="modal-close" id="btn-inc-cancel">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Etkilenen Şirket ID (Tüm platform ise boş bırakın)</label>
+          <input type="text" id="inc-comp-select" placeholder="Şirket ID" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Incident Kritik Seviyesi</label>
+          <select id="inc-severity">
+            <option value="low">Düşük (Low)</option>
+            <option value="medium" selected>Orta (Medium)</option>
+            <option value="high">Yüksek (High)</option>
+            <option value="critical">Kritik / Servis Kesintisi (Critical)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Arıza Başlığı <span class="required">*</span></label>
+          <input type="text" id="inc-title" placeholder="Hatanın kısa özeti" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Arıza Açıklaması <span class="required">*</span></label>
+          <textarea id="inc-desc" rows="4" placeholder="Teknik detayları buraya ekleyin..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-inc-cancel-close">İptal</button>
+        <button class="btn btn-primary btn-sm" id="btn-inc-submit">Incident Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create IP Ban modal -->
+  <div class="modal-overlay" id="modal-ipban">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Şüpheli IP Adresini Engelle (Ban-IP)</h3>
+        <button class="modal-close" id="btn-ipban-cancel">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Yasaklanacak IP Adresi <span class="required">*</span></label>
+          <input type="text" id="ban-ip-val" placeholder="Örn: 195.175.44.2" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Yasaklama Gerekçesi (Reason) <span class="required">*</span></label>
+          <input type="text" id="ban-reason" placeholder="Örn: Ddos saldırı şüphesi / Tekrarlı başarısız login" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-ipban-cancel-close">Vazgeç</button>
+        <button class="btn btn-primary btn-sm" id="btn-ipban-submit" style="background:var(--danger-500); border-color:var(--danger-600);">IP Engelle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Offline QR Activation key popup -->
+  <div class="modal-overlay" id="modal-offline-activation">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Offline Lisans QR & Aktivasyon Anahtarı</h3>
+        <button class="modal-close" id="btn-offline-close">&times;</button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="text-sm">Aşağıdaki şifrelenmiş aktivasyon tokenini cihazın lisans ekranına yapıştırarak veya QR kodu taratarak POS terminalini internetsiz aktif edebilirsiniz.</p>
+        
+        <div style="width:160px; height:160px; background:white; color:black; margin: var(--space-4) auto; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:0.75rem; border-radius: var(--radius-md);" id="qr-placeholder-graphics">
+          [QR Grafik Eşleşmesi]
+        </div>
+
+        <div class="form-group text-left">
+          <label class="form-label">Aktivasyon Token Metni</label>
+          <textarea id="offline-token-text" readonly rows="4" style="font-family: monospace; font-size: 0.8rem; background: var(--neutral-900); border-color: var(--neutral-800);"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm w-full" id="btn-offline-close-btn">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device Hardware Swap Modal -->
+  <div class="modal-overlay" id="modal-device-swap">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Terminal Donanım Eşleştirmesi Değiştir</h3>
+        <button class="modal-close" id="btn-swap-cancel">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="swap-company-id" />
+        <input type="hidden" id="swap-old-device-id" />
+        
+        <div class="form-group">
+          <label class="form-label">Mevcut Terminal İsmi</label>
+          <input type="text" id="swap-old-device-name" readonly style="background:var(--neutral-900);" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Yeni Cihaz İsmi <span class="required">*</span></label>
+          <input type="text" id="swap-new-device-name" placeholder="Örn: Yeni El Terminali" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Yeni Cihaz Donanım Hash Kodu (UUID) <span class="required">*</span></label>
+          <input type="text" id="swap-new-device-hash" placeholder="Cihazın lisans ekranındaki UUID hash kodu" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-swap-cancel-close">İptal</button>
+        <button class="btn btn-primary btn-sm" id="btn-swap-submit">Eşleşmeyi Güncelle (Swap)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- General Text details Modal Viewer -->
+  <div class="modal-overlay" id="modal-viewer">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="viewer-title">Detay</h3>
+        <button class="modal-close" id="btn-viewer-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <pre id="viewer-content" style="font-family: monospace; font-size: 0.85rem; background: var(--neutral-900); padding: var(--space-4); border-radius: var(--radius-md); overflow-x: auto; white-space: pre-wrap; color: var(--neutral-100); border: 1px solid var(--neutral-800);"></pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" id="btn-viewer-close-btn" onclick="document.getElementById('modal-viewer').classList.remove('active');">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subscription plan editing modal -->
+  <div class="modal-overlay" id="modal-plan">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Lisans Plan Detaylarını Düzenle</h3>
+        <button class="modal-close" id="btn-plan-cancel">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-plan-id" />
+        <div class="form-group">
+          <label class="form-label">Plan İsmi <span class="required">*</span></label>
+          <input type="text" id="edit-plan-name" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Aylık Fiyat Tutarı <span class="required">*</span></label>
+          <input type="number" id="edit-plan-price" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Para Birimi</label>
+          <select id="edit-plan-currency">
+            <option value="TRY">TRY (₺)</option>
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Faturalama Periyodu</label>
+          <select id="edit-plan-interval">
+            <option value="monthly">Aylık</option>
+            <option value="yearly">Yıllık</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Maksimum Terminal (Cihaz) Limiti <span class="required">*</span></label>
+          <input type="number" id="edit-plan-devices" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Maksimum Şube Limiti <span class="required">*</span></label>
+          <input type="number" id="edit-plan-stores" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Eşitleme Tipi <span class="required">*</span></label>
+          <select id="edit-plan-sync">
+            <option value="realtime">Anlık (Realtime Sync)</option>
+            <option value="delayed">Gecikmeli (Batch Sync)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Analiz Raporlama <span class="required">*</span></label>
+          <select id="edit-plan-analytics">
+            <option value="standard">Standart</option>
+            <option value="advanced">Gelişmiş Zeka</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Özellik Listesi (Her satıra bir özellik yazın)</label>
+          <textarea id="edit-plan-features-list" rows="5" placeholder="Örn: 7/24 Telefon Destek"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-plan-cancel-close">Vazgeç</button>
+        <button class="btn btn-primary btn-sm" id="btn-plan-save" style="background:var(--secondary-500); border-color:var(--secondary-600);">Planı Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ticket Reply & Internal note Modal -->
+  <div class="modal-overlay" id="modal-ticket">
+    <div class="modal-card" style="max-width: 800px;">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <h3 id="ticket-title">Talep Detayı</h3>
+          <span class="badge" id="ticket-status-badge">AÇIK</span>
+        </div>
+        <button class="modal-close" id="btn-ticket-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="grid grid-cols-3 gap-4" style="height: 420px;">
+          <!-- Left side: customer chat threads messages -->
+          <div class="col-span-2 flex flex-col chat-container" style="height:100%;">
+            <div class="chat-messages" id="ticket-chat-messages" style="flex:1;">
+              <!-- Dynamic chats -->
+            </div>
+            <div class="chat-input-area">
+              <input type="text" id="ticket-reply-text" placeholder="Müşteriye yanıt yazın..." />
+              <button class="btn btn-primary btn-sm" id="btn-ticket-send">Gönder</button>
+            </div>
+          </div>
+
+          <!-- Right side: internal support team notes annotations -->
+          <div class="flex flex-col" style="height:100%; gap:var(--space-2);">
+            <h4 class="font-bold text-xs uppercase text-muted">Takım İçi Özel Notlar</h4>
+            <div id="ticket-internal-notes-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; background:rgba(15,23,42,0.4); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--neutral-800);">
+              <!-- Internal notes -->
+            </div>
+            <div class="flex gap-1">
+              <input type="text" id="ticket-internal-note-input" placeholder="İç not ekle..." style="font-size:0.8rem; padding:6px;" />
+              <button class="btn btn-secondary btn-sm" id="btn-note-submit" style="padding-inline:10px;">Not</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/admin.js"></script>
 </body>
 </html>

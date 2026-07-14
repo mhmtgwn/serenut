@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/system_hub_page.dart
+// lib/presentation/pages/system_hub_page.dart
 // Serenut OS — System Observability & Diagnostics Center
 // Created: Phase E — 01 Jul 2026
 
@@ -108,17 +108,7 @@ class SystemHubPage extends ConsumerWidget {
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const ObservabilityDashboard())),
             ),
-            const _Divider(),
-            _SystemTile(
-              icon: Icons.cloud_sync_rounded,
-              color: hasSyncError ? _kRed : _kBlue,
-              title: 'Bulut Senkronizasyonu',
-              subtitle: hasSyncError
-                  ? '⚠️ Aktif veri çakışması tespit edildi'
-                  : 'Bulut entegrasyonu ve çakışma çözümleme',
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const SyncConflictPage())),
-            ),
+
           ]),
           const SizedBox(height: 32),
         ],

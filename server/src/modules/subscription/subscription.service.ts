@@ -116,7 +116,7 @@ export class SubscriptionService {
       );
 
       // Invalidate subscription cache
-      if (redisClient?.isOpen) {
+      if (redisClient?.isReady) {
         await redisClient.del(`sub:${companyId}`).catch(() => {});
       }
     } catch (err) {
@@ -133,7 +133,7 @@ export class SubscriptionService {
    */
   static async getSubscription(companyId: string): Promise<any | null> {
     // Try cache first
-    if (redisClient?.isOpen) {
+    if (redisClient?.isReady) {
       try {
         const cached = await redisClient.get(`sub:${companyId}`);
         if (cached) return JSON.parse(cached);
@@ -170,7 +170,7 @@ export class SubscriptionService {
     }
 
     // Cache for 60 seconds
-    if (redisClient?.isOpen) {
+    if (redisClient?.isReady) {
       await redisClient.setEx(`sub:${companyId}`, 60, JSON.stringify(sub)).catch(() => {});
     }
 

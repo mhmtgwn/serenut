@@ -1,0 +1,313 @@
+/* ==========================================================================
+   SERENUT OS V2 - CUSTOMER PORTAL SPECIFIC STYLES
+   ========================================================================== */
+
+@import "/shared/css/tokens.css";
+@import "/shared/css/base.css";
+@import "/shared/css/components.css";
+@import "/shared/css/utilities.css";
+
+/* ── 1. PORTAL SHELL LAYOUT ──────────────────────────────────────────────── */
+#portal-app {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar styling */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--neutral-900);
+  border-right: 1px solid var(--neutral-800);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-nav);
+  transition: transform var(--transition-normal);
+}
+
+.sidebar-header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--neutral-800);
+}
+
+.sidebar-brand {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  color: var(--neutral-50);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sidebar-brand svg {
+  color: var(--primary-500);
+}
+
+.sidebar-nav {
+  flex-grow: 1;
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-y: auto;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--neutral-300);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.sidebar-item:hover, .sidebar-item.active {
+  color: var(--primary-400);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.sidebar-footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--neutral-800);
+}
+
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: rgba(15, 23, 42, 0.3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-800);
+}
+
+.sidebar-profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--neutral-800);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-400);
+  font-weight: 800;
+}
+
+.sidebar-profile-info {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.sidebar-profile-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--neutral-100);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-profile-role {
+  font-size: 0.72rem;
+  color: var(--neutral-400);
+}
+
+/* Main Dashboard Panel */
+.main-panel {
+  flex-grow: 1;
+  margin-left: var(--sidebar-w);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top header bar */
+.topbar {
+  height: var(--header-h);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--neutral-800);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-nav) - 1);
+}
+
+.topbar-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--neutral-50);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--neutral-300);
+  font-size: 0.9rem;
+}
+
+/* Dashboard screen page layout */
+.content-wrapper {
+  padding: var(--space-6);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* ── 2. SINGLE PAGE TAB PANELS ────────────────────────────────────────────── */
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+/* ── 3. AUTH PAGES SPECIFICS ────────────────────────────────────────────── */
+#auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(189, 0, 255, 0.05) 0%, transparent 40%);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.auth-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.8rem;
+  color: var(--neutral-50);
+  margin-bottom: var(--space-3);
+}
+
+.auth-logo svg {
+  color: var(--primary-500);
+}
+
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--neutral-800);
+  margin-bottom: var(--space-6);
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding-block: var(--space-3);
+  text-align: center;
+  font-weight: 600;
+  color: var(--neutral-400);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all var(--transition-fast);
+}
+
+.auth-tab-btn.active {
+  color: var(--primary-400);
+  border-bottom-color: var(--primary-500);
+}
+
+/* ── 4. CHAT SYSTEM (SUPPORT TICKET THREADS) ────────────────────────────────── */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 380px;
+  border: 1px solid var(--neutral-800);
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.chat-msg {
+  max-width: 75%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  position: relative;
+}
+
+.chat-msg-user {
+  background: var(--neutral-800);
+  color: var(--neutral-100);
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-msg-admin {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  color: var(--neutral-100);
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+}
+
+.chat-msg-time {
+  font-size: 0.68rem;
+  color: var(--neutral-400);
+  display: block;
+  text-align: right;
+  margin-top: 4px;
+}
+
+.chat-input-area {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--neutral-800);
+  background: var(--neutral-900);
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+/* ── 5. RESPONSIVE DESIGN ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.active {
+    transform: translateX(0);
+  }
+  .main-panel {
+    margin-left: 0;
+  }
+}

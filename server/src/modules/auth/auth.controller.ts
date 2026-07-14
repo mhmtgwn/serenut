@@ -255,7 +255,7 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
 // ── SELF-SERVICE REGISTRATION ────────────────────────────────────────────────
 // Creates a new company tenant + owner/admin user in a single atomic transaction.
 router.post('/register', signupLimiter, async (req: Request, res: Response) => {
-  const { company_name, name, email, password, phone, tax_number } = req.body;
+  const { company_name, name, email, password, phone, tax_number, plan_id } = req.body;
 
   if (!company_name || !name || !email || !password) {
     return res.status(400).json({
@@ -264,10 +264,10 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     });
   }
 
-  if (password.length < 4) {
+  if (password.length < 8) {
     return res.status(400).json({
       error: 'weak_password',
-      message: 'Şifre veya PIN en az 4 karakter olmalıdır.'
+      message: 'Şifre en az 8 karakter olmalıdır.'
     });
   }
 
@@ -320,17 +320,28 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       );
     }
 
+    // Map user plan selection to database IDs (target plan for subscription)
+    let mappedPlanId = 'plan-free';
+    if (plan_id === 'starter') mappedPlanId = 'plan-basic';
+    else if (plan_id === 'growth') mappedPlanId = 'plan-pro';
+    else if (plan_id === 'pro') mappedPlanId = 'plan-enterprise';
+
+    // All trial registrations start on plan-free limits to prevent unpaid premium entitlement bypass
+    const trialPlanId = 'plan-free';
+    const trialDeviceLimit = 1;
+    const trialStoreLimit = 1;
+
     // Create subscription with trial_started_at = NULL (AC 1.1)
-    // Trial does NOT start at registration — it starts on FIRST LOGIN.
-    // auth.service.ts login() checks trial_started_at IS NULL and sets it.
+    // Trial does NOT start at registration, nor on first login.
+    // It starts on FIRST POS DEVICE ACTIVATION via LicenseService.activate().
       const subId = `sub-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
       await client.query(
         `INSERT INTO subscriptions
            (id, company_id, plan_id, status, current_period_start, current_period_end,
             trial_started_at, trial_ends_at, payment_retry_count)
-         VALUES ($1, $2, 'plan-free', 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
+         VALUES ($1, $2, $3, 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
                  NULL, NULL, 0)`,
-        [subId, companyId]
+        [subId, companyId, mappedPlanId]
       );
 
       // Generate a canonical license key and trial entitlement during registration!
@@ -340,7 +351,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       }
       const licenseKey = `SRNT-${parts.join('-')}`;
 
-      // Insert into license_entitlements
+      // Insert into license_entitlements (free trial limits enforce authorization boundaries)
       const entId = `ent-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
       await client.query(`
         INSERT INTO license_entitlements (
@@ -349,18 +360,21 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
           valid_from, valid_until, token_version,
           license_key, created_at, updated_at
         )
-        VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), NOW() + INTERVAL '30 days', 1, $4, NOW(), NOW())
-      `, [entId, companyId, subId, licenseKey]);
+        VALUES ($1, $2, $3, $4, 'trial', $5, $6, NOW(), NOW() + INTERVAL '30 days', 1, $7, NOW(), NOW())
+      `, [entId, companyId, subId, trialPlanId, trialDeviceLimit, trialStoreLimit, licenseKey]);
 
-      // Sync legacy licenses table
+      // Sync legacy licenses table (start on trial with 1 device)
       await client.query(`
         INSERT INTO licenses (
           id, company_id, license_key, tier,
-          allowed_devices_count, status, expires_at, created_at, updated_at
+          allowed_devices_count, status, expires_at, created_at
         )
-        VALUES ($1, $2, $3, 'trial', 2, 'active', NOW() + INTERVAL '30 days', NOW(), NOW())
-      `, [`lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, companyId, licenseKey]);
-
+        VALUES ($1, $2, $3, 'trial', 1, 'active', NOW() + INTERVAL '30 days', NOW())
+      `, [
+        `lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+        companyId,
+        licenseKey
+      ]);
 
     await client.query('COMMIT');
 

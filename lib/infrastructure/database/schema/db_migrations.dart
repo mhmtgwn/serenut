@@ -455,6 +455,17 @@ class DatabaseMigrations {
             'migrated_at': DateTime.now().toIso8601String(),
             'status': 'success'
           });
+        if (oldVersion < 28) {
+          try {
+            await txn.execute('ALTER TABLE sales ADD COLUMN entitlement_snapshot TEXT');
+          } catch (e) {
+            handleMigrationError(e, 28);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 28,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
         }
       });
     } catch (err) {

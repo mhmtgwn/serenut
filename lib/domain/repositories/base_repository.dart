@@ -308,6 +308,7 @@ class SaleEntity {
   final String? idempotencyKey;
   final int isSynced;
   final String? createdBy;
+  final String? entitlementSnapshot;
 
   SaleEntity({
     required this.id,
@@ -321,6 +322,7 @@ class SaleEntity {
     this.idempotencyKey,
     this.isSynced = 0,
     this.createdBy,
+    this.entitlementSnapshot,
   });
 
   double get remainingAmount => totalAmount - paidAmount;
@@ -336,6 +338,7 @@ class SaleEntity {
     'idempotency_key': idempotencyKey,
     'is_synced': isSynced,
     'created_by': createdBy,
+    'entitlement_snapshot': entitlementSnapshot,
   };
 
   factory SaleEntity.fromMap(Map<String, dynamic> map) => SaleEntity(
@@ -349,6 +352,7 @@ class SaleEntity {
     idempotencyKey: map['idempotency_key'] as String?,
     isSynced: map['is_synced'] as int? ?? 0,
     createdBy: map['created_by'] as String?,
+    entitlementSnapshot: map['entitlement_snapshot'] as String?,
     items: [],
   );
 }

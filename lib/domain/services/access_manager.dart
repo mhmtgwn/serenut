@@ -1,4 +1,4 @@
-﻿// lib/domain/services/access_manager.dart
+// lib/domain/services/access_manager.dart
 import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/license_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
@@ -6,7 +6,8 @@ import 'package:serenutos/domain/services/device_manager.dart';
 enum AccessStatus {
   trialActive,
   licensed,
-  paywall;
+  paywall,
+  restrictedOperation;
 }
 
 class AccessManager {
@@ -26,18 +27,21 @@ class AccessManager {
   /// 1. If 30-day trial is active -> AccessStatus.trialActive
   /// 2. If trial expired but valid license exists and device limit is satisfied -> AccessStatus.licensed
   /// 3. Otherwise -> AccessStatus.paywall
-  AccessStatus checkAccess() {
-    _trialManager.initTrialIfNeeded();
-
-    if (_trialManager.isTrialActive()) {
-      return AccessStatus.trialActive;
+  AccessStatus checkAccess({required AuthUser? currentUser}) {
+    if (currentUser == null) return AccessStatus.trialActive; // Handled by auth guard
+    
+    final state = _trialManager.getEntitlementState();
+    
+    if (state == EntitlementState.active || state == EntitlementState.graceActive) {
+      return AccessStatus.trialActive; // Or licensed
     }
 
-    final deviceId = _deviceManager.getDeviceId();
-    if (_licenseManager.isDeviceAllowed(deviceId)) {
-      return AccessStatus.licensed;
+    // state is graceExpired, revoked, or unknown
+    final role = currentUser.role;
+    if (role == UserRole.owner || role == UserRole.admin || role == UserRole.sysadmin) {
+      return AccessStatus.paywall;
+    } else {
+      return AccessStatus.restrictedOperation;
     }
-
-    return AccessStatus.paywall;
   }
 }

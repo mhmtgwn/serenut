@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yükleme & İndirme Merkezi — Serenut OS</title>
+  <meta name="description" content="Android APK ve Windows Desktop terminal uygulamalarımızın en son stabil sürümlerini indirin." />
+  <link rel="stylesheet" href="css/website.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="nav-landing nav-scrolled" id="main-header">
+    <div class="nav-container">
+      <a href="index.html" class="brand">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
+          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
+        </svg>
+        <span>Serenut OS</span>
+      </a>
+      <nav class="nav-links" id="nav-links">
+        <a href="platform.html" class="nav-link">Platform</a>
+        <a href="plans.html" class="nav-link">Planlar</a>
+        <a href="downloads.html" class="nav-link active">İndir</a>
+        <a href="contact.html" class="nav-link">İletişim</a>
+      </nav>
+      <div class="nav-auth" id="nav-auth">
+        <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
+        <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
+        <button class="menu-toggle" id="nav-toggle">&equiv;</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- INTRO HEADER -->
+  <header class="hero" style="padding-top: calc(var(--header-h) + var(--space-8)); padding-bottom: var(--space-4); text-align: center;">
+    <div class="container">
+      <div class="section-title">
+        <div class="badge badge-active mb-2" style="display:inline-flex; width:auto; align-self:center;">Sürüm Dağıtımı</div>
+        <h1 class="font-bold">Serenut OS İndirme Merkezi</h1>
+        <p>Windows bilgisayarlar ve Android el terminalleri için optimize edilmiş stabil terminal yazılımlarımız.</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="container mb-12">
+    <!-- Dynamic releases rendering grid -->
+    <div class="plans-grid" id="releases-history-container">
+      <!-- Will be populated dynamically via downloads.js -->
+    </div>
+
+    <!-- Requirements checklist -->
+    <section class="mt-12 grid grid-cols-2 gap-6">
+      <div class="card">
+        <h4 class="font-bold text-light mb-3">💻 Windows Sistem Gereksinimleri</h4>
+        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--neutral-300);">
+          <li>• Windows 10 veya Windows 11 (64-bit)</li>
+          <li>• Minimum 4 GB RAM bellek (8 GB önerilir)</li>
+          <li>• 1.6 GHz çift çekirdekli veya daha hızlı işlemci</li>
+          <li>• ESC/POS uyumlu 58mm / 80mm Termal fiş yazıcısı sürücüsü</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 class="font-bold text-light mb-3">📱 Android El Terminali Gereksinimleri</h4>
+        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--neutral-300);">
+          <li>• Android 7.0 (Nougat) veya üzeri işletim sistemi</li>
+          <li>• Minimum 2 GB RAM (Dahili termal yazıcılı Sunmi, Urovo cihazları desteklenir)</li>
+          <li>• Bluetooth 4.0 / USB bağlantı destekli taşınabilir yazıcılar</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="brand">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
+              <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
+            </svg>
+            <span>Serenut OS</span>
+          </a>
+          <p class="text-muted text-sm mt-2">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+        </div>
+        <div class="footer-links-col">
+          <h4>Platform</h4>
+          <ul>
+            <li><a href="platform.html">Özellikler</a></li>
+            <li><a href="plans.html">Fiyatlandırma</a></li>
+            <li><a href="downloads.html">İndir</a></li>
+          </ul>
+        </div>
+        <div class="footer-links-col">
+          <h4>Destek</h4>
+          <ul>
+            <li><a href="contact.html">İletişim</a></li>
+            <li><a href="/portal/">Müşteri Portalı</a></li>
+          </ul>
+        </div>
+        <div class="footer-links-col">
+          <h4>Yasal</h4>
+          <ul>
+            <li><a href="privacy.html">Gizlilik Politikası</a></li>
+            <li><a href="kvkk.html">KVKK Bilgilendirme</a></li>
+            <li><a href="terms.html">Kullanım Şartları</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 Serenut OS. Tüm Hakları Saklıdır.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="js/downloads.js"></script>
+  <script src="js/website.js"></script>
+</body>
+</html>

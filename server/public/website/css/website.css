@@ -1,0 +1,546 @@
+/* ==========================================================================
+   SERENUT OS V2 - MARKETING WEBSITE SPECIFIC STYLES
+   ========================================================================== */
+
+@import "/shared/css/tokens.css";
+@import "/shared/css/base.css";
+@import "/shared/css/components.css";
+@import "/shared/css/utilities.css";
+
+/* ── 1. GLOBAL LAYOUTS ────────────────────────────────────────────────────── */
+.nav-landing {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-h);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  z-index: var(--z-nav);
+  display: flex;
+  align-items: center;
+  transition: all var(--transition-normal);
+}
+
+.nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: var(--container-max-w);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.brand {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--neutral-50);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.brand svg {
+  color: var(--primary-400);
+}
+
+.nav-links {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.nav-link {
+  font-weight: 500;
+  color: var(--neutral-300);
+  font-size: 0.95rem;
+  transition: color var(--transition-fast);
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--primary-400);
+}
+
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Mobile Nav Drawer */
+.menu-toggle {
+  display: none;
+  font-size: 1.5rem;
+  color: var(--neutral-300);
+}
+
+/* ── 2. HERO SECTION ──────────────────────────────────────────────────────── */
+.hero {
+  padding: calc(var(--header-h) + var(--space-16)) 0 var(--space-16) 0;
+  background: radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+              radial-gradient(circle at 10% 80%, rgba(189, 0, 255, 0.05) 0%, transparent 50%);
+  border-bottom: 1px solid var(--neutral-900);
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.hero-tag {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--primary-400);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hero-content h1 {
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.hero-content h1 span {
+  background: linear-gradient(135deg, var(--primary-400) 0%, var(--info-400) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-content p {
+  font-size: 1.15rem;
+  color: var(--neutral-300);
+  line-height: 1.6;
+}
+
+.hero-ctas {
+  display: flex;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.hero-visual {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--neutral-800);
+}
+
+/* ── 3. TRUST & workflow SECTIONS ─────────────────────────────────────────── */
+.section-padding {
+  padding: var(--space-16) 0;
+}
+
+.section-title {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto var(--space-12) auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.section-title h2 {
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-weight: 800;
+}
+
+.section-title p {
+  color: var(--neutral-400);
+  font-size: 1.05rem;
+}
+
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+.trust-card {
+  background: var(--neutral-900);
+  border: 1px solid var(--neutral-800);
+  padding: var(--space-8);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transition: all var(--transition-normal);
+}
+
+.trust-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary-500);
+  box-shadow: var(--shadow-primary-glow);
+}
+
+.trust-icon {
+  font-size: 2.2rem;
+  color: var(--primary-400);
+  line-height: 1;
+}
+
+/* Workflow Steps */
+.workflow-flow {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-4);
+  position: relative;
+}
+
+.workflow-step {
+  text-align: center;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--neutral-800);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-md);
+  position: relative;
+  transition: all var(--transition-normal);
+}
+
+.workflow-step:hover {
+  border-color: var(--primary-500);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.workflow-num {
+  width: 28px;
+  height: 28px;
+  background: var(--primary-500);
+  color: var(--neutral-950);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  margin: 0 auto var(--space-3) auto;
+}
+
+.workflow-step h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+}
+
+.workflow-step p {
+  font-size: 0.78rem;
+  color: var(--neutral-400);
+}
+
+/* ── 4. OFFLINE & DUAL ARCHITECTURE ───────────────────────────────────────── */
+.offline-sync-box {
+  background: linear-gradient(135deg, var(--neutral-900) 0%, hsl(222, 47%, 8%) 100%);
+  border: 1px solid var(--neutral-800);
+  border-radius: var(--radius-xl);
+  padding: var(--space-12);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.sync-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.sync-item {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.sync-item-icon {
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 240, 255, 0.1);
+  color: var(--info-400);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.sync-item-text h4 {
+  font-size: 1.1rem;
+  margin-bottom: var(--space-1);
+}
+
+.sync-item-text p {
+  font-size: 0.9rem;
+  color: var(--neutral-400);
+}
+
+/* ── 5. PLAN DISPLAY ──────────────────────────────────────────────────────── */
+.billing-toggle-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-10);
+}
+
+.billing-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--neutral-400);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.billing-label.active {
+  color: var(--neutral-50);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 50px;
+  height: 26px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--neutral-700);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-normal);
+}
+
+.toggle-thumb {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  top: 4px;
+  left: 4px;
+  transition: transform var(--transition-normal);
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: var(--primary-500);
+}
+
+.toggle-switch input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(24px);
+}
+
+.discount-tag {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--primary-400);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Plans Grid cards */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-8);
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.plan-price-block {
+  font-size: 2.5rem;
+  font-family: var(--font-heading);
+  font-weight: 900;
+  color: var(--neutral-50);
+  margin-block: var(--space-4);
+}
+
+.plan-price-block span {
+  font-size: 1rem;
+  color: var(--neutral-400);
+  font-weight: normal;
+}
+
+.plan-features-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block: var(--space-6);
+  flex-grow: 1;
+}
+
+.plan-feature-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.9rem;
+}
+
+.plan-feature-item svg {
+  color: var(--primary-500);
+  flex-shrink: 0;
+}
+
+/* ── 6. FINAL CTA & FOOTER ────────────────────────────────────────────────── */
+.final-cta {
+  background: linear-gradient(135deg, hsl(224, 71%, 3%) 0%, var(--neutral-900) 100%);
+  border-top: 1px solid var(--neutral-800);
+  border-bottom: 1px solid var(--neutral-900);
+  text-align: center;
+  padding: var(--space-16) 0;
+}
+
+.cta-box {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.cta-box h2 {
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.cta-box p {
+  font-size: 1.1rem;
+  color: var(--neutral-300);
+}
+
+/* Footer styling */
+.footer {
+  background: var(--neutral-950);
+  padding: var(--space-12) 0 var(--space-8) 0;
+  font-size: 0.88rem;
+  color: var(--neutral-400);
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.2fr repeat(4, 0.95fr);
+  gap: var(--space-8);
+  margin-bottom: var(--space-10);
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.footer-links-col h4 {
+  color: var(--neutral-200);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-4);
+}
+
+.footer-links-col ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.footer-links-col a {
+  color: var(--neutral-400);
+}
+
+.footer-links-col a:hover {
+  color: var(--primary-400);
+}
+
+.footer-bottom {
+  border-top: 1px solid var(--neutral-900);
+  padding-top: var(--space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ── 7. RESPONSIVE DESIGN ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-10);
+    text-align: center;
+  }
+  .hero-content {
+    align-items: center;
+  }
+  .hero-ctas {
+    justify-content: center;
+  }
+  .offline-sync-box {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+    padding: var(--space-8);
+  }
+  .workflow-flow {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-links {
+    display: none;
+  }
+  .menu-toggle {
+    display: block;
+  }
+  .trust-grid {
+    grid-template-columns: 1fr;
+  }
+  .workflow-flow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .footer-bottom {
+    flex-direction: column;
+    gap: var(--space-4);
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .workflow-flow {
+    grid-template-columns: 1fr;
+  }
+  .hero-ctas {
+    flex-direction: column;
+    width: 100%;
+  }
+}

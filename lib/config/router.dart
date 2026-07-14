@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/pages/onboarding/bootstrap_loading_view.d
 import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
 import 'package:serenutos/presentation/pages/login_page.dart';
 import 'package:serenutos/presentation/pages/register_page.dart';
+import 'package:serenutos/presentation/pages/operational_error_page.dart';
 import 'package:serenutos/presentation/pages/home_page.dart';
 import 'package:serenutos/presentation/pages/sales_page.dart';
 import 'package:serenutos/presentation/pages/customers_page.dart';
@@ -29,7 +30,6 @@ import 'package:serenutos/presentation/pages/sales_history_page.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
-import 'package:serenutos/presentation/pages/sync_conflict_page.dart';
 import 'package:serenutos/presentation/pages/license_page.dart' show LicenseManagementPage;
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_import_wizard_page.dart';
@@ -44,8 +44,6 @@ import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/paywall_page.dart';
 import 'package:serenutos/domain/services/access_manager.dart';
-import 'package:serenutos/presentation/pages/admin/mobile_admin_dashboard.dart';
-import 'package:serenutos/presentation/pages/admin/ticket_chat_page.dart';
 
 /// Navigation routes
 class AppRoutes {
@@ -71,7 +69,6 @@ class AppRoutes {
   static const orderEdit = '/orders/edit';
   static const settings = '/settings';
   static const catalogImportWizard = '/settings/catalog-import';
-  static const syncConflict = '/settings/sync-conflict';
   static const license = '/settings/license';
   static const admin = '/admin';
   static const finance = '/finance';
@@ -82,8 +79,6 @@ class AppRoutes {
   static const smsHistory  = '/settings/sms-history';
   static const dbHealth    = '/settings/db-health';
   static const management  = '/management';
-  static const mobileAdmin = '/admin/mobile-dashboard';
-  static const ticketChat  = '/admin/mobile-dashboard/ticket';
 }
 
 String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
@@ -97,7 +92,7 @@ String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
 String? _roleOrPermissionRedirect(BuildContext context, Permission permission) {
   final user = ProviderScope.containerOf(context).read(currentUserProvider);
   if (user == null) return AppRoutes.login;
-  if (user.role == UserRole.sysadmin || user.role == UserRole.owner) {
+  if (user.role == UserRole.owner || user.role == UserRole.admin) {
     return null;
   }
   if (user.hasPermission(permission.value)) {
@@ -110,25 +105,34 @@ String? _roleOrPermissionRedirect(BuildContext context, Permission permission) {
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuthenticated = ref.watch(isAuthenticatedProvider);
   final accessManager = ref.watch(accessManagerProvider);
-  final accessStatus = accessManager.checkAccess();
+  final currentUser = ref.watch(currentUserProvider);
+  final accessStatus = accessManager.checkAccess(currentUser: currentUser);
 
   return GoRouter(
     initialLocation: (accessStatus == AccessStatus.paywall)
         ? AppRoutes.paywall
-        : (isAuthenticated
-            ? AppRoutes.home
-            : AppRoutes.login),
+        : (accessStatus == AccessStatus.restrictedOperation)
+            ? '/operational-error'
+            : (isAuthenticated
+                ? AppRoutes.home
+                : AppRoutes.login),
     redirect: (context, state) {
       final loggedIn = isAuthenticated;
-      final status = accessManager.checkAccess();
+      final status = accessManager.checkAccess(currentUser: currentUser);
       final onPaywall = state.matchedLocation == AppRoutes.paywall;
+      final onRestricted = state.matchedLocation == '/operational-error';
       
       if (loggedIn && status == AccessStatus.paywall) {
         if (!onPaywall) return AppRoutes.paywall;
         return null;
       }
       
-      if (onPaywall) {
+      if (loggedIn && status == AccessStatus.restrictedOperation) {
+        if (!onRestricted) return '/operational-error';
+        return null;
+      }
+      
+      if (onPaywall || onRestricted) {
         return loggedIn ? AppRoutes.home : AppRoutes.login;
       }
       
@@ -221,6 +225,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PaywallPage(),
       ),
 
+      // ── Operational Error (Cashier/Staff Restricted State) ─────────────
+      GoRoute(
+        path: '/operational-error',
+        name: 'operationalError',
+        builder: (context, state) => const OperationalErrorPage(),
+      ),
+
       // ── Settings (free route — accessed via AppBar icon) ─────────────
       GoRoute(
         path: AppRoutes.settings,
@@ -237,11 +248,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // ── Phase 4-6 New Free Routes ─────────────────────────────────────
       GoRoute(
-        path: AppRoutes.syncConflict,
-        name: 'syncConflict',
-        builder: (context, state) => const SyncConflictPage(),
-      ),
-      GoRoute(
         path: AppRoutes.license,
         name: 'license',
         builder: (context, state) => const LicenseManagementPage(),
@@ -251,22 +257,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.admin,
         name: 'admin',
         builder: (context, state) => const AdminPage(),
-        redirect: _adminOnlyRedirect,
-      ),
-      GoRoute(
-        path: AppRoutes.mobileAdmin,
-        name: 'mobileAdmin',
-        builder: (context, state) => const MobileAdminDashboard(),
-        redirect: _adminOnlyRedirect,
-      ),
-      GoRoute(
-        path: '${AppRoutes.ticketChat}/:id',
-        name: 'ticketChat',
-        builder: (context, state) {
-          final ticketId = state.pathParameters['id'] ?? '';
-          final ticketTitle = state.uri.queryParameters['title'] ?? 'Destek Talebi';
-          return TicketChatPage(ticketId: ticketId, ticketTitle: ticketTitle);
-        },
         redirect: _adminOnlyRedirect,
       ),
       GoRoute(

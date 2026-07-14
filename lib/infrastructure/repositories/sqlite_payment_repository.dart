@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -163,6 +163,7 @@ class SqliteSaleRepository implements ISaleRepository {
       'idempotency_key': entity.idempotencyKey,
       'is_synced': entity.isSynced,
       'created_by': entity.createdBy,
+      'entitlement_snapshot': entity.entitlementSnapshot,
     });
 
     for (final item in entity.items) {

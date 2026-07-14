@@ -53,6 +53,45 @@ router.post('/activate', licenseRateLimit, async (req: Request, res: Response) =
   }
 });
 
+router.use(authenticateUser);
+
+router.post('/auto-activate', licenseRateLimit, async (req: Request, res: Response) => {
+  const { device_hash, device_name, fingerprint } = req.body;
+  const user = (req as any).user;
+  if (!device_hash || !device_name) {
+    incrementLicenseValidation(false);
+    return res.status(400).json({ error: 'missing_fields', message: 'Cihaz imzası ve cihaz adı zorunludur.' });
+  }
+
+  try {
+    const result = await LicenseService.autoActivate(user.company_id, device_hash, device_name, undefined, fingerprint);
+    incrementLicenseValidation(true);
+    return res.json(result);
+  } catch (err: any) {
+    incrementLicenseValidation(false);
+    if (err.message === 'no_license_found') {
+      return res.status(404).json({ error: 'no_license_found', message: 'İşletmenize ait geçerli bir lisans bulunamadı.' });
+    }
+    if (err.message === 'license_inactive') {
+      return res.status(403).json({ error: 'license_inactive', message: 'Lisans şu anda aktif değil.' });
+    }
+    if (err.message === 'license_expired') {
+      return res.status(403).json({ error: 'license_expired', message: 'Lisansın geçerlilik süresi dolmuştur.' });
+    }
+    if (err.message === 'device_blocked') {
+      return res.status(403).json({ error: 'device_blocked', message: 'Cihazın erişimi engellenmiştir.' });
+    }
+    if (err.message === 'device_limit_exceeded') {
+      return res.status(403).json({ error: 'device_limit_exceeded', message: 'Bu lisans için tanımlı maksimum cihaz sınırına ulaşıldı.' });
+    }
+    if (err.message === 'hardware_tampered_limit_exceeded') {
+      return res.status(403).json({ error: 'hardware_tampered_limit_exceeded', message: 'Cihaz donanım değişikliği limiti aşılmıştır.' });
+    }
+    console.error('Auto Activation error:', err);
+    return res.status(500).json({ error: 'server_error', message: 'Lisans aktivasyonu esnasında hata oluştu.' });
+  }
+});
+
 // Public Validation Route
 router.post('/validate', licenseRateLimit, async (req: Request, res: Response) => {
   const { license_key, device_hash } = req.body;

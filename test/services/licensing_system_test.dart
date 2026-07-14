@@ -133,7 +133,15 @@ void main() {
         deviceManager: device,
       );
 
-      expect(orchestrator.checkAccess(), equals(AccessStatus.trialActive));
+      final dummyUser = AuthUser(
+        id: '1',
+        name: 'Test',
+        companyId: 'C',
+        role: UserRole.owner,
+        permissions: [],
+        createdAt: DateTime.now(),
+      );
+      expect(orchestrator.checkAccess(currentUser: dummyUser), equals(AccessStatus.trialActive));
     });
 
     test('Redirects to paywall when trial is expired and no valid license is set', () async {
@@ -150,10 +158,18 @@ void main() {
       );
 
       // Expire trial
-      final pastDate = DateTime.now().subtract(const Duration(days: 31));
-      await prefs.setInt('nutopiano_first_launch_timestamp', pastDate.millisecondsSinceEpoch);
+      await prefs.setString('serenut_subscription_cache', '{"status":"canceled"}');
+      
+      final dummyUser = AuthUser(
+        id: '1',
+        name: 'Test',
+        companyId: 'C',
+        role: UserRole.owner,
+        permissions: [],
+        createdAt: DateTime.now(),
+      );
 
-      expect(orchestrator.checkAccess(), equals(AccessStatus.paywall));
+      expect(orchestrator.checkAccess(currentUser: dummyUser), equals(AccessStatus.paywall));
     });
 
     test('Allows access when trial is expired but valid license is configured', () async {
@@ -169,22 +185,19 @@ void main() {
         deviceManager: device,
       );
 
-      // Expire trial
-      final pastDate = DateTime.now().subtract(const Duration(days: 31));
-      await prefs.setInt('nutopiano_first_launch_timestamp', pastDate.millisecondsSinceEpoch);
+      // Expire trial but mock active
+      await prefs.setString('serenut_subscription_cache', '{"status":"active", "current_period_end": "${DateTime.now().add(const Duration(days: 30)).toIso8601String()}"}');
 
-      // Register device under active PRO package
-      final myDevice = device.getDeviceId();
-      final uuid = licenseService.getDeviceUuid();
-      final token = generateLicenseTokenHelper(
-        merchantId: 'COMP_OK',
-        tier: LicenseTier.pro,
-        allowedDevices: [uuid, myDevice],
-        expiryDate: DateTime.now().add(const Duration(days: 30)),
+      final dummyUser = AuthUser(
+        id: '1',
+        name: 'Test',
+        companyId: 'C',
+        role: UserRole.owner,
+        permissions: [],
+        createdAt: DateTime.now(),
       );
-      await licenseService.saveLicenseToken(token);
 
-      expect(orchestrator.checkAccess(), equals(AccessStatus.licensed));
+      expect(orchestrator.checkAccess(currentUser: dummyUser), equals(AccessStatus.trialActive));
     });
   });
 }

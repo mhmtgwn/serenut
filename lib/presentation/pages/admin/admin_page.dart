@@ -12,7 +12,7 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/presentation/pages/admin/observability_dashboard.dart';
-import 'package:serenutos/presentation/pages/sync_conflict_page.dart';
+import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
@@ -109,7 +109,7 @@ class AdminPage extends ConsumerWidget {
               subtitle: syncState.lastError ?? 'Bilinmeyen hata',
               actionLabel: 'İncele',
               onAction: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const SyncConflictPage())),
+                  MaterialPageRoute(builder: (_) => const RecoveryCenterPage())),
             ),
             const SizedBox(height: 12),
           ],
@@ -130,14 +130,14 @@ class AdminPage extends ConsumerWidget {
             _AdminTile(
               icon: Icons.cloud_sync_rounded,
               color: hasConflict ? _kRed : _kBlue,
-              title: 'Senkronizasyon & Çakışmalar',
+              title: 'Senkronizasyon & Kurtarma',
               subtitle: hasConflict
                   ? '⚠️ Aktif çakışma — dokunun'
                   : 'Tüm sync oturumları ve incident geçmişi',
               badge: hasConflict ? '!' : null,
               badgeColor: _kRed,
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const SyncConflictPage())),
+                  MaterialPageRoute(builder: (_) => const RecoveryCenterPage())),
             ),
           ]),
           const SizedBox(height: 16),

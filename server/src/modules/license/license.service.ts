@@ -226,6 +226,33 @@ export class LicenseService {
     }
   }
 
+  public static async autoActivate(
+    companyId: string,
+    deviceHash: string,
+    deviceName: string,
+    enforceAuthUser?: any,
+    fingerprint?: any
+  ): Promise<any> {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      const keyRes = await client.query(
+        `SELECT license_key FROM license_entitlements WHERE company_id = $1 AND status IN ('active', 'trial') ORDER BY valid_until DESC LIMIT 1`,
+        [companyId]
+      );
+      if (keyRes.rows.length === 0) {
+        throw new Error('no_license_found');
+      }
+      await client.query('COMMIT');
+      return this.activate(keyRes.rows[0].license_key, deviceHash, deviceName, enforceAuthUser, fingerprint);
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   public static async validate(licenseKey: string, deviceHash: string): Promise<boolean> {
     const res = await pgPool.query(
       `SELECT da.status FROM device_activations da

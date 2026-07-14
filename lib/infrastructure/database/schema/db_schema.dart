@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/database/schema/db_schema.dart
+// lib/infrastructure/database/schema/db_schema.dart
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseSchema {
@@ -88,6 +88,7 @@ class DatabaseSchema {
         deleted_at TEXT,
         deleted_by TEXT,
         created_by TEXT,
+        entitlement_snapshot TEXT,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');

@@ -1,0 +1,216 @@
+/* ==========================================================================
+   SERENUT OS V2 - ADMIN CONTROL CENTER SPECIFIC STYLES
+   ========================================================================== */
+
+@import "/shared/css/tokens.css";
+@import "/shared/css/base.css";
+@import "/shared/css/components.css";
+@import "/shared/css/utilities.css";
+
+/* ── 1. ADMIN SHELL LAYOUT ───────────────────────────────────────────────── */
+#admin-app {
+  display: flex;
+  min-height: 100vh;
+  background-color: hsl(224, 71%, 3%);
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  background: hsl(222, 47%, 7%);
+  border-right: 1px solid var(--neutral-900);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-nav);
+  transition: transform var(--transition-normal);
+}
+
+.sidebar-header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--neutral-900);
+}
+
+.sidebar-brand {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  color: var(--neutral-50);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sidebar-brand svg {
+  color: var(--secondary-500);
+}
+
+.sidebar-nav {
+  flex-grow: 1;
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-y: auto;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--neutral-400);
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.sidebar-item:hover, .sidebar-item.active {
+  color: var(--secondary-400);
+  background: rgba(189, 0, 255, 0.05);
+}
+
+.sidebar-footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--neutral-900);
+}
+
+/* Main Dashboard Panel */
+.main-panel {
+  flex-grow: 1;
+  margin-left: var(--sidebar-w);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Topbar Header */
+.topbar {
+  height: var(--header-h);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--neutral-900);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-nav) - 1);
+}
+
+.topbar-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--neutral-50);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--neutral-300);
+  font-size: 0.9rem;
+}
+
+/* Content Area layout */
+.content-wrapper {
+  padding: var(--space-6);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* ── 2. SINGLE PAGE TAB PANELS ────────────────────────────────────────────── */
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+/* ── 3. LOGIN PAGE ───────────────────────────────────────────────────────── */
+#login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: radial-gradient(circle at 10% 20%, rgba(189, 0, 255, 0.05) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(0, 240, 255, 0.05) 0%, transparent 40%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+}
+
+/* ── 4. ANALYTICS CHART DETAILS ───────────────────────────────────────────── */
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  height: 280px;
+}
+
+/* System Health Bars */
+.health-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.health-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--neutral-300);
+}
+
+.health-bar-track {
+  height: 8px;
+  background: var(--neutral-800);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.health-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow) ease-in-out;
+}
+
+.health-bar-fill.normal {
+  background: var(--primary-500);
+}
+
+.health-bar-fill.warning {
+  background: var(--warning-500);
+}
+
+.health-bar-fill.danger {
+  background: var(--danger-500);
+}
+
+/* ── 5. RESPONSIVE DESIGN ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.active {
+    transform: translateX(0);
+  }
+  .main-panel {
+    margin-left: 0;
+  }
+}

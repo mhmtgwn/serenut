@@ -90,9 +90,7 @@ class HomePage extends ConsumerWidget {
                         // 1b. Trial / License Banner (görünür sadece uyarı varsa)
                         const TrialBannerWidget(),
 
-                        // 1c. Sync Conflict Banner
-                        if (syncState.status == SyncStatus.error)
-                          SyncConflictBanner(syncState: syncState),
+
 
                         const SizedBox(height: 8),
 
@@ -1104,60 +1102,3 @@ class _KpiData {
   });
 }
 
-// ── Sync Conflict Banner ──────────────────────────────────────────────────────
-/// Shown on Dashboard when syncState.status == SyncStatus.error.
-/// Minimal 1-line banner with "Detaylar" action.
-class SyncConflictBanner extends StatelessWidget {
-  final SyncState syncState;
-  const SyncConflictBanner({super.key, required this.syncState});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFECACA)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.cloud_off_rounded, color: Color(0xFFEF4444), size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              syncState.lastError ?? 'Senkronizasyon başarısız',
-              style: const TextStyle(
-                color: Color(0xFFDC2626),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => context.push(AppRoutes.syncConflict),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444),
-                borderRadius: BorderRadius.circular(7),
-              ),
-              child: const Text(
-                'Detaylar',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

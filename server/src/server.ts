@@ -244,14 +244,14 @@ app.use(enforceSchemaHandshake);
 app.get(['/pricing', '/pricing.html'], (req, res) => {
   res.redirect(301, '/plans.html');
 });
-app.get(['/marketing/pricing', '/marketing/pricing.html'], (req, res) => {
-  res.redirect(301, '/marketing/plans.html');
+app.get(['/marketing/pricing', '/marketing/pricing.html', '/marketing/plans.html'], (req, res) => {
+  res.redirect(301, '/plans.html');
 });
 app.get(['/features', '/features.html'], (req, res) => {
   res.redirect(301, '/platform.html');
 });
-app.get(['/marketing/features', '/marketing/features.html'], (req, res) => {
-  res.redirect(301, '/marketing/platform.html');
+app.get(['/marketing/features', '/marketing/features.html', '/marketing/platform.html'], (req, res) => {
+  res.redirect(301, '/platform.html');
 });
 app.get(['/login', '/login.html'], (req, res) => {
   res.redirect(301, '/portal/');
@@ -259,12 +259,15 @@ app.get(['/login', '/login.html'], (req, res) => {
 app.get(['/marketing/login', '/marketing/login.html'], (req, res) => {
   res.redirect(301, '/portal/');
 });
+app.get('/marketing*', (req, res) => {
+  res.redirect(301, '/');
+});
 
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
+app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
 app.use('/admin', express.static(path.join(process.cwd(), 'public/admin')));
 app.use('/portal', express.static(path.join(process.cwd(), 'public/portal')));
 app.use('/', express.static(path.join(process.cwd(), 'public/website')));
-app.use('/marketing', express.static(path.join(process.cwd(), '../web/marketing')));
 
 // ── ROUTERS — Auth & License (özel rate limitler) ────────────────────────────
 app.use('/api/v1/auth', authLimiter, authRouter);
@@ -623,4 +626,6 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+if (process.env.NODE_ENV !== 'test') {
+  bootstrap();
+}

@@ -183,7 +183,7 @@ class SystemTrustPanel extends ConsumerWidget {
                 color: syncOk ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                 label: 'Bulut Sync',
                 value: syncOk ? 'Stabil' : 'Çakışma',
-                onTap: () => context.push(AppRoutes.syncConflict),
+                onTap: null,
               ),
               _TrustMetric(
                 icon: Icons.verified_user_rounded,

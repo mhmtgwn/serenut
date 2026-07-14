@@ -597,6 +597,7 @@ class OfflineSyncService {
       'paymentMethod':   mapped,
       'status':          sale.status,
       'createdAt':       sale.createdAt.toIso8601String(),
+      'entitlement_snapshot': sale.entitlementSnapshot,
       'items':           sale.items.map((item) {
         return {
           'productId': item['product_id'],
