@@ -47,17 +47,17 @@ jobs:
           cd server
           npm run build
 
-      - name: Validate Database Schema Migrations (Up)
-        env:
-          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
-        run: |
-          cd server
-          npm run migrate
-
       - name: Create Test Database
         env:
           PGPASSWORD: postgrespassword
         run: psql -h localhost -U postgres -d postgres -c "CREATE DATABASE testdb;"
+
+      - name: Validate Database Schema Migrations (Up)
+        env:
+          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/testdb
+        run: |
+          cd server
+          npm run migrate
 
       - name: Run All Verification Tests
         env:
