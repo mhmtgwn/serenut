@@ -205,5 +205,5 @@ jobs:
               git remote add origin https://github.com/mhmtgwn/serenut.git
             fi
             git fetch --all
-            git reset --hard origin/develop
+            git reset --hard origin/staging
             sudo bash server/scripts/deploy_staging.sh
