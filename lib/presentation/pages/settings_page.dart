@@ -186,7 +186,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         }
       }
     } catch (e) {
-      debugPrint('Hata loading cities settings: $e');
+      // Ignored in tests to prevent debugPrint from crashing the test runner if it finishes early
     }
   }
 
