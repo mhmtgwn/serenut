@@ -1,5 +1,6 @@
 // lib/presentation/controllers/sales_controller.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/services/sales_service.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
@@ -141,6 +142,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       final sale = await _saleRepository.findById(saleId);
       await _salesService.cancelSale(saleId);
       try {
+        final auditService = await ref.read(auditServiceProvider.future);
         await auditService.logDelete('sale', saleId, 'Satış İptali: ₺${sale?.totalAmount.toStringAsFixed(2)}');
       } catch (e) {
         debugPrint('Failed to log sale cancellation audit event: $e');
