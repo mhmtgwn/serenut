@@ -13,7 +13,14 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/domain/services/i_printer_service.dart';
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    try {
+      // Pre-load cities.json into the rootBundle cache to prevent async Future leaks 
+      // where SettingsPage's initState loads it and completes after the test is closed.
+      await rootBundle.loadString('assets/data/cities.json');
+    } catch (_) {}
+
     InMemoryDb.settings = Settings(
       businessName: 'Test Market',
       businessPhone: '05554443322',

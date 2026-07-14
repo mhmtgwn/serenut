@@ -56,6 +56,7 @@ jobs:
 
       - name: Run All Verification Tests
         env:
+          NODE_ENV: test
           DATABASE_URL: postgres://postgres:postgrespassword@localhost:5432/postgres
           JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
           INVOICES_DIR: ./invoices
