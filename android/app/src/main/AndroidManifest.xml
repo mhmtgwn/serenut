@@ -23,6 +23,10 @@
     <!-- SMS izinleri -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     
+    <!-- Rehber izinleri -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    
     <!-- APK Kurulum izni (OTA Update Platform - Sprint 6) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     
