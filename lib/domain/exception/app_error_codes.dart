@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names
 // lib/domain/exception/app_error_codes.dart
 // PHASE 0 - Error Model (Day 2)
 // Centralized error codes for all business domains
