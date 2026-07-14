@@ -88,12 +88,17 @@ class ApiClient {
     Map<String, dynamic>? body,
     String? idempotencyKey,
   }) async {
+    String? resolvedIdempotencyKey = idempotencyKey;
+    if (resolvedIdempotencyKey == null && (method == 'POST' || method == 'PUT' || method == 'DELETE')) {
+      resolvedIdempotencyKey = const Uuid().v4();
+    }
+
     String cleanPath = path;
     if (cleanPath.startsWith('/api/v1') && _config.apiBaseUrl.endsWith('/api/v1')) {
       cleanPath = cleanPath.substring(7);
     }
     final uri = Uri.parse('${_config.apiBaseUrl}$cleanPath');
-    final headers = _buildHeaders(idempotencyKey: idempotencyKey);
+    final headers = _buildHeaders(idempotencyKey: resolvedIdempotencyKey);
     final String? bodyString = body != null ? jsonEncode(body) : null;
 
     final request = http.Request(method, uri);
@@ -133,7 +138,7 @@ class ApiClient {
         _refreshFuture = null; // reset for next time
 
         if (success) {
-          final newHeaders = _buildHeaders(idempotencyKey: idempotencyKey);
+          final newHeaders = _buildHeaders(idempotencyKey: resolvedIdempotencyKey);
           final retryRequest = http.Request(method, uri);
           retryRequest.headers.addAll(newHeaders);
           if (bodyString != null) {

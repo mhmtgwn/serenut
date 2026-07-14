@@ -5,6 +5,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/data_integrity_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+
+import 'package:serenutos/infrastructure/database/schema/db_triggers.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';
@@ -163,7 +165,7 @@ void main() {
       );
       expect(rows.isEmpty, isTrue);
 
-      await DatabaseManager().getDatabase();
+      await DatabaseTriggers.verifyAndRepairTriggers(db);
 
       rows = await db.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'"

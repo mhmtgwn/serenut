@@ -5,6 +5,19 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const envFile = nodeEnv === 'test' ? '.env.test' : '.env';
 dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
+// HARD GUARD: Prevent staging/test environments from connecting to production database.
+const dbUrl = process.env.DATABASE_URL || '';
+try {
+  const urlObj = new URL(dbUrl);
+  const dbName = urlObj.pathname.replace('/', '');
+  if ((nodeEnv === 'staging' || nodeEnv === 'test') && dbName === 'serenut_db') {
+    console.error(`🚨 FATAL SECURITY GUARD: Attempted to run ${nodeEnv} environment against PRODUCTION database! (${dbUrl})`);
+    process.exit(1);
+  }
+} catch (e) {
+  // Ignore URL parse errors, let normal validation handle it
+}
+
 // Environment Validation
 const isProduction = process.env.NODE_ENV === 'production';
 const requiredEnv = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET', 'RSA_PRIVATE_KEY'];

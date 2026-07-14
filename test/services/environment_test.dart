@@ -7,7 +7,7 @@ void main() {
     test('Resolves correct settings for dev environment', () {
       final config = EnvironmentConfig.fromEnv(AppEnvironment.dev);
       expect(config.environment, AppEnvironment.dev);
-      expect(config.apiBaseUrl, 'https://serenut.com/api/v1');
+      expect(config.apiBaseUrl, 'http://localhost:3000/api/v1');
       expect(config.authEndpoint, '/auth');
       expect(config.syncEndpoint, '/sync');
       expect(config.updateEndpoint, '/updates');
@@ -22,13 +22,16 @@ void main() {
     test('Resolves correct settings for prod environment', () {
       final config = EnvironmentConfig.fromEnv(AppEnvironment.prod);
       expect(config.environment, AppEnvironment.prod);
-      expect(config.apiBaseUrl, 'https://serenut.com/api/v1');
+      expect(config.apiBaseUrl, 'https://api.serenut.com/api/v1');
     });
 
     test('Loads default current config', () {
       final current = EnvironmentConfig.current;
-      const expectedEnvStr = String.fromEnvironment('ENVIRONMENT', defaultValue: 'prod');
-      final expectedEnv = AppEnvironment.values.firstWhere((e) => e.name == expectedEnvStr, orElse: () => AppEnvironment.prod);
+      const expectedEnvStr = String.fromEnvironment('ENVIRONMENT', defaultValue: '');
+      final expectedEnv = AppEnvironment.values.firstWhere(
+        (e) => e.name == (expectedEnvStr.isEmpty ? 'dev' : expectedEnvStr), 
+        orElse: () => AppEnvironment.dev
+      );
       expect(current.environment, expectedEnv);
     });
   });

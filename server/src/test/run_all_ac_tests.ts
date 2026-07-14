@@ -8,6 +8,47 @@ dotenv.config();
 import { exec } from 'child_process';
 import path from 'path';
 
+// ---------------------------------------------------------
+// FAIL-FAST GUARD: DATABASE ISOLATION
+// ---------------------------------------------------------
+if (process.env.NODE_ENV !== 'test') {
+  console.error('❌ FATAL: Test suite must run with NODE_ENV=test.');
+  process.exit(1);
+}
+
+const testDbUrl = process.env.TEST_DATABASE_URL;
+if (!testDbUrl) {
+  console.error('❌ FATAL: TEST_DATABASE_URL is not set for tests.');
+  process.exit(1);
+}
+
+const prodDbUrl = process.env.DATABASE_URL;
+if (prodDbUrl && testDbUrl === prodDbUrl) {
+  console.error('❌ FATAL: TEST_DATABASE_URL and DATABASE_URL resolve to the same destination. Tests aborted to prevent data loss.');
+  process.exit(1);
+}
+
+// Check against known production identifiers
+const prodIdentifiers = ['serenut.com', 'production', 'prod_db', 'supabase', 'rds.amazonaws.com'];
+for (const id of prodIdentifiers) {
+  if (testDbUrl.includes(id)) {
+    console.error(`❌ FATAL: TEST_DATABASE_URL contains production identifier '${id}'. Tests aborted to prevent data loss.`);
+    process.exit(1);
+  }
+}
+
+// Must explicitly state test or local DB
+if (!testDbUrl.includes('test') && !testDbUrl.includes('localhost') && !testDbUrl.includes('127.0.0.1')) {
+  console.error('❌ FATAL: TEST_DATABASE_URL does not look like a local or test database. Aborting.');
+  process.exit(1);
+}
+
+// Override DATABASE_URL for child processes
+process.env.DATABASE_URL = testDbUrl;
+
+console.log('✅ DATABASE ISOLATION VERIFIED: Running against safe test environment.');
+// ---------------------------------------------------------
+
 const testFiles = [
   'ac_trial.test.ts',
   'ac_license.test.ts',

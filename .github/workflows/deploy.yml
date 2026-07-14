@@ -137,14 +137,14 @@ jobs:
           name: serenut-pos-windows-build
           path: build/windows/x64/runner/Release/
 
-  deploy-staging:
-    name: Continuous Staging Deployment (VPS)
+  deploy-production:
+    name: Continuous Production Deployment (VPS)
     needs: [backend-ci]
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
 
     steps:
-      - name: Deploy to Staging VPS via SSH
+      - name: Deploy to Production VPS via SSH
         uses: appleboy/ssh-action@master
         with:
           host: "185.255.93.94"
@@ -177,9 +177,40 @@ jobs:
             # Execute Rollback & Schema integrity validation
             bash devops/migrate-with-rollback.sh || echo "⚠️ Migration script returned non-zero, continuing..."
             docker compose -f docker-compose.prod.yml build
-            # Restart Services with resource limits
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             sleep 25
             docker compose -f docker-compose.prod.yml exec -T backend node public/website/downloads/seed_production.js
-            logger info "Staging deployment and database release seeding completed successfully."
+            logger info "Production deployment and database release seeding completed successfully."
+
+  deploy-staging:
+    name: Continuous Staging Deployment (VPS)
+    needs: [backend-ci]
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to Staging VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: "185.255.93.94"
+          username: "root"
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACDAUAZVBGx/uZMjvl6CCmFZb2wZ4kEZ0aRQz3yTEImtHQAAAJi2hGXLtoRl
+            ywAAAAtzc2gtZWQyNTUxOQAAACDAUAZVBGx/uZMjvl6CCmFZb2wZ4kEZ0aRQz3yTEImtHQ
+            AAAEDqFwaBfVpVAtI/tjbKE8TJCuvhcCowW/N8YImQTPefRMBQBlUEbH+5kyO+XoIKYVlv
+            bBniQRnRpFDPfJMQia0dAAAAEW1obXRnd25AZ21haWwuY29tAQIDBA==
+            -----END OPENSSH PRIVATE KEY-----
+          port: ${{ secrets.STAGING_VPS_PORT || 22 }}
+          script: |
+            mkdir -p /var/www/serenut-staging
+            cd /var/www/serenut-staging
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin https://github.com/mhmtgwn/serenut.git
+            fi
+            git fetch --all
+            git reset --hard origin/develop
+            sudo bash server/scripts/deploy_staging.sh

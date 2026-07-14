@@ -88,8 +88,8 @@ void main() {
       // 4. Verify encrypted data can be decrypted using the same key and IV
       final encryptedBytes = base64Decode(uploadedBase64!);
       
-      final keyBytes = utf8.encode('serenut_log_sec_key_128b_!!'); // 32 bytes
-      final ivBytes = utf8.encode('serenut_log_iv!!'); // 16 bytes
+      final keyBytes = utf8.encode('default_log_sec_key_128b_!!_12345'.padRight(32, '0'));
+      final ivBytes = utf8.encode('default_log_iv!!'.padRight(16, '0'));
       
       final keyParam = KeyParameter(Uint8List.fromList(keyBytes.sublist(0, 16)));
       final params = ParametersWithIV(keyParam, Uint8List.fromList(ivBytes.sublist(0, 16)));

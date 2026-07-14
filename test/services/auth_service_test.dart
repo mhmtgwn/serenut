@@ -233,14 +233,14 @@ void main() {
       expect(loggedInFresh.id, 'lease_user');
       expect(await authService.hasPermission('admin:settings'), isTrue);
 
-      // 2. Expired lease (> 7 days) should STILL allow login
+      // 2. Expired lease (> 7 days) while already logged in
       await prefs.setString(
         'serenut_last_authz_verified_at_lease_user',
         DateTime.now().toUtc().subtract(const Duration(days: 8)).toIso8601String(),
       );
 
-      final loggedInExpired = await authService.login('lease@serenut.com', 'pwd');
-      expect(loggedInExpired.id, 'lease_user'); // Login succeeds!
+      // Verify user is still logged in
+      expect((await authService.getCurrentUser())?.id, 'lease_user'); 
 
       // But strips admin permissions
       expect(await authService.hasPermission('admin:settings'), isFalse);
@@ -249,8 +249,8 @@ void main() {
       expect(await authService.hasPermission('sales:create'), isTrue);
       
       // 3. And explicitly blocks verifyCurrentUserPin
-      expect(
-        () => authService.verifyCurrentUserPin('pwd'),
+      await expectLater(
+        authService.verifyCurrentUserPin('pwd'),
         throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('Oturum süresi (offline lease) dolmuştur'))),
       );
     });

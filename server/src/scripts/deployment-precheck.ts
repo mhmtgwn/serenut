@@ -107,6 +107,32 @@ async function runPrecheck() {
     console.log('✅ [PASS] System Resources: Memory footprint is within safe operating parameters.');
   }
 
+  // 5. External Credentials Validation (SMS & Email)
+  const smsKey = process.env.SMS_API_KEY;
+  if (!smsKey || smsKey.toLowerCase().includes('mock') || smsKey.toLowerCase().includes('test')) {
+    console.error('❌ [FAIL] SMS Configuration: Mock or missing SMS credentials detected in production.');
+    failed = true;
+  } else {
+    console.log('✅ [PASS] SMS Configuration: Production SMS credentials present.');
+  }
+
+  const emailHost = process.env.SMTP_HOST;
+  const emailUser = process.env.SMTP_USER;
+  if (!emailHost || emailHost.toLowerCase().includes('mailtrap') || emailHost.toLowerCase().includes('mock') || !emailUser || emailUser.toLowerCase().includes('mock')) {
+    console.error('❌ [FAIL] Email Configuration: Mock or missing SMTP credentials detected in production.');
+    failed = true;
+  } else {
+    console.log('✅ [PASS] Email Configuration: Production SMTP credentials present.');
+  }
+
+  // 6. Unsafe Development Flags
+  if (process.env.ENABLE_TEST_ENDPOINTS === 'true' || process.env.BYPASS_AUTH === 'true' || process.env.DEBUG === 'true') {
+    console.error('❌ [FAIL] Security: Unsafe development flags detected in production environment.');
+    failed = true;
+  } else {
+    console.log('✅ [PASS] Security: No unsafe development flags detected.');
+  }
+
   console.log('===============================================================');
   if (failed) {
     console.error('❌ PRE-DEPLOYMENT CHECKS FAILED. Deployment blocked to prevent environment downtime.');
