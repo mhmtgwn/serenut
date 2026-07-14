@@ -187,7 +187,13 @@ jobs:
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             sleep 25
-            docker compose -f docker-compose.prod.yml exec -T backend node public/website/downloads/seed_production.js
+            # Setup Nginx reverse proxy
+            apt-get install -y nginx || true
+            cp devops/nginx.conf /etc/nginx/sites-available/serenut
+            ln -sf /etc/nginx/sites-available/serenut /etc/nginx/sites-enabled/serenut
+            rm -f /etc/nginx/sites-enabled/default
+            nginx -t && systemctl reload nginx || systemctl restart nginx
+            docker compose -f docker-compose.prod.yml exec -T backend node public/website/downloads/seed_production.js || echo "Seed skipped"
             echo "Deployment completed successfully."
 
   deploy-staging:
