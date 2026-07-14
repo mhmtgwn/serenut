@@ -156,39 +156,28 @@ jobs:
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
 
-    env:
-      VPS_HOST: "185.255.93.94"
-      VPS_USER: "root"
-      VPS_PASS: ${{ secrets.VPS_SSH_PASSWORD }}
-      GH_ACTOR: ${{ github.actor }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_SHA: ${{ github.sha }}
-
     steps:
-      - name: Install sshpass
-        run: sudo apt-get install -y sshpass
-
-      - name: Test SSH Connection
-        run: |
-          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST "echo 'SSH OK' && whoami"
-
       - name: Deploy to Production VPS via SSH
-        run: |
-          sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 $VPS_USER@$VPS_HOST bash << 'ENDSSH'
-            set -e
+        uses: appleboy/ssh-action@master
+        with:
+          host: "185.255.93.94"
+          username: "root"
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
             mkdir -p /var/www/serenut
             cd /var/www/serenut
             if [ ! -d .git ]; then
               git init
-              git remote add origin https://$GH_ACTOR:$GH_TOKEN@github.com/mhmtgwn/serenut.git
+              git remote add origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
             else
-              git remote set-url origin https://$GH_ACTOR:$GH_TOKEN@github.com/mhmtgwn/serenut.git
+              git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
             fi
             git fetch --all
             git reset --hard origin/main
             cd server
             sed -i '/^GIT_COMMIT=/d' .env.production || true
-            echo "GIT_COMMIT=$GH_SHA" >> .env.production
+            echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
             npm ci --only=production --legacy-peer-deps
             set -a
             [ -f .env.production ] && . .env.production
@@ -200,7 +189,6 @@ jobs:
             sleep 25
             docker compose -f docker-compose.prod.yml exec -T backend node public/website/downloads/seed_production.js
             echo "Deployment completed successfully."
-          ENDSSH
 
   deploy-staging:
     name: Continuous Staging Deployment (VPS)
