@@ -43,7 +43,8 @@ void main() {
       securityGate = SecurityGate(licenseService, trialManager);
     });
 
-    test('OrderMathEngine - Safe decimal calculations without precision drifts', () {
+    test('OrderMathEngine - Safe decimal calculations without precision drifts',
+        () {
       final subtotal = OrderMathEngine.calculateItemSubtotal(19.90, 1.5);
       expect(subtotal, 29.85); // 1.5 * 19.90 = 29.85
 
@@ -98,10 +99,12 @@ void main() {
       final savedOrder = await orderRepo.findById('ord-test-123');
       expect(savedOrder, isNotNull);
       expect(savedOrder!.items, hasLength(1));
-      expect(savedOrder.items.first['quantity'], 1.5); // Verify double quantity is preserved!
+      expect(savedOrder.items.first['quantity'],
+          1.5); // Verify double quantity is preserved!
     });
 
-    test('PrinterService - Queue execution doesn’t break on job failures', () async {
+    test('PrinterService - Queue execution doesn’t break on job failures',
+        () async {
       final printerService = PrinterService((ip, port, {timeout}) async {
         throw Exception('Connection failed');
       });
@@ -131,7 +134,8 @@ void main() {
 
       expect(printerService.queue, hasLength(2));
       expect(printerService.queue[0].status, 'failed');
-      expect(printerService.queue[1].status, 'success'); // Job 2 successfully ran despite Job 1 failure!
+      expect(printerService.queue[1].status,
+          'success'); // Job 2 successfully ran despite Job 1 failure!
     });
 
     test('LabelLayoutEngine - Beautiful ESC/POS label bytes generation', () {

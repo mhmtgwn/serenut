@@ -140,7 +140,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         eventType: 'order_created',
         entityType: 'order',
         entityId: order.id,
-        newValue: 'Tutar: ₺${total.toStringAsFixed(2)}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
+        newValue:
+            'Tutar: ₺${total.toStringAsFixed(2)}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
         notes: 'Yeni sipariş oluşturuldu: ${order.id}',
       );
     } catch (_) {}
@@ -161,7 +162,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         eventType: 'order_updated',
         entityType: 'order',
         entityId: order.id,
-        newValue: 'Durum: ${order.status}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
+        newValue:
+            'Durum: ${order.status}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
         notes: 'Sipariş güncellendi: ${order.id}',
       );
     } catch (_) {}
@@ -169,7 +171,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     await refresh();
   }
 
-  Future<void> deleteOrder(String id, {String? approvedByUserId, String? approvedByUserName}) async {
+  Future<void> deleteOrder(String id,
+      {String? approvedByUserId, String? approvedByUserName}) async {
     await future;
     final order = await _repository.findById(id);
     await _repository.delete(id);

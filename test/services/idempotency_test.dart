@@ -1,6 +1,7 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
@@ -22,6 +23,7 @@ class FakeSecurityGate implements SecurityGate {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
@@ -39,6 +41,7 @@ void main() {
     late SalesService salesService;
 
     setUp(() async {
+      SharedPreferences.setMockInitialValues({});
       final databasePath = await getDatabasesPath();
       final path = join(databasePath, 'serenut_pos_idempotency.db');
       await deleteDatabase(path);
@@ -111,7 +114,9 @@ void main() {
       await databaseManager.close();
     });
 
-    test('Should block writes and throw DatabaseLockedException when database is write-locked', () async {
+    test(
+        'Should block writes and throw DatabaseLockedException when database is write-locked',
+        () async {
       DatabaseManager.isWriteLocked = true;
 
       expect(
@@ -127,12 +132,15 @@ void main() {
       );
     });
 
-    test('Should complete sale idempotently if idempotencyKey is used twice', () async {
+    test('Should complete sale idempotently if idempotencyKey is used twice',
+        () async {
       const idempotencyKey = 'key-unique-123';
 
       final sale1 = await salesService.createSale(
         customerId: 'cust-1',
-        items: [SaleItemInput(productId: 'prod-1', quantity: 2, unitPrice: 50.0)],
+        items: [
+          SaleItemInput(productId: 'prod-1', quantity: 2, unitPrice: 50.0)
+        ],
         paymentMethod: 'cash',
         paidAmount: 100.0,
         idempotencyKey: idempotencyKey,
@@ -148,7 +156,9 @@ void main() {
       // Try creating the exact same sale with the same idempotency key again
       final sale2 = await salesService.createSale(
         customerId: 'cust-1',
-        items: [SaleItemInput(productId: 'prod-1', quantity: 2, unitPrice: 50.0)],
+        items: [
+          SaleItemInput(productId: 'prod-1', quantity: 2, unitPrice: 50.0)
+        ],
         paymentMethod: 'cash',
         paidAmount: 100.0,
         idempotencyKey: idempotencyKey,
@@ -169,7 +179,9 @@ void main() {
 
       final sale = await salesService.createSale(
         customerId: 'cust-1',
-        items: [SaleItemInput(productId: 'prod-1', quantity: 15, unitPrice: 50.0)],
+        items: [
+          SaleItemInput(productId: 'prod-1', quantity: 15, unitPrice: 50.0)
+        ],
         paymentMethod: 'cash',
         paidAmount: 750.0,
       );
@@ -185,7 +197,9 @@ void main() {
       expect(allSales.length, equals(1));
     });
 
-    test('Should defer event publishing until transaction commits, and discard events on rollback', () async {
+    test(
+        'Should defer event publishing until transaction commits, and discard events on rollback',
+        () async {
       final events = <DomainEvent>[];
       eventPublisher.subscribe<DomainEvent>((e) => events.add(e));
 

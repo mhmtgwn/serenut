@@ -54,7 +54,6 @@ const _kTeal = Color(0xFF5856D6);
 const _kTealLight = Color(0xFF00C7BE);
 
 class DataTransferPage extends ConsumerStatefulWidget {
-
   const DataTransferPage({super.key});
 
   @override
@@ -98,7 +97,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             _buildRoundedCard([
               _buildTransferRow(
                 title: 'Ürün Kataloğu İçe Aktar (.zip / .xlsx)',
-                subtitle: 'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',
+                subtitle:
+                    'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',
                 icon: Icons.upload_file_rounded,
                 color: _kGreen,
                 onTap: () => _handleImportZipCatalog(context),
@@ -126,7 +126,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             _buildRoundedCard([
               _buildTransferRow(
                 title: 'Ürün Kataloğu Dışarı Aktar (.zip)',
-                subtitle: 'Mevcut kataloğu Excel tablosu ve görsellerle yedekler.',
+                subtitle:
+                    'Mevcut kataloğu Excel tablosu ve görsellerle yedekler.',
                 icon: Icons.download_rounded,
                 color: _kTealLight,
                 onTap: () => _handleExportZipCatalog(context),
@@ -147,7 +148,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             _buildRoundedCard([
               _buildTransferRow(
                 title: 'Tüm Ürün Kataloğunu Temizle',
-                subtitle: 'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
+                subtitle:
+                    'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
                 icon: Icons.delete_sweep_rounded,
                 color: _kPink,
                 onTap: () => _clearAllProducts(),
@@ -155,7 +157,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
               const _Divider(),
               _buildTransferRow(
                 title: 'Tüm Verileri Sıfırla (Fabrika Ayarları)',
-                subtitle: 'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
+                subtitle:
+                    'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
                 icon: Icons.phonelink_erase_rounded,
                 color: _kPink,
                 onTap: () => _resetAllUserData(),
@@ -186,12 +189,16 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
               children: [
                 Text(
                   'Veri Yönetim Paneli',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _kTextPrimary),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: _kTextPrimary),
                 ),
                 SizedBox(height: 4),
                 Text(
                   'Bu panelden katalog verinizi yedekleyebilir, yeni kataloglar yükleyebilir veya müşteri listelerinizi aktarabilirsiniz.',
-                  style: TextStyle(fontSize: 12, color: _kTextSecondary, height: 1.3),
+                  style: TextStyle(
+                      fontSize: 12, color: _kTextSecondary, height: 1.3),
                 ),
               ],
             ),
@@ -263,17 +270,22 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _kTextPrimary),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: _kTextPrimary),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                      style:
+                          const TextStyle(color: _kTextSecondary, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
+              const Icon(Icons.chevron_right_rounded,
+                  color: _kTextSecondary, size: 20),
             ],
           ),
         ),
@@ -316,17 +328,21 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.cleaning_services_rounded, color: Color(0xFFF59E0B), size: 24),
+                    Icon(Icons.cleaning_services_rounded,
+                        color: Color(0xFFF59E0B), size: 24),
                     SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Standart Sıfırlama', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text('Standart Sıfırlama',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15)),
                           SizedBox(height: 2),
                           Text(
                             'Satışlar, siparişler, müşteriler ve ürünler silinir. Ayarlar ve yedekler korunur.',
-                            style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                            style: TextStyle(
+                                color: Color(0xFF64748B), fontSize: 12),
                           ),
                         ],
                       ),
@@ -349,17 +365,23 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 24),
+                    Icon(Icons.delete_forever_rounded,
+                        color: Color(0xFFDC2626), size: 24),
                     SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Tam Temizlik', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFFDC2626))),
+                          Text('Tam Temizlik',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Color(0xFFDC2626))),
                           SizedBox(height: 2),
                           Text(
                             'Tüm veriler, ayarlar, PIN kodu ve yedekler silinir. Cihaz fabrika ayarlarına döner.',
-                            style: TextStyle(color: Color(0xFF991B1B), fontSize: 12),
+                            style: TextStyle(
+                                color: Color(0xFF991B1B), fontSize: 12),
                           ),
                         ],
                       ),
@@ -373,7 +395,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal', style: TextStyle(color: Color(0xFF64748B))),
+            child:
+                const Text('İptal', style: TextStyle(color: Color(0xFF64748B))),
           ),
         ],
       ),
@@ -382,7 +405,9 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
     if (resetType == null || !mounted) return;
 
     // Second confirmation dialog
-    final title = resetType == 'standard' ? 'Standart Sıfırlama Onayı' : 'Tam Temizlik Onayı';
+    final title = resetType == 'standard'
+        ? 'Standart Sıfırlama Onayı'
+        : 'Tam Temizlik Onayı';
     final desc = resetType == 'standard'
         ? 'Tüm satışlar, siparişler, müşteriler ve ürünler kalıcı olarak silinecek. Ayarlarınız ve yedekleriniz korunacak.\n\nBu işlem geri alınamaz!'
         : 'Tüm veriler, ayarlar, PIN kodu, kullanıcılar ve yedekler silinecek. Cihaz ilk kurulum ekranına dönecek.\n\nBu işlem KESİNLİKLE geri alınamaz!';
@@ -391,21 +416,28 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Text(desc, style: const TextStyle(fontSize: 14, color: Color(0xFF475569))),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(desc,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF475569))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Vazgeç', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text('Vazgeç',
+                style: TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: resetType == 'full' ? const Color(0xFFDC2626) : const Color(0xFFF59E0B),
+              backgroundColor: resetType == 'full'
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFFF59E0B),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text(resetType == 'standard' ? 'Standart Sıfırla' : 'Her Şeyi Sil'),
+            child: Text(
+                resetType == 'standard' ? 'Standart Sıfırla' : 'Her Şeyi Sil'),
           ),
         ],
       ),
@@ -413,31 +445,28 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
     if (confirmed != true || !mounted) return;
 
-    requireAdminAccess(
-      context,
-      title: 'Sıfırlama Yetkisi',
-      requirePin: true,
-      requireConfirm: true,
-      onGranted: (approvedByUserId, approvedByUserName) async {
-        // Show loading
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(_kPink),
-            ),
+    requireAdminAccess(context,
+        title: 'Sıfırlama Yetkisi', requirePin: true, requireConfirm: true,
+        onGranted: (approvedByUserId, approvedByUserName) async {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(_kPink),
           ),
-        );
+        ),
+      );
 
-        try {
-          final auditService = await ref.read(auditServiceProvider.future);
-          await auditService.logSystemAction(
-            'database_reset',
-            'Sıfırlama Tipi: $resetType',
-            approvedByUserId: approvedByUserId,
-            approvedByUserName: approvedByUserName,
-          );
+      try {
+        final auditService = await ref.read(auditServiceProvider.future);
+        await auditService.logSystemAction(
+          'database_reset',
+          'Sıfırlama Tipi: $resetType',
+          approvedByUserId: approvedByUserId,
+          approvedByUserName: approvedByUserName,
+        );
         if (resetType == 'standard') {
           // ── Standart Sıfırlama: Sadece operasyonel veri ──
           // KRİTİK C DÜZELTMESİ: Tüm silme işlemleri tek bir SQLite transaction
@@ -459,7 +488,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                 // 4. Finansal işlemler (borç/tahsilat)
                 await txn.rawDelete('DELETE FROM financial_transactions');
                 // 6. Müşteriler — peşin müşteri (id='' veya id='default') korunur
-                await txn.rawDelete("DELETE FROM customers WHERE id != '' AND id != 'default'");
+                await txn.rawDelete(
+                    "DELETE FROM customers WHERE id != '' AND id != 'default'");
               } finally {
                 // Disable ledger bypass flag to restore immutability
                 await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
@@ -471,7 +501,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             InMemoryDb.sales.clear();
             InMemoryDb.transactions.clear();
             InMemoryDb.orders.clear();
-            final defaultCust = InMemoryDb.customers.where((c) => c.id.isEmpty).toList();
+            final defaultCust =
+                InMemoryDb.customers.where((c) => c.id.isEmpty).toList();
             InMemoryDb.customers.clear();
             InMemoryDb.customers.addAll(defaultCust);
           }
@@ -496,7 +527,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Operasyonel veriler başarıyla sıfırlandı. Ayarlar korundu.'),
+                content: Text(
+                    'Operasyonel veriler başarıyla sıfırlandı. Ayarlar korundu.'),
                 backgroundColor: Color(0xFF10B981),
                 behavior: SnackBarBehavior.floating,
               ),
@@ -532,7 +564,8 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Tüm veriler silindi. Sistem ilk kuruluma hazırlanıyor...'),
+                content: Text(
+                    'Tüm veriler silindi. Sistem ilk kuruluma hazırlanıyor...'),
                 backgroundColor: Color(0xFF10B981),
                 behavior: SnackBarBehavior.floating,
               ),
@@ -556,13 +589,13 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
     });
   }
 
-
   Future<void> _clearAllProducts() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Kataloğu Temizle'),
-        content: const Text('Katalogdaki tüm ürünler silinecektir. Bu işlem geri alınamaz. Emin misiniz?'),
+        content: const Text(
+            'Katalogdaki tüm ürünler silinecektir. Bu işlem geri alınamaz. Emin misiniz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -659,4 +692,3 @@ class _Divider extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── ASENKRON İŞLEM DİYALOGLARI (UI DONDURMAYAN VE ÇAKIŞMAYAN YAPILAR) ─────────
 // ══════════════════════════════════════════════════════════════════════════════
-

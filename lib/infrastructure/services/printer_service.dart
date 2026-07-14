@@ -28,18 +28,33 @@ class EscPosCommands {
   static const List<int> boldOn = [0x1B, 0x45, 0x01];
   static const List<int> boldOff = [0x1B, 0x45, 0x00];
   static const List<int> sizeNormal = [0x1D, 0x21, 0x00];
-  static const List<int> sizeMedium = [0x1D, 0x21, 0x01]; // Double height, normal width
-  static const List<int> sizeLarge = [0x1D, 0x21, 0x11]; // Double width & height
+  static const List<int> sizeMedium = [
+    0x1D,
+    0x21,
+    0x01
+  ]; // Double height, normal width
+  static const List<int> sizeLarge = [
+    0x1D,
+    0x21,
+    0x11
+  ]; // Double width & height
   static const List<int> lf = [0x0A];
   static const List<int> cut = [0x1D, 0x56, 0x41, 0x08]; // Feed & Cut
   static const List<int> beep = [0x1B, 0x42, 0x04, 0x02]; // Sound buzzer
-  static const List<int> openDrawer = [0x1B, 0x70, 0x00, 0x19, 0xFA]; // RJ11 drawer open
+  static const List<int> openDrawer = [
+    0x1B,
+    0x70,
+    0x00,
+    0x19,
+    0xFA
+  ]; // RJ11 drawer open
 }
 
 /// Service to handle connection, receipt formatting, and binary transmission
 class PrinterService with ChangeNotifier implements IPrinterService {
   // Socket connector abstraction for mock tests
-  final Future<Socket> Function(String, int, {Duration? timeout})? _socketConnector;
+  final Future<Socket> Function(String, int, {Duration? timeout})?
+      _socketConnector;
   final PersistentPrintQueue? _persistentQueue;
 
   final List<PrintJob> _queue = [];
@@ -81,7 +96,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   /// Clears completed/failed jobs from queue
   @override
   void clearQueue() {
-    _queue.removeWhere((job) => job.status == 'success' || job.status == 'failed');
+    _queue.removeWhere(
+        (job) => job.status == 'success' || job.status == 'failed');
     notifyListeners();
   }
 
@@ -127,7 +143,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     // Windows & iOS
     if (Platform.isWindows || Platform.isIOS) {
-      if (Platform.isWindows && printerName != null && printerName.isNotEmpty && !printerName.contains('.')) {
+      if (Platform.isWindows &&
+          printerName != null &&
+          printerName.isNotEmpty &&
+          !printerName.contains('.')) {
         return PrinterBackend.usb;
       }
       return (ip != null && ip.isNotEmpty)
@@ -165,12 +184,14 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   /// Helper to send bytes with Sunmi → Network → Bluetooth → PersistentQueue failover.
-  Future<void> _sendBytes(List<int> bytes, Settings settings, {PrinterPurpose purpose = PrinterPurpose.receipt}) async {
+  Future<void> _sendBytes(List<int> bytes, Settings settings,
+      {PrinterPurpose purpose = PrinterPurpose.receipt}) async {
     final targetSettings = _getSettingsForPurpose(settings, purpose);
 
     if (_socketConnector != null && _persistentQueue == null) {
       // Test mode — use mock socket directly
-      await _sendViaTcp(bytes, targetSettings.printerIp ?? '127.0.0.1', targetSettings.printerPort);
+      await _sendViaTcp(bytes, targetSettings.printerIp ?? '127.0.0.1',
+          targetSettings.printerPort);
       return;
     }
 
@@ -191,7 +212,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final queue = _persistentQueue;
     if (queue != null) {
       await queue.enqueue(
-        title: purpose == PrinterPurpose.label ? 'Etiket (failover)' : 'Fis (failover)',
+        title: purpose == PrinterPurpose.label
+            ? 'Etiket (failover)'
+            : 'Fis (failover)',
         receiptJson: bytes.join(','), // Compact byte list
       );
     }
@@ -208,7 +231,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final ip = settings.printerIp?.trim();
 
     if (Platform.isIOS || Platform.isWindows) {
-      if (Platform.isWindows && printerName != null && printerName.isNotEmpty && !printerName.contains('.')) {
+      if (Platform.isWindows &&
+          printerName != null &&
+          printerName.isNotEmpty &&
+          !printerName.contains('.')) {
         chain.add(PrinterBackend.usb);
       }
       chain.add(PrinterBackend.network);
@@ -251,7 +277,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         if (!ok) throw Exception('USB print failed');
       case PrinterBackend.network:
         final ip = settings.printerIp?.trim();
-        if (ip == null || ip.isEmpty) throw Exception('No printer IP configured');
+        if (ip == null || ip.isEmpty)
+          throw Exception('No printer IP configured');
         await _sendViaTcp(bytes, ip, settings.printerPort);
       case PrinterBackend.bluetooth:
         final mac = settings.printerName?.trim() ?? '';
@@ -271,8 +298,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         final socket = _socketConnector != null
-            ? await _socketConnector!(ip, port, timeout: const Duration(seconds: 5))
-            : await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
+            ? await _socketConnector!(ip, port,
+                timeout: const Duration(seconds: 5))
+            : await Socket.connect(ip, port,
+                timeout: const Duration(seconds: 5));
         try {
           socket.add(bytes);
           await socket.flush();
@@ -292,7 +321,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       return true; // Android devices always support local/built-in printing fallbacks
     }
     return (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-           (settings.printerName != null && settings.printerName!.isNotEmpty);
+        (settings.printerName != null && settings.printerName!.isNotEmpty);
   }
 
   /// Backward-compatible TCP test (used by printer_service_test.dart).
@@ -310,7 +339,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('Yazıcı Bağlantı Testi\n'));
-    bytes.addAll(_textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(_textToBytes('Durum: BAĞLANTI BAŞARILI! :)\n'));
     bytes.addAll(EscPosCommands.lf);
@@ -326,14 +356,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final List<int> bytes = [];
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('SERENUT POS\n'));
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('Yazıcı Bağlantı Testi\n'));
-    bytes.addAll(_textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(_textToBytes('Durum: BAĞLANTI BAŞARILI! :)\n'));
     bytes.addAll(EscPosCommands.lf);
@@ -354,18 +386,21 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!_hasPrinter(settings)) return;
 
     final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58) ? 32 : 48;
+    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
+        ? 32
+        : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
-    
+
     // Trigger physical cash drawer open for cash transactions
     if (sale.paymentMethod == 'cash') {
       bytes.addAll(EscPosCommands.openDrawer);
     }
 
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
 
     // 0. Logo (Centred)
     final logo = await _getLogoBytes(settings.businessLogo);
@@ -393,8 +428,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // 2. Info (Left aligned)
     bytes.addAll(EscPosCommands.alignLeft);
     bytes.addAll(_textToBytes('Fiş No: #${sale.id.toShortId}\n'));
-    bytes.addAll(_textToBytes('Tarih: ${sale.createdAt.toString().substring(0, 16)}\n'));
-    bytes.addAll(_textToBytes('Ödeme: ${_getPaymentLabel(sale.paymentMethod)}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${sale.createdAt.toString().substring(0, 16)}\n'));
+    bytes.addAll(
+        _textToBytes('Ödeme: ${_getPaymentLabel(sale.paymentMethod)}\n'));
     if (sale.createdBy != null && sale.createdBy!.isNotEmpty) {
       bytes.addAll(_textToBytes('Kasiyer: ${sale.createdBy}\n'));
     }
@@ -421,12 +458,13 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final details = '(${_formatQty(qty)} x ${price.toStringAsFixed(2)})';
       final left = '$name $details'.replaceAll('₺', 'TL');
       final right = '${subtotal.toStringAsFixed(2)} $currency';
-      
+
       if (left.length + right.length + 1 <= width) {
         bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
       } else {
         // Truncate name if it overflows width, preventing messy wrapping
-        final displayName = name.length > width ? '${name.substring(0, width - 3)}...' : name;
+        final displayName =
+            name.length > width ? '${name.substring(0, width - 3)}...' : name;
         bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
@@ -437,12 +475,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // 4. Totals (Right aligned)
     bytes.addAll(EscPosCommands.alignRight);
     bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('TOPLAM: ${sale.totalAmount.toStringAsFixed(2)} $currency\n'));
+    bytes.addAll(_textToBytes(
+        'TOPLAM: ${sale.totalAmount.toStringAsFixed(2)} $currency\n'));
     bytes.addAll(EscPosCommands.boldOff);
-    bytes.addAll(_textToBytes('Ödenen: ${sale.paidAmount.toStringAsFixed(2)} $currency\n'));
+    bytes.addAll(_textToBytes(
+        'Ödenen: ${sale.paidAmount.toStringAsFixed(2)} $currency\n'));
     final debt = sale.totalAmount - sale.paidAmount;
     if (debt > 0) {
-      bytes.addAll(_textToBytes('Kalan Borç: ${debt.toStringAsFixed(2)} $currency\n'));
+      bytes.addAll(
+          _textToBytes('Kalan Borç: ${debt.toStringAsFixed(2)} $currency\n'));
     }
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
@@ -454,7 +495,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       bytes.addAll(EscPosCommands.lf);
     }
 
-    bytes.addAll(_textToBytes('Bizi tercih ettiğiniz için\nteşekkür ederiz!\n'));
+    bytes
+        .addAll(_textToBytes('Bizi tercih ettiğiniz için\nteşekkür ederiz!\n'));
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(EscPosCommands.cut);
@@ -475,12 +517,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!_hasPrinter(settings)) return;
 
     final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58) ? 32 : 48;
+    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
+        ? 32
+        : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
 
     // 0. Logo (Centred)
     final logo = await _getLogoBytes(settings.businessLogo);
@@ -511,9 +556,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(_textToBytes('*** SİPARİŞ FİŞİ ***\n'));
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('Sipariş No: #${order.id.toShortId}\n'));
-    bytes.addAll(_textToBytes('Tarih: ${order.createdAt.toString().substring(0, 16)}\n'));
+    bytes.addAll(_textToBytes(
+        'Tarih: ${order.createdAt.toString().substring(0, 16)}\n'));
     if (order.expectedDeliveryDate != null) {
-      bytes.addAll(_textToBytes('Teslim Tarihi: ${order.expectedDeliveryDate!.toString().substring(0, 10)}\n'));
+      bytes.addAll(_textToBytes(
+          'Teslim Tarihi: ${order.expectedDeliveryDate!.toString().substring(0, 10)}\n'));
     }
     if (customer != null) {
       bytes.addAll(_textToBytes('Müşteri: ${customer.name}\n'));
@@ -546,11 +593,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final details = '(${_formatQty(qty)} x ${price.toStringAsFixed(2)})';
       final left = '$name $details'.replaceAll('₺', 'TL');
       final right = '${subtotal.toStringAsFixed(2)} $currency';
-      
+
       if (left.length + right.length + 1 <= width) {
         bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
       } else {
-        final displayName = name.length > width ? '${name.substring(0, width - 3)}...' : name;
+        final displayName =
+            name.length > width ? '${name.substring(0, width - 3)}...' : name;
         bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
@@ -561,14 +609,17 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // 4. Totals (Right aligned)
     bytes.addAll(EscPosCommands.alignRight);
     bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('TOPLAM: ${totalAmount.toStringAsFixed(2)} $currency\n'));
+    bytes.addAll(
+        _textToBytes('TOPLAM: ${totalAmount.toStringAsFixed(2)} $currency\n'));
     bytes.addAll(EscPosCommands.boldOff);
 
     if (paidAmount != null) {
-      bytes.addAll(_textToBytes('Ödenen: ${paidAmount.toStringAsFixed(2)} $currency\n'));
+      bytes.addAll(
+          _textToBytes('Ödenen: ${paidAmount.toStringAsFixed(2)} $currency\n'));
       final debt = totalAmount - paidAmount;
       if (debt > 0) {
-        bytes.addAll(_textToBytes('Kalan Borç: ${debt.toStringAsFixed(2)} $currency\n'));
+        bytes.addAll(
+            _textToBytes('Kalan Borç: ${debt.toStringAsFixed(2)} $currency\n'));
       }
     }
     bytes.addAll(EscPosCommands.alignCenter);
@@ -579,7 +630,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(_generateQrCodeBytes(qrData));
     bytes.addAll(EscPosCommands.lf);
 
-    bytes.addAll(_textToBytes('Bizi tercih ettiğiniz için\nteşekkür ederiz!\n'));
+    bytes
+        .addAll(_textToBytes('Bizi tercih ettiğiniz için\nteşekkür ederiz!\n'));
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(EscPosCommands.cut);
@@ -599,12 +651,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!_hasPrinter(settings)) return;
 
     final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58) ? 32 : 48;
+    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
+        ? 32
+        : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
 
     // 0. Logo (Centred)
     final logo = await _getLogoBytes(settings.businessLogo);
@@ -640,9 +695,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     // 3. Info (Left aligned)
     bytes.addAll(EscPosCommands.alignLeft);
-    bytes.addAll(_textToBytes('Tarih: ${DateTime.now().toString().substring(0, 16)}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 16)}\n'));
     bytes.addAll(_textToBytes('Müşteri: ${customer.name}\n'));
-    bytes.addAll(_textToBytes('Ödeme Yöntemi: ${_getPaymentLabel(paymentMethod)}\n'));
+    bytes.addAll(
+        _textToBytes('Ödeme Yöntemi: ${_getPaymentLabel(paymentMethod)}\n'));
     if (notes != null && notes.trim().isNotEmpty) {
       bytes.addAll(_textToBytes('Not: ${notes.trim()}\n'));
     }
@@ -666,7 +723,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     } else {
       balText = 'Bakiye: 0.00 $currency';
     }
-    bytes.addAll(_textToBytes('${_formatLine("Güncel Bakiye:", balText, width)}\n'));
+    bytes.addAll(
+        _textToBytes('${_formatLine("Güncel Bakiye:", balText, width)}\n'));
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     bytes.addAll(EscPosCommands.alignCenter);
@@ -688,35 +746,45 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!_hasPrinter(settings)) return;
 
     final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58) ? 32 : 48;
+    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
+        ? 32
+        : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('GÜN İÇİ X RAPORU\n'));
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('İşletme: ${settings.businessName}\n'));
-    bytes.addAll(_textToBytes('Tarih: ${DateTime.now().toString().substring(0, 16)}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 16)}\n'));
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     final currency = settings.currency == '₺' ? 'TL' : settings.currency;
 
     bytes.addAll(EscPosCommands.alignLeft);
-    bytes.addAll(_textToBytes(_formatLine('Toplam Ciro:', '${summary.totalRevenue.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('Toplam Ciro:',
+        '${summary.totalRevenue.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('Satış Sayısı:', '${summary.totalSales}', width)));
+    bytes.addAll(_textToBytes(
+        _formatLine('Satış Sayısı:', '${summary.totalSales}', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('Toplam Tahsilat:', '${summary.totalCollected.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('Toplam Tahsilat:',
+        '${summary.totalCollected.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('Vadeli Borç:', '${summary.totalDebt.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('Vadeli Borç:',
+        '${summary.totalDebt.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('Ort. Sepet:', '${summary.avgBasket.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('Ort. Sepet:',
+        '${summary.avgBasket.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('Yeni Müşteri:', '${summary.newCustomers}', width)));
+    bytes.addAll(_textToBytes(
+        _formatLine('Yeni Müşteri:', '${summary.newCustomers}', width)));
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -726,7 +794,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(EscPosCommands.alignLeft);
     for (final cat in categories) {
-      final left = '${cat.categoryName} (${cat.percentage.toStringAsFixed(0)}%)'.replaceAll('₺', 'TL');
+      final left = '${cat.categoryName} (${cat.percentage.toStringAsFixed(0)}%)'
+          .replaceAll('₺', 'TL');
       final right = '${cat.totalAmount.toStringAsFixed(2)} $currency';
       bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
     }
@@ -750,32 +819,41 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!_hasPrinter(settings)) return;
 
     final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58) ? 32 : 48;
+    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
+        ? 32
+        : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('GÜN SONU Z RAPORU\n'));
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('İşletme: ${settings.businessName}\n'));
-    bytes.addAll(_textToBytes('Z No: #${DateTime.now().toIso8601String().substring(0, 10).replaceAll('-', '')}\n'));
-    bytes.addAll(_textToBytes('Tarih: ${DateTime.now().toString().substring(0, 16)}\n'));
+    bytes.addAll(_textToBytes(
+        'Z No: #${DateTime.now().toIso8601String().substring(0, 10).replaceAll('-', '')}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 16)}\n'));
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     final currency = settings.currency == '₺' ? 'TL' : settings.currency;
 
     bytes.addAll(EscPosCommands.alignLeft);
-    bytes.addAll(_textToBytes(_formatLine('TOPLAM CIRO:', '${summary.totalRevenue.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('TOPLAM CIRO:',
+        '${summary.totalRevenue.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('TOPLAM SATIŞ:', '${summary.totalSales}', width)));
+    bytes.addAll(_textToBytes(
+        _formatLine('TOPLAM SATIŞ:', '${summary.totalSales}', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('TOPLAM TAHSILAT:', '${summary.totalCollected.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('TOPLAM TAHSILAT:',
+        '${summary.totalCollected.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes(_formatLine('TOPLAM VADELİ ALACAK:', '${summary.totalDebt.toStringAsFixed(2)} $currency', width)));
+    bytes.addAll(_textToBytes(_formatLine('TOPLAM VADELİ ALACAK:',
+        '${summary.totalDebt.toStringAsFixed(2)} $currency', width)));
     bytes.addAll(EscPosCommands.lf);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -820,20 +898,44 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     for (int i = 0; i < text.length; i++) {
       final char = text[i];
       switch (char) {
-        case 'ğ': bytes.add(0xA7); break;
-        case 'Ğ': bytes.add(0xA6); break;
-        case 'ş': bytes.add(0x9F); break;
-        case 'Ş': bytes.add(0x9E); break;
-        case 'ı': bytes.add(0x8D); break;
-        case 'İ': bytes.add(0x98); break;
-        case 'ç': bytes.add(0x87); break;
-        case 'Ç': bytes.add(0x80); break;
-        case 'ö': bytes.add(0x94); break;
-        case 'Ö': bytes.add(0x99); break;
-        case 'ü': bytes.add(0x81); break;
-        case 'Ü': bytes.add(0x9A); break;
-        case '₺': 
-          bytes.addAll('TL'.codeUnits); 
+        case 'ğ':
+          bytes.add(0xA7);
+          break;
+        case 'Ğ':
+          bytes.add(0xA6);
+          break;
+        case 'ş':
+          bytes.add(0x9F);
+          break;
+        case 'Ş':
+          bytes.add(0x9E);
+          break;
+        case 'ı':
+          bytes.add(0x8D);
+          break;
+        case 'İ':
+          bytes.add(0x98);
+          break;
+        case 'ç':
+          bytes.add(0x87);
+          break;
+        case 'Ç':
+          bytes.add(0x80);
+          break;
+        case 'ö':
+          bytes.add(0x94);
+          break;
+        case 'Ö':
+          bytes.add(0x99);
+          break;
+        case 'ü':
+          bytes.add(0x81);
+          break;
+        case 'Ü':
+          bytes.add(0x9A);
+          break;
+        case '₺':
+          bytes.addAll('TL'.codeUnits);
           break;
         default:
           final code = char.codeUnitAt(0);
@@ -855,7 +957,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
     try {
       Uint8List list;
-      if (!kIsWeb && logoPath != null && logoPath.isNotEmpty && File(logoPath).existsSync()) {
+      if (!kIsWeb &&
+          logoPath != null &&
+          logoPath.isNotEmpty &&
+          File(logoPath).existsSync()) {
         list = await File(logoPath).readAsBytes();
       } else {
         final ByteData data = await rootBundle.load('assets/logo.png');
@@ -898,7 +1003,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             if (pixel.a < 128) {
               // Transparent -> treat as white
             } else {
-              final double luminance = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+              final double luminance =
+                  0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
               if (luminance < 128) {
                 byte |= (1 << (7 - bit));
               }
@@ -953,11 +1059,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<Map<String, dynamic>> items,
     Settings settings,
   ) async {
-    final targetSettings = _getSettingsForPurpose(settings, PrinterPurpose.label);
+    final targetSettings =
+        _getSettingsForPurpose(settings, PrinterPurpose.label);
     if (!_hasPrinter(targetSettings)) return;
 
     final backend = await _detectBackend(targetSettings);
-    final width = (backend == PrinterBackend.sunmi || targetSettings.paperWidth == 58) ? 32 : 48;
+    final width =
+        (backend == PrinterBackend.sunmi || targetSettings.paperWidth == 58)
+            ? 32
+            : 48;
     final List<int> allBytes = [];
 
     for (final item in items) {
@@ -973,7 +1083,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         timestamp: order.createdAt,
       );
 
-      final labelBytes = LabelLayoutEngine.generateLabelBytes(labelModel, width: width);
+      final labelBytes =
+          LabelLayoutEngine.generateLabelBytes(labelModel, width: width);
       allBytes.addAll(labelBytes);
     }
 
@@ -997,8 +1108,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
-    
+    bytes.addAll(
+        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+
     // Sound buzzer
     bytes.addAll(EscPosCommands.beep);
 
@@ -1008,10 +1120,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('SERENUT POS\n'));
     bytes.addAll(EscPosCommands.boldOff);
-    
+
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(_textToBytes('DONANIM TEŞHİS FİŞİ\n'));
-    bytes.addAll(_textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
+    bytes.addAll(
+        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     // Alignments test
@@ -1021,7 +1134,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(_textToBytes('Ortaya Hizalı Test\n'));
     bytes.addAll(EscPosCommands.alignRight);
     bytes.addAll(_textToBytes('Sağa Hizalı Test\n'));
-    
+
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -1030,16 +1143,21 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('Türkçe Karakter Testi:\n'));
     bytes.addAll(EscPosCommands.boldOff);
-    bytes.addAll(_textToBytes('ııı İİİ şşş ŞŞŞ ğğğ ĞĞĞ\nüüü ÜÜÜ ççç ÇÇÇ ööö ÖÖÖ\n'));
+    bytes.addAll(
+        _textToBytes('ııı İİİ şşş ŞŞŞ ğğğ ĞĞĞ\nüüü ÜÜÜ ççç ÇÇÇ ööö ÖÖÖ\n'));
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     // Device / width parameters
     bytes.addAll(EscPosCommands.alignLeft);
-    bytes.addAll(_textToBytes('Kağıt Genişliği: $paperWidth mm ($width karakter)\n'));
-    bytes.addAll(_textToBytes('Printer Modeli: ${settings.printerName ?? 'Belirtilmedi'}\n'));
-    bytes.addAll(_textToBytes('Yazıcı IP: ${settings.printerIp ?? 'Belirtilmedi'}\n'));
-    bytes.addAll(_textToBytes('Bağlantı Türü: ${backend.toString().split('.').last}\n'));
+    bytes.addAll(
+        _textToBytes('Kağıt Genişliği: $paperWidth mm ($width karakter)\n'));
+    bytes.addAll(_textToBytes(
+        'Printer Modeli: ${settings.printerName ?? 'Belirtilmedi'}\n'));
+    bytes.addAll(
+        _textToBytes('Yazıcı IP: ${settings.printerIp ?? 'Belirtilmedi'}\n'));
+    bytes.addAll(
+        _textToBytes('Bağlantı Türü: ${backend.toString().split('.').last}\n'));
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -1058,7 +1176,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   @override
   Future<void> retryPersistedJob(dynamic job, Settings settings) async {
     final persistedJob = job as PersistedPrintJob;
-    final bytes = persistedJob.receiptJson.split(',').map((s) => int.parse(s.trim())).toList();
+    final bytes = persistedJob.receiptJson
+        .split(',')
+        .map((s) => int.parse(s.trim()))
+        .toList();
 
     final queue = _persistentQueue;
     if (queue != null) {
@@ -1067,7 +1188,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     try {
       if (_socketConnector != null) {
         // Test mode — use mock socket directly
-        await _sendViaTcp(bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
+        await _sendViaTcp(
+            bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
       } else {
         final backends = await _buildFailoverChain(settings);
         bool sent = false;

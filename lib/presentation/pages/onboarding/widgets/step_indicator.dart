@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/onboarding/widgets/step_indicator.dart
+// lib/presentation/pages/onboarding/widgets/step_indicator.dart
 // Premium adım göstergesi: ●────○────○
 
 import 'package:flutter/material.dart';
@@ -37,11 +37,11 @@ class StepIndicator extends StatelessWidget {
           // Adım noktası
           final stepIndex = i ~/ 2;
           final isCompleted = currentStep > stepIndex;
-          final isCurrent   = currentStep == stepIndex;
+          final isCurrent = currentStep == stepIndex;
           return _StepDot(
-            index:       stepIndex + 1,
+            index: stepIndex + 1,
             isCompleted: isCompleted,
-            isCurrent:   isCurrent,
+            isCurrent: isCurrent,
           );
         }
       }),
@@ -68,22 +68,26 @@ class _StepDot extends StatelessWidget {
             ? POSColors.green
             : Colors.white;
 
-    final Color border = (isCompleted || isCurrent)
-        ? POSColors.green
-        : POSColors.border;
+    final Color border =
+        (isCompleted || isCurrent) ? POSColors.green : POSColors.border;
 
     final double size = isCurrent ? 32 : 26;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width:  size,
+      width: size,
       height: size,
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
         border: Border.all(color: border, width: 2),
         boxShadow: isCurrent
-            ? [BoxShadow(color: POSColors.green.withValues(alpha: 0.30), blurRadius: 8, spreadRadius: 1)]
+            ? [
+                BoxShadow(
+                    color: POSColors.green.withValues(alpha: 0.30),
+                    blurRadius: 8,
+                    spreadRadius: 1)
+              ]
             : null,
       ),
       child: Center(

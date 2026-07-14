@@ -9,9 +9,9 @@ import 'package:go_router/go_router.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kAmber  = Color(0xFFF59E0B);
-const _kRed    = Color(0xFFEF4444);
-const _kGreen  = Color(0xFF10B981);
+const _kAmber = Color(0xFFF59E0B);
+const _kRed = Color(0xFFEF4444);
+const _kGreen = Color(0xFF10B981);
 
 // ── License Status Provider ───────────────────────────────────────────────────
 
@@ -96,7 +96,8 @@ class TrialBannerWidget extends ConsumerWidget {
         icon: Icons.security_rounded,
         color: _kRed,
         title: 'Sistem Saati Manipülasyonu Tespit Edildi',
-        subtitle: 'Lütfen cihazınızın saatini kontrol edin ve desteğe başvurun.',
+        subtitle:
+            'Lütfen cihazınızın saatini kontrol edin ve desteğe başvurun.',
         actionLabel: 'Destek Al',
         onAction: () => context.push('/settings'),
         isCritical: true,
@@ -109,7 +110,8 @@ class TrialBannerWidget extends ConsumerWidget {
         icon: Icons.lock_clock_rounded,
         color: _kRed,
         title: 'Lisansınız Sona Erdi',
-        subtitle: 'Sistem kısıtlı modda çalışıyor. Lisansı yenilemek için tıklayın.',
+        subtitle:
+            'Sistem kısıtlı modda çalışıyor. Lisansı yenilemek için tıklayın.',
         actionLabel: 'Yenile',
         onAction: () => context.push('/license'),
         isCritical: true,
@@ -205,9 +207,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, child) {
-        final alpha = widget.isCritical
-            ? (0.06 + _pulse.value * 0.04)
-            : 0.06;
+        final alpha = widget.isCritical ? (0.06 + _pulse.value * 0.04) : 0.06;
 
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -247,7 +247,8 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
               GestureDetector(
                 onTap: widget.onAction,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: widget.color,
                     borderRadius: BorderRadius.circular(8),

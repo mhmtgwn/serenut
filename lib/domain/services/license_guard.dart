@@ -57,7 +57,9 @@ class LicenseGuard {
     final token = _licenseService.getLicenseToken();
 
     // 3. Check if unlicensed
-    if (info == null || token == null || !_licenseService.verifyLicenseToken(token)) {
+    if (info == null ||
+        token == null ||
+        !_licenseService.verifyLicenseToken(token)) {
       throw LicenseException(
         'Bu cihaz lisansınıza bağlı değil. Portaldan ekleyin.',
         'DEVICE501',
@@ -88,7 +90,8 @@ class LicenseGuard {
       final isValid = await _licenseClient.validate(info.merchantId);
       if (isValid) {
         // Validation succeeded online, save timestamp
-        await _prefs.setString(_lastVerifiedAtKey, DateTime.now().toIso8601String());
+        await _prefs.setString(
+            _lastVerifiedAtKey, DateTime.now().toIso8601String());
         return;
       } else {
         // Server explicitly returned invalid/blocked license
@@ -113,12 +116,12 @@ class LicenseGuard {
           'DEVICE501',
         );
       }
-      
+
       // Offline grace is active and within 72 hours — allow execution
       return;
     } catch (e) {
       if (e is LicenseException) rethrow;
-      
+
       // Other network timeouts / errors — treat as offline grace check
       if (lastVerified == null) {
         throw LicenseException(
@@ -138,6 +141,7 @@ class LicenseGuard {
 
   /// Sets the last verified timestamp to simulate successful verification in tests
   Future<void> setLastVerifiedNow() async {
-    await _prefs.setString(_lastVerifiedAtKey, DateTime.now().toIso8601String());
+    await _prefs.setString(
+        _lastVerifiedAtKey, DateTime.now().toIso8601String());
   }
 }

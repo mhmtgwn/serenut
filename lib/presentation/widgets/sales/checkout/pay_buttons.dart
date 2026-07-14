@@ -54,7 +54,8 @@ class _PayButton extends StatelessWidget {
                 Text(
                   sublabel,
                   style: TextStyle(
-                    color: disabled ? _kTextSecondary : fg.withValues(alpha: 0.8),
+                    color:
+                        disabled ? _kTextSecondary : fg.withValues(alpha: 0.8),
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
                   ),
@@ -82,7 +83,9 @@ class _KarmaToggleButton extends StatelessWidget {
       height: 64,
       width: 44,
       child: Material(
-        color: disabled ? _kSurface : const Color(0xFF7C3AED).withValues(alpha: 0.1),
+        color: disabled
+            ? _kSurface
+            : const Color(0xFF7C3AED).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: disabled ? null : onTap,
@@ -158,4 +161,3 @@ class _CancelKarmaButton extends StatelessWidget {
 }
 
 // ── MÜŞTERİ SEÇİM BOTTOM SHEET ────────────────────────────────────────────────
-

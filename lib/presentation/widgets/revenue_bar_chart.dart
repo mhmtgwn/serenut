@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/revenue_bar_chart.dart
+// lib/presentation/widgets/revenue_bar_chart.dart
 // Phase 2.3 — Custom Canvas Bar Chart
 // Zero external dependencies — pure Flutter CustomPainter
 // Generated: 21 Jun 2026
@@ -176,7 +176,8 @@ class _BarChartPainter extends CustomPainter {
     // Draw horizontal grid lines (4 lines)
     for (int i = 0; i <= 4; i++) {
       final y = topPad + chartH - (chartH * i / 4);
-      canvas.drawLine(Offset(leftPad, y), Offset(size.width - rightPad, y), gridPaint);
+      canvas.drawLine(
+          Offset(leftPad, y), Offset(size.width - rightPad, y), gridPaint);
 
       // Y-axis labels
       final val = maxVal * i / 4;
@@ -208,9 +209,7 @@ class _BarChartPainter extends CustomPainter {
       final isHovered = hoveredIndex == i;
 
       // Main bar (cash portion)
-      barPaint.color = isHovered
-          ? barColor
-          : barColor.withAlpha(204);
+      barPaint.color = isHovered ? barColor : barColor.withAlpha(204);
 
       final barRect = RRect.fromRectAndRadius(
         Rect.fromLTWH(x, barTop, barW, barHeight),
@@ -236,19 +235,22 @@ class _BarChartPainter extends CustomPainter {
       if (dateLabel.isNotEmpty) {
         final tp = _buildTextPainter(dateLabel, 9, Colors.grey.shade500);
         tp.layout();
-        tp.paint(canvas, Offset(x + barW / 2 - tp.width / 2, topPad + chartH + 4));
+        tp.paint(
+            canvas, Offset(x + barW / 2 - tp.width / 2, topPad + chartH + 4));
       }
 
       // Hover tooltip
       if (isHovered) {
-        final tooltip = '${_formatAmount(item.totalAmount)} TL\n${item.saleCount} satış';
+        final tooltip =
+            '${_formatAmount(item.totalAmount)} TL\n${item.saleCount} satış';
         final tp = _buildTextPainter(tooltip, 10, Colors.white, bold: true);
         tp.layout();
         final ttW = tp.width + 12;
         final ttH = tp.height + 8;
         var ttX = x + barW / 2 - ttW / 2;
         if (ttX < leftPad) ttX = leftPad;
-        if (ttX + ttW > size.width - rightPad) ttX = size.width - rightPad - ttW;
+        if (ttX + ttW > size.width - rightPad)
+          ttX = size.width - rightPad - ttW;
         final ttY = barTop - ttH - 4;
 
         final ttRect = RRect.fromRectAndRadius(

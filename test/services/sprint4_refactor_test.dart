@@ -17,9 +17,11 @@ Future<DatabaseManager> _createInMemoryDb() async {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
   final tempDir = Directory.systemTemp.createTempSync();
-  final dbPath = '${tempDir.path}/test_db_${DateTime.now().microsecondsSinceEpoch}.db';
+  final dbPath =
+      '${tempDir.path}/test_db_${DateTime.now().microsecondsSinceEpoch}.db';
   final mgr = DatabaseManager();
-  await mgr.close(); // Crucial: clear cached connection in the DatabaseManager singleton
+  await mgr
+      .close(); // Crucial: clear cached connection in the DatabaseManager singleton
   DatabaseManager.overrideDatabasePath = dbPath;
   await mgr.getDatabase(); // triggers onCreate
   return mgr;
@@ -39,7 +41,8 @@ void main() {
   // GROUP 1: Database Migration v22 — new columns exist
   // ──────────────────────────────────────────────────────────────────────────
   group('DB Migration v22 — new columns in settings table', () {
-    test('Fresh install: settings row has all 9 new Sprint 4 columns', () async {
+    test('Fresh install: settings row has all 9 new Sprint 4 columns',
+        () async {
       final mgr = await _createInMemoryDb();
       final db = await mgr.getDatabase();
       final rows = await db.query('settings');
@@ -129,7 +132,8 @@ void main() {
       final gateway = DbGatewayImpl(mgr);
       final repo = SqliteSettingsRepository(gateway);
 
-      final withPin = (await repo.getSettings()).copyWith(adminPinCode: 'some_hash');
+      final withPin =
+          (await repo.getSettings()).copyWith(adminPinCode: 'some_hash');
       await repo.updateSettings(withPin);
 
       // Verify PIN is stored

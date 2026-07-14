@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -40,7 +40,8 @@ class MockPathProviderPlatform extends Fake
   }
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async {
+  Future<List<String>?> getExternalStoragePaths(
+      {StorageDirectory? type}) async {
     return [Directory.current.absolute.path];
   }
 
@@ -95,7 +96,8 @@ void main() {
       ];
     });
 
-    test('exportCustomerStatementPdf generates a valid PDF file on disk', () async {
+    test('exportCustomerStatementPdf generates a valid PDF file on disk',
+        () async {
       final path = await exportService.exportCustomerStatementPdf(
         testCustomer,
         testTxns,
@@ -111,7 +113,9 @@ void main() {
       await file.delete();
     });
 
-    test('exportCustomerStatementExcel generates a valid Excel workbook file on disk', () async {
+    test(
+        'exportCustomerStatementExcel generates a valid Excel workbook file on disk',
+        () async {
       final path = await exportService.exportCustomerStatementExcel(
         testCustomer,
         testTxns,
@@ -127,7 +131,8 @@ void main() {
       await file.delete();
     });
 
-    test('exportSalesReportExcel generates workbook for sales history list', () async {
+    test('exportSalesReportExcel generates workbook for sales history list',
+        () async {
       final sales = [
         SaleEntity(
           id: 'sale-1',
@@ -141,7 +146,8 @@ void main() {
         ),
       ];
 
-      final path = await exportService.exportSalesReportExcel(sales, 'Bu Ay', 'TL');
+      final path =
+          await exportService.exportSalesReportExcel(sales, 'Bu Ay', 'TL');
 
       expect(path, isNotEmpty);
       final file = File(path);
@@ -151,7 +157,8 @@ void main() {
       await file.delete();
     });
 
-    test('exportStockReportExcel generates workbook for product envanter', () async {
+    test('exportStockReportExcel generates workbook for product envanter',
+        () async {
       final products = [
         ProductEntity(
           id: 'prod-1',

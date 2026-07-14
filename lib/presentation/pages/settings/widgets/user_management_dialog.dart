@@ -31,7 +31,8 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                     title: 'Kullanıcı Yönetimi',
                     actions: [
                       IconButton(
-                        icon: const Icon(Icons.add_circle_outline_rounded, color: _kGreen, size: 28),
+                        icon: const Icon(Icons.add_circle_outline_rounded,
+                            color: _kGreen, size: 28),
                         onPressed: () => _showAddUserDialog(ctx, () {
                           setPageState(() {});
                         }),
@@ -44,16 +45,19 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.people_outline_rounded, size: 64, color: _kTextSecondary),
+                                  Icon(Icons.people_outline_rounded,
+                                      size: 64, color: _kTextSecondary),
                                   SizedBox(height: 16),
                                   Text(
                                     'Henüz kullanıcı eklenmemiş.',
-                                    style: TextStyle(color: _kTextSecondary, fontSize: 15),
+                                    style: TextStyle(
+                                        color: _kTextSecondary, fontSize: 15),
                                   ),
                                   SizedBox(height: 8),
                                   Text(
                                     'Sağ üstteki + butonuyla yeni kullanıcı ekleyin.',
-                                    style: TextStyle(color: _kTextSecondary, fontSize: 13),
+                                    style: TextStyle(
+                                        color: _kTextSecondary, fontSize: 13),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -70,10 +74,13 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: users.length,
-                              separatorBuilder: (c, i) => const Divider(height: 1, color: _kBorderColor),
+                              separatorBuilder: (c, i) => const Divider(
+                                  height: 1, color: _kBorderColor),
                               itemBuilder: (c, idx) {
                                 final u = users[idx];
-                                final initials = u.name.isNotEmpty ? u.name[0].toUpperCase() : 'U';
+                                final initials = u.name.isNotEmpty
+                                    ? u.name[0].toUpperCase()
+                                    : 'U';
                                 final roleLabel = switch (u.role) {
                                   UserRole.owner => 'Kurucu/Sahip',
                                   UserRole.admin => 'Yönetici',
@@ -107,22 +114,36 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                                   ),
                                   subtitle: Text(
                                     roleLabel,
-                                    style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                                    style: const TextStyle(
+                                        color: _kTextSecondary, fontSize: 12),
                                   ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       // Yetki butonu
                                       TextButton.icon(
-                                        onPressed: () => _showPermissionsSheet(ctx, ref, u, () => setPageState(() {})),
-                                        icon: const Icon(Icons.shield_outlined, size: 16, color: _kGreen),
-                                        label: const Text('Yetkiler', style: TextStyle(color: _kGreen, fontSize: 12, fontWeight: FontWeight.w600)),
-                                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                        onPressed: () => _showPermissionsSheet(
+                                            ctx,
+                                            ref,
+                                            u,
+                                            () => setPageState(() {})),
+                                        icon: const Icon(Icons.shield_outlined,
+                                            size: 16, color: _kGreen),
+                                        label: const Text('Yetkiler',
+                                            style: TextStyle(
+                                                color: _kGreen,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600)),
+                                        style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8)),
                                       ),
-                                      const Icon(Icons.chevron_right_rounded, color: _kTextSecondary),
+                                      const Icon(Icons.chevron_right_rounded,
+                                          color: _kTextSecondary),
                                     ],
                                   ),
-                                  onTap: () => _showEditUserDialog(ctx, u, isCurrent, () {
+                                  onTap: () => _showEditUserDialog(
+                                      ctx, u, isCurrent, () {
                                     setPageState(() {});
                                   }),
                                 );
@@ -140,48 +161,77 @@ extension SettingsUserManagementSheets on _SettingsPageState {
   }
 
   // ── Granüler Yetki Atama Ekranı ────────────────────────────────────────────
-  void _showPermissionsSheet(BuildContext context, WidgetRef ref, AuthUser user, VoidCallback onSaved) {
+  void _showPermissionsSheet(BuildContext context, WidgetRef ref, AuthUser user,
+      VoidCallback onSaved) {
     final authService = ref.read(authServiceProvider);
     List<String> selectedPerms = List<String>.from(user.permissions);
 
     final permGroups = [
-      (label: 'Satış', icon: Icons.point_of_sale_rounded, perms: [
-        (value: 'sales:view', label: 'Satışları görüntüle'),
-        (value: 'sales:create', label: 'Satış oluştur'),
-        (value: 'sales:edit', label: 'Satış düzenle'),
-        (value: 'sales:print', label: 'Fiş yazdır'),
-      ]),
-      (label: 'Sipariş', icon: Icons.shopping_bag_outlined, perms: [
-        (value: 'orders:view', label: 'Siparişleri görüntüle'),
-        (value: 'orders:create', label: 'Sipariş oluştur'),
-        (value: 'orders:edit', label: 'Sipariş düzenle'),
-        (value: 'orders:deliver', label: 'Sipariş teslim et'),
-      ]),
-      (label: 'Müşteri', icon: Icons.people_outline_rounded, perms: [
-        (value: 'customers:view', label: 'Müşterileri görüntüle'),
-        (value: 'customers:create', label: 'Müşteri ekle'),
-        (value: 'customers:edit', label: 'Müşteri düzenle'),
-        (value: 'customers:delete', label: 'Müşteri sil'),
-      ]),
-      (label: 'Finans / Ödeme', icon: Icons.account_balance_wallet_outlined, perms: [
-        (value: 'payments:view', label: 'Cari görüntüle'),
-        (value: 'payments:record', label: 'Tahsilat al'),
-        (value: 'payments:reverse', label: 'Borç sil'),
-      ]),
-      (label: 'Stok', icon: Icons.inventory_2_outlined, perms: [
-        (value: 'inventory:view', label: 'Stok görüntüle'),
-        (value: 'inventory:adjust', label: 'Stok düzenle'),
-        (value: 'inventory:transfer', label: 'Stok transfer'),
-      ]),
-      (label: 'Raporlar', icon: Icons.bar_chart_rounded, perms: [
-        (value: 'reports:view', label: 'Raporları görüntüle'),
-        (value: 'reports:financial', label: 'Finansal raporlar'),
-        (value: 'reports:inventory', label: 'Stok raporları'),
-      ]),
-      (label: 'Yönetim / Sistem', icon: Icons.admin_panel_settings_outlined, perms: [
-        (value: 'admin:settings', label: 'Ayarları yönet'),
-        (value: 'admin:users', label: 'Kullanıcıları yönet'),
-      ]),
+      (
+        label: 'Satış',
+        icon: Icons.point_of_sale_rounded,
+        perms: [
+          (value: 'sales:view', label: 'Satışları görüntüle'),
+          (value: 'sales:create', label: 'Satış oluştur'),
+          (value: 'sales:edit', label: 'Satış düzenle'),
+          (value: 'sales:print', label: 'Fiş yazdır'),
+        ]
+      ),
+      (
+        label: 'Sipariş',
+        icon: Icons.shopping_bag_outlined,
+        perms: [
+          (value: 'orders:view', label: 'Siparişleri görüntüle'),
+          (value: 'orders:create', label: 'Sipariş oluştur'),
+          (value: 'orders:edit', label: 'Sipariş düzenle'),
+          (value: 'orders:deliver', label: 'Sipariş teslim et'),
+        ]
+      ),
+      (
+        label: 'Müşteri',
+        icon: Icons.people_outline_rounded,
+        perms: [
+          (value: 'customers:view', label: 'Müşterileri görüntüle'),
+          (value: 'customers:create', label: 'Müşteri ekle'),
+          (value: 'customers:edit', label: 'Müşteri düzenle'),
+          (value: 'customers:delete', label: 'Müşteri sil'),
+        ]
+      ),
+      (
+        label: 'Finans / Ödeme',
+        icon: Icons.account_balance_wallet_outlined,
+        perms: [
+          (value: 'payments:view', label: 'Cari görüntüle'),
+          (value: 'payments:record', label: 'Tahsilat al'),
+          (value: 'payments:reverse', label: 'Borç sil'),
+        ]
+      ),
+      (
+        label: 'Stok',
+        icon: Icons.inventory_2_outlined,
+        perms: [
+          (value: 'inventory:view', label: 'Stok görüntüle'),
+          (value: 'inventory:adjust', label: 'Stok düzenle'),
+          (value: 'inventory:transfer', label: 'Stok transfer'),
+        ]
+      ),
+      (
+        label: 'Raporlar',
+        icon: Icons.bar_chart_rounded,
+        perms: [
+          (value: 'reports:view', label: 'Raporları görüntüle'),
+          (value: 'reports:financial', label: 'Finansal raporlar'),
+          (value: 'reports:inventory', label: 'Stok raporları'),
+        ]
+      ),
+      (
+        label: 'Yönetim / Sistem',
+        icon: Icons.admin_panel_settings_outlined,
+        perms: [
+          (value: 'admin:settings', label: 'Ayarları yönet'),
+          (value: 'admin:users', label: 'Kullanıcıları yönet'),
+        ]
+      ),
     ];
 
     showModalBottomSheet(
@@ -202,7 +252,8 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                 Center(
                   child: Container(
                     margin: const EdgeInsets.only(top: 8),
-                    width: 36, height: 5,
+                    width: 36,
+                    height: 5,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(2.5),
@@ -220,18 +271,23 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                           children: [
                             Text(
                               '${user.name} — Yetkiler',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: _kTextPrimary),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                  color: _kTextPrimary),
                             ),
                             Text(
                               '${selectedPerms.length} / ${Permission.values.length} yetki aktif',
-                              style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                              style: const TextStyle(
+                                  color: _kTextSecondary, fontSize: 12),
                             ),
                           ],
                         ),
                       ),
                       ElevatedButton(
                         onPressed: () async {
-                          final updated = user.copyWith(permissions: selectedPerms);
+                          final updated =
+                              user.copyWith(permissions: selectedPerms);
                           await authService.updateUser(updated);
                           onSaved();
                           if (ctx.mounted) Navigator.pop(ctx);
@@ -239,10 +295,13 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _kGreen,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
                         ),
-                        child: const Text('Kaydet', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text('Kaydet',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -256,7 +315,8 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                     itemBuilder: (ctx, groupIdx) {
                       final group = permGroups[groupIdx];
                       final groupPerms = group.perms;
-                      final allSelected = groupPerms.every((p) => selectedPerms.contains(p.value));
+                      final allSelected = groupPerms
+                          .every((p) => selectedPerms.contains(p.value));
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
@@ -272,7 +332,8 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                               onTap: () {
                                 setSheetState(() {
                                   if (allSelected) {
-                                    selectedPerms.removeWhere((p) => groupPerms.any((gp) => gp.value == p));
+                                    selectedPerms.removeWhere((p) =>
+                                        groupPerms.any((gp) => gp.value == p));
                                   } else {
                                     for (final p in groupPerms) {
                                       if (!selectedPerms.contains(p.value)) {
@@ -282,31 +343,47 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                                   }
                                 });
                               },
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12)),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
                                 child: Row(
                                   children: [
-                                    Icon(group.icon, size: 18, color: _kTextSecondary),
+                                    Icon(group.icon,
+                                        size: 18, color: _kTextSecondary),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         group.label,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kTextPrimary),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: _kTextPrimary),
                                       ),
                                     ),
                                     Text(
-                                      allSelected ? 'Hepsi Seçili' : 'Hepsini Seç',
+                                      allSelected
+                                          ? 'Hepsi Seçili'
+                                          : 'Hepsini Seç',
                                       style: TextStyle(
-                                        color: allSelected ? _kGreen : _kTextSecondary,
+                                        color: allSelected
+                                            ? _kGreen
+                                            : _kTextSecondary,
                                         fontSize: 12,
-                                        fontWeight: allSelected ? FontWeight.bold : FontWeight.normal,
+                                        fontWeight: allSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
                                     ),
                                     const SizedBox(width: 4),
                                     Icon(
-                                      allSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                                      color: allSelected ? _kGreen : _kTextSecondary,
+                                      allSelected
+                                          ? Icons.check_circle_rounded
+                                          : Icons.circle_outlined,
+                                      color: allSelected
+                                          ? _kGreen
+                                          : _kTextSecondary,
                                       size: 18,
                                     ),
                                   ],
@@ -318,19 +395,29 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                             ...groupPerms.asMap().entries.map((entry) {
                               final idx2 = entry.key;
                               final perm = entry.value;
-                              final isEnabled = selectedPerms.contains(perm.value);
+                              final isEnabled =
+                                  selectedPerms.contains(perm.value);
                               return Column(
                                 children: [
-                                  if (idx2 > 0) const Divider(height: 1, color: _kBorderColor, indent: 16),
+                                  if (idx2 > 0)
+                                    const Divider(
+                                        height: 1,
+                                        color: _kBorderColor,
+                                        indent: 16),
                                   ListTile(
                                     dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 0),
                                     title: Text(
                                       perm.label,
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: isEnabled ? _kTextPrimary : _kTextSecondary,
-                                        fontWeight: isEnabled ? FontWeight.w500 : FontWeight.normal,
+                                        color: isEnabled
+                                            ? _kTextPrimary
+                                            : _kTextSecondary,
+                                        fontWeight: isEnabled
+                                            ? FontWeight.w500
+                                            : FontWeight.normal,
                                       ),
                                     ),
                                     trailing: Switch.adaptive(
@@ -380,25 +467,32 @@ extension SettingsUserManagementSheets on _SettingsPageState {
     );
   }
 
-  void _showEditUserDialog(BuildContext context, AuthUser user, bool isCurrent, VoidCallback onSaved) {
+  void _showEditUserDialog(BuildContext context, AuthUser user, bool isCurrent,
+      VoidCallback onSaved) {
     showDialog(
       context: context,
-      builder: (ctx) => _EditUserDialog(pageState: this, user: user, isCurrent: isCurrent, onSaved: onSaved),
+      builder: (ctx) => _EditUserDialog(
+          pageState: this, user: user, isCurrent: isCurrent, onSaved: onSaved),
     );
   }
 
-  void _showConfirmDeleteUserDialog(BuildContext context, AuthUser user, VoidCallback onDeleted) {
+  void _showConfirmDeleteUserDialog(
+      BuildContext context, AuthUser user, VoidCallback onDeleted) {
     showDialog(
       context: context,
       builder: (ctx) => Consumer(
         builder: (dialogCtx, ref, child) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Kullanıcıyı Sil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          content: Text('${user.name} kullanıcısını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Kullanıcıyı Sil',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          content: Text(
+              '${user.name} kullanıcısını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('İptal', style: TextStyle(color: _kTextSecondary)),
+              child:
+                  const Text('İptal', style: TextStyle(color: _kTextSecondary)),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -409,7 +503,8 @@ extension SettingsUserManagementSheets on _SettingsPageState {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _kPink,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               child: const Text('Sil', style: TextStyle(color: Colors.white)),
             ),
@@ -419,8 +514,6 @@ extension SettingsUserManagementSheets on _SettingsPageState {
     );
   }
 }
-
-
 
 class _AddUserDialog extends ConsumerStatefulWidget {
   final _SettingsPageState pageState;
@@ -456,7 +549,8 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Yeni Kullanıcı Ekle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      title: const Text('Yeni Kullanıcı Ekle',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -469,10 +563,13 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   labelText: 'Ad Soyad',
-                  prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon:
+                      const Icon(Icons.person_outline_rounded, size: 18),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Ad Soyad gerekli' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Ad Soyad gerekli' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -483,11 +580,13 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                   labelText: 'E-posta',
                   hintText: 'örn: mehmet@serenut.com',
                   prefixIcon: const Icon(Icons.email_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'E-posta gerekli';
-                  if (!v.contains('@') || !v.contains('.')) return 'Geçersiz e-posta';
+                  if (!v.contains('@') || !v.contains('.'))
+                    return 'Geçersiz e-posta';
                   return null;
                 },
               ),
@@ -497,8 +596,10 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                 style: const TextStyle(fontSize: 14, color: _kTextPrimary),
                 decoration: InputDecoration(
                   labelText: 'Rol',
-                  prefixIcon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon:
+                      const Icon(Icons.admin_panel_settings_outlined, size: 18),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 items: UserRole.values.map((role) {
                   final label = switch (role) {
@@ -527,7 +628,8 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                   labelText: 'Kullanıcı Adı (Opsiyonel)',
                   hintText: 'örn: kasiyer1',
                   prefixIcon: const Icon(Icons.badge_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
               const SizedBox(height: 12),
@@ -541,7 +643,8 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                   labelText: 'PIN (Opsiyonel)',
                   hintText: 'Sadece rakam',
                   prefixIcon: const Icon(Icons.dialpad_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   counterText: '',
                 ),
               ),
@@ -560,13 +663,17 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                       });
                     },
                     child: Icon(
-                      obscureText ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      obscureText
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
                       size: 18,
                     ),
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Şifre gerekli' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Şifre gerekli' : null,
               ),
             ],
           ),
@@ -582,29 +689,36 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
             if (_formKey.currentState!.validate()) {
               final authService = ref.read(authServiceProvider);
               final id = 'user-${DateTime.now().millisecondsSinceEpoch}';
-              final businessCode = ref.read(currentUserProvider)?.businessCode ?? 'DEFAULT';
+              final businessCode =
+                  ref.read(currentUserProvider)?.businessCode ?? 'DEFAULT';
               final newUser = AuthUser(
                 id: id,
                 name: nameCtrl.text.trim(),
                 email: emailCtrl.text.trim(),
-                username: usernameCtrl.text.trim().isEmpty ? null : usernameCtrl.text.trim(),
+                username: usernameCtrl.text.trim().isEmpty
+                    ? null
+                    : usernameCtrl.text.trim(),
                 businessCode: businessCode,
                 role: selectedRole,
                 permissions: AuthService.getPermissionsForRole(selectedRole),
                 createdAt: DateTime.now(),
               );
-              await authService.createUser(newUser, passCtrl.text.trim(), pin: pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim());
+              await authService.createUser(newUser, passCtrl.text.trim(),
+                  pin:
+                      pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim());
               ref.read(auditLogServiceProvider).log(
-                action: 'user_created',
-                details: '{"id":"${newUser.id}","name":"${newUser.name}","role":"${newUser.role.name}"}',
-              );
+                    action: 'user_created',
+                    details:
+                        '{"id":"${newUser.id}","name":"${newUser.name}","role":"${newUser.role.name}"}',
+                  );
               widget.onSaved();
               if (mounted) Navigator.pop(context);
             }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: _kGreen,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: const Text('Ekle', style: TextStyle(color: Colors.white)),
         ),
@@ -665,7 +779,8 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text('${widget.user.name} Düzenle', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      title: Text('${widget.user.name} Düzenle',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -678,10 +793,13 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   labelText: 'Ad Soyad',
-                  prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon:
+                      const Icon(Icons.person_outline_rounded, size: 18),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Ad Soyad gerekli' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Ad Soyad gerekli' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -691,11 +809,13 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                 decoration: InputDecoration(
                   labelText: 'E-posta',
                   prefixIcon: const Icon(Icons.email_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'E-posta gerekli';
-                  if (!v.contains('@') || !v.contains('.')) return 'Geçersiz e-posta';
+                  if (!v.contains('@') || !v.contains('.'))
+                    return 'Geçersiz e-posta';
                   return null;
                 },
               ),
@@ -710,18 +830,22 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                   UserRole.cashier => 'Kasiyer',
                   UserRole.staff => 'Personel',
                 }),
-                onChanged: widget.isCurrent ? null : (val) {
-                  if (val != null) {
-                    setState(() {
-                      selectedRole = val;
-                    });
-                  }
-                },
+                onChanged: widget.isCurrent
+                    ? null
+                    : (val) {
+                        if (val != null) {
+                          setState(() {
+                            selectedRole = val;
+                          });
+                        }
+                      },
                 style: const TextStyle(fontSize: 14, color: _kTextPrimary),
                 decoration: InputDecoration(
                   labelText: 'Rol',
-                  prefixIcon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon:
+                      const Icon(Icons.admin_panel_settings_outlined, size: 18),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 items: UserRole.values.map((role) {
                   final label = switch (role) {
@@ -743,7 +867,8 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                   labelText: 'Kullanıcı Adı (Opsiyonel)',
                   hintText: 'örn: kasiyer1',
                   prefixIcon: const Icon(Icons.badge_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
               const SizedBox(height: 12),
@@ -757,7 +882,8 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                   labelText: 'Yeni PIN (İsteğe Bağlı)',
                   hintText: 'Değiştirmek istemiyorsanız boş bırakın',
                   prefixIcon: const Icon(Icons.dialpad_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   counterText: '',
                 ),
               ),
@@ -777,11 +903,14 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                       });
                     },
                     child: Icon(
-                      obscureText ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      obscureText
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
                       size: 18,
                     ),
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
@@ -792,12 +921,14 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
         if (!widget.isCurrent)
           TextButton(
             onPressed: () {
-              widget.pageState._showConfirmDeleteUserDialog(context, widget.user, () {
+              widget.pageState
+                  ._showConfirmDeleteUserDialog(context, widget.user, () {
                 widget.onSaved();
                 Navigator.pop(context);
               });
             },
-            child: const Text('Sil', style: TextStyle(color: _kPink, fontWeight: FontWeight.bold)),
+            child: const Text('Sil',
+                style: TextStyle(color: _kPink, fontWeight: FontWeight.bold)),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -810,24 +941,28 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
               final updated = widget.user.copyWith(
                 name: nameCtrl.text.trim(),
                 email: emailCtrl.text.trim(),
-                username: usernameCtrl.text.trim().isEmpty ? null : usernameCtrl.text.trim(),
+                username: usernameCtrl.text.trim().isEmpty
+                    ? null
+                    : usernameCtrl.text.trim(),
                 role: selectedRole,
-                permissions: selectedRole == widget.user.role 
-                    ? widget.user.permissions 
+                permissions: selectedRole == widget.user.role
+                    ? widget.user.permissions
                     : AuthService.getPermissionsForRole(selectedRole),
               );
-              await authService.updateUser(
-                updated, 
-                password: passCtrl.text.trim().isEmpty ? null : passCtrl.text.trim(),
-                pin: pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim()
-              );
+              await authService.updateUser(updated,
+                  password: passCtrl.text.trim().isEmpty
+                      ? null
+                      : passCtrl.text.trim(),
+                  pin:
+                      pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim());
               widget.onSaved();
               if (mounted) Navigator.pop(context);
             }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: _kGreen,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
         ),
@@ -894,7 +1029,8 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                 prefixIcon: Icon(Icons.lock_outline),
               ),
               validator: (v) {
-                if (v == null || v.length != 4) return 'PIN tam olarak 4 haneli olmalıdır.';
+                if (v == null || v.length != 4)
+                  return 'PIN tam olarak 4 haneli olmalıdır.';
                 return null;
               },
             ),
@@ -923,29 +1059,36 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kGreen,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    final hashedPin = PasswordHashService.hashPassword(pinCtrl.text);
+                    final hashedPin =
+                        PasswordHashService.hashPassword(pinCtrl.text);
                     // Write hashed PIN to SQLite settings (single source of truth)
                     final settingsState = ref.read(settingsNotifierProvider);
                     if (settingsState.hasValue) {
-                      await ref.read(settingsNotifierProvider.notifier)
-                          .updateSettings(settingsState.value!.copyWith(adminPinCode: hashedPin));
+                      await ref
+                          .read(settingsNotifierProvider.notifier)
+                          .updateSettings(settingsState.value!
+                              .copyWith(adminPinCode: hashedPin));
                     }
                     widget.pageState._loadAdminPin();
                     if (mounted) {
                       Navigator.pop(context);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Yönetici PIN kodu başarıyla güncellendi.')),
+                          const SnackBar(
+                              content: Text(
+                                  'Yönetici PIN kodu başarıyla güncellendi.')),
                         );
                       }
                     }
                   }
                 },
-                child: const Text('PIN Kaydet', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('PIN Kaydet',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 24),
@@ -955,4 +1098,3 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
     );
   }
 }
-

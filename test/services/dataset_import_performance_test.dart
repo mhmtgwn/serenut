@@ -1,4 +1,4 @@
-﻿// test/services/dataset_import_performance_test.dart
+// test/services/dataset_import_performance_test.dart
 // Integration tests for DatasetImportService batch transactions and strategy algorithms.
 
 import 'dart:io';
@@ -27,8 +27,9 @@ void main() {
 
   setUpAll(() async {
     tempDir = Directory.systemTemp.createTempSync('dataset_perf_test');
-    
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
       (MethodCall methodCall) async {
         if (methodCall.method == 'getApplicationDocumentsDirectory') {
@@ -39,7 +40,8 @@ void main() {
     );
 
     // Delete existing test DB to ensure clean start
-    final dbPath = join(await databaseFactory.getDatabasesPath(), 'serenut_pos.db');
+    final dbPath =
+        join(await databaseFactory.getDatabasesPath(), 'serenut_pos.db');
     final file = File(dbPath);
     if (await file.exists()) {
       await file.delete();
@@ -96,7 +98,8 @@ void main() {
 
     final excelBytes = excel.save();
     final archive = Archive();
-    archive.addFile(ArchiveFile('market_data_catalog.xlsx', excelBytes!.length, excelBytes));
+    archive.addFile(ArchiveFile(
+        'market_data_catalog.xlsx', excelBytes!.length, excelBytes));
     return Uint8List.fromList(ZipEncoder().encode(archive)!);
   }
 
@@ -280,7 +283,8 @@ void main() {
 
       // Verify p2 is deactivated (is_active = 0)
       final db = await dbManager.getDatabase();
-      final rows = await db.query('products', where: 'id = ?', whereArgs: ['8690001112227']);
+      final rows = await db
+          .query('products', where: 'id = ?', whereArgs: ['8690001112227']);
       expect(rows, isNotEmpty);
       expect(rows.first['is_active'], equals(0));
     });

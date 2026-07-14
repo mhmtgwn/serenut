@@ -70,13 +70,16 @@ void main() {
       );
     });
 
-    test('Failed print enqueues job, then successful retry clears it from queue', () async {
+    test(
+        'Failed print enqueues job, then successful retry clears it from queue',
+        () async {
       // 1. Trigger print when shouldFail is true -> Should throw exception and write to print_queue table
       shouldFail = true;
-      
+
       await expectLater(
         printerService.printDiagnosticsTest(testSettings, 80),
-        throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('kuyruga alindi'))),
+        throwsA(isA<Exception>().having(
+            (e) => e.toString(), 'message', contains('kuyruga alindi'))),
       );
 
       // Verify that print_queue table has 1 pending job

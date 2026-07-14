@@ -9,34 +9,34 @@ import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/services/auth_service.dart' hide AuthException;
 import 'package:serenutos/presentation/state/app_state.dart';
 
-
 /// Riverpod StateNotifier wrapping AuthService
-/// 
+///
 /// Responsibilities:
 /// - Manage current user state (success/loading/error)
 /// - Orchestrate AuthService calls with state updates
 /// - Provide Riverpod-compatible API for UI consumption
-/// 
+///
 /// Usage (in UI):
 /// ```dart
 /// // Get current user
 /// final userAsyncValue = ref.watch(currentUserProvider);
-/// 
+///
 /// // Login
 /// await ref.read(authNotifierProvider.notifier).login(username, password);
-/// 
+///
 /// // Logout
 /// await ref.read(authNotifierProvider.notifier).logout();
 /// ```
 class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   final AuthService _authService;
 
-  AppAuthNotifier(this._authService)
-    : super(AppState.loading()) {
+  AppAuthNotifier(this._authService) : super(AppState.loading()) {
     // Bind session expiration to trigger state updates & routing redirects
     _authService.onSessionExpiredCallback = () {
       state = AppState.error(
-        AuthException(message: 'Oturum süresi doldu. Lütfen tekrar giriş yapın.', code: 'AUTH_003'),
+        AuthException(
+            message: 'Oturum süresi doldu. Lütfen tekrar giriş yapın.',
+            code: 'AUTH_003'),
       );
     };
     _authService.onUserUpdatedCallback = (updatedUser) {
@@ -64,14 +64,14 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   }
 
   /// Perform login with username/password
-  /// 
+  ///
   /// Flow:
   /// 1. Set state to loading
   /// 2. Call AuthService.login() — backend-first, local SQLite fallback
   /// 3. Trial sync: AuthService.login() backend'den trial_started_at okur (tek yer)
   /// 4. On success: set state to success(user)
   /// 5. On error: set state to error(exception)
-  /// 
+  ///
   /// Throws: Never (errors go to state.error)
   Future<void> login(String username, String password) async {
     try {
@@ -86,7 +86,8 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   }
 
   /// Perform sub-user login with businessCode, username, and PIN
-  Future<void> loginSubUser(String businessCode, String username, String pin) async {
+  Future<void> loginSubUser(
+      String businessCode, String username, String pin) async {
     try {
       state = AppState.loading();
       final user = await _authService.loginSubUser(businessCode, username, pin);
@@ -97,11 +98,11 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   }
 
   /// Perform logout
-  /// 
+  ///
   /// Flow:
   /// 1. Call AuthService.logout() (clears storage)
   /// 2. Set state to error (no user)
-  /// 
+  ///
   /// Throws: Never
   Future<void> logout() async {
     try {
@@ -115,7 +116,7 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
   }
 
   /// Check if user has a specific permission
-  /// 
+  ///
   /// Returns: true if user is authenticated AND has permission
   bool hasPermission(String permission) {
     return state.getOrNull()?.hasPermission(permission) ?? false;

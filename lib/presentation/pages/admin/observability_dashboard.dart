@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/admin/observability_dashboard.dart
+// lib/presentation/pages/admin/observability_dashboard.dart
 // Serenut POS — System Observability Dashboard
 // Backend: ObservabilityService.getSystemHealthMetrics() — sıfır değişiklik
 // Created: Phase 5 — 01 Jul 2026
@@ -12,26 +12,29 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFF0D1117);  // GitHub dark
-const _kCardBg        = Color(0xFF161B22);
-const _kBorderColor   = Color(0xFF30363D);
-const _kTextPrimary   = Color(0xFFE6EDF3);
+const _kBgColor = Color(0xFF0D1117); // GitHub dark
+const _kCardBg = Color(0xFF161B22);
+const _kBorderColor = Color(0xFF30363D);
+const _kTextPrimary = Color(0xFFE6EDF3);
 const _kTextSecondary = Color(0xFF8B949E);
-const _kGreen         = Color(0xFF3FB950);
-const _kRed           = Color(0xFFF85149);
-const _kAmber         = Color(0xFFD29922);
-const _kBlue          = Color(0xFF58A6FF);
-const _kPurple        = Color(0xFFBC8CFF);
+const _kGreen = Color(0xFF3FB950);
+const _kRed = Color(0xFFF85149);
+const _kAmber = Color(0xFFD29922);
+const _kBlue = Color(0xFF58A6FF);
+const _kPurple = Color(0xFFBC8CFF);
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _healthMetricsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
-  final transactionRepo = await ref.watch(financialTransactionRepositoryProvider.future);
+final _healthMetricsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  final transactionRepo =
+      await ref.watch(financialTransactionRepositoryProvider.future);
   final service = ObservabilityService(transactionRepository: transactionRepo);
   return service.getSystemHealthMetrics();
 });
 
-final _recentLogsProvider = FutureProvider.autoDispose<List<TelemetryEvent>>((ref) async {
+final _recentLogsProvider =
+    FutureProvider.autoDispose<List<TelemetryEvent>>((ref) async {
   return TelemetryService().getEventsByLevel(LogLevel.warning);
 });
 
@@ -41,10 +44,12 @@ class ObservabilityDashboard extends ConsumerStatefulWidget {
   const ObservabilityDashboard({super.key});
 
   @override
-  ConsumerState<ObservabilityDashboard> createState() => _ObservabilityDashboardState();
+  ConsumerState<ObservabilityDashboard> createState() =>
+      _ObservabilityDashboardState();
 }
 
-class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard> {
+class _ObservabilityDashboardState
+    extends ConsumerState<ObservabilityDashboard> {
   Timer? _autoRefreshTimer;
 
   @override
@@ -68,7 +73,7 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
   @override
   Widget build(BuildContext context) {
     final metricsAsync = ref.watch(_healthMetricsProvider);
-    final logsAsync    = ref.watch(_recentLogsProvider);
+    final logsAsync = ref.watch(_recentLogsProvider);
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -98,7 +103,10 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
             const SizedBox(width: 10),
             const Text(
               'Sistem Sağlık Durumu',
-              style: TextStyle(color: _kTextPrimary, fontWeight: FontWeight.bold, fontSize: 17),
+              style: TextStyle(
+                  color: _kTextPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17),
             ),
           ],
         ),
@@ -166,12 +174,13 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
   // ── Metrics Grid ──────────────────────────────────────────────────────────
 
   Widget _buildMetricsGrid(Map<String, dynamic> metrics) {
-    final driftRate      = (metrics['drift_rate'] as num?)?.toDouble() ?? 0.0;
-    final failureRate    = (metrics['sync_failure_rate'] as num?)?.toDouble() ?? 0.0;
-    final anomalyCount   = (metrics['anomaly_count'] as int?) ?? 0;
-    final totalTx        = (metrics['total_transactions'] as int?) ?? 0;
-    final syncSuccess    = (metrics['sync_success_count'] as int?) ?? 0;
-    final syncFail       = (metrics['sync_failure_count'] as int?) ?? 0;
+    final driftRate = (metrics['drift_rate'] as num?)?.toDouble() ?? 0.0;
+    final failureRate =
+        (metrics['sync_failure_rate'] as num?)?.toDouble() ?? 0.0;
+    final anomalyCount = (metrics['anomaly_count'] as int?) ?? 0;
+    final totalTx = (metrics['total_transactions'] as int?) ?? 0;
+    final syncSuccess = (metrics['sync_success_count'] as int?) ?? 0;
+    final syncFail = (metrics['sync_failure_count'] as int?) ?? 0;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -185,7 +194,11 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
           label: 'Drift Rate',
           value: '${(driftRate * 100).toStringAsFixed(2)}%',
           icon: Icons.sync_alt_rounded,
-          color: driftRate > 0.1 ? _kRed : driftRate > 0.05 ? _kAmber : _kGreen,
+          color: driftRate > 0.1
+              ? _kRed
+              : driftRate > 0.05
+                  ? _kAmber
+                  : _kGreen,
           sublabel: driftRate > 0.1 ? '⚠️ Yüksek' : '✓ Normal',
           tooltip: 'Lamport clock / fiziksel zaman sapması oranı',
         ),
@@ -193,7 +206,11 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
           label: 'Sync Başarısızlık',
           value: '${(failureRate * 100).toStringAsFixed(1)}%',
           icon: Icons.cloud_off_rounded,
-          color: failureRate > 0.2 ? _kRed : failureRate > 0.1 ? _kAmber : _kGreen,
+          color: failureRate > 0.2
+              ? _kRed
+              : failureRate > 0.1
+                  ? _kAmber
+                  : _kGreen,
           sublabel: 'S:$syncSuccess F:$syncFail',
           tooltip: 'Toplam sync denemelerine oranla başarısız olanlar',
         ),
@@ -220,25 +237,32 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
   // ── Status Indicators ─────────────────────────────────────────────────────
 
   Widget _buildStatusIndicators(Map<String, dynamic> metrics) {
-    final driftRate   = (metrics['drift_rate'] as num?)?.toDouble() ?? 0.0;
-    final failureRate = (metrics['sync_failure_rate'] as num?)?.toDouble() ?? 0.0;
+    final driftRate = (metrics['drift_rate'] as num?)?.toDouble() ?? 0.0;
+    final failureRate =
+        (metrics['sync_failure_rate'] as num?)?.toDouble() ?? 0.0;
     final anomalyCount = (metrics['anomaly_count'] as int?) ?? 0;
 
     final indicators = [
       _StatusIndicator(
         label: 'Ledger Bütünlüğü',
         isHealthy: driftRate < 0.05,
-        detail: driftRate < 0.05 ? 'Yerel ve bulut zamanı uyumlu (Veri bütünlüğü garantilendi)' : 'Zaman sapması algılandı (Bütünlük kontrolü önerilir)',
+        detail: driftRate < 0.05
+            ? 'Yerel ve bulut zamanı uyumlu (Veri bütünlüğü garantilendi)'
+            : 'Zaman sapması algılandı (Bütünlük kontrolü önerilir)',
       ),
       _StatusIndicator(
         label: 'Senkronizasyon',
         isHealthy: failureRate < 0.1,
-        detail: failureRate < 0.1 ? 'Bulut senkronizasyonu aktif ve güvende' : 'Senkronizasyon bekleniyor (İnternet bağlantısını kontrol edin)',
+        detail: failureRate < 0.1
+            ? 'Bulut senkronizasyonu aktif ve güvende'
+            : 'Senkronizasyon bekleniyor (İnternet bağlantısını kontrol edin)',
       ),
       _StatusIndicator(
         label: 'Güvenlik',
         isHealthy: anomalyCount == 0,
-        detail: anomalyCount == 0 ? 'Veri anomalisi tespit edilmedi (İşlemler doğruluğu onaylı)' : 'Şüpheli kayıtlar bulundu (IT incelemesi önerilir)',
+        detail: anomalyCount == 0
+            ? 'Veri anomalisi tespit edilmedi (İşlemler doğruluğu onaylı)'
+            : 'Şüpheli kayıtlar bulundu (IT incelemesi önerilir)',
       ),
     ];
 
@@ -263,44 +287,45 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
           ),
           const SizedBox(height: 12),
           ...indicators.map((ind) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: ind.isHealthy ? _kGreen : _kRed,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (ind.isHealthy ? _kGreen : _kRed).withValues(alpha: 0.4),
-                        blurRadius: 4,
-                        spreadRadius: 1,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: ind.isHealthy ? _kGreen : _kRed,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (ind.isHealthy ? _kGreen : _kRed)
+                                .withValues(alpha: 0.4),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      ind.label,
+                      style: const TextStyle(
+                        color: _kTextPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      ind.detail,
+                      style: TextStyle(
+                        color: ind.isHealthy ? _kGreen : _kRed,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  ind.label,
-                  style: const TextStyle(
-                    color: _kTextPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  ind.detail,
-                  style: TextStyle(
-                    color: ind.isHealthy ? _kGreen : _kRed,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
@@ -340,15 +365,16 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
           final isLast = entry.key == recentEvents.length - 1;
           final levelColor = switch (event.level) {
             LogLevel.critical => _kRed,
-            LogLevel.error    => const Color(0xFFF85149),
-            LogLevel.warning  => _kAmber,
-            _                 => _kTextSecondary,
+            LogLevel.error => const Color(0xFFF85149),
+            LogLevel.warning => _kAmber,
+            _ => _kTextSecondary,
           };
 
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -369,7 +395,8 @@ class _ObservabilityDashboardState extends ConsumerState<ObservabilityDashboard>
                             ),
                           ),
                           Text(
-                            DateFormat('dd.MM HH:mm:ss').format(event.timestamp),
+                            DateFormat('dd.MM HH:mm:ss')
+                                .format(event.timestamp),
                             style: const TextStyle(
                               color: _kTextSecondary,
                               fontSize: 10,

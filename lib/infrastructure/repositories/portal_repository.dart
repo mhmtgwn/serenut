@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/portal_repository.dart
+// lib/infrastructure/repositories/portal_repository.dart
 // Serenut Platform — Portal Repository (Sprint 10)
 // Client side interface for dashboard, devices, store nodes and support ticket systems.
 // Created: 04 Jul 2026
@@ -22,7 +22,8 @@ class PortalDashboardSummary {
     required this.monthlyRevenue,
   });
 
-  factory PortalDashboardSummary.fromJson(Map<String, dynamic> json) => PortalDashboardSummary(
+  factory PortalDashboardSummary.fromJson(Map<String, dynamic> json) =>
+      PortalDashboardSummary(
         stores: json['stores'] as int? ?? 0,
         devices: json['devices'] as int? ?? 0,
         activeLicenseCount: json['activeLicenseCount'] as int? ?? 0,
@@ -122,7 +123,8 @@ class PortalRepository {
       '${_config.releaseEndpoint.replaceAll('releases', 'portal')}/dashboard',
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return PortalDashboardSummary.fromJson(data['summary'] as Map<String, dynamic>);
+    return PortalDashboardSummary.fromJson(
+        data['summary'] as Map<String, dynamic>);
   }
 
   /// List terminals/devices

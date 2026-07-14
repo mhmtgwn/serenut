@@ -74,7 +74,8 @@ final deviceManagerProvider = Provider<DeviceManager>((ref) {
 });
 
 /// Provides DeviceFingerprintService instance.
-final deviceFingerprintServiceProvider = Provider<DeviceFingerprintService>((ref) {
+final deviceFingerprintServiceProvider =
+    Provider<DeviceFingerprintService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final deviceManager = ref.watch(deviceManagerProvider);
   return DeviceFingerprintService(prefs, deviceManager);
@@ -104,8 +105,6 @@ final accessManagerProvider = Provider<AccessManager>((ref) {
   );
 });
 
-
-
 /// Provides ApiClient instance.
 final apiClientProvider = Provider<ApiClient>((ref) {
   final client = ApiClient();
@@ -127,7 +126,8 @@ final integrityCheckServiceProvider = Provider<IntegrityCheckService>((ref) {
 });
 
 /// Provides CentralBackgroundScheduler instance.
-final centralBackgroundSchedulerProvider = Provider<CentralBackgroundScheduler>((ref) {
+final centralBackgroundSchedulerProvider =
+    Provider<CentralBackgroundScheduler>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return CentralBackgroundScheduler(prefs);
 });

@@ -32,12 +32,14 @@ import 'package:serenutos/providers/service_providers.dart';
 // ════════════════════════════════════════════════════════════
 
 // ── Remote Data Source Providers ──
-final productRemoteDataSourceProvider = Provider<ProductRemoteDataSource>((ref) {
+final productRemoteDataSourceProvider =
+    Provider<ProductRemoteDataSource>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return CloudProductRemoteDataSource(apiClient);
 });
 
-final customerRemoteDataSourceProvider = Provider<CustomerRemoteDataSource>((ref) {
+final customerRemoteDataSourceProvider =
+    Provider<CustomerRemoteDataSource>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return CloudCustomerRemoteDataSource(apiClient);
 });
@@ -48,13 +50,16 @@ final salesRemoteDataSourceProvider = Provider<SalesRemoteDataSource>((ref) {
 });
 
 // ── Repository Providers ──
-final productRepositoryProvider = FutureProvider<IProductRepository>((ref) async {
-  final localRepo = SqliteProductRepository(ref.watch(dbGatewayProvider), ref.watch(datasetLoaderServiceProvider));
+final productRepositoryProvider =
+    FutureProvider<IProductRepository>((ref) async {
+  final localRepo = SqliteProductRepository(
+      ref.watch(dbGatewayProvider), ref.watch(datasetLoaderServiceProvider));
   final remoteDS = ref.watch(productRemoteDataSourceProvider);
   return CloudAdaptiveProductRepository(localRepo, remoteDS);
 });
 
-final customerRepositoryProvider = FutureProvider<ICustomerRepository>((ref) async {
+final customerRepositoryProvider =
+    FutureProvider<ICustomerRepository>((ref) async {
   final localRepo = SqliteCustomerRepository(ref.watch(dbGatewayProvider));
   final remoteDS = ref.watch(customerRemoteDataSourceProvider);
   return CloudAdaptiveCustomerRepository(localRepo, remoteDS);
@@ -66,7 +71,8 @@ final saleRepositoryProvider = FutureProvider<ISaleRepository>((ref) async {
   return CloudAdaptiveSaleRepository(localRepo, remoteDS);
 });
 
-final financialTransactionRepositoryProvider = FutureProvider<IFinancialTransactionRepository>((ref) async {
+final financialTransactionRepositoryProvider =
+    FutureProvider<IFinancialTransactionRepository>((ref) async {
   final gateway = ref.watch(dbGatewayProvider);
   final licenseService = ref.watch(licenseServiceProvider);
   final deviceId = licenseService.getDeviceUuid();
@@ -102,7 +108,8 @@ final todayRevenueProvider = FutureProvider<double>((ref) async {
   return repo.getTodayRevenue();
 });
 
-final lowStockProductsProvider = FutureProvider<List<ProductEntity>>((ref) async {
+final lowStockProductsProvider =
+    FutureProvider<List<ProductEntity>>((ref) async {
   final repo = await ref.watch(productRepositoryProvider.future);
   return repo.getLowStockProducts(5);
 });
@@ -111,7 +118,6 @@ final debtorsProvider = FutureProvider<List<CustomerEntity>>((ref) async {
   final repo = await ref.watch(customerRepositoryProvider.future);
   return repo.getDebtors();
 });
-
 
 /// ════════════════════════════════════════════════════════════
 /// Phase 2.3 — Report Providers
@@ -127,12 +133,12 @@ final reportServiceProvider = FutureProvider<ReportService>((ref) async {
   return ReportService(repo);
 });
 
-
 /// ════════════════════════════════════════════════════════════
 /// Phase 3 — Dashboard Providers
 /// ════════════════════════════════════════════════════════════
 
-final dashboardRepositoryProvider = FutureProvider<IDashboardRepository>((ref) async {
+final dashboardRepositoryProvider =
+    FutureProvider<IDashboardRepository>((ref) async {
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteDashboardRepository(gateway);
 });
@@ -142,28 +148,25 @@ final userRepositoryProvider = Provider<IUserRepository>((ref) {
   return SqliteUserRepository(gateway);
 });
 
-
 final dashboardServiceProvider = FutureProvider<DashboardService>((ref) async {
   final repo = await ref.watch(dashboardRepositoryProvider.future);
   return DashboardService(repo);
 });
 
-final databaseHealthRepositoryProvider = Provider<IDatabaseHealthRepository>((ref) {
+final databaseHealthRepositoryProvider =
+    Provider<IDatabaseHealthRepository>((ref) {
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteDatabaseHealthRepository(gateway);
 });
-
-
 
 final globalSearchRepositoryProvider = Provider<IGlobalSearchRepository>((ref) {
   final gateway = ref.watch(dbGatewayProvider);
   return SqliteGlobalSearchRepository(gateway);
 });
 
-
-
 // ── Cloud BI Analytics Providers (Sprint 7) ──
-final cloudAnalyticsRepositoryProvider = Provider<CloudAnalyticsRepository>((ref) {
+final cloudAnalyticsRepositoryProvider =
+    Provider<CloudAnalyticsRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return CloudAnalyticsRepository(apiClient: apiClient);
 });

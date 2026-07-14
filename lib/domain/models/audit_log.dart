@@ -3,7 +3,8 @@ class AuditLog {
   final String id;
   final String userId;
   final String userName;
-  final String action; // price_changed, product_deleted, stock_adjusted, sale_cancelled, user_created
+  final String
+      action; // price_changed, product_deleted, stock_adjusted, sale_cancelled, user_created
   final String details; // JSON description of state change
   final DateTime createdAt;
 

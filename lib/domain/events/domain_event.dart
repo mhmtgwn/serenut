@@ -1,4 +1,3 @@
-
 /// Event = Sistem genelinde her değişiklik bir event üretir
 /// Domain events: SaleCreated, OrderCreated, PaymentAdded, StockChanged, SmsTriggered, etc.
 library;
@@ -18,14 +17,14 @@ enum EventType {
   customerCreated,
   customerUpdated,
   smsTriggered,
-  collectionRecorded,   // tahsilat/ödeme kaydı
-  debtCreated,          // borçlu satış
+  collectionRecorded, // tahsilat/ödeme kaydı
+  debtCreated, // borçlu satış
 }
 
 abstract class DomainEvent {
   final EventType type;
   final DateTime occurredAt;
-  final int? aggregateId;      // saleId, orderId, customerId, etc.
+  final int? aggregateId; // saleId, orderId, customerId, etc.
   final String? aggregateType; // "Sale", "Order", "Customer", etc.
   final Map<String, dynamic>? metadata;
 
@@ -49,10 +48,10 @@ class SaleCreatedEvent extends DomainEvent {
   final List<String>? paymentMethods; // [cash, card, debt]
 
   // String UUID fields — used by SmsNotificationHandler
-  final String saleIdStr;       // actual UUID e.g. 'sale-xxx'
-  final String customerIdStr;   // actual UUID e.g. 'cust-yyy'
-  final double paidAmount;      // used to detect debt (totalAmount - paidAmount > 0)
-  final String paymentMethod;   // 'cash' | 'card' | 'debt' | 'karma'
+  final String saleIdStr; // actual UUID e.g. 'sale-xxx'
+  final String customerIdStr; // actual UUID e.g. 'cust-yyy'
+  final double paidAmount; // used to detect debt (totalAmount - paidAmount > 0)
+  final String paymentMethod; // 'cash' | 'card' | 'debt' | 'karma'
 
   SaleCreatedEvent({
     required this.saleId,
@@ -67,10 +66,10 @@ class SaleCreatedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.saleCreated,
-    aggregateId: saleId,
-    aggregateType: 'Sale',
-  );
+          type: EventType.saleCreated,
+          aggregateId: saleId,
+          aggregateType: 'Sale',
+        );
 
   /// True if the sale has any unpaid debt.
   bool get hasDebt => (totalAmount - paidAmount) > 0.001;
@@ -96,18 +95,18 @@ class OrderCreatedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.orderCreated,
-    aggregateId: orderId,
-    aggregateType: 'Order',
-  );
+          type: EventType.orderCreated,
+          aggregateId: orderId,
+          aggregateType: 'Order',
+        );
 }
 
 class PaymentAddedEvent extends DomainEvent {
   final int paymentId;
-  final int? referenceId;          // saleId or orderId
+  final int? referenceId; // saleId or orderId
   final int customerId;
   final double paidAmount;
-  final String paymentMethod;      // cash, card, transfer, check
+  final String paymentMethod; // cash, card, transfer, check
 
   PaymentAddedEvent({
     required this.paymentId,
@@ -118,10 +117,10 @@ class PaymentAddedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.paymentAdded,
-    aggregateId: paymentId,
-    aggregateType: 'Payment',
-  );
+          type: EventType.paymentAdded,
+          aggregateId: paymentId,
+          aggregateType: 'Payment',
+        );
 }
 
 // Aliases for compatibility with event_publisher.dart
@@ -133,9 +132,9 @@ class PaymentRecordedEvent extends PaymentAddedEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    paidAmount: amount,
-    paymentMethod: 'recorded',
-  );
+          paidAmount: amount,
+          paymentMethod: 'recorded',
+        );
 }
 
 class PaymentFailedEvent extends DomainEvent {
@@ -150,10 +149,10 @@ class PaymentFailedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.paymentReversed,
-    aggregateId: paymentId,
-    aggregateType: 'Payment',
-  );
+          type: EventType.paymentReversed,
+          aggregateId: paymentId,
+          aggregateType: 'Payment',
+        );
 }
 
 class RefundIssuedEvent extends DomainEvent {
@@ -170,10 +169,10 @@ class RefundIssuedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.paymentReversed,
-    aggregateId: refundId,
-    aggregateType: 'Refund',
-  );
+          type: EventType.paymentReversed,
+          aggregateId: refundId,
+          aggregateType: 'Refund',
+        );
 }
 
 class OrderDeliveredEvent extends DomainEvent {
@@ -194,16 +193,16 @@ class OrderDeliveredEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.orderDelivered,
-    aggregateId: orderId,
-    aggregateType: 'Order',
-  );
+          type: EventType.orderDelivered,
+          aggregateId: orderId,
+          aggregateType: 'Order',
+        );
 }
 
 class StockChangedEvent extends DomainEvent {
   final int productId;
-  final int quantityChange;     // + for increase, - for decrease
-  final String reason;          // 'sale', 'order_delivery', 'adjustment', 'receipt'
+  final int quantityChange; // + for increase, - for decrease
+  final String reason; // 'sale', 'order_delivery', 'adjustment', 'receipt'
 
   StockChangedEvent({
     required this.productId,
@@ -212,16 +211,17 @@ class StockChangedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.stockChanged,
-    aggregateId: productId,
-    aggregateType: 'Product',
-  );
+          type: EventType.stockChanged,
+          aggregateId: productId,
+          aggregateType: 'Product',
+        );
 }
 
 class SmsTriggeredEvent extends DomainEvent {
   final String phoneNumber;
   final String message;
-  final String trigger; // 'order_created', 'order_ready', 'order_delivered', 'payment_reminder'
+  final String
+      trigger; // 'order_created', 'order_ready', 'order_delivered', 'payment_reminder'
 
   SmsTriggeredEvent({
     required this.phoneNumber,
@@ -230,9 +230,9 @@ class SmsTriggeredEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.smsTriggered,
-    aggregateType: 'Sms',
-  );
+          type: EventType.smsTriggered,
+          aggregateType: 'Sms',
+        );
 }
 
 /// Tahsilat / genel ödeme alındığında yayınlanır.
@@ -242,7 +242,8 @@ class CollectionRecordedEvent extends DomainEvent {
   final String collectionIdStr;
   final String customerIdStr;
   final double amount;
-  final double remainingDebt;  // tahsilat sonrası kalan borç (0 ise tamamen kapanmış)
+  final double
+      remainingDebt; // tahsilat sonrası kalan borç (0 ise tamamen kapanmış)
 
   CollectionRecordedEvent({
     required this.collectionIdStr,
@@ -252,9 +253,9 @@ class CollectionRecordedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.collectionRecorded,
-    aggregateType: 'Collection',
-  );
+          type: EventType.collectionRecorded,
+          aggregateType: 'Collection',
+        );
 }
 
 class OrderPreparingEvent extends DomainEvent {
@@ -271,10 +272,10 @@ class OrderPreparingEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.orderPreparing,
-    aggregateId: orderId,
-    aggregateType: 'Order',
-  );
+          type: EventType.orderPreparing,
+          aggregateId: orderId,
+          aggregateType: 'Order',
+        );
 }
 
 class OrderReadyEvent extends DomainEvent {
@@ -291,10 +292,10 @@ class OrderReadyEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.orderReady,
-    aggregateId: orderId,
-    aggregateType: 'Order',
-  );
+          type: EventType.orderReady,
+          aggregateId: orderId,
+          aggregateType: 'Order',
+        );
 }
 
 class OrderCancelledEvent extends DomainEvent {
@@ -311,8 +312,8 @@ class OrderCancelledEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.orderCancelled,
-    aggregateId: orderId,
-    aggregateType: 'Order',
-  );
+          type: EventType.orderCancelled,
+          aggregateId: orderId,
+          aggregateType: 'Order',
+        );
 }

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -11,7 +11,8 @@ class GlobalSearchPage extends ConsumerStatefulWidget {
   ConsumerState<GlobalSearchPage> createState() => _GlobalSearchPageState();
 }
 
-class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with SingleTickerProviderStateMixin {
+class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   GlobalSearchResult? _result;
   bool _isLoading = false;
@@ -90,7 +91,8 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
             border: InputBorder.none,
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, color: kTextSecondary),
+                    icon:
+                        const Icon(Icons.clear_rounded, color: kTextSecondary),
                     onPressed: () {
                       _searchController.clear();
                       _performSearch('');
@@ -111,7 +113,8 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
           labelColor: kGreen,
           unselectedLabelColor: kTextSecondary,
           indicatorColor: kGreen,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: [
             Tab(text: 'Ürünler (${products.length})'),
             Tab(text: 'Müşteriler (${customers.length})'),
@@ -121,14 +124,20 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(kGreen)))
+          ? const Center(
+              child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(kGreen)))
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildProductList(products, kTextPrimary, kTextSecondary, kBorderColor),
-                _buildCustomerList(customers, kTextPrimary, kTextSecondary, kBorderColor),
-                _buildSaleList(sales, kTextPrimary, kTextSecondary, kBorderColor),
-                _buildTransactionList(transactions, kTextPrimary, kTextSecondary, kBorderColor),
+                _buildProductList(
+                    products, kTextPrimary, kTextSecondary, kBorderColor),
+                _buildCustomerList(
+                    customers, kTextPrimary, kTextSecondary, kBorderColor),
+                _buildSaleList(
+                    sales, kTextPrimary, kTextSecondary, kBorderColor),
+                _buildTransactionList(
+                    transactions, kTextPrimary, kTextSecondary, kBorderColor),
               ],
             ),
     );
@@ -141,13 +150,15 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
         children: [
           Icon(Icons.search_off_rounded, size: 64, color: Colors.grey[300]),
           const SizedBox(height: 12),
-          Text(message, style: const TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+          Text(message,
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 14)),
         ],
       ),
     );
   }
 
-  Widget _buildProductList(List<ProductEntity> list, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildProductList(List<ProductEntity> list, Color textPrimary,
+      Color textSecondary, Color borderColor) {
     if (_searchController.text.isEmpty) {
       return _buildEmptyState('Arama yapmak için bir şeyler yazın.');
     }
@@ -169,16 +180,23 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
           ),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            title: Text(product.name, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            title: Text(product.name,
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                Text('Kategori: ${product.category}', style: TextStyle(color: textSecondary, fontSize: 12)),
+                Text('Kategori: ${product.category}',
+                    style: TextStyle(color: textSecondary, fontSize: 12)),
                 if (product.description.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(product.description, style: TextStyle(color: textSecondary, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(product.description,
+                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                 ],
               ],
             ),
@@ -186,9 +204,16 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('${product.price.toStringAsFixed(2)} TL', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                Text('${product.price.toStringAsFixed(2)} TL',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
                 const SizedBox(height: 4),
-                Text('Stok: ${product.quantity}', style: TextStyle(color: product.quantity <= 0 ? Colors.red : textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text('Stok: ${product.quantity}',
+                    style: TextStyle(
+                        color:
+                            product.quantity <= 0 ? Colors.red : textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
               ],
             ),
             onTap: () {
@@ -204,7 +229,8 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
     );
   }
 
-  Widget _buildCustomerList(List<CustomerEntity> list, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildCustomerList(List<CustomerEntity> list, Color textPrimary,
+      Color textSecondary, Color borderColor) {
     if (_searchController.text.isEmpty) {
       return _buildEmptyState('Arama yapmak için bir şeyler yazın.');
     }
@@ -227,19 +253,26 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
           ),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: CircleAvatar(
-              backgroundColor: isDebt ? const Color(0xFFFEE2E2) : const Color(0xFFD1FAE5),
+              backgroundColor:
+                  isDebt ? const Color(0xFFFEE2E2) : const Color(0xFFD1FAE5),
               child: Text(
                 customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                style: TextStyle(fontWeight: FontWeight.bold, color: isDebt ? Colors.red : const Color(0xFF047857)),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDebt ? Colors.red : const Color(0xFF047857)),
               ),
             ),
-            title: Text(customer.name, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+            title: Text(customer.name,
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
             subtitle: customer.phone.isNotEmpty
                 ? Padding(
                     padding: const EdgeInsets.only(top: 4.0),
-                    child: Text(customer.phone, style: TextStyle(color: textSecondary, fontSize: 12)),
+                    child: Text(customer.phone,
+                        style: TextStyle(color: textSecondary, fontSize: 12)),
                   )
                 : null,
             trailing: Text(
@@ -258,7 +291,8 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
     );
   }
 
-  Widget _buildSaleList(List<SaleEntity> list, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildSaleList(List<SaleEntity> list, Color textPrimary,
+      Color textSecondary, Color borderColor) {
     if (_searchController.text.isEmpty) {
       return _buildEmptyState('Arama yapmak için bir şeyler yazın.');
     }
@@ -280,19 +314,30 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
           ),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            title: Text('Satış ID: ${sale.id.substring(0, 8)}...', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            title: Text('Satış ID: ${sale.id.substring(0, 8)}...',
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                Text('Ödeme: ${sale.paymentMethod}', style: TextStyle(color: textSecondary, fontSize: 12)),
-                Text('Durum: ${sale.status}', style: TextStyle(color: sale.status == 'cancelled' ? Colors.red : Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text('Ödeme: ${sale.paymentMethod}',
+                    style: TextStyle(color: textSecondary, fontSize: 12)),
+                Text('Durum: ${sale.status}',
+                    style: TextStyle(
+                        color: sale.status == 'cancelled'
+                            ? Colors.red
+                            : Colors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
               ],
             ),
             trailing: Text(
               '${sale.totalAmount.toStringAsFixed(2)} TL',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
             ),
             onTap: () {
               context.push('/sales/detail/${sale.id}');
@@ -303,7 +348,8 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
     );
   }
 
-  Widget _buildTransactionList(List<FinancialTransactionEntity> list, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildTransactionList(List<FinancialTransactionEntity> list,
+      Color textPrimary, Color textSecondary, Color borderColor) {
     if (_searchController.text.isEmpty) {
       return _buildEmptyState('Arama yapmak için bir şeyler yazın.');
     }
@@ -326,7 +372,8 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
           ),
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             title: Text(
               tx.type == 'sale'
                   ? 'Veresiye Satış'
@@ -342,8 +389,10 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> with Single
               children: [
                 const SizedBox(height: 4),
                 if (tx.referenceId != null && tx.referenceId!.isNotEmpty)
-                  Text('Ref: ${tx.referenceId}', style: TextStyle(color: textSecondary, fontSize: 12)),
-                Text('Tarih: ${tx.date}', style: TextStyle(color: textSecondary, fontSize: 11)),
+                  Text('Ref: ${tx.referenceId}',
+                      style: TextStyle(color: textSecondary, fontSize: 12)),
+                Text('Tarih: ${tx.date}',
+                    style: TextStyle(color: textSecondary, fontSize: 11)),
               ],
             ),
             trailing: Text(

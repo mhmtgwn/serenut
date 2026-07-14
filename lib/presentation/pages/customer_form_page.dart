@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/customer_form_page.dart
+// lib/presentation/pages/customer_form_page.dart
 // Serenut POS — Müşteri Ekleme / Düzenleme (Tam Ekran Form)
 // UX Redesign v3: Full-screen, no dialog, mobile banking form style
 
@@ -11,14 +11,14 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:uuid/uuid.dart';
 
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kRed        = Color(0xFFDC2626);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kRed = Color(0xFFDC2626);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class CustomerFormPage extends ConsumerStatefulWidget {
   final bool isEditing;
@@ -36,9 +36,9 @@ class CustomerFormPage extends ConsumerStatefulWidget {
 
 class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameFocus    = FocusNode();
-  final _phoneFocus   = FocusNode();
-  final _emailFocus   = FocusNode();
+  final _nameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _emailFocus = FocusNode();
   final _balanceFocus = FocusNode();
 
   late final TextEditingController _nameController;
@@ -52,9 +52,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
   void initState() {
     super.initState();
     final c = widget.existingCustomer;
-    _nameController    = TextEditingController(text: c?.name ?? '');
-    _phoneController   = TextEditingController(text: c?.phone ?? '');
-    _emailController   = TextEditingController(text: c?.email ?? '');
+    _nameController = TextEditingController(text: c?.name ?? '');
+    _phoneController = TextEditingController(text: c?.phone ?? '');
+    _emailController = TextEditingController(text: c?.email ?? '');
     _balanceController = TextEditingController(
         text: c == null ? '0' : c.balance.toStringAsFixed(2));
   }
@@ -77,9 +77,8 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     setState(() => _isSaving = true);
 
     try {
-      final id = widget.isEditing
-          ? widget.existingCustomer!.id
-          : const Uuid().v4();
+      final id =
+          widget.isEditing ? widget.existingCustomer!.id : const Uuid().v4();
 
       final customer = CustomerEntity(
         id: id,
@@ -91,8 +90,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
             : (double.tryParse(
                     _balanceController.text.trim().replaceAll(',', '.')) ??
                 0.0),
-        createdAt:
-            widget.isEditing ? widget.existingCustomer!.createdAt : DateTime.now(),
+        createdAt: widget.isEditing
+            ? widget.existingCustomer!.createdAt
+            : DateTime.now(),
       );
 
       final notifier = ref.read(customersControllerProvider.notifier);
@@ -196,15 +196,19 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                     decoration: BoxDecoration(
                       color: _kGreenLight,
                       shape: BoxShape.circle,
-                      border: Border.all(color: _kGreen.withValues(alpha: 0.3), width: 2),
+                      border: Border.all(
+                          color: _kGreen.withValues(alpha: 0.3), width: 2),
                     ),
                     child: const Icon(Icons.person_rounded,
                         size: 36, color: _kGreenDark),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    widget.isEditing ? 'Müşteri bilgilerini düzenleyin' : 'Yeni müşteri hesabı oluşturun',
-                    style: const TextStyle(color: _kTextSecondary, fontSize: 13),
+                    widget.isEditing
+                        ? 'Müşteri bilgilerini düzenleyin'
+                        : 'Yeni müşteri hesabı oluşturun',
+                    style:
+                        const TextStyle(color: _kTextSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -233,7 +237,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                   label: 'Telefon Numarası',
                   icon: Icons.phone_rounded,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))
+                  ],
                   nextFocus: _emailFocus,
                 ),
                 const SizedBox(height: 14),
@@ -271,8 +277,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                           child: Text(
                             'Negatif değer borç (ör: -150), pozitif değer alacak anlamına gelir.',
                             style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF92400E)),
+                                fontSize: 11, color: Color(0xFF92400E)),
                           ),
                         ),
                       ],
@@ -290,8 +295,10 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                       FilteringTextInputFormatter.allow(RegExp(r'[\d\.\,\-]'))
                     ],
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Bakiye giriniz';
-                      if (double.tryParse(v.trim().replaceAll(',', '.')) == null) {
+                      if (v == null || v.trim().isEmpty)
+                        return 'Bakiye giriniz';
+                      if (double.tryParse(v.trim().replaceAll(',', '.')) ==
+                          null) {
                         return 'Geçerli bir sayı giriniz';
                       }
                       return null;
@@ -322,10 +329,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white),
                       )
-                    : Icon(
-                        widget.isEditing
-                            ? Icons.save_rounded
-                            : Icons.person_add_rounded),
+                    : Icon(widget.isEditing
+                        ? Icons.save_rounded
+                        : Icons.person_add_rounded),
                 label: Text(
                   widget.isEditing ? 'Değişiklikleri Kaydet' : 'Müşteri Ekle',
                   style: const TextStyle(
@@ -368,9 +374,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
               Text(
                 label,
                 style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _kText),
+                    fontSize: 13, fontWeight: FontWeight.w700, color: _kText),
               ),
             ],
           ),

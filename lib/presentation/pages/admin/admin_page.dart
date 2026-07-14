@@ -17,17 +17,17 @@ import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFFF8FAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFE2E8F0);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kBgColor = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kRed           = Color(0xFFEF4444);
-const _kAmber         = Color(0xFFF59E0B);
-const _kBlue          = Color(0xFF3B82F6);
-const _kPurple        = Color(0xFF8B5CF6);
-const _kTeal          = Color(0xFF0D9488);
+const _kGreen = Color(0xFF10B981);
+const _kRed = Color(0xFFEF4444);
+const _kAmber = Color(0xFFF59E0B);
+const _kBlue = Color(0xFF3B82F6);
+const _kPurple = Color(0xFF8B5CF6);
+const _kTeal = Color(0xFF0D9488);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -37,12 +37,15 @@ class AdminPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
-    final syncState   = ref.watch(syncProvider);
-    final licStatus   = ref.watch(licenseStatusProvider);
-    final printQueue  = ref.watch(persistentPrintQueueProvider);
+    final syncState = ref.watch(syncProvider);
+    final licStatus = ref.watch(licenseStatusProvider);
+    final printQueue = ref.watch(persistentPrintQueueProvider);
 
     // Guard — admin, owner, or sysadmin only
-    if (currentUser == null || !(currentUser.role == UserRole.admin || currentUser.role == UserRole.owner || currentUser.role == UserRole.sysadmin)) {
+    if (currentUser == null ||
+        !(currentUser.role == UserRole.admin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.sysadmin)) {
       return Scaffold(
         backgroundColor: _kBgColor,
         appBar: AppBar(
@@ -86,7 +89,8 @@ class AdminPage extends ConsumerWidget {
           // System Health Pulse
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: _SystemPulseDot(isHealthy: !hasConflict && licStatus.status == 'valid'),
+            child: _SystemPulseDot(
+                isHealthy: !hasConflict && licStatus.status == 'valid'),
           ),
         ],
       ),
@@ -108,8 +112,10 @@ class AdminPage extends ConsumerWidget {
               title: 'Aktif Senkronizasyon Çakışması',
               subtitle: syncState.lastError ?? 'Bilinmeyen hata',
               actionLabel: 'İncele',
-              onAction: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const RecoveryCenterPage())),
+              onAction: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RecoveryCenterPage())),
             ),
             const SizedBox(height: 12),
           ],
@@ -123,8 +129,10 @@ class AdminPage extends ConsumerWidget {
               color: _kGreen,
               title: 'Sistem Sağlık Durumu',
               subtitle: 'Drift rate, anomali, sync failure oranı',
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ObservabilityDashboard())),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ObservabilityDashboard())),
             ),
             const _Divider(),
             _AdminTile(
@@ -136,8 +144,10 @@ class AdminPage extends ConsumerWidget {
                   : 'Tüm sync oturumları ve incident geçmişi',
               badge: hasConflict ? '!' : null,
               badgeColor: _kRed,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const RecoveryCenterPage())),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RecoveryCenterPage())),
             ),
           ]),
           const SizedBox(height: 16),
@@ -239,7 +249,8 @@ class AdminPage extends ConsumerWidget {
                     )),
                 Text(
                   'Yönetici • ${licStatus.tierName}',
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  style:
+                      const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                 ),
               ],
             ),
@@ -296,9 +307,12 @@ class AdminPage extends ConsumerWidget {
               children: [
                 Text(title,
                     style: TextStyle(
-                        color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
                 Text(subtitle,
-                    style: const TextStyle(color: _kTextSecondary, fontSize: 11),
+                    style:
+                        const TextStyle(color: _kTextSecondary, fontSize: 11),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ],

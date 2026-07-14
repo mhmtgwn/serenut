@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/services/unified_scanner_service.dart
+// lib/infrastructure/services/unified_scanner_service.dart
 // Serenut POS — Unified Barcode Scanner Service
 // Supports: Sunmi hardware, camera (Android/iOS), USB keyboard (Windows)
 // Features: debounce, anti-spam, offline buffer, platform detection
@@ -12,23 +12,23 @@ import 'package:serenutos/domain/services/i_scanner_service.dart';
 
 /// Production-grade scanner abstraction for all platforms.
 class UnifiedScannerService implements IScannerService {
-  static const Duration _debounceWindow  = Duration(milliseconds: 1500);
-  static const Duration _spamWindow      = Duration(milliseconds: 200);
-  static const int      _spamThreshold   = 3;
-  static const int      _maxBufferSize   = 50;
+  static const Duration _debounceWindow = Duration(milliseconds: 1500);
+  static const Duration _spamWindow = Duration(milliseconds: 200);
+  static const int _spamThreshold = 3;
+  static const int _maxBufferSize = 50;
 
-  final _scanController  = StreamController<ScanEvent>.broadcast();
-  final List<ScanEvent>  _buffer        = [];
+  final _scanController = StreamController<ScanEvent>.broadcast();
+  final List<ScanEvent> _buffer = [];
 
   // Anti-spam / debounce state
-  String?    _lastBarcode;
-  DateTime?  _lastScanTime;
-  int        _recentScanCount = 0;
-  DateTime?  _spamWindowStart;
+  String? _lastBarcode;
+  DateTime? _lastScanTime;
+  int _recentScanCount = 0;
+  DateTime? _spamWindowStart;
 
   // USB keyboard mode accumulator
-  final StringBuffer _keyBuffer    = StringBuffer();
-  Timer?             _keyTimer;
+  final StringBuffer _keyBuffer = StringBuffer();
+  Timer? _keyTimer;
 
   ScannerMode _activeMode = ScannerMode.none;
   bool _isInitialized = false;
@@ -118,7 +118,8 @@ class UnifiedScannerService implements IScannerService {
     if (char == null) return false;
 
     // Enter key = end of barcode
-    if (char == '\n' || char == '\r' ||
+    if (char == '\n' ||
+        char == '\r' ||
         event.logicalKey == LogicalKeyboardKey.enter) {
       final code = _keyBuffer.toString().trim();
       _keyBuffer.clear();

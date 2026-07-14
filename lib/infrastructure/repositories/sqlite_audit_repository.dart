@@ -58,7 +58,8 @@ class SqliteAuditRepository implements IAuditRepository {
       whereArgs.add(toDate.toIso8601String());
     }
 
-    final whereString = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+    final whereString =
+        whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
 
     final results = await db.query(
       'audit_events',
@@ -76,10 +77,11 @@ class SqliteAuditRepository implements IAuditRepository {
   Future<List<AuditEvent>> search(String query) async {
     final db = await _dbManager.getDatabase();
     final likeQuery = '%$query%';
-    
+
     final results = await db.query(
       'audit_events',
-      where: 'user_name LIKE ? OR notes LIKE ? OR entity_id LIKE ? OR event_type LIKE ? OR entity_type LIKE ?',
+      where:
+          'user_name LIKE ? OR notes LIKE ? OR entity_id LIKE ? OR event_type LIKE ? OR entity_type LIKE ?',
       whereArgs: [likeQuery, likeQuery, likeQuery, likeQuery, likeQuery],
       orderBy: 'timestamp DESC',
     );

@@ -23,7 +23,8 @@ void main() {
       DatabaseManager.overrideDatabasePath = null;
     });
 
-    test('Rethrows critical migration errors and records failure in history', () async {
+    test('Rethrows critical migration errors and records failure in history',
+        () async {
       // 1. Create a database at version 17 with duplicate users (violating v18 UNIQUE constraint)
       final db = await openDatabase(
         tempDbPath,
@@ -84,7 +85,9 @@ void main() {
       );
     });
 
-    test('Throws StateError if database schema invariants fail (PRAGMA table_info / sqlite_master check)', () async {
+    test(
+        'Throws StateError if database schema invariants fail (PRAGMA table_info / sqlite_master check)',
+        () async {
       final db = await openDatabase(
         tempDbPath,
         version: 26,
@@ -109,7 +112,8 @@ void main() {
 
       expect(
         () => dbManager.getDatabase(),
-        throwsA(isA<StateError>().having((e) => e.toString(), 'message', contains('Database invariant violation'))),
+        throwsA(isA<StateError>().having((e) => e.toString(), 'message',
+            contains('Database invariant violation'))),
       );
     });
   });

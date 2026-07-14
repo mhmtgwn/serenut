@@ -2,10 +2,12 @@
 import 'package:flutter/material.dart';
 
 // ── Design Theme Sabitleri ───────────────────────────────────────────────────
-const kBgColor = Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
+const kBgColor =
+    Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
 const kCardBg = Colors.white;
 const kBorderColor = Color(0xFFF0F0F3); // Faint, subtle border
-const kTextPrimary = Color(0xFF1E293B); // Slate-900: softer and cleaner than raw black
+const kTextPrimary =
+    Color(0xFF1E293B); // Slate-900: softer and cleaner than raw black
 const kTextSecondary = Color(0xFF64748B); // Slate-500: elegant subtitle color
 const kGreen = Color(0xFF10B981); // Emerald Green
 const kBlue = Color(0xFF3B82F6); // Modern Blue
@@ -47,7 +49,8 @@ class FullScreenSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7), // _kBgColor matching the main settings screen
+      backgroundColor: const Color(
+          0xFFF2F2F7), // _kBgColor matching the main settings screen
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
@@ -62,7 +65,8 @@ class FullScreenSettingsPage extends StatelessWidget {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: kGreen), // _kGreen close button
+          icon: const Icon(Icons.close_rounded,
+              color: kGreen), // _kGreen close button
           onPressed: () => Navigator.pop(context),
         ),
         actions: actions,

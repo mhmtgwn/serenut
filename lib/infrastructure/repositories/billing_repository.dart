@@ -73,7 +73,8 @@ class BillingRepository {
 
   /// Fetch list of subscription tiers
   Future<List<BillingPlan>> getPlans() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'billing')}/plans');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/plans');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => BillingPlan.fromJson(item)).toList();
   }
@@ -90,13 +91,16 @@ class BillingRepository {
 
   /// Fetch history of invoices
   Future<List<InvoiceEntry>> getInvoices() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'billing')}/invoices');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/invoices');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => InvoiceEntry.fromJson(item)).toList();
   }
 
   /// Request auto-renewal cancel at period end
   Future<void> cancelSubscription() async {
-    await _apiClient.post('${_config.releaseEndpoint.replaceAll('releases', 'billing')}/cancel', {});
+    await _apiClient.post(
+        '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/cancel',
+        {});
   }
 }

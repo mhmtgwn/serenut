@@ -63,7 +63,8 @@ class PersistedPrintJob {
       id: map['id'] as String,
       title: (map['title'] as String?) ?? 'Fis',
       receiptJson: (map['receipt_json'] ?? map['receiptJson']) as String,
-      createdAt: DateTime.parse((map['created_at'] ?? map['createdAt']) as String),
+      createdAt:
+          DateTime.parse((map['created_at'] ?? map['createdAt']) as String),
       retryCount: (map['retry_count'] ?? map['retryCount'] ?? 0) as int,
       status: PrintJobStatus.values.firstWhere(
         (s) => s.name == (map['status'] as String?),
@@ -80,7 +81,8 @@ class PersistedPrintJob {
 class PersistentPrintQueue {
   static const int _maxRetries = 5;
   static const int _maxJobs = 200;
-  static int _idCounter = 0; // Monotonic counter — guarantees unique IDs in tight loops
+  static int _idCounter =
+      0; // Monotonic counter — guarantees unique IDs in tight loops
   static final _lock = AsyncLock();
 
   final String? testKey;
@@ -124,10 +126,10 @@ class PersistentPrintQueue {
         receiptJson: receiptJson,
         createdAt: DateTime.now(),
       );
-      
+
       final db = await _getDb();
       await _ensureTable(db);
-      
+
       await db.insert(_tableName, {
         'id': job.id,
         'title': job.title,
@@ -140,9 +142,9 @@ class PersistentPrintQueue {
 
       // Prune: keep newest _maxJobs
       final count = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT COUNT(*) FROM $_tableName')
-      ) ?? 0;
-      
+              await db.rawQuery('SELECT COUNT(*) FROM $_tableName')) ??
+          0;
+
       if (count > _maxJobs) {
         final deleteCount = count - _maxJobs;
         await db.execute('''
@@ -206,21 +208,21 @@ class PersistentPrintQueue {
   Future<void> markFailed(String id, {String? error}) async {
     final db = await _getDb();
     await _ensureTable(db);
-    
+
     final rows = await db.query(
       _tableName,
       columns: ['retry_count'],
       where: 'id = ?',
       whereArgs: [id],
     );
-    
+
     if (rows.isNotEmpty) {
       final currentRetryCount = rows.first['retry_count'] as int;
       final newRetryCount = currentRetryCount + 1;
       final newStatus = newRetryCount >= _maxRetries
           ? PrintJobStatus.abandoned.name
           : PrintJobStatus.pending.name;
-          
+
       await db.update(
         _tableName,
         {

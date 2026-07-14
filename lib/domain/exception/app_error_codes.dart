@@ -5,7 +5,7 @@
 // Generated: 21 Jun 2026
 
 /// Global error codes for consistent error handling
-/// 
+///
 /// Prefix pattern:
 /// - AUTH_* (authentication failures)
 /// - VAL_* (validation failures)
@@ -13,12 +13,12 @@
 /// - TXN_* (transaction failures)
 /// - DB_* (database failures)
 /// - UNK_* (unknown errors)
-/// 
+///
 class AppErrorCode {
   // ════════════════════════════════════════════════════════════
   // Authentication Errors (AUTH_)
   // ════════════════════════════════════════════════════════════
-  
+
   static const String AUTH_INVALID_CREDENTIALS = 'AUTH_INVALID_CREDENTIALS';
   static const String AUTH_USER_NOT_FOUND = 'AUTH_USER_NOT_FOUND';
   static const String AUTH_PERMISSION_DENIED = 'AUTH_PERMISSION_DENIED';
@@ -29,7 +29,7 @@ class AppErrorCode {
   // ════════════════════════════════════════════════════════════
   // Validation Errors (VAL_)
   // ════════════════════════════════════════════════════════════
-  
+
   static const String VAL_REQUIRED_FIELD_MISSING = 'VAL_REQUIRED_FIELD_MISSING';
   static const String VAL_INVALID_FORMAT = 'VAL_INVALID_FORMAT';
   static const String VAL_INVALID_EMAIL = 'VAL_INVALID_EMAIL';
@@ -44,7 +44,7 @@ class AppErrorCode {
   // ════════════════════════════════════════════════════════════
   // Network Errors (NET_)
   // ════════════════════════════════════════════════════════════
-  
+
   static const String NET_NO_CONNECTION = 'NET_NO_CONNECTION';
   static const String NET_CONNECTION_TIMEOUT = 'NET_CONNECTION_TIMEOUT';
   static const String NET_REQUEST_TIMEOUT = 'NET_REQUEST_TIMEOUT';
@@ -55,7 +55,7 @@ class AppErrorCode {
   // ════════════════════════════════════════════════════════════
   // Transaction Errors (TXN_)
   // ════════════════════════════════════════════════════════════
-  
+
   static const String TXN_INSUFFICIENT_FUNDS = 'TXN_INSUFFICIENT_FUNDS';
   static const String TXN_INSUFFICIENT_STOCK = 'TXN_INSUFFICIENT_STOCK';
   static const String TXN_FAILED = 'TXN_FAILED';
@@ -63,12 +63,13 @@ class AppErrorCode {
   static const String TXN_ATOMIC_VIOLATION = 'TXN_ATOMIC_VIOLATION';
   static const String TXN_CONSTRAINT_VIOLATION = 'TXN_CONSTRAINT_VIOLATION';
   static const String TXN_LOCK_CONFLICT = 'TXN_LOCK_CONFLICT';
-  static const String TXN_CONCURRENT_MODIFICATION = 'TXN_CONCURRENT_MODIFICATION';
+  static const String TXN_CONCURRENT_MODIFICATION =
+      'TXN_CONCURRENT_MODIFICATION';
 
   // ════════════════════════════════════════════════════════════
   // Database Errors (DB_)
   // ════════════════════════════════════════════════════════════
-  
+
   static const String DB_CONSTRAINT_FAILED = 'DB_CONSTRAINT_FAILED';
   static const String DB_RECORD_NOT_FOUND = 'DB_RECORD_NOT_FOUND';
   static const String DB_RECORD_ALREADY_EXISTS = 'DB_RECORD_ALREADY_EXISTS';
@@ -80,7 +81,7 @@ class AppErrorCode {
   // ════════════════════════════════════════════════════════════
   // Unknown Errors (UNK_)
   // ════════════════════════════════════════════════════════════
-  
+
   static const String UNK_ERROR = 'UNK_ERROR';
   static const String UNK_UNHANDLED_EXCEPTION = 'UNK_UNHANDLED_EXCEPTION';
 

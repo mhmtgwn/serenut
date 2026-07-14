@@ -65,8 +65,8 @@ class ConnectionManager {
 
   Future<void> connect() async {
     _explicitClose = false;
-    if (_status == RealtimeStatus.connected || 
-        _status == RealtimeStatus.connecting || 
+    if (_status == RealtimeStatus.connected ||
+        _status == RealtimeStatus.connecting ||
         _status == RealtimeStatus.reconnecting) {
       return;
     }
@@ -76,7 +76,9 @@ class ConnectionManager {
       _reconnectTimer = null;
     }
 
-    _setStatus(reconnectManager.attempts > 0 ? RealtimeStatus.reconnecting : RealtimeStatus.connecting);
+    _setStatus(reconnectManager.attempts > 0
+        ? RealtimeStatus.reconnecting
+        : RealtimeStatus.connecting);
 
     try {
       final user = await authService.getCurrentUser();
@@ -108,7 +110,8 @@ class ConnectionManager {
       wsManager.connect(wsUrlWithParams);
     } catch (e) {
       _setStatus(RealtimeStatus.disconnected);
-      if (e is ApiException && (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
+      if (e is ApiException &&
+          (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
         authService.triggerSessionExpired();
       } else {
         _scheduleReconnect();
@@ -197,12 +200,12 @@ class ConnectionManager {
           authService.triggerSessionExpired();
           return;
         }
-        
+
         // Reset status to disconnected temporarily so connect() isn't filtered out
         if (_status == RealtimeStatus.reconnecting) {
           _status = RealtimeStatus.disconnected;
         }
-        
+
         connect();
       } catch (e) {
         // Temporary network / connection error (timeout, SocketException, offline)

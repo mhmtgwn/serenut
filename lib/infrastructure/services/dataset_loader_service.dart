@@ -29,12 +29,12 @@ class DatasetVersion {
   });
 
   factory DatasetVersion.fromJson(Map<String, dynamic> json) => DatasetVersion(
-    version: json['version'] as String? ?? 'Unknown',
-    timestamp: json['timestamp'] as String? ?? '',
-    productCount: json['product_count'] as int? ?? 0,
-    priceCount: json['price_count'] as int? ?? 0,
-    integrityScore: (json['integrity_score'] as num?)?.toDouble() ?? 0.0,
-  );
+        version: json['version'] as String? ?? 'Unknown',
+        timestamp: json['timestamp'] as String? ?? '',
+        productCount: json['product_count'] as int? ?? 0,
+        priceCount: json['price_count'] as int? ?? 0,
+        integrityScore: (json['integrity_score'] as num?)?.toDouble() ?? 0.0,
+      );
 }
 
 class DatasetLoaderService {
@@ -45,7 +45,8 @@ class DatasetLoaderService {
 
   DatasetLoaderService(this._prefs) {
     _activeVersion = _prefs.getString('active_dataset_version') ?? 'None';
-    _selectedMarket = _prefs.getString('selected_intelligence_market') ?? 'Migros';
+    _selectedMarket =
+        _prefs.getString('selected_intelligence_market') ?? 'Migros';
   }
 
   String get activeVersion => _activeVersion;
@@ -59,7 +60,6 @@ class DatasetLoaderService {
   }
 
   Future<Directory> get _datasetsDirectory async {
-
     final appDocDir = await getApplicationDocumentsDirectory();
     final path = join(appDocDir.path, 'datasets');
     return Directory(path)..createSync(recursive: true);
@@ -107,7 +107,8 @@ class DatasetLoaderService {
       }
 
       // Open connection to dataset database (read-only mode)
-      _activeDb = await DatabaseManager().openDatabaseConnection(sqlitePath, readOnly: true);
+      _activeDb = await DatabaseManager()
+          .openDatabaseConnection(sqlitePath, readOnly: true);
       _activeVersion = version;
       await _prefs.setString('active_dataset_version', version);
       return true;
@@ -142,19 +143,22 @@ class DatasetLoaderService {
       LEFT JOIN prices pr ON p.barcode = pr.barcode AND pr.market_name = ?
     ''', [_selectedMarket]);
 
-    return rows.map((row) => ProductEntity(
-      id: row['id'] as String,
-      name: row['name'] as String,
-      description: row['description'] as String,
-      price: (row['price'] as num).toDouble(),
-      quantity: row['quantity'] as int,
-      category: row['category'] as String,
-      vat: row['vat'] as int?,
-    )).toList();
+    return rows
+        .map((row) => ProductEntity(
+              id: row['id'] as String,
+              name: row['name'] as String,
+              description: row['description'] as String,
+              price: (row['price'] as num).toDouble(),
+              quantity: row['quantity'] as int,
+              category: row['category'] as String,
+              vat: row['vat'] as int?,
+            ))
+        .toList();
   }
 }
 
 // Riverpod Provider definitions for dependency injection
 final datasetLoaderServiceProvider = Provider<DatasetLoaderService>((ref) {
-  throw UnimplementedError('Must override datasetLoaderServiceProvider in ProviderScope');
+  throw UnimplementedError(
+      'Must override datasetLoaderServiceProvider in ProviderScope');
 });

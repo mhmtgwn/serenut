@@ -16,9 +16,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
-    
+
     final searchQuery = ref.watch(customerSearchQueryProvider);
-    
+
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
         return _repository.findFiltered(
@@ -29,7 +29,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       },
       pageSize: 50,
     );
-    
+
     await _paginationService!.loadFirstPage(searchQuery: searchQuery);
     return _paginationService!.items;
   }
@@ -39,7 +39,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
 
   Future<void> loadNextPage() async {
     if (_paginationService == null) return;
-    if (_paginationService!.isLoading || !_paginationService!.hasMoreData) return;
+    if (_paginationService!.isLoading || !_paginationService!.hasMoreData)
+      return;
     try {
       await _paginationService!.loadNextPage();
       state = AsyncValue.data(List.from(_paginationService!.items));
@@ -87,7 +88,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     _invalidateAll();
   }
 
-  Future<void> deleteCustomer(String id, {String? approvedByUserId, String? approvedByUserName}) async {
+  Future<void> deleteCustomer(String id,
+      {String? approvedByUserId, String? approvedByUserName}) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(id);
@@ -145,7 +147,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     } catch (_) {}
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
-    
+
     // Refresh customers list
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
@@ -181,16 +183,17 @@ final customersControllerProvider =
 // Screen-specific Customer Search Providers
 final salesCustomerSearchQueryProvider = StateProvider<String>((ref) => '');
 final ordersCustomerSearchQueryProvider = StateProvider<String>((ref) => '');
-final collectionCustomerSearchQueryProvider = StateProvider<String>((ref) => '');
+final collectionCustomerSearchQueryProvider =
+    StateProvider<String>((ref) => '');
 
 // Sales-specific customers list notifier and provider
 class SalesCustomersController extends CustomersController {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
-    
+
     final searchQuery = ref.watch(salesCustomerSearchQueryProvider);
-    
+
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
         return _repository.findFiltered(
@@ -201,7 +204,7 @@ class SalesCustomersController extends CustomersController {
       },
       pageSize: 50,
     );
-    
+
     await _paginationService!.loadFirstPage(searchQuery: searchQuery);
     return _paginationService!.items;
   }
@@ -217,9 +220,9 @@ class OrdersCustomersController extends CustomersController {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
-    
+
     final searchQuery = ref.watch(ordersCustomerSearchQueryProvider);
-    
+
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
         return _repository.findFiltered(
@@ -230,7 +233,7 @@ class OrdersCustomersController extends CustomersController {
       },
       pageSize: 50,
     );
-    
+
     await _paginationService!.loadFirstPage(searchQuery: searchQuery);
     return _paginationService!.items;
   }
@@ -246,9 +249,9 @@ class CollectionCustomersController extends CustomersController {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
-    
+
     final searchQuery = ref.watch(collectionCustomerSearchQueryProvider);
-    
+
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
         return _repository.findFiltered(
@@ -259,20 +262,22 @@ class CollectionCustomersController extends CustomersController {
       },
       pageSize: 50,
     );
-    
+
     await _paginationService!.loadFirstPage(searchQuery: searchQuery);
     return _paginationService!.items;
   }
 }
 
 final collectionCustomersControllerProvider =
-    AsyncNotifierProvider<CollectionCustomersController, List<CustomerEntity>>(() {
+    AsyncNotifierProvider<CollectionCustomersController, List<CustomerEntity>>(
+        () {
   return CollectionCustomersController();
 });
 
 /// Per-customer transactions provider
 final customerTransactionsProvider =
-    FutureProvider.family<List<FinancialTransactionEntity>, String>((ref, customerId) async {
+    FutureProvider.family<List<FinancialTransactionEntity>, String>(
+        (ref, customerId) async {
   final repo = await ref.watch(financialTransactionRepositoryProvider.future);
   return repo.getByCustomerId(customerId);
 });
@@ -292,8 +297,8 @@ final customerBalanceDetailsProvider =
 });
 
 /// Provider to load details (items) of a financial transaction (sale or order)
-final transactionItemsProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, FinancialTransactionEntity>((ref, txn) async {
+final transactionItemsProvider = FutureProvider.family<
+    List<Map<String, dynamic>>, FinancialTransactionEntity>((ref, txn) async {
   if (txn.referenceId == null || txn.referenceId!.isEmpty) {
     return [];
   }
@@ -307,7 +312,8 @@ final transactionItemsProvider =
       final list = <Map<String, dynamic>>[];
       for (final item in order.items) {
         final prodId = item['product_id'] as String;
-        final storedName = item['product_name'] as String? ?? item['name'] as String?;
+        final storedName =
+            item['product_name'] as String? ?? item['name'] as String?;
         if (storedName != null && storedName.isNotEmpty) {
           list.add({
             'name': storedName,
@@ -332,7 +338,8 @@ final transactionItemsProvider =
       final list = <Map<String, dynamic>>[];
       for (final item in sale.items) {
         final prodId = item['product_id'] as String;
-        final storedName = item['name'] as String? ?? item['product_name'] as String?;
+        final storedName =
+            item['name'] as String? ?? item['product_name'] as String?;
         if (storedName != null && storedName.isNotEmpty) {
           list.add({
             'name': storedName,

@@ -1,4 +1,4 @@
-﻿// test/services/sync_conflict_simulation_test.dart
+// test/services/sync_conflict_simulation_test.dart
 // Sync Conflict Simulation Framework — Deterministic edge-case coverage
 //
 // Tests:
@@ -53,7 +53,8 @@ void main() {
     tearDown(() async => db.close());
 
     // ── 1. Legal transition chain persisted ───────────────────────────────────
-    test('Legal transitions: idle → syncing → synced, all written to DB', () async {
+    test('Legal transitions: idle → syncing → synced, all written to DB',
+        () async {
       final machine = SyncStateMachine(db: db, deviceId: 'device-A');
 
       expect(machine.currentState, SyncState.idle);
@@ -73,12 +74,12 @@ void main() {
     });
 
     // ── 2. Conflict resolution path ───────────────────────────────────────────
-    test('Conflict path: syncing → conflictDetected → resolving → syncing', () async {
+    test('Conflict path: syncing → conflictDetected → resolving → syncing',
+        () async {
       final machine = SyncStateMachine(db: db);
       await machine.transition(SyncTrigger.startSync);
       await machine.transition(SyncTrigger.pushConflict,
-          saleId: 'sale-conflict-1',
-          metadata: {'http_status': 409});
+          saleId: 'sale-conflict-1', metadata: {'http_status': 409});
 
       expect(machine.currentState, SyncState.conflictDetected);
 
@@ -107,7 +108,8 @@ void main() {
     });
 
     // ── 4. Crash recovery restores last state ─────────────────────────────────
-    test('Crash recovery: restoreFromCrash() loads last persisted state', () async {
+    test('Crash recovery: restoreFromCrash() loads last persisted state',
+        () async {
       const session = 'test-session-crash-recovery';
       final machine1 = SyncStateMachine(db: db, sessionId: session);
       await machine1.transition(SyncTrigger.startSync);
@@ -135,23 +137,23 @@ void main() {
     });
 
     // ── 6. Retention purge ────────────────────────────────────────────────────
-    test('purgeOldTransitions removes only entries older than retentionDays', () async {
+    test('purgeOldTransitions removes only entries older than retentionDays',
+        () async {
       // Insert a row with a very old timestamp
       await db.insert('sync_state_log', {
         'session_id': 'old-session',
         'from_state': 'idle',
         'to_state': 'syncing',
         'trigger_event': 'startSync',
-        'occurred_at': DateTime.now()
-            .subtract(const Duration(days: 60))
-            .toIso8601String(),
+        'occurred_at':
+            DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
       });
 
       final machine = SyncStateMachine(db: db);
       await machine.transition(SyncTrigger.startSync); // recent row
 
-      final deleted = await SyncStateMachine.purgeOldTransitions(db,
-          retentionDays: 30);
+      final deleted =
+          await SyncStateMachine.purgeOldTransitions(db, retentionDays: 30);
       expect(deleted, equals(1)); // only the old-session row deleted
 
       final remaining = await db.query('sync_state_log');
@@ -164,8 +166,7 @@ void main() {
 
   group('SyncChaosInjector — Fault Injection Tests', () {
     test('NetworkCutFault at beforePush throws SocketException', () async {
-      final injector = SyncChaosInjector()
-        ..addFault(const NetworkCutFault());
+      final injector = SyncChaosInjector()..addFault(const NetworkCutFault());
 
       expect(
         () => injector.trigger(FaultHook.beforePush),
@@ -193,16 +194,19 @@ void main() {
       final after = DateTime.now();
 
       // injectedNow should be ~10 minutes ahead of real now
-      expect(injectedNow.isAfter(before.add(const Duration(minutes: 9))), isTrue);
-      expect(injectedNow.isBefore(after.add(const Duration(minutes: 11))), isTrue);
+      expect(
+          injectedNow.isAfter(before.add(const Duration(minutes: 9))), isTrue);
+      expect(
+          injectedNow.isBefore(after.add(const Duration(minutes: 11))), isTrue);
     });
 
-    test('PartialWriteFault at afterPushBeforeCommit throws StateError', () async {
-      final injector = SyncChaosInjector()
-        ..addFault(const PartialWriteFault());
+    test('PartialWriteFault at afterPushBeforeCommit throws StateError',
+        () async {
+      final injector = SyncChaosInjector()..addFault(const PartialWriteFault());
 
       expect(
-        () => injector.trigger(FaultHook.afterPushBeforeCommit, saleId: 'sale-1'),
+        () =>
+            injector.trigger(FaultHook.afterPushBeforeCommit, saleId: 'sale-1'),
         throwsA(isA<StateError>()),
       );
     });
@@ -297,8 +301,8 @@ void main() {
     });
 
     test('formatSessionTrace produces human-readable output', () async {
-      final machine =
-          SyncStateMachine(db: db, sessionId: 'format-session', deviceId: 'dev-1');
+      final machine = SyncStateMachine(
+          db: db, sessionId: 'format-session', deviceId: 'dev-1');
       await machine.transition(SyncTrigger.startSync);
       await machine.transition(SyncTrigger.pushConflict, saleId: 'sale-xyz');
 

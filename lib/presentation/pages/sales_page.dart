@@ -12,7 +12,8 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/domain/services/sales_service.dart' show SaleItemInput;
+import 'package:serenutos/domain/services/sales_service.dart'
+    show SaleItemInput;
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
@@ -24,8 +25,6 @@ import 'package:serenutos/config/utils.dart';
 
 part 'sales/animated_cart_tab.dart';
 
-
-
 const _kGreen = Color(0xFF16A34A);
 const _kGreenDark = Color(0xFF15803D);
 const _kRed = Color(0xFFDC2626);
@@ -33,7 +32,6 @@ const _kSurface = Color(0xFFF8FAFC);
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
-
 
 class SalesPage extends ConsumerStatefulWidget {
   const SalesPage({super.key});
@@ -75,8 +73,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     final activeIndex = ref.read(activeShellIndexProvider);
     if (activeIndex != 1) return false;
 
-    final isEnter = event.logicalKey == LogicalKeyboardKey.enter || 
-                    event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
 
     // Consume both KeyDown and KeyUp events for Enter to prevent focus activation triggers.
     if (isEnter) {
@@ -134,14 +132,15 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     );
   }
 
-  Future<void> _handleBarcodeSubmit(String barcode, List<ProductEntity> productsList) async {
+  Future<void> _handleBarcodeSubmit(
+      String barcode, List<ProductEntity> productsList) async {
     if (barcode.trim().isEmpty) return;
-    
+
     final repository = await ref.read(productRepositoryProvider.future);
-    
+
     // 1. Direct ID / SKU match
     var matched = await repository.findById(barcode.trim());
-    
+
     // 2. Search by name/exact matches
     if (matched == null) {
       final results = await repository.searchByName(barcode.trim());
@@ -178,7 +177,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
 
     final double totalAmount = flowState.total;
 
-    if (flowState.paymentMethod == 'debt' && flowState.selectedCustomer == null) {
+    if (flowState.paymentMethod == 'debt' &&
+        flowState.selectedCustomer == null) {
       _showErrorSnackBar('Vadeli satış için müşteri seçilmesi zorunludur!');
       return;
     }
@@ -186,7 +186,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     if (flowState.paymentMethod == 'karma') {
       final double paidAmount = flowState.paidAmount;
       if (paidAmount < totalAmount && flowState.selectedCustomer == null) {
-        _showErrorSnackBar('Kalan borç tutarı (Vadeli) için müşteri seçilmesi zorunludur!');
+        _showErrorSnackBar(
+            'Kalan borç tutarı (Vadeli) için müşteri seçilmesi zorunludur!');
         return;
       }
     }
@@ -204,7 +205,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       }).toList();
 
       final customerId = flowState.selectedCustomer?.id ?? '';
-      
+
       double finalPaid = totalAmount;
       if (flowState.paymentMethod == 'debt') {
         finalPaid = 0.0;
@@ -212,12 +213,13 @@ class _SalesPageState extends ConsumerState<SalesPage> {
         finalPaid = flowState.paidAmount;
       }
 
-      final createdSale = await ref.read(salesControllerProvider.notifier).createSale(
-        customerId: customerId,
-        items: itemsInput,
-        paymentMethod: flowState.paymentMethod,
-        paidAmount: finalPaid,
-      );
+      final createdSale =
+          await ref.read(salesControllerProvider.notifier).createSale(
+                customerId: customerId,
+                items: itemsInput,
+                paymentMethod: flowState.paymentMethod,
+                paidAmount: finalPaid,
+              );
 
       if (createdSale == null) {
         throw Exception('Satış kaydı oluşturulamadı.');
@@ -277,15 +279,23 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       _showErrorSnackBar('Yazıcı ayarları yüklenemedi.');
       return;
     }
-    final hasPrinter = (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                       (settings.printerName != null && settings.printerName!.isNotEmpty);
+    final hasPrinter =
+        (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
+            (settings.printerName != null && settings.printerName!.isNotEmpty);
     if (!hasPrinter) {
       _showErrorSnackBar('Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.');
       return;
     }
 
     try {
-      final customer = selectedCustomer ?? CustomerEntity(id: '', name: 'Bilinmeyen Müşteri', email: '', phone: '', balance: 0, createdAt: DateTime.now());
+      final customer = selectedCustomer ??
+          CustomerEntity(
+              id: '',
+              name: 'Bilinmeyen Müşteri',
+              email: '',
+              phone: '',
+              balance: 0,
+              createdAt: DateTime.now());
 
       final products = ref.read(productsControllerProvider).value ?? [];
       final receiptItems = sale.items.map((item) {
@@ -308,14 +318,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       }).toList();
 
       ref.read(printerServiceProvider).enqueue(
-        'Satış Fişi #${sale.id.toShortId}',
-        () => ref.read(printerServiceProvider).printSaleReceipt(
-          sale,
-          receiptItems,
-          customer.id.isNotEmpty ? customer : null,
-          settings,
-        ),
-      );
+            'Satış Fişi #${sale.id.toShortId}',
+            () => ref.read(printerServiceProvider).printSaleReceipt(
+                  sale,
+                  receiptItems,
+                  customer.id.isNotEmpty ? customer : null,
+                  settings,
+                ),
+          );
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -338,7 +348,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
           children: [
             Consumer(
               builder: (context, ref, child) {
-                final isProcessing = ref.watch(salesFlowProvider.select((state) => state.status == SalesFlowStatus.processing));
+                final isProcessing = ref.watch(salesFlowProvider.select(
+                    (state) => state.status == SalesFlowStatus.processing));
                 return AbsorbPointer(
                   absorbing: isProcessing,
                   child: child!,
@@ -347,7 +358,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth >= 900;
-  
+
                   if (isWide) {
                     return Row(
                       children: [
@@ -357,7 +368,9 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             searchController: _searchController,
                             barcodeController: _barcodeController,
                             barcodeFocusNode: _barcodeFocusNode,
-                            onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
+                            onAddToCart: (p) => ref
+                                .read(salesFlowProvider.notifier)
+                                .addToCart(p),
                             onBarcodeSubmit: _handleBarcodeSubmit,
                           ),
                         ),
@@ -367,7 +380,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                           child: Consumer(
                             builder: (context, ref, child) {
                               final flowState = ref.watch(salesFlowProvider);
-                              final customersAsyncVal = ref.watch(salesCustomersControllerProvider);
+                              final customersAsyncVal =
+                                  ref.watch(salesCustomersControllerProvider);
 
                               final checkoutWidget = CheckoutSection(
                                 total: flowState.total,
@@ -377,20 +391,36 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                                 paidController: _paidController,
                                 isSubmitting: flowState.isSubmitting,
                                 customersAsyncVal: customersAsyncVal,
-                                onCustomerChanged: (cust) => ref.read(salesFlowProvider.notifier).selectCustomer(cust),
-                                onPaymentMethodChanged: (method) => ref.read(salesFlowProvider.notifier).setPaymentMethod(method),
-                                onPaidAmountChanged: (amt) => ref.read(salesFlowProvider.notifier).setPaidAmount(amt),
+                                onCustomerChanged: (cust) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .selectCustomer(cust),
+                                onPaymentMethodChanged: (method) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .setPaymentMethod(method),
+                                onPaidAmountChanged: (amt) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .setPaidAmount(amt),
                                 onSubmitSale: _submitSale,
                               );
 
                               return CartPanel(
                                 cartQuantities: flowState.cartQuantities,
                                 cartProducts: flowState.cartProducts,
-                                onClearCart: () => ref.read(salesFlowProvider.notifier).clearCart(),
-                                onRemoveFromCart: (p) => ref.read(salesFlowProvider.notifier).removeFromCart(p),
-                                onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
-                                onDeleteFromCart: (p) => ref.read(salesFlowProvider.notifier).deleteFromCart(p),
-                                onQuantityChanged: (p, qty) => ref.read(salesFlowProvider.notifier).updateQuantity(p, qty),
+                                onClearCart: () => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .clearCart(),
+                                onRemoveFromCart: (p) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .removeFromCart(p),
+                                onAddToCart: (p) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .addToCart(p),
+                                onDeleteFromCart: (p) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .deleteFromCart(p),
+                                onQuantityChanged: (p, qty) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .updateQuantity(p, qty),
                                 checkoutSectionWidget: checkoutWidget,
                               );
                             },
@@ -399,7 +429,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                       ],
                     );
                   }
- 
+
                   return DefaultTabController(
                     length: 2,
                     child: Scaffold(
@@ -410,13 +440,16 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             searchController: _searchController,
                             barcodeController: _barcodeController,
                             barcodeFocusNode: _barcodeFocusNode,
-                            onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
+                            onAddToCart: (p) => ref
+                                .read(salesFlowProvider.notifier)
+                                .addToCart(p),
                             onBarcodeSubmit: _handleBarcodeSubmit,
                           ),
                           Consumer(
                             builder: (context, ref, child) {
                               final flowState = ref.watch(salesFlowProvider);
-                              final customersAsyncVal = ref.watch(salesCustomersControllerProvider);
+                              final customersAsyncVal =
+                                  ref.watch(salesCustomersControllerProvider);
 
                               final checkoutWidget = CheckoutSection(
                                 total: flowState.total,
@@ -426,20 +459,36 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                                 paidController: _paidController,
                                 isSubmitting: flowState.isSubmitting,
                                 customersAsyncVal: customersAsyncVal,
-                                onCustomerChanged: (cust) => ref.read(salesFlowProvider.notifier).selectCustomer(cust),
-                                onPaymentMethodChanged: (method) => ref.read(salesFlowProvider.notifier).setPaymentMethod(method),
-                                onPaidAmountChanged: (amt) => ref.read(salesFlowProvider.notifier).setPaidAmount(amt),
+                                onCustomerChanged: (cust) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .selectCustomer(cust),
+                                onPaymentMethodChanged: (method) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .setPaymentMethod(method),
+                                onPaidAmountChanged: (amt) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .setPaidAmount(amt),
                                 onSubmitSale: _submitSale,
                               );
 
                               return CartPanel(
                                 cartQuantities: flowState.cartQuantities,
                                 cartProducts: flowState.cartProducts,
-                                onClearCart: () => ref.read(salesFlowProvider.notifier).clearCart(),
-                                onRemoveFromCart: (p) => ref.read(salesFlowProvider.notifier).removeFromCart(p),
-                                onAddToCart: (p) => ref.read(salesFlowProvider.notifier).addToCart(p),
-                                onDeleteFromCart: (p) => ref.read(salesFlowProvider.notifier).deleteFromCart(p),
-                                onQuantityChanged: (p, qty) => ref.read(salesFlowProvider.notifier).updateQuantity(p, qty),
+                                onClearCart: () => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .clearCart(),
+                                onRemoveFromCart: (p) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .removeFromCart(p),
+                                onAddToCart: (p) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .addToCart(p),
+                                onDeleteFromCart: (p) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .deleteFromCart(p),
+                                onQuantityChanged: (p, qty) => ref
+                                    .read(salesFlowProvider.notifier)
+                                    .updateQuantity(p, qty),
                                 checkoutSectionWidget: checkoutWidget,
                               );
                             },
@@ -449,7 +498,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                       bottomNavigationBar: Container(
                         decoration: const BoxDecoration(
                           color: Colors.white,
-                          border: Border(top: BorderSide(color: _kBorder, width: 1)),
+                          border: Border(
+                              top: BorderSide(color: _kBorder, width: 1)),
                         ),
                         child: const SafeArea(
                           child: TabBar(
@@ -457,8 +507,10 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             indicatorWeight: 3,
                             labelColor: _kGreen,
                             unselectedLabelColor: _kTextSecondary,
-                            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+                            labelStyle: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 11),
+                            unselectedLabelStyle: TextStyle(
+                                fontWeight: FontWeight.w500, fontSize: 11),
                             tabs: [
                               Tab(
                                 icon: Icon(Icons.grid_view_rounded, size: 20),
@@ -477,20 +529,19 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 },
               ),
             ),
-          if (_showSuccessNotification)
-            Positioned.fill(
-              child: Center(
-                child: Icon(
-                  Icons.check_circle_outline_rounded,
-                  color: const Color(0xFF22C55E).withValues(alpha: 0.7),
-                  size: 96,
+            if (_showSuccessNotification)
+              Positioned.fill(
+                child: Center(
+                  child: Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: const Color(0xFF22C55E).withValues(alpha: 0.7),
+                    size: 96,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 }
-

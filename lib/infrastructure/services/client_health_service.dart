@@ -59,7 +59,7 @@ class ClientHealthService {
   Future<bool> reportHealthToServer({required String deviceId}) async {
     try {
       final services = await checkServicesHealth();
-      
+
       // Determine overall status
       final isHealthy = services['database'] == 'up' &&
           services['license'] == 'valid' &&

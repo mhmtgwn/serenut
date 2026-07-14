@@ -1,4 +1,4 @@
-﻿// lib/domain/services/data_integrity_service.dart
+// lib/domain/services/data_integrity_service.dart
 import 'package:flutter/foundation.dart' show compute;
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
@@ -51,7 +51,8 @@ class DataIntegrityService {
     final customer = await _customerRepository.findById(customerId);
     if (customer == null) return true;
 
-    final transactions = await _transactionRepository.getByCustomerId(customerId);
+    final transactions =
+        await _transactionRepository.getByCustomerId(customerId);
     final expectedBalance = calculateExpectedBalance(transactions);
 
     // Floating-point tolerance: 0.01 TL
@@ -76,7 +77,8 @@ class DataIntegrityService {
   /// Rebuilds customer balance from the financial transaction log (State Replay).
   /// Writes the corrected value back to the database.
   Future<double> rebuildCustomerBalance(String customerId) async {
-    final transactions = await _transactionRepository.getByCustomerId(customerId);
+    final transactions =
+        await _transactionRepository.getByCustomerId(customerId);
     final expectedBalance = calculateExpectedBalance(transactions);
 
     final customer = await _customerRepository.findById(customerId);
@@ -95,9 +97,12 @@ class DataIntegrityService {
   }
 
   /// Explains customer balance chronologically, detailing exact ledger transitions.
-  Future<List<BalanceExplanationRecord>> explainCustomerBalance(String customerId) async {
-    final transactions = await _transactionRepository.getByCustomerId(customerId);
-    final chronoTxs = List<FinancialTransactionEntity>.from(transactions).reversed.toList();
+  Future<List<BalanceExplanationRecord>> explainCustomerBalance(
+      String customerId) async {
+    final transactions =
+        await _transactionRepository.getByCustomerId(customerId);
+    final chronoTxs =
+        List<FinancialTransactionEntity>.from(transactions).reversed.toList();
 
     double running = 0.0;
     final List<BalanceExplanationRecord> records = [];
@@ -106,13 +111,15 @@ class DataIntegrityService {
       String desc = '';
       if (tx.type == 'sale') {
         running -= tx.debtAmount;
-        desc = '${tx.amount.toStringAsFixed(2)} TL değerinde satış yapıldı (Ödenen: ${tx.paidAmount.toStringAsFixed(2)} TL, Borç: ${tx.debtAmount.toStringAsFixed(2)} TL).';
+        desc =
+            '${tx.amount.toStringAsFixed(2)} TL değerinde satış yapıldı (Ödenen: ${tx.paidAmount.toStringAsFixed(2)} TL, Borç: ${tx.debtAmount.toStringAsFixed(2)} TL).';
       } else if (tx.type == 'payment') {
         running += tx.paidAmount;
         desc = '${tx.amount.toStringAsFixed(2)} TL kısmi ödeme alındı.';
       } else if (tx.type == 'cancellation') {
         running += tx.debtAmount;
-        desc = '${tx.amount.toStringAsFixed(2)} TL değerinde satış iptal edildi (Müşteri borcu düşüldü: ${tx.debtAmount.toStringAsFixed(2)} TL).';
+        desc =
+            '${tx.amount.toStringAsFixed(2)} TL değerinde satış iptal edildi (Müşteri borcu düşüldü: ${tx.debtAmount.toStringAsFixed(2)} TL).';
       } else if (tx.type == 'collection') {
         running += tx.paidAmount;
         desc = '${tx.amount.toStringAsFixed(2)} TL tahsilat alındı.';
@@ -120,9 +127,11 @@ class DataIntegrityService {
         if (tx.paidAmount == 0) {
           running += tx.amount;
         }
-        desc = '${tx.amount.toStringAsFixed(2)} TL iade kaydı oluşturuldu (Yöntem: ${tx.paidAmount == 0 ? "Bakiye" : "Nakit"}).';
+        desc =
+            '${tx.amount.toStringAsFixed(2)} TL iade kaydı oluşturuldu (Yöntem: ${tx.paidAmount == 0 ? "Bakiye" : "Nakit"}).';
       } else {
-        desc = 'İşlem tipi: ${tx.type}, Tutar: ${tx.amount.toStringAsFixed(2)} TL.';
+        desc =
+            'İşlem tipi: ${tx.type}, Tutar: ${tx.amount.toStringAsFixed(2)} TL.';
       }
 
       records.add(BalanceExplanationRecord(
@@ -210,10 +219,10 @@ class DataIntegrityService {
   /// Returns an adaptive chunk size based on the total record count.
   /// Smaller chunks for large datasets reduce per-isolate memory copy overhead.
   static int _adaptiveChunkSize(int totalCount) {
-    if (totalCount <= 1000)  return 1000; // Small  — single pass, max speed
-    if (totalCount <= 5000)  return 500;  // Medium — balanced
-    if (totalCount <= 20000) return 300;  // Large  — memory-conscious
-    return 100;                           // Very large — tight memory guard
+    if (totalCount <= 1000) return 1000; // Small  — single pass, max speed
+    if (totalCount <= 5000) return 500; // Medium — balanced
+    if (totalCount <= 20000) return 300; // Large  — memory-conscious
+    return 100; // Very large — tight memory guard
   }
 
   /// Top-level function required by [compute] — operates on plain serialized
@@ -225,10 +234,10 @@ class DataIntegrityService {
           (a['created_at'] as String).compareTo(b['created_at'] as String));
 
     for (final tx in sorted) {
-      final type   = tx['type']        as String? ?? '';
-      final debt   = (tx['debt_amount']  as num?)?.toDouble() ?? 0.0;
-      final paid   = (tx['paid_amount']  as num?)?.toDouble() ?? 0.0;
-      final amount = (tx['amount']       as num?)?.toDouble() ?? 0.0;
+      final type = tx['type'] as String? ?? '';
+      final debt = (tx['debt_amount'] as num?)?.toDouble() ?? 0.0;
+      final paid = (tx['paid_amount'] as num?)?.toDouble() ?? 0.0;
+      final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
 
       if (type == 'sale') {
         calculated -= debt;

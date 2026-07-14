@@ -1,4 +1,4 @@
-﻿// lib/domain/services/sync_trace_service.dart
+// lib/domain/services/sync_trace_service.dart
 // Incident Debugging System — correlationId trace viewer + CRITICAL log query.
 //
 // Provides two complementary views of system incidents:
@@ -75,9 +75,10 @@ class SyncIncident {
         hasCritical = events.any((e) => e.level == LogLevel.critical),
         fingerprint = incidentFingerprint(
           errorType: events
-              .where((e) => e.level.index >= LogLevel.error.index)
-              .map((e) => e.event)
-              .firstOrNull ?? 'unknown',
+                  .where((e) => e.level.index >= LogLevel.error.index)
+                  .map((e) => e.event)
+                  .firstOrNull ??
+              'unknown',
           entityId: events
               .expand((e) => [
                     e.metadata['customerId'],

@@ -44,7 +44,8 @@ void main() {
       expect(response.json['auth'], true);
     });
 
-    test('Generates Idempotency-Key for modifying requests by default', () async {
+    test('Generates Idempotency-Key for modifying requests by default',
+        () async {
       apiClient.mockHandler = (request) {
         expect(request.headers.containsKey('Idempotency-Key'), true);
         expect(request.headers['Idempotency-Key']!.length, 36); // UUID length
@@ -70,7 +71,8 @@ void main() {
 
       expect(
         apiClient.get('/bad-route'),
-        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 400)),
+        throwsA(
+            isA<ApiException>().having((e) => e.statusCode, 'statusCode', 400)),
       );
     });
   });

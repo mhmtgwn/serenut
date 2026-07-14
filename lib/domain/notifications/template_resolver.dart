@@ -1,4 +1,4 @@
-﻿// lib/domain/notifications/template_resolver.dart
+// lib/domain/notifications/template_resolver.dart
 // Serenut POS — SMS Template Resolver
 // Reads active template from Settings.smsTemplate JSON,
 // resolves {variable} tokens, returns final message string.
@@ -12,28 +12,28 @@ import 'package:serenutos/domain/models/settings.dart';
 // New format (preferred): 'sale_created', 'debt_created', etc.
 // Legacy format (backward compat): 'sale', 'debt', etc.
 
-const kSmsEventSaleCreated        = 'sale_created';
-const kSmsEventDebtCreated        = 'debt_created';
+const kSmsEventSaleCreated = 'sale_created';
+const kSmsEventDebtCreated = 'debt_created';
 const kSmsEventCollectionRecorded = 'collection_recorded';
-const kSmsEventOrderCreated       = 'order_created';
-const kSmsEventOrderPreparing     = 'order_preparing';
-const kSmsEventOrderReady         = 'order_ready';
-const kSmsEventOrderDelivered     = 'order_delivered';
-const kSmsEventOrderCancelled     = 'order_cancelled';
-const kSmsEventDiscountApplied    = 'discount_applied';
+const kSmsEventOrderCreated = 'order_created';
+const kSmsEventOrderPreparing = 'order_preparing';
+const kSmsEventOrderReady = 'order_ready';
+const kSmsEventOrderDelivered = 'order_delivered';
+const kSmsEventOrderCancelled = 'order_cancelled';
+const kSmsEventDiscountApplied = 'discount_applied';
 
 // Legacy aliases (still supported in template JSON)
-const _kLegacySale       = 'sale';
-const _kLegacyDebt       = 'debt';
+const _kLegacySale = 'sale';
+const _kLegacyDebt = 'debt';
 const _kLegacyCollection = 'collection';
-const _kLegacyOrder      = 'order';
+const _kLegacyOrder = 'order';
 
 // Map new → legacy for backward compat lookup
 const _legacyAliases = <String, String>{
-  kSmsEventSaleCreated:        _kLegacySale,
-  kSmsEventDebtCreated:        _kLegacyDebt,
+  kSmsEventSaleCreated: _kLegacySale,
+  kSmsEventDebtCreated: _kLegacyDebt,
   kSmsEventCollectionRecorded: _kLegacyCollection,
-  kSmsEventOrderCreated:       _kLegacyOrder,
+  kSmsEventOrderCreated: _kLegacyOrder,
 };
 
 // ── Template Variables Reference ──────────────────────────────────────────────
@@ -95,8 +95,8 @@ class TemplateResolver {
 
       for (final item in decoded) {
         if (item is! Map) continue;
-        final id       = item['id']?.toString();
-        final enabled  = item['enabled'];
+        final id = item['id']?.toString();
+        final enabled = item['enabled'];
         final template = item['template']?.toString();
 
         if (id == null || template == null || template.trim().isEmpty) continue;
@@ -135,13 +135,14 @@ class SmsTemplateVars {
   }) {
     return {
       'customer': customerName,
-      'amount':   _fmt(totalAmount, currency),
-      'paid':     _fmt(paidAmount, currency),
-      'debt':     _fmt((totalAmount - paidAmount).clamp(0, double.maxFinite), currency),
-      'id':       saleId,
+      'amount': _fmt(totalAmount, currency),
+      'paid': _fmt(paidAmount, currency),
+      'debt':
+          _fmt((totalAmount - paidAmount).clamp(0, double.maxFinite), currency),
+      'id': saleId,
       'business': businessName,
-      'date':     _today(),
-      'items':    itemNames?.join(', ') ?? '',
+      'date': _today(),
+      'items': itemNames?.join(', ') ?? '',
       'discount': _fmt(0, currency),
     };
   }
@@ -159,14 +160,14 @@ class SmsTemplateVars {
     final newBalance = currentBalance - debtAmount;
     return {
       'customer': customerName,
-      'amount':   _fmt(totalAmount, currency),
-      'paid':     _fmt(paidAmount, currency),
-      'debt':     _fmt(debtAmount, currency),
-      'balance':  _fmt(newBalance.abs(), currency),
-      'id':       saleId,
+      'amount': _fmt(totalAmount, currency),
+      'paid': _fmt(paidAmount, currency),
+      'debt': _fmt(debtAmount, currency),
+      'balance': _fmt(newBalance.abs(), currency),
+      'id': saleId,
       'business': businessName,
-      'date':     _today(),
-      'items':    '',
+      'date': _today(),
+      'items': '',
       'discount': _fmt(0, currency),
     };
   }
@@ -181,14 +182,16 @@ class SmsTemplateVars {
   }) {
     return {
       'customer': customerName,
-      'amount':   _fmt(collectedAmount, currency),
-      'paid':     _fmt(collectedAmount, currency),
-      'debt':     remainingDebt > 0 ? _fmt(remainingDebt, currency) : '0,00 $currency',
-      'balance':  remainingDebt > 0 ? _fmt(remainingDebt, currency) : '0,00 $currency',
-      'id':       transactionId,
+      'amount': _fmt(collectedAmount, currency),
+      'paid': _fmt(collectedAmount, currency),
+      'debt':
+          remainingDebt > 0 ? _fmt(remainingDebt, currency) : '0,00 $currency',
+      'balance':
+          remainingDebt > 0 ? _fmt(remainingDebt, currency) : '0,00 $currency',
+      'id': transactionId,
       'business': businessName,
-      'date':     _today(),
-      'items':    '',
+      'date': _today(),
+      'items': '',
       'discount': _fmt(0, currency),
     };
   }
@@ -203,13 +206,13 @@ class SmsTemplateVars {
   }) {
     return {
       'customer': customerName,
-      'amount':   _fmt(totalAmount, currency),
-      'paid':     _fmt(0, currency),
-      'debt':     '0,00 $currency',
-      'id':       orderId,
+      'amount': _fmt(totalAmount, currency),
+      'paid': _fmt(0, currency),
+      'debt': '0,00 $currency',
+      'id': orderId,
       'business': businessName,
-      'date':     _today(),
-      'items':    itemNames?.join(', ') ?? '',
+      'date': _today(),
+      'items': itemNames?.join(', ') ?? '',
       'discount': _fmt(0, currency),
     };
   }

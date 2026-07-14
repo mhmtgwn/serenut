@@ -42,7 +42,8 @@ class DeviceFingerprint {
         'last_seen': lastSeen,
       };
 
-  factory DeviceFingerprint.fromJson(Map<String, dynamic> json) => DeviceFingerprint(
+  factory DeviceFingerprint.fromJson(Map<String, dynamic> json) =>
+      DeviceFingerprint(
         installationId: json['installation_id'] as String? ?? '',
         deviceUuid: json['device_uuid'] as String? ?? '',
         machineHash: json['machine_hash'] as String? ?? '',

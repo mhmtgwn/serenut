@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/sales/cart_panel.dart
+// lib/presentation/widgets/sales/cart_panel.dart
 // Serenut POS — Sepet Paneli
 // UX Redesign v3: 44×44 touch targets, swipe-to-delete, improved empty state
 // Preserved: all callback signatures, no business logic changes
@@ -6,15 +6,15 @@
 import 'package:flutter/material.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class CartPanel extends StatelessWidget {
   final Map<String, int> cartQuantities;
@@ -125,8 +125,7 @@ class CartPanel extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
                     itemCount: cartQuantities.length,
                     itemBuilder: (context, index) {
-                      final entry =
-                          cartQuantities.entries.elementAt(index);
+                      final entry = cartQuantities.entries.elementAt(index);
                       final prod = cartProducts[entry.key]!;
                       final qty = entry.value;
                       return _CartItem(
@@ -136,7 +135,8 @@ class CartPanel extends StatelessWidget {
                         onAdd: () => onAddToCart(prod),
                         onRemove: () => onRemoveFromCart(prod),
                         onDelete: () => onDeleteFromCart(prod),
-                        onQtyChanged: (newQty) => onQuantityChanged(prod, newQty),
+                        onQtyChanged: (newQty) =>
+                            onQuantityChanged(prod, newQty),
                       );
                     },
                   ),
@@ -211,7 +211,8 @@ class _CartItem extends StatefulWidget {
   State<_CartItem> createState() => _CartItemState();
 }
 
-class _CartItemState extends State<_CartItem> with SingleTickerProviderStateMixin {
+class _CartItemState extends State<_CartItem>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
 
@@ -224,7 +225,7 @@ class _CartItemState extends State<_CartItem> with SingleTickerProviderStateMixi
     );
     _colorAnimation = ColorTween(
       begin: const Color(0xFFDCFCE7), // Light green flash highlight
-      end: _kSurface,                 // Normal surface color
+      end: _kSurface, // Normal surface color
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeInOut,
@@ -314,8 +315,8 @@ class _CartItemState extends State<_CartItem> with SingleTickerProviderStateMixi
                             color: _kTextSecondary, fontSize: 11),
                       ),
                       const Text(' × ',
-                          style: TextStyle(
-                              color: _kTextSecondary, fontSize: 11)),
+                          style:
+                              TextStyle(color: _kTextSecondary, fontSize: 11)),
                       Text('${widget.quantity}',
                           style: const TextStyle(
                               color: _kTextSecondary,
@@ -384,13 +385,17 @@ class _CartItemState extends State<_CartItem> with SingleTickerProviderStateMixi
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text(widget.product.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text(widget.product.name,
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Stok Adedi: ${widget.product.quantity}', style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
+              Text('Stok Adedi: ${widget.product.quantity}',
+                  style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
               const SizedBox(height: 10),
               TextField(
                 controller: controller,
@@ -415,7 +420,8 @@ class _CartItemState extends State<_CartItem> with SingleTickerProviderStateMixi
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(backgroundColor: _kGreen),
-              child: const Text('Güncelle', style: TextStyle(color: Colors.white)),
+              child:
+                  const Text('Güncelle', style: TextStyle(color: Colors.white)),
             ),
           ],
         );

@@ -102,11 +102,13 @@ class NativePrinterBridge {
 
   static bool usePowerShellFallback = false;
 
-  static Future<bool> _printUsbPowerShellFallback(String printerName, List<int> bytes) async {
+  static Future<bool> _printUsbPowerShellFallback(
+      String printerName, List<int> bytes) async {
     try {
-      final tempFile = File('${Directory.systemTemp.path}/print_raw_${DateTime.now().microsecondsSinceEpoch}.bin');
+      final tempFile = File(
+          '${Directory.systemTemp.path}/print_raw_${DateTime.now().microsecondsSinceEpoch}.bin');
       await tempFile.writeAsBytes(bytes);
-      
+
       final psScript = '''
 \$code = @'
 using System;
@@ -188,20 +190,20 @@ if (-not \$success) {
     try {
       pPrinterName = printerName.toNativeUtf16();
       phPrinter = calloc<IntPtr>();
-      
+
       final openRes = _winspool.openPrinter(pPrinterName, phPrinter, nullptr);
       if (openRes == 0) return false;
-      
+
       hPrinter = phPrinter.value;
-      
+
       docInfo = calloc<DocInfo1W>();
       docInfo.ref.pDocName = 'Serenut POS Raw Receipt'.toNativeUtf16();
       docInfo.ref.pOutputFile = nullptr;
       docInfo.ref.pDataType = 'RAW'.toNativeUtf16();
-      
+
       final docId = _winspool.startDocPrinter(hPrinter, 1, docInfo);
       if (docId == 0) return false;
-      
+
       bool printSuccess = false;
       try {
         final pageRes = _winspool.startPagePrinter(hPrinter);
@@ -212,8 +214,9 @@ if (-not \$success) {
               pBytes[i] = bytes[i];
             }
             pcWritten = calloc<Uint32>();
-            
-            final writeRes = _winspool.writePrinter(hPrinter, pBytes, bytes.length, pcWritten);
+
+            final writeRes = _winspool.writePrinter(
+                hPrinter, pBytes, bytes.length, pcWritten);
             printSuccess = writeRes != 0;
           } finally {
             if (pBytes != null) calloc.free(pBytes);
@@ -224,14 +227,15 @@ if (-not \$success) {
       } finally {
         _winspool.endDocPrinter(hPrinter);
       }
-      
+
       return printSuccess;
     } finally {
       if (pPrinterName != null) calloc.free(pPrinterName);
       if (phPrinter != null) calloc.free(phPrinter);
       if (docInfo != null) {
         if (docInfo.ref.pDocName != nullptr) calloc.free(docInfo.ref.pDocName);
-        if (docInfo.ref.pDataType != nullptr) calloc.free(docInfo.ref.pDataType);
+        if (docInfo.ref.pDataType != nullptr)
+          calloc.free(docInfo.ref.pDataType);
         calloc.free(docInfo);
       }
       if (hPrinter != 0) {
@@ -260,7 +264,8 @@ if (-not \$success) {
       try {
         final success = await _defaultInstance.printUsbFfi(printerName, bytes);
         if (!success) {
-          debugPrint('WinSpool FFI returned false. Trying PowerShell fallback...');
+          debugPrint(
+              'WinSpool FFI returned false. Trying PowerShell fallback...');
           return _printUsbPowerShellFallback(printerName, bytes);
         }
         return success;
@@ -308,8 +313,8 @@ if (-not \$success) {
   static Future<List<Map<String, String>>> getPairedBluetoothDevices() async {
     if (!_isAndroid) return [];
     try {
-      final List<dynamic>? devices =
-          await _bluetoothChannel.invokeMethod<List<dynamic>>('getPairedDevices');
+      final List<dynamic>? devices = await _bluetoothChannel
+          .invokeMethod<List<dynamic>>('getPairedDevices');
       if (devices == null) return [];
       return devices.map((d) {
         final map = Map<String, dynamic>.from(d as Map);
@@ -418,8 +423,8 @@ if (-not \$success) {
   static Future<bool> printSunmiRaw(List<int> bytes) async {
     if (!_isAndroid) return false;
     try {
-      final bool? success =
-          await _sunmiChannel.invokeMethod<bool>('printRawData', {'data': bytes});
+      final bool? success = await _sunmiChannel
+          .invokeMethod<bool>('printRawData', {'data': bytes});
       return success ?? false;
     } on PlatformException catch (_) {
       return false;
@@ -445,13 +450,15 @@ if (-not \$success) {
 
 /// Arayüz: Windows Spooler raw yazdırma FFI çağrıları için mock'lanabilir soyut sınıf
 abstract class WinspoolWrapper {
-  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter, Pointer<Void> pDefault);
+  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter,
+      Pointer<Void> pDefault);
   int closePrinter(int hPrinter);
   int startDocPrinter(int hPrinter, int level, Pointer<DocInfo1W> pDocInfo);
   int endDocPrinter(int hPrinter);
   int startPagePrinter(int hPrinter);
   int endPagePrinter(int hPrinter);
-  int writePrinter(int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten);
+  int writePrinter(
+      int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten);
 }
 
 /// Üretim Uygulaması: winspool.drv DLL FFI çağrılarını gerçekleştiren gerçek wrapper
@@ -468,18 +475,33 @@ class WinspoolWrapperImpl implements WinspoolWrapper {
   WinspoolWrapperImpl() {
     if (Platform.isWindows) {
       _dylib = DynamicLibrary.open('winspool.drv');
-      _openPrinter = _dylib.lookupFunction<OpenPrinterWUtf16Func, OpenPrinterWFunc>('OpenPrinterW');
-      _closePrinter = _dylib.lookupFunction<ClosePrinterFunc, ClosePrinterDartFunc>('ClosePrinter');
-      _startDocPrinter = _dylib.lookupFunction<StartDocPrinterWFunc, StartDocPrinterWDartFunc>('StartDocPrinterW');
-      _endDocPrinter = _dylib.lookupFunction<EndDocPrinterFunc, EndDocPrinterDartFunc>('EndDocPrinter');
-      _startPagePrinter = _dylib.lookupFunction<StartPagePrinterFunc, StartPagePrinterDartFunc>('StartPagePrinter');
-      _endPagePrinter = _dylib.lookupFunction<EndPagePrinterFunc, EndPagePrinterDartFunc>('EndPagePrinter');
-      _writePrinter = _dylib.lookupFunction<WritePrinterFunc, WritePrinterDartFunc>('WritePrinter');
+      _openPrinter =
+          _dylib.lookupFunction<OpenPrinterWUtf16Func, OpenPrinterWFunc>(
+              'OpenPrinterW');
+      _closePrinter =
+          _dylib.lookupFunction<ClosePrinterFunc, ClosePrinterDartFunc>(
+              'ClosePrinter');
+      _startDocPrinter =
+          _dylib.lookupFunction<StartDocPrinterWFunc, StartDocPrinterWDartFunc>(
+              'StartDocPrinterW');
+      _endDocPrinter =
+          _dylib.lookupFunction<EndDocPrinterFunc, EndDocPrinterDartFunc>(
+              'EndDocPrinter');
+      _startPagePrinter =
+          _dylib.lookupFunction<StartPagePrinterFunc, StartPagePrinterDartFunc>(
+              'StartPagePrinter');
+      _endPagePrinter =
+          _dylib.lookupFunction<EndPagePrinterFunc, EndPagePrinterDartFunc>(
+              'EndPagePrinter');
+      _writePrinter =
+          _dylib.lookupFunction<WritePrinterFunc, WritePrinterDartFunc>(
+              'WritePrinter');
     }
   }
 
   @override
-  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter, Pointer<Void> pDefault) {
+  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter,
+      Pointer<Void> pDefault) {
     return _openPrinter(pPrinterName, phPrinter, pDefault);
   }
 
@@ -509,8 +531,8 @@ class WinspoolWrapperImpl implements WinspoolWrapper {
   }
 
   @override
-  int writePrinter(int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten) {
+  int writePrinter(
+      int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten) {
     return _writePrinter(hPrinter, pBuf, cbBuf, pcWritten);
   }
 }
-

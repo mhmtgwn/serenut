@@ -57,7 +57,8 @@ void main() {
       expect(job.callCount, 1);
     });
 
-    test('Power Saving Mode (low battery < 20) slows down job runtime check', () async {
+    test('Power Saving Mode (low battery < 20) slows down job runtime check',
+        () async {
       final job = MockJob(
         name: 'test_power_saving',
         priority: JobPriority.medium,
@@ -79,9 +80,16 @@ void main() {
       expect(job.callCount, 1); // still 1
     });
 
-    test('Offline mode skips medium/low jobs but runs high priority job', () async {
-      final highJob = MockJob(name: 'high_job', priority: JobPriority.high, interval: const Duration(seconds: 5));
-      final lowJob = MockJob(name: 'low_job', priority: JobPriority.low, interval: const Duration(seconds: 5));
+    test('Offline mode skips medium/low jobs but runs high priority job',
+        () async {
+      final highJob = MockJob(
+          name: 'high_job',
+          priority: JobPriority.high,
+          interval: const Duration(seconds: 5));
+      final lowJob = MockJob(
+          name: 'low_job',
+          priority: JobPriority.low,
+          interval: const Duration(seconds: 5));
 
       scheduler.registerJob(highJob);
       scheduler.registerJob(lowJob);
@@ -91,10 +99,11 @@ void main() {
       await scheduler.tick();
 
       expect(highJob.callCount, 1); // High priority runs offline
-      expect(lowJob.callCount, 0);  // Low priority skipped offline
+      expect(lowJob.callCount, 0); // Low priority skipped offline
     });
 
-    test('Exponential backoff increments on failure and resets on success', () async {
+    test('Exponential backoff increments on failure and resets on success',
+        () async {
       final job = MockJob(
         name: 'failing_job',
         priority: JobPriority.high,
@@ -116,7 +125,8 @@ void main() {
 
       // Because backoff factor is 1, active interval is 5s + 30s = 35s.
       // Force elapsed time by overriding the last run time back in time
-      scheduler.lastRunTimes[job.name] = DateTime.now().subtract(const Duration(seconds: 40));
+      scheduler.lastRunTimes[job.name] =
+          DateTime.now().subtract(const Duration(seconds: 40));
 
       await scheduler.tick();
       expect(job.callCount, 2);

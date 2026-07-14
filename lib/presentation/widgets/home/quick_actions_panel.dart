@@ -92,7 +92,8 @@ class QuickActionsPanel extends ConsumerWidget {
                 crossAxisCount = 6;
               } else if (width > 400) crossAxisCount = 4;
 
-              final itemWidth = (width - ((crossAxisCount - 1) * 12)) / crossAxisCount;
+              final itemWidth =
+                  (width - ((crossAxisCount - 1) * 12)) / crossAxisCount;
               const spacing = 12.0;
               const childHeight = 90.0;
               final aspectRatio = itemWidth / childHeight;

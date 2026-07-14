@@ -1,10 +1,11 @@
-﻿// test/services/service_decomposition_test.dart
+// test/services/service_decomposition_test.dart
 // Phase 2.4 — Service Decomposition & Orchestration Integration Tests
 // Generated: 21 Jun 2026
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/domain/services/payment_service.dart';
@@ -25,6 +26,7 @@ class FakeSecurityGate implements SecurityGate {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
@@ -42,19 +44,20 @@ void main() {
     late SalesService salesService;
 
     setUp(() async {
+      SharedPreferences.setMockInitialValues({});
       final databasePath = await getDatabasesPath();
       final path = join(databasePath, 'serenut_pos_test.db');
       await deleteDatabase(path);
 
       databaseManager = DatabaseManager();
       db = await databaseManager.getDatabase();
-      
+
       final gateway = DbGatewayImpl(databaseManager);
       productRepo = SqliteProductRepository(gateway);
       customerRepo = SqliteCustomerRepository(gateway);
       saleRepo = SqliteSaleRepository(gateway);
       transactionRepo = SqliteFinancialTransactionRepository(gateway);
-      
+
       eventPublisher = EventPublisher();
 
       inventoryService = InventoryService(
@@ -124,7 +127,8 @@ void main() {
       // 2. Should complete successfully for quantity 15 (only 10 in stock) because we allow negative stock
       await expectLater(
         inventoryService.verifyStockAvailability([
-          SaleItemInput(productId: 'prod-test-1', quantity: 15, unitPrice: 100.0)
+          SaleItemInput(
+              productId: 'prod-test-1', quantity: 15, unitPrice: 100.0)
         ]),
         completes,
       );
@@ -132,13 +136,15 @@ void main() {
       // 3. Should throw ProductNotFoundException for unknown product
       await expectLater(
         inventoryService.verifyStockAvailability([
-          SaleItemInput(productId: 'prod-unknown', quantity: 1, unitPrice: 100.0)
+          SaleItemInput(
+              productId: 'prod-unknown', quantity: 1, unitPrice: 100.0)
         ]),
         throwsA(isA<ProductNotFoundException>()),
       );
     });
 
-    test('SalesService.createSale - Full sale orchestrator flow with debt', () async {
+    test('SalesService.createSale - Full sale orchestrator flow with debt',
+        () async {
       // Create a sale with total 300 TL, paid 100 TL, debt 200 TL
       final sale = await salesService.createSale(
         customerId: 'cust-test-1',
@@ -171,7 +177,8 @@ void main() {
       expect(txs.first.referenceId, equals(sale.id));
     });
 
-    test('SalesService.recordPayment - Record partial payment on existing sale', () async {
+    test('SalesService.recordPayment - Record partial payment on existing sale',
+        () async {
       // Create sale first
       final sale = await salesService.createSale(
         customerId: 'cust-test-1',
@@ -183,7 +190,8 @@ void main() {
       );
 
       // Record 50 TL partial payment
-      await salesService.recordPayment(saleId: sale.id, amount: 50.0, method: 'cash');
+      await salesService.recordPayment(
+          saleId: sale.id, amount: 50.0, method: 'cash');
 
       // Check updated sale paid amount is 150 TL
       final updatedSale = await saleRepo.findById(sale.id);
@@ -204,7 +212,9 @@ void main() {
       expect(paymentTx.referenceId, equals(sale.id));
     });
 
-    test('SalesService.cancelSale - Reverses stock, customer balance, and records cancellation', () async {
+    test(
+        'SalesService.cancelSale - Reverses stock, customer balance, and records cancellation',
+        () async {
       // Create sale
       final sale = await salesService.createSale(
         customerId: 'cust-test-1',
@@ -233,7 +243,9 @@ void main() {
       expect(cancelTx.referenceId, equals(sale.id));
     });
 
-    test('PaymentService.recordCollection - Cari tahsilat entry and balance adjustment', () async {
+    test(
+        'PaymentService.recordCollection - Cari tahsilat entry and balance adjustment',
+        () async {
       // Record a customer collection of 500 TL (meaning customer starts with credit)
       await paymentService.recordCollection(
         customerId: 'cust-test-1',
@@ -256,7 +268,8 @@ void main() {
       expect(txs.first.metadata?['notes'], equals('Cari tahsilat smoke test'));
     });
 
-    test('SalesService.returnItems - Return items and credit customer balance', () async {
+    test('SalesService.returnItems - Return items and credit customer balance',
+        () async {
       // Create sale
       final sale = await salesService.createSale(
         customerId: 'cust-test-1',
@@ -288,26 +301,32 @@ void main() {
       final txs = await transactionRepo.getByCustomerId('cust-test-1');
       final refundTx = txs.firstWhere((t) => t.type == 'refund');
       expect(refundTx.amount, equals(200.0));
-      expect(refundTx.paidAmount, equals(0.0)); // refundMethod is balance, so cash refund is 0
+      expect(refundTx.paidAmount,
+          equals(0.0)); // refundMethod is balance, so cash refund is 0
       expect(refundTx.referenceId, equals(sale.id));
     });
-  group('v_financial_ledger view integration', () {
-      test('Query from v_financial_ledger view aggregates debit/credit correctly', () async {
+    group('v_financial_ledger view integration', () {
+      test(
+          'Query from v_financial_ledger view aggregates debit/credit correctly',
+          () async {
         // Create sale (total: 300, paid: 100, debt: 200)
         final sale = await salesService.createSale(
           customerId: 'cust-test-1',
           items: [
-            SaleItemInput(productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
+            SaleItemInput(
+                productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
           ],
           paymentMethod: 'credit',
           paidAmount: 100.0,
         );
 
         // Record partial payment (50 TL)
-        await salesService.recordPayment(saleId: sale.id, amount: 50.0, method: 'cash');
+        await salesService.recordPayment(
+            saleId: sale.id, amount: 50.0, method: 'cash');
 
         // Query view directly
-        final rows = await db.query('v_financial_ledger', orderBy: 'created_at ASC');
+        final rows =
+            await db.query('v_financial_ledger', orderBy: 'created_at ASC');
         expect(rows.length, equals(2));
 
         final saleRow = rows.firstWhere((r) => r['type'] == 'sale');

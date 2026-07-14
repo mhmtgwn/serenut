@@ -31,8 +31,10 @@ class ReconnectManager {
   Duration getNextDelay() {
     if (_attempts == 0) return Duration.zero;
 
-    final tempDelayMs = minDelay.inMilliseconds * pow(backoffFactor, _attempts - 1);
-    var delayMs = min(tempDelayMs.toDouble(), maxDelay.inMilliseconds.toDouble());
+    final tempDelayMs =
+        minDelay.inMilliseconds * pow(backoffFactor, _attempts - 1);
+    var delayMs =
+        min(tempDelayMs.toDouble(), maxDelay.inMilliseconds.toDouble());
 
     if (jitter > 0) {
       final random = Random();

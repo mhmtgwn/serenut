@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 class RemoteConfigService {
   final SharedPreferences _prefs;
   final ApiClient _apiClient;
-  
+
   static const String _configKey = 'cached_remote_config';
 
   RemoteConfigService(this._prefs, this._apiClient);
@@ -21,7 +21,8 @@ class RemoteConfigService {
       if (response.statusCode == 200) {
         final body = response.body;
         await _prefs.setString(_configKey, body);
-        debugPrint('[RemoteConfig] Successfully synced configurations from server.');
+        debugPrint(
+            '[RemoteConfig] Successfully synced configurations from server.');
       }
     } catch (e) {
       debugPrint('[RemoteConfig] Sync failed, using cached config. Error: $e');

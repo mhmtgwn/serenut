@@ -1,4 +1,4 @@
-﻿// lib/providers/realtime/realtime_provider.dart
+// lib/providers/realtime/realtime_provider.dart
 // Riverpod DI and Stream Providers for Realtime event channels
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,9 +25,11 @@ final websocketManagerProvider = Provider<WebSocketManager>((ref) {
   return ws;
 });
 
-final reconnectManagerProvider = Provider<ReconnectManager>((ref) => ReconnectManager());
+final reconnectManagerProvider =
+    Provider<ReconnectManager>((ref) => ReconnectManager());
 
-final connectionStateProvider = StateNotifierProvider<ConnectionStateNotifier, RealtimeStatus>((ref) {
+final connectionStateProvider =
+    StateNotifierProvider<ConnectionStateNotifier, RealtimeStatus>((ref) {
   return ConnectionStateNotifier();
 });
 
@@ -86,7 +88,8 @@ final realtimeInventoryStreamProvider = StreamProvider<RealtimeEvent>((ref) {
 });
 
 // Stream Provider for Notification Events
-final realtimeNotificationsStreamProvider = StreamProvider<RealtimeEvent>((ref) {
+final realtimeNotificationsStreamProvider =
+    StreamProvider<RealtimeEvent>((ref) {
   final repo = ref.watch(realtimeRepositoryProvider);
   final user = ref.watch(currentUserProvider);
   if (user == null) return const Stream.empty();

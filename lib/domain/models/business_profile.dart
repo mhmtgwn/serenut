@@ -5,16 +5,16 @@
 
 class BusinessProfile {
   final int? id;
-  final String name;         // İşletme adı
-  final String ownerName;    // Yetkili adı soyadı
-  final String type;         // Market, Kafe, Restoran, vb.
+  final String name; // İşletme adı
+  final String ownerName; // Yetkili adı soyadı
+  final String type; // Market, Kafe, Restoran, vb.
   final String phone;
   final String? email;
   final String? taxNumber;
   final String city;
   final String district;
   final String currency;
-  final bool taxIncluded;    // Vergi dahil fiyat mı?
+  final bool taxIncluded; // Vergi dahil fiyat mı?
   final String? logoPath;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -37,7 +37,10 @@ class BusinessProfile {
   });
 
   bool get isValid =>
-      name.isNotEmpty && ownerName.isNotEmpty && phone.isNotEmpty && city.isNotEmpty;
+      name.isNotEmpty &&
+      ownerName.isNotEmpty &&
+      phone.isNotEmpty &&
+      city.isNotEmpty;
 
   Map<String, dynamic> toMap({bool includeId = false}) {
     final map = <String, dynamic>{

@@ -5,6 +5,7 @@ import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/i_hash_service.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
+import 'package:serenutos/domain/services/device_manager.dart';
 
 class MockUserRepository implements IUserRepository {
   final Map<String, AuthUser> _usersByUsername = {};
@@ -20,7 +21,8 @@ class MockUserRepository implements IUserRepository {
   }
 
   @override
-  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username) async {
+  Future<AuthUser?> findByBusinessCodeAndUsername(
+      String businessCode, String username) async {
     return _usersByUsername[username];
   }
 
@@ -38,11 +40,14 @@ class MockUserRepository implements IUserRepository {
   }
 
   @override
-  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5}) async {
+  Future<void> incrementFailedPinAttempts(String userId,
+      {int lockoutMinutes = 5, int maxAttempts = 5}) async {
     final attempts = (_failedAttempts[userId] ?? 0) + 1;
     _failedAttempts[userId] = attempts;
     if (attempts >= maxAttempts) {
-      _lockedUntil[userId] = DateTime.now().add(Duration(minutes: lockoutMinutes)).toIso8601String();
+      _lockedUntil[userId] = DateTime.now()
+          .add(Duration(minutes: lockoutMinutes))
+          .toIso8601String();
     }
   }
 
@@ -64,7 +69,8 @@ class MockHashService implements IHashService {
   String hashPassword(String password) => 'hashed_$password';
 
   @override
-  bool verifyPassword(String password, String hash) => hash == 'hashed_$password';
+  bool verifyPassword(String password, String hash) =>
+      hash == 'hashed_$password';
 
   @override
   bool isLegacyHash(String hash) => false;
@@ -82,11 +88,14 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final deviceManager = DeviceManager(prefs);
       userRepo = MockUserRepository();
       hashService = MockHashService();
       authService = AuthService(
         userRepository: userRepo,
         hashService: hashService,
+        deviceManager: deviceManager,
         apiClient: null,
       );
 
@@ -106,14 +115,16 @@ void main() {
       // 1. First fail once
       await expectLater(
         authService.loginSubUser('TEST', 'kasiyer', 'wrong_pin'),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('Kalan deneme'))),
+        throwsA(isA<AuthException>()
+            .having((e) => e.message, 'message', contains('Kalan deneme'))),
       );
 
       final status = await userRepo.getFailedPinAttempts(user.id);
       expect(status['failed_pin_attempts'], 1);
 
       // 2. Login successfully
-      final loggedIn = await authService.loginSubUser('TEST', 'kasiyer', '1234');
+      final loggedIn =
+          await authService.loginSubUser('TEST', 'kasiyer', '1234');
       expect(loggedIn.id, user.id);
 
       // 3. Status is reset
@@ -122,12 +133,15 @@ void main() {
       expect(resetStatus['locked_until'], isNull);
     });
 
-    test('Offline login lockout activates after 5 failed attempts and blocks login', () async {
+    test(
+        'Offline login lockout activates after 5 failed attempts and blocks login',
+        () async {
       // Fail 4 times
       for (int i = 0; i < 4; i++) {
         await expectLater(
           authService.loginSubUser('TEST', 'kasiyer', 'wrong'),
-          throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('Kalan deneme'))),
+          throwsA(isA<AuthException>()
+              .having((e) => e.message, 'message', contains('Kalan deneme'))),
         );
       }
 
@@ -138,7 +152,8 @@ void main() {
       // 5th failure -> Lockout
       await expectLater(
         authService.loginSubUser('TEST', 'kasiyer', 'wrong'),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('kilitlendi'))),
+        throwsA(isA<AuthException>()
+            .having((e) => e.message, 'message', contains('kilitlendi'))),
       );
 
       final status5 = await userRepo.getFailedPinAttempts(user.id);
@@ -148,7 +163,8 @@ void main() {
       // Subsequent login attempt (even with correct PIN) throws lockout exception
       await expectLater(
         authService.loginSubUser('TEST', 'kasiyer', '1234'),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('başarısız deneme nedeniyle kilitlendi'))),
+        throwsA(isA<AuthException>().having((e) => e.message, 'message',
+            contains('başarısız deneme nedeniyle kilitlendi'))),
       );
     });
   });

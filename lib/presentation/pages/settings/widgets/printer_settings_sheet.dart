@@ -6,7 +6,8 @@ extension SettingsPrinterSheets on _SettingsPageState {
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (context) => _ReceiptPrinterSheet(settings: settings, pageState: this),
+        builder: (context) =>
+            _ReceiptPrinterSheet(settings: settings, pageState: this),
       ),
     );
   }
@@ -15,7 +16,8 @@ extension SettingsPrinterSheets on _SettingsPageState {
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (context) => _LabelPrinterSheet(settings: settings, pageState: this),
+        builder: (context) =>
+            _LabelPrinterSheet(settings: settings, pageState: this),
       ),
     );
   }
@@ -28,7 +30,8 @@ class _ReceiptPrinterSheet extends ConsumerStatefulWidget {
   const _ReceiptPrinterSheet({required this.settings, required this.pageState});
 
   @override
-  ConsumerState<_ReceiptPrinterSheet> createState() => _ReceiptPrinterSheetState();
+  ConsumerState<_ReceiptPrinterSheet> createState() =>
+      _ReceiptPrinterSheetState();
 }
 
 class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
@@ -51,17 +54,21 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
     super.initState();
     nameCtrl = TextEditingController(text: widget.settings.printerName ?? '');
     ipCtrl = TextEditingController(text: widget.settings.printerIp ?? '');
-    portCtrl = TextEditingController(text: widget.settings.printerPort.toString());
-    copiesCtrl = TextEditingController(text: widget.settings.printCopies.toString());
+    portCtrl =
+        TextEditingController(text: widget.settings.printerPort.toString());
+    copiesCtrl =
+        TextEditingController(text: widget.settings.printCopies.toString());
     paperWidth = widget.settings.paperWidth;
 
     connectionType = 'network';
     if (widget.settings.printerName == 'sunmi') {
       connectionType = 'sunmi';
-    } else if (widget.settings.printerName != null && widget.settings.printerName!.contains(':')) {
+    } else if (widget.settings.printerName != null &&
+        widget.settings.printerName!.contains(':')) {
       connectionType = 'bluetooth';
     }
-    selectedDeviceMac = connectionType == 'bluetooth' ? widget.settings.printerName : null;
+    selectedDeviceMac =
+        connectionType == 'bluetooth' ? widget.settings.printerName : null;
   }
 
   @override
@@ -127,22 +134,32 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
               style: const TextStyle(color: _kTextPrimary, fontSize: 14),
               decoration: InputDecoration(
                 labelText: 'Bağlantı Tipi',
-                prefixIcon: const Icon(Icons.compare_arrows_rounded, size: 18, color: _kTextSecondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
+                prefixIcon: const Icon(Icons.compare_arrows_rounded,
+                    size: 18, color: _kTextSecondary),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _kBorderColor)),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _kBorderColor)),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
               ),
               items: const [
-                DropdownMenuItem(value: 'network', child: Text('WiFi / Network (Ethernet)')),
-                DropdownMenuItem(value: 'bluetooth', child: Text('Bluetooth (Mobil Termal)')),
-                DropdownMenuItem(value: 'sunmi', child: Text('Sunmi Gömülü Yazıcı')),
+                DropdownMenuItem(
+                    value: 'network', child: Text('WiFi / Network (Ethernet)')),
+                DropdownMenuItem(
+                    value: 'bluetooth',
+                    child: Text('Bluetooth (Mobil Termal)')),
+                DropdownMenuItem(
+                    value: 'sunmi', child: Text('Sunmi Gömülü Yazıcı')),
               ],
               onChanged: (val) {
                 if (val != null) {
                   setState(() {
                     connectionType = val;
-                    if (connectionType == 'bluetooth' && pairedDevices.isEmpty) {
+                    if (connectionType == 'bluetooth' &&
+                        pairedDevices.isEmpty) {
                       fetchDevices();
                     }
                   });
@@ -190,9 +207,12 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Column(
                     children: [
-                      CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_kBlue)),
+                      CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(_kBlue)),
                       SizedBox(height: 12),
-                      Text('Eşleşmiş cihazlar listeleniyor...', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+                      Text('Eşleşmiş cihazlar listeleniyor...',
+                          style:
+                              TextStyle(color: _kTextSecondary, fontSize: 13)),
                     ],
                   ),
                 )
@@ -206,12 +226,16 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.bluetooth_disabled_rounded, color: _kPink, size: 24),
+                      Icon(Icons.bluetooth_disabled_rounded,
+                          color: _kPink, size: 24),
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Bu cihazda Bluetooth bulunamadı veya etkinleştirilmedi.',
-                          style: TextStyle(color: _kPink, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                              color: _kPink,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
@@ -228,26 +252,37 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                     const SizedBox(height: 12),
                     TextButton.icon(
                       icon: const Icon(Icons.refresh_rounded, color: _kBlue),
-                      label: const Text('Yeniden Tara', style: TextStyle(color: _kBlue, fontWeight: FontWeight.bold)),
+                      label: const Text('Yeniden Tara',
+                          style: TextStyle(
+                              color: _kBlue, fontWeight: FontWeight.bold)),
                       onPressed: () => fetchDevices(),
                     ),
                   ],
                 )
               else
                 DropdownButtonFormField<String>(
-                  value: pairedDevices.any((d) => d['address'] == selectedDeviceMac) ? selectedDeviceMac : null,
+                  value: pairedDevices
+                          .any((d) => d['address'] == selectedDeviceMac)
+                      ? selectedDeviceMac
+                      : null,
                   dropdownColor: Colors.white,
                   hint: const Text('Bluetooth Yazıcı Seçin'),
                   style: const TextStyle(color: _kTextPrimary, fontSize: 14),
                   decoration: InputDecoration(
                     labelText: 'Eşleşmiş Bluetooth Cihazları',
-                    prefixIcon: const Icon(Icons.bluetooth_rounded, size: 18, color: _kBlue),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
+                    prefixIcon: const Icon(Icons.bluetooth_rounded,
+                        size: 18, color: _kBlue),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kBorderColor)),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kBorderColor)),
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.refresh_rounded, size: 18, color: _kBlue),
+                      icon: const Icon(Icons.refresh_rounded,
+                          size: 18, color: _kBlue),
                       onPressed: () => fetchDevices(),
                     ),
                   ),
@@ -281,7 +316,10 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                     Expanded(
                       child: Text(
                         'Sunmi entegre termal yazıcı modu aktif. Herhangi bir ekstra kablo veya IP bağlantısı gerekmez.',
-                        style: TextStyle(color: _kGreen, fontSize: 13, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            color: _kGreen,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
@@ -299,8 +337,12 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                     style: const TextStyle(color: _kTextPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       labelText: 'Genişlik',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _kBorderColor)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _kBorderColor)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _kBorderColor)),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
                     ),
@@ -336,42 +378,63 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                 foregroundColor: _kBlue,
                 side: const BorderSide(color: _kBlue),
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () async {
                 final currentUser = ref.read(currentUserProvider);
-                final hasAccess = currentUser != null && (
-                  currentUser.role == UserRole.sysadmin ||
-                  currentUser.role == UserRole.owner ||
-                  currentUser.role == UserRole.admin ||
-                  currentUser.hasPermission(Permission.settingsPrinter.value)
-                );
+                final hasAccess = currentUser != null &&
+                    (currentUser.role == UserRole.sysadmin ||
+                        currentUser.role == UserRole.owner ||
+                        currentUser.role == UserRole.admin ||
+                        currentUser
+                            .hasPermission(Permission.settingsPrinter.value));
                 if (!hasAccess) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Yazıcı ayarlarını test etmek için yetkiniz yok.'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                    const SnackBar(
+                        content: Text(
+                            'Yazıcı ayarlarını test etmek için yetkiniz yok.'),
+                        backgroundColor: _kPink,
+                        behavior: SnackBarBehavior.floating),
                   );
                   return;
                 }
                 final testSet = widget.settings.copyWith(
-                  printerName: connectionType == 'sunmi' ? 'sunmi' : (connectionType == 'bluetooth' ? selectedDeviceMac : nameCtrl.text.trim()),
-                  printerIp: connectionType == 'network' ? ipCtrl.text.trim() : null,
+                  printerName: connectionType == 'sunmi'
+                      ? 'sunmi'
+                      : (connectionType == 'bluetooth'
+                          ? selectedDeviceMac
+                          : nameCtrl.text.trim()),
+                  printerIp:
+                      connectionType == 'network' ? ipCtrl.text.trim() : null,
                   printerPort: int.tryParse(portCtrl.text) ?? 9100,
                   paperWidth: paperWidth,
                 );
                 try {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Test fişi kuyruğa eklendi...'), backgroundColor: _kBlue, behavior: SnackBarBehavior.floating),
+                    const SnackBar(
+                        content: Text('Test fişi kuyruğa eklendi...'),
+                        backgroundColor: _kBlue,
+                        behavior: SnackBarBehavior.floating),
                   );
-                  await ref.read(printerServiceProvider).testPrinterConnection(testSet);
+                  await ref
+                      .read(printerServiceProvider)
+                      .testPrinterConnection(testSet);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Test fişi başarıyla yazdırıldı.'), backgroundColor: _kGreen, behavior: SnackBarBehavior.floating),
+                      const SnackBar(
+                          content: Text('Test fişi başarıyla yazdırıldı.'),
+                          backgroundColor: _kGreen,
+                          behavior: SnackBarBehavior.floating),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Test başarısız: $e'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                      SnackBar(
+                          content: Text('Test başarısız: $e'),
+                          backgroundColor: _kPink,
+                          behavior: SnackBarBehavior.floating),
                     );
                   }
                 }
@@ -381,33 +444,50 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
 
             widget.pageState._buildModalSaveButton(onTap: () async {
               final currentUser = ref.read(currentUserProvider);
-              final hasAccess = currentUser != null && (
-                currentUser.role == UserRole.sysadmin ||
-                currentUser.role == UserRole.owner ||
-                currentUser.role == UserRole.admin ||
-                currentUser.hasPermission(Permission.settingsPrinter.value)
-              );
+              final hasAccess = currentUser != null &&
+                  (currentUser.role == UserRole.sysadmin ||
+                      currentUser.role == UserRole.owner ||
+                      currentUser.role == UserRole.admin ||
+                      currentUser
+                          .hasPermission(Permission.settingsPrinter.value));
               if (!hasAccess) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Yazıcı ayarlarını kaydetmek için yetkiniz yok.'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                  const SnackBar(
+                      content: Text(
+                          'Yazıcı ayarlarını kaydetmek için yetkiniz yok.'),
+                      backgroundColor: _kPink,
+                      behavior: SnackBarBehavior.floating),
                 );
                 return;
               }
               if (_formKey.currentState!.validate()) {
                 final updated = widget.settings.copyWith(
-                  printerName: connectionType == 'sunmi' ? 'sunmi' : (connectionType == 'bluetooth' ? selectedDeviceMac : nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim()),
-                  printerIp: connectionType == 'network' ? ipCtrl.text.trim() : null,
-                  printerPort: connectionType == 'network' ? (int.tryParse(portCtrl.text) ?? 9100) : 9100,
+                  printerName: connectionType == 'sunmi'
+                      ? 'sunmi'
+                      : (connectionType == 'bluetooth'
+                          ? selectedDeviceMac
+                          : nameCtrl.text.trim().isEmpty
+                              ? null
+                              : nameCtrl.text.trim()),
+                  printerIp:
+                      connectionType == 'network' ? ipCtrl.text.trim() : null,
+                  printerPort: connectionType == 'network'
+                      ? (int.tryParse(portCtrl.text) ?? 9100)
+                      : 9100,
                   printCopies: int.tryParse(copiesCtrl.text) ?? 1,
                   paperWidth: paperWidth,
                 );
                 try {
-                  await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+                  await ref
+                      .read(settingsNotifierProvider.notifier)
+                      .updateSettings(updated);
                   if (mounted) Navigator.pop(context);
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Kaydedilemedi: $e'), backgroundColor: _kPink),
+                      SnackBar(
+                          content: Text('Kaydedilemedi: $e'),
+                          backgroundColor: _kPink),
                     );
                   }
                 }
@@ -439,7 +519,8 @@ class _LabelPrinterSheetState extends ConsumerState<_LabelPrinterSheet> {
   void initState() {
     super.initState();
     ipCtrl = TextEditingController(text: widget.settings.labelPrinterIp ?? '');
-    portCtrl = TextEditingController(text: (widget.settings.labelPrinterPort ?? 9100).toString());
+    portCtrl = TextEditingController(
+        text: (widget.settings.labelPrinterPort ?? 9100).toString());
   }
 
   @override
@@ -482,15 +563,19 @@ class _LabelPrinterSheetState extends ConsumerState<_LabelPrinterSheet> {
             const SizedBox(height: 24),
             widget.pageState._buildModalSaveButton(onTap: () async {
               final currentUser = ref.read(currentUserProvider);
-              final hasAccess = currentUser != null && (
-                currentUser.role == UserRole.sysadmin ||
-                currentUser.role == UserRole.owner ||
-                currentUser.role == UserRole.admin ||
-                currentUser.hasPermission(Permission.settingsPrinter.value)
-              );
+              final hasAccess = currentUser != null &&
+                  (currentUser.role == UserRole.sysadmin ||
+                      currentUser.role == UserRole.owner ||
+                      currentUser.role == UserRole.admin ||
+                      currentUser
+                          .hasPermission(Permission.settingsPrinter.value));
               if (!hasAccess) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Yazıcı ayarlarını kaydetmek için yetkiniz yok.'), backgroundColor: _kPink, behavior: SnackBarBehavior.floating),
+                  const SnackBar(
+                      content: Text(
+                          'Yazıcı ayarlarını kaydetmek için yetkiniz yok.'),
+                      backgroundColor: _kPink,
+                      behavior: SnackBarBehavior.floating),
                 );
                 return;
               }
@@ -501,7 +586,9 @@ class _LabelPrinterSheetState extends ConsumerState<_LabelPrinterSheet> {
                     labelPrinterIp: ipCtrl.text.trim(),
                     labelPrinterPort: port,
                   );
-                  await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+                  await ref
+                      .read(settingsNotifierProvider.notifier)
+                      .updateSettings(updated);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -515,7 +602,9 @@ class _LabelPrinterSheetState extends ConsumerState<_LabelPrinterSheet> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Kaydedilemedi: $e'), backgroundColor: _kPink),
+                      SnackBar(
+                          content: Text('Kaydedilemedi: $e'),
+                          backgroundColor: _kPink),
                     );
                   }
                 }

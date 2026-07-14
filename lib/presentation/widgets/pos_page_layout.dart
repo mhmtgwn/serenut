@@ -70,9 +70,12 @@ class PosHeader extends StatelessWidget {
                       controller: searchController,
                       decoration: InputDecoration(
                         hintText: searchHint ?? 'Ara...',
-                        hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded, color: _kTextSecondary, size: 18),
-                        suffixIcon: searchController != null && searchController!.text.isNotEmpty
+                        hintStyle: const TextStyle(
+                            color: _kTextSecondary, fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            color: _kTextSecondary, size: 18),
+                        suffixIcon: searchController != null &&
+                                searchController!.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear_rounded, size: 18),
                                 onPressed: () {
@@ -84,9 +87,13 @@ class PosHeader extends StatelessWidget {
                               )
                             : null,
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 9, horizontal: 12),
                       ),
-                      style: const TextStyle(color: _kText, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                          color: _kText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
                       onChanged: onSearchChanged,
                     ),
                   ),
@@ -120,7 +127,8 @@ class PosHeader extends StatelessWidget {
                   IconButton(
                     padding: const EdgeInsets.all(6),
                     constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.search_rounded, color: _kGreen, size: 22),
+                    icon: const Icon(Icons.search_rounded,
+                        color: _kGreen, size: 22),
                     tooltip: 'Ara',
                     onPressed: () => onSearchToggled!(true),
                   ),
@@ -130,7 +138,8 @@ class PosHeader extends StatelessWidget {
                     padding: const EdgeInsets.all(6),
                     constraints: const BoxConstraints(),
                     onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh_rounded, color: _kTextSecondary, size: 22),
+                    icon: const Icon(Icons.refresh_rounded,
+                        color: _kTextSecondary, size: 22),
                     tooltip: 'Yenile',
                   ),
                 if (showStatusIndicator) ...[
@@ -141,7 +150,8 @@ class PosHeader extends StatelessWidget {
                   IconButton(
                     padding: const EdgeInsets.all(6),
                     constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.settings_outlined, color: _kTextSecondary, size: 22),
+                    icon: const Icon(Icons.settings_outlined,
+                        color: _kTextSecondary, size: 22),
                     tooltip: 'Ayarlar',
                     onPressed: () => requireAdminAccess(
                       context,

@@ -1,4 +1,4 @@
-﻿// lib/domain/services/report_service.dart
+// lib/domain/services/report_service.dart
 // Phase 2.3 — Analytics Engine Service Layer
 // Pure aggregation & business logic over IReportRepository
 // Generated: 21 Jun 2026
@@ -8,7 +8,7 @@ import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 /// ════════════════════════════════════════════════════════════
 /// ReportService
 /// ════════════════════════════════════════════════════════════
-/// 
+///
 /// Single-responsibility: data aggregation for reports.
 /// Does NOT write any data. Read-only.
 /// Intentionally separate from SalesService to avoid God-Service.
@@ -42,7 +42,8 @@ class ReportService {
   // ──────────────────────────────────────────────────────────
 
   /// Top-10 ürün (gelire göre)
-  Future<List<ProductPerformance>> getTopProducts(DateRange range, {int limit = 10}) {
+  Future<List<ProductPerformance>> getTopProducts(DateRange range,
+      {int limit = 10}) {
     return _repo.getTopProducts(range, limit: limit);
   }
 

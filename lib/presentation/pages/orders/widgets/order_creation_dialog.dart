@@ -14,7 +14,8 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
-import 'package:serenutos/presentation/controllers/sales_controller.dart' show paymentServiceProvider;
+import 'package:serenutos/presentation/controllers/sales_controller.dart'
+    show paymentServiceProvider;
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 
@@ -24,25 +25,26 @@ part 'steps/step_cart_summary.dart';
 part 'steps/step_checkout.dart';
 
 // Color and layout constants
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kAmber      = Color(0xFFEAB308);
+const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kAmberDark  = Color(0xFFB45309);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kAmberDark = Color(0xFFB45309);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class OrderCreationDialog extends ConsumerStatefulWidget {
   final OrderEntity? existingOrder;
   const OrderCreationDialog({super.key, this.existingOrder});
 
   @override
-  ConsumerState<OrderCreationDialog> createState() => OrderCreationDialogState();
+  ConsumerState<OrderCreationDialog> createState() =>
+      OrderCreationDialogState();
 }
 
 class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
@@ -104,7 +106,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     }
     _loadLabelPrinterSettings();
     _initExistingOrder();
-    
+
     // Reset product filters when opening the order creation dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(ordersProductSearchQueryProvider.notifier).state = '';
@@ -163,8 +165,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     if (widget.existingOrder != null) {
       final order = widget.existingOrder!;
       _notesController.text = order.notes ?? '';
-      _expectedDelivery = order.expectedDeliveryDate ?? DateTime.now().add(const Duration(days: 1));
-      
+      _expectedDelivery = order.expectedDeliveryDate ??
+          DateTime.now().add(const Duration(days: 1));
+
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final customers = ref.read(ordersCustomersControllerProvider).value;
         if (customers != null) {
@@ -204,7 +207,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
             }
           });
         }
-        
+
         await _loadExistingPaymentInfo();
       });
     }
@@ -214,7 +217,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     if (widget.existingOrder == null) return;
     final order = widget.existingOrder!;
     try {
-      final repo = await ref.read(financialTransactionRepositoryProvider.future);
+      final repo =
+          await ref.read(financialTransactionRepositoryProvider.future);
       final transactions = await repo.getByCustomerId(order.customerId);
       FinancialTransactionEntity? orderTx;
       for (final t in transactions) {
@@ -267,7 +271,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       // Write label printer settings to SQLite settings (single source of truth)
       final current = ref.read(settingsNotifierProvider).valueOrNull;
       if (current != null) {
-        await ref.read(settingsNotifierProvider.notifier)
+        await ref
+            .read(settingsNotifierProvider.notifier)
             .updateSettings(current.copyWith(
               labelPrinterEnabled: _printLabel,
               labelPrinterCopies: _labelCopies,
@@ -279,7 +284,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   }
 
   void _onProductScroll() {
-    if (_productScrollController.position.pixels >= _productScrollController.position.maxScrollExtent - 200) {
+    if (_productScrollController.position.pixels >=
+        _productScrollController.position.maxScrollExtent - 200) {
       ref.read(productsControllerProvider.notifier).loadNextPage();
     }
   }
@@ -308,15 +314,19 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   }
 
   // Karma split fields getters
-  double get _karmaCash => double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ?? 0.0;
-  double get _karmaCard => double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaCash =>
+      double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaCard =>
+      double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ?? 0.0;
   double get _karmaDebt => _selectedCustomer != null
       ? (double.tryParse(_debtSplitController.text.replaceAll(',', '.')) ?? 0.0)
       : 0.0;
 
   double get _karmaTotal => _karmaCash + _karmaCard + _karmaDebt;
-  double get _karmaRemainder => (_totalAmount - _karmaTotal).clamp(0.0, double.infinity);
-  bool get _karmaValid => _totalAmount > 0 && (_karmaTotal - _totalAmount).abs() < 0.01;
+  double get _karmaRemainder =>
+      (_totalAmount - _karmaTotal).clamp(0.0, double.infinity);
+  bool get _karmaValid =>
+      _totalAmount > 0 && (_karmaTotal - _totalAmount).abs() < 0.01;
 
   void _nextStep() {
     if (_activeStep < 3) {
@@ -340,14 +350,15 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     }
   }
 
-  Future<void> _handleBarcodeSubmit(String barcode, List<ProductEntity> productsList) async {
+  Future<void> _handleBarcodeSubmit(
+      String barcode, List<ProductEntity> productsList) async {
     if (barcode.trim().isEmpty) return;
-    
+
     final repository = await ref.read(productRepositoryProvider.future);
-    
+
     // 1. Direct ID / SKU match
     var matched = await repository.findById(barcode.trim());
-    
+
     // 2. Search by name/exact matches
     if (matched == null) {
       final results = await repository.searchByName(barcode.trim());
@@ -387,7 +398,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -402,7 +412,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: _kText, size: 22),
+                    icon: const Icon(Icons.close_rounded,
+                        color: _kText, size: 22),
                     onPressed: () => Navigator.pop(context),
                     style: IconButton.styleFrom(
                       padding: const EdgeInsets.all(8),
@@ -459,14 +470,21 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: isCurrent ? _kGreen : (isCompleted ? _kGreenLight : Colors.white),
+                  color: isCurrent
+                      ? _kGreen
+                      : (isCompleted ? _kGreenLight : Colors.white),
                   shape: BoxShape.circle,
-                  border: Border.all(color: isCurrent || isCompleted ? _kGreen : _kBorder),
+                  border: Border.all(
+                      color: isCurrent || isCompleted ? _kGreen : _kBorder),
                 ),
                 child: Icon(
-                  isCompleted ? Icons.check_circle_rounded : (step['icon'] as IconData),
+                  isCompleted
+                      ? Icons.check_circle_rounded
+                      : (step['icon'] as IconData),
                   size: 16,
-                  color: isCurrent ? Colors.white : (isCompleted ? _kGreenDark : _kTextSecondary),
+                  color: isCurrent
+                      ? Colors.white
+                      : (isCompleted ? _kGreenDark : _kTextSecondary),
                 ),
               ),
               if (idx < 3)
@@ -506,12 +524,17 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     final customersVal = ref.watch(ordersCustomersControllerProvider);
 
     return customersVal.when(
-      loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen))),
-      error: (err, _) => Center(child: Text('Müşteriler yüklenemedi: $err', style: const TextStyle(color: _kRed))),
+      loading: () => const Center(
+          child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(_kGreen))),
+      error: (err, _) => Center(
+          child: Text('Müşteriler yüklenemedi: $err',
+              style: const TextStyle(color: _kRed))),
       data: (customersList) {
         final filtered = customersList.where((c) {
           final query = _customerQuery.toLowerCase();
-          return c.name.toLowerCase().contains(query) || c.phone.contains(query);
+          return c.name.toLowerCase().contains(query) ||
+              c.phone.contains(query);
         }).toList();
 
         return Padding(
@@ -525,15 +548,19 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   final searchField = TextField(
                     decoration: InputDecoration(
                       hintText: 'Müşteri ara (isim veya telefon)...',
-                      prefixIcon: const Icon(Icons.search_rounded, color: _kTextSecondary),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: _kTextSecondary),
                       suffixIcon: _customerQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, size: 18),
-                              onPressed: () => setState(() => _customerQuery = ''),
+                              onPressed: () =>
+                                  setState(() => _customerQuery = ''),
                             )
                           : null,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                     ),
                     onChanged: (val) => setState(() => _customerQuery = val),
                   );
@@ -553,10 +580,12 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         borderRadius: BorderRadius.circular(10),
                         side: BorderSide(color: _kGreen.withValues(alpha: 0.3)),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                    label: const Text('Yeni Müşteri Ekle', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text('Yeni Müşteri Ekle',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   );
 
                   if (isWide) {
@@ -587,11 +616,13 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey[300]),
+                            Icon(Icons.people_outline_rounded,
+                                size: 64, color: Colors.grey[300]),
                             const SizedBox(height: 12),
                             const Text(
                               'Aradığınız müşteri bulunamadı.',
-                              style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                              style: TextStyle(
+                                  color: _kTextSecondary, fontSize: 14),
                             ),
                           ],
                         ),
@@ -609,33 +640,52 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                               duration: const Duration(milliseconds: 150),
                               margin: const EdgeInsets.only(bottom: 8),
                               decoration: BoxDecoration(
-                                color: isSel ? _kGreen.withValues(alpha: 0.05) : Colors.white,
+                                color: isSel
+                                    ? _kGreen.withValues(alpha: 0.05)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isSel ? _kGreen : _kBorder,
                                   width: 1.5,
                                 ),
                                 boxShadow: isSel
-                                    ? [BoxShadow(color: _kGreen.withValues(alpha: 0.08), blurRadius: 6)]
+                                    ? [
+                                        BoxShadow(
+                                            color:
+                                                _kGreen.withValues(alpha: 0.08),
+                                            blurRadius: 6)
+                                      ]
                                     : null,
                               ),
                               child: ListTile(
                                 dense: true,
                                 leading: CircleAvatar(
-                                  backgroundColor: isSel ? _kGreen : (isDebt ? _kRedLight : _kGreenLight),
-                                  foregroundColor: isSel ? Colors.white : (isDebt ? _kRed : _kGreenDark),
+                                  backgroundColor: isSel
+                                      ? _kGreen
+                                      : (isDebt ? _kRedLight : _kGreenLight),
+                                  foregroundColor: isSel
+                                      ? Colors.white
+                                      : (isDebt ? _kRed : _kGreenDark),
                                   child: Text(
-                                    c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    c.name.isNotEmpty
+                                        ? c.name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13),
                                   ),
                                 ),
                                 title: Text(
                                   c.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, color: _kText, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: _kText,
+                                      fontSize: 13),
                                 ),
                                 subtitle: Text(
                                   c.phone.isNotEmpty ? c.phone : 'Telefon Yok',
-                                  style: const TextStyle(color: _kTextSecondary, fontSize: 11),
+                                  style: const TextStyle(
+                                      color: _kTextSecondary, fontSize: 11),
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -653,7 +703,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                       width: 20,
                                       height: 20,
                                       child: isSel
-                                          ? const Icon(Icons.check_circle_rounded, color: _kGreen, size: 20)
+                                          ? const Icon(
+                                              Icons.check_circle_rounded,
+                                              color: _kGreen,
+                                              size: 20)
                                           : null,
                                     ),
                                   ],
@@ -685,12 +738,16 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                 children: [
                   IconButton(
                     onPressed: () => setState(() => _isAddingCustomer = false),
-                    icon: const Icon(Icons.arrow_back_rounded, color: _kTextSecondary),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: _kTextSecondary),
                   ),
                   const SizedBox(width: 8),
                   const Text(
                     'Yeni Müşteri Ekle',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kText),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: _kText),
                   ),
                 ],
               ),
@@ -699,17 +756,21 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                 controller: _newCustNameController,
                 decoration: InputDecoration(
                   labelText: 'Müşteri Adı / Unvan *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.person_outline_rounded),
                 ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Müşteri adı zorunludur' : null,
+                validator: (val) => val == null || val.trim().isEmpty
+                    ? 'Müşteri adı zorunludur'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _newCustPhoneController,
                 decoration: InputDecoration(
                   labelText: 'Telefon Numarası',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.phone_outlined),
                 ),
                 keyboardType: TextInputType.phone,
@@ -719,11 +780,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                 controller: _newCustBalanceController,
                 decoration: InputDecoration(
                   labelText: 'Devreden Bakiye (Pozitif Alacak, Negatif Borç)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
-                  helperText: 'Eğer müşterinin önceden borcu varsa negatif (-100 vb.) girin.',
+                  helperText:
+                      'Eğer müşterinin önceden borcu varsa negatif (-100 vb.) girin.',
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
               ),
               const SizedBox(height: 24),
               Row(
@@ -732,8 +796,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   OutlinedButton(
                     onPressed: () => setState(() => _isAddingCustomer = false),
                     style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
                     ),
                     child: const Text('Vazgeç'),
                   ),
@@ -743,12 +809,19 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreen,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
                     ),
                     child: _isSavingCustomer
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Kaydet ve Seç', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Kaydet ve Seç',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -767,7 +840,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     try {
       final name = _newCustNameController.text.trim();
       final phone = _newCustPhoneController.text.trim();
-      final balance = double.tryParse(_newCustBalanceController.text.trim().replaceAll(',', '.')) ?? 0.0;
+      final balance = double.tryParse(
+              _newCustBalanceController.text.trim().replaceAll(',', '.')) ??
+          0.0;
 
       final newCust = CustomerEntity(
         id: const Uuid().v4(),
@@ -778,12 +853,16 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         createdAt: DateTime.now(),
       );
 
-      await ref.read(ordersCustomersControllerProvider.notifier).addCustomer(newCust);
+      await ref
+          .read(ordersCustomersControllerProvider.notifier)
+          .addCustomer(newCust);
       await ref.read(ordersCustomersControllerProvider.notifier).refresh();
 
       // Find the newly added customer in the reloaded list to have matching object reference if needed
-      final updatedList = ref.read(ordersCustomersControllerProvider).value ?? [];
-      final createdCust = updatedList.firstWhere((c) => c.id == newCust.id, orElse: () => newCust);
+      final updatedList =
+          ref.read(ordersCustomersControllerProvider).value ?? [];
+      final createdCust = updatedList.firstWhere((c) => c.id == newCust.id,
+          orElse: () => newCust);
 
       setState(() {
         _selectedCustomer = createdCust;
@@ -858,7 +937,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         isSelected: _selectedCategory == 'Tümü',
                         onTap: () {
                           setState(() => _selectedCategory = 'Tümü');
-                          ref.read(ordersProductCategoryFilterProvider.notifier).state = null;
+                          ref
+                              .read(
+                                  ordersProductCategoryFilterProvider.notifier)
+                              .state = null;
                           Navigator.pop(ctx);
                         },
                       ),
@@ -869,7 +951,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                           isSelected: _selectedCategory == cat,
                           onTap: () {
                             setState(() => _selectedCategory = cat);
-                            ref.read(ordersProductCategoryFilterProvider.notifier).state = cat;
+                            ref
+                                .read(ordersProductCategoryFilterProvider
+                                    .notifier)
+                                .state = cat;
                             Navigator.pop(ctx);
                           },
                         );
@@ -921,8 +1006,12 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     final categories = ref.watch(productCategoriesProvider);
 
     return productsVal.when(
-      loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen))),
-      error: (err, _) => Center(child: Text('Ürünler yüklenemedi: $err', style: const TextStyle(color: _kRed))),
+      loading: () => const Center(
+          child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(_kGreen))),
+      error: (err, _) => Center(
+          child: Text('Ürünler yüklenemedi: $err',
+              style: const TextStyle(color: _kRed))),
       data: (productsList) {
         final filtered = productsList;
 
@@ -949,15 +1038,23 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                             controller: _productSearchController,
                             decoration: const InputDecoration(
                               hintText: 'Ürün ara...',
-                              hintStyle: TextStyle(color: _kTextSecondary, fontSize: 13),
-                              prefixIcon: Icon(Icons.search_rounded, color: _kTextSecondary, size: 18),
+                              hintStyle: TextStyle(
+                                  color: _kTextSecondary, fontSize: 13),
+                              prefixIcon: Icon(Icons.search_rounded,
+                                  color: _kTextSecondary, size: 18),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                              contentPadding: EdgeInsets.symmetric(
+                                  vertical: 9, horizontal: 12),
                             ),
-                            style: const TextStyle(color: _kText, fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                color: _kText,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
                             onChanged: (val) {
                               setState(() => _productQuery = val);
-                              ref.read(productSearchQueryProvider.notifier).state = val;
+                              ref
+                                  .read(productSearchQueryProvider.notifier)
+                                  .state = val;
                             },
                           ),
                         ),
@@ -970,7 +1067,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                             _productQuery = '';
                             _productSearchController.clear();
                           });
-                          ref.read(productSearchQueryProvider.notifier).state = '';
+                          ref.read(productSearchQueryProvider.notifier).state =
+                              '';
                         },
                       ),
                     ] else ...[
@@ -985,18 +1083,22 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                       ),
                       Expanded(
                         child: InkWell(
-                          onTap: () => _showCategoryBottomSheet(context, categories),
+                          onTap: () =>
+                              _showCategoryBottomSheet(context, categories),
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9), // Slate 100
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.filter_list_rounded, size: 16, color: _kGreenDark),
+                                const Icon(Icons.filter_list_rounded,
+                                    size: 16, color: _kGreenDark),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
@@ -1011,7 +1113,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _kTextSecondary),
+                                const Icon(Icons.keyboard_arrow_down_rounded,
+                                    size: 16, color: _kTextSecondary),
                               ],
                             ),
                           ),
@@ -1029,7 +1132,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                           },
                         );
                       },
-                      icon: const Icon(Icons.photo_camera_rounded, color: _kGreen),
+                      icon: const Icon(Icons.photo_camera_rounded,
+                          color: _kGreen),
                       tooltip: 'Kamera Tarayıcı',
                     ),
                   ],
@@ -1044,18 +1148,21 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
+                            Icon(Icons.inventory_2_outlined,
+                                size: 64, color: Colors.grey[300]),
                             const SizedBox(height: 12),
                             const Text(
                               'Eşleşen ürün bulunamadı.',
-                              style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                              style: TextStyle(
+                                  color: _kTextSecondary, fontSize: 14),
                             ),
                           ],
                         ),
                       )
                     : GridView.builder(
                         controller: _productScrollController,
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 200,
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
@@ -1065,19 +1172,24 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         itemBuilder: (context, idx) {
                           final p = filtered[idx];
                           final qtyInCart = _cart[p] ?? 0;
-                          final outOfStock = p.quantity <= 0; // Allowed negative stock sales
+                          final outOfStock =
+                              p.quantity <= 0; // Allowed negative stock sales
                           final isLowStock = p.quantity <= 5;
                           final Color badgeBgColor = outOfStock
                               ? _kRedLight
                               : (isLowStock ? _kAmberLight : _kGreenLight);
                           final Color badgeTextColor = outOfStock
                               ? _kRed
-                              : (isLowStock ? const Color(0xFF854D0E) : _kGreenDark);
+                              : (isLowStock
+                                  ? const Color(0xFF854D0E)
+                                  : _kGreenDark);
                           final Color borderColor = qtyInCart > 0
                               ? _kGreen
                               : (outOfStock
                                   ? _kRed.withValues(alpha: 0.25)
-                                  : (isLowStock ? _kAmber.withValues(alpha: 0.35) : _kBorder));
+                                  : (isLowStock
+                                      ? _kAmber.withValues(alpha: 0.35)
+                                      : _kBorder));
 
                           return AnimatedOpacity(
                             opacity: outOfStock ? 0.85 : 1.0,
@@ -1088,7 +1200,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: borderColor,
-                                  width: qtyInCart > 0 ? 2.0 : ((outOfStock || isLowStock) ? 1.5 : 1.0),
+                                  width: qtyInCart > 0
+                                      ? 2.0
+                                      : ((outOfStock || isLowStock)
+                                          ? 1.5
+                                          : 1.0),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -1104,18 +1220,23 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                 color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(14),
                                 child: InkWell(
-                                  onTap: () => setState(() => _cart[p] = qtyInCart + 1.0),
+                                  onTap: () => setState(
+                                      () => _cart[p] = qtyInCart + 1.0),
                                   borderRadius: BorderRadius.circular(14),
                                   splashColor: _kGreenLight,
-                                  highlightColor: _kGreenLight.withValues(alpha: 0.5),
+                                  highlightColor:
+                                      _kGreenLight.withValues(alpha: 0.5),
                                   child: Padding(
                                     padding: const EdgeInsets.all(11),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Expanded(
                                               child: Text(
@@ -1132,15 +1253,21 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                             ),
                                             const SizedBox(width: 4),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 3),
                                               decoration: BoxDecoration(
                                                 color: badgeBgColor,
-                                                borderRadius: BorderRadius.circular(6),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
                                               child: Text(
                                                 outOfStock
                                                     ? 'Tükendi'
-                                                    : (isLowStock ? '${p.quantity} adet' : '${p.quantity}'),
+                                                    : (isLowStock
+                                                        ? '${p.quantity} adet'
+                                                        : '${p.quantity}'),
                                                 style: TextStyle(
                                                   fontSize: 9,
                                                   color: badgeTextColor,
@@ -1164,8 +1291,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                         ),
                                         const SizedBox(height: 10),
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
                                           children: [
                                             Expanded(
                                               child: Text(
@@ -1187,7 +1316,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                                     height: 32,
                                                     decoration: BoxDecoration(
                                                       color: _kGreen,
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
                                                     ),
                                                     child: const Icon(
                                                       Icons.add_rounded,
@@ -1196,47 +1327,84 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                                     ),
                                                   )
                                                 : GestureDetector(
-                                                    onTap: () {}, // Swallows taps on the controller container to prevent card onTap trigger
+                                                    onTap:
+                                                        () {}, // Swallows taps on the controller container to prevent card onTap trigger
                                                     child: Container(
                                                       height: 32,
                                                       decoration: BoxDecoration(
                                                         color: Colors.white,
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        border: Border.all(color: _kGreen, width: 1.5),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8),
+                                                        border: Border.all(
+                                                            color: _kGreen,
+                                                            width: 1.5),
                                                       ),
                                                       child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
                                                         children: [
                                                           GestureDetector(
-                                                            onTap: () => setState(() {
-                                                              if (qtyInCart - 1.0 <= 0.0001) {
+                                                            onTap: () =>
+                                                                setState(() {
+                                                              if (qtyInCart -
+                                                                      1.0 <=
+                                                                  0.0001) {
                                                                 _cart.remove(p);
                                                               } else {
-                                                                _cart[p] = qtyInCart - 1.0;
+                                                                _cart[p] =
+                                                                    qtyInCart -
+                                                                        1.0;
                                                               }
                                                             }),
-                                                            child: const Padding(
-                                                              padding: EdgeInsets.symmetric(horizontal: 6),
-                                                              child: Icon(Icons.remove_rounded, color: _kRed, size: 14),
+                                                            child:
+                                                                const Padding(
+                                                              padding: EdgeInsets
+                                                                  .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Icon(
+                                                                  Icons
+                                                                      .remove_rounded,
+                                                                  color: _kRed,
+                                                                  size: 14),
                                                             ),
                                                           ),
                                                           _InlineQuantityField(
                                                             quantity: qtyInCart,
                                                             hasBorder: false,
-                                                            onChanged: (val) => setState(() {
-                                                              if (val <= 0.0001) {
+                                                            onChanged: (val) =>
+                                                                setState(() {
+                                                              if (val <=
+                                                                  0.0001) {
                                                                 _cart.remove(p);
                                                               } else {
                                                                 _cart[p] = val;
                                                               }
                                                             }),
-                                                            onRemove: () => setState(() => _cart.remove(p)),
+                                                            onRemove: () =>
+                                                                setState(() =>
+                                                                    _cart
+                                                                        .remove(
+                                                                            p)),
                                                           ),
                                                           GestureDetector(
-                                                            onTap: () => setState(() => _cart[p] = qtyInCart + 1.0),
-                                                            child: const Padding(
-                                                              padding: EdgeInsets.symmetric(horizontal: 6),
-                                                              child: Icon(Icons.add_rounded, color: _kGreen, size: 14),
+                                                            onTap: () => setState(
+                                                                () => _cart[p] =
+                                                                    qtyInCart +
+                                                                        1.0),
+                                                            child:
+                                                                const Padding(
+                                                              padding: EdgeInsets
+                                                                  .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Icon(
+                                                                  Icons
+                                                                      .add_rounded,
+                                                                  color:
+                                                                      _kGreen,
+                                                                  size: 14),
                                                             ),
                                                           ),
                                                         ],
@@ -1268,11 +1436,15 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_basket_outlined, size: 72, color: Colors.grey[200]),
+            Icon(Icons.shopping_basket_outlined,
+                size: 72, color: Colors.grey[200]),
             const SizedBox(height: 16),
             const Text(
               'Sipariş sepetiniz boş.',
-              style: TextStyle(color: _kTextSecondary, fontSize: 15, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: _kTextSecondary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -1284,7 +1456,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       children: [
         const Text(
           'Sepetteki Ürünler',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
         ),
         const SizedBox(height: 8),
         ListView.builder(
@@ -1300,12 +1473,18 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
               color: _kSurface,
               elevation: 0,
               margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: _kBorder)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: _kBorder)),
               child: ListTile(
                 dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('₺${p.price.toStringAsFixed(2)} x ${_formatQuantity(qty)} = ₺${lineTotal.toStringAsFixed(2)}'),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                title: Text(p.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text(
+                    '₺${p.price.toStringAsFixed(2)} x ${_formatQuantity(qty)} = ₺${lineTotal.toStringAsFixed(2)}'),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1329,7 +1508,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                             }),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 8),
-                              child: Icon(Icons.remove_rounded, color: _kRed, size: 16),
+                              child: Icon(Icons.remove_rounded,
+                                  color: _kRed, size: 16),
                             ),
                           ),
                           _InlineQuantityField(
@@ -1348,7 +1528,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                             onTap: () => setState(() => _cart[p] = qty + 1.0),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 8),
-                              child: Icon(Icons.add_rounded, color: _kGreen, size: 16),
+                              child: Icon(Icons.add_rounded,
+                                  color: _kGreen, size: 16),
                             ),
                           ),
                         ],
@@ -1358,7 +1539,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.delete_outline_rounded, color: _kRed, size: 20),
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: _kRed, size: 20),
                       onPressed: () => setState(() => _cart.remove(p)),
                     ),
                   ],
@@ -1373,9 +1555,15 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     final formConfigWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Teslimat Tarihi ve Notlar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
+        const Text('Teslimat Tarihi ve Notlar',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
         const SizedBox(height: 12),
-        const Text('Tahmini Teslimat Tarihi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _kTextSecondary)),
+        const Text('Tahmini Teslimat Tarihi',
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: _kTextSecondary)),
         const SizedBox(height: 6),
         InkWell(
           onTap: () async {
@@ -1397,14 +1585,19 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(DateFormat('dd.MM.yyyy').format(_expectedDelivery), style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(DateFormat('dd.MM.yyyy').format(_expectedDelivery),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Icon(Icons.calendar_month_rounded, color: _kGreen),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Sipariş Notu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _kTextSecondary)),
+        const Text('Sipariş Notu',
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: _kTextSecondary)),
         const SizedBox(height: 6),
         TextField(
           controller: _notesController,
@@ -1427,8 +1620,13 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Sipariş Toplamı:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text('₺${_totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _kGreenDark)),
+              const Text('Sipariş Toplamı:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('₺${_totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: _kGreenDark)),
             ],
           ),
         ),
@@ -1481,7 +1679,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Sipariş Bilgileri', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
+        const Text('Sipariş Bilgileri',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
         const SizedBox(height: 12),
         _buildSummaryRow(
           icon: Icons.person_outline_rounded,
@@ -1492,7 +1692,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           _buildSummaryRow(
             icon: Icons.account_balance_wallet_outlined,
             label: 'Müşteri Bakiyesi',
-            value: '₺${_selectedCustomer!.balance.abs().toStringAsFixed(2)} ${_selectedCustomer!.balance < 0 ? "(Borçlu)" : "(Alacaklı)"}',
+            value:
+                '₺${_selectedCustomer!.balance.abs().toStringAsFixed(2)} ${_selectedCustomer!.balance < 0 ? "(Borçlu)" : "(Alacaklı)"}',
             valueColor: _selectedCustomer!.balance < 0 ? _kRed : _kGreenDark,
           ),
         _buildSummaryRow(
@@ -1513,7 +1714,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Ödeme Yöntemi Seçin', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
+        const Text('Ödeme Yöntemi Seçin',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
         const SizedBox(height: 12),
         // Totals box
         Container(
@@ -1573,11 +1776,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
               IconButton(
                 onPressed: () => setState(() => _printReceipt = !_printReceipt),
                 icon: Icon(
-                  _printReceipt ? Icons.print_rounded : Icons.print_disabled_rounded,
+                  _printReceipt
+                      ? Icons.print_rounded
+                      : Icons.print_disabled_rounded,
                   color: _printReceipt ? _kGreen : _kTextSecondary,
                   size: 20,
                 ),
-                tooltip: _printReceipt ? 'Fiş Yazdırma Açık' : 'Fiş Yazdırma Kapalı',
+                tooltip:
+                    _printReceipt ? 'Fiş Yazdırma Açık' : 'Fiş Yazdırma Kapalı',
                 style: IconButton.styleFrom(
                   backgroundColor: _printReceipt ? _kGreenLight : Colors.white,
                   padding: const EdgeInsets.all(8),
@@ -1586,7 +1792,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(
-                      color: _printReceipt ? _kGreen.withValues(alpha: 0.3) : _kBorder,
+                      color: _printReceipt
+                          ? _kGreen.withValues(alpha: 0.3)
+                          : _kBorder,
                     ),
                   ),
                 ),
@@ -1607,11 +1815,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   _saveLabelPrinterSettings();
                 },
                 icon: Icon(
-                  _printLabel ? Icons.label_rounded : Icons.label_outline_rounded,
+                  _printLabel
+                      ? Icons.label_rounded
+                      : Icons.label_outline_rounded,
                   color: _printLabel ? _kGreen : _kTextSecondary,
                   size: 20,
                 ),
-                tooltip: _printLabel ? 'Etiket Yazıcı Açık' : 'Etiket Yazıcı Kapalı',
+                tooltip:
+                    _printLabel ? 'Etiket Yazıcı Açık' : 'Etiket Yazıcı Kapalı',
                 style: IconButton.styleFrom(
                   backgroundColor: _printLabel ? _kGreenLight : Colors.white,
                   padding: const EdgeInsets.all(8),
@@ -1620,7 +1831,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(
-                      color: _printLabel ? _kGreen.withValues(alpha: 0.3) : _kBorder,
+                      color: _printLabel
+                          ? _kGreen.withValues(alpha: 0.3)
+                          : _kBorder,
                     ),
                   ),
                 ),
@@ -1677,7 +1890,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     );
   }
 
-  Widget _buildSummaryRow({required IconData icon, required String label, required String value, Color? valueColor}) {
+  Widget _buildSummaryRow(
+      {required IconData icon,
+      required String label,
+      required String value,
+      Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -1685,9 +1902,16 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         children: [
           Icon(icon, size: 16, color: _kTextSecondary),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: const TextStyle(color: _kTextSecondary, fontSize: 12))),
+          Expanded(
+              child: Text(label,
+                  style:
+                      const TextStyle(color: _kTextSecondary, fontSize: 12))),
           const SizedBox(width: 8),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: valueColor ?? _kText)),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: valueColor ?? _kText)),
         ],
       ),
     );
@@ -1699,19 +1923,26 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       decoration: BoxDecoration(
         color: _kSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _karmaValid ? _kGreen.withValues(alpha: 0.4) : _kBorder),
+        border: Border.all(
+            color: _karmaValid ? _kGreen.withValues(alpha: 0.4) : _kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.call_split_rounded, size: 14, color: _kTextSecondary),
+              const Icon(Icons.call_split_rounded,
+                  size: 14, color: _kTextSecondary),
               const SizedBox(width: 6),
-              const Text('Karma Ödeme Dağılımı', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text('Karma Ödeme Dağılımı',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               const Spacer(),
               if (_karmaValid)
-                const Text('✓ Tamam', style: TextStyle(fontSize: 11, color: _kGreenDark, fontWeight: FontWeight.bold)),
+                const Text('✓ Tamam',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: _kGreenDark,
+                        fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1750,14 +1981,19 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     );
   }
 
-  Widget _buildSplitField({required TextEditingController controller, required String label, required IconData icon, required Color color}) {
+  Widget _buildSplitField(
+      {required TextEditingController controller,
+      required String label,
+      required IconData icon,
+      required Color color}) {
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d,.]'))],
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+        labelStyle:
+            TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
         prefixIcon: Icon(icon, color: color, size: 16),
         prefixText: '₺',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1770,10 +2006,30 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   Widget _buildPaymentSelectionGrid() {
     final methods = [
-      {'id': 'cash', 'label': 'Nakit', 'icon': Icons.payments_rounded, 'color': _kGreen},
-      {'id': 'card', 'label': 'Kart', 'icon': Icons.credit_card_rounded, 'color': Colors.blue},
-      {'id': 'debt', 'label': 'Vadeli (Borç)', 'icon': Icons.account_balance_wallet_rounded, 'color': Colors.orange},
-      {'id': 'karma', 'label': 'Karma (Split)', 'icon': Icons.call_split_rounded, 'color': Colors.purple},
+      {
+        'id': 'cash',
+        'label': 'Nakit',
+        'icon': Icons.payments_rounded,
+        'color': _kGreen
+      },
+      {
+        'id': 'card',
+        'label': 'Kart',
+        'icon': Icons.credit_card_rounded,
+        'color': Colors.blue
+      },
+      {
+        'id': 'debt',
+        'label': 'Vadeli (Borç)',
+        'icon': Icons.account_balance_wallet_rounded,
+        'color': Colors.orange
+      },
+      {
+        'id': 'karma',
+        'label': 'Karma (Split)',
+        'icon': Icons.call_split_rounded,
+        'color': Colors.purple
+      },
     ];
 
     return LayoutBuilder(
@@ -1855,15 +2111,19 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   icon: const Icon(Icons.arrow_back_rounded, size: 16),
                   label: const Text('Geri'),
                   style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 14),
                   ),
                 )
               : OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 14),
                   ),
                   child: const Text('Kapat'),
                 ),
@@ -1874,26 +2134,41 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kGreen,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 14),
                   ),
                   icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: const Text('Devam Et', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text('Devam Et',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 )
               : ElevatedButton.icon(
-                  onPressed: _isSubmitting || _paymentMethod.isEmpty || (_paymentMethod == 'karma' && !_karmaValid)
+                  onPressed: _isSubmitting ||
+                          _paymentMethod.isEmpty ||
+                          (_paymentMethod == 'karma' && !_karmaValid)
                       ? null
                       : _submitOrder,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kGreen,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 14),
                   ),
                   icon: _isSubmitting
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.check_circle_rounded, size: 16),
-                  label: Text(widget.existingOrder != null ? 'Siparişi Güncelle' : 'Siparişi Onayla', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(
+                      widget.existingOrder != null
+                          ? 'Siparişi Güncelle'
+                          : 'Siparişi Onayla',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
         ],
       ),
@@ -1910,13 +2185,15 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     setState(() => _isSubmitting = true);
 
     try {
-      final itemsList = _cart.entries.map((e) => {
-        'product_id': e.key.id,
-        'quantity': e.value,
-        'unit_price': e.key.price,
-        'tax': e.key.vat ?? 0.0,
-        'total_price': e.value * e.key.price,
-      }).toList();
+      final itemsList = _cart.entries
+          .map((e) => {
+                'product_id': e.key.id,
+                'quantity': e.value,
+                'unit_price': e.key.price,
+                'tax': e.key.vat ?? 0.0,
+                'total_price': e.value * e.key.price,
+              })
+          .toList();
 
       final isEdit = widget.existingOrder != null;
       final String orderId = isEdit
@@ -1932,7 +2209,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         status: isEdit ? widget.existingOrder!.status : 'created',
         createdAt: isEdit ? widget.existingOrder!.createdAt : DateTime.now(),
         expectedDeliveryDate: _expectedDelivery,
-        actualDeliveryDate: isEdit ? widget.existingOrder!.actualDeliveryDate : null,
+        actualDeliveryDate:
+            isEdit ? widget.existingOrder!.actualDeliveryDate : null,
         items: itemsList,
         notes: _notesController.text.trim(),
         createdBy: isEdit ? widget.existingOrder!.createdBy : cashierName,
@@ -1952,8 +2230,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         await ref.read(ordersControllerProvider.notifier).updateOrder(newOrder);
 
         // Find existing transaction to calculate oldDebt
-        final txRepo = await ref.read(financialTransactionRepositoryProvider.future);
-        final transactions = await txRepo.getByCustomerId(widget.existingOrder!.customerId);
+        final txRepo =
+            await ref.read(financialTransactionRepositoryProvider.future);
+        final transactions =
+            await txRepo.getByCustomerId(widget.existingOrder!.customerId);
         FinancialTransactionEntity? orderTx;
         for (final t in transactions) {
           if (t.referenceId == widget.existingOrder!.id && t.type == 'sale') {
@@ -1971,12 +2251,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         if (_selectedCustomer!.id == widget.existingOrder!.customerId) {
           final balanceAdjustment = oldDebt - newDebt;
           if (balanceAdjustment != 0) {
-            await customerRepo.updateBalance(_selectedCustomer!.id, balanceAdjustment);
+            await customerRepo.updateBalance(
+                _selectedCustomer!.id, balanceAdjustment);
           }
         } else {
           // Customer changed: refund old, charge new
           if (oldDebt > 0) {
-            await customerRepo.updateBalance(widget.existingOrder!.customerId, oldDebt);
+            await customerRepo.updateBalance(
+                widget.existingOrder!.customerId, oldDebt);
           }
           if (newDebt > 0) {
             await customerRepo.updateBalance(_selectedCustomer!.id, -newDebt);
@@ -1998,7 +2280,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           );
           await txRepo.update(updatedTx);
         } else {
-          final transactionId = 'trans-${DateTime.now().microsecondsSinceEpoch}${Random().nextInt(10000).toString().padLeft(4, '0')}';
+          final transactionId =
+              'trans-${DateTime.now().microsecondsSinceEpoch}${Random().nextInt(10000).toString().padLeft(4, '0')}';
           await txRepo.create(
             FinancialTransactionEntity(
               id: transactionId,
@@ -2031,34 +2314,38 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       ref.invalidate(customerTransactionsProvider(_selectedCustomer!.id));
       ref.invalidate(customerBalanceDetailsProvider(_selectedCustomer!.id));
       if (isEdit && _selectedCustomer!.id != widget.existingOrder!.customerId) {
-        ref.invalidate(customerTransactionsProvider(widget.existingOrder!.customerId));
-        ref.invalidate(customerBalanceDetailsProvider(widget.existingOrder!.customerId));
+        ref.invalidate(
+            customerTransactionsProvider(widget.existingOrder!.customerId));
+        ref.invalidate(
+            customerBalanceDetailsProvider(widget.existingOrder!.customerId));
       }
 
       // Print order receipt & labels
       final settings = ref.read(settingsNotifierProvider).value;
       if (settings != null) {
-        final receiptItems = _cart.entries.map((e) => {
-          'product_id': e.key.name,
-          'quantity': e.value,
-          'unit_price': e.key.price,
-        }).toList();
+        final receiptItems = _cart.entries
+            .map((e) => {
+                  'product_id': e.key.name,
+                  'quantity': e.value,
+                  'unit_price': e.key.price,
+                })
+            .toList();
 
         // 1. Print main receipt copies
         if (_printReceipt) {
           for (int i = 0; i < _printCopies; i++) {
             final suffix = _printCopies > 1 ? ' (Kopya ${i + 1})' : '';
             ref.read(printerServiceProvider).enqueue(
-              'Sipariş Fişi #${newOrder.id.toShortId}$suffix',
-              () => ref.read(printerServiceProvider).printOrderReceipt(
-                newOrder,
-                receiptItems,
-                _selectedCustomer,
-                settings,
-                paidAmount: finalPaid,
-                notes: _notesController.text.trim(),
-              ),
-            );
+                  'Sipariş Fişi #${newOrder.id.toShortId}$suffix',
+                  () => ref.read(printerServiceProvider).printOrderReceipt(
+                        newOrder,
+                        receiptItems,
+                        _selectedCustomer,
+                        settings,
+                        paidAmount: finalPaid,
+                        notes: _notesController.text.trim(),
+                      ),
+                );
           }
         }
 
@@ -2076,13 +2363,13 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           for (int i = 0; i < _labelCopies; i++) {
             final suffix = _labelCopies > 1 ? ' (Kopya ${i + 1})' : '';
             ref.read(printerServiceProvider).enqueue(
-              'Sipariş Etiketleri #${newOrder.id.toShortId}$suffix',
-              () => ref.read(printerServiceProvider).printOrderLabels(
-                newOrder,
-                receiptItems,
-                labelSettings,
-              ),
-            );
+                  'Sipariş Etiketleri #${newOrder.id.toShortId}$suffix',
+                  () => ref.read(printerServiceProvider).printOrderLabels(
+                        newOrder,
+                        receiptItems,
+                        labelSettings,
+                      ),
+                );
           }
         }
       }
@@ -2094,7 +2381,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isEdit ? 'Sipariş başarıyla güncellendi.' : 'Sipariş başarıyla oluşturuldu.'),
+            content: Text(isEdit
+                ? 'Sipariş başarıyla güncellendi.'
+                : 'Sipariş başarıyla oluşturuldu.'),
             backgroundColor: _kGreen,
           ),
         );
@@ -2103,7 +2392,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       setState(() => _isSubmitting = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sipariş kaydedilirken hata: $e'), backgroundColor: _kRed),
+          SnackBar(
+              content: Text('Sipariş kaydedilirken hata: $e'),
+              backgroundColor: _kRed),
         );
       }
     }
@@ -2206,7 +2497,8 @@ class _InlineQuantityFieldState extends State<_InlineQuantityField> {
         focusNode: _focusNode,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         textAlign: TextAlign.center,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: _kText),
+        style: const TextStyle(
+            fontWeight: FontWeight.w800, fontSize: 13, color: _kText),
         maxLines: 1,
         decoration: const InputDecoration(
           isDense: true,
@@ -2291,18 +2583,17 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final Color bgColor = widget.isEnabled 
-        ? Colors.white 
+
+    final Color bgColor = widget.isEnabled
+        ? Colors.white
         : (isDark ? Colors.black26 : Colors.grey.shade100);
-        
-    final Color borderColor = widget.isEnabled 
-        ? _kBorder 
+
+    final Color borderColor = widget.isEnabled
+        ? _kBorder
         : (isDark ? Colors.white24 : Colors.grey.shade300);
-        
-    final Color textColor = widget.isEnabled 
-        ? _kText 
-        : _kTextSecondary.withValues(alpha: 0.5);
+
+    final Color textColor =
+        widget.isEnabled ? _kText : _kTextSecondary.withValues(alpha: 0.5);
 
     return Container(
       width: 36,
@@ -2319,7 +2610,8 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
         enabled: widget.isEnabled,
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+        style: TextStyle(
+            fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
         maxLines: 1,
         decoration: const InputDecoration(
           isDense: true,

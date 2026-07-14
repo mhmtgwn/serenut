@@ -4,7 +4,8 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'pin_verification_dialog.dart';
 
-typedef GatedActionCallback = void Function(String? approvedByUserId, String? approvedByUserName);
+typedef GatedActionCallback = void Function(
+    String? approvedByUserId, String? approvedByUserName);
 
 /// Centralized RBAC check utility.
 /// Checks if the logged-in user has the required role. If requirePin is true,
@@ -20,7 +21,11 @@ Future<void> requireAdminAccess(
   final container = ProviderScope.containerOf(context);
   final user = container.read(currentUserProvider);
 
-  if (user == null || !(user.role == UserRole.admin || user.role == UserRole.owner || user.role == UserRole.sysadmin || allowedRoles.contains(user.role))) {
+  if (user == null ||
+      !(user.role == UserRole.admin ||
+          user.role == UserRole.owner ||
+          user.role == UserRole.sysadmin ||
+          allowedRoles.contains(user.role))) {
     if (!context.mounted) return;
     showDialog(
       context: context,
@@ -40,7 +45,9 @@ Future<void> requireAdminAccess(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Kapat', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text('Kapat',
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -82,11 +89,10 @@ Future<void> requirePermissionAccess(
   final container = ProviderScope.containerOf(context);
   final user = container.read(currentUserProvider);
 
-  final hasAccess = user != null && (
-    user.role == UserRole.sysadmin ||
-    user.role == UserRole.owner ||
-    user.hasPermission(permission.value)
-  );
+  final hasAccess = user != null &&
+      (user.role == UserRole.sysadmin ||
+          user.role == UserRole.owner ||
+          user.hasPermission(permission.value));
 
   if (!hasAccess) {
     if (!context.mounted) return;
@@ -108,7 +114,9 @@ Future<void> requirePermissionAccess(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Kapat', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text('Kapat',
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

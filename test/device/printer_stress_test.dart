@@ -173,17 +173,20 @@ void main() {
         await queue.markDone(ids[i]);
       }
       for (int i = 5; i < totalJobs; i++) {
-        await queue.markFailed(ids[i], error: 'SocketException: printer offline');
+        await queue.markFailed(ids[i],
+            error: 'SocketException: printer offline');
       }
 
       // Failed jobs should still be in pending (retry count = 1, not abandoned)
       final pending = await queue.loadPending();
-      final failedPending = pending.where((j) => ids.sublist(5).contains(j.id)).toList();
+      final failedPending =
+          pending.where((j) => ids.sublist(5).contains(j.id)).toList();
       expect(failedPending.length, equals(5));
       expect(failedPending.every((j) => j.retryCount == 1), isTrue);
     });
 
-    test('network outage recovery — jobs persist across simulated restart', () async {
+    test('network outage recovery — jobs persist across simulated restart',
+        () async {
       // Simulate: app creates job, then crashes before printing
       final job = await queue.enqueue(
         title: 'Outage Recovery Test',

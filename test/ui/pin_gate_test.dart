@@ -22,10 +22,13 @@ class MockUserRepository implements IUserRepository {
   }
 
   @override
-  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5}) async {
+  Future<void> incrementFailedPinAttempts(String userId,
+      {int lockoutMinutes = 5, int maxAttempts = 5}) async {
     attempts++;
     if (attempts >= maxAttempts) {
-      lockedUntil = DateTime.now().add(Duration(minutes: lockoutMinutes)).toIso8601String();
+      lockedUntil = DateTime.now()
+          .add(Duration(minutes: lockoutMinutes))
+          .toIso8601String();
     }
   }
 
@@ -50,7 +53,8 @@ class MockAuthService implements AuthService {
   Future<AuthUser?> getCurrentUser() async => mockUser;
 
   @override
-  Future<({bool success, String? approverUserId, String? approverUserName})> verifyCurrentUserPin(String pin) async {
+  Future<({bool success, String? approverUserId, String? approverUserName})>
+      verifyCurrentUserPin(String pin) async {
     final lockout = await repo.getFailedPinAttempts(mockUser.id);
     if (lockout['locked_until'] != null) {
       return (success: false, approverUserId: null, approverUserName: null);
@@ -58,7 +62,11 @@ class MockAuthService implements AuthService {
 
     if (pin == '1234') {
       await repo.resetPinAttempts(mockUser.id);
-      return (success: true, approverUserId: mockUser.id, approverUserName: mockUser.name);
+      return (
+        success: true,
+        approverUserId: mockUser.id,
+        approverUserName: mockUser.name
+      );
     } else {
       await repo.incrementFailedPinAttempts(mockUser.id);
       return (success: false, approverUserId: null, approverUserName: null);
@@ -70,7 +78,9 @@ class MockAuthService implements AuthService {
 }
 
 void main() {
-  testWidgets('PinVerificationDialog correctly handles inputs, wrong pins, lockout and success', (WidgetTester tester) async {
+  testWidgets(
+      'PinVerificationDialog correctly handles inputs, wrong pins, lockout and success',
+      (WidgetTester tester) async {
     final mockUser = AuthUser(
       id: 'admin_1',
       name: 'Test Admin',
@@ -151,7 +161,8 @@ void main() {
 
     // Verify lockout active
     expect(mockRepo.attempts, 5);
-    expect(find.text('Çok fazla hatalı deneme! Cihaz kilitlendi.'), findsOneWidget);
+    expect(find.text('Çok fazla hatalı deneme! Cihaz kilitlendi.'),
+        findsOneWidget);
     expect(find.textContaining('Güvenlik kilidi devrede'), findsOneWidget);
 
     // 4. Close dialog and reopen (simulating reopening during lockout)
@@ -180,7 +191,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Since requireConfirm was true and checkbox not checked, it should display warning
-    expect(find.textContaining('Lütfen tehlikeli işlemi onay kutusunu işaretleyerek onaylayın'), findsOneWidget);
+    expect(
+        find.textContaining(
+            'Lütfen tehlikeli işlemi onay kutusunu işaretleyerek onaylayın'),
+        findsOneWidget);
 
     // Check the confirmation checkbox
     await tester.tap(find.byType(Checkbox));

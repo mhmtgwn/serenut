@@ -1,5 +1,5 @@
-﻿/// RequiredDbExecutor — Enforces transaction usage at compile time
-/// 
+/// RequiredDbExecutor — Enforces transaction usage at compile time
+///
 /// Key idea: Can ONLY be created by AppTransaction.run()
 /// This prevents accidental use of cached executor in critical paths.
 ///

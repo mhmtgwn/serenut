@@ -57,27 +57,30 @@ class FakeCustomerRepository implements ICustomerRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class FakeFinancialTransactionRepository implements IFinancialTransactionRepository {
+class FakeFinancialTransactionRepository
+    implements IFinancialTransactionRepository {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class FakeInventoryService extends InventoryService {
-  FakeInventoryService() : super(
-    productRepository: FakeProductRepository(),
-    eventPublisher: FakeEventPublisher(),
-  );
+  FakeInventoryService()
+      : super(
+          productRepository: FakeProductRepository(),
+          eventPublisher: FakeEventPublisher(),
+        );
 
   @override
   Future<void> restoreStock(List<SaleItemInput> items) async {}
 }
 
 class FakePaymentService extends PaymentService {
-  FakePaymentService() : super(
-    customerRepository: FakeCustomerRepository(),
-    transactionRepository: FakeFinancialTransactionRepository(),
-    eventPublisher: FakeEventPublisher(),
-  );
+  FakePaymentService()
+      : super(
+          customerRepository: FakeCustomerRepository(),
+          transactionRepository: FakeFinancialTransactionRepository(),
+          eventPublisher: FakeEventPublisher(),
+        );
 
   @override
   Future<void> recordPartialPayment({
@@ -148,7 +151,8 @@ void main() {
     test('Allowed to record payment when license is valid', () async {
       licenseService.statusResult = 'valid';
       await expectLater(
-        salesService.recordPayment(saleId: 'sale-1', amount: 10.0, method: 'cash'),
+        salesService.recordPayment(
+            saleId: 'sale-1', amount: 10.0, method: 'cash'),
         completes,
       );
     });
@@ -156,7 +160,8 @@ void main() {
     test('Fails to record payment when license is expired', () async {
       licenseService.statusResult = 'expired';
       expect(
-        () => salesService.recordPayment(saleId: 'sale-1', amount: 10.0, method: 'cash'),
+        () => salesService.recordPayment(
+            saleId: 'sale-1', amount: 10.0, method: 'cash'),
         throwsA(isA<LicenseException>()),
       );
     });
@@ -164,7 +169,8 @@ void main() {
     test('Fails to record payment when license is suspended', () async {
       licenseService.statusResult = 'suspended';
       expect(
-        () => salesService.recordPayment(saleId: 'sale-1', amount: 10.0, method: 'cash'),
+        () => salesService.recordPayment(
+            saleId: 'sale-1', amount: 10.0, method: 'cash'),
         throwsA(isA<LicenseException>()),
       );
     });

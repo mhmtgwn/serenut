@@ -27,11 +27,11 @@ void main() {
 
     test('Loads default current config', () {
       final current = EnvironmentConfig.current;
-      const expectedEnvStr = String.fromEnvironment('ENVIRONMENT', defaultValue: '');
+      const expectedEnvStr =
+          String.fromEnvironment('ENVIRONMENT', defaultValue: '');
       final expectedEnv = AppEnvironment.values.firstWhere(
-        (e) => e.name == (expectedEnvStr.isEmpty ? 'dev' : expectedEnvStr), 
-        orElse: () => AppEnvironment.dev
-      );
+          (e) => e.name == (expectedEnvStr.isEmpty ? 'dev' : expectedEnvStr),
+          orElse: () => AppEnvironment.dev);
       expect(current.environment, expectedEnv);
     });
   });

@@ -74,30 +74,33 @@ class DatasetImportService {
       if (fileCount > 10000) {
         throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
       }
-      
+
       final filename = header.filename.toLowerCase();
-      if (filename.endsWith('.zip') || filename.endsWith('.tar') || filename.endsWith('.gz')) {
+      if (filename.endsWith('.zip') ||
+          filename.endsWith('.tar') ||
+          filename.endsWith('.gz')) {
         throw Exception('İç içe arşiv dosyaları desteklenmiyor.');
       }
 
       final uncompressed = header.uncompressedSize ?? 0;
       totalUncompressedSize += uncompressed;
-      
+
       if (header.compressedSize != null && header.compressedSize! > 0) {
         final ratio = uncompressed / header.compressedSize!;
         if (ratio > 100) {
-          throw Exception('Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
+          throw Exception(
+              'Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
         }
       }
     }
 
     if (totalUncompressedSize > 100 * 1024 * 1024) {
-      throw Exception('Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
+      throw Exception(
+          'Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
     }
 
     // Decode ZIP archive after checks
     final archive = ZipDecoder().decodeBuffer(InputStream(zipBytes));
-
 
     // 2. Identify Excel file and images
     bool isRawExcel = true;
@@ -118,26 +121,28 @@ class DatasetImportService {
         final filename = p.basename(rawName);
         if (filename.isEmpty || filename.startsWith('.')) continue;
         final dotIndex = filename.lastIndexOf('.');
-        final barcode = dotIndex != -1 ? filename.substring(0, dotIndex) : filename;
+        final barcode =
+            dotIndex != -1 ? filename.substring(0, dotIndex) : filename;
         if (barcode.isNotEmpty && file.content != null) {
           imageMap[barcode] = Uint8List.fromList(file.content as List<int>);
         }
       }
     }
 
-
     Uint8List excelBytes;
     if (isRawExcel) {
       excelBytes = zipBytes;
     } else {
       if (excelFile == null) {
-        throw Exception('ZIP arşivi içerisinde Excel (.xlsx) dosyası bulunamadı.');
+        throw Exception(
+            'ZIP arşivi içerisinde Excel (.xlsx) dosyası bulunamadı.');
       }
       excelBytes = Uint8List.fromList(excelFile.content as List<int>);
     }
 
     // 3. Fix Excel relationships XML in-memory (reuse archive if isRawExcel to avoid double decoding)
-    final innerArchive = isRawExcel ? archive : ZipDecoder().decodeBytes(excelBytes);
+    final innerArchive =
+        isRawExcel ? archive : ZipDecoder().decodeBytes(excelBytes);
     final newInnerArchive = Archive();
 
     for (final file in innerArchive) {
@@ -148,7 +153,8 @@ class DatasetImportService {
           // Replace Target="/xl/ with Target=" to resolve internal parsing bugs in excel package
           final fixedContent = content.replaceAll('Target="/xl/', 'Target="');
           final fixedBytes = Uint8List.fromList(fixedContent.codeUnits);
-          newInnerArchive.addFile(ArchiveFile(file.name, fixedBytes.length, fixedBytes));
+          newInnerArchive
+              .addFile(ArchiveFile(file.name, fixedBytes.length, fixedBytes));
         }
       } else {
         newInnerArchive.addFile(file);
@@ -166,7 +172,7 @@ class DatasetImportService {
     if (excel.tables.isEmpty) {
       throw Exception('Excel dosyası okunamadı veya boş.');
     }
-    
+
     final sheetName = excel.tables.keys.first;
     final sheet = excel.tables[sheetName];
     if (sheet == null || sheet.maxRows <= 1) {
@@ -184,7 +190,7 @@ class DatasetImportService {
 
       final barcode = row.isNotEmpty ? _staticParseString(row[0]) : '';
       final name = row.length > 1 ? _staticParseString(row[1]) : '';
-      
+
       if (barcode.isEmpty || name.isEmpty) {
         continue;
       }
@@ -214,13 +220,13 @@ class DatasetImportService {
   /// Asynchronous ZIP decoding and Excel parsing for Flutter Web execution.
   /// Yields execution to let browser draw frames between major CPU-heavy tasks.
   static Future<ParsedCatalogData> _parseZipAsync(
-    Uint8List zipBytes, 
+    Uint8List zipBytes,
     void Function(double progress, String status) onProgress,
   ) async {
     // Step 1: Pre-decompression checks & Decode ZIP
     onProgress(0.06, 'Dosya açılıyor...');
     await Future.delayed(const Duration(milliseconds: 50));
-    
+
     final inputStream = InputStream(zipBytes);
     final zipDirectory = ZipDirectory.read(inputStream);
 
@@ -231,34 +237,37 @@ class DatasetImportService {
       if (fileCount > 10000) {
         throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
       }
-      
+
       final filename = header.filename.toLowerCase();
-      if (filename.endsWith('.zip') || filename.endsWith('.tar') || filename.endsWith('.gz')) {
+      if (filename.endsWith('.zip') ||
+          filename.endsWith('.tar') ||
+          filename.endsWith('.gz')) {
         throw Exception('İç içe arşiv dosyaları desteklenmiyor.');
       }
 
       final uncompressed = header.uncompressedSize ?? 0;
       totalUncompressedSize += uncompressed;
-      
+
       if (header.compressedSize != null && header.compressedSize! > 0) {
         final ratio = uncompressed / header.compressedSize!;
         if (ratio > 100) {
-          throw Exception('Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
+          throw Exception(
+              'Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
         }
       }
     }
 
     if (totalUncompressedSize > 100 * 1024 * 1024) {
-      throw Exception('Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
+      throw Exception(
+          'Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
     }
 
     final archive = ZipDecoder().decodeBuffer(InputStream(zipBytes));
 
-
     // Step 2: Identify files & images
     onProgress(0.12, 'Katalog dosyaları ve görseller ayrıştırılıyor...');
     await Future.delayed(const Duration(milliseconds: 50));
-    
+
     bool isRawExcel = true;
     ArchiveFile? excelFile;
     final Map<String, List<int>> imageMap = {};
@@ -272,7 +281,8 @@ class DatasetImportService {
       } else if (file.name.startsWith('images/')) {
         final filename = p.basename(file.name);
         final dotIndex = filename.lastIndexOf('.');
-        final barcode = dotIndex != -1 ? filename.substring(0, dotIndex) : filename;
+        final barcode =
+            dotIndex != -1 ? filename.substring(0, dotIndex) : filename;
         if (barcode.isNotEmpty && file.content != null) {
           imageMap[barcode] = Uint8List.fromList(file.content as List<int>);
         }
@@ -284,7 +294,8 @@ class DatasetImportService {
       excelBytes = zipBytes;
     } else {
       if (excelFile == null) {
-        throw Exception('ZIP arşivi içerisinde Excel (.xlsx) dosyası bulunamadı.');
+        throw Exception(
+            'ZIP arşivi içerisinde Excel (.xlsx) dosyası bulunamadı.');
       }
       excelBytes = Uint8List.fromList(excelFile.content as List<int>);
     }
@@ -292,7 +303,8 @@ class DatasetImportService {
     // Step 3: Fix Excel relations XML (reuse archive if isRawExcel to avoid double decoding)
     onProgress(0.18, 'Excel ilişkileri optimize ediliyor...');
     await Future.delayed(const Duration(milliseconds: 50));
-    final innerArchive = isRawExcel ? archive : ZipDecoder().decodeBytes(excelBytes);
+    final innerArchive =
+        isRawExcel ? archive : ZipDecoder().decodeBytes(excelBytes);
     final newInnerArchive = Archive();
 
     for (final file in innerArchive) {
@@ -302,7 +314,8 @@ class DatasetImportService {
           var content = String.fromCharCodes(rawContent as List<int>);
           final fixedContent = content.replaceAll('Target="/xl/', 'Target="');
           final fixedBytes = Uint8List.fromList(fixedContent.codeUnits);
-          newInnerArchive.addFile(ArchiveFile(file.name, fixedBytes.length, fixedBytes));
+          newInnerArchive
+              .addFile(ArchiveFile(file.name, fixedBytes.length, fixedBytes));
         }
       } else {
         newInnerArchive.addFile(file);
@@ -316,13 +329,14 @@ class DatasetImportService {
     }
 
     // Step 4: Decode Excel
-    onProgress(0.24, 'Excel tablosu çözümleniyor (Bu işlem birkaç saniye sürebilir)...');
+    onProgress(0.24,
+        'Excel tablosu çözümleniyor (Bu işlem birkaç saniye sürebilir)...');
     await Future.delayed(const Duration(milliseconds: 100));
     final excel = ex.Excel.decodeBytes(Uint8List.fromList(encodedExcelBytes));
     if (excel.tables.isEmpty) {
       throw Exception('Excel dosyası okunamadı veya boş.');
     }
-    
+
     final sheetName = excel.tables.keys.first;
     final sheet = excel.tables[sheetName];
     if (sheet == null || sheet.maxRows <= 1) {
@@ -342,7 +356,7 @@ class DatasetImportService {
 
       final barcode = row.isNotEmpty ? _staticParseString(row[0]) : '';
       final name = row.length > 1 ? _staticParseString(row[1]) : '';
-      
+
       if (barcode.isEmpty || name.isEmpty) {
         continue;
       }
@@ -380,7 +394,7 @@ class DatasetImportService {
 
   /// Decodes and parses ZIP/Excel catalog without inserting into DB (for wizard preview).
   Future<ParsedCatalogData> analyzeZip(
-    Uint8List zipBytes, 
+    Uint8List zipBytes,
     void Function(double progress, String status) onProgress,
   ) async {
     if (zipBytes.length > 100 * 1024 * 1024) {
@@ -392,11 +406,11 @@ class DatasetImportService {
   }
 
   /// Imports product catalog and images from a ZIP archive bytes.
-  /// 
+  ///
   /// Calls [onProgress] with progress fraction and informative status messages.
   /// Returns a map with summary info (total imported, errors).
   Future<Map<String, int>> importFromZip(
-    Uint8List zipBytes, 
+    Uint8List zipBytes,
     void Function(double progress, String status) onProgress, [
     ImportStrategy strategy = const ImportStrategy(),
   ]) async {
@@ -435,7 +449,8 @@ class DatasetImportService {
       String? localImagesDirPath;
       if (!kIsWeb) {
         final docsDir = await getApplicationDocumentsDirectory();
-        final localImagesDir = Directory(p.join(docsDir.path, 'product_images'));
+        final localImagesDir =
+            Directory(p.join(docsDir.path, 'product_images'));
         if (!await localImagesDir.exists()) {
           await localImagesDir.create(recursive: true);
         }
@@ -450,7 +465,7 @@ class DatasetImportService {
           final imageFile = File(imagePath);
           await imageFile.writeAsBytes(bytes);
           writtenImagePaths.add(imagePath);
-          
+
           savedImages++;
           if (savedImages % 50 == 0 && totalImages > 0) {
             onProgress(
@@ -462,7 +477,9 @@ class DatasetImportService {
       }
       onProgress(0.45, 'Veritabanı kayıt işlemi hazırlanıyor...');
 
-      final isSqlite = _productRepository.runtimeType.toString().contains('SqliteProductRepository');
+      final isSqlite = _productRepository.runtimeType
+          .toString()
+          .contains('SqliteProductRepository');
 
       if (isSqlite) {
         final db = await DatabaseManager().getDatabase();
@@ -471,7 +488,8 @@ class DatasetImportService {
 
         await db.transaction((txn) async {
           for (int i = 0; i < totalProducts; i += chunkLimit) {
-            final chunk = products.sublist(i, min(i + chunkLimit, totalProducts));
+            final chunk =
+                products.sublist(i, min(i + chunkLimit, totalProducts));
             final batch = txn.batch();
 
             for (final prodMap in chunk) {
@@ -488,11 +506,13 @@ class DatasetImportService {
               String? finalImageUrl;
               if (kIsWeb) {
                 if (imageMap.containsKey(barcode)) {
-                  finalImageUrl = 'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
+                  finalImageUrl =
+                      'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
                 } else if (remoteUrl.isNotEmpty) {
                   finalImageUrl = remoteUrl;
                 }
-              } else if (localImagesDirPath != null && imageMap.containsKey(barcode)) {
+              } else if (localImagesDirPath != null &&
+                  imageMap.containsKey(barcode)) {
                 finalImageUrl = p.join(localImagesDirPath, '$barcode.jpg');
               } else if (remoteUrl.isNotEmpty) {
                 finalImageUrl = remoteUrl;
@@ -501,7 +521,14 @@ class DatasetImportService {
               // Query existing product using txn
               final existingRows = await txn.query(
                 'products',
-                columns: ['id', 'quantity', 'price', 'description', 'image_url', 'is_active'],
+                columns: [
+                  'id',
+                  'quantity',
+                  'price',
+                  'description',
+                  'image_url',
+                  'is_active'
+                ],
                 where: 'id = ?',
                 whereArgs: [barcode],
               );
@@ -535,7 +562,8 @@ class DatasetImportService {
                     'updated_at': DateTime.now().toIso8601String(),
                   };
 
-                  if (strategy.reactivatePassive && existing['is_active'] == 0) {
+                  if (strategy.reactivatePassive &&
+                      existing['is_active'] == 0) {
                     updateFields['is_active'] = 1;
                   }
 
@@ -549,7 +577,8 @@ class DatasetImportService {
                     updateFields['image_url'] = finalImageUrl;
                   }
 
-                  if (strategy.duplicateResolution == DuplicateResolution.merge) {
+                  if (strategy.duplicateResolution ==
+                      DuplicateResolution.merge) {
                     final existingQty = existing['quantity'] as int? ?? 0;
                     updateFields['quantity'] = existingQty + quantity;
                   } else if (strategy.syncStocks) {
@@ -571,11 +600,13 @@ class DatasetImportService {
             updatePeakRss();
 
             // Yield to let the UI refresh
-            await Future.delayed(kIsWeb ? const Duration(milliseconds: 15) : Duration.zero);
+            await Future.delayed(
+                kIsWeb ? const Duration(milliseconds: 15) : Duration.zero);
 
             // Update progress (from 0.45 to 1.0)
             final currentCompleted = min(i + chunkLimit, totalProducts);
-            final progressFraction = 0.45 + ((currentCompleted / totalProducts) * 0.55);
+            final progressFraction =
+                0.45 + ((currentCompleted / totalProducts) * 0.55);
             onProgress(
               progressFraction,
               'Veritabanına kaydediliyor: $currentCompleted / $totalProducts ürün...',
@@ -584,11 +615,13 @@ class DatasetImportService {
 
           // Deactivate missing products if enabled
           if (strategy.deactivateMissing) {
-            final excelBarcodes = products.map((p) => p['barcode'] as String).toList();
+            final excelBarcodes =
+                products.map((p) => p['barcode'] as String).toList();
             if (excelBarcodes.isNotEmpty) {
               const int sqliteParamLimit = 999;
               for (int k = 0; k < excelBarcodes.length; k += sqliteParamLimit) {
-                final subList = excelBarcodes.sublist(k, min(k + sqliteParamLimit, excelBarcodes.length));
+                final subList = excelBarcodes.sublist(
+                    k, min(k + sqliteParamLimit, excelBarcodes.length));
                 final placeholders = List.filled(subList.length, '?').join(',');
                 await txn.update(
                   'products',
@@ -620,11 +653,13 @@ class DatasetImportService {
           String? finalImageUrl;
           if (kIsWeb) {
             if (imageMap.containsKey(barcode)) {
-              finalImageUrl = 'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
+              finalImageUrl =
+                  'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
             } else if (remoteUrl.isNotEmpty) {
               finalImageUrl = remoteUrl;
             }
-          } else if (localImagesDirPath != null && imageMap.containsKey(barcode)) {
+          } else if (localImagesDirPath != null &&
+              imageMap.containsKey(barcode)) {
             finalImageUrl = p.join(localImagesDirPath, '$barcode.jpg');
           } else if (remoteUrl.isNotEmpty) {
             finalImageUrl = remoteUrl;
@@ -663,11 +698,14 @@ class DatasetImportService {
               final updatedProd = ProductEntity(
                 id: barcode,
                 name: name,
-                description: strategy.syncDescriptions ? brand : existing.description,
+                description:
+                    strategy.syncDescriptions ? brand : existing.description,
                 price: strategy.syncPrices ? price : existing.price,
                 quantity: finalQty,
                 category: category,
-                imageUrl: strategy.syncImages && finalImageUrl != null ? finalImageUrl : existing.imageUrl,
+                imageUrl: strategy.syncImages && finalImageUrl != null
+                    ? finalImageUrl
+                    : existing.imageUrl,
               );
               await _productRepository.update(updatedProd);
               importedCount++;
@@ -676,7 +714,8 @@ class DatasetImportService {
 
           if (i % 20 == 0 || i == totalProducts - 1) {
             updatePeakRss();
-            await Future.delayed(kIsWeb ? const Duration(milliseconds: 15) : Duration.zero);
+            await Future.delayed(
+                kIsWeb ? const Duration(milliseconds: 15) : Duration.zero);
             final progressFraction = 0.45 + (((i + 1) / totalProducts) * 0.55);
             onProgress(
               progressFraction,
@@ -691,9 +730,13 @@ class DatasetImportService {
       await TelemetryService().logEvent('import', {
         'rows': products.length,
         'time_ms': stopwatch.elapsedMilliseconds,
-        'start_rss_mb': kIsWeb ? '0.00' : (startRss / (1024 * 1024)).toStringAsFixed(2),
-        'peak_rss_mb': kIsWeb ? '0.00' : (peakRss / (1024 * 1024)).toStringAsFixed(2),
-        'end_rss_mb': kIsWeb ? '0.00' : (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(2),
+        'start_rss_mb':
+            kIsWeb ? '0.00' : (startRss / (1024 * 1024)).toStringAsFixed(2),
+        'peak_rss_mb':
+            kIsWeb ? '0.00' : (peakRss / (1024 * 1024)).toStringAsFixed(2),
+        'end_rss_mb': kIsWeb
+            ? '0.00'
+            : (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(2),
         'status': 'success',
       });
     } catch (e) {
@@ -707,9 +750,13 @@ class DatasetImportService {
       }
       await TelemetryService().logEvent('import', {
         'time_ms': stopwatch.elapsedMilliseconds,
-        'start_rss_mb': kIsWeb ? '0.00' : (startRss / (1024 * 1024)).toStringAsFixed(2),
-        'peak_rss_mb': kIsWeb ? '0.00' : (peakRss / (1024 * 1024)).toStringAsFixed(2),
-        'end_rss_mb': kIsWeb ? '0.00' : (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(2),
+        'start_rss_mb':
+            kIsWeb ? '0.00' : (startRss / (1024 * 1024)).toStringAsFixed(2),
+        'peak_rss_mb':
+            kIsWeb ? '0.00' : (peakRss / (1024 * 1024)).toStringAsFixed(2),
+        'end_rss_mb': kIsWeb
+            ? '0.00'
+            : (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(2),
         'status': 'failed',
         'error': e.toString(),
       });
@@ -723,7 +770,8 @@ class DatasetImportService {
   }
 
   /// Exports the entire product database and local images into a ZIP archive bytes.
-  Future<Uint8List> exportToZip(void Function(double progress) onProgress) async {
+  Future<Uint8List> exportToZip(
+      void Function(double progress) onProgress) async {
     try {
       onProgress(0.05);
       final products = await _productRepository.findAll();
@@ -759,7 +807,8 @@ class DatasetImportService {
             final file = File(p.imageUrl!);
             if (file.existsSync()) {
               final imageBytes = file.readAsBytesSync();
-              archive.addFile(ArchiveFile('images/${p.id}.jpg', imageBytes.length, imageBytes));
+              archive.addFile(ArchiveFile(
+                  'images/${p.id}.jpg', imageBytes.length, imageBytes));
             }
           }
         }
@@ -776,7 +825,7 @@ class DatasetImportService {
         ]);
 
         index++;
-        
+
         // Yield control every 50 iterations to keep UI responsive
         if (index % 50 == 0) {
           await Future.delayed(Duration.zero);
@@ -790,9 +839,10 @@ class DatasetImportService {
       onProgress(0.85);
       final excelBytes = excel.save();
       if (excelBytes != null) {
-        archive.addFile(ArchiveFile('market_data_catalog.xlsx', excelBytes.length, excelBytes));
+        archive.addFile(ArchiveFile(
+            'market_data_catalog.xlsx', excelBytes.length, excelBytes));
       }
-      
+
       onProgress(0.90);
       final zipBytes = ZipEncoder().encode(archive);
       onProgress(1.0);

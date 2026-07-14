@@ -1,4 +1,4 @@
-﻿// test/services/chaos_sync_advanced_test.dart
+// test/services/chaos_sync_advanced_test.dart
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -50,7 +50,7 @@ const _versionOkBody =
 http.Response _versionOkResponse() => http.Response(_versionOkBody, 200);
 
 SaleEntity _makeSale(String id,
-    {String customerId = 'cust-1', double amount = 100.0}) =>
+        {String customerId = 'cust-1', double amount = 100.0}) =>
     SaleEntity(
       id: id,
       customerId: customerId,
@@ -111,7 +111,8 @@ void main() {
       await saleRepo.create(_makeSale('sale-race-multi'));
 
       final slowMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath)) return _versionOkResponse();
+        if (req.url.path.contains(_versionCheckPath))
+          return _versionOkResponse();
         await Future<void>.delayed(const Duration(milliseconds: 150));
         return http.Response('{"status":"ok"}', 200);
       });
@@ -128,8 +129,9 @@ void main() {
       ]);
 
       final totalSynced = results.fold<int>(0, (s, r) => s + r.synced);
-      final overlapRejections =
-          results.where((r) => r.errors.contains('Sync already in progress')).length;
+      final overlapRejections = results
+          .where((r) => r.errors.contains('Sync already in progress'))
+          .length;
 
       expect(totalSynced, equals(1),
           reason: 'Exactly one device wins the sync mutex');
@@ -141,11 +143,13 @@ void main() {
     });
 
     // ── 6. DELAYED SYNC INJECTION ─────────────────────────────────────────────
-    test('Delayed sync injection: second call deferred, third finds nothing', () async {
+    test('Delayed sync injection: second call deferred, third finds nothing',
+        () async {
       await saleRepo.create(_makeSale('sale-delayed'));
 
       final slowMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath)) return _versionOkResponse();
+        if (req.url.path.contains(_versionCheckPath))
+          return _versionOkResponse();
         await Future<void>.delayed(const Duration(milliseconds: 300));
         return http.Response('{"status":"ok"}', 200);
       });
@@ -168,7 +172,8 @@ void main() {
           reason: 'Second is rejected while first is in-flight');
 
       final fastMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath)) return _versionOkResponse();
+        if (req.url.path.contains(_versionCheckPath))
+          return _versionOkResponse();
         return http.Response('{"status":"ok"}', 200);
       });
       final apiClient2 = ApiClient(httpClient: fastMock);
@@ -182,13 +187,15 @@ void main() {
     });
 
     // ── 7. PARTIAL PUSH RETRY (3-sale batch, 1 fails mid-batch) ──────────────
-    test('Partial push retry: two of three succeed, failed one stays unsynced', () async {
+    test('Partial push retry: two of three succeed, failed one stays unsynced',
+        () async {
       await saleRepo.create(_makeSale('sale-p1'));
       await saleRepo.create(_makeSale('sale-p2'));
       await saleRepo.create(_makeSale('sale-p3'));
 
       final partialMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath)) return _versionOkResponse();
+        if (req.url.path.contains(_versionCheckPath))
+          return _versionOkResponse();
         if (req.body.contains('sale-p2')) {
           throw const SocketException('Simulated mid-batch network failure');
         }

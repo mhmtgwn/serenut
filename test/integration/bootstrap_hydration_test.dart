@@ -23,7 +23,8 @@ class MockPathProviderPlatform extends PathProviderPlatform
   Future<String?> getLibraryPath() async => '.';
 
   @override
-  Future<String?> getApplicationDocumentsPath() async => Directory.current.absolute.path;
+  Future<String?> getApplicationDocumentsPath() async =>
+      Directory.current.absolute.path;
 
   @override
   Future<String?> getExternalStoragePath() async => '.';
@@ -32,7 +33,9 @@ class MockPathProviderPlatform extends PathProviderPlatform
   Future<List<String>?> getExternalCachePaths() async => [];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async => [];
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
+      [];
 
   @override
   Future<String?> getDownloadsPath() async => '.';
@@ -74,7 +77,9 @@ void main() {
       }
     });
 
-    test('runBootstrap loads company profile and hydrates settings table correctly', () async {
+    test(
+        'runBootstrap loads company profile and hydrates settings table correctly',
+        () async {
       final prefs = await SharedPreferences.getInstance();
       final config = EnvironmentConfig.fromEnv(AppEnvironment.test);
       final apiClient = ApiClient(httpClient: http.Client(), config: config);
@@ -85,13 +90,15 @@ void main() {
         if (path.contains('/sync/bootstrap/company')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"data": {"name": "Hydrated Market", "owner_name": "John Doe", "type": "market", "phone": "05553334455", "email": "info@hydrated.com", "tax_number": "999888777", "city": "Istanbul", "district": "Kadikoy", "currency": "₺"}}',
+            body:
+                '{"data": {"name": "Hydrated Market", "owner_name": "John Doe", "type": "market", "phone": "05553334455", "email": "info@hydrated.com", "tax_number": "999888777", "city": "Istanbul", "district": "Kadikoy", "currency": "₺"}}',
             headers: {},
           );
         } else if (path.contains('/sync/bootstrap/license-config')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"data": {"license_key": "TEST-KEY-123", "license_token": "TEST-TOKEN-456"}}',
+            body:
+                '{"data": {"license_key": "TEST-KEY-123", "license_token": "TEST-TOKEN-456"}}',
             headers: {},
           );
         } else if (path.contains('/sync/bootstrap/stores') ||
@@ -116,7 +123,7 @@ void main() {
       };
 
       final bootstrapService = BootstrapSyncService(prefs, apiClient);
-      
+
       // Run bootstrap process
       await bootstrapService.runBootstrap((progress, statusText) {
         // print('Progress: $progress% -> $statusText');
@@ -126,7 +133,8 @@ void main() {
       final db = await DatabaseManager().getDatabase();
 
       // Query business_profile
-      final profileRows = await db.rawQuery('SELECT * FROM business_profile WHERE id = 1');
+      final profileRows =
+          await db.rawQuery('SELECT * FROM business_profile WHERE id = 1');
       expect(profileRows.length, equals(1));
       expect(profileRows.first['name'], equals('Hydrated Market'));
       expect(profileRows.first['owner_name'], equals('John Doe'));
@@ -147,8 +155,10 @@ void main() {
       expect(prefs.getString('license_token'), equals('TEST-TOKEN-456'));
 
       // Verify license token in SQLite settings table
-      final settingsTokenRows = await db.rawQuery('SELECT license_token FROM settings LIMIT 1');
-      expect(settingsTokenRows.first['license_token'], equals('TEST-TOKEN-456'));
+      final settingsTokenRows =
+          await db.rawQuery('SELECT license_token FROM settings LIMIT 1');
+      expect(
+          settingsTokenRows.first['license_token'], equals('TEST-TOKEN-456'));
     });
   });
 }

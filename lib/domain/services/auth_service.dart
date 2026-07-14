@@ -45,7 +45,7 @@ class AuthService {
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
     await _loadStoredUser();
-    
+
     // Restore JWT token to ApiClient if exists
     final savedToken = _prefs.getString('auth_jwt_token');
     _apiClient?.setJwtToken(savedToken);
@@ -66,7 +66,8 @@ class AuthService {
     if (userJson != null) {
       try {
         final user = AuthUser.fromJson(userJson);
-        final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+        final lastVerifiedStr =
+            _prefs.getString('serenut_last_authz_verified_at_${user.id}');
         if (lastVerifiedStr != null) {
           // Lease check removed from here to allow offline POS sales.
         }
@@ -101,7 +102,7 @@ class AuthService {
           'email': username.trim(),
           'password': password,
         });
-        
+
         if (response.isSuccess) {
           final data = response.json;
           final token = data['access_token'] as String;
@@ -119,22 +120,28 @@ class AuthService {
             await trialManager.cacheSubscription(subscription);
           }
 
-
           final roles = userMap['roles'] as List<dynamic>? ?? [];
-          final roleStr = roles.isNotEmpty ? roles.first.toString() : (userMap['role'] as String? ?? 'cashier');
+          final roleStr = roles.isNotEmpty
+              ? roles.first.toString()
+              : (userMap['role'] as String? ?? 'cashier');
           final role = UserRole.values.firstWhere(
             (r) => r.name == roleStr.toLowerCase(),
             orElse: () => UserRole.cashier,
           );
-          
+
           final user = AuthUser(
             id: userMap['id'] as String,
             companyId: userMap['company_id'] as String? ?? 'TEST_COMPANY',
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
-            permissions: (userMap['permissions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? getPermissionsForRole(role),
-            createdAt: DateTime.tryParse(userMap['created_at'] as String? ?? '') ?? DateTime.now(),
+            permissions: (userMap['permissions'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                getPermissionsForRole(role),
+            createdAt:
+                DateTime.tryParse(userMap['created_at'] as String? ?? '') ??
+                    DateTime.now(),
           );
 
           // PHASE 3: Device Lifecycle - Auto Activate
@@ -148,7 +155,8 @@ class AuthService {
               });
             }
           } catch (e) {
-            debugPrint('Auto-activation failed, device might already be active or limit reached: $e');
+            debugPrint(
+                'Auto-activation failed, device might already be active or limit reached: $e');
           }
 
           // Cache credentials in local sqlite for offline login
@@ -158,18 +166,22 @@ class AuthService {
           } catch (_) {
             try {
               final hash = _hashService.hashPassword(password);
-              await _userRepository.updateUserFields(user, isActive: true, passwordHash: hash);
+              await _userRepository.updateUserFields(user,
+                  isActive: true, passwordHash: hash);
             } catch (_) {}
           }
 
           _currentUser = user;
           await _prefs.setString(_userStorageKey, user.toJson());
-          await _prefs.setString('serenut_last_authz_verified_at_${user.id}', DateTime.now().toUtc().toIso8601String());
+          await _prefs.setString('serenut_last_authz_verified_at_${user.id}',
+              DateTime.now().toUtc().toIso8601String());
           return user;
         }
       } catch (e) {
         if (e is ApiException) {
-          if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
+          if (e.statusCode == 400 ||
+              e.statusCode == 401 ||
+              e.statusCode == 403) {
             final body = e.responseBody;
             String message = 'Giriş başarısız.';
             if (body != null) {
@@ -198,14 +210,17 @@ class AuthService {
           final isValid = _hashService.verifyPassword(password, hash);
 
           if (isValid) {
-            final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+            final lastVerifiedStr =
+                _prefs.getString('serenut_last_authz_verified_at_${user.id}');
             if (lastVerifiedStr != null) {
               final lastVerified = DateTime.parse(lastVerifiedStr);
               if (DateTime.now().toUtc().difference(lastVerified).inDays >= 7) {
-                throw AuthException('Güvenlik nedeniyle (offline policy) 7 günde bir çevrimiçi giriş yapmalısınız.');
+                throw AuthException(
+                    'Güvenlik nedeniyle (offline policy) 7 günde bir çevrimiçi giriş yapmalısınız.');
               }
             } else {
-              throw AuthException('Çevrimdışı giriş için önceden senkronizasyon gereklidir.');
+              throw AuthException(
+                  'Çevrimdışı giriş için önceden senkronizasyon gereklidir.');
             }
 
             await _onLoginSuccess(user);
@@ -231,7 +246,8 @@ class AuthService {
 
   /// Login sub-user (cashier, manager, staff) using business_code, username, and PIN.
   /// Enforces online lookup with automatic local SQLite cache and offline fallback.
-  Future<AuthUser> loginSubUser(String businessCode, String username, String pin) async {
+  Future<AuthUser> loginSubUser(
+      String businessCode, String username, String pin) async {
     if (businessCode.trim().isEmpty || username.trim().isEmpty || pin.isEmpty) {
       throw AuthException('İşletme kodu, kullanıcı adı ve PIN boş olamaz.');
     }
@@ -248,7 +264,8 @@ class AuthService {
         if (response.isSuccess) {
           final data = response.json;
           final token = (data['access_token'] ?? data['accessToken']) as String;
-          final refreshToken = (data['refresh_token'] ?? data['refreshToken']) as String;
+          final refreshToken =
+              (data['refresh_token'] ?? data['refreshToken']) as String;
           final userMap = data['user'] as Map<String, dynamic>;
 
           await _prefs.setString('auth_jwt_token', token);
@@ -274,7 +291,10 @@ class AuthService {
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
-            permissions: (userMap['permissions'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? getPermissionsForRole(role),
+            permissions: (userMap['permissions'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                getPermissionsForRole(role),
             createdAt: DateTime.now(),
           );
 
@@ -303,12 +323,15 @@ class AuthService {
 
           _currentUser = user;
           await _prefs.setString(_userStorageKey, user.toJson());
-          await _prefs.setString('serenut_last_authz_verified_at_${user.id}', DateTime.now().toUtc().toIso8601String());
+          await _prefs.setString('serenut_last_authz_verified_at_${user.id}',
+              DateTime.now().toUtc().toIso8601String());
           return user;
         }
       } catch (e) {
         if (e is ApiException) {
-          if (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403) {
+          if (e.statusCode == 400 ||
+              e.statusCode == 401 ||
+              e.statusCode == 403) {
             final body = e.responseBody;
             String message = 'Giriş başarısız.';
             if (body != null) {
@@ -337,7 +360,8 @@ class AuthService {
           final lockedUntil = DateTime.tryParse(lockedUntilStr);
           if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
             final remaining = lockedUntil.difference(DateTime.now()).inSeconds;
-            throw AuthException('Hesap çok fazla başarısız deneme nedeniyle kilitlendi. Lütfen $remaining saniye bekleyin.');
+            throw AuthException(
+                'Hesap çok fazla başarısız deneme nedeniyle kilitlendi. Lütfen $remaining saniye bekleyin.');
           }
         }
 
@@ -346,7 +370,8 @@ class AuthService {
         if (pinHash != null) {
           final isValid = _hashService.verifyPassword(pin, pinHash);
           if (isValid) {
-            final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+            final lastVerifiedStr =
+                _prefs.getString('serenut_last_authz_verified_at_${user.id}');
             // Lease check removed from here to allow offline POS sales.
             await _userRepository.resetPinAttempts(user.id);
             await _onLoginSuccess(user);
@@ -358,9 +383,11 @@ class AuthService {
             final attempts = updated['failed_pin_attempts'] as int? ?? 0;
             final remainingAttempts = 5 - attempts;
             if (remainingAttempts <= 0) {
-              throw AuthException('Çok fazla başarısız deneme. Hesap 5 dakika süreyle kilitlendi.');
+              throw AuthException(
+                  'Çok fazla başarısız deneme. Hesap 5 dakika süreyle kilitlendi.');
             } else {
-              throw AuthException('İşletme kodu, kullanıcı adı veya PIN hatalı. Kalan deneme hakkı: $remainingAttempts');
+              throw AuthException(
+                  'İşletme kodu, kullanıcı adı veya PIN hatalı. Kalan deneme hakkı: $remainingAttempts');
             }
           }
         }
@@ -374,19 +401,23 @@ class AuthService {
 
   /// Verifies a sub-user PIN for the currently logged-in user or an admin/manager.
   /// Used for gated action verification with brute-force lockout.
-  Future<({bool success, String? approverUserId, String? approverUserName})> verifyCurrentUserPin(String pin) async {
+  Future<({bool success, String? approverUserId, String? approverUserName})>
+      verifyCurrentUserPin(String pin) async {
     final user = await getCurrentUser();
     if (user == null) {
       return (success: false, approverUserId: null, approverUserName: null);
     }
 
     // Offline lease check for admin-gated actions
-    final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+    final lastVerifiedStr =
+        _prefs.getString('serenut_last_authz_verified_at_${user.id}');
     if (lastVerifiedStr != null) {
       final lastVerified = DateTime.tryParse(lastVerifiedStr);
       final leaseDays = _prefs.getInt('offline_auth_lease_days') ?? 7;
-      if (lastVerified != null && DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
-        throw AuthException('Oturum süresi (offline lease) dolmuştur. Hassas yetkili işlemler için lütfen internete bağlanın.');
+      if (lastVerified != null &&
+          DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
+        throw AuthException(
+            'Oturum süresi (offline lease) dolmuştur. Hassas yetkili işlemler için lütfen internete bağlanın.');
       }
     }
 
@@ -416,7 +447,11 @@ class AuthService {
 
     if (isValid) {
       await _userRepository.resetPinAttempts(user.id);
-      return (success: true, approverUserId: user.id, approverUserName: user.name);
+      return (
+        success: true,
+        approverUserId: user.id,
+        approverUserName: user.name
+      );
     } else {
       await _userRepository.incrementFailedPinAttempts(user.id);
       return (success: false, approverUserId: null, approverUserName: null);
@@ -507,14 +542,18 @@ class AuthService {
   }
 
   Future<void> checkCurrentUserSessionOnline() async {
-    if (_currentUser == null || _apiClient == null || _apiClient!.jwtToken == null) return;
+    if (_currentUser == null ||
+        _apiClient == null ||
+        _apiClient!.jwtToken == null) return;
     try {
       final response = await _apiClient!.get('/auth/me');
       if (response.statusCode == 200) {
-        await _prefs.setString('serenut_last_authz_verified_at_${_currentUser!.id}', DateTime.now().toUtc().toIso8601String());
+        await _prefs.setString(
+            'serenut_last_authz_verified_at_${_currentUser!.id}',
+            DateTime.now().toUtc().toIso8601String());
         final data = response.json;
         final userMap = data['user'] as Map<String, dynamic>;
-        
+
         final isActive = userMap['is_active'] as bool? ?? true;
         if (!isActive) {
           triggerSessionExpired();
@@ -522,7 +561,9 @@ class AuthService {
         }
 
         final roles = userMap['roles'] as List<dynamic>? ?? [];
-        final roleStr = roles.isNotEmpty ? roles.first.toString() : (userMap['role'] as String? ?? 'cashier');
+        final roleStr = roles.isNotEmpty
+            ? roles.first.toString()
+            : (userMap['role'] as String? ?? 'cashier');
         final role = UserRole.values.firstWhere(
           (r) => r.name == roleStr.toLowerCase(),
           orElse: () => UserRole.cashier,
@@ -571,7 +612,7 @@ class AuthService {
   }
 
   /// Şifre sıfırlama isteği gönder (backend e-posta akışı)
-  /// 
+  ///
   /// Backend POST /auth/forgot-password çağırır.
   /// Network yoksa veya backend hata verirse silent fail —
   /// güvenlik gereği kullanıcıya her zaman başarı gösterilir.
@@ -584,7 +625,7 @@ class AuthService {
     }
   }
 
-  /// Phase 5: Entitlement Recovery 
+  /// Phase 5: Entitlement Recovery
   /// Forces a token refresh to fetch the latest subscription status, updates TrialManager,
   /// and potentially triggers sync resumption.
   Future<bool> refreshEntitlement() async {
@@ -625,11 +666,13 @@ class AuthService {
   }
 
   bool _isLeaseExpired(AuthUser user) {
-    final lastVerifiedStr = _prefs.getString('serenut_last_authz_verified_at_${user.id}');
+    final lastVerifiedStr =
+        _prefs.getString('serenut_last_authz_verified_at_${user.id}');
     if (lastVerifiedStr != null) {
       final lastVerified = DateTime.tryParse(lastVerifiedStr);
       final leaseDays = _prefs.getInt('offline_auth_lease_days') ?? 7;
-      if (lastVerified != null && DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
+      if (lastVerified != null &&
+          DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
         return true;
       }
     }
@@ -639,12 +682,13 @@ class AuthService {
   Future<bool> hasPermission(String permission) async {
     final user = await getCurrentUser();
     if (user == null) return false;
-    
+
     // Only allow cashier permissions if lease expired
-    if (_isLeaseExpired(user) && !_getCashierPermissions().contains(permission)) {
+    if (_isLeaseExpired(user) &&
+        !_getCashierPermissions().contains(permission)) {
       return false;
     }
-    
+
     return user.hasPermission(permission);
   }
 
@@ -652,14 +696,14 @@ class AuthService {
   Future<bool> hasAllPermissions(List<String> permissions) async {
     final user = await getCurrentUser();
     if (user == null) return false;
-    
+
     if (_isLeaseExpired(user)) {
       final cashierPerms = _getCashierPermissions();
       if (!permissions.every((p) => cashierPerms.contains(p))) {
         return false;
       }
     }
-    
+
     return user.hasAllPermissions(permissions);
   }
 
@@ -719,7 +763,7 @@ class AuthService {
       pinHash = _hashService.hashPassword(pin);
     }
     await _userRepository.insertUser(
-      user, 
+      user,
       _hashService.hashPassword(password),
       username: user.username,
       businessCode: user.businessCode,
@@ -742,8 +786,8 @@ class AuthService {
       pinHash = _hashService.hashPassword(pin);
     }
     await _userRepository.updateUserFields(
-      user, 
-      isActive: isActive, 
+      user,
+      isActive: isActive,
       passwordHash: passwordHash,
       username: user.username,
       businessCode: user.businessCode,
@@ -771,7 +815,8 @@ class AuthService {
       throw AuthException('Mevcut şifre hatalı.');
     }
 
-    await _userRepository.updatePasswordHash(userId, _hashService.hashPassword(newPassword));
+    await _userRepository.updatePasswordHash(
+        userId, _hashService.hashPassword(newPassword));
   }
 
   static List<String> getPermissionsForRole(UserRole role) => switch (role) {
@@ -779,14 +824,14 @@ class AuthService {
         UserRole.admin => _getAllPermissions(),
         // Sysadmin (Platform role) should not have tenant POS permissions by default
         UserRole.sysadmin => [
-          'admin.settings',
-          'admin.users',
-          'reports.view',
-          'settings.view'
-        ],
+            'admin.settings',
+            'admin.users',
+            'reports.view',
+            'settings.view'
+          ],
         UserRole.manager => _getManagerPermissions(),
         UserRole.cashier => _getCashierPermissions(),
-        UserRole.staff   => _getCashierPermissions(),
+        UserRole.staff => _getCashierPermissions(),
       };
 
   // ════════════════════════════════════════════════════════════
@@ -794,26 +839,57 @@ class AuthService {
   // ════════════════════════════════════════════════════════════
 
   static List<String> _getAllPermissions() => [
-        'sales:view', 'sales:create', 'sales:edit', 'sales:delete', 'sales:print',
-        'orders:view', 'orders:create', 'orders:edit', 'orders:deliver',
-        'customers:view', 'customers:create', 'customers:edit', 'customers:delete',
-        'payments:view', 'payments:record', 'payments:reverse',
-        'inventory:view', 'inventory:adjust', 'inventory:transfer',
-        'reports:view', 'reports:financial', 'reports:inventory',
-        'admin:settings', 'admin:users',
+        'sales:view',
+        'sales:create',
+        'sales:edit',
+        'sales:delete',
+        'sales:print',
+        'orders:view',
+        'orders:create',
+        'orders:edit',
+        'orders:deliver',
+        'customers:view',
+        'customers:create',
+        'customers:edit',
+        'customers:delete',
+        'payments:view',
+        'payments:record',
+        'payments:reverse',
+        'inventory:view',
+        'inventory:adjust',
+        'inventory:transfer',
+        'reports:view',
+        'reports:financial',
+        'reports:inventory',
+        'admin:settings',
+        'admin:users',
       ];
 
   static List<String> _getManagerPermissions() => [
-        'sales:view', 'sales:create', 'sales:print',
-        'orders:view', 'orders:create', 'orders:edit', 'orders:deliver',
-        'customers:view', 'customers:create', 'customers:edit',
-        'payments:view', 'payments:record',
-        'inventory:view', 'inventory:adjust', 'inventory:transfer',
-        'reports:view', 'reports:financial', 'reports:inventory',
+        'sales:view',
+        'sales:create',
+        'sales:print',
+        'orders:view',
+        'orders:create',
+        'orders:edit',
+        'orders:deliver',
+        'customers:view',
+        'customers:create',
+        'customers:edit',
+        'payments:view',
+        'payments:record',
+        'inventory:view',
+        'inventory:adjust',
+        'inventory:transfer',
+        'reports:view',
+        'reports:financial',
+        'reports:inventory',
       ];
 
   static List<String> _getCashierPermissions() => [
-        'sales:view', 'sales:create', 'sales:print',
+        'sales:view',
+        'sales:create',
+        'sales:print',
         'payments:record',
         'customers:view',
       ];

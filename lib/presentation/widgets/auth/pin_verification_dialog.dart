@@ -23,7 +23,8 @@ class PinVerificationDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<PinVerificationDialog> createState() => _PinVerificationDialogState();
+  ConsumerState<PinVerificationDialog> createState() =>
+      _PinVerificationDialogState();
 }
 
 class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
@@ -59,7 +60,8 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
       if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
         setState(() {
           _isLocked = true;
-          _lockoutSecondsRemaining = lockedUntil.difference(DateTime.now()).inSeconds;
+          _lockoutSecondsRemaining =
+              lockedUntil.difference(DateTime.now()).inSeconds;
         });
         _startTimer();
       }
@@ -112,7 +114,8 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
     if (result.success) {
       if (widget.requireConfirm && !_isConfirmChecked) {
         setState(() {
-          _error = 'Lütfen tehlikeli işlemi onay kutusunu işaretleyerek onaylayın.';
+          _error =
+              'Lütfen tehlikeli işlemi onay kutusunu işaretleyerek onaylayın.';
           _pin = '';
         });
         return;
@@ -135,13 +138,14 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
         final lockoutData = await repo.getFailedPinAttempts(user.id);
         final attempts = lockoutData['failed_pin_attempts'] as int? ?? 0;
         final lockedUntilStr = lockoutData['locked_until'] as String?;
-        
+
         setState(() {
           _pin = '';
           if (lockedUntilStr != null) {
             _isLocked = true;
             final lockedUntil = DateTime.parse(lockedUntilStr);
-            _lockoutSecondsRemaining = lockedUntil.difference(DateTime.now()).inSeconds;
+            _lockoutSecondsRemaining =
+                lockedUntil.difference(DateTime.now()).inSeconds;
             _error = 'Çok fazla hatalı deneme! Cihaz kilitlendi.';
             _startTimer();
           } else {
@@ -166,7 +170,8 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Title & Icon
-            const Icon(Icons.shield_outlined, color: Color(0xFFF59E0B), size: 40),
+            const Icon(Icons.shield_outlined,
+                color: Color(0xFFF59E0B), size: 40),
             const SizedBox(height: 12),
             const Text(
               'Yönetici Doğrulaması',
@@ -254,7 +259,9 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
                     height: 16,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: active ? const Color(0xFFF59E0B) : const Color(0xFF334155),
+                      color: active
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFF334155),
                       boxShadow: active
                           ? [
                               const BoxShadow(
@@ -272,7 +279,8 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
               // Lockout countdown timer widget
               Column(
                 children: [
-                  const Icon(Icons.timer_outlined, color: Color(0xFFEF4444), size: 28),
+                  const Icon(Icons.timer_outlined,
+                      color: Color(0xFFEF4444), size: 28),
                   const SizedBox(height: 6),
                   Text(
                     'Güvenlik kilidi devrede. Kalan süre:\n$_lockoutSecondsRemaining saniye',
@@ -311,17 +319,20 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: ['1', '2', '3'].map((k) => _buildKey(k)).toList(),
+                      children:
+                          ['1', '2', '3'].map((k) => _buildKey(k)).toList(),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: ['4', '5', '6'].map((k) => _buildKey(k)).toList(),
+                      children:
+                          ['4', '5', '6'].map((k) => _buildKey(k)).toList(),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: ['7', '8', '9'].map((k) => _buildKey(k)).toList(),
+                      children:
+                          ['7', '8', '9'].map((k) => _buildKey(k)).toList(),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -341,7 +352,8 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
 
             // Close / Cancel Button
             TextButton(
-              onPressed: () => Navigator.pop(context, PinVerificationResult(success: false)),
+              onPressed: () =>
+                  Navigator.pop(context, PinVerificationResult(success: false)),
               child: const Text(
                 'İptal Et',
                 style: TextStyle(
@@ -391,7 +403,8 @@ class _PinVerificationDialogState extends ConsumerState<PinVerificationDialog> {
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
-        child: const Icon(Icons.backspace_outlined, color: Colors.white, size: 20),
+        child:
+            const Icon(Icons.backspace_outlined, color: Colors.white, size: 20),
       ),
     );
   }

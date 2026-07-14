@@ -17,7 +17,7 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     try {
-      // Pre-load cities.json into the rootBundle cache to prevent async Future leaks 
+      // Pre-load cities.json into the rootBundle cache to prevent async Future leaks
       // where SettingsPage's initState loads it and completes after the test is closed.
       await rootBundle.loadString('assets/data/cities.json');
     } catch (_) {}
@@ -32,7 +32,9 @@ void main() {
   });
 
   group('SettingsPage Granular RBAC Authorization Tests', () {
-    testWidgets('Sysadmin sees all sections including platform-level Admin Kontrol Merkezi', (WidgetTester tester) async {
+    testWidgets(
+        'Sysadmin sees all sections including platform-level Admin Kontrol Merkezi',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -45,7 +47,8 @@ void main() {
         name: 'Sys Admin',
         email: 'sys@shaman.com',
         role: UserRole.sysadmin,
-        permissions: Permission.forRole(UserRole.sysadmin).map((p) => p.value).toList(),
+        permissions:
+            Permission.forRole(UserRole.sysadmin).map((p) => p.value).toList(),
         createdAt: DateTime.now(),
       );
 
@@ -53,7 +56,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -70,11 +74,13 @@ void main() {
       expect(find.text('Denetim Merkezi (Audit Center)'), findsOneWidget);
       expect(find.text('Veri Kurtarma Merkezi'), findsOneWidget);
       expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
-      
+
       await tester.pump();
     });
 
-    testWidgets('Owner sees all tenant-level sections but NOT Admin Kontrol Merkezi (platform level)', (WidgetTester tester) async {
+    testWidgets(
+        'Owner sees all tenant-level sections but NOT Admin Kontrol Merkezi (platform level)',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -87,7 +93,8 @@ void main() {
         name: 'Owner User',
         email: 'owner@shaman.com',
         role: UserRole.owner,
-        permissions: Permission.forRole(UserRole.owner).map((p) => p.value).toList(),
+        permissions:
+            Permission.forRole(UserRole.owner).map((p) => p.value).toList(),
         createdAt: DateTime.now(),
       );
 
@@ -95,7 +102,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -112,11 +120,13 @@ void main() {
       expect(find.text('Denetim Merkezi (Audit Center)'), findsOneWidget);
       expect(find.text('Veri Kurtarma Merkezi'), findsOneWidget);
       expect(find.text('Admin Kontrol Merkezi'), findsNothing);
-      
+
       await tester.pump();
     });
 
-    testWidgets('Admin with all permissions sees all tenant-level sections but NOT Admin Kontrol Merkezi', (WidgetTester tester) async {
+    testWidgets(
+        'Admin with all permissions sees all tenant-level sections but NOT Admin Kontrol Merkezi',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -129,7 +139,8 @@ void main() {
         name: 'Admin User',
         email: 'admin@shaman.com',
         role: UserRole.admin,
-        permissions: Permission.forRole(UserRole.admin).map((p) => p.value).toList(),
+        permissions:
+            Permission.forRole(UserRole.admin).map((p) => p.value).toList(),
         createdAt: DateTime.now(),
       );
 
@@ -137,7 +148,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -150,11 +162,13 @@ void main() {
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
       expect(find.text('Veritabanı Sağlık Kontrolü'), findsOneWidget);
       expect(find.text('Admin Kontrol Merkezi'), findsNothing);
-      
+
       await tester.pump();
     });
 
-    testWidgets('Admin with customized restricted permissions cannot see options without permission', (WidgetTester tester) async {
+    testWidgets(
+        'Admin with customized restricted permissions cannot see options without permission',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -168,7 +182,10 @@ void main() {
         email: 'radmin@shaman.com',
         role: UserRole.admin,
         permissions: [
-          'settings:view', 'settings:printer', 'settings:users', 'settings:finance'
+          'settings:view',
+          'settings:printer',
+          'settings:users',
+          'settings:finance'
         ], // lacks settings:database
         createdAt: DateTime.now(),
       );
@@ -177,7 +194,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -193,11 +211,13 @@ void main() {
 
       // Allowed options visible
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
-      
+
       await tester.pump();
     });
 
-    testWidgets('Cashier with printer permission sees Settings & Printer options, but Admin options are hidden', (WidgetTester tester) async {
+    testWidgets(
+        'Cashier with printer permission sees Settings & Printer options, but Admin options are hidden',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -218,7 +238,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(cashierUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -238,11 +259,13 @@ void main() {
       expect(find.text('Cari Hesap Bütünlüğü & Replay'), findsNothing);
       expect(find.text('Veritabanı Sağlık Kontrolü'), findsNothing);
       expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
-      
+
       await tester.pump();
     });
 
-    testWidgets('Staff without printer permission sees Settings & Safe settings, but Printer options are hidden', (WidgetTester tester) async {
+    testWidgets(
+        'Staff without printer permission sees Settings & Safe settings, but Printer options are hidden',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -263,7 +286,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(staffUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -280,11 +304,13 @@ void main() {
       // Printer options are hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
       expect(find.text('Etiket Yazıcı Ayarları'), findsNothing);
-      
+
       await tester.pump();
     });
 
-    testWidgets('User with empty/restricted permissions can still access Settings shell for safe/local settings', (WidgetTester tester) async {
+    testWidgets(
+        'User with empty/restricted permissions can still access Settings shell for safe/local settings',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -305,7 +331,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: SettingsPage(),
@@ -316,8 +343,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Access is allowed (no blocked entry message)
-      expect(find.text('Ayarlar sayfasına erişim yetkiniz bulunmuyor.'), findsNothing);
-      
+      expect(find.text('Ayarlar sayfasına erişim yetkiniz bulunmuyor.'),
+          findsNothing);
+
       // Safe local settings visible
       expect(find.text('Hata Ayıklama Modu (Debug)'), findsOneWidget);
       expect(find.text('Satışta Sesli Bildirim'), findsOneWidget);
@@ -325,11 +353,13 @@ void main() {
       // Sensitive modules hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
-      
+
       await tester.pump();
     });
 
-    testWidgets('Action bypass protection: direct navigation to DbHealthPage without database permission blocks access', (WidgetTester tester) async {
+    testWidgets(
+        'Action bypass protection: direct navigation to DbHealthPage without database permission blocks access',
+        (WidgetTester tester) async {
       final mockUser = AuthUser(
         id: 'usr-staff',
         name: 'Restricted Staff',
@@ -343,7 +373,8 @@ void main() {
         ProviderScope(
           overrides: [
             currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+            settingsRepositoryProvider
+                .overrideWith((ref) => InMemorySettingsRepository()),
           ],
           child: const MaterialApp(
             home: Scaffold(
@@ -356,8 +387,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert DbHealthPage is blocked because of missing settings:database permission
-      expect(find.text('Bu sayfaya erişim yetkiniz bulunmuyor.'), findsOneWidget);
-      
+      expect(
+          find.text('Bu sayfaya erişim yetkiniz bulunmuyor.'), findsOneWidget);
+
       await tester.pump();
     });
   });

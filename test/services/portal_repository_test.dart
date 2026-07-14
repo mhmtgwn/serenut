@@ -1,4 +1,4 @@
-﻿// test/services/portal_repository_test.dart
+// test/services/portal_repository_test.dart
 // Serenut Platform — PortalRepository Unit Tests (Sprint 10)
 // Tests dashboard summarize, online status metrics and ticket dispatch replies.
 
@@ -78,7 +78,7 @@ void main() {
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
       final repo = PortalRepository(apiClient: apiClient, config: testConfig);
-      
+
       final summary = await repo.getDashboard();
       expect(summary.stores, 2);
       expect(summary.devices, 3);
@@ -90,7 +90,7 @@ void main() {
         final body = jsonDecode(request.body);
         expect(body['message'], 'Hello, troubleshooting completed');
         expect(request.url.path, endsWith('/tickets/tkt-123/reply'));
-        
+
         return http.Response(
           jsonEncode({'success': true}),
           200,
@@ -100,7 +100,7 @@ void main() {
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
       final repo = PortalRepository(apiClient: apiClient, config: testConfig);
-      
+
       await repo.replyTicket('tkt-123', 'Hello, troubleshooting completed');
     });
   });

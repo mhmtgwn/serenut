@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
@@ -74,10 +74,11 @@ void main() {
       await DatabaseManager().close();
       DatabaseManager.overrideDatabasePath = dbPath;
       db = await DatabaseManager().getDatabase();
-      
+
       final gateway = DbGatewayImpl.raw(db);
       customerRepo = SqliteCustomerRepository(gateway);
-      transactionRepo = SqliteFinancialTransactionRepository(gateway, deviceId: 'device-test-123');
+      transactionRepo = SqliteFinancialTransactionRepository(gateway,
+          deviceId: 'device-test-123');
 
       await customerRepo.create(CustomerEntity(
         id: custId,
@@ -104,17 +105,32 @@ void main() {
       // Normal non-inverted transaction list (chronological matching logical clock)
       final txsNormal = [
         FinancialTransactionEntity(
-          id: '1', type: 'sale', customerId: custId, amount: 100, paidAmount: 0, debtAmount: 100,
-          date: DateTime.now().subtract(const Duration(hours: 3)), logicalClock: 1
-        ),
+            id: '1',
+            type: 'sale',
+            customerId: custId,
+            amount: 100,
+            paidAmount: 0,
+            debtAmount: 100,
+            date: DateTime.now().subtract(const Duration(hours: 3)),
+            logicalClock: 1),
         FinancialTransactionEntity(
-          id: '2', type: 'sale', customerId: custId, amount: 100, paidAmount: 0, debtAmount: 100,
-          date: DateTime.now().subtract(const Duration(hours: 2)), logicalClock: 2
-        ),
+            id: '2',
+            type: 'sale',
+            customerId: custId,
+            amount: 100,
+            paidAmount: 0,
+            debtAmount: 100,
+            date: DateTime.now().subtract(const Duration(hours: 2)),
+            logicalClock: 2),
         FinancialTransactionEntity(
-          id: '3', type: 'sale', customerId: custId, amount: 100, paidAmount: 0, debtAmount: 100,
-          date: DateTime.now().subtract(const Duration(hours: 1)), logicalClock: 3
-        ),
+            id: '3',
+            type: 'sale',
+            customerId: custId,
+            amount: 100,
+            paidAmount: 0,
+            debtAmount: 100,
+            date: DateTime.now().subtract(const Duration(hours: 1)),
+            logicalClock: 3),
       ];
 
       expect(obs.calculateDriftRate(txsNormal), equals(0.0));
@@ -123,17 +139,34 @@ void main() {
       // Transaction chronologically later (date 1hr ago) has lower clock than transaction earlier (2hr ago)
       final txsInverted = [
         FinancialTransactionEntity(
-          id: '1', type: 'sale', customerId: custId, amount: 100, paidAmount: 0, debtAmount: 100,
-          date: DateTime.now().subtract(const Duration(hours: 3)), logicalClock: 1
-        ),
+            id: '1',
+            type: 'sale',
+            customerId: custId,
+            amount: 100,
+            paidAmount: 0,
+            debtAmount: 100,
+            date: DateTime.now().subtract(const Duration(hours: 3)),
+            logicalClock: 1),
         FinancialTransactionEntity(
-          id: '2', type: 'sale', customerId: custId, amount: 100, paidAmount: 0, debtAmount: 100,
-          date: DateTime.now().subtract(const Duration(hours: 2)), logicalClock: 3 // Skewed high
-        ),
+            id: '2',
+            type: 'sale',
+            customerId: custId,
+            amount: 100,
+            paidAmount: 0,
+            debtAmount: 100,
+            date: DateTime.now().subtract(const Duration(hours: 2)),
+            logicalClock: 3 // Skewed high
+            ),
         FinancialTransactionEntity(
-          id: '3', type: 'sale', customerId: custId, amount: 100, paidAmount: 0, debtAmount: 100,
-          date: DateTime.now().subtract(const Duration(hours: 1)), logicalClock: 2 // Out of logical order!
-        ),
+            id: '3',
+            type: 'sale',
+            customerId: custId,
+            amount: 100,
+            paidAmount: 0,
+            debtAmount: 100,
+            date: DateTime.now().subtract(const Duration(hours: 1)),
+            logicalClock: 2 // Out of logical order!
+            ),
       ];
 
       // Total pairs: (1, 2) clocks (1, 3) - OK
@@ -143,7 +176,9 @@ void main() {
       expect(obs.calculateDriftRate(txsInverted), closeTo(0.333, 0.01));
     });
 
-    test('Clock Spoof Resistance: Rejects anomalous remote updates and logs anomalies', () async {
+    test(
+        'Clock Spoof Resistance: Rejects anomalous remote updates and logs anomalies',
+        () async {
       // 1. Setup local base clock (max local clock is 1)
       await transactionRepo.create(FinancialTransactionEntity(
         id: 'tx-local-base',
@@ -185,7 +220,8 @@ void main() {
               'amount': 50.0,
               'paid_amount': 50.0,
               'debt_amount': 0.0,
-              'created_at': DateTime.now().add(const Duration(days: 3)).toIso8601String(),
+              'created_at':
+                  DateTime.now().add(const Duration(days: 3)).toIso8601String(),
               'logical_clock': 3,
               'device_id': 'device-B'
             }
@@ -241,7 +277,9 @@ void main() {
       expect(metrics['anomaly_count'], equals(2));
     });
 
-    test('Disk Full Chaos Resilience: Aborts gracefully, registers failure and leaves database in consistent state', () async {
+    test(
+        'Disk Full Chaos Resilience: Aborts gracefully, registers failure and leaves database in consistent state',
+        () async {
       // Create local sale and try to push/commit under DiskFullFault simulation
       final sale = SaleEntity(
         id: 'sale-unsynced-chaos',

@@ -12,7 +12,8 @@ class BootstrapLoadingView extends ConsumerStatefulWidget {
   const BootstrapLoadingView({super.key, required this.onCompleted});
 
   @override
-  ConsumerState<BootstrapLoadingView> createState() => _BootstrapLoadingViewState();
+  ConsumerState<BootstrapLoadingView> createState() =>
+      _BootstrapLoadingViewState();
 }
 
 class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
@@ -65,7 +66,8 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
           entityType: 'system',
           entityId: 'bootstrap',
           newValue: e.toString(),
-          notes: 'Bootstrap senkronizasyonu başarısız: ${e.toString()}\n${st.toString().substring(0, st.toString().length.clamp(0, 500))}',
+          notes:
+              'Bootstrap senkronizasyonu başarısız: ${e.toString()}\n${st.toString().substring(0, st.toString().length.clamp(0, 500))}',
         );
       } catch (_) {
         // Audit service may not be available during very early onboarding — fail silently
@@ -102,9 +104,11 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
               padding: const EdgeInsets.all(24.0),
               child: Card(
                 elevation: 8,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 32.0, vertical: 40.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -115,7 +119,8 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
                           height: 80,
                           child: CircularProgressIndicator(
                             strokeWidth: 6,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.green),
                           ),
                         )
                       else
@@ -125,22 +130,25 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
                           size: 80,
                         ),
                       const SizedBox(height: 32),
-                      
+
                       Text(
-                        _errorMsg == null ? 'Sistem Hazırlanıyor' : 'Bağlantı Hatası',
+                        _errorMsg == null
+                            ? 'Sistem Hazırlanıyor'
+                            : 'Bağlantı Hatası',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
-                      
+
                       Text(
-                        _errorMsg == null 
+                        _errorMsg == null
                             ? 'Lütfen bekleyin, Serenut OS ilk kurulum verileri senkronize ediliyor.'
                             : 'Sunucuya bağlanırken bir hata oluştu. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withAlpha(180),
+                          color:
+                              theme.textTheme.bodyMedium?.color?.withAlpha(180),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -153,8 +161,10 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
                           child: LinearProgressIndicator(
                             value: _progress / 100,
                             minHeight: 12,
-                            backgroundColor: theme.colorScheme.primary.withAlpha(40),
-                            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                            backgroundColor:
+                                theme.colorScheme.primary.withAlpha(40),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.colorScheme.primary),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -188,7 +198,8 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
                           decoration: BoxDecoration(
                             color: Colors.red.withAlpha(20),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.redAccent.withAlpha(60)),
+                            border: Border.all(
+                                color: Colors.redAccent.withAlpha(60)),
                           ),
                           child: Text(
                             _errorMsg!,

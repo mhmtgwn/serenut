@@ -57,7 +57,7 @@ class MigrationManager {
       FROM migration_history_logs 
       WHERE status = 'success'
     ''');
-    
+
     if (res.isEmpty || res.first['max_version'] == null) {
       return 0;
     }
@@ -68,9 +68,10 @@ class MigrationManager {
   Future<void> runMigrations() async {
     final db = await _dbManager.getDatabase();
     await _initMigrationTable(db);
-    
+
     final currentVer = await getCurrentAppliedVersion(db);
-    final pendingSteps = _steps.where((step) => step.version > currentVer).toList();
+    final pendingSteps =
+        _steps.where((step) => step.version > currentVer).toList();
 
     if (pendingSteps.isEmpty) {
       return; // Database up to date
@@ -83,7 +84,8 @@ class MigrationManager {
         backupPath = await _backupService.backupDatabase();
       } catch (e) {
         // Log backup failure and abort migration to be safe
-        throw Exception('Migration backup failed. Aborting migrations. Error: $e');
+        throw Exception(
+            'Migration backup failed. Aborting migrations. Error: $e');
       }
 
       final logId = const Uuid().v4();
@@ -116,7 +118,7 @@ class MigrationManager {
 
         // 5. Restore DB from physical backup file
         await _performPhysicalRollback(backupPath);
-      
+
         rethrow;
       }
     }
@@ -126,11 +128,11 @@ class MigrationManager {
   Future<void> _performPhysicalRollback(String backupPath) async {
     final activeDbPath = DatabaseManager.overrideDatabasePath ??
         await _dbManager.getDatabasesPath();
-        
+
     if (activeDbPath == ':memory:') {
       return; // Skip physical file rollback in memory tests
     }
-        
+
     final activeDbFile = File(activeDbPath);
     final backupFile = File(backupPath);
 

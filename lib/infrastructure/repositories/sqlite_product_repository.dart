@@ -13,10 +13,12 @@ class SqliteProductRepository implements IProductRepository {
 
   DbExecutor get _executor => _gateway;
 
-  bool get _hasDataset => _datasetLoader != null && _datasetLoader!.activeDb != null;
+  bool get _hasDataset =>
+      _datasetLoader != null && _datasetLoader!.activeDb != null;
   String get _market => _datasetLoader?.selectedMarket ?? 'Migros';
 
-  Future<List<ProductEntity>> _queryProducts({String? where, List<Object?>? whereArgs, String? orderBy}) async {
+  Future<List<ProductEntity>> _queryProducts(
+      {String? where, List<Object?>? whereArgs, String? orderBy}) async {
     if (_hasDataset) {
       const selectPart = '''
         SELECT p.barcode as id, p.name, COALESCE(p.brand, '') as description, 
@@ -25,14 +27,14 @@ class SqliteProductRepository implements IProductRepository {
         FROM products p
         LEFT JOIN prices pr ON p.barcode = pr.barcode AND pr.market_name = ?
       ''';
-      
+
       String sql = selectPart;
       final args = <Object?>[_market];
-      
+
       if (where != null) {
-        // GÜVENLİK/SAĞLAMLIK NOTU: rewrittenWhere değişkeni yalnızca repository içindeki hardcoded (sabit) WHERE 
-        // şablonları üzerinde yapısal dönüşümler (sütun adı eşlemeleri gibi) yapar. Arama terimi, kategori veya ID 
-        // gibi kullanıcı girdileri asla doğrudan bu stringe eklenmez (SQL injection riski yoktur). Tüm dinamik girdiler 
+        // GÜVENLİK/SAĞLAMLIK NOTU: rewrittenWhere değişkeni yalnızca repository içindeki hardcoded (sabit) WHERE
+        // şablonları üzerinde yapısal dönüşümler (sütun adı eşlemeleri gibi) yapar. Arama terimi, kategori veya ID
+        // gibi kullanıcı girdileri asla doğrudan bu stringe eklenmez (SQL injection riski yoktur). Tüm dinamik girdiler
         // placeholders (?) aracılığıyla whereArgs/args listesiyle rawQuery'ye parametre olarak güvenle bağlanır.
         String rewrittenWhere = where
             .replaceAll('is_active = 1', '1=1')
@@ -41,21 +43,29 @@ class SqliteProductRepository implements IProductRepository {
             .replaceAll('name LIKE ?', 'p.name LIKE ?');
         sql += ' WHERE $rewrittenWhere';
       }
-      
+
       if (whereArgs != null) {
         args.addAll(whereArgs);
       }
-      
+
       if (orderBy != null) {
         String rewrittenOrder = orderBy.replaceAll('category', 'p.category');
         // DÜZELTME: SQL injection koruması — sadece izin verilen sütunlar kabul edilir
         const allowedOrderCols = {
-          'p.category', 'p.name', 'p.quantity', 'p.price',
-          'p.category ASC', 'p.category DESC',
-          'p.name ASC', 'p.name DESC',
-          'p.quantity ASC', 'p.quantity DESC',
-          'p.price ASC', 'p.price DESC',
-          'quantity ASC', 'quantity DESC',
+          'p.category',
+          'p.name',
+          'p.quantity',
+          'p.price',
+          'p.category ASC',
+          'p.category DESC',
+          'p.name ASC',
+          'p.name DESC',
+          'p.quantity ASC',
+          'p.quantity DESC',
+          'p.price ASC',
+          'p.price DESC',
+          'quantity ASC',
+          'quantity DESC',
         };
         if (!allowedOrderCols.contains(rewrittenOrder)) {
           rewrittenOrder = 'p.name ASC'; // güvenli varsayılan
@@ -63,17 +73,18 @@ class SqliteProductRepository implements IProductRepository {
         sql += ' ORDER BY $rewrittenOrder';
       }
 
-      
       final rows = await _datasetLoader!.activeDb!.rawQuery(sql, args);
-      final datasetProducts = rows.map((row) => ProductEntity(
-        id: row['id'] as String,
-        name: row['name'] as String,
-        description: row['description'] as String,
-        price: (row['price'] as num).toDouble(),
-        quantity: row['quantity'] as int,
-        category: row['category'] as String,
-        vat: row['vat'] as int?,
-      )).toList();
+      final datasetProducts = rows
+          .map((row) => ProductEntity(
+                id: row['id'] as String,
+                name: row['name'] as String,
+                description: row['description'] as String,
+                price: (row['price'] as num).toDouble(),
+                quantity: row['quantity'] as int,
+                category: row['category'] as String,
+                vat: row['vat'] as int?,
+              ))
+          .toList();
 
       if (datasetProducts.isEmpty) return [];
 
@@ -84,7 +95,9 @@ class SqliteProductRepository implements IProductRepository {
         where: 'id IN ($placeholders)',
         whereArgs: ids,
       );
-      final overrideMap = {for (var row in localOverrides) row['id'] as String: row};
+      final overrideMap = {
+        for (var row in localOverrides) row['id'] as String: row
+      };
 
       final result = <ProductEntity>[];
       for (final p in datasetProducts) {
@@ -111,7 +124,8 @@ class SqliteProductRepository implements IProductRepository {
       }
       return result;
     } else {
-      final rows = await _executor.query('products', where: where, whereArgs: whereArgs, orderBy: orderBy);
+      final rows = await _executor.query('products',
+          where: where, whereArgs: whereArgs, orderBy: orderBy);
       return rows.map((row) => ProductEntity.fromMap(row)).toList();
     }
   }
@@ -123,7 +137,8 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<ProductEntity?> findById(dynamic id) async {
-    final list = await _queryProducts(where: 'id = ? AND is_active = 1', whereArgs: [id]);
+    final list = await _queryProducts(
+        where: 'id = ? AND is_active = 1', whereArgs: [id]);
     if (list.isEmpty) return null;
     return list.first;
   }
@@ -146,7 +161,8 @@ class SqliteProductRepository implements IProductRepository {
     if (oldId != null && oldId != product.id) {
       final alreadyExists = await exists(product.id);
       if (alreadyExists) {
-        throw Exception('Bu barkod kodu (${product.id}) zaten başka bir üründe kullanılıyor.');
+        throw Exception(
+            'Bu barkod kodu (${product.id}) zaten başka bir üründe kullanılıyor.');
       }
       await _gateway.transaction(() async {
         await _executor.update(
@@ -204,7 +220,8 @@ class SqliteProductRepository implements IProductRepository {
   @override
   Future<int> count() async {
     if (_hasDataset) {
-      final result = await _datasetLoader!.activeDb!.rawQuery('SELECT COUNT(*) as count FROM products');
+      final result = await _datasetLoader!.activeDb!
+          .rawQuery('SELECT COUNT(*) as count FROM products');
       return Sqflite.firstIntValue(result) ?? 0;
     }
     final result = await _executor.rawQuery(
@@ -216,7 +233,8 @@ class SqliteProductRepository implements IProductRepository {
   @override
   Future<bool> exists(dynamic id) async {
     if (_hasDataset) {
-      final result = await _datasetLoader!.activeDb!.rawQuery('SELECT 1 FROM products WHERE barcode = ? LIMIT 1', [id]);
+      final result = await _datasetLoader!.activeDb!
+          .rawQuery('SELECT 1 FROM products WHERE barcode = ? LIMIT 1', [id]);
       return result.isNotEmpty;
     }
     final result = await _executor.query(
@@ -230,18 +248,21 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<List<ProductEntity>> searchByName(String query) async {
-    return await _queryProducts(where: 'name LIKE ? AND is_active = 1', whereArgs: ['%$query%']);
+    return await _queryProducts(
+        where: 'name LIKE ? AND is_active = 1', whereArgs: ['%$query%']);
   }
 
   @override
   Future<List<ProductEntity>> getByCategory(String category) async {
-    return await _queryProducts(where: 'category = ? AND is_active = 1', whereArgs: [category]);
+    return await _queryProducts(
+        where: 'category = ? AND is_active = 1', whereArgs: [category]);
   }
 
   @override
   Future<Map<String, List<ProductEntity>>> getGroupedByCategory() async {
-    final entities = await _queryProducts(where: 'is_active = 1', orderBy: 'category');
-    
+    final entities =
+        await _queryProducts(where: 'is_active = 1', orderBy: 'category');
+
     final grouped = <String, List<ProductEntity>>{};
     for (final entity in entities) {
       grouped.putIfAbsent(entity.category, () => []).add(entity);
@@ -252,7 +273,8 @@ class SqliteProductRepository implements IProductRepository {
   @override
   Future<void> decreaseStock(String productId, int quantity) async {
     if (_hasDataset) {
-      final localRes = await _executor.query('products', where: 'id = ?', whereArgs: [productId]);
+      final localRes = await _executor
+          .query('products', where: 'id = ?', whereArgs: [productId]);
       if (localRes.isEmpty) {
         final original = await findById(productId);
         if (original != null) {
@@ -283,7 +305,8 @@ class SqliteProductRepository implements IProductRepository {
   @override
   Future<void> increaseStock(String productId, int quantity) async {
     if (_hasDataset) {
-      final localRes = await _executor.query('products', where: 'id = ?', whereArgs: [productId]);
+      final localRes = await _executor
+          .query('products', where: 'id = ?', whereArgs: [productId]);
       if (localRes.isEmpty) {
         final original = await findById(productId);
         if (original != null) {
@@ -362,6 +385,9 @@ class SqliteProductRepository implements IProductRepository {
     final rows = await _executor.rawQuery(
       'SELECT DISTINCT category FROM products WHERE is_active = 1 ORDER BY category ASC',
     );
-    return rows.map((row) => (row['category'] as String?) ?? '').where((c) => c.isNotEmpty).toList();
+    return rows
+        .map((row) => (row['category'] as String?) ?? '')
+        .where((c) => c.isNotEmpty)
+        .toList();
   }
 }

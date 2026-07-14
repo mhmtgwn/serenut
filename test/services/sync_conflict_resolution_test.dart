@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
@@ -81,12 +81,14 @@ void main() {
       DatabaseManager.overrideDatabasePath = null;
     });
 
-    test('Ensures Lamport Timestamps are logically incremented locally', () async {
+    test('Ensures Lamport Timestamps are logically incremented locally',
+        () async {
       DatabaseManager.overrideDatabasePath = dbPathA;
       final db = await DatabaseManager().getDatabase();
       final gateway = DbGatewayImpl.raw(db);
       final customerRepo = SqliteCustomerRepository(gateway);
-      final transactionRepo = SqliteFinancialTransactionRepository(gateway, deviceId: 'device-A');
+      final transactionRepo =
+          SqliteFinancialTransactionRepository(gateway, deviceId: 'device-A');
 
       // Setup customer
       await customerRepo.create(CustomerEntity(
@@ -126,14 +128,15 @@ void main() {
       // Clocks should increment logically: 1 -> 2
       expect(tx1!.logicalClock, equals(1));
       expect(tx1.deviceId, equals('device-A'));
-      
+
       expect(tx2!.logicalClock, equals(2));
       expect(tx2.deviceId, equals('device-A'));
 
       await DatabaseManager().close();
     });
 
-    test('Multi-Device Deterministic Convergence & Balance Drift Prevention', () async {
+    test('Multi-Device Deterministic Convergence & Balance Drift Prevention',
+        () async {
       // ────────────────────────────────────────────────────────────────────────
       // Step 1: Device A creates a sale of 1000 TL offline
       // ────────────────────────────────────────────────────────────────────────
@@ -141,7 +144,8 @@ void main() {
       var db = await DatabaseManager().getDatabase();
       var gateway = DbGatewayImpl.raw(db);
       var customerRepo = SqliteCustomerRepository(gateway);
-      var transactionRepo = SqliteFinancialTransactionRepository(gateway, deviceId: 'device-A');
+      var transactionRepo =
+          SqliteFinancialTransactionRepository(gateway, deviceId: 'device-A');
 
       await customerRepo.create(CustomerEntity(
         id: custId,
@@ -174,7 +178,8 @@ void main() {
       db = await DatabaseManager().getDatabase();
       gateway = DbGatewayImpl.raw(db);
       customerRepo = SqliteCustomerRepository(gateway);
-      transactionRepo = SqliteFinancialTransactionRepository(gateway, deviceId: 'device-B');
+      transactionRepo =
+          SqliteFinancialTransactionRepository(gateway, deviceId: 'device-B');
 
       await customerRepo.create(CustomerEntity(
         id: custId,
@@ -207,7 +212,8 @@ void main() {
       db = await DatabaseManager().getDatabase();
       gateway = DbGatewayImpl.raw(db);
       customerRepo = SqliteCustomerRepository(gateway);
-      transactionRepo = SqliteFinancialTransactionRepository(gateway, deviceId: 'device-A');
+      transactionRepo =
+          SqliteFinancialTransactionRepository(gateway, deviceId: 'device-A');
 
       final mockResponseForA = {
         'status': 'ok',
@@ -266,7 +272,8 @@ void main() {
       db = await DatabaseManager().getDatabase();
       gateway = DbGatewayImpl.raw(db);
       customerRepo = SqliteCustomerRepository(gateway);
-      transactionRepo = SqliteFinancialTransactionRepository(gateway, deviceId: 'device-B');
+      transactionRepo =
+          SqliteFinancialTransactionRepository(gateway, deviceId: 'device-B');
 
       final mockResponseForB = {
         'status': 'ok',

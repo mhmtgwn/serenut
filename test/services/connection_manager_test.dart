@@ -104,7 +104,8 @@ class MockEventDispatcher implements EventDispatcher {
 }
 
 void main() {
-  group('ConnectionManager Reconnect Loop & Error Distinction Tests (Kritik D)', () {
+  group('ConnectionManager Reconnect Loop & Error Distinction Tests (Kritik D)',
+      () {
     late MockWebSocketManager wsManager;
     late MockAuthService authService;
     late MockEventDispatcher eventDispatcher;
@@ -115,7 +116,7 @@ void main() {
       wsManager = MockWebSocketManager();
       authService = MockAuthService();
       eventDispatcher = MockEventDispatcher();
-      
+
       // Use slightly longer delays for Windows timer resolution safety
       reconnectManager = ReconnectManager(
         minDelay: const Duration(milliseconds: 100),
@@ -146,27 +147,29 @@ void main() {
       connectionManager.dispose();
     });
 
-    test('Temporary network error during reconnect -> schedules retry, loop continues', () async {
+    test(
+        'Temporary network error during reconnect -> schedules retry, loop continues',
+        () async {
       await connectionManager.connect();
       await Future.delayed(const Duration(milliseconds: 30));
       expect(wsManager.isConnected, true);
 
       authService.failWithNetworkError = true;
-      
+
       // Trigger a disconnect to schedule a reconnect
       wsManager.disconnect();
-      
+
       // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 150ms for it to run.
       await Future.delayed(const Duration(milliseconds: 150));
-      
+
       expect(authService.refreshCalled, true);
       expect(authService.sessionExpiredTriggered, false);
       expect(reconnectManager.attempts, greaterThan(0));
-      
+
       // Reset flag and stop network error to verify next loop succeeds
       authService.failWithNetworkError = false;
       authService.refreshCalled = false;
-      
+
       // Reconnect is scheduled (attempt 2: delay = 150ms). Wait 200ms for it to run.
       await Future.delayed(const Duration(milliseconds: 200));
       expect(authService.refreshCalled, true);
@@ -175,19 +178,21 @@ void main() {
       connectionManager.dispose();
     });
 
-    test('Permanent auth failure during reconnect -> stops loop and triggers session expiry redirect', () async {
+    test(
+        'Permanent auth failure during reconnect -> stops loop and triggers session expiry redirect',
+        () async {
       await connectionManager.connect();
       await Future.delayed(const Duration(milliseconds: 30));
       expect(wsManager.isConnected, true);
 
       authService.failWithAuthError = true;
-      
+
       // Trigger a disconnect
       wsManager.disconnect();
-      
+
       // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 150ms for it to run.
       await Future.delayed(const Duration(milliseconds: 150));
-      
+
       expect(authService.refreshCalled, true);
       expect(authService.sessionExpiredTriggered, true);
       expect(wsManager.isConnected, false);
@@ -195,7 +200,9 @@ void main() {
       connectionManager.dispose();
     });
 
-    test('connect() called while reconnecting is ignored and does not double schedule', () async {
+    test(
+        'connect() called while reconnecting is ignored and does not double schedule',
+        () async {
       await connectionManager.connect();
       await Future.delayed(const Duration(milliseconds: 30));
       expect(wsManager.isConnected, true);

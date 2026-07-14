@@ -15,17 +15,17 @@ import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 
 // ── Design Constants (Aligned with SettingsPage) ──────────────────────────────
-const _kBgColor       = Color(0xFFFAFAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFF0F0F3);
-const _kTextPrimary   = Color(0xFF1E293B);
+const _kBgColor = Color(0xFFFAFAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFF0F0F3);
+const _kTextPrimary = Color(0xFF1E293B);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kRed           = Color(0xFFEF4444);
-const _kBlue          = Color(0xFF3B82F6);
-const _kPurple        = Color(0xFF8B5CF6);
-const _kTeal          = Color(0xFF0D9488);
-const _kAmber         = Color(0xFFF59E0B);
+const _kGreen = Color(0xFF10B981);
+const _kRed = Color(0xFFEF4444);
+const _kBlue = Color(0xFF3B82F6);
+const _kPurple = Color(0xFF8B5CF6);
+const _kTeal = Color(0xFF0D9488);
+const _kAmber = Color(0xFFF59E0B);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -61,14 +61,15 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final licStatus   = ref.watch(licenseStatusProvider);
+    final licStatus = ref.watch(licenseStatusProvider);
 
     // Guard — user must be logged in
     if (currentUser == null) {
       return const Scaffold(
         backgroundColor: _kBgColor,
         body: Center(
-          child: Text('Lütfen oturum açın.', style: TextStyle(color: _kTextSecondary)),
+          child: Text('Lütfen oturum açın.',
+              style: TextStyle(color: _kTextSecondary)),
         ),
       );
     }
@@ -95,12 +96,15 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               _isUnlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
               color: _isUnlocked ? _kGreen : _kPurple,
             ),
-            tooltip: _isUnlocked ? 'Yönetici yetkileri açık (Kilitle)' : 'Yetkileri Aç',
+            tooltip: _isUnlocked
+                ? 'Yönetici yetkileri açık (Kilitle)'
+                : 'Yetkileri Aç',
             onPressed: () {
               if (_isUnlocked) {
                 setState(() => _isUnlocked = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Yönetici yetkileri kilitlendi.')),
+                  const SnackBar(
+                      content: Text('Yönetici yetkileri kilitlendi.')),
                 );
               } else {
                 _runGuardedAction(() {});
@@ -176,8 +180,10 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               icon: Icons.verified_rounded,
               color: _kGreen,
               onTap: () => _runGuardedAction(() {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const LicenseManagementPage()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const LicenseManagementPage()));
               }),
             ),
             const _Divider(),
@@ -186,7 +192,8 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               subtitle: 'Yetim kayıt denetimi, bakiye düzeltme (State Replay)',
               icon: Icons.health_and_safety_rounded,
               color: _kPurple,
-              onTap: () => _runGuardedAction(() => context.push('/settings/db-health')),
+              onTap: () =>
+                  _runGuardedAction(() => context.push('/settings/db-health')),
             ),
             const _Divider(),
             _buildCategoryRow(
@@ -194,7 +201,8 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               subtitle: 'Bulut senkronizasyonu ve yerel veritabanı yedekleri',
               icon: Icons.backup_rounded,
               color: _kTeal,
-              onTap: () => _runGuardedAction(() => context.push('/settings/backup')),
+              onTap: () =>
+                  _runGuardedAction(() => context.push('/settings/backup')),
             ),
             const _Divider(),
             _buildCategoryRow(
@@ -203,7 +211,8 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               icon: Icons.assignment_turned_in_rounded,
               color: _kBlue,
               onTap: () => _runGuardedAction(() {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditCenterPage()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AuditCenterPage()));
               }),
             ),
             const _Divider(),
@@ -213,7 +222,10 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               icon: Icons.restore_from_trash_rounded,
               color: _kRed,
               onTap: () => _runGuardedAction(() {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryCenterPage()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const RecoveryCenterPage()));
               }),
             ),
             const _Divider(),
@@ -264,7 +276,10 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               child: Center(
                 child: Text(
                   initials,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22),
                 ),
               ),
             ),
@@ -275,12 +290,16 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
                 children: [
                   Text(
                     user.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: _kTextPrimary),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Yönetici • ${licStatus.tierName}',
-                    style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                    style:
+                        const TextStyle(color: _kTextSecondary, fontSize: 12),
                   ),
                 ],
               ),
@@ -293,7 +312,8 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
               ),
               child: const Text(
                 'Yönetim',
-                style: TextStyle(color: _kPurple, fontSize: 10, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: _kPurple, fontSize: 10, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -367,7 +387,8 @@ class _ManagementHubPageState extends ConsumerState<ManagementHubPage> {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
+              const Icon(Icons.chevron_right_rounded,
+                  color: _kTextSecondary, size: 20),
             ],
           ),
         ),

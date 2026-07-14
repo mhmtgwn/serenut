@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' hide equals;
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -20,7 +20,8 @@ class MockPathProviderPlatform extends PathProviderPlatform
   Future<String?> getLibraryPath() async => '.';
 
   @override
-  Future<String?> getApplicationDocumentsPath() async => Directory.current.absolute.path;
+  Future<String?> getApplicationDocumentsPath() async =>
+      Directory.current.absolute.path;
 
   @override
   Future<String?> getExternalStoragePath() async => '.';
@@ -29,7 +30,9 @@ class MockPathProviderPlatform extends PathProviderPlatform
   Future<List<String>?> getExternalCachePaths() async => [];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async => [];
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
+      [];
 
   @override
   Future<String?> getDownloadsPath() async => '.';
@@ -72,12 +75,14 @@ void main() {
       }
     });
 
-    test('Resilience test with 500 customers, 5000 sales, 1000 collections', () async {
+    test('Resilience test with 500 customers, 5000 sales, 1000 collections',
+        () async {
       final dbManager = DatabaseManager();
       final db = await dbManager.getDatabase();
 
       // Verify schema is initialized by querying sqlite_master
-      final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final tables = await db
+          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
       final tableNames = tables.map((t) => t['name'] as String).toList();
       expect(tableNames.contains('customers'), isTrue);
       expect(tableNames.contains('sales'), isTrue);
@@ -178,22 +183,35 @@ void main() {
       await db.transaction((txn) async {
         final updateBatch = txn.batch();
         for (final entry in expectedBalances.entries) {
-          updateBatch.update('customers', {
-            'balance': entry.value,
-          }, where: 'id = ?', whereArgs: [entry.key]);
+          updateBatch.update(
+              'customers',
+              {
+                'balance': entry.value,
+              },
+              where: 'id = ?',
+              whereArgs: [entry.key]);
         }
         await updateBatch.commit(noResult: true);
       });
 
       // Assert database sizes and counts
-      final salesCount = (await db.rawQuery('SELECT COUNT(*) FROM sales')).first.values.first as int;
-      final txCount = (await db.rawQuery('SELECT COUNT(*) FROM financial_transactions')).first.values.first as int;
+      final salesCount = (await db.rawQuery('SELECT COUNT(*) FROM sales'))
+          .first
+          .values
+          .first as int;
+      final txCount =
+          (await db.rawQuery('SELECT COUNT(*) FROM financial_transactions'))
+              .first
+              .values
+              .first as int;
       expect(salesCount, equals(5000));
       expect(txCount, equals(6000)); // 5000 sales + 1000 payments
 
       // Verify a sample customer balance
-      final sampleB = await db.query('customers', columns: ['balance'], where: 'id = ?', whereArgs: ['cust-123']);
-      expect(sampleB.first['balance'] as double, closeTo(expectedBalances['cust-123']!, 0.01));
+      final sampleB = await db.query('customers',
+          columns: ['balance'], where: 'id = ?', whereArgs: ['cust-123']);
+      expect(sampleB.first['balance'] as double,
+          closeTo(expectedBalances['cust-123']!, 0.01));
 
       // ── Step 4: Perform Database Backup ──
       final backupPath = await backupService.backupDatabase();
@@ -221,8 +239,16 @@ void main() {
 
       // ── Step 7: Verify Restored State & Invariants ──
       final restoredDb = await dbManager.getDatabase();
-      final restoredSalesCount = (await restoredDb.rawQuery('SELECT COUNT(*) FROM sales')).first.values.first as int;
-      final restoredTxCount = (await restoredDb.rawQuery('SELECT COUNT(*) FROM financial_transactions')).first.values.first as int;
+      final restoredSalesCount =
+          (await restoredDb.rawQuery('SELECT COUNT(*) FROM sales'))
+              .first
+              .values
+              .first as int;
+      final restoredTxCount = (await restoredDb
+              .rawQuery('SELECT COUNT(*) FROM financial_transactions'))
+          .first
+          .values
+          .first as int;
       expect(restoredSalesCount, equals(5000));
       expect(restoredTxCount, equals(6000));
 
@@ -230,7 +256,8 @@ void main() {
       for (final entry in expectedBalances.entries) {
         final id = entry.key;
         final expected = entry.value;
-        final custResult = await restoredDb.query('customers', columns: ['balance'], where: 'id = ?', whereArgs: [id]);
+        final custResult = await restoredDb.query('customers',
+            columns: ['balance'], where: 'id = ?', whereArgs: [id]);
         expect(custResult, isNotEmpty);
         final balance = custResult.first['balance'] as double;
         expect(balance, closeTo(expected, 0.01));

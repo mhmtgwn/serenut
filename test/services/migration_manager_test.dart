@@ -39,8 +39,6 @@ void main() {
       );
     });
 
-
-
     test('Registers steps and executes successful migrations', () async {
       migrationManager.registerStep(const MigrationStep(
         version: 1,
@@ -53,7 +51,8 @@ void main() {
       await migrationManager.runMigrations();
 
       final db = await dbManager.getDatabase();
-      final List<Map<String, dynamic>> res = await db.rawQuery('SELECT * FROM test_table');
+      final List<Map<String, dynamic>> res =
+          await db.rawQuery('SELECT * FROM test_table');
       expect(res.length, 1);
       expect(res.first['value'], 'hello');
 
@@ -81,7 +80,7 @@ void main() {
       expect(() => migrationManager.runMigrations(), throwsA(anything));
 
       final db = await dbManager.getDatabase();
-      
+
       // Verify version stays at 1 due to step 2 failure
       final currentVer = await migrationManager.getCurrentAppliedVersion(db);
       expect(currentVer, 1);

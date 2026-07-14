@@ -1,28 +1,30 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/services/pagination_service.dart';
 
 // Mock veri yükleyici
-Future<List<String>> mockDataLoader(int offset, int limit, String? searchQuery) async {
-  await Future.delayed(const Duration(milliseconds: 100)); // Simüle edilmiş gecikme
-  
+Future<List<String>> mockDataLoader(
+    int offset, int limit, String? searchQuery) async {
+  await Future.delayed(
+      const Duration(milliseconds: 100)); // Simüle edilmiş gecikme
+
   final allData = List.generate(100, (index) => 'Item $index');
-  
+
   // Arama filtresi
   List<String> filteredData = allData;
   if (searchQuery != null && searchQuery.isNotEmpty) {
-    filteredData = allData.where((item) => 
-      item.toLowerCase().contains(searchQuery.toLowerCase())
-    ).toList();
+    filteredData = allData
+        .where((item) => item.toLowerCase().contains(searchQuery.toLowerCase()))
+        .toList();
   }
-  
+
   // Sayfalama
   final startIndex = offset;
   final endIndex = (startIndex + limit).clamp(0, filteredData.length);
-  
+
   if (startIndex >= filteredData.length) {
     return [];
   }
-  
+
   return filteredData.sublist(startIndex, endIndex);
 }
 
@@ -47,7 +49,7 @@ void main() {
 
     test('should load first page correctly', () async {
       await paginationService.loadFirstPage();
-      
+
       expect(paginationService.items.length, equals(10));
       expect(paginationService.items.first, equals('Item 0'));
       expect(paginationService.items.last, equals('Item 9'));
@@ -58,7 +60,7 @@ void main() {
     test('should load next page correctly', () async {
       await paginationService.loadFirstPage();
       await paginationService.loadNextPage();
-      
+
       expect(paginationService.items.length, equals(20));
       expect(paginationService.items[10], equals('Item 10'));
       expect(paginationService.items.last, equals('Item 19'));
@@ -67,15 +69,16 @@ void main() {
 
     test('should handle search correctly', () async {
       await paginationService.search('Item 1');
-      
+
       expect(paginationService.currentSearchQuery, equals('Item 1'));
       expect(paginationService.items.isNotEmpty, isTrue);
-      expect(paginationService.items.every((item) => item.contains('1')), isTrue);
+      expect(
+          paginationService.items.every((item) => item.contains('1')), isTrue);
     });
 
     test('should handle empty search results', () async {
       await paginationService.search('NonExistentItem');
-      
+
       expect(paginationService.items, isEmpty);
       expect(paginationService.hasMoreData, isFalse);
     });
@@ -83,9 +86,9 @@ void main() {
     test('should refresh data correctly', () async {
       await paginationService.loadFirstPage();
       final initialItemCount = paginationService.items.length;
-      
+
       await paginationService.refresh();
-      
+
       expect(paginationService.items.length, equals(initialItemCount));
       expect(paginationService.currentPage, equals(0));
     });
@@ -93,9 +96,9 @@ void main() {
     test('should reset state correctly', () async {
       await paginationService.loadFirstPage();
       await paginationService.search('test');
-      
+
       paginationService.reset();
-      
+
       expect(paginationService.items, isEmpty);
       expect(paginationService.isLoading, isFalse);
       expect(paginationService.hasMoreData, isTrue);
@@ -106,9 +109,9 @@ void main() {
     test('should add item correctly', () async {
       await paginationService.loadFirstPage();
       final initialCount = paginationService.items.length;
-      
+
       paginationService.addItem('New Item');
-      
+
       expect(paginationService.items.length, equals(initialCount + 1));
       expect(paginationService.items.first, equals('New Item'));
     });
@@ -117,9 +120,9 @@ void main() {
       await paginationService.loadFirstPage();
       final itemToRemove = paginationService.items.first;
       final initialCount = paginationService.items.length;
-      
+
       paginationService.removeItem(itemToRemove);
-      
+
       expect(paginationService.items.length, equals(initialCount - 1));
       expect(paginationService.items.contains(itemToRemove), isFalse);
     });
@@ -130,10 +133,10 @@ void main() {
       while (paginationService.hasMoreData) {
         await paginationService.loadNextPage();
       }
-      
+
       final finalCount = paginationService.items.length;
       await paginationService.loadNextPage();
-      
+
       expect(paginationService.items.length, equals(finalCount));
       expect(paginationService.hasMoreData, isFalse);
     });
@@ -142,9 +145,9 @@ void main() {
       // Start multiple load operations
       final future1 = paginationService.loadFirstPage();
       final future2 = paginationService.loadFirstPage();
-      
+
       await Future.wait([future1, future2]);
-      
+
       // Should only load once
       expect(paginationService.items.length, equals(10));
     });
@@ -156,11 +159,11 @@ void main() {
         dataLoader: mockDataLoader,
         pageSize: 50,
       );
-      
+
       final stopwatch = Stopwatch()..start();
       await paginationService.loadFirstPage();
       stopwatch.stop();
-      
+
       expect(stopwatch.elapsedMilliseconds, lessThan(500));
       expect(paginationService.items.length, equals(50));
     });
@@ -169,23 +172,24 @@ void main() {
       final paginationService = PaginationService<String>(
         dataLoader: (offset, limit, query) async {
           // Simulate large dataset
-          final data = List.generate(limit, (index) => 'Item ${offset + index}');
+          final data =
+              List.generate(limit, (index) => 'Item ${offset + index}');
           await Future.delayed(const Duration(milliseconds: 10));
           return data;
         },
         pageSize: 100,
       );
-      
+
       final stopwatch = Stopwatch()..start();
-      
+
       // Load multiple pages
       await paginationService.loadFirstPage();
       for (int i = 0; i < 5; i++) {
         await paginationService.loadNextPage();
       }
-      
+
       stopwatch.stop();
-      
+
       expect(paginationService.items.length, equals(600));
       expect(stopwatch.elapsedMilliseconds, lessThan(1000));
     });
@@ -197,9 +201,9 @@ void main() {
         dataLoader: (offset, limit, query) async => [],
         pageSize: 10,
       );
-      
+
       await emptyPaginationService.loadFirstPage();
-      
+
       expect(emptyPaginationService.items, isEmpty);
       expect(emptyPaginationService.hasMoreData, isFalse);
     });
@@ -211,7 +215,7 @@ void main() {
         },
         pageSize: 10,
       );
-      
+
       expect(() => errorPaginationService.loadFirstPage(), throwsException);
     });
 
@@ -220,10 +224,10 @@ void main() {
         dataLoader: mockDataLoader,
         pageSize: 10,
       );
-      
+
       await paginationService.loadFirstPage(searchQuery: 'Item');
       await paginationService.search('');
-      
+
       expect(paginationService.currentSearchQuery, isEmpty);
       expect(paginationService.items.isNotEmpty, isTrue);
     });

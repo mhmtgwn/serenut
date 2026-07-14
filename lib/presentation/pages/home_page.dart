@@ -25,7 +25,6 @@ import 'package:serenutos/presentation/widgets/home/system_trust_panel.dart';
 import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
 import 'package:serenutos/presentation/widgets/home/alert_stream_panel.dart';
 
-
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kBgColor = Color(0xFFF8FAFC);
 const _kTextDark = Color(0xFF0F172A);
@@ -57,11 +56,14 @@ class HomePage extends ConsumerWidget {
           ),
           data: (data) {
             final orders = ordersAsync.value ?? [];
-            final pendingCount = orders.where((o) => o.status == 'created').length;
-            final preparingCount = orders.where((o) => o.status == 'preparing').length;
-            
+            final pendingCount =
+                orders.where((o) => o.status == 'created').length;
+            final preparingCount =
+                orders.where((o) => o.status == 'preparing').length;
+
             final debtAging = debtAgingVal.value ?? [];
-            final overdueCount = debtAging.where((row) => row.hasOverdue).length;
+            final overdueCount =
+                debtAging.where((row) => row.hasOverdue).length;
 
             return RefreshIndicator(
               color: const Color(0xFF10B981),
@@ -90,8 +92,6 @@ class HomePage extends ConsumerWidget {
                         // 1b. Trial / License Banner (görünür sadece uyarı varsa)
                         const TrialBannerWidget(),
 
-
-
                         const SizedBox(height: 8),
 
                         // 2. SYSTEM TRUST PANEL (Phase B)
@@ -115,11 +115,13 @@ class HomePage extends ConsumerWidget {
                         const SizedBox(height: 24),
 
                         // 7. Son Hareketler
-                        _buildRecentSalesSection(context, ref, data.recentSales),
+                        _buildRecentSalesSection(
+                            context, ref, data.recentSales),
                         const SizedBox(height: 24),
 
                         // 8. En Çok Satan Ürünler
-                        _buildTopProductsSection(context, data.topProducts.take(3).toList()),
+                        _buildTopProductsSection(
+                            context, data.topProducts.take(3).toList()),
                         const SizedBox(height: 80), // nav bar boşluğu
                       ],
                     ),
@@ -137,12 +139,14 @@ class HomePage extends ConsumerWidget {
   Widget _buildHeader(BuildContext context, WidgetRef ref, DashboardData data) {
     final now = DateTime.now();
     final dayName = DateFormat('EEEE', 'tr_TR').format(now);
-    final dateFormatted = '${now.day} ${DateFormat('MMMM', 'tr_TR').format(now)} $dayName';
+    final dateFormatted =
+        '${now.day} ${DateFormat('MMMM', 'tr_TR').format(now)} $dayName';
 
     final settings = ref.watch(settingsNotifierProvider).value;
-    final titleText = (settings?.businessName != null && settings!.businessName.isNotEmpty)
-        ? settings.businessName
-        : 'İyi Çalışmalar';
+    final titleText =
+        (settings?.businessName != null && settings!.businessName.isNotEmpty)
+            ? settings.businessName
+            : 'İyi Çalışmalar';
 
     return Row(
       children: [
@@ -186,7 +190,8 @@ class HomePage extends ConsumerWidget {
             Stack(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF475569), size: 24),
+                  icon: const Icon(Icons.notifications_none_rounded,
+                      color: Color(0xFF475569), size: 24),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -214,7 +219,8 @@ class HomePage extends ConsumerWidget {
             ),
             const SizedBox(width: 4),
             IconButton(
-              icon: const Icon(Icons.search_rounded, color: Color(0xFF475569), size: 24),
+              icon: const Icon(Icons.search_rounded,
+                  color: Color(0xFF475569), size: 24),
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -226,7 +232,8 @@ class HomePage extends ConsumerWidget {
             const SizedBox(width: 4),
             if (ref.watch(currentUserProvider) != null)
               IconButton(
-                icon: const Icon(Icons.settings_outlined, color: Color(0xFF475569), size: 24),
+                icon: const Icon(Icons.settings_outlined,
+                    color: Color(0xFF475569), size: 24),
                 onPressed: () => context.push(AppRoutes.settings),
               ),
           ],
@@ -238,7 +245,8 @@ class HomePage extends ConsumerWidget {
   // ── Financial Summary KPI Cards ────────────────────────────────────────────
   Widget _buildFinancialSummary(DashboardSummary summary) {
     final format = NumberFormat('#,##0.00', 'tr_TR');
-    final profit = summary.todayRevenue * 0.30; // Estimated 30% gross profit margin
+    final profit =
+        summary.todayRevenue * 0.30; // Estimated 30% gross profit margin
 
     final items = [
       _KpiData(
@@ -280,7 +288,7 @@ class HomePage extends ConsumerWidget {
         final crossCount = constraints.maxWidth >= 720 ? 4 : 2;
         // On small screens, lower aspect ratio (e.g. 0.95) allows more vertical space to avoid overflows.
         final childRatio = constraints.maxWidth >= 720 ? 1.35 : 0.95;
-        
+
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -416,8 +424,10 @@ class HomePage extends ConsumerWidget {
                       ),
                       titlesData: FlTitlesData(
                         show: true,
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -430,7 +440,10 @@ class HomePage extends ConsumerWidget {
                                   padding: const EdgeInsets.only(top: 6.0),
                                   child: Text(
                                     DateFormat('dd.MM').format(trend[idx].date),
-                                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 );
                               }
@@ -449,7 +462,10 @@ class HomePage extends ConsumerWidget {
                                   value >= 1000
                                       ? '${(value / 1000).toStringAsFixed(1)}K'
                                       : value.toInt().toString(),
-                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold),
                                   textAlign: TextAlign.right,
                                 ),
                               );
@@ -460,7 +476,12 @@ class HomePage extends ConsumerWidget {
                       borderData: FlBorderData(show: false),
                       lineBarsData: [
                         LineChartBarData(
-                          spots: trend.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.revenue)).toList(),
+                          spots: trend
+                              .asMap()
+                              .entries
+                              .map((e) =>
+                                  FlSpot(e.key.toDouble(), e.value.revenue))
+                              .toList(),
                           isCurved: true,
                           color: const Color(0xFF10B981), // Emerald 500
                           barWidth: 3.5,
@@ -481,7 +502,8 @@ class HomePage extends ConsumerWidget {
   }
 
   // ── Operations Cards Grid ──────────────────────────────────────────────────
-  Widget _buildOperationsSection(BuildContext context, int pending, int preparing, int lowStock, int overdue) {
+  Widget _buildOperationsSection(BuildContext context, int pending,
+      int preparing, int lowStock, int overdue) {
     final items = [
       _OpCardData(
         label: 'Bekleyen Sipariş',
@@ -628,7 +650,12 @@ class HomePage extends ConsumerWidget {
   }
 
   // ── Smart Alerts Panel ─────────────────────────────────────────────────────
-  Widget _buildAlertsSection(BuildContext context, WidgetRef ref, List<ProductEntity> lowStockProducts, int overdueCount, SyncState syncState) {
+  Widget _buildAlertsSection(
+      BuildContext context,
+      WidgetRef ref,
+      List<ProductEntity> lowStockProducts,
+      int overdueCount,
+      SyncState syncState) {
     final list = <Widget>[];
 
     if (lowStockProducts.isNotEmpty) {
@@ -637,7 +664,8 @@ class HomePage extends ConsumerWidget {
           icon: Icons.inventory_2_outlined,
           color: const Color(0xFFEF4444),
           bgColor: const Color(0xFFFEF2F2),
-          message: 'Kritik Stok: ${lowStockProducts.length} adet ürün kritik stok seviyesinin altında.',
+          message:
+              'Kritik Stok: ${lowStockProducts.length} adet ürün kritik stok seviyesinin altında.',
           actionLabel: 'Stokları Gör',
           onTap: () => context.go(AppRoutes.products),
         ),
@@ -650,7 +678,8 @@ class HomePage extends ConsumerWidget {
           icon: Icons.hourglass_empty_rounded,
           color: const Color(0xFFF59E0B),
           bgColor: const Color(0xFFFFF7ED),
-          message: 'Gecikmiş Ödeme: $overdueCount müşterinin vadesi geçmiş borcu bulunuyor.',
+          message:
+              'Gecikmiş Ödeme: $overdueCount müşterinin vadesi geçmiş borcu bulunuyor.',
           actionLabel: 'Detay',
           onTap: () => requireAdminAccess(
             context,
@@ -697,18 +726,24 @@ class HomePage extends ConsumerWidget {
             ),
             child: const Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                Icon(Icons.check_circle_rounded,
+                    color: Color(0xFF10B981), size: 18),
                 SizedBox(width: 8),
                 Text(
                   'Her şey normal görünüyor',
-                  style: TextStyle(color: Color(0xFF047857), fontSize: 13, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      color: Color(0xFF047857),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700),
                 ),
               ],
             ),
           )
         else
           Column(
-            children: list.expand((w) => [w, const SizedBox(height: 8)]).toList()..removeLast(),
+            children:
+                list.expand((w) => [w, const SizedBox(height: 8)]).toList()
+                  ..removeLast(),
           ),
       ],
     );
@@ -749,11 +784,13 @@ class HomePage extends ConsumerWidget {
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               backgroundColor: color.withOpacity(0.1),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: Text(
               actionLabel,
-              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                  color: color, fontSize: 11, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -762,7 +799,8 @@ class HomePage extends ConsumerWidget {
   }
 
   // ── Recent Activities ──────────────────────────────────────────────────────
-  Widget _buildRecentSalesSection(BuildContext context, WidgetRef ref, List<SaleEntity> sales) {
+  Widget _buildRecentSalesSection(
+      BuildContext context, WidgetRef ref, List<SaleEntity> sales) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -783,8 +821,13 @@ class HomePage extends ConsumerWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Tümünü Gör', style: TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.w700)),
-                  Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF10B981)),
+                  Text('Tümünü Gör',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF10B981),
+                          fontWeight: FontWeight.w700)),
+                  Icon(Icons.chevron_right_rounded,
+                      size: 16, color: Color(0xFF10B981)),
                 ],
               ),
             ),
@@ -792,7 +835,10 @@ class HomePage extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         if (sales.isEmpty)
-          const _EmptyCard(icon: Icons.receipt_long_outlined, message: 'Henüz işlem bulunmuyor', color: _kTextSecondary)
+          const _EmptyCard(
+              icon: Icons.receipt_long_outlined,
+              message: 'Henüz işlem bulunmuyor',
+              color: _kTextSecondary)
         else
           Container(
             decoration: BoxDecoration(
@@ -804,22 +850,31 @@ class HomePage extends ConsumerWidget {
               children: sales.asMap().entries.map((e) {
                 final sale = e.value;
                 final isLast = e.key == sales.length - 1;
-                
+
                 final pmLabel = {
-                  'cash': 'Nakit', 'nakit': 'Nakit',
-                  'card': 'Kart', 'kart': 'Kart',
-                  'debt': 'Vadeli', 'vadeli': 'Vadeli',
-                  'mixed': 'Karma',
-                }[sale.paymentMethod.toLowerCase()] ?? sale.paymentMethod;
-                
-                final isDebt = sale.paymentMethod.toLowerCase().contains('debt') || sale.paymentMethod.toLowerCase().contains('vadeli');
-                final pmColor = isDebt ? const Color(0xFFFF9500) : const Color(0xFF10B981);
-                final pmBgColor = isDebt ? const Color(0xFFFFF7ED) : const Color(0xFFECFDF5);
+                      'cash': 'Nakit',
+                      'nakit': 'Nakit',
+                      'card': 'Kart',
+                      'kart': 'Kart',
+                      'debt': 'Vadeli',
+                      'vadeli': 'Vadeli',
+                      'mixed': 'Karma',
+                    }[sale.paymentMethod.toLowerCase()] ??
+                    sale.paymentMethod;
+
+                final isDebt =
+                    sale.paymentMethod.toLowerCase().contains('debt') ||
+                        sale.paymentMethod.toLowerCase().contains('vadeli');
+                final pmColor =
+                    isDebt ? const Color(0xFFFF9500) : const Color(0xFF10B981);
+                final pmBgColor =
+                    isDebt ? const Color(0xFFFFF7ED) : const Color(0xFFECFDF5);
 
                 return Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
                           Container(
@@ -828,35 +883,46 @@ class HomePage extends ConsumerWidget {
                               color: pmBgColor,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.receipt_outlined, color: pmColor, size: 18),
+                            child: Icon(Icons.receipt_outlined,
+                                color: pmColor, size: 18),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Builder(
-                                  builder: (context) {
-                                    final customers = ref.watch(customersControllerProvider).value ?? [];
-                                    final customer = customers.firstWhere(
-                                      (c) => c.id == sale.customerId,
-                                      orElse: () => CustomerEntity(id: '', name: 'Hızlı Satış', email: '', phone: '', balance: 0, createdAt: DateTime.now()),
-                                    );
-                                    final customerName = sale.customerId.isEmpty || sale.customerId == 'walkin' || customer.id.isEmpty 
-                                        ? 'Hızlı Satış' 
-                                        : customer.name;
-                                    return Text(
-                                      customerName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: _kTextDark,
-                                      ),
-                                    );
-                                  }
-                                ),
+                                Builder(builder: (context) {
+                                  final customers = ref
+                                          .watch(customersControllerProvider)
+                                          .value ??
+                                      [];
+                                  final customer = customers.firstWhere(
+                                    (c) => c.id == sale.customerId,
+                                    orElse: () => CustomerEntity(
+                                        id: '',
+                                        name: 'Hızlı Satış',
+                                        email: '',
+                                        phone: '',
+                                        balance: 0,
+                                        createdAt: DateTime.now()),
+                                  );
+                                  final customerName =
+                                      sale.customerId.isEmpty ||
+                                              sale.customerId == 'walkin' ||
+                                              customer.id.isEmpty
+                                          ? 'Hızlı Satış'
+                                          : customer.name;
+                                  return Text(
+                                    customerName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: _kTextDark,
+                                    ),
+                                  );
+                                }),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${DateFormat('HH:mm').format(sale.createdAt)} • $pmLabel Satış',
@@ -879,8 +945,7 @@ class HomePage extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (!isLast)
-                      const Divider(height: 1, color: _kBorderColor),
+                    if (!isLast) const Divider(height: 1, color: _kBorderColor),
                   ],
                 );
               }).toList(),
@@ -890,7 +955,8 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildTopProductsSection(BuildContext context, List<DashboardProductPerformance> products) {
+  Widget _buildTopProductsSection(
+      BuildContext context, List<DashboardProductPerformance> products) {
     final format = NumberFormat('#,##0.00', 'tr_TR');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -906,7 +972,10 @@ class HomePage extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         if (products.isEmpty)
-          const _EmptyCard(icon: Icons.inventory_2_outlined, message: 'Satış verisi bulunmuyor', color: _kTextSecondary)
+          const _EmptyCard(
+              icon: Icons.inventory_2_outlined,
+              message: 'Satış verisi bulunmuyor',
+              color: _kTextSecondary)
         else
           Container(
             decoration: BoxDecoration(
@@ -918,7 +987,7 @@ class HomePage extends ConsumerWidget {
               children: products.asMap().entries.map((e) {
                 final prod = e.value;
                 final isLast = e.key == products.length - 1;
-                
+
                 final badgeColor = [
                   const Color(0xFFFBBF24), // Gold for 1st
                   const Color(0xFF94A3B8), // Silver for 2nd
@@ -934,7 +1003,8 @@ class HomePage extends ConsumerWidget {
                 return Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
                           Container(
@@ -991,8 +1061,7 @@ class HomePage extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (!isLast)
-                      const Divider(height: 1, color: _kBorderColor),
+                    if (!isLast) const Divider(height: 1, color: _kBorderColor),
                   ],
                 );
               }).toList(),
@@ -1009,7 +1078,8 @@ class _EmptyCard extends StatelessWidget {
   final IconData icon;
   final String message;
   final Color color;
-  const _EmptyCard({required this.icon, required this.message, required this.color});
+  const _EmptyCard(
+      {required this.icon, required this.message, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1025,7 +1095,8 @@ class _EmptyCard extends StatelessWidget {
         children: [
           Icon(icon, size: 36, color: color.withOpacity(0.5)),
           const SizedBox(height: 8),
-          Text(message, style: TextStyle(color: color.withOpacity(0.7), fontSize: 13)),
+          Text(message,
+              style: TextStyle(color: color.withOpacity(0.7), fontSize: 13)),
         ],
       ),
     );
@@ -1045,11 +1116,15 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 64, color: Color(0xFFEF4444)),
+            const Icon(Icons.error_outline_rounded,
+                size: 64, color: Color(0xFFEF4444)),
             const SizedBox(height: 16),
-            const Text('Veriler yüklenemedi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const Text('Veriler yüklenemedi',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text(message, style: const TextStyle(color: _kTextSecondary, fontSize: 12), textAlign: TextAlign.center),
+            Text(message,
+                style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                textAlign: TextAlign.center),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onRetry,
@@ -1058,7 +1133,8 @@ class _ErrorView extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
@@ -1101,4 +1177,3 @@ class _KpiData {
     required this.bgColor,
   });
 }
-

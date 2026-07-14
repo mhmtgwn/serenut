@@ -1,4 +1,4 @@
-﻿// test/services/sync_handshake_test.dart
+// test/services/sync_handshake_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -45,7 +45,7 @@ class FakeLicenseService implements LicenseService {
 class MockSaleRepository implements ISaleRepository {
   @override
   Future<List<SaleEntity>> findAll() async => [];
-  
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -57,7 +57,9 @@ void main() {
       FakeLicenseService.mockPrefs = await SharedPreferences.getInstance();
     });
 
-    test('syncPendingSales blocks synchronization when schema versions mismatch', () async {
+    test(
+        'syncPendingSales blocks synchronization when schema versions mismatch',
+        () async {
       // Mock server returning schemaVersion 2 (mismatch with client version 1)
       final mockHttpClient = MockClient((request) async {
         if (request.url.path.contains('/updates/check')) {
@@ -80,8 +82,10 @@ void main() {
 
       expect(result.synced, equals(0));
       expect(result.failed, equals(0));
-      expect(result.success, isTrue); // No sales failed pushing, but errors list contains warning
-      expect(result.errors.first, contains('Veritabanı şema uyuşmazlığı tespit edildi'));
+      expect(result.success,
+          isTrue); // No sales failed pushing, but errors list contains warning
+      expect(result.errors.first,
+          contains('Veritabanı şema uyuşmazlığı tespit edildi'));
     });
   });
 }

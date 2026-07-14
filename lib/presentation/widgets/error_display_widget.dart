@@ -13,21 +13,26 @@ class ErrorCatalog {
     'AUTH005': 'Bu işlem için yetkiniz bulunmuyor.',
     'LICENSE101': 'Girdiğiniz lisans anahtarı geçerli değil.',
     'LICENSE102': 'Lisansınızın süresi dolmuştur. Lütfen yenileyin.',
-    'LICENSE103': 'Cihaz limitinize ulaştınız. Portaldan eski bir cihazı kaldırın.',
+    'LICENSE103':
+        'Cihaz limitinize ulaştınız. Portaldan eski bir cihazı kaldırın.',
     'LICENSE104': 'Bu ay cihaz değişim hakkınızı doldurdunuz.',
     'LICENSE105': 'Bu cihaz başka bir hesaba kayıtlı. Desteğe başvurun.',
     'LICENSE106': 'Ödemeniz alınamadı. Lütfen ödeme bilgilerinizi güncelleyin.',
     'SYNC201': 'Mükerrer istek tespit edildi.',
     'SYNC202': 'Veri senkronizasyonunda hata oluştu. Destek kodu: SYNC202',
-    'SYNC203': 'Senkronizasyon geçici olarak duraklatıldı. Verileriniz güvende.',
+    'SYNC203':
+        'Senkronizasyon geçici olarak duraklatıldı. Verileriniz güvende.',
     'SYNC204': 'Veri çakışması tespit edildi. Sunucu değeri esas alındı.',
-    'PAYMENT301': 'Kartınız reddedildi. Lütfen farklı bir ödeme yöntemi deneyin.',
+    'PAYMENT301':
+        'Kartınız reddedildi. Lütfen farklı bir ödeme yöntemi deneyin.',
     'PAYMENT302': 'Kartınızda yeterli bakiye bulunmuyor.',
     'PAYMENT303': 'Güvenli ödeme doğrulaması tamamlanamadı. Tekrar deneyin.',
     'PAYMENT304': 'Ödeme işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.',
-    'PAYMENT305': 'Ödeme anlaşmazlığı nedeniyle hesabınız geçici olarak askıya alındı.',
+    'PAYMENT305':
+        'Ödeme anlaşmazlığı nedeniyle hesabınız geçici olarak askıya alındı.',
     'COMPANY401': 'Bu şubede aktif cihaz var. Önce cihazı kaldırın.',
-    'COMPANY402': 'Hesap silme talebiniz alındı. 7 gün içinde iptal edebilirsiniz.',
+    'COMPANY402':
+        'Hesap silme talebiniz alındı. 7 gün içinde iptal edebilirsiniz.',
     'COMPANY403': 'Deneme süresini yalnızca destek ekibi uzatabilir.',
     'DEVICE501': 'Bu cihaz lisansınıza bağlı değil. Portaldan ekleyin.',
     'DEVICE502': 'Bu cihaz güvenlik nedeniyle engellendi. Desteğe başvurun.',
@@ -35,7 +40,9 @@ class ErrorCatalog {
   };
 
   static String getMessage(String code, [String? fallback]) {
-    return messages[code] ?? fallback ?? 'Beklenmedik bir hata oluştu (Hata Kodu: $code).';
+    return messages[code] ??
+        fallback ??
+        'Beklenmedik bir hata oluştu (Hata Kodu: $code).';
   }
 }
 
@@ -65,7 +72,8 @@ class ErrorDisplayWidget extends StatelessWidget {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: const Color(0xFF1E293B), // Slate 800
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -126,7 +134,8 @@ class ErrorDisplayWidget extends StatelessWidget {
                           onRetry();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981), // Emerald 500
+                          backgroundColor:
+                              const Color(0xFF10B981), // Emerald 500
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('Tekrar Dene'),
@@ -159,7 +168,8 @@ class ErrorDisplayWidget extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 24),
+                const Icon(Icons.error_outline_rounded,
+                    color: Colors.redAccent, size: 24),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -191,7 +201,9 @@ class ErrorDisplayWidget extends StatelessWidget {
                     if (onClose != null)
                       TextButton(
                         onPressed: onClose,
-                        child: const Text('Kapat', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                        child: const Text('Kapat',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF94A3B8))),
                       ),
                     if (onRetry != null) ...[
                       const SizedBox(width: 8),
@@ -200,9 +212,11 @@ class ErrorDisplayWidget extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF10B981),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                         ),
-                        child: const Text('Yenile', style: TextStyle(fontSize: 12)),
+                        child: const Text('Yenile',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     ],
                   ],

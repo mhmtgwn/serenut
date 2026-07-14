@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/services/cart_persistence_service.dart
+// lib/infrastructure/services/cart_persistence_service.dart
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -26,7 +26,8 @@ class CartPersistenceService {
     required String idempotencyKey,
   }) async {
     final quantitiesJson = jsonEncode(cartQuantities);
-    final productsMap = cartProducts.map((key, value) => MapEntry(key, value.toMap()));
+    final productsMap =
+        cartProducts.map((key, value) => MapEntry(key, value.toMap()));
     final productsJson = jsonEncode(productsMap);
 
     await _prefs.setString(_kCartQuantitiesKey, quantitiesJson);
@@ -37,7 +38,8 @@ class CartPersistenceService {
     await _prefs.setString(_kIdempotencyKeyKey, idempotencyKey);
 
     if (selectedCustomer != null) {
-      await _prefs.setString(_kSelectedCustomerKey, jsonEncode(selectedCustomer.toMap()));
+      await _prefs.setString(
+          _kSelectedCustomerKey, jsonEncode(selectedCustomer.toMap()));
     } else {
       await _prefs.remove(_kSelectedCustomerKey);
     }
@@ -64,7 +66,8 @@ class CartPersistenceService {
     if (productsRaw != null) {
       final Map<String, dynamic> decoded = jsonDecode(productsRaw);
       decoded.forEach((key, value) {
-        cartProducts[key] = ProductEntity.fromMap(value as Map<String, dynamic>);
+        cartProducts[key] =
+            ProductEntity.fromMap(value as Map<String, dynamic>);
       });
     }
 

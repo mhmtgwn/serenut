@@ -17,7 +17,7 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
-      
+
       final dbPath = await databaseFactory.getDatabasesPath();
       final path = join(dbPath, 'serenut_pos.db');
       await deleteDatabase(path);
@@ -36,7 +36,9 @@ void main() {
       DatabaseManager.overrideDatabasePath = null;
     });
 
-    test('Preserves local-only user fields and updates role/name during bootstrap sync', () async {
+    test(
+        'Preserves local-only user fields and updates role/name during bootstrap sync',
+        () async {
       // 1. Insert existing user with offline PIN, lockout data, and business code
       await db.insert('users', {
         'id': 'user-123',
@@ -60,7 +62,8 @@ void main() {
         if (path.contains('/sync/bootstrap/users')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"data": [{"id": "user-123", "name": "New Name", "email": "new@email.com", "password_hash": "new_pw_hash", "role": "manager", "is_active": true}]}',
+            body:
+                '{"data": [{"id": "user-123", "name": "New Name", "email": "new@email.com", "password_hash": "new_pw_hash", "role": "manager", "is_active": true}]}',
             headers: {},
           );
         }
@@ -74,7 +77,8 @@ void main() {
             headers: {},
           );
         }
-        return const ApiResponse(statusCode: 200, body: '{"data": []}', headers: {});
+        return const ApiResponse(
+            statusCode: 200, body: '{"data": []}', headers: {});
       };
 
       final prefs = await SharedPreferences.getInstance();
@@ -82,14 +86,15 @@ void main() {
 
       // Run bootstrap sync just for the users module (the index starts at 0, users is index 2)
       await prefs.setInt('nutopiano_bootstrap_index', 2); // Start at users
-      
+
       // Let's modify the index completion key to false to allow running
       await prefs.setBool('nutopiano_bootstrap_completed', false);
 
       await syncService.runBootstrap((progress, text) {});
 
       // 2. Query the updated user and check values
-      final userRows = await db.query('users', where: 'id = ?', whereArgs: ['user-123']);
+      final userRows =
+          await db.query('users', where: 'id = ?', whereArgs: ['user-123']);
       expect(userRows.length, 1);
       final row = userRows.first;
 

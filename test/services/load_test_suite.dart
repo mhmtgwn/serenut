@@ -1,4 +1,4 @@
-﻿// test/services/load_test_suite.dart
+// test/services/load_test_suite.dart
 // Production Load Test Suite
 // Validates mathematical correctness and performance under realistic data volumes:
 //   - 1,000 customer drift check
@@ -148,7 +148,8 @@ void main() {
     }, timeout: const Timeout(Duration(seconds: 30)));
 
     // ── TEST 2: 10k transactions — ledger math invariant ──────────────────
-    test('10,000 transactions: ledger balance invariant holds to 0.01 TL', () async {
+    test('10,000 transactions: ledger balance invariant holds to 0.01 TL',
+        () async {
       const txCount = 10000;
       const custId = 'cust-ledger-stress';
       final now = DateTime.now();
@@ -170,9 +171,7 @@ void main() {
 
       final batch = db.batch();
       for (var i = 0; i < txCount; i++) {
-        final ts = now
-            .add(Duration(seconds: i))
-            .toIso8601String();
+        final ts = now.add(Duration(seconds: i)).toIso8601String();
 
         if (i % 2 == 0) {
           // Sale
@@ -213,7 +212,9 @@ void main() {
     }, timeout: const Timeout(Duration(seconds: 60)));
 
     // ── TEST 3: 1M TL turnover — floating-point drift ─────────────────────
-    test('1,000,000 TL total turnover: cumulative floating-point drift < 0.01 TL', () async {
+    test(
+        '1,000,000 TL total turnover: cumulative floating-point drift < 0.01 TL',
+        () async {
       // Simulate: 1000 sales of 1000 TL each = 1M TL total
       // Each sale fully paid → expected net balance = 0
 
@@ -265,12 +266,12 @@ void main() {
           reason:
               '1M TL total turnover: floating-point cumulative drift must be < 0.01 TL');
 
-      debugPrint(
-          '✅ 1M TL turnover drift: ${balance.toStringAsFixed(6)} TL');
+      debugPrint('✅ 1M TL turnover drift: ${balance.toStringAsFixed(6)} TL');
     }, timeout: const Timeout(Duration(seconds: 60)));
 
     // ── TEST 4: Concurrent insertions — orphaned transaction check ────────
-    test('50 concurrent sales: no orphaned transactions, all IDs unique', () async {
+    test('50 concurrent sales: no orphaned transactions, all IDs unique',
+        () async {
       final gateway = DbGatewayImpl(databaseManager);
       final saleRepo = SqliteSaleRepository(gateway);
 
@@ -313,7 +314,8 @@ void main() {
       expect(ids.length, equals(concurrentCount),
           reason: 'All sale IDs must be unique (no overwrites)');
 
-      debugPrint('✅ 50 concurrent sales: ${all.length} rows, ${ids.length} unique IDs');
+      debugPrint(
+          '✅ 50 concurrent sales: ${all.length} rows, ${ids.length} unique IDs');
     }, timeout: const Timeout(Duration(seconds: 30)));
   });
 }

@@ -2,7 +2,8 @@ part of '../../settings_page.dart';
 
 // Extracted System Config Section sheets for SettingsPage
 extension SettingsSystemConfigSheets on _SettingsPageState {
-  void _showMarketSelectionSheet(BuildContext context, DatasetLoaderService datasetLoader) {
+  void _showMarketSelectionSheet(
+      BuildContext context, DatasetLoaderService datasetLoader) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -10,7 +11,14 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
       ),
       builder: (ctx) => Consumer(
         builder: (ctx, ref, child) {
-          final markets = ['Migros', 'CarrefourSA', 'A101', 'Şok', 'Mopaş', 'Metro'];
+          final markets = [
+            'Migros',
+            'CarrefourSA',
+            'A101',
+            'Şok',
+            'Mopaş',
+            'Metro'
+          ];
           return Container(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(
@@ -19,7 +27,10 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
               children: [
                 const Text(
                   'Zeka Fiyat Karşılaştırma Pazarı',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kTextPrimary),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _kTextPrimary),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -31,7 +42,8 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: markets.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorderColor),
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: _kBorderColor),
                     itemBuilder: (context, index) {
                       final m = markets[index];
                       final isSelected = datasetLoader.selectedMarket == m;
@@ -45,7 +57,8 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Karşılaştırma pazarı $m olarak güncellendi.'),
+                                content: Text(
+                                    'Karşılaştırma pazarı $m olarak güncellendi.'),
                                 backgroundColor: _kGreen,
                                 behavior: SnackBarBehavior.floating,
                               ),
@@ -55,11 +68,15 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                         title: Text(
                           m,
                           style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             color: isSelected ? _kGreen : _kTextPrimary,
                           ),
                         ),
-                        trailing: isSelected ? const Icon(Icons.check_rounded, color: _kGreen) : null,
+                        trailing: isSelected
+                            ? const Icon(Icons.check_rounded, color: _kGreen)
+                            : null,
                       );
                     },
                   ),
@@ -72,7 +89,8 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
     );
   }
 
-  void _showDatasetManagementSheet(BuildContext context, DatasetLoaderService datasetLoader) {
+  void _showDatasetManagementSheet(
+      BuildContext context, DatasetLoaderService datasetLoader) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -93,17 +111,21 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                   ),
                 );
               }
-              
+
               final versions = snapshot.data ?? [];
               return Container(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Offline Veri Zekası Paketi Yönetimi',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kTextPrimary),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _kTextPrimary),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -118,7 +140,8 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                           child: Text(
                             'Kayıtlı offline veri paketi bulunamadı.\nLütfen data pipeline üzerinden paket oluşturun.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                            style:
+                                TextStyle(color: _kTextSecondary, fontSize: 14),
                           ),
                         ),
                       )
@@ -127,10 +150,12 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: versions.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorderColor),
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 1, color: _kBorderColor),
                           itemBuilder: (context, index) {
                             final v = versions[index];
-                            final isActive = datasetLoader.activeVersion == v.version;
+                            final isActive =
+                                datasetLoader.activeVersion == v.version;
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
                               title: Row(
@@ -144,41 +169,55 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                                   ),
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: _kGreen.withOpacity(0.12),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       'Bütünlük: %${v.integrityScore.toStringAsFixed(0)}',
-                                      style: const TextStyle(fontSize: 10, color: _kGreen, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                          fontSize: 10,
+                                          color: _kGreen,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
                               ),
                               subtitle: Text(
                                 'Ürün: ${v.productCount} • Fiyat: ${v.priceCount}\nTarih: ${v.timestamp}',
-                                style: const TextStyle(fontSize: 11, color: _kTextSecondary),
+                                style: const TextStyle(
+                                    fontSize: 11, color: _kTextSecondary),
                               ),
                               trailing: isActive
                                   ? TextButton(
                                       onPressed: () async {
-                                        await datasetLoader.unmountActiveVersion();
-                                        ref.invalidate(productRepositoryProvider);
-                                        ref.invalidate(productsControllerProvider);
+                                        await datasetLoader
+                                            .unmountActiveVersion();
+                                        ref.invalidate(
+                                            productRepositoryProvider);
+                                        ref.invalidate(
+                                            productsControllerProvider);
                                         if (mounted) {
                                           updateState(() {});
                                           Navigator.pop(ctx);
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
                                             const SnackBar(
-                                              content: Text('Offline veri zekası paketi kaldırıldı. Yerel POS verisine dönüldü.'),
+                                              content: Text(
+                                                  'Offline veri zekası paketi kaldırıldı. Yerel POS verisine dönüldü.'),
                                               backgroundColor: _kOrange,
-                                              behavior: SnackBarBehavior.floating,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
                                             ),
                                           );
                                         }
                                       },
-                                      child: const Text('Kaldır', style: TextStyle(color: _kPink, fontWeight: FontWeight.bold)),
+                                      child: const Text('Kaldır',
+                                          style: TextStyle(
+                                              color: _kPink,
+                                              fontWeight: FontWeight.bold)),
                                     )
                                   : ElevatedButton(
                                       style: ElevatedButton.styleFrom(
@@ -186,22 +225,29 @@ extension SettingsSystemConfigSheets on _SettingsPageState {
                                         foregroundColor: Colors.white,
                                         elevation: 0,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                       ),
                                       onPressed: () async {
-                                        final success = await datasetLoader.mountVersion(v.version);
+                                        final success = await datasetLoader
+                                            .mountVersion(v.version);
                                         if (success) {
-                                          ref.invalidate(productRepositoryProvider);
-                                          ref.invalidate(productsControllerProvider);
+                                          ref.invalidate(
+                                              productRepositoryProvider);
+                                          ref.invalidate(
+                                              productsControllerProvider);
                                           if (mounted) {
                                             updateState(() {});
                                             Navigator.pop(ctx);
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
                                               SnackBar(
-                                                content: Text('Offline veri zekası paketi ${v.version} aktifleştirildi!'),
+                                                content: Text(
+                                                    'Offline veri zekası paketi ${v.version} aktifleştirildi!'),
                                                 backgroundColor: _kGreen,
-                                                behavior: SnackBarBehavior.floating,
+                                                behavior:
+                                                    SnackBarBehavior.floating,
                                               ),
                                             );
                                           }

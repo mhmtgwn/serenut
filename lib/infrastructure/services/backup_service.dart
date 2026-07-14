@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -28,16 +28,20 @@ class BackupService implements IBackupService {
         await backupsDir.create(recursive: true);
       }
 
-      final String timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final String timestamp =
+          DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final backupFileName = 'serenut_pos_backup_$timestamp.db';
       final backupPath = join(backupsDir.path, backupFileName);
 
       final Database db = await DatabaseManager().getDatabase();
 
       // Verify database integrity before creating a backup copy
-      final List<Map<String, dynamic>> integrityResult = await db.rawQuery('PRAGMA integrity_check');
-      if (integrityResult.isEmpty || integrityResult.first.values.first != 'ok') {
-        throw Exception('Veritabanı bütünlük doğrulaması başarısız oldu. Yedekleme iptal edildi.');
+      final List<Map<String, dynamic>> integrityResult =
+          await db.rawQuery('PRAGMA integrity_check');
+      if (integrityResult.isEmpty ||
+          integrityResult.first.values.first != 'ok') {
+        throw Exception(
+            'Veritabanı bütünlük doğrulaması başarısız oldu. Yedekleme iptal edildi.');
       }
 
       try {
@@ -122,7 +126,8 @@ class BackupService implements IBackupService {
     await Share.shareXFiles(
       [XFile(backupPath)],
       subject: 'Serenut POS Veritabanı Yedeği',
-      text: 'Serenut POS veritabanı yedeğidir. Dosya adı: ${basename(backupPath)}',
+      text:
+          'Serenut POS veritabanı yedeğidir. Dosya adı: ${basename(backupPath)}',
     );
   }
 
@@ -136,7 +141,9 @@ class BackupService implements IBackupService {
     final list = backupsDir.listSync();
     final files = list
         .whereType<File>()
-        .where((file) => basename(file.path).startsWith('serenut_pos_backup_') && file.path.endsWith('.db'))
+        .where((file) =>
+            basename(file.path).startsWith('serenut_pos_backup_') &&
+            file.path.endsWith('.db'))
         .toList();
 
     // Sort by modified date descending
@@ -163,12 +170,16 @@ class BackupService implements IBackupService {
         backupPath,
         readOnly: true,
       );
-      final tables = await tempDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final tables = await tempDb
+          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
       final tableNames = tables.map((t) => t['name'] as String).toList();
-      
+
       // Basic validation checks
-      if (!tableNames.contains('settings') || !tableNames.contains('sales') || !tableNames.contains('products')) {
-        throw Exception('Geçersiz yedek dosyası. Gerekli Serenut POS tabloları bulunamadı.');
+      if (!tableNames.contains('settings') ||
+          !tableNames.contains('sales') ||
+          !tableNames.contains('products')) {
+        throw Exception(
+            'Geçersiz yedek dosyası. Gerekli Serenut POS tabloları bulunamadı.');
       }
     } catch (e) {
       throw Exception('Yedek dosyası doğrulanamadı: $e');
@@ -183,7 +194,8 @@ class BackupService implements IBackupService {
 
     // 3. Overwrite current DB file and delete active WAL/SHM sidecars safely
     final dbDir = await dbManager.getDatabasesPath();
-    final dbPath = DatabaseManager.overrideDatabasePath ?? join(dbDir, 'serenut_pos.db');
+    final dbPath =
+        DatabaseManager.overrideDatabasePath ?? join(dbDir, 'serenut_pos.db');
     final walPath = '$dbPath-wal';
     final shmPath = '$dbPath-shm';
 
@@ -220,7 +232,8 @@ class BackupService implements IBackupService {
           dbPath,
           readOnly: true,
         );
-        await testRestoredDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+        await testRestoredDb
+            .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
       } finally {
         if (testRestoredDb != null) {
           await testRestoredDb.close();
@@ -237,11 +250,15 @@ class BackupService implements IBackupService {
       if (await walFile.exists()) await walFile.delete();
       if (await shmFile.exists()) await shmFile.delete();
 
-      if (await tempBackupDbFile.exists()) await tempBackupDbFile.rename(dbPath);
-      if (await tempBackupWalFile.exists()) await tempBackupWalFile.rename(walPath);
-      if (await tempBackupShmFile.exists()) await tempBackupShmFile.rename(shmPath);
+      if (await tempBackupDbFile.exists())
+        await tempBackupDbFile.rename(dbPath);
+      if (await tempBackupWalFile.exists())
+        await tempBackupWalFile.rename(walPath);
+      if (await tempBackupShmFile.exists())
+        await tempBackupShmFile.rename(shmPath);
 
-      throw Exception('Veritabanı geri yükleme yazma hatası, değişiklikler geri alındı: $e');
+      throw Exception(
+          'Veritabanı geri yükleme yazma hatası, değişiklikler geri alındı: $e');
     }
 
     // 4. Force re-initialization of DatabaseManager

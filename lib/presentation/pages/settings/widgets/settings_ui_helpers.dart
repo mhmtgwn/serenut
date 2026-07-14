@@ -2,7 +2,14 @@ part of '../../settings_page.dart';
 
 extension SettingsPageUiHelpers on _SettingsPageState {
   // �”€�”€ Helper UI Metotları �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
-  bool _matchesQuery(String f1, [String f2 = '', String f3 = '', String f4 = '', String f5 = '', String f6 = '', String f7 = '', String f8 = '']) {
+  bool _matchesQuery(String f1,
+      [String f2 = '',
+      String f3 = '',
+      String f4 = '',
+      String f5 = '',
+      String f6 = '',
+      String f7 = '',
+      String f8 = '']) {
     if (_searchQuery.isEmpty) return true;
     return f1.toLowerCase().contains(_searchQuery) ||
         f2.toLowerCase().contains(_searchQuery) ||
@@ -73,11 +80,15 @@ extension SettingsPageUiHelpers on _SettingsPageState {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _kTextPrimary),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: _kTextPrimary),
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
+              const Icon(Icons.chevron_right_rounded,
+                  color: _kTextSecondary, size: 20),
             ],
           ),
         ),
@@ -102,7 +113,10 @@ extension SettingsPageUiHelpers on _SettingsPageState {
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _kTextPrimary),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: _kTextPrimary),
             ),
           ),
           Switch.adaptive(
@@ -162,11 +176,15 @@ extension SettingsPageUiHelpers on _SettingsPageState {
             children: [
               _buildInfoRow('Kullanıcı Adı', user.name),
               _buildInfoRow('Sistem Rolü', roleLabel.toUpperCase()),
-              _buildInfoRow('Hesap OluŸturulma Tarihi', user.createdAt.toLocal().toString().substring(0, 16)),
+              _buildInfoRow('Hesap OluŸturulma Tarihi',
+                  user.createdAt.toLocal().toString().substring(0, 16)),
               const SizedBox(height: 16),
               const Text(
                 'Sahip OlduŸum Yetkiler',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _kTextPrimary),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: _kTextPrimary),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -174,11 +192,14 @@ extension SettingsPageUiHelpers on _SettingsPageState {
                 runSpacing: 6,
                 children: (user.permissions as List<dynamic>).map((p) {
                   return Chip(
-                    label: Text(p.toString(), style: const TextStyle(fontSize: 12)),
+                    label: Text(p.toString(),
+                        style: const TextStyle(fontSize: 12)),
                     backgroundColor: _kGreen.withOpacity(0.1),
                     side: BorderSide.none,
-                    labelStyle: const TextStyle(color: _kGreen, fontWeight: FontWeight.w600),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    labelStyle: const TextStyle(
+                        color: _kGreen, fontWeight: FontWeight.w600),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   );
                 }).toList(),
@@ -197,8 +218,13 @@ extension SettingsPageUiHelpers on _SettingsPageState {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: _kTextSecondary, fontSize: 14)),
-          Text(val, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _kTextPrimary)),
+          Text(label,
+              style: const TextStyle(color: _kTextSecondary, fontSize: 14)),
+          Text(val,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: _kTextPrimary)),
         ],
       ),
     );

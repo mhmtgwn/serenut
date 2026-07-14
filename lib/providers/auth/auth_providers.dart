@@ -13,11 +13,11 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
 // ════════════════════════════════════════════════════════════
-// Core Providers  
+// Core Providers
 // ════════════════════════════════════════════════════════════
 
 /// AuthService singleton
-/// 
+///
 /// Initialize on app startup:
 /// ```dart
 /// final authService = ref.read(authServiceProvider);
@@ -37,13 +37,11 @@ final authServiceProvider = Provider<AuthService>((ref) {
 });
 
 /// AppAuthNotifier StateNotifier
-/// 
+///
 /// Wraps AuthService with Riverpod management
 /// Usage: ref.read(authNotifierProvider.notifier).login(user, pass)
-final authNotifierProvider = StateNotifierProvider<
-  AppAuthNotifier,
-  AppState<AuthUser>
->((ref) {
+final authNotifierProvider =
+    StateNotifierProvider<AppAuthNotifier, AppState<AuthUser>>((ref) {
   final authService = ref.watch(authServiceProvider);
   return AppAuthNotifier(authService);
 });
@@ -53,7 +51,7 @@ final authNotifierProvider = StateNotifierProvider<
 // ════════════════════════════════════════════════════════════
 
 /// Current authenticated user
-/// 
+///
 /// Usage in UI:
 /// ```dart
 /// final currentUser = ref.watch(currentUserProvider);
@@ -69,15 +67,15 @@ final currentUserProvider = Provider<AuthUser?>((ref) {
 });
 
 /// Is user authenticated
-/// 
+///
 /// Usage: if (ref.watch(isAuthenticatedProvider)) { /* show app */ }
 final isAuthenticatedProvider = Provider<bool>((ref) {
   return ref.watch(currentUserProvider) != null;
 });
 
 /// Current user role
-/// 
-/// Usage: 
+///
+/// Usage:
 /// ```dart
 /// final role = ref.watch(userRoleProvider);
 /// if (role == UserRole.admin) { /* show admin panel */ }
@@ -87,7 +85,7 @@ final userRoleProvider = Provider<UserRole?>((ref) {
 });
 
 /// Current user permissions
-/// 
+///
 /// Usage:
 /// ```dart
 /// final perms = ref.watch(permissionsProvider);
@@ -98,7 +96,7 @@ final permissionsProvider = Provider<List<String>>((ref) {
 });
 
 /// Check if user has a specific permission
-/// 
+///
 /// Usage:
 /// ```dart
 /// final canDelete = ref.watch(hasPermissionProvider('sales:delete'));
@@ -114,11 +112,11 @@ final hasPermissionProvider = Provider.family<bool, String>((ref, permission) {
 // ════════════════════════════════════════════════════════════
 
 /// Current auth error (if any)
-/// 
+///
 /// Usage:
 /// ```dart
 /// final error = ref.watch(authErrorProvider);
-/// if (error != null) { 
+/// if (error != null) {
 ///   ScaffoldMessenger.of(context).showSnackBar(
 ///     SnackBar(content: Text(error.userMessage))
 ///   );
@@ -137,5 +135,3 @@ final isAuthLoadingProvider = Provider<bool>((ref) {
 // ════════════════════════════════════════════════════════════
 // Mock Data Helper (Development Only)
 // ════════════════════════════════════════════════════════════
-
-

@@ -11,7 +11,8 @@ class SqliteOrderRepository implements IOrderRepository {
 
   DbExecutor get _executor => _gateway;
 
-  Future<List<OrderEntity>> _enrichOrders(List<Map<String, dynamic>> rows) async {
+  Future<List<OrderEntity>> _enrichOrders(
+      List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return [];
 
     // Optimized: single bulk IN query instead of N+1 per-order subqueries
@@ -42,7 +43,9 @@ class SqliteOrderRepository implements IOrderRepository {
   @override
   Future<List<OrderEntity>> findAll() async {
     try {
-      final rows = await _executor.query('orders', where: 'is_deleted = 0 OR is_deleted IS NULL', orderBy: 'created_at DESC');
+      final rows = await _executor.query('orders',
+          where: 'is_deleted = 0 OR is_deleted IS NULL',
+          orderBy: 'created_at DESC');
       return _enrichOrders(rows);
     } catch (_) {
       final rows = await _executor.query('orders', orderBy: 'created_at DESC');
@@ -67,7 +70,8 @@ class SqliteOrderRepository implements IOrderRepository {
       );
     }
     if (rows.isEmpty) return null;
-    final itemRows = await _executor.query('order_items', where: 'order_id = ?', whereArgs: [id]);
+    final itemRows = await _executor
+        .query('order_items', where: 'order_id = ?', whereArgs: [id]);
     final order = OrderEntity.fromMap(rows.first);
     order.items.addAll(itemRows);
     return order;
@@ -77,7 +81,10 @@ class SqliteOrderRepository implements IOrderRepository {
   Future<int> create(OrderEntity entity) async {
     final totalAmount = entity.items.fold<double>(
       0.0,
-      (sum, item) => sum + ((item['unit_price'] as double? ?? 0.0) * ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
+      (sum, item) =>
+          sum +
+          ((item['unit_price'] as double? ?? 0.0) *
+              ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
     );
     final rowId = await _executor.insert('orders', {
       'id': entity.id,
@@ -109,7 +116,10 @@ class SqliteOrderRepository implements IOrderRepository {
   Future<int> update(OrderEntity entity) async {
     final totalAmount = entity.items.fold<double>(
       0.0,
-      (sum, item) => sum + ((item['unit_price'] as double? ?? 0.0) * ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
+      (sum, item) =>
+          sum +
+          ((item['unit_price'] as double? ?? 0.0) *
+              ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
     );
     await _executor.update(
       'orders',
@@ -117,7 +127,8 @@ class SqliteOrderRepository implements IOrderRepository {
         'customer_id': entity.customerId,
         'status': entity.status,
         'total_amount': totalAmount,
-        'expected_delivery_date': entity.expectedDeliveryDate?.toIso8601String(),
+        'expected_delivery_date':
+            entity.expectedDeliveryDate?.toIso8601String(),
         'actual_delivery_date': entity.actualDeliveryDate?.toIso8601String(),
         'notes': entity.notes,
         'updated_at': DateTime.now().toIso8601String(),
@@ -127,7 +138,8 @@ class SqliteOrderRepository implements IOrderRepository {
     );
 
     // Re-insert items
-    await _executor.delete('order_items', where: 'order_id = ?', whereArgs: [entity.id]);
+    await _executor
+        .delete('order_items', where: 'order_id = ?', whereArgs: [entity.id]);
     int index = 0;
     for (final item in entity.items) {
       await _executor.insert('order_items', {
@@ -159,13 +171,15 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<int> count() async {
-    final result = await _executor.rawQuery('SELECT COUNT(*) as count FROM orders');
+    final result =
+        await _executor.rawQuery('SELECT COUNT(*) as count FROM orders');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
   @override
   Future<bool> exists(dynamic id) async {
-    final result = await _executor.query('orders', where: 'id = ?', whereArgs: [id], limit: 1);
+    final result = await _executor.query('orders',
+        where: 'id = ?', whereArgs: [id], limit: 1);
     return result.isNotEmpty;
   }
 
@@ -281,7 +295,6 @@ class SqliteOrderRepository implements IOrderRepository {
       'SELECT status, COUNT(*) as cnt FROM orders WHERE $where GROUP BY status',
       args,
     );
-
 
     final counts = <String, int>{
       'all': 0,

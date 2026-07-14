@@ -9,21 +9,20 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/admin/observability_dashboard.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
-import 'package:serenutos/presentation/pages/sync_conflict_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFFF8FAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFE2E8F0);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kBgColor = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kRed           = Color(0xFFEF4444);
-const _kBlue          = Color(0xFF3B82F6);
-const _kAmber         = Color(0xFFF59E0B);
-const _kPurple        = Color(0xFF8B5CF6);
-const _kTeal          = Color(0xFF0D9488);
+const _kGreen = Color(0xFF10B981);
+const _kRed = Color(0xFFEF4444);
+const _kBlue = Color(0xFF3B82F6);
+const _kAmber = Color(0xFFF59E0B);
+const _kPurple = Color(0xFF8B5CF6);
+const _kTeal = Color(0xFF0D9488);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -32,8 +31,8 @@ class SystemHubPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final syncState  = ref.watch(syncProvider);
-    final licStatus  = ref.watch(licenseStatusProvider);
+    final syncState = ref.watch(syncProvider);
+    final licStatus = ref.watch(licenseStatusProvider);
     final printQueue = ref.watch(persistentPrintQueueProvider);
 
     final hasSyncError = syncState.status == SyncStatus.error;
@@ -105,10 +104,11 @@ class SystemHubPage extends ConsumerWidget {
               color: _kGreen,
               title: 'Canlı Telemetri Dashboard',
               subtitle: 'Sapma oranı (drift), anomali ve hata günlükleri',
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ObservabilityDashboard())),
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ObservabilityDashboard())),
             ),
-
           ]),
           const SizedBox(height: 32),
         ],
@@ -119,7 +119,8 @@ class SystemHubPage extends ConsumerWidget {
   // ── Health Card ────────────────────────────────────────────────────────────
 
   Widget _buildHealthStatusCard(SyncState sync, LicenseStatus license) {
-    final isHealthy = sync.status != SyncStatus.error && license.status == 'valid';
+    final isHealthy =
+        sync.status != SyncStatus.error && license.status == 'valid';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -136,7 +137,8 @@ class SystemHubPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isHealthy ? _kGreen.withOpacity(0.1) : _kRed.withOpacity(0.1),
+              color:
+                  isHealthy ? _kGreen.withOpacity(0.1) : _kRed.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -151,7 +153,9 @@ class SystemHubPage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isHealthy ? 'Sistem Sağlığı: Stabil' : 'Sistem Sağlığı: İnceleme Gerekli',
+                  isHealthy
+                      ? 'Sistem Sağlığı: Stabil'
+                      : 'Sistem Sağlığı: İnceleme Gerekli',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -232,9 +236,13 @@ class _SystemTile extends StatelessWidget {
         ),
         child: Icon(icon, color: color, size: 18),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _kTextPrimary)),
-      subtitle: Text(subtitle, style: const TextStyle(color: _kTextSecondary, fontSize: 11)),
-      trailing: const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 18),
+      title: Text(title,
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 13, color: _kTextPrimary)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(color: _kTextSecondary, fontSize: 11)),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: _kTextSecondary, size: 18),
       onTap: onTap,
     );
   }

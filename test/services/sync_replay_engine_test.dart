@@ -1,4 +1,4 @@
-﻿// test/services/sync_replay_engine_test.dart
+// test/services/sync_replay_engine_test.dart
 // Unit tests for the Incident Replay Engine & Heuristic Diagnosis classifier.
 
 import 'dart:io';
@@ -49,7 +49,8 @@ void main() {
       await db.close();
     });
 
-    test('Should merge telemetry logs and state transitions chronologically', () async {
+    test('Should merge telemetry logs and state transitions chronologically',
+        () async {
       const corrId = 'session-replay-1';
 
       // 1. Simulate transition at t=0
@@ -95,7 +96,8 @@ void main() {
       await machine.transition(SyncTrigger.startSync);
 
       await telemetry.logError(
-        const SocketException('Connection timed out (NetworkCutFault simulated)'),
+        const SocketException(
+            'Connection timed out (NetworkCutFault simulated)'),
         StackTrace.current,
         context: 'OfflineSyncService._syncSaleWithRetry',
         correlationId: corrId,

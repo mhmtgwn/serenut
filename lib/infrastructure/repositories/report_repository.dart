@@ -8,7 +8,6 @@
 /// ════════════════════════════════════════════════════════════
 library;
 
-
 class DateRange {
   final DateTime from;
   final DateTime to;
@@ -221,7 +220,8 @@ abstract class IReportRepository {
   Future<List<CategoryRevenue>> getCategoryRevenue(DateRange range);
 
   /// Top-N ürün performansı (gelire göre sıralı)
-  Future<List<ProductPerformance>> getTopProducts(DateRange range, {int limit = 10});
+  Future<List<ProductPerformance>> getTopProducts(DateRange range,
+      {int limit = 10});
 
   /// Müşteri borç yaşlandırma tablosu
   Future<List<DebtAgingRow>> getDebtAging();
@@ -230,6 +230,6 @@ abstract class IReportRepository {
   Future<ReportSummary> getSummary(DateRange range);
 
   /// KDV Oranlarına göre matrah ve vergi kırılımını döndürür.
-  Future<List<Map<String, dynamic>>> getVatBreakdown(DateTime start, DateTime end);
+  Future<List<Map<String, dynamic>>> getVatBreakdown(
+      DateTime start, DateTime end);
 }
-

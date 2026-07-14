@@ -95,10 +95,12 @@ class MathEngine {
 
   /// Ortalama fiyat (weighted avg)
   static double calculateWeightedAveragePrice(List<ItemLine> items) {
-    final totalQuantity = items.fold<int>(0, (sum, item) => sum + item.quantity);
+    final totalQuantity =
+        items.fold<int>(0, (sum, item) => sum + item.quantity);
     if (totalQuantity == 0) return 0.0;
-    
-    final totalValue = items.fold<double>(0.0, (sum, item) => sum + item.subtotal);
+
+    final totalValue =
+        items.fold<double>(0.0, (sum, item) => sum + item.subtotal);
     return totalValue / totalQuantity;
   }
 
@@ -116,7 +118,8 @@ class MathEngine {
   static bool isValidTotal(double total) => total > 0;
 
   /// Validation: paid >= 0 && paid <= total (for partial payments)
-  static bool isValidPayment(double paid, double total) => paid >= 0 && paid <= total;
+  static bool isValidPayment(double paid, double total) =>
+      paid >= 0 && paid <= total;
 
   /// Validation: vat between 0-100
   static bool isValidVatRate(double vatRate) => vatRate >= 0 && vatRate <= 100;

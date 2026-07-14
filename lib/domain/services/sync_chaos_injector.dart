@@ -112,8 +112,7 @@ class ClockSkewFault extends SyncFault {
 /// Forces a crash (StateError) mid-transaction, after push but before DB commit.
 /// Used to verify full transaction rollback on partial writes.
 class PartialWriteFault extends SyncFault {
-  const PartialWriteFault()
-      : super(FaultHook.afterPushBeforeCommit);
+  const PartialWriteFault() : super(FaultHook.afterPushBeforeCommit);
 
   @override
   Future<void> apply({String? saleId}) async {
@@ -127,7 +126,8 @@ class PartialWriteFault extends SyncFault {
 /// Simulated DatabaseException subclass for Disk Full conditions
 class DiskFullDatabaseException implements Exception {
   final String? message;
-  DiskFullDatabaseException([this.message = 'SQLITE_FULL: database or disk is full']);
+  DiskFullDatabaseException(
+      [this.message = 'SQLITE_FULL: database or disk is full']);
 
   @override
   String toString() => 'DatabaseException($message)';

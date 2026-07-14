@@ -11,20 +11,21 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFFF8FAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFE2E8F0);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kBgColor = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kRed           = Color(0xFFEF4444);
-const _kAmber         = Color(0xFFF59E0B);
-const _kBlue          = Color(0xFF3B82F6);
-const _kGray          = Color(0xFF94A3B8);
+const _kGreen = Color(0xFF10B981);
+const _kRed = Color(0xFFEF4444);
+const _kAmber = Color(0xFFF59E0B);
+const _kBlue = Color(0xFF3B82F6);
+const _kGray = Color(0xFF94A3B8);
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _printJobsProvider = FutureProvider.autoDispose<List<PersistedPrintJob>>((ref) async {
+final _printJobsProvider =
+    FutureProvider.autoDispose<List<PersistedPrintJob>>((ref) async {
   final queue = ref.watch(persistentPrintQueueProvider);
   return queue.loadAll();
 });
@@ -121,9 +122,12 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
       ),
       bottomNavigationBar: jobsAsync.maybeWhen(
         data: (jobs) {
-          final hasPending = jobs.any((j) => j.status == PrintJobStatus.pending);
+          final hasPending =
+              jobs.any((j) => j.status == PrintJobStatus.pending);
           final hasCompleted = jobs.any(
-            (j) => j.status == PrintJobStatus.success || j.status == PrintJobStatus.abandoned,
+            (j) =>
+                j.status == PrintJobStatus.success ||
+                j.status == PrintJobStatus.abandoned,
           );
           if (!hasPending && !hasCompleted) return null;
           return _buildBottomActions(hasPending, hasCompleted);
@@ -136,10 +140,13 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
   // ── Summary Banner ─────────────────────────────────────────────────────────
 
   Widget _buildSummaryBanner(List<PersistedPrintJob> jobs) {
-    final pending   = jobs.where((j) => j.status == PrintJobStatus.pending).length;
-    final success   = jobs.where((j) => j.status == PrintJobStatus.success).length;
-    final failed    = jobs.where((j) => j.status == PrintJobStatus.failed).length;
-    final abandoned = jobs.where((j) => j.status == PrintJobStatus.abandoned).length;
+    final pending =
+        jobs.where((j) => j.status == PrintJobStatus.pending).length;
+    final success =
+        jobs.where((j) => j.status == PrintJobStatus.success).length;
+    final failed = jobs.where((j) => j.status == PrintJobStatus.failed).length;
+    final abandoned =
+        jobs.where((j) => j.status == PrintJobStatus.abandoned).length;
 
     return Column(
       children: [
@@ -149,12 +156,16 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                const Icon(Icons.warning_amber_rounded,
+                    color: Colors.redAccent, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     '$abandoned adet fiş basılamadı ve iptal edildi. Lütfen yazıcıyı kontrol edin.',
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -165,13 +176,13 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
             children: [
-              _SummaryChip(count: pending,   label: 'Bekliyor',  color: _kAmber),
+              _SummaryChip(count: pending, label: 'Bekliyor', color: _kAmber),
               const SizedBox(width: 8),
-              _SummaryChip(count: success,   label: 'Başarılı',  color: _kGreen),
+              _SummaryChip(count: success, label: 'Başarılı', color: _kGreen),
               const SizedBox(width: 8),
-              _SummaryChip(count: failed,    label: 'Başarısız', color: _kRed),
+              _SummaryChip(count: failed, label: 'Başarısız', color: _kRed),
               const SizedBox(width: 8),
-              _SummaryChip(count: abandoned, label: 'İptal',     color: _kGray),
+              _SummaryChip(count: abandoned, label: 'İptal', color: _kGray),
             ],
           ),
         ),
@@ -204,7 +215,8 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
                 onTap: () => setState(() => _filterStatus = f.$1),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
                     color: isActive ? _kBlue : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(20),
@@ -247,7 +259,8 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
                   foregroundColor: _kBlue,
                   side: const BorderSide(color: _kBlue),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ),
@@ -263,7 +276,8 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
                   foregroundColor: _kTextSecondary,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ),
@@ -370,9 +384,7 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
 
   List<PersistedPrintJob> _filterJobs(List<PersistedPrintJob> jobs) {
     if (_filterStatus == 'all') return jobs.reversed.toList();
-    return jobs.reversed
-        .where((j) => j.status.name == _filterStatus)
-        .toList();
+    return jobs.reversed.where((j) => j.status.name == _filterStatus).toList();
   }
 
   Widget _buildEmptyState() {
@@ -474,13 +486,15 @@ class _PrintJobCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         DateFormat('dd.MM.yyyy HH:mm').format(job.createdAt),
-                        style: const TextStyle(color: _kTextSecondary, fontSize: 11),
+                        style: const TextStyle(
+                            color: _kTextSecondary, fontSize: 11),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: style.bgColor,
                     borderRadius: BorderRadius.circular(20),
@@ -496,7 +510,6 @@ class _PrintJobCard extends StatelessWidget {
                 ),
               ],
             ),
-
             if (job.retryCount > 0 || job.lastError != null) ...[
               const SizedBox(height: 10),
               Container(
@@ -513,7 +526,8 @@ class _PrintJobCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         job.lastError ?? 'Deneme sayısı: ${job.retryCount}/5',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF92400E)),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -522,7 +536,6 @@ class _PrintJobCard extends StatelessWidget {
                 ),
               ),
             ],
-
             if (job.status == PrintJobStatus.pending ||
                 job.status == PrintJobStatus.failed) ...[
               const SizedBox(height: 10),
@@ -537,8 +550,10 @@ class _PrintJobCard extends StatelessWidget {
                         foregroundColor: _kBlue,
                         side: const BorderSide(color: _kBlue),
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        textStyle: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ),
@@ -550,9 +565,12 @@ class _PrintJobCard extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _kRed,
                       side: const BorderSide(color: _kRed),
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 12),
+                      textStyle: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],
@@ -568,28 +586,43 @@ class _PrintJobCard extends StatelessWidget {
     switch (status) {
       case PrintJobStatus.pending:
         return const _JobStyle(
-          icon: Icons.pending_rounded, label: 'Bekliyor',
-          bgColor: Color(0xFFFFFBEB), fgColor: _kAmber, borderColor: Color(0xFFFDE68A),
+          icon: Icons.pending_rounded,
+          label: 'Bekliyor',
+          bgColor: Color(0xFFFFFBEB),
+          fgColor: _kAmber,
+          borderColor: Color(0xFFFDE68A),
         );
       case PrintJobStatus.printing:
         return const _JobStyle(
-          icon: Icons.print_rounded, label: 'Basılıyor',
-          bgColor: Color(0xFFEFF6FF), fgColor: _kBlue, borderColor: Color(0xFFBFDBFE),
+          icon: Icons.print_rounded,
+          label: 'Basılıyor',
+          bgColor: Color(0xFFEFF6FF),
+          fgColor: _kBlue,
+          borderColor: Color(0xFFBFDBFE),
         );
       case PrintJobStatus.success:
         return const _JobStyle(
-          icon: Icons.check_circle_rounded, label: 'Başarılı',
-          bgColor: Color(0xFFECFDF5), fgColor: _kGreen, borderColor: Color(0xFFA7F3D0),
+          icon: Icons.check_circle_rounded,
+          label: 'Başarılı',
+          bgColor: Color(0xFFECFDF5),
+          fgColor: _kGreen,
+          borderColor: Color(0xFFA7F3D0),
         );
       case PrintJobStatus.failed:
         return const _JobStyle(
-          icon: Icons.error_rounded, label: 'Başarısız',
-          bgColor: Color(0xFFFEF2F2), fgColor: _kRed, borderColor: Color(0xFFFECACA),
+          icon: Icons.error_rounded,
+          label: 'Başarısız',
+          bgColor: Color(0xFFFEF2F2),
+          fgColor: _kRed,
+          borderColor: Color(0xFFFECACA),
         );
       case PrintJobStatus.abandoned:
         return const _JobStyle(
-          icon: Icons.cancel_rounded, label: 'İptal Edildi',
-          bgColor: Color(0xFFF8FAFC), fgColor: _kGray, borderColor: _kBorderColor,
+          icon: Icons.cancel_rounded,
+          label: 'İptal Edildi',
+          bgColor: Color(0xFFF8FAFC),
+          fgColor: _kGray,
+          borderColor: _kBorderColor,
         );
     }
   }
@@ -602,8 +635,11 @@ class _JobStyle {
   final Color fgColor;
   final Color borderColor;
   const _JobStyle({
-    required this.icon, required this.label,
-    required this.bgColor, required this.fgColor, required this.borderColor,
+    required this.icon,
+    required this.label,
+    required this.bgColor,
+    required this.fgColor,
+    required this.borderColor,
   });
 }
 
@@ -614,7 +650,8 @@ class _SummaryChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const _SummaryChip({required this.count, required this.label, required this.color});
+  const _SummaryChip(
+      {required this.count, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -628,9 +665,11 @@ class _SummaryChip extends StatelessWidget {
       child: Column(
         children: [
           Text('$count',
-              style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18)),
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w900, fontSize: 18)),
           Text(label,
-              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+              style: TextStyle(
+                  color: color, fontSize: 10, fontWeight: FontWeight.w600)),
         ],
       ),
     );

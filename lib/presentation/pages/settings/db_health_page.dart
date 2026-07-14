@@ -91,12 +91,11 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final hasAccess = currentUser != null && (
-      currentUser.role == UserRole.sysadmin ||
-      currentUser.role == UserRole.owner ||
-      currentUser.role == UserRole.admin ||
-      currentUser.hasPermission(Permission.settingsDatabase.value)
-    );
+    final hasAccess = currentUser != null &&
+        (currentUser.role == UserRole.sysadmin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.hasPermission(Permission.settingsDatabase.value));
 
     if (!hasAccess) {
       return const Scaffold(
@@ -129,7 +128,10 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
                     children: [
                       Text(
                         'Veri Bütünlüğü Güvencesi',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: kTextPrimary),
                       ),
                       SizedBox(height: 4),
                       Text(
@@ -149,7 +151,8 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(40.0),
-                child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(kGreen)),
+                child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(kGreen)),
               ),
             )
 
@@ -159,7 +162,11 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
             const SizedBox(height: 20),
             const Text(
               'DETAYLI DENETİM RAPORU',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.3),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kTextSecondary,
+                  letterSpacing: 0.3),
             ),
             const SizedBox(height: 8),
             _buildReportDetailsCard(_report!),
@@ -178,22 +185,29 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
       decoration: BoxDecoration(
         color: isHealthy ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isHealthy ? const Color(0xFFA7F3D0) : const Color(0xFFFCA5A5)),
+        border: Border.all(
+            color:
+                isHealthy ? const Color(0xFFA7F3D0) : const Color(0xFFFCA5A5)),
       ),
       child: Column(
         children: [
           Icon(
-            isHealthy ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+            isHealthy
+                ? Icons.check_circle_rounded
+                : Icons.warning_amber_rounded,
             color: isHealthy ? kGreen : kPink,
             size: 48,
           ),
           const SizedBox(height: 12),
           Text(
-            isHealthy ? 'Veritabanı Sağlıklı' : 'Sağlık Sorunları Tespit Edildi',
+            isHealthy
+                ? 'Veritabanı Sağlıklı'
+                : 'Sağlık Sorunları Tespit Edildi',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: isHealthy ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+              color:
+                  isHealthy ? const Color(0xFF065F46) : const Color(0xFF991B1B),
             ),
           ),
           const SizedBox(height: 6),
@@ -204,7 +218,8 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: isHealthy ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+              color:
+                  isHealthy ? const Color(0xFF047857) : const Color(0xFFB91C1C),
             ),
           ),
         ],
@@ -292,7 +307,8 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: hasIssue ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9),
+              color:
+                  hasIssue ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -320,12 +336,14 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
               backgroundColor: kGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             onPressed: _isLoading ? null : _repairHealth,
             icon: const Icon(Icons.build_rounded),
-            label: const Text('Sorunları Düzelt ve Onar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            label: const Text('Sorunları Düzelt ve Onar',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           ),
           const SizedBox(height: 12),
         ],
@@ -334,13 +352,20 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
             foregroundColor: kTextPrimary,
             side: const BorderSide(color: kBorderColor),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onPressed: _isLoading ? null : _runHealthCheck,
           icon: _isLoading
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(kTextSecondary)))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(kTextSecondary)))
               : const Icon(Icons.refresh_rounded),
-          label: const Text('Yeniden Tara', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          label: const Text('Yeniden Tara',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ),
       ],
     );

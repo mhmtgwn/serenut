@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
@@ -87,7 +87,8 @@ void main() {
       await databaseManager.close();
     });
 
-    test('searchAll retrieves matches across multiple tables correctly', () async {
+    test('searchAll retrieves matches across multiple tables correctly',
+        () async {
       final nowStr = DateTime.now().toIso8601String();
       // 1. Insert seed data
       await db.insert('customers', {

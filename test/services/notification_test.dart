@@ -1,4 +1,4 @@
-﻿// test/services/notification_test.dart
+// test/services/notification_test.dart
 // Serenut Platform — NotificationRepository Unit Tests (Sprint 9)
 // Tests templates, credit parse, campaign queues and status reports mapping.
 
@@ -23,7 +23,11 @@ EnvironmentConfig get testConfig => const EnvironmentConfig(
 void main() {
   group('CompanyCredits.fromJson', () {
     test('parses credit limits correctly', () {
-      final json = {'sms_credits': 85, 'whatsapp_credits': 42, 'email_credits': 950};
+      final json = {
+        'sms_credits': 85,
+        'whatsapp_credits': 42,
+        'email_credits': 950
+      };
       final credits = CompanyCredits.fromJson(json);
       expect(credits.smsCredits, 85);
       expect(credits.whatsappCredits, 42);
@@ -62,14 +66,19 @@ void main() {
     test('getCredits returns correct balance', () async {
       final mockClient = MockClient((request) async {
         return http.Response(
-          jsonEncode({'sms_credits': 120, 'whatsapp_credits': 60, 'email_credits': 500}),
+          jsonEncode({
+            'sms_credits': 120,
+            'whatsapp_credits': 60,
+            'email_credits': 500
+          }),
           200,
           headers: {'content-type': 'application/json'},
         );
       });
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
-      final repo = NotificationRepository(apiClient: apiClient, config: testConfig);
+      final repo =
+          NotificationRepository(apiClient: apiClient, config: testConfig);
       final credits = await repo.getCredits();
 
       expect(credits.smsCredits, 120);
@@ -82,7 +91,7 @@ void main() {
         expect(body['segment'], 'debtors');
         expect(body['channel'], 'sms');
         expect(body['template_name'], 'debt_reminder');
-        
+
         return http.Response(
           jsonEncode({'success': true, 'queued_count': 14}),
           200,
@@ -91,7 +100,8 @@ void main() {
       });
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
-      final repo = NotificationRepository(apiClient: apiClient, config: testConfig);
+      final repo =
+          NotificationRepository(apiClient: apiClient, config: testConfig);
       final count = await repo.sendCampaign(
         segment: 'debtors',
         channel: 'sms',

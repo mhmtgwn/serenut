@@ -70,7 +70,7 @@ class _Step3SuccessState extends State<Step3Success>
 
   @override
   Widget build(BuildContext context) {
-    final size   = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
     final expiryFormatted = widget.trialExpiryDate != null
         ? DateFormat('dd.MM.yyyy').format(widget.trialExpiryDate!)
@@ -107,18 +107,18 @@ class _Step3SuccessState extends State<Step3Success>
                 'Kurulum Tamamlandı',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: POSColors.text,
-                ),
+                      fontWeight: FontWeight.w800,
+                      color: POSColors.text,
+                    ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Kurulum başarıyla tamamlandı.\nİlk girişinizle birlikte 30 günlük ücretsiz denemeniz başlayacaktır.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: POSColors.textSecondary,
-                  height: 1.5,
-                ),
+                      color: POSColors.textSecondary,
+                      height: 1.5,
+                    ),
               ),
               const SizedBox(height: 32),
 
@@ -134,7 +134,7 @@ class _Step3SuccessState extends State<Step3Success>
 
                     // Sistem özeti kartı
                     _SystemSummaryCard(
-                      state:      widget.state,
+                      state: widget.state,
                       appVersion: widget.appVersion,
                     ),
                     const SizedBox(height: 16),
@@ -182,8 +182,8 @@ class _CheckPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center  = Offset(size.width / 2, size.height / 2);
-    final radius  = size.width / 2;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
 
     // Daire
     final circlePaint = Paint()
@@ -254,7 +254,8 @@ class _TrialBanner extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 56, height: 56,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(14),
@@ -262,7 +263,8 @@ class _TrialBanner extends StatelessWidget {
             child: const Center(
               child: Text('30',
                   style: TextStyle(
-                      color: Colors.white, fontSize: 22,
+                      color: Colors.white,
+                      fontSize: 22,
                       fontWeight: FontWeight.w900)),
             ),
           ),
@@ -273,7 +275,8 @@ class _TrialBanner extends StatelessWidget {
               children: [
                 const Text('Ücretsiz Deneme Başladı',
                     style: TextStyle(
-                        color: Colors.white, fontSize: 16,
+                        color: Colors.white,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text(
@@ -303,13 +306,42 @@ class _SystemSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _SummaryItem(icon: Icons.store_rounded,    label: 'İşletme', value: state.business.businessName.isNotEmpty ? state.business.businessName : '—'),
-      _SummaryItem(icon: Icons.category_rounded, label: 'Tür', value: state.business.businessType.isNotEmpty ? state.business.businessType : '—'),
-      const _SummaryItem(icon: Icons.storage_rounded,  label: 'Veritabanı', value: 'Hazır', isGood: true),
-      const _SummaryItem(icon: Icons.backup_rounded,   label: 'Yedekleme', value: 'Hazır', isGood: true),
-      _SummaryItem(icon: Icons.manage_accounts_rounded, label: 'Admin', value: state.admin.adminFullName.isNotEmpty ? state.admin.adminFullName : '—', isGood: true),
-      const _SummaryItem(icon: Icons.devices_rounded,  label: 'Cihaz', value: 'Aktif', isGood: true),
-      _SummaryItem(icon: Icons.info_outline_rounded, label: 'Sürüm', value: appVersion),
+      _SummaryItem(
+          icon: Icons.store_rounded,
+          label: 'İşletme',
+          value: state.business.businessName.isNotEmpty
+              ? state.business.businessName
+              : '—'),
+      _SummaryItem(
+          icon: Icons.category_rounded,
+          label: 'Tür',
+          value: state.business.businessType.isNotEmpty
+              ? state.business.businessType
+              : '—'),
+      const _SummaryItem(
+          icon: Icons.storage_rounded,
+          label: 'Veritabanı',
+          value: 'Hazır',
+          isGood: true),
+      const _SummaryItem(
+          icon: Icons.backup_rounded,
+          label: 'Yedekleme',
+          value: 'Hazır',
+          isGood: true),
+      _SummaryItem(
+          icon: Icons.manage_accounts_rounded,
+          label: 'Admin',
+          value: state.admin.adminFullName.isNotEmpty
+              ? state.admin.adminFullName
+              : '—',
+          isGood: true),
+      const _SummaryItem(
+          icon: Icons.devices_rounded,
+          label: 'Cihaz',
+          value: 'Aktif',
+          isGood: true),
+      _SummaryItem(
+          icon: Icons.info_outline_rounded, label: 'Sürüm', value: appVersion),
     ];
 
     return Container(
@@ -324,7 +356,8 @@ class _SystemSummaryCard extends StatelessWidget {
         children: [
           const Text('Sistem Durumu',
               style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                   color: POSColors.text)),
           const SizedBox(height: 16),
           ...items.map((item) => _SummaryRow(item: item)),
@@ -340,7 +373,9 @@ class _SummaryItem {
   final String value;
   final bool isGood;
   const _SummaryItem({
-    required this.icon, required this.label, required this.value,
+    required this.icon,
+    required this.label,
+    required this.value,
     this.isGood = false,
   });
 }
@@ -356,12 +391,14 @@ class _SummaryRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 36, height: 36,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: item.isGood ? POSColors.greenLight : POSColors.surface,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(item.icon, size: 18,
+            child: Icon(item.icon,
+                size: 18,
                 color: item.isGood ? POSColors.green : POSColors.textSecondary),
           ),
           const SizedBox(width: 12),
@@ -379,13 +416,15 @@ class _SummaryRow extends StatelessWidget {
               ),
               child: Text(item.value,
                   style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: POSColors.green)),
             )
           else
             Text(item.value,
                 style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: POSColors.text)),
         ],
       ),

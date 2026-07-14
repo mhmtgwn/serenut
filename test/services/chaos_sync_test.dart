@@ -1,4 +1,4 @@
-﻿// test/services/chaos_sync_test.dart
+// test/services/chaos_sync_test.dart
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -92,7 +92,9 @@ void main() {
     });
 
     // ── 1. MID-SYNC NETWORK DROP SIMULATION ──────────────────────────────────────
-    test('Should handle network drop mid-sync cleanly, preserving unsynced local state', () async {
+    test(
+        'Should handle network drop mid-sync cleanly, preserving unsynced local state',
+        () async {
       // Simulate socket exception during HTTP POST call
       final failingMockClient = MockClient((request) async {
         if (request.url.path.contains('/updates/check')) {
@@ -138,7 +140,9 @@ void main() {
     });
 
     // ── 2. DUPLICATE PUSH (REPLAY ATTACK) IDEMPOTENCY SIMULATION ─────────────────
-    test('Should handle duplicate pushes (replay attack) idempotently without duplication', () async {
+    test(
+        'Should handle duplicate pushes (replay attack) idempotently without duplication',
+        () async {
       // Setup mock client that simulates duplicate push success (idempotent 409 conflict handled)
       final mockHttpClient = MockClient((request) async {
         if (request.url.path.contains('/updates/check')) {
@@ -182,7 +186,9 @@ void main() {
     });
 
     // ── 3. CONCURRENT SYNC SERIALIZATION & RACE CONDITION PROTECTION ──────────────
-    test('Should serialize concurrent sync calls and reject overlapping triggers', () async {
+    test(
+        'Should serialize concurrent sync calls and reject overlapping triggers',
+        () async {
       final mockHttpClient = MockClient((request) async {
         if (request.url.path.contains('/updates/check')) {
           return http.Response(
@@ -190,7 +196,8 @@ void main() {
             200,
           );
         }
-        await Future.delayed(const Duration(milliseconds: 100)); // Simulate slow latency
+        await Future.delayed(
+            const Duration(milliseconds: 100)); // Simulate slow latency
         return http.Response('{"status": "ok"}', 200);
       });
 
@@ -225,7 +232,8 @@ void main() {
 
       // One call must succeed, others should reject / return 'Sync already in progress'
       final totalSynced = results.fold<int>(0, (sum, res) => sum + res.synced);
-      final hasOverlapError = results.any((res) => res.errors.contains('Sync already in progress'));
+      final hasOverlapError =
+          results.any((res) => res.errors.contains('Sync already in progress'));
 
       expect(totalSynced, equals(1));
       expect(hasOverlapError, isTrue);

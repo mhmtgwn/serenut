@@ -8,11 +8,15 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_basket_outlined, size: 72, color: Colors.grey[200]),
+            Icon(Icons.shopping_basket_outlined,
+                size: 72, color: Colors.grey[200]),
             const SizedBox(height: 16),
             const Text(
               'Sipariş sepetiniz boş.',
-              style: TextStyle(color: _kTextSecondary, fontSize: 15, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: _kTextSecondary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -24,7 +28,8 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
       children: [
         const Text(
           'Sepetteki Ürünler',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
         ),
         const SizedBox(height: 8),
         ListView.builder(
@@ -40,12 +45,18 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
               color: _kSurface,
               elevation: 0,
               margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: _kBorder)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: _kBorder)),
               child: ListTile(
                 dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('₺${p.price.toStringAsFixed(2)} x ${_formatQuantity(qty)} = ₺${lineTotal.toStringAsFixed(2)}'),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                title: Text(p.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text(
+                    '₺${p.price.toStringAsFixed(2)} x ${_formatQuantity(qty)} = ₺${lineTotal.toStringAsFixed(2)}'),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -69,7 +80,8 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
                             }),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 8),
-                              child: Icon(Icons.remove_rounded, color: _kRed, size: 16),
+                              child: Icon(Icons.remove_rounded,
+                                  color: _kRed, size: 16),
                             ),
                           ),
                           _InlineQuantityField(
@@ -85,10 +97,12 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
                             onRemove: () => updateState(() => _cart.remove(p)),
                           ),
                           GestureDetector(
-                            onTap: () => updateState(() => _cart[p] = qty + 1.0),
+                            onTap: () =>
+                                updateState(() => _cart[p] = qty + 1.0),
                             child: const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 8),
-                              child: Icon(Icons.add_rounded, color: _kGreen, size: 16),
+                              child: Icon(Icons.add_rounded,
+                                  color: _kGreen, size: 16),
                             ),
                           ),
                         ],
@@ -98,7 +112,8 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.delete_outline_rounded, color: _kRed, size: 20),
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: _kRed, size: 20),
                       onPressed: () => updateState(() => _cart.remove(p)),
                     ),
                   ],
@@ -113,9 +128,15 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
     final formConfigWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Teslimat Tarihi ve Notlar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
+        const Text('Teslimat Tarihi ve Notlar',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
         const SizedBox(height: 12),
-        const Text('Tahmini Teslimat Tarihi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _kTextSecondary)),
+        const Text('Tahmini Teslimat Tarihi',
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: _kTextSecondary)),
         const SizedBox(height: 6),
         InkWell(
           onTap: () async {
@@ -137,14 +158,19 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(DateFormat('dd.MM.yyyy').format(_expectedDelivery), style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(DateFormat('dd.MM.yyyy').format(_expectedDelivery),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Icon(Icons.calendar_month_rounded, color: _kGreen),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Sipariş Notu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _kTextSecondary)),
+        const Text('Sipariş Notu',
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: _kTextSecondary)),
         const SizedBox(height: 6),
         TextField(
           controller: _notesController,
@@ -167,8 +193,13 @@ extension OrderCreationCartSummaryStep on OrderCreationDialogState {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Sipariş Toplamı:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text('₺${_totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _kGreenDark)),
+              const Text('Sipariş Toplamı:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('₺${_totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: _kGreenDark)),
             ],
           ),
         ),

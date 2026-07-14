@@ -1,4 +1,4 @@
-﻿// test/services/remote_data_sources_test.dart
+// test/services/remote_data_sources_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -10,14 +10,17 @@ void main() {
     late ApiClient apiClient;
 
     setUp(() {
-      apiClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      apiClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
     });
 
-    test('CloudProductRemoteDataSource fetches products list correctly', () async {
+    test('CloudProductRemoteDataSource fetches products list correctly',
+        () async {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"products": [{"id": "p1", "name": "Apple", "description": "Fresh Red Apple", "price": 10.5, "quantity": 100, "category": "Fruit", "vat": 8}]}',
+          body:
+              '{"products": [{"id": "p1", "name": "Apple", "description": "Fresh Red Apple", "price": 10.5, "quantity": 100, "category": "Fruit", "vat": 8}]}',
           headers: {},
         );
       };
@@ -36,7 +39,8 @@ void main() {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"customers": [{"id": "c1", "name": "John Doe", "email": "john@doe.com", "phone": "123", "balance": -50.0, "created_at": "2026-07-04T10:00:00Z"}]}',
+          body:
+              '{"customers": [{"id": "c1", "name": "John Doe", "email": "john@doe.com", "phone": "123", "balance": -50.0, "created_at": "2026-07-04T10:00:00Z"}]}',
           headers: {},
         );
       };
@@ -50,7 +54,8 @@ void main() {
       expect(customers.first.balance, -50.0);
     });
 
-    test('CloudSalesRemoteDataSource pushes sale entity successfully', () async {
+    test('CloudSalesRemoteDataSource pushes sale entity successfully',
+        () async {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,

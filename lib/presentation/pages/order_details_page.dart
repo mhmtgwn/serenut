@@ -13,26 +13,26 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:serenutos/presentation/controllers/sales_controller.dart' show paymentServiceProvider;
+import 'package:serenutos/presentation/controllers/sales_controller.dart'
+    show paymentServiceProvider;
 import 'package:flutter/services.dart';
 
-
-
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kAmber      = Color(0xFFEAB308);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 /// Provider — build() dışında tanımlanıyor (kritik bug düzeltmesi)
-final _orderDetailProvider = FutureProvider.autoDispose.family<OrderEntity?, String>((ref, orderId) async {
+final _orderDetailProvider = FutureProvider.autoDispose
+    .family<OrderEntity?, String>((ref, orderId) async {
   ref.watch(ordersControllerProvider);
   final repo = await ref.watch(orderRepositoryProvider.future);
   return repo.findById(orderId);
@@ -100,12 +100,15 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      final hasPrinter = (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                                         (settings.printerName != null && settings.printerName!.isNotEmpty);
+                      final hasPrinter = (settings.printerIp != null &&
+                              settings.printerIp!.isNotEmpty) ||
+                          (settings.printerName != null &&
+                              settings.printerName!.isNotEmpty);
                       if (!hasPrinter) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
+                            content: Text(
+                                'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
                             backgroundColor: Colors.orange,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -118,13 +121,20 @@ class OrderDetailsPage extends ConsumerWidget {
                         final customer = customersVal.maybeWhen(
                           data: (list) => list.firstWhere(
                             (c) => c.id == order.customerId,
-                            orElse: () => CustomerEntity(id: '', name: 'Bilinmeyen Musteri', email: '', phone: '', balance: 0, createdAt: DateTime.now()),
+                            orElse: () => CustomerEntity(
+                                id: '',
+                                name: 'Bilinmeyen Musteri',
+                                email: '',
+                                phone: '',
+                                balance: 0,
+                                createdAt: DateTime.now()),
                           ),
                           orElse: () => null,
                         );
 
                         // Load products to map IDs to names
-                        final products = ref.read(productsControllerProvider).value ?? [];
+                        final products =
+                            ref.read(productsControllerProvider).value ?? [];
                         final receiptItems = order.items.map((item) {
                           final prod = products.firstWhere(
                             (p) => p.id == item['product_id'],
@@ -132,7 +142,8 @@ class OrderDetailsPage extends ConsumerWidget {
                               id: item['product_id'] ?? '',
                               name: item['product_id'] ?? 'Urun',
                               description: '',
-                              price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
+                              price: (item['unit_price'] as num?)?.toDouble() ??
+                                  0.0,
                               quantity: 0,
                               category: '',
                             ),
@@ -145,14 +156,18 @@ class OrderDetailsPage extends ConsumerWidget {
                         }).toList();
 
                         ref.read(printerServiceProvider).enqueue(
-                          'Hazırlama Fişi #${order.id.toShortId}',
-                          () => ref.read(printerServiceProvider).printOrderReceipt(
-                            order,
-                            receiptItems,
-                            customer != null && customer.id.isNotEmpty ? customer : null,
-                            settings,
-                          ),
-                        );
+                              'Hazırlama Fişi #${order.id.toShortId}',
+                              () => ref
+                                  .read(printerServiceProvider)
+                                  .printOrderReceipt(
+                                    order,
+                                    receiptItems,
+                                    customer != null && customer.id.isNotEmpty
+                                        ? customer
+                                        : null,
+                                    settings,
+                                  ),
+                            );
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -179,7 +194,8 @@ class OrderDetailsPage extends ConsumerWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => OrderCreationDialog(existingOrder: order),
+                          builder: (context) =>
+                              OrderCreationDialog(existingOrder: order),
                           fullscreenDialog: true,
                         ),
                       ).then((_) {
@@ -188,7 +204,8 @@ class OrderDetailsPage extends ConsumerWidget {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: _kRed),
+                    icon:
+                        const Icon(Icons.delete_outline_rounded, color: _kRed),
                     tooltip: 'Siparişi Sil',
                     onPressed: () => _confirmDelete(context, ref, order),
                   ),
@@ -264,13 +281,12 @@ class OrderDetailsPage extends ConsumerWidget {
     );
   }
 
-
-  Widget _buildStatusStepper(BuildContext context, WidgetRef ref, OrderEntity order) {
+  Widget _buildStatusStepper(
+      BuildContext context, WidgetRef ref, OrderEntity order) {
     final isCancelled = order.status == 'cancelled';
     final isDelivered = order.status == 'delivered';
-    final currentIndex = isCancelled
-        ? -1
-        : _statusFlow.indexOf(order.status.toLowerCase());
+    final currentIndex =
+        isCancelled ? -1 : _statusFlow.indexOf(order.status.toLowerCase());
 
     return Container(
       decoration: BoxDecoration(
@@ -322,30 +338,34 @@ class OrderDetailsPage extends ConsumerWidget {
                 Icon(Icons.cancel_rounded, color: _kRed),
                 SizedBox(width: 10),
                 Expanded(
-                  child: Text('Bu sipariş iptal edildi.',
-                      style: TextStyle(
-                          color: _kRed, fontWeight: FontWeight.bold))),
+                    child: Text('Bu sipariş iptal edildi.',
+                        style: TextStyle(
+                            color: _kRed, fontWeight: FontWeight.bold))),
               ]),
             )
-          else ...
-            [_buildPillStepper(context, ref, order, currentIndex), const SizedBox(height: 16)],
+          else ...[
+            _buildPillStepper(context, ref, order, currentIndex),
+            const SizedBox(height: 16)
+          ],
 
           // ── Aksiyon Butonları ──────────────────────────────────────────
-          if (!isCancelled && order.status != 'delivered') ...
-            _buildActionRow(context, ref, order),
+          if (!isCancelled && order.status != 'delivered')
+            ..._buildActionRow(context, ref, order),
         ],
       ),
     );
   }
 
-  Widget _buildPillStepper(BuildContext context, WidgetRef ref, OrderEntity order, int currentIndex) {
+  Widget _buildPillStepper(BuildContext context, WidgetRef ref,
+      OrderEntity order, int currentIndex) {
     return Column(
       children: [
         // Progress bar
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: currentIndex < 0 ? 0 : (currentIndex + 1) / _statusFlow.length,
+            value:
+                currentIndex < 0 ? 0 : (currentIndex + 1) / _statusFlow.length,
             minHeight: 6,
             backgroundColor: _kBorder,
             valueColor: const AlwaysStoppedAnimation(_kGreen),
@@ -367,10 +387,13 @@ class OrderDetailsPage extends ConsumerWidget {
                     if (status == 'delivered') {
                       _handleDelivery(context, ref, order);
                     } else {
-                      ref.read(ordersControllerProvider.notifier).updateStatus(order.id, status);
+                      ref
+                          .read(ordersControllerProvider.notifier)
+                          .updateStatus(order.id, status);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Durum güncellendi: ${_statusLabels[status]}'),
+                          content: Text(
+                              'Durum güncellendi: ${_statusLabels[status]}'),
                           backgroundColor: _kGreenDark,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -393,13 +416,15 @@ class OrderDetailsPage extends ConsumerWidget {
                           border: isCurrent
                               ? Border.all(color: _kGreenDark, width: 2.5)
                               : null,
-                          boxShadow: isCurrent ? [
-                            BoxShadow(
-                              color: _kGreen.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              spreadRadius: 2,
-                            )
-                          ] : null,
+                          boxShadow: isCurrent
+                              ? [
+                                  BoxShadow(
+                                    color: _kGreen.withValues(alpha: 0.3),
+                                    blurRadius: 6,
+                                    spreadRadius: 2,
+                                  )
+                                ]
+                              : null,
                         ),
                         child: Icon(
                           _statusIcons[status] ?? Icons.circle,
@@ -435,9 +460,10 @@ class OrderDetailsPage extends ConsumerWidget {
 
     return [
       // VADELİ uyarısı — teslim adımında borçlu müşteriler için
-      if (isDeliveryStep && order.items.any((item) =>
-          item['payment_method']?.toString() == 'vadeli' ||
-          ((item['debt_amount'] as num?)?.toDouble() ?? 0) > 0))
+      if (isDeliveryStep &&
+          order.items.any((item) =>
+              item['payment_method']?.toString() == 'vadeli' ||
+              ((item['debt_amount'] as num?)?.toDouble() ?? 0) > 0))
         Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
@@ -447,8 +473,7 @@ class OrderDetailsPage extends ConsumerWidget {
             border: Border.all(color: _kAmber.withValues(alpha: 0.4)),
           ),
           child: const Row(children: [
-            Icon(Icons.info_outline_rounded,
-                size: 16, color: _kAmber),
+            Icon(Icons.info_outline_rounded, size: 16, color: _kAmber),
             SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -467,12 +492,16 @@ class OrderDetailsPage extends ConsumerWidget {
           Expanded(
             child: Row(
               children: [
-                Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey[500]),
+                Icon(Icons.info_outline_rounded,
+                    size: 14, color: Colors.grey[500]),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Durumu değiştirmek için yukarıdaki adımlara dokunabilirsiniz.',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 11, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -489,13 +518,13 @@ class OrderDetailsPage extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
             icon: const Icon(Icons.cancel_rounded, size: 16),
-            label: const Text('İptal Et', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            label: const Text('İptal Et',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ],
       ),
     ];
   }
-
 
   String _nextStepLabel(String status) {
     switch (status) {
@@ -543,7 +572,8 @@ class OrderDetailsPage extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Siparişi İptal Et'),
-        content: const Text('Bu siparişi iptal etmek istediğinize emin misiniz?'),
+        content:
+            const Text('Bu siparişi iptal etmek istediğinize emin misiniz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -552,12 +582,17 @@ class OrderDetailsPage extends ConsumerWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              ref.read(ordersControllerProvider.notifier).updateStatus(order.id, 'cancelled');
+              ref
+                  .read(ordersControllerProvider.notifier)
+                  .updateStatus(order.id, 'cancelled');
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sipariş iptal edildi.'), backgroundColor: Colors.red),
+                const SnackBar(
+                    content: Text('Sipariş iptal edildi.'),
+                    backgroundColor: Colors.red),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
             child: const Text('İptal Et'),
           ),
         ],
@@ -591,20 +626,25 @@ class OrderDetailsPage extends ConsumerWidget {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Siparişi Sil'),
-        content: const Text('Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
+        content: const Text(
+            'Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('İptal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _kRed, 
-              foregroundColor: Colors.white, 
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-            ),
+                backgroundColor: _kRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
             onPressed: () async {
               Navigator.pop(context);
-              
-              final txRepo = await ref.read(financialTransactionRepositoryProvider.future);
-              final transactions = await txRepo.getByCustomerId(order.customerId);
+
+              final txRepo =
+                  await ref.read(financialTransactionRepositoryProvider.future);
+              final transactions =
+                  await txRepo.getByCustomerId(order.customerId);
               FinancialTransactionEntity? orderTx;
               for (final t in transactions) {
                 if (t.referenceId == order.id && t.type == 'sale') {
@@ -614,16 +654,20 @@ class OrderDetailsPage extends ConsumerWidget {
               }
 
               if (orderTx != null && orderTx.debtAmount > 0) {
-                final customerRepo = await ref.read(customerRepositoryProvider.future);
-                await customerRepo.updateBalance(order.customerId, orderTx.debtAmount);
+                final customerRepo =
+                    await ref.read(customerRepositoryProvider.future);
+                await customerRepo.updateBalance(
+                    order.customerId, orderTx.debtAmount);
               }
 
               if (orderTx != null) {
                 await txRepo.delete(orderTx.id);
               }
 
-              await ref.read(ordersControllerProvider.notifier).deleteOrder(order.id);
-              
+              await ref
+                  .read(ordersControllerProvider.notifier)
+                  .deleteOrder(order.id);
+
               ref.invalidate(dashboardProvider);
               ref.invalidate(productsControllerProvider);
               ref.invalidate(customerTransactionsProvider(order.customerId));
@@ -633,7 +677,9 @@ class OrderDetailsPage extends ConsumerWidget {
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sipariş başarıyla silindi.'), backgroundColor: Colors.red),
+                  const SnackBar(
+                      content: Text('Sipariş başarıyla silindi.'),
+                      backgroundColor: Colors.red),
                 );
               }
             },
@@ -645,7 +691,9 @@ class OrderDetailsPage extends ConsumerWidget {
   }
 
   Widget _buildDeliveryCountdown(OrderEntity order) {
-    if (order.status == 'delivered' || order.status == 'cancelled' || order.expectedDeliveryDate == null) {
+    if (order.status == 'delivered' ||
+        order.status == 'cancelled' ||
+        order.expectedDeliveryDate == null) {
       return const SizedBox.shrink();
     }
 
@@ -717,7 +765,9 @@ class OrderDetailsPage extends ConsumerWidget {
 
   Widget _buildPaymentMethodRow(WidgetRef ref, OrderEntity order) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: ref.read(financialTransactionRepositoryProvider.future).then((repo) async {
+      future: ref
+          .read(financialTransactionRepositoryProvider.future)
+          .then((repo) async {
         final txs = await repo.getByCustomerId(order.customerId);
         FinancialTransactionEntity? saleTx;
         double totalPaid = 0.0;
@@ -738,7 +788,8 @@ class OrderDetailsPage extends ConsumerWidget {
       }),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _infoRow('Ödeme Yöntemi', 'Yükleniyor...', Icons.payment_rounded);
+          return _infoRow(
+              'Ödeme Yöntemi', 'Yükleniyor...', Icons.payment_rounded);
         }
         final data = snapshot.data;
         final saleTx = data?['saleTx'] as FinancialTransactionEntity?;
@@ -749,7 +800,8 @@ class OrderDetailsPage extends ConsumerWidget {
         }
 
         final double totalAmount = saleTx.amount;
-        final double remainingDebt = (totalAmount - totalPaid).clamp(0.0, double.infinity);
+        final double remainingDebt =
+            (totalAmount - totalPaid).clamp(0.0, double.infinity);
 
         String display = '';
         if (remainingDebt <= 0.01) {
@@ -790,7 +842,8 @@ class OrderDetailsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildOrderInfoCard(BuildContext context, WidgetRef ref, OrderEntity order, CustomerEntity? customer) {
+  Widget _buildOrderInfoCard(BuildContext context, WidgetRef ref,
+      OrderEntity order, CustomerEntity? customer) {
     final customerName = customer?.name ?? 'Bilinmeyen Müşteri';
     final hasPhone = customer != null && customer.phone.isNotEmpty;
 
@@ -806,9 +859,14 @@ class OrderDetailsPage extends ConsumerWidget {
                 Icon(Icons.person_outline, size: 18, color: Colors.grey[600]),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('Müşteri', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                  child: Text('Müşteri',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                 ),
-                Text(customerName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87, fontSize: 14)),
+                Text(customerName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        fontSize: 14)),
                 if (hasPhone) ...[
                   const SizedBox(width: 8),
                   InkWell(
@@ -820,7 +878,8 @@ class OrderDetailsPage extends ConsumerWidget {
                         color: _kGreenLight,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.phone_rounded, color: _kGreen, size: 14),
+                      child: const Icon(Icons.phone_rounded,
+                          color: _kGreen, size: 14),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -833,7 +892,8 @@ class OrderDetailsPage extends ConsumerWidget {
                         color: Color(0xFFEFF6FF),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.sms_rounded, color: Colors.blue[700], size: 14),
+                      child: Icon(Icons.sms_rounded,
+                          color: Colors.blue[700], size: 14),
                     ),
                   ),
                 ],
@@ -842,20 +902,24 @@ class OrderDetailsPage extends ConsumerWidget {
             const Divider(height: 20),
             _buildPaymentMethodRow(ref, order),
             const Divider(height: 20),
-            _infoRow('Oluşturma',
+            _infoRow(
+                'Oluşturma',
                 DateFormat('dd.MM.yyyy HH:mm').format(order.createdAt),
                 Icons.calendar_today_outlined),
             if (order.expectedDeliveryDate != null) ...[
               const Divider(height: 20),
-              _infoRow('Teslim Tarihi',
+              _infoRow(
+                  'Teslim Tarihi',
                   DateFormat('dd.MM.yyyy').format(order.expectedDeliveryDate!),
                   Icons.local_shipping_outlined,
                   isOverdue: order.isOverdue),
             ],
             if (order.actualDeliveryDate != null) ...[
               const Divider(height: 20),
-              _infoRow('Teslim Edildi',
-                  DateFormat('dd.MM.yyyy HH:mm').format(order.actualDeliveryDate!),
+              _infoRow(
+                  'Teslim Edildi',
+                  DateFormat('dd.MM.yyyy HH:mm')
+                      .format(order.actualDeliveryDate!),
                   Icons.check_circle_outline,
                   positive: true),
             ],
@@ -871,29 +935,43 @@ class OrderDetailsPage extends ConsumerWidget {
 
   Widget _infoRow(String label, String value, IconData icon,
       {bool isOverdue = false, bool positive = false, bool isRed = false}) {
-    final color = isOverdue || isRed ? Colors.red[700]! : positive ? _kGreen : Colors.black87;
+    final color = isOverdue || isRed
+        ? Colors.red[700]!
+        : positive
+            ? _kGreen
+            : Colors.black87;
     return Row(
       children: [
         Icon(icon, size: 18, color: Colors.grey[600]),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          child: Text(label,
+              style: TextStyle(color: Colors.grey[600], fontSize: 13)),
         ),
-        Text(value, style: TextStyle(fontWeight: FontWeight.w600, color: color, fontSize: 14)),
+        Text(value,
+            style: TextStyle(
+                fontWeight: FontWeight.w600, color: color, fontSize: 14)),
         if (isOverdue) ...[
           const SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(4)),
-            child: const Text('GECİKMİŞ', style: TextStyle(color: Color(0xFFC2410C), fontSize: 9, fontWeight: FontWeight.bold)),
+            decoration: BoxDecoration(
+                color: Colors.red[50], borderRadius: BorderRadius.circular(4)),
+            child: const Text('GECİKMİŞ',
+                style: TextStyle(
+                    color: Color(0xFFC2410C),
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold)),
           ),
         ],
       ],
     );
   }
 
-  Future<void> _handleDelivery(BuildContext context, WidgetRef ref, OrderEntity order) async {
-    final txRepo = await ref.read(financialTransactionRepositoryProvider.future);
+  Future<void> _handleDelivery(
+      BuildContext context, WidgetRef ref, OrderEntity order) async {
+    final txRepo =
+        await ref.read(financialTransactionRepositoryProvider.future);
     final txs = await txRepo.getByCustomerId(order.customerId);
     FinancialTransactionEntity? saleTx;
     double totalPaid = 0.0;
@@ -909,19 +987,26 @@ class OrderDetailsPage extends ConsumerWidget {
     }
 
     if (saleTx == null) {
-      await ref.read(ordersControllerProvider.notifier).updateStatus(order.id, 'delivered');
+      await ref
+          .read(ordersControllerProvider.notifier)
+          .updateStatus(order.id, 'delivered');
       _triggerPrint(ref, order);
       return;
     }
 
-    final double remainingDebt = (saleTx.amount - totalPaid).clamp(0.0, double.infinity);
+    final double remainingDebt =
+        (saleTx.amount - totalPaid).clamp(0.0, double.infinity);
 
     if (remainingDebt <= 0.01) {
-      await ref.read(ordersControllerProvider.notifier).updateStatus(order.id, 'delivered');
+      await ref
+          .read(ordersControllerProvider.notifier)
+          .updateStatus(order.id, 'delivered');
       _triggerPrint(ref, order);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sipariş teslim edildi ve fiş yazdırıldı.'), backgroundColor: _kGreen),
+          const SnackBar(
+              content: Text('Sipariş teslim edildi ve fiş yazdırıldı.'),
+              backgroundColor: _kGreen),
         );
       }
       return;
@@ -958,8 +1043,9 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
   final settingsAsync = ref.read(settingsNotifierProvider);
   final settings = settingsAsync.value;
   if (settings == null) return;
-  final hasPrinter = (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                     (settings.printerName != null && settings.printerName!.isNotEmpty);
+  final hasPrinter =
+      (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
+          (settings.printerName != null && settings.printerName!.isNotEmpty);
   if (!hasPrinter) return;
 
   try {
@@ -967,7 +1053,13 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
     final customer = customersVal.maybeWhen(
       data: (list) => list.firstWhere(
         (c) => c.id == order.customerId,
-        orElse: () => CustomerEntity(id: '', name: 'Bilinmeyen Musteri', email: '', phone: '', balance: 0, createdAt: DateTime.now()),
+        orElse: () => CustomerEntity(
+            id: '',
+            name: 'Bilinmeyen Musteri',
+            email: '',
+            phone: '',
+            balance: 0,
+            createdAt: DateTime.now()),
       ),
       orElse: () => null,
     );
@@ -993,14 +1085,14 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
     }).toList();
 
     ref.read(printerServiceProvider).enqueue(
-      'Hazırlama Fişi #${order.id.toShortId}',
-      () => ref.read(printerServiceProvider).printOrderReceipt(
-        order,
-        receiptItems,
-        customer != null && customer.id.isNotEmpty ? customer : null,
-        settings,
-      ),
-    );
+          'Hazırlama Fişi #${order.id.toShortId}',
+          () => ref.read(printerServiceProvider).printOrderReceipt(
+                order,
+                receiptItems,
+                customer != null && customer.id.isNotEmpty ? customer : null,
+                settings,
+              ),
+        );
   } catch (e) {
     debugPrint('Printing error in delivery: $e');
   }
@@ -1058,7 +1150,8 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       // Write label_printer_enabled to SQLite settings (single source of truth)
       final current = ref.read(settingsNotifierProvider).valueOrNull;
       if (current != null) {
-        await ref.read(settingsNotifierProvider.notifier)
+        await ref
+            .read(settingsNotifierProvider.notifier)
             .updateSettings(current.copyWith(labelPrinterEnabled: _printLabel));
       }
     } catch (_) {}
@@ -1072,15 +1165,21 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
     super.dispose();
   }
 
-  double get _remainingAmount => (widget.saleTx.amount - widget.totalPaid).clamp(0.0, double.infinity);
+  double get _remainingAmount =>
+      (widget.saleTx.amount - widget.totalPaid).clamp(0.0, double.infinity);
 
-  double get _karmaCash => double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ?? 0.0;
-  double get _karmaCard => double.tryParse(_karmaCardController.text.replaceAll(',', '.')) ?? 0.0;
-  double get _karmaDebt => double.tryParse(_karmaDebtController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaCash =>
+      double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaCard =>
+      double.tryParse(_karmaCardController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaDebt =>
+      double.tryParse(_karmaDebtController.text.replaceAll(',', '.')) ?? 0.0;
 
   double get _karmaTotal => _karmaCash + _karmaCard + _karmaDebt;
-  double get _karmaRemainder => (_remainingAmount - _karmaTotal).clamp(0.0, double.infinity);
-  bool get _karmaValid => _remainingAmount > 0 && (_karmaTotal - _remainingAmount).abs() < 0.01;
+  double get _karmaRemainder =>
+      (_remainingAmount - _karmaTotal).clamp(0.0, double.infinity);
+  bool get _karmaValid =>
+      _remainingAmount > 0 && (_karmaTotal - _remainingAmount).abs() < 0.01;
 
   Future<void> _submitPayment() async {
     setState(() {
@@ -1142,7 +1241,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         }
       }
 
-      await ref.read(ordersControllerProvider.notifier).updateStatus(widget.order.id, 'delivered');
+      await ref
+          .read(ordersControllerProvider.notifier)
+          .updateStatus(widget.order.id, 'delivered');
 
       await ref.read(customersControllerProvider.notifier).refresh();
       ref.invalidate(customerTransactionsProvider(widget.order.customerId));
@@ -1154,14 +1255,22 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final settingsAsync = ref.read(settingsNotifierProvider);
         final settings = settingsAsync.value;
         if (settings != null) {
-          final hasPrinter = (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                             (settings.printerName != null && settings.printerName!.isNotEmpty);
+          final hasPrinter =
+              (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
+                  (settings.printerName != null &&
+                      settings.printerName!.isNotEmpty);
           if (hasPrinter) {
             final customersVal = ref.read(customersControllerProvider);
             final customer = customersVal.maybeWhen(
               data: (list) => list.firstWhere(
                 (c) => c.id == widget.order.customerId,
-                orElse: () => CustomerEntity(id: '', name: 'Bilinmeyen Musteri', email: '', phone: '', balance: 0, createdAt: DateTime.now()),
+                orElse: () => CustomerEntity(
+                    id: '',
+                    name: 'Bilinmeyen Musteri',
+                    email: '',
+                    phone: '',
+                    balance: 0,
+                    createdAt: DateTime.now()),
               ),
               orElse: () => null,
             );
@@ -1186,25 +1295,30 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               };
             }).toList();
 
-            final double currentFinalPaid = widget.totalPaid + (
-              _selectedMethod == 'cash' 
-                ? remaining 
-                : (_selectedMethod == 'card' ? remaining : (_selectedMethod == 'karma' ? _karmaCash + _karmaCard : 0.0))
-            );
+            final double currentFinalPaid = widget.totalPaid +
+                (_selectedMethod == 'cash'
+                    ? remaining
+                    : (_selectedMethod == 'card'
+                        ? remaining
+                        : (_selectedMethod == 'karma'
+                            ? _karmaCash + _karmaCard
+                            : 0.0)));
 
             for (int i = 0; i < _printCopies; i++) {
               final suffix = _printCopies > 1 ? ' (Kopya ${i + 1})' : '';
               ref.read(printerServiceProvider).enqueue(
-                'Sipariş Fişi #${widget.order.id.toShortId}$suffix',
-                () => ref.read(printerServiceProvider).printOrderReceipt(
-                  widget.order,
-                  receiptItems,
-                  customer != null && customer.id.isNotEmpty ? customer : null,
-                  settings,
-                  paidAmount: currentFinalPaid,
-                  notes: widget.order.notes?.trim(),
-                ),
-              );
+                    'Sipariş Fişi #${widget.order.id.toShortId}$suffix',
+                    () => ref.read(printerServiceProvider).printOrderReceipt(
+                          widget.order,
+                          receiptItems,
+                          customer != null && customer.id.isNotEmpty
+                              ? customer
+                              : null,
+                          settings,
+                          paidAmount: currentFinalPaid,
+                          notes: widget.order.notes?.trim(),
+                        ),
+                  );
             }
           }
         }
@@ -1247,13 +1361,13 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           for (int i = 0; i < _labelCopies; i++) {
             final suffix = _labelCopies > 1 ? ' (Kopya ${i + 1})' : '';
             ref.read(printerServiceProvider).enqueue(
-              'Sipariş Etiketleri #${widget.order.id.toShortId}$suffix',
-              () => ref.read(printerServiceProvider).printOrderLabels(
-                widget.order,
-                receiptItems,
-                labelSettings,
-              ),
-            );
+                  'Sipariş Etiketleri #${widget.order.id.toShortId}$suffix',
+                  () => ref.read(printerServiceProvider).printOrderLabels(
+                        widget.order,
+                        receiptItems,
+                        labelSettings,
+                      ),
+                );
           }
         }
       }
@@ -1307,7 +1421,13 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
     final customer = customersVal.maybeWhen(
       data: (list) => list.firstWhere(
         (c) => c.id == widget.order.customerId,
-        orElse: () => CustomerEntity(id: '', name: 'Bilinmeyen Musteri', email: '', phone: '', balance: 0.0, createdAt: DateTime.now()),
+        orElse: () => CustomerEntity(
+            id: '',
+            name: 'Bilinmeyen Musteri',
+            email: '',
+            phone: '',
+            balance: 0.0,
+            createdAt: DateTime.now()),
       ),
       orElse: () => null,
     );
@@ -1317,7 +1437,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Sipariş Bilgileri', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
+        const Text('Sipariş Bilgileri',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
         const SizedBox(height: 12),
         _buildSummaryRow(
           icon: Icons.person_outline_rounded,
@@ -1328,14 +1450,16 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           _buildSummaryRow(
             icon: Icons.account_balance_wallet_outlined,
             label: 'Müşteri Bakiyesi',
-            value: '₺${customer.balance.abs().toStringAsFixed(2)} ${customer.balance < 0 ? "(Borçlu)" : "(Alacaklı)"}',
+            value:
+                '₺${customer.balance.abs().toStringAsFixed(2)} ${customer.balance < 0 ? "(Borçlu)" : "(Alacaklı)"}',
             valueColor: customer.balance < 0 ? _kRed : _kGreenDark,
           ),
         _buildSummaryRow(
           icon: Icons.calendar_month_outlined,
           label: 'Teslimat Tarihi',
           value: widget.order.expectedDeliveryDate != null
-              ? DateFormat('dd.MM.yyyy').format(widget.order.expectedDeliveryDate!)
+              ? DateFormat('dd.MM.yyyy')
+                  .format(widget.order.expectedDeliveryDate!)
               : 'Belirtilmedi',
         ),
         if (widget.order.notes != null && widget.order.notes!.trim().isNotEmpty)
@@ -1352,7 +1476,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Ödeme Yöntemi Seçin', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
+        const Text('Ödeme Yöntemi Seçin',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: _kText)),
         const SizedBox(height: 12),
         // Totals box
         Container(
@@ -1411,11 +1537,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               IconButton(
                 onPressed: () => setState(() => _printReceipt = !_printReceipt),
                 icon: Icon(
-                  _printReceipt ? Icons.print_rounded : Icons.print_disabled_rounded,
+                  _printReceipt
+                      ? Icons.print_rounded
+                      : Icons.print_disabled_rounded,
                   color: _printReceipt ? _kGreen : _kTextSecondary,
                   size: 20,
                 ),
-                tooltip: _printReceipt ? 'Fiş Yazdırma Açık' : 'Fiş Yazdırma Kapalı',
+                tooltip:
+                    _printReceipt ? 'Fiş Yazdırma Açık' : 'Fiş Yazdırma Kapalı',
                 style: IconButton.styleFrom(
                   backgroundColor: _printReceipt ? _kGreenLight : Colors.white,
                   padding: const EdgeInsets.all(8),
@@ -1424,7 +1553,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(
-                      color: _printReceipt ? _kGreen.withValues(alpha: 0.3) : _kBorder,
+                      color: _printReceipt
+                          ? _kGreen.withValues(alpha: 0.3)
+                          : _kBorder,
                     ),
                   ),
                 ),
@@ -1444,11 +1575,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   _saveLabelPrinterSettings();
                 },
                 icon: Icon(
-                  _printLabel ? Icons.label_rounded : Icons.label_outline_rounded,
+                  _printLabel
+                      ? Icons.label_rounded
+                      : Icons.label_outline_rounded,
                   color: _printLabel ? _kGreen : _kTextSecondary,
                   size: 20,
                 ),
-                tooltip: _printLabel ? 'Etiket Yazıcı Açık' : 'Etiket Yazıcı Kapalı',
+                tooltip:
+                    _printLabel ? 'Etiket Yazıcı Açık' : 'Etiket Yazıcı Kapalı',
                 style: IconButton.styleFrom(
                   backgroundColor: _printLabel ? _kGreenLight : Colors.white,
                   padding: const EdgeInsets.all(8),
@@ -1457,7 +1591,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                     side: BorderSide(
-                      color: _printLabel ? _kGreen.withValues(alpha: 0.3) : _kBorder,
+                      color: _printLabel
+                          ? _kGreen.withValues(alpha: 0.3)
+                          : _kBorder,
                     ),
                   ),
                 ),
@@ -1568,20 +1704,23 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 height: 50,
                 child: ElevatedButton.icon(
                   onPressed: (_isSubmitting || isActionDisabled)
-                    ? null
-                    : _submitPayment,
+                      ? null
+                      : _submitPayment,
                   icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.check_circle_outline_rounded, size: 20),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.check_circle_outline_rounded,
+                          size: 20),
                   label: Text(
-                    _isSubmitting ? 'Ödeme Kaydediliyor...' : 'Ödemeyi Tamamla & Teslim Et',
+                    _isSubmitting
+                        ? 'Ödeme Kaydediliyor...'
+                        : 'Ödemeyi Tamamla & Teslim Et',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -1606,7 +1745,11 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
     );
   }
 
-  Widget _buildSummaryRow({required IconData icon, required String label, required String value, Color? valueColor}) {
+  Widget _buildSummaryRow(
+      {required IconData icon,
+      required String label,
+      required String value,
+      Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -1614,9 +1757,16 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         children: [
           Icon(icon, size: 16, color: _kTextSecondary),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: const TextStyle(color: _kTextSecondary, fontSize: 12))),
+          Expanded(
+              child: Text(label,
+                  style:
+                      const TextStyle(color: _kTextSecondary, fontSize: 12))),
           const SizedBox(width: 8),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: valueColor ?? _kText)),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: valueColor ?? _kText)),
         ],
       ),
     );
@@ -1624,10 +1774,30 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
   Widget _buildMethodsGrid(double remaining) {
     final methods = [
-      {'id': 'cash', 'label': 'Nakit', 'icon': Icons.payments_rounded, 'color': _kGreen},
-      {'id': 'card', 'label': 'Kart', 'icon': Icons.credit_card_rounded, 'color': Colors.blue},
-      {'id': 'debt', 'label': 'Vadeli (Borç)', 'icon': Icons.account_balance_wallet_rounded, 'color': Colors.orange},
-      {'id': 'karma', 'label': 'Karma (Split)', 'icon': Icons.call_split_rounded, 'color': Colors.purple},
+      {
+        'id': 'cash',
+        'label': 'Nakit',
+        'icon': Icons.payments_rounded,
+        'color': _kGreen
+      },
+      {
+        'id': 'card',
+        'label': 'Kart',
+        'icon': Icons.credit_card_rounded,
+        'color': Colors.blue
+      },
+      {
+        'id': 'debt',
+        'label': 'Vadeli (Borç)',
+        'icon': Icons.account_balance_wallet_rounded,
+        'color': Colors.orange
+      },
+      {
+        'id': 'karma',
+        'label': 'Karma (Split)',
+        'icon': Icons.call_split_rounded,
+        'color': Colors.purple
+      },
     ];
 
     return LayoutBuilder(
@@ -1690,9 +1860,10 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
     );
   }
 
-  void _onSplitFieldChanged(String field, String valStr, double remaining, bool hasCustomer) {
+  void _onSplitFieldChanged(
+      String field, String valStr, double remaining, bool hasCustomer) {
     final val = double.tryParse(valStr.replaceAll(',', '.')) ?? 0.0;
-    
+
     if (!hasCustomer) {
       _karmaDebtController.text = '0.00';
       if (field == 'cash') {
@@ -1704,15 +1875,21 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       }
     } else {
       if (field == 'cash') {
-        final currentCard = double.tryParse(_karmaCardController.text.replaceAll(',', '.')) ?? 0.0;
+        final currentCard =
+            double.tryParse(_karmaCardController.text.replaceAll(',', '.')) ??
+                0.0;
         final debtVal = (remaining - (val + currentCard)).clamp(0.0, remaining);
         _karmaDebtController.text = debtVal.toStringAsFixed(2);
       } else if (field == 'card') {
-        final currentCash = double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ?? 0.0;
+        final currentCash =
+            double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ??
+                0.0;
         final debtVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
         _karmaDebtController.text = debtVal.toStringAsFixed(2);
       } else if (field == 'debt') {
-        final currentCash = double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ?? 0.0;
+        final currentCash =
+            double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ??
+                0.0;
         final cardVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
         _karmaCardController.text = cardVal.toStringAsFixed(2);
       }
@@ -1737,18 +1914,24 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d,.]'))],
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: isEnabled ? color : Colors.grey, fontWeight: FontWeight.bold, fontSize: 11),
-        prefixIcon: Icon(icon, color: isEnabled ? color : Colors.grey, size: 16),
+        labelStyle: TextStyle(
+            color: isEnabled ? color : Colors.grey,
+            fontWeight: FontWeight.bold,
+            fontSize: 11),
+        prefixIcon:
+            Icon(icon, color: isEnabled ? color : Colors.grey, size: 16),
         prefixText: '₺',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         isDense: true,
       ),
-      onChanged: (val) => _onSplitFieldChanged(fieldId, val, remaining, hasCustomer),
+      onChanged: (val) =>
+          _onSplitFieldChanged(fieldId, val, remaining, hasCustomer),
     );
   }
 
-  Widget _buildKarmaFields(double remaining, bool karmaValid, double karmaRemaining) {
+  Widget _buildKarmaFields(
+      double remaining, bool karmaValid, double karmaRemaining) {
     final customerId = widget.order.customerId;
     final bool hasCustomer = customerId.isNotEmpty;
 
@@ -1757,19 +1940,26 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
       decoration: BoxDecoration(
         color: _kSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: karmaValid ? _kGreen.withValues(alpha: 0.4) : _kBorder),
+        border: Border.all(
+            color: karmaValid ? _kGreen.withValues(alpha: 0.4) : _kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.call_split_rounded, size: 14, color: _kTextSecondary),
+              const Icon(Icons.call_split_rounded,
+                  size: 14, color: _kTextSecondary),
               const SizedBox(width: 6),
-              const Text('Karma Ödeme Dağılımı', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text('Karma Ödeme Dağılımı',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               const Spacer(),
               if (karmaValid)
-                const Text('✓ Tamam', style: TextStyle(fontSize: 11, color: _kGreenDark, fontWeight: FontWeight.bold)),
+                const Text('✓ Tamam',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: _kGreenDark,
+                        fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
@@ -1886,18 +2076,17 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final Color bgColor = widget.isEnabled 
-        ? Colors.white 
+
+    final Color bgColor = widget.isEnabled
+        ? Colors.white
         : (isDark ? Colors.black26 : Colors.grey.shade100);
-        
-    final Color borderColor = widget.isEnabled 
-        ? _kBorder 
+
+    final Color borderColor = widget.isEnabled
+        ? _kBorder
         : (isDark ? Colors.white24 : Colors.grey.shade300);
-        
-    final Color textColor = widget.isEnabled 
-        ? _kText 
-        : _kTextSecondary.withValues(alpha: 0.5);
+
+    final Color textColor =
+        widget.isEnabled ? _kText : _kTextSecondary.withValues(alpha: 0.5);
 
     return Container(
       width: 36,
@@ -1914,7 +2103,8 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
         enabled: widget.isEnabled,
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+        style: TextStyle(
+            fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
         maxLines: 1,
         decoration: const InputDecoration(
           isDense: true,
@@ -1939,126 +2129,125 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
   }
 }
 
+Widget _buildOrderItemsCard(
+  List<Map<String, dynamic>> items,
+  Map<String, String> productNameMap,
+) {
+  double total = 0;
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          ...items.asMap().entries.map((entry) {
+            final i = entry.key;
+            final item = entry.value;
+            final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+            final price = item['unit_price'] as double? ?? 0.0;
+            final itemTotal = qty * price;
+            total += itemTotal;
+            final productId = item['product_id']?.toString() ?? '';
+            final productName = productNameMap[productId] ??
+                item['product_name']?.toString() ??
+                productId;
 
-
-  Widget _buildOrderItemsCard(
-    List<Map<String, dynamic>> items,
-    Map<String, String> productNameMap,
-  ) {
-    double total = 0;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            ...items.asMap().entries.map((entry) {
-              final i = entry.key;
-              final item = entry.value;
-              final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-              final price = item['unit_price'] as double? ?? 0.0;
-              final itemTotal = qty * price;
-              total += itemTotal;
-              final productId = item['product_id']?.toString() ?? '';
-              final productName = productNameMap[productId] ??
-                  item['product_name']?.toString() ?? productId;
-
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32, height: 32,
-                          decoration: BoxDecoration(
-                            color: _kGreenLight,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _formatQuantity(qty),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _kGreen,
-                                fontSize: 13,
-                              ),
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _kGreenLight,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _formatQuantity(qty),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _kGreen,
+                              fontSize: 13,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                productName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: _kText,
-                                ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              productName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: _kText,
                               ),
-                              Text(
-                                '${price.toStringAsFixed(2)} TL x $qty',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: _kTextSecondary,
-                                ),
+                            ),
+                            Text(
+                              '${price.toStringAsFixed(2)} TL x $qty',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: _kTextSecondary,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          '${itemTotal.toStringAsFixed(2)} TL',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: _kText,
-                          ),
+                      ),
+                      Text(
+                        '${itemTotal.toStringAsFixed(2)} TL',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _kText,
                         ),
-                      ],
-                    ),
-                  ),
-                  if (i < items.length - 1)
-                    const Divider(height: 1, indent: 42),
-                ],
-              );
-            }),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Toplam',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: _kText,
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '${total.toStringAsFixed(2)} TL',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                    color: _kGreen,
-                  ),
-                ),
+                if (i < items.length - 1) const Divider(height: 1, indent: 42),
               ],
-            ),
-          ],
-        ),
+            );
+          }),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Toplam',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: _kText,
+                ),
+              ),
+              Text(
+                '${total.toStringAsFixed(2)} TL',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  color: _kGreen,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildActionButtons(BuildContext context, WidgetRef ref, OrderEntity order) {
-    return const SizedBox.shrink(); // Action row now lives inside stepper
-  }
-
+Widget _buildActionButtons(
+    BuildContext context, WidgetRef ref, OrderEntity order) {
+  return const SizedBox.shrink(); // Action row now lives inside stepper
+}
 
 String _formatQuantity(double qty) {
   if (qty == qty.toInt()) {

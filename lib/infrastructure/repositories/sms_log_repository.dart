@@ -115,7 +115,8 @@ class SmsLogRepository {
   Future<List<SmsLogEntry>> getPendingLogs({int maxRetries = 3}) async {
     if (kIsWeb) {
       return _inMemoryLogs
-          .where((e) => e.status == SmsLogStatus.pending && e.retryCount < maxRetries)
+          .where((e) =>
+              e.status == SmsLogStatus.pending && e.retryCount < maxRetries)
           .toList();
     }
     try {
@@ -136,7 +137,9 @@ class SmsLogRepository {
   /// Count pending entries.
   Future<int> getPendingCount() async {
     if (kIsWeb) {
-      return _inMemoryLogs.where((e) => e.status == SmsLogStatus.pending).length;
+      return _inMemoryLogs
+          .where((e) => e.status == SmsLogStatus.pending)
+          .length;
     }
     try {
       final database = await _db.getDatabase();
@@ -153,14 +156,18 @@ class SmsLogRepository {
   Future<List<SmsLogEntry>> getActiveCampaignLogs() async {
     if (kIsWeb) {
       return _inMemoryLogs
-          .where((e) => (e.status == SmsLogStatus.pending || e.status == SmsLogStatus.sending) && e.eventType == 'bulk_debt_reminder')
+          .where((e) =>
+              (e.status == SmsLogStatus.pending ||
+                  e.status == SmsLogStatus.sending) &&
+              e.eventType == 'bulk_debt_reminder')
           .toList();
     }
     try {
       final database = await _db.getDatabase();
       final rows = await database.query(
         'sms_logs',
-        where: "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
+        where:
+            "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
         orderBy: 'created_at ASC',
       );
       return rows.map(SmsLogEntry.fromMap).toList();
@@ -174,8 +181,11 @@ class SmsLogRepository {
   Future<void> cancelActiveCampaignLogs() async {
     if (kIsWeb) {
       for (var i = 0; i < _inMemoryLogs.length; i++) {
-        if ((_inMemoryLogs[i].status == SmsLogStatus.pending || _inMemoryLogs[i].status == SmsLogStatus.sending) && _inMemoryLogs[i].eventType == 'bulk_debt_reminder') {
-          _inMemoryLogs[i] = _inMemoryLogs[i].copyWith(status: SmsLogStatus.cancelled);
+        if ((_inMemoryLogs[i].status == SmsLogStatus.pending ||
+                _inMemoryLogs[i].status == SmsLogStatus.sending) &&
+            _inMemoryLogs[i].eventType == 'bulk_debt_reminder') {
+          _inMemoryLogs[i] =
+              _inMemoryLogs[i].copyWith(status: SmsLogStatus.cancelled);
         }
       }
       return;
@@ -185,7 +195,8 @@ class SmsLogRepository {
       await database.update(
         'sms_logs',
         {'status': 'cancelled'},
-        where: "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
+        where:
+            "(status = 'pending' OR status = 'sending') AND event_type = 'bulk_debt_reminder'",
       );
     } catch (e) {
       debugPrint('⚠️ SmsLogRepository.cancelActiveCampaignLogs error: $e');
@@ -196,12 +207,14 @@ class SmsLogRepository {
   Future<void> pruneOldLogs({int days = 90}) async {
     if (kIsWeb) {
       final cutoff = DateTime.now().subtract(Duration(days: days));
-      _inMemoryLogs.removeWhere((e) => e.createdAt.isBefore(cutoff) && e.status != SmsLogStatus.pending);
+      _inMemoryLogs.removeWhere((e) =>
+          e.createdAt.isBefore(cutoff) && e.status != SmsLogStatus.pending);
       return;
     }
     try {
       final database = await _db.getDatabase();
-      final cutoff = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+      final cutoff =
+          DateTime.now().subtract(Duration(days: days)).toIso8601String();
       await database.delete(
         'sms_logs',
         where: "created_at < ? AND status != 'pending'",
@@ -217,7 +230,8 @@ class SmsLogRepository {
     if (kIsWeb) {
       for (var i = 0; i < _inMemoryLogs.length; i++) {
         if (_inMemoryLogs[i].status == SmsLogStatus.sending) {
-          _inMemoryLogs[i] = _inMemoryLogs[i].copyWith(status: SmsLogStatus.interrupted);
+          _inMemoryLogs[i] =
+              _inMemoryLogs[i].copyWith(status: SmsLogStatus.interrupted);
         }
       }
       return;
@@ -238,7 +252,9 @@ class SmsLogRepository {
   /// Fetch entries with status 'interrupted'.
   Future<List<SmsLogEntry>> getUnknownLogs() async {
     if (kIsWeb) {
-      return _inMemoryLogs.where((e) => e.status == SmsLogStatus.interrupted).toList();
+      return _inMemoryLogs
+          .where((e) => e.status == SmsLogStatus.interrupted)
+          .toList();
     }
     try {
       final database = await _db.getDatabase();

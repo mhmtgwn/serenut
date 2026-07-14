@@ -57,7 +57,8 @@ class SalesTab extends ConsumerWidget {
                         children: [
                           Text(
                             'Yazıcı Raporları',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                           Text(
                             'Termal yazıcıdan gün içi (X) veya gün sonu (Z) raporu alın.',
@@ -70,24 +71,31 @@ class SalesTab extends ConsumerWidget {
                       onPressed: () async {
                         final summary = summaryVal.value;
                         final categories = categoryVal.value;
-                        final settings = ref.read(settingsNotifierProvider).value;
+                        final settings =
+                            ref.read(settingsNotifierProvider).value;
 
-                        if (summary == null || categories == null || settings == null) {
+                        if (summary == null ||
+                            categories == null ||
+                            settings == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Veriler yukleniyor, lutfen bekleyin...'),
+                              content: Text(
+                                  'Veriler yukleniyor, lutfen bekleyin...'),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
                           return;
                         }
 
-                        final hasPrinter = (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                                           (settings.printerName != null && settings.printerName!.isNotEmpty);
+                        final hasPrinter = (settings.printerIp != null &&
+                                settings.printerIp!.isNotEmpty) ||
+                            (settings.printerName != null &&
+                                settings.printerName!.isNotEmpty);
                         if (!hasPrinter) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
+                              content: Text(
+                                  'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
                               backgroundColor: Colors.orange,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -97,16 +105,19 @@ class SalesTab extends ConsumerWidget {
 
                         try {
                           ref.read(printerServiceProvider).enqueue(
-                            'X Raporu (${range.label})',
-                            () => ref.read(printerServiceProvider).printXReport(
-                              summary,
-                              categories,
-                              settings,
-                            ),
-                          );
+                                'X Raporu (${range.label})',
+                                () => ref
+                                    .read(printerServiceProvider)
+                                    .printXReport(
+                                      summary,
+                                      categories,
+                                      settings,
+                                    ),
+                              );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('X Raporu yazdırma sırasına eklendi.'),
+                              content:
+                                  Text('X Raporu yazdırma sırasına eklendi.'),
                               backgroundColor: Colors.green,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -124,35 +135,46 @@ class SalesTab extends ConsumerWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: POSColors.green,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.print_outlined, size: 16),
-                      label: const Text('X Raporu', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      label: const Text('X Raporu',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: () async {
                         final summary = summaryVal.value;
                         final categories = categoryVal.value;
-                        final settings = ref.read(settingsNotifierProvider).value;
+                        final settings =
+                            ref.read(settingsNotifierProvider).value;
 
-                        if (summary == null || categories == null || settings == null) {
+                        if (summary == null ||
+                            categories == null ||
+                            settings == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Veriler yukleniyor, lutfen bekleyin...'),
+                              content: Text(
+                                  'Veriler yukleniyor, lutfen bekleyin...'),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
                           return;
                         }
 
-                        final hasPrinter = (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                                           (settings.printerName != null && settings.printerName!.isNotEmpty);
+                        final hasPrinter = (settings.printerIp != null &&
+                                settings.printerIp!.isNotEmpty) ||
+                            (settings.printerName != null &&
+                                settings.printerName!.isNotEmpty);
                         if (!hasPrinter) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
+                              content: Text(
+                                  'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
                               backgroundColor: Colors.orange,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -162,16 +184,19 @@ class SalesTab extends ConsumerWidget {
 
                         try {
                           ref.read(printerServiceProvider).enqueue(
-                            'Z Raporu',
-                            () => ref.read(printerServiceProvider).printZReport(
-                              summary,
-                              categories,
-                              settings,
-                            ),
-                          );
+                                'Z Raporu',
+                                () => ref
+                                    .read(printerServiceProvider)
+                                    .printZReport(
+                                      summary,
+                                      categories,
+                                      settings,
+                                    ),
+                              );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Z Raporu yazdırma sırasına eklendi.'),
+                              content:
+                                  Text('Z Raporu yazdırma sırasına eklendi.'),
                               backgroundColor: Colors.green,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -189,11 +214,15 @@ class SalesTab extends ConsumerWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1E293B),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       icon: const Icon(Icons.print_outlined, size: 16),
-                      label: const Text('Z Raporu', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      label: const Text('Z Raporu',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -210,7 +239,8 @@ class SalesTab extends ConsumerWidget {
             const SizedBox(height: 8),
             Card(
               elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: dailyVal.when(
@@ -219,7 +249,8 @@ class SalesTab extends ConsumerWidget {
                     height: 220,
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                  error: (e, _) => buildErrorReportCard('Grafik yüklenemedi: $e'),
+                  error: (e, _) =>
+                      buildErrorReportCard('Grafik yüklenemedi: $e'),
                 ),
               ),
             ),
@@ -278,8 +309,12 @@ class SalesTab extends ConsumerWidget {
           label: 'Tahsilat Oranı',
           value: '%${s.collectionRate.toStringAsFixed(1)}',
           icon: Icons.percent,
-          color: s.collectionRate >= 80 ? POSColors.greenDark : POSColors.amberDark,
-          bg: s.collectionRate >= 80 ? POSColors.greenLight : POSColors.amberLight,
+          color: s.collectionRate >= 80
+              ? POSColors.greenDark
+              : POSColors.amberDark,
+          bg: s.collectionRate >= 80
+              ? POSColors.greenLight
+              : POSColors.amberLight,
           subtitle: 'Toplam Borç: ${formatReportCurrency(s.totalDebt)} TL',
         ),
       ],
@@ -287,7 +322,8 @@ class SalesTab extends ConsumerWidget {
   }
 
   Widget _buildCategoryList(List<CategoryRevenue> cats) {
-    final maxAmount = cats.fold<double>(0, (m, c) => c.totalAmount > m ? c.totalAmount : m);
+    final maxAmount =
+        cats.fold<double>(0, (m, c) => c.totalAmount > m ? c.totalAmount : m);
     final colors = [
       POSColors.green,
       POSColors.amber,
@@ -318,13 +354,16 @@ class SalesTab extends ConsumerWidget {
                   Row(
                     children: [
                       Container(
-                        width: 10, height: 10,
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                        width: 10,
+                        height: 10,
+                        decoration:
+                            BoxDecoration(color: color, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(cat.categoryName,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w500)),
                       ),
                       Text(
                         '%${cat.percentage.toStringAsFixed(1)}',
@@ -368,12 +407,14 @@ class SalesTab extends ConsumerWidget {
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       childAspectRatio: 1.6,
-      children: List.generate(4, (_) => Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-        ),
-      )),
+      children: List.generate(
+          4,
+          (_) => Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              )),
     );
   }
 }

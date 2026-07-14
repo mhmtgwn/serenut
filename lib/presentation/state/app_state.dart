@@ -6,11 +6,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Generic application state wrapper combining AsyncValue + AppException
-/// 
+///
 /// Purpose: Unified state management across all screens
 /// Pattern: Let UI handle AsyncValue.when() with 4 branches
 /// Integration: Works with Riverpod AsyncNotifier + FutureProvider
-/// 
+///
 /// Example:
 /// ```dart
 /// final productListProvider = FutureProvider<AppState<List<Product>>>((ref) async {
@@ -21,7 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///     return AppState.error(AppException.from(e));
 ///   }
 /// });
-/// 
+///
 /// // In UI:
 /// productListProvider.when(
 ///   data: (state) {
@@ -42,7 +42,7 @@ sealed class AppState<T> {
   /// Create success state
   factory AppState.success(T data) => _Success(data);
 
-  /// Create loading state  
+  /// Create loading state
   factory AppState.loading() => const _Loading();
 
   /// Create error state
@@ -54,17 +54,19 @@ sealed class AppState<T> {
     required R Function(T data) success,
     required R Function() loading,
     required R Function(AppException error) error,
-  }) => switch (this) {
-    _Success(data: var data) => success(data),
-    _Loading() => loading(),
-    _Error(exception: var ex) => error(ex),
-  };
+  }) =>
+      switch (this) {
+        _Success(data: var data) => success(data),
+        _Loading() => loading(),
+        _Error(exception: var ex) => error(ex),
+      };
 
   /// Get data if success, otherwise null
   T? getOrNull() => this is _Success ? (this as _Success<T>).data : null;
 
-  /// Get error if error state, otherwise null  
-  AppException? getErrorOrNull() => this is _Error ? (this as _Error<T>).exception : null;
+  /// Get error if error state, otherwise null
+  AppException? getErrorOrNull() =>
+      this is _Error ? (this as _Error<T>).exception : null;
 
   /// Check if success
   bool get isSuccess => this is _Success;
@@ -99,7 +101,7 @@ final class _Error<T> extends AppState<T> {
 
 /// Domain exception hierarchy
 /// Replaces string error messages with type-safe error codes
-/// 
+///
 /// Categories:
 /// - Authentication: Login, token, permission failures
 /// - Validation: Input validation, constraint violations
@@ -165,8 +167,8 @@ final class AuthException extends AppException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: code ?? 'AUTH_ERROR',
-  );
+          code: code ?? 'AUTH_ERROR',
+        );
 
   @override
   String get userMessage => message;
@@ -183,13 +185,13 @@ final class ValidationException extends AppException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: code ?? 'VALIDATION_ERROR',
-  );
+          code: code ?? 'VALIDATION_ERROR',
+        );
 
   @override
-  String get userMessage => fieldName != null 
-    ? '$fieldName is invalid: $message'
-    : 'Invalid input: $message';
+  String get userMessage => fieldName != null
+      ? '$fieldName is invalid: $message'
+      : 'Invalid input: $message';
 }
 
 /// Network/connectivity failures
@@ -200,8 +202,8 @@ final class NetworkException extends AppException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: code ?? 'NETWORK_ERROR',
-  );
+          code: code ?? 'NETWORK_ERROR',
+        );
 
   @override
   String get userMessage => 'Network error: Please check your connection';
@@ -220,8 +222,8 @@ final class TransactionException extends AppException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: code ?? 'TRANSACTION_ERROR',
-  );
+          code: code ?? 'TRANSACTION_ERROR',
+        );
 
   @override
   String get userMessage => 'Transaction failed: $message';
@@ -235,8 +237,8 @@ final class DatabaseException extends AppException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: code ?? 'DATABASE_ERROR',
-  );
+          code: code ?? 'DATABASE_ERROR',
+        );
 
   @override
   String get userMessage => 'Database error: Operation failed';
@@ -249,8 +251,8 @@ final class UnknownException extends AppException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: 'UNKNOWN_ERROR',
-  );
+          code: 'UNKNOWN_ERROR',
+        );
 
   @override
   String get userMessage => 'An unexpected error occurred';
@@ -264,10 +266,10 @@ final class UnknownException extends AppException {
 extension AsyncValueToAppState<T> on AsyncValue<T> {
   /// Convert AsyncValue to AppState
   AppState<T> toAppState() => when(
-    data: (data) => AppState.success(data),
-    loading: () => AppState.loading(),
-    error: (error, stack) => AppState.error(AppException.from(error)),
-  );
+        data: (data) => AppState.success(data),
+        loading: () => AppState.loading(),
+        error: (error, stack) => AppState.error(AppException.from(error)),
+      );
 }
 
 /// Extension for AppState to humanize errors in UI
@@ -287,12 +289,12 @@ extension AppStateErrorDisplay on AppException {
   /// Get color for error display (hex format for Flutter)
   String get colorHex {
     return switch (this) {
-      AuthException() => 'FF6B6B',      // Red
-      ValidationException() => 'FFA500',  // Orange
-      NetworkException() => 'FFD700',     // Yellow
+      AuthException() => 'FF6B6B', // Red
+      ValidationException() => 'FFA500', // Orange
+      NetworkException() => 'FFD700', // Yellow
       TransactionException() => 'FF6B6B', // Red
-      DatabaseException() => 'FF6B6B',    // Red
-      UnknownException() => '808080',     // Gray
+      DatabaseException() => 'FF6B6B', // Red
+      UnknownException() => '808080', // Gray
     };
   }
 }

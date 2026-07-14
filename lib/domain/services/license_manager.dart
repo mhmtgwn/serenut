@@ -17,7 +17,7 @@ class LicenseManager {
     final info = _licenseService.getLicenseInfo();
     final token = _licenseService.getLicenseToken();
     if (info == null || token == null) return null;
-    
+
     final isValid = _licenseService.verifyLicenseToken(token);
     if (!isValid) return null;
 
@@ -35,7 +35,8 @@ class LicenseManager {
     if (license == null || !license.isActive) return false;
 
     // If device wildcard or direct match, allow it
-    if (license.activeDeviceIds.contains('*') || license.activeDeviceIds.contains(deviceId)) {
+    if (license.activeDeviceIds.contains('*') ||
+        license.activeDeviceIds.contains(deviceId)) {
       return true;
     }
 

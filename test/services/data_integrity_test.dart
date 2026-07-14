@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/services/data_integrity_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -11,7 +11,8 @@ class MockTelemetryService implements TelemetryService {
   final List<Map<String, dynamic>> loggedAlarms = [];
 
   @override
-  Future<void> logEvent(String eventName, [Map<String, dynamic>? properties]) async {
+  Future<void> logEvent(String eventName,
+      [Map<String, dynamic>? properties]) async {
     if (eventName == 'silent_data_corruption_alarm') {
       loggedAlarms.add(properties ?? {});
     }
@@ -31,7 +32,9 @@ class MockTelemetryService implements TelemetryService {
 
   @override
   Future<void> logError(Object error, StackTrace stackTrace,
-      {String? context, LogLevel level = LogLevel.error, String? correlationId}) async {}
+      {String? context,
+      LogLevel level = LogLevel.error,
+      String? correlationId}) async {}
 
   @override
   Future<List<TelemetryEvent>> getEvents() async => [];
@@ -42,7 +45,6 @@ class MockTelemetryService implements TelemetryService {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
-
 
 void main() {
   sqfliteFfiInit();
@@ -83,7 +85,9 @@ void main() {
       await databaseManager.close();
     });
 
-    test('Ledger Invariant check detects drift, alerts via telemetry, and rebuild corrects state', () async {
+    test(
+        'Ledger Invariant check detects drift, alerts via telemetry, and rebuild corrects state',
+        () async {
       // 1. Create a customer with a balance of 0
       final customer = CustomerEntity(
         id: 'cust-integrity-1',
@@ -128,13 +132,16 @@ void main() {
       );
 
       // 5. Run verifyLedgerInvariant and expect it to fail & log telemetry alarm
-      final isValid = await integrityService.verifyLedgerInvariant('cust-integrity-1');
+      final isValid =
+          await integrityService.verifyLedgerInvariant('cust-integrity-1');
       expect(isValid, isFalse);
       expect(mockTelemetry.loggedAlarms.length, equals(1));
-      expect(mockTelemetry.loggedAlarms.first['drift'], equals(40.0)); // Difference between -10 and -50
+      expect(mockTelemetry.loggedAlarms.first['drift'],
+          equals(40.0)); // Difference between -10 and -50
 
       // 6. Run rebuildCustomerBalance to rebuild state from transaction logs (State Replay)
-      final correctedBalance = await integrityService.rebuildCustomerBalance('cust-integrity-1');
+      final correctedBalance =
+          await integrityService.rebuildCustomerBalance('cust-integrity-1');
       expect(correctedBalance, equals(-50.0));
 
       // 7. Verify the database now contains the corrected balance
@@ -142,11 +149,13 @@ void main() {
       expect(current, equals(-50.0));
 
       // 8. Invariant should now pass
-      final isNowValid = await integrityService.verifyLedgerInvariant('cust-integrity-1');
+      final isNowValid =
+          await integrityService.verifyLedgerInvariant('cust-integrity-1');
       expect(isNowValid, isTrue);
     });
 
-    test('runGlobalDriftCheck auto-corrects all corrupted customer balances', () async {
+    test('runGlobalDriftCheck auto-corrects all corrupted customer balances',
+        () async {
       // Create two debtor customers starting with 0 balance
       await customerRepo.create(CustomerEntity(
         id: 'cust-drift-1',
@@ -185,11 +194,12 @@ void main() {
       ));
 
       // Corrupt Bob's balance in database directly to -50.0 (drift)
-      await db.rawUpdate('UPDATE customers SET balance = -50.0 WHERE id = "cust-drift-2"');
+      await db.rawUpdate(
+          'UPDATE customers SET balance = -50.0 WHERE id = "cust-drift-2"');
 
       // Run Global Drift Check
       final corrected = await integrityService.runGlobalDriftCheck();
-      
+
       // Bob should be corrected, Alice should remain untouched
       expect(corrected.containsKey('cust-drift-2'), isTrue);
       expect(corrected.containsKey('cust-drift-1'), isFalse);

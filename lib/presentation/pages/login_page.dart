@@ -59,7 +59,8 @@ class LoginPage extends ConsumerWidget {
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       color: POSColors.greenLight,
-                      child: const Icon(Icons.storefront_rounded, size: 48, color: POSColors.green),
+                      child: const Icon(Icons.storefront_rounded,
+                          size: 48, color: POSColors.green),
                     ),
                   ),
                 ),
@@ -146,7 +147,8 @@ class LoginPage extends ConsumerWidget {
                   onPressed: () async {
                     final uri = Uri.parse('https://serenut.com/portal/#reset');
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
                     }
                   },
                   child: Text(
@@ -211,7 +213,7 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final size   = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
 
     ref.listen<AppState<AuthUser>>(authNotifierProvider, (_, next) {
@@ -239,12 +241,14 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
         backgroundColor: POSColors.card,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: POSColors.text, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: POSColors.text, size: 18),
           onPressed: () => context.go('/login'),
         ),
         title: Text(
           'Giriş Yap',
-          style: GoogleFonts.inter(color: POSColors.text, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+              color: POSColors.text, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         bottom: PreferredSize(
@@ -275,12 +279,16 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline_rounded, color: POSColors.red, size: 20),
+                        const Icon(Icons.error_outline_rounded,
+                            color: POSColors.red, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: GoogleFonts.inter(color: POSColors.red, fontSize: 13, fontWeight: FontWeight.w500),
+                            style: GoogleFonts.inter(
+                                color: POSColors.red,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -310,7 +318,9 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                   obscureText: _obscure,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      _obscure
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
                       color: POSColors.textSecondary,
                       size: 20,
                     ),
@@ -329,7 +339,8 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: POSColors.green,
                       disabledBackgroundColor: POSColors.border,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: _isLoading
@@ -338,7 +349,8 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : Text(
@@ -361,7 +373,8 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                     children: [
                       Text(
                         'Hesabınız yok mu? ',
-                        style: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13),
+                        style: GoogleFonts.inter(
+                            color: POSColors.textSecondary, fontSize: 13),
                       ),
                       GestureDetector(
                         onTap: () => context.go('/register'),
@@ -410,7 +423,8 @@ class _PrimaryButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _PrimaryButton({required this.label, required this.icon, required this.onTap});
+  const _PrimaryButton(
+      {required this.label, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -463,7 +477,8 @@ class _SecondaryButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _SecondaryButton({required this.label, required this.icon, required this.onTap});
+  const _SecondaryButton(
+      {required this.label, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -543,8 +558,10 @@ class _LightField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: GoogleFonts.inter(color: POSColors.textDisabled, fontSize: 14),
-        labelStyle: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 14),
+        hintStyle:
+            GoogleFonts.inter(color: POSColors.textDisabled, fontSize: 14),
+        labelStyle:
+            GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 14),
         prefixIcon: Icon(icon, color: POSColors.textSecondary, size: 20),
         suffixIcon: suffixIcon,
         filled: true,
@@ -561,7 +578,8 @@ class _LightField extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: POSColors.border),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
@@ -595,14 +613,17 @@ class _SubUserLoginPageState extends ConsumerState<SubUserLoginPage> {
     final username = _usernameCtrl.text.trim();
     final pin = _pinCtrl.text;
     if (businessCode.isEmpty || username.isEmpty || pin.isEmpty) {
-      setState(() => _errorMessage = 'İşletme kodu, kullanıcı adı ve PIN zorunludur.');
+      setState(() =>
+          _errorMessage = 'İşletme kodu, kullanıcı adı ve PIN zorunludur.');
       return;
     }
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    ref.read(authNotifierProvider.notifier).loginSubUser(businessCode, username, pin);
+    ref
+        .read(authNotifierProvider.notifier)
+        .loginSubUser(businessCode, username, pin);
   }
 
   @override
@@ -635,12 +656,14 @@ class _SubUserLoginPageState extends ConsumerState<SubUserLoginPage> {
         backgroundColor: POSColors.card,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: POSColors.text, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: POSColors.text, size: 18),
           onPressed: () => context.go('/login'),
         ),
         title: Text(
           'Personel Girişi',
-          style: GoogleFonts.inter(color: POSColors.text, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+              color: POSColors.text, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         bottom: PreferredSize(
@@ -671,12 +694,16 @@ class _SubUserLoginPageState extends ConsumerState<SubUserLoginPage> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline_rounded, color: POSColors.red, size: 20),
+                        const Icon(Icons.error_outline_rounded,
+                            color: POSColors.red, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: GoogleFonts.inter(color: POSColors.red, fontSize: 13, fontWeight: FontWeight.w500),
+                            style: GoogleFonts.inter(
+                                color: POSColors.red,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -717,7 +744,12 @@ class _SubUserLoginPageState extends ConsumerState<SubUserLoginPage> {
                   obscureText: _obscure,
                   keyboardType: TextInputType.number,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: POSColors.textSecondary, size: 20),
+                    icon: Icon(
+                        _obscure
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        color: POSColors.textSecondary,
+                        size: 20),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                   onSubmitted: (_) => _handleSubUserLogin(),
@@ -732,7 +764,8 @@ class _SubUserLoginPageState extends ConsumerState<SubUserLoginPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: POSColors.green,
                       disabledBackgroundColor: POSColors.border,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: _isLoading
@@ -741,7 +774,8 @@ class _SubUserLoginPageState extends ConsumerState<SubUserLoginPage> {
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : Text(

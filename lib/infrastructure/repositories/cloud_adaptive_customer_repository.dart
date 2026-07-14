@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/cloud_adaptive_customer_repository.dart
+// lib/infrastructure/repositories/cloud_adaptive_customer_repository.dart
 // Serenut Platform — Cloud Adaptive Customer Repository
 // Implements Repository Pattern, coordinating Local SQLite and Remote Data Source.
 // Created: 04 Jul 2026
@@ -35,17 +35,22 @@ class CloudAdaptiveCustomerRepository implements ICustomerRepository {
   Future<List<CustomerEntity>> getWithCredit() => _localRepo.getWithCredit();
 
   @override
-  Future<double> getBalance(String customerId) => _localRepo.getBalance(customerId);
+  Future<double> getBalance(String customerId) =>
+      _localRepo.getBalance(customerId);
 
   @override
-  Future<double> getTotalDebt(String customerId) => _localRepo.getTotalDebt(customerId);
+  Future<double> getTotalDebt(String customerId) =>
+      _localRepo.getTotalDebt(customerId);
 
   @override
-  Future<double> getTotalPaid(String customerId) => _localRepo.getTotalPaid(customerId);
+  Future<double> getTotalPaid(String customerId) =>
+      _localRepo.getTotalPaid(customerId);
 
   @override
-  Future<List<CustomerEntity>> findFiltered({String? searchQuery, int? limit, int? offset}) =>
-      _localRepo.findFiltered(searchQuery: searchQuery, limit: limit, offset: offset);
+  Future<List<CustomerEntity>> findFiltered(
+          {String? searchQuery, int? limit, int? offset}) =>
+      _localRepo.findFiltered(
+          searchQuery: searchQuery, limit: limit, offset: offset);
 
   // ── Write operations (Offline first: write local, then sync remote in bg) ──
   @override

@@ -1,4 +1,4 @@
-﻿// test/services/telemetry_service_test.dart
+// test/services/telemetry_service_test.dart
 // Unit tests for TelemetryService logs execution and JSONL consistency checks.
 
 import 'dart:io';
@@ -14,8 +14,9 @@ void main() {
 
   setUpAll(() async {
     tempDir = Directory.systemTemp.createTempSync('telemetry_test');
-    
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
       (MethodCall methodCall) async {
         if (methodCall.method == 'getApplicationDocumentsDirectory') {
@@ -62,7 +63,8 @@ void main() {
       expect(ev1.event, equals('test_event_1'));
       expect(ev1.metadata['metric_val'], equals(42));
       expect(ev1.metadata['tag'], equals('debug'));
-      expect(ev1.metadata['rss_mb'], isNotNull); // RSS memory profiling verification
+      expect(ev1.metadata['rss_mb'],
+          isNotNull); // RSS memory profiling verification
 
       // 4. Assert second event
       final ev2 = events.last;

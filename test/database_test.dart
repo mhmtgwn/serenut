@@ -1,4 +1,4 @@
-﻿// test/database_test.dart
+// test/database_test.dart
 // PHASE 0 Day 4 - Database Layer Integration Tests
 // Verifies DatabaseManager, schema creation, and SQLite repositories
 // Generated: 21 Jun 2026
@@ -32,21 +32,111 @@ void main() {
 
       // Seed the database with the mock data needed for these tests
       final db = await databaseManager.getDatabase();
-      
+
       // Insert products
       final products = [
-        {'id': 'prod-1', 'name': 'Fındık İçi', 'description': 'Taze fındık', 'price': 150.0, 'quantity': 10, 'category': 'Kuruyemiş', 'sku': 'PROD-001', 'vat': 8},
-        {'id': 'prod-2', 'name': 'Badem İçi', 'description': 'Taze badem', 'price': 200.0, 'quantity': 15, 'category': 'Kuruyemiş', 'sku': 'PROD-002', 'vat': 8},
-        {'id': 'prod-3', 'name': 'Ceviz İçi', 'description': 'Taze ceviz', 'price': 180.0, 'quantity': 20, 'category': 'Kuruyemiş', 'sku': 'PROD-003', 'vat': 8},
-        {'id': 'prod-4', 'name': 'Antep Fıstığı', 'description': 'Taze antep fıstığı', 'price': 300.0, 'quantity': 25, 'category': 'Kuruyemiş', 'sku': 'PROD-004', 'vat': 8},
-        {'id': 'prod-5', 'name': 'Kaju', 'description': 'Taze kaju', 'price': 250.0, 'quantity': 30, 'category': 'Kuruyemiş', 'sku': 'PROD-005', 'vat': 8},
-        {'id': 'prod-6', 'name': 'Leblebi', 'description': 'Taze leblebi', 'price': 80.0, 'quantity': 40, 'category': 'Kuruyemiş', 'sku': 'PROD-006', 'vat': 8},
-        {'id': 'prod-7', 'name': 'Kuru Üzüm', 'description': 'Taze kuru üzüm', 'price': 90.0, 'quantity': 50, 'category': 'Kuruyemiş', 'sku': 'PROD-007', 'vat': 8},
-        {'id': 'prod-8', 'name': 'Kuru Kayısı', 'description': 'Taze kuru kayısı', 'price': 120.0, 'quantity': 35, 'category': 'Kuruyemiş', 'sku': 'PROD-008', 'vat': 8},
-        {'id': 'prod-9', 'name': 'Kuru İncir', 'description': 'Taze kuru incir', 'price': 160.0, 'quantity': 18, 'category': 'Kuruyemiş', 'sku': 'PROD-009', 'vat': 8},
-        {'id': 'prod-10', 'name': 'Kabak Çekirdeği', 'description': 'Taze kabak çekirdeği', 'price': 110.0, 'quantity': 22, 'category': 'Kuruyemiş', 'sku': 'PROD-010', 'vat': 8},
+        {
+          'id': 'prod-1',
+          'name': 'Fındık İçi',
+          'description': 'Taze fındık',
+          'price': 150.0,
+          'quantity': 10,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-001',
+          'vat': 8
+        },
+        {
+          'id': 'prod-2',
+          'name': 'Badem İçi',
+          'description': 'Taze badem',
+          'price': 200.0,
+          'quantity': 15,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-002',
+          'vat': 8
+        },
+        {
+          'id': 'prod-3',
+          'name': 'Ceviz İçi',
+          'description': 'Taze ceviz',
+          'price': 180.0,
+          'quantity': 20,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-003',
+          'vat': 8
+        },
+        {
+          'id': 'prod-4',
+          'name': 'Antep Fıstığı',
+          'description': 'Taze antep fıstığı',
+          'price': 300.0,
+          'quantity': 25,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-004',
+          'vat': 8
+        },
+        {
+          'id': 'prod-5',
+          'name': 'Kaju',
+          'description': 'Taze kaju',
+          'price': 250.0,
+          'quantity': 30,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-005',
+          'vat': 8
+        },
+        {
+          'id': 'prod-6',
+          'name': 'Leblebi',
+          'description': 'Taze leblebi',
+          'price': 80.0,
+          'quantity': 40,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-006',
+          'vat': 8
+        },
+        {
+          'id': 'prod-7',
+          'name': 'Kuru Üzüm',
+          'description': 'Taze kuru üzüm',
+          'price': 90.0,
+          'quantity': 50,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-007',
+          'vat': 8
+        },
+        {
+          'id': 'prod-8',
+          'name': 'Kuru Kayısı',
+          'description': 'Taze kuru kayısı',
+          'price': 120.0,
+          'quantity': 35,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-008',
+          'vat': 8
+        },
+        {
+          'id': 'prod-9',
+          'name': 'Kuru İncir',
+          'description': 'Taze kuru incir',
+          'price': 160.0,
+          'quantity': 18,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-009',
+          'vat': 8
+        },
+        {
+          'id': 'prod-10',
+          'name': 'Kabak Çekirdeği',
+          'description': 'Taze kabak çekirdeği',
+          'price': 110.0,
+          'quantity': 22,
+          'category': 'Kuruyemiş',
+          'sku': 'PROD-010',
+          'vat': 8
+        },
       ];
-      
+
       for (final product in products) {
         await db.insert('products', {
           ...product,
@@ -58,9 +148,27 @@ void main() {
 
       // Insert customers
       final customers = [
-        {'id': 'cust-1', 'name': 'Ahmet Yılmaz', 'email': 'ahmet@gmail.com', 'phone': '5550001122', 'balance': 0.0},
-        {'id': 'cust-2', 'name': 'Mehmet Kaya', 'email': 'mehmet@gmail.com', 'phone': '5550001133', 'balance': 100.0},
-        {'id': 'cust-3', 'name': 'Ayşe Demir', 'email': 'ayse@gmail.com', 'phone': '5550001144', 'balance': 0.0},
+        {
+          'id': 'cust-1',
+          'name': 'Ahmet Yılmaz',
+          'email': 'ahmet@gmail.com',
+          'phone': '5550001122',
+          'balance': 0.0
+        },
+        {
+          'id': 'cust-2',
+          'name': 'Mehmet Kaya',
+          'email': 'mehmet@gmail.com',
+          'phone': '5550001133',
+          'balance': 100.0
+        },
+        {
+          'id': 'cust-3',
+          'name': 'Ayşe Demir',
+          'email': 'ayse@gmail.com',
+          'phone': '5550001144',
+          'balance': 0.0
+        },
       ];
 
       for (final customer in customers) {
@@ -87,14 +195,14 @@ void main() {
 
       test('should create all required tables', () async {
         final db = await databaseManager.getDatabase();
-        
+
         // Query system tables to verify
         final result = await db.query(
           'sqlite_master',
           where: 'type=? AND name NOT LIKE ?',
           whereArgs: ['table', 'sqlite_%'],
         );
-        
+
         final tableNames = result.map((t) => t['name']).toList();
         expect(tableNames, contains('users'));
         expect(tableNames, contains('products'));
@@ -108,7 +216,7 @@ void main() {
 
       test('should insert default mock data', () async {
         final db = await databaseManager.getDatabase();
-        
+
         // Populate test users since hardcoded seeding was removed for security
         await db.insert('users', {
           'id': 'test-admin-id',
@@ -181,14 +289,12 @@ void main() {
         const productId = 'prod-1';
         const decreaseQty = 2;
 
-        final productBefore =
-            await productRepository.findById(productId);
+        final productBefore = await productRepository.findById(productId);
         final initialQuantity = productBefore?.quantity ?? 0;
 
         await productRepository.decreaseStock(productId, decreaseQty);
 
-        final productAfter =
-            await productRepository.findById(productId);
+        final productAfter = await productRepository.findById(productId);
         expect(productAfter?.quantity, equals(initialQuantity - decreaseQty));
       });
 
@@ -196,14 +302,12 @@ void main() {
         const productId = 'prod-1';
         const increaseQty = 3;
 
-        final productBefore =
-            await productRepository.findById(productId);
+        final productBefore = await productRepository.findById(productId);
         final initialQuantity = productBefore?.quantity ?? 0;
 
         await productRepository.increaseStock(productId, increaseQty);
 
-        final productAfter =
-            await productRepository.findById(productId);
+        final productAfter = await productRepository.findById(productId);
         expect(productAfter?.quantity, equals(initialQuantity + increaseQty));
       });
     });
@@ -257,7 +361,8 @@ void main() {
         expect(withCredit.any((c) => c.id == 'cust-credit-test'), isTrue);
       });
 
-      test('should update customer balance via financial transaction triggers', () async {
+      test('should update customer balance via financial transaction triggers',
+          () async {
         const customerId = 'cust-1';
         final customerBefore = await customerRepository.findById(customerId);
         final initialBalance = customerBefore?.balance ?? 0.0;
@@ -274,8 +379,7 @@ void main() {
           date: DateTime.now(),
         ));
 
-        final customer =
-            await customerRepository.findById(customerId);
+        final customer = await customerRepository.findById(customerId);
         expect(customer?.balance, equals(initialBalance + balanceChange));
       });
     });
@@ -297,7 +401,8 @@ void main() {
         final startDate = DateTime.now().subtract(const Duration(days: 7));
         final endDate = DateTime.now();
 
-        final salees = await saleRepository.getSalesByDateRange(startDate, endDate);
+        final salees =
+            await saleRepository.getSalesByDateRange(startDate, endDate);
         expect(salees, isA<List<SaleEntity>>());
       });
 
@@ -315,7 +420,7 @@ void main() {
     group('Database Persistence', () {
       test('should persist data across queries', () async {
         final db = await databaseManager.getDatabase();
-        
+
         // Insert a test record
         final testId = 'test-persist-${DateTime.now().millisecondsSinceEpoch}';
         await db.insert('products', {

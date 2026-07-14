@@ -21,7 +21,8 @@ void main() {
     });
 
     test('enqueue adds print job and loads pending successfully', () async {
-      final job = await queue.enqueue(title: 'Sale Receipt', receiptJson: '{"amount": 100}');
+      final job = await queue.enqueue(
+          title: 'Sale Receipt', receiptJson: '{"amount": 100}');
       expect(job.title, 'Sale Receipt');
       expect(job.status, PrintJobStatus.pending);
 
@@ -33,7 +34,7 @@ void main() {
 
     test('markPrinting and markDone updates job status correctly', () async {
       final job = await queue.enqueue(title: 'Fis', receiptJson: '{}');
-      
+
       await queue.markPrinting(job.id);
       var pending = await queue.loadPending();
       expect(pending.length, 0); // No longer pending
@@ -46,7 +47,9 @@ void main() {
       expect(all.first.status, PrintJobStatus.success);
     });
 
-    test('markFailed increments retry count and marks abandoned if exceeds limit', () async {
+    test(
+        'markFailed increments retry count and marks abandoned if exceeds limit',
+        () async {
       final job = await queue.enqueue(title: 'Fis', receiptJson: '{}');
 
       // Retry up to 5 times
@@ -82,7 +85,8 @@ void main() {
     test('high concurrency enqueues do not produce race conditions', () async {
       // Run 20 concurrent enqueue operations in parallel
       await Future.wait(List.generate(20, (i) {
-        return queue.enqueue(title: 'Concurrent Fis $i', receiptJson: '{"id": $i}');
+        return queue.enqueue(
+            title: 'Concurrent Fis $i', receiptJson: '{"id": $i}');
       }));
 
       final all = await queue.loadAll();

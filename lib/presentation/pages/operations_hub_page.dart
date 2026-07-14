@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/operations_hub_page.dart
+// lib/presentation/pages/operations_hub_page.dart
 // Serenut OS — Daily Operations & Transaction Center
 // Created: Phase C — 01 Jul 2026
 
@@ -10,15 +10,15 @@ import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFFF8FAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFE2E8F0);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kBgColor = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kBlue          = Color(0xFF3B82F6);
-const _kPurple        = Color(0xFF8B5CF6);
-const _kTeal          = Color(0xFF0D9488);
+const _kGreen = Color(0xFF10B981);
+const _kBlue = Color(0xFF3B82F6);
+const _kPurple = Color(0xFF8B5CF6);
+const _kTeal = Color(0xFF0D9488);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -31,7 +31,9 @@ class OperationsHubPage extends ConsumerWidget {
     final dashboardAsync = ref.watch(dashboardProvider);
 
     final pendingOrdersCount = ordersAsync.maybeWhen(
-      data: (list) => list.where((o) => o.status == 'created' || o.status == 'preparing').length,
+      data: (list) => list
+          .where((o) => o.status == 'created' || o.status == 'preparing')
+          .length,
       orElse: () => 0,
     );
 
@@ -187,7 +189,8 @@ class _HubCard extends StatelessWidget {
                   const Spacer(),
                   if (badge != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: badgeColor ?? color,
                         borderRadius: BorderRadius.circular(10),

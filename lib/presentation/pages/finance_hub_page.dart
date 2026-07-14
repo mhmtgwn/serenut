@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/finance_hub_page.dart
+// lib/presentation/pages/finance_hub_page.dart
 // Serenut OS — Finance & Ledger Center
 // Created: Phase D — 01 Jul 2026
 
@@ -10,20 +10,20 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFFF8FAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFE2E8F0);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kBgColor = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kGreenDark     = Color(0xFF047857);
-const _kRed           = Color(0xFFEF4444);
-const _kRedLight       = Color(0xFFFEF2F2);
-const _kBlue          = Color(0xFF3B82F6);
-const _kBlueLight      = Color(0xFFEFF6FF);
-const _kAmber         = Color(0xFFF59E0B);
-const _kAmberLight     = Color(0xFFFEF3C7);
-const _kPurple        = Color(0xFF8B5CF6);
+const _kGreen = Color(0xFF10B981);
+const _kGreenDark = Color(0xFF047857);
+const _kRed = Color(0xFFEF4444);
+const _kRedLight = Color(0xFFFEF2F2);
+const _kBlue = Color(0xFF3B82F6);
+const _kBlueLight = Color(0xFFEFF6FF);
+const _kAmber = Color(0xFFF59E0B);
+const _kAmberLight = Color(0xFFFEF3C7);
+const _kPurple = Color(0xFF8B5CF6);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ class FinanceHubPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardProvider);
-    final debtorsAsync   = ref.watch(debtorsProvider);
+    final debtorsAsync = ref.watch(debtorsProvider);
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -108,7 +108,10 @@ class FinanceHubPage extends ConsumerWidget {
         children: [
           const Text(
             'Toplam Cari Alacak',
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 13,
+                fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
           Text(
@@ -132,12 +135,16 @@ class FinanceHubPage extends ConsumerWidget {
                       style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                   const SizedBox(height: 2),
                   Text('₺${todayRevenue.toStringAsFixed(2)}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13)),
                 ],
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: _kGreen.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -149,7 +156,10 @@ class FinanceHubPage extends ConsumerWidget {
                     SizedBox(width: 4),
                     Text(
                       'Ledger Güvenli',
-                      style: TextStyle(color: _kGreen, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: _kGreen,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -229,17 +239,24 @@ class FinanceHubPage extends ConsumerWidget {
           return Column(
             children: [
               ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 leading: CircleAvatar(
                   backgroundColor: _kRedLight,
                   child: Text(
-                    customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: _kRed, fontWeight: FontWeight.bold),
+                    customer.name.isNotEmpty
+                        ? customer.name[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                        color: _kRed, fontWeight: FontWeight.bold),
                   ),
                 ),
                 title: Text(
                   customer.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: _kTextPrimary, fontSize: 14),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _kTextPrimary,
+                      fontSize: 14),
                 ),
                 subtitle: Text(
                   customer.phone.isNotEmpty ? customer.phone : 'Telefon yok',
@@ -258,12 +275,14 @@ class FinanceHubPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: _kTextSecondary, size: 20),
                   ],
                 ),
                 onTap: () => context.push('/customers/detail/${customer.id}'),
               ),
-              if (!isLast) const Divider(height: 1, indent: 72, color: _kBorderColor),
+              if (!isLast)
+                const Divider(height: 1, indent: 72, color: _kBorderColor),
             ],
           );
         }).toList(),
@@ -316,9 +335,13 @@ class _ReportTile extends StatelessWidget {
         ),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kTextPrimary)),
-      subtitle: Text(subtitle, style: const TextStyle(color: _kTextSecondary, fontSize: 11)),
-      trailing: const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
+      title: Text(title,
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 14, color: _kTextPrimary)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(color: _kTextSecondary, fontSize: 11)),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: _kTextSecondary, size: 20),
       onTap: onTap,
     );
   }
@@ -340,7 +363,8 @@ class _LoadingPlaceholder extends StatelessWidget {
         border: Border.all(color: _kBorderColor),
       ),
       child: const Center(
-        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen), strokeWidth: 2),
+        child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(_kGreen), strokeWidth: 2),
       ),
     );
   }
@@ -363,7 +387,9 @@ class _ErrorCard extends StatelessWidget {
         children: [
           const Icon(Icons.error_outline_rounded, color: _kRed),
           const SizedBox(width: 12),
-          Expanded(child: Text(message, style: const TextStyle(color: _kRed, fontSize: 12))),
+          Expanded(
+              child: Text(message,
+                  style: const TextStyle(color: _kRed, fontSize: 12))),
         ],
       ),
     );

@@ -9,7 +9,7 @@ class _Unset {
 
 class Settings {
   final int? id;
-  
+
   // İşletme bilgisi
   final String businessName;
   final String businessPhone;
@@ -21,32 +21,32 @@ class Settings {
   final String businessCity;
   final String businessDistrict;
   final String businessType;
-  final String currency;          // ₺
-  
+  final String currency; // ₺
+
   // Yazıcı ayarları
   final String? printerName;
   final String? printerIp;
   final int printerPort;
-  final int paperWidth;           // mm (80mm termal)
+  final int paperWidth; // mm (80mm termal)
   final bool printReceipt;
   final bool printQRCode;
   final bool printProductDetails;
   final bool printBarcode;
   final int printCopies;
-  
+
   // KDV kategorileri (JSON string)
-  final String vatCategories;     // JSON: [{"name":"Normal","rate":18}, ...]
-  
+  final String vatCategories; // JSON: [{"name":"Normal","rate":18}, ...]
+
   // SMS ayarları
   final bool smsEnabled;
-  final String? smsProvider;      // 'twilio', 'local', etc.
+  final String? smsProvider; // 'twilio', 'local', etc.
   final String? smsApiKey;
   final String? smsTemplate;
-  
+
   // QR Settings
   final bool qrEnabled;
-  final String qrFormat;          // 'type|id|timestamp|customerId|amount|hash'
-  
+  final String qrFormat; // 'type|id|timestamp|customerId|amount|hash'
+
   // Diğer
   final bool debugMode;
   final DateTime createdAt;
@@ -125,10 +125,17 @@ class Settings {
   factory Settings.fromMap(Map<String, dynamic> map) {
     return Settings(
       id: map['id'] as int?,
-      businessName: (map['business_name'] as String?) ?? (map['company_name'] as String?) ?? 'Serenut OS',
-      businessPhone: (map['business_phone'] as String?) ?? (map['company_phone'] as String?) ?? '',
-      businessAddress: (map['business_address'] as String?) ?? (map['company_address'] as String?) ?? '',
-      businessTaxId: map['business_tax_id'] ?? map['company_tax_number'] as String?,
+      businessName: (map['business_name'] as String?) ??
+          (map['company_name'] as String?) ??
+          'Serenut OS',
+      businessPhone: (map['business_phone'] as String?) ??
+          (map['company_phone'] as String?) ??
+          '',
+      businessAddress: (map['business_address'] as String?) ??
+          (map['company_address'] as String?) ??
+          '',
+      businessTaxId:
+          map['business_tax_id'] ?? map['company_tax_number'] as String?,
       businessLogo: map['business_logo'] as String?,
       ownerName: map['owner_name'] as String? ?? '',
       businessEmail: map['business_email'] as String?,
@@ -152,16 +159,25 @@ class Settings {
       smsApiKey: map['sms_api_key'] as String?,
       smsTemplate: map['sms_template'] as String?,
       qrEnabled: (map['qr_enabled'] as int?) == 1,
-      qrFormat: map['qr_format'] as String? ?? 'type|id|timestamp|customerId|amount|hash',
+      qrFormat: map['qr_format'] as String? ??
+          'type|id|timestamp|customerId|amount|hash',
       debugMode: (map['debug_mode'] as int?) == 1,
-      createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()),
-      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null,
+      createdAt: DateTime.parse(
+          map['created_at'] as String? ?? DateTime.now().toIso8601String()),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
+          : null,
 
       // Sprint 4 mappings
-      soundNotificationEnabled: (map['sound_notification_enabled'] as int?) == 1,
-      smsAutoDebtReminderEnabled: (map['sms_auto_debt_reminder_enabled'] as int?) == 1,
-      smsAutoDebtReminderDays: (map['sms_auto_debt_reminder_days'] as int?) ?? 15,
-      smsAutoDebtReminderMinAmount: (map['sms_auto_debt_reminder_min_amount'] as num?)?.toDouble() ?? 100.0,
+      soundNotificationEnabled:
+          (map['sound_notification_enabled'] as int?) == 1,
+      smsAutoDebtReminderEnabled:
+          (map['sms_auto_debt_reminder_enabled'] as int?) == 1,
+      smsAutoDebtReminderDays:
+          (map['sms_auto_debt_reminder_days'] as int?) ?? 15,
+      smsAutoDebtReminderMinAmount:
+          (map['sms_auto_debt_reminder_min_amount'] as num?)?.toDouble() ??
+              100.0,
       labelPrinterEnabled: (map['label_printer_enabled'] as int?) == 1,
       labelPrinterIp: map['label_printer_ip'] as String?,
       labelPrinterPort: (map['label_printer_port'] as int?) ?? 9100,
@@ -246,7 +262,6 @@ class Settings {
     String? businessDistrict,
     String? businessType,
     String? currency,
-
     String? printerName,
     String? printerIp,
     int? printerPort,
@@ -318,15 +333,20 @@ class Settings {
       updatedAt: updatedAt ?? this.updatedAt,
 
       // Sprint 4 copyWith updates
-      soundNotificationEnabled: soundNotificationEnabled ?? this.soundNotificationEnabled,
-      smsAutoDebtReminderEnabled: smsAutoDebtReminderEnabled ?? this.smsAutoDebtReminderEnabled,
-      smsAutoDebtReminderDays: smsAutoDebtReminderDays ?? this.smsAutoDebtReminderDays,
-      smsAutoDebtReminderMinAmount: smsAutoDebtReminderMinAmount ?? this.smsAutoDebtReminderMinAmount,
+      soundNotificationEnabled:
+          soundNotificationEnabled ?? this.soundNotificationEnabled,
+      smsAutoDebtReminderEnabled:
+          smsAutoDebtReminderEnabled ?? this.smsAutoDebtReminderEnabled,
+      smsAutoDebtReminderDays:
+          smsAutoDebtReminderDays ?? this.smsAutoDebtReminderDays,
+      smsAutoDebtReminderMinAmount:
+          smsAutoDebtReminderMinAmount ?? this.smsAutoDebtReminderMinAmount,
       labelPrinterEnabled: labelPrinterEnabled ?? this.labelPrinterEnabled,
       labelPrinterIp: labelPrinterIp ?? this.labelPrinterIp,
       labelPrinterPort: labelPrinterPort ?? this.labelPrinterPort,
       labelPrinterCopies: labelPrinterCopies ?? this.labelPrinterCopies,
-      adminPinCode: adminPinCode is _Unset ? this.adminPinCode : adminPinCode as String?,
+      adminPinCode:
+          adminPinCode is _Unset ? this.adminPinCode : adminPinCode as String?,
       smsSimSubscriptionId: smsSimSubscriptionId ?? this.smsSimSubscriptionId,
       smsSimSlotIndex: smsSimSlotIndex ?? this.smsSimSlotIndex,
       smsMonthlyLimit: smsMonthlyLimit ?? this.smsMonthlyLimit,

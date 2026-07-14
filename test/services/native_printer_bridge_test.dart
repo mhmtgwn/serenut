@@ -13,7 +13,8 @@ class MockWinspoolWrapper implements WinspoolWrapper {
   bool closePrinterCalled = false;
 
   @override
-  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter, Pointer<Void> pDefault) {
+  int openPrinter(Pointer<Utf16> pPrinterName, Pointer<IntPtr> phPrinter,
+      Pointer<Void> pDefault) {
     openPrinterCalled = true;
     lastPrinterName = pPrinterName.toDartString();
     // Simulate successful handle creation (e.g. hPrinter = 42)
@@ -57,17 +58,18 @@ class MockWinspoolWrapper implements WinspoolWrapper {
   }
 
   @override
-  int writePrinter(int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten) {
+  int writePrinter(
+      int hPrinter, Pointer<Uint8> pBuf, int cbBuf, Pointer<Uint32> pcWritten) {
     writePrinterCalled = true;
     expect(hPrinter, 42);
-    
+
     // Copy bytes out of pointer buffer
     final copied = <int>[];
     for (var i = 0; i < cbBuf; i++) {
       copied.add(pBuf[i]);
     }
     lastBytes = copied;
-    
+
     // Simulate bytes written
     pcWritten.value = cbBuf;
     return 1; // success
@@ -76,7 +78,8 @@ class MockWinspoolWrapper implements WinspoolWrapper {
 
 void main() {
   group('NativePrinterBridge FFI Unit Tests', () {
-    test('FFI print path successfully maps parameters and executes FFI calls', () async {
+    test('FFI print path successfully maps parameters and executes FFI calls',
+        () async {
       final mockWinspool = MockWinspoolWrapper();
       final bridge = NativePrinterBridge(mockWinspool);
 
@@ -84,7 +87,8 @@ void main() {
       const constPrinterName = 'Thermal USB Printer';
 
       // Call public printUsbFfi method directly on bridge
-      final bool success = await bridge.printUsbFfi(constPrinterName, testBytes);
+      final bool success =
+          await bridge.printUsbFfi(constPrinterName, testBytes);
 
       expect(success, isTrue);
       expect(mockWinspool.openPrinterCalled, isTrue);

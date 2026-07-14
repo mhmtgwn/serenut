@@ -24,7 +24,8 @@ class _TestableIntegrityCheckService {
   final String dbsPath;
   final String docsPath;
 
-  _TestableIntegrityCheckService({required this.dbsPath, required this.docsPath});
+  _TestableIntegrityCheckService(
+      {required this.dbsPath, required this.docsPath});
 
   // attemptDatabaseRepair() ile ayni mantigi uygular; path_provider yerine enjekte edilen path'leri kullanir
   Future<Map<String, dynamic>> runRepair() async {
@@ -43,8 +44,8 @@ class _TestableIntegrityCheckService {
                 f.path.endsWith('.db'))
             .toList();
         if (files.isNotEmpty) {
-          files.sort((a, b) =>
-              b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+          files.sort(
+              (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
           latestBackupFile = files.first;
         }
       }
@@ -55,8 +56,8 @@ class _TestableIntegrityCheckService {
     // 2. Fallback: upgrade backup
     final upgradePath = p.join(dbsPath, 'serenut_pos_upgrade_backup.db');
     final upgradeBackup = File(upgradePath);
-    final File? sourceFile =
-        latestBackupFile ?? (await upgradeBackup.exists() ? upgradeBackup : null);
+    final File? sourceFile = latestBackupFile ??
+        (await upgradeBackup.exists() ? upgradeBackup : null);
 
     if (sourceFile == null) return {'success': false, 'source': null};
 
@@ -73,8 +74,12 @@ class _TestableIntegrityCheckService {
       // Basit gecerlilik kontrolu: SQLite magic bytes (53 51 4c 69 74 65)
       final bytes = await File(dbPath).readAsBytes();
       final isSqlite = bytes.length > 16 &&
-          bytes[0] == 0x53 && bytes[1] == 0x51 && bytes[2] == 0x4c &&
-          bytes[3] == 0x69 && bytes[4] == 0x74 && bytes[5] == 0x65;
+          bytes[0] == 0x53 &&
+          bytes[1] == 0x51 &&
+          bytes[2] == 0x4c &&
+          bytes[3] == 0x69 &&
+          bytes[4] == 0x74 &&
+          bytes[5] == 0x65;
 
       if (!isSqlite) {
         throw Exception('Geri yuklenen dosya gecerli bir SQLite DB degil.');
@@ -127,13 +132,19 @@ void main() {
     });
 
     tearDown(() async {
-      try { await tempDbsDir.delete(recursive: true); } catch (_) {}
-      try { await tempDocsDir.delete(recursive: true); } catch (_) {}
+      try {
+        await tempDbsDir.delete(recursive: true);
+      } catch (_) {}
+      try {
+        await tempDocsDir.delete(recursive: true);
+      } catch (_) {}
     });
 
-    test('SENARYO 1: Bozuk + gecerli backup varsa, gecerli olan secilmeli', () async {
+    test('SENARYO 1: Bozuk + gecerli backup varsa, gecerli olan secilmeli',
+        () async {
       // Bozuk backup (eski tarih — simule etmek icin once olusturup 2sn bekleyecegiz)
-      final corruptPath = p.join(backupsDir.path, 'serenut_pos_backup_20260101_100000.db');
+      final corruptPath =
+          p.join(backupsDir.path, 'serenut_pos_backup_20260101_100000.db');
       await _createCorruptFile(corruptPath);
 
       // Bozuk dosyaya eski timestamp ver
@@ -141,7 +152,8 @@ void main() {
       File(corruptPath).setLastModifiedSync(oldTime);
 
       // Gecerli backup (yeni tarih)
-      final validPath = p.join(backupsDir.path, 'serenut_pos_backup_20260710_090000.db');
+      final validPath =
+          p.join(backupsDir.path, 'serenut_pos_backup_20260710_090000.db');
       await _createValidSqliteFile(validPath);
       // Yeni timestamp — gecerli dosya daha yeni olmali
       File(validPath).setLastModifiedSync(DateTime(2026, 7, 10, 9, 0, 0));
@@ -158,11 +170,14 @@ void main() {
           reason: 'Secilen backup en yeni ve gecerli olan olmali');
     });
 
-    test('SENARYO 2: Birden fazla gecerli backup varsa, EN YENI tarihli secilmeli', () async {
+    test(
+        'SENARYO 2: Birden fazla gecerli backup varsa, EN YENI tarihli secilmeli',
+        () async {
       final paths = [
         p.join(backupsDir.path, 'serenut_pos_backup_20260701_080000.db'),
         p.join(backupsDir.path, 'serenut_pos_backup_20260705_120000.db'),
-        p.join(backupsDir.path, 'serenut_pos_backup_20260710_180000.db'), // EN YENI
+        p.join(backupsDir.path,
+            'serenut_pos_backup_20260710_180000.db'), // EN YENI
       ];
       // Siradaki timestamps ile olustur
       final times = [
@@ -184,10 +199,13 @@ void main() {
 
       expect(result['success'], isTrue);
       expect(result['source'], equals('serenut_pos_backup_20260710_180000.db'),
-          reason: '20260710_180000 en yeni backup olmali — en son tarihli secilmeli');
+          reason:
+              '20260710_180000 en yeni backup olmali — en son tarihli secilmeli');
     });
 
-    test('SENARYO 3: SerenutBackups bos, upgrade backup da yok => false donmeli', () async {
+    test(
+        'SENARYO 3: SerenutBackups bos, upgrade backup da yok => false donmeli',
+        () async {
       // Backups dizini bos, upgrade backup olusturulmadi
       final svc = _TestableIntegrityCheckService(
         dbsPath: tempDbsDir.path,
@@ -200,10 +218,13 @@ void main() {
       expect(result['source'], isNull);
     });
 
-    test('SENARYO 4: SerenutBackups bos ama upgrade backup var => ona fallback etmeli', () async {
+    test(
+        'SENARYO 4: SerenutBackups bos ama upgrade backup var => ona fallback etmeli',
+        () async {
       // SerenutBackups/ dizini bos birakilir
       // upgrade backup olusturulur
-      final upgradePath = p.join(tempDbsDir.path, 'serenut_pos_upgrade_backup.db');
+      final upgradePath =
+          p.join(tempDbsDir.path, 'serenut_pos_upgrade_backup.db');
       await _createValidSqliteFile(upgradePath);
 
       final svc = _TestableIntegrityCheckService(
@@ -218,7 +239,8 @@ void main() {
           reason: 'Fallback kaynak upgrade backup olmali');
     });
 
-    test('SENARYO 5: Repair basarisizsa mevcut DB rollback ile korunmali', () async {
+    test('SENARYO 5: Repair basarisizsa mevcut DB rollback ile korunmali',
+        () async {
       // Var olan DB oluştur
       final existingDbPath = p.join(tempDbsDir.path, 'serenut_pos.db');
       await _createValidSqliteFile(existingDbPath);

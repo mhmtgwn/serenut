@@ -1,4 +1,4 @@
-﻿// test/services/portal_telemetry_test.dart
+// test/services/portal_telemetry_test.dart
 // Serenut Platform — Portal Telemetry & Auditing Unit Tests (Sprint 11)
 // Tests system health checks, connection pools, and audit logs parse mapping.
 
@@ -46,9 +46,9 @@ void main() {
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
       final repo = PortalRepository(apiClient: apiClient, config: testConfig);
-      
+
       final telemetry = await repo.getTelemetryHealth();
-      
+
       expect(telemetry['system']['memoryUsage'], '62.40%');
       expect(telemetry['system']['dbActivePool'], 5);
       expect(telemetry['gateways']['push'], 'DOWN');
@@ -78,9 +78,9 @@ void main() {
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
       final repo = PortalRepository(apiClient: apiClient, config: testConfig);
-      
+
       final logs = await repo.getAuditLogs();
-      
+
       expect(logs.length, 1);
       expect(logs[0]['action'], 'DELETE_CUSTOMER');
       expect(logs[0]['ip_address'], '192.168.1.45');

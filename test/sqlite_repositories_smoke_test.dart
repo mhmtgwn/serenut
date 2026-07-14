@@ -1,4 +1,4 @@
-﻿// test/sqlite_repositories_smoke_test.dart
+// test/sqlite_repositories_smoke_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
@@ -26,7 +26,7 @@ void main() {
 
       databaseManager = DatabaseManager();
       db = await databaseManager.getDatabase();
-      
+
       // Clean tables in correct foreign key constraint order
       await db.update('ledger_bypass_flag', {'active': 1});
       await db.delete('sale_items');

@@ -10,9 +10,9 @@ import 'package:serenutos/domain/events/domain_event.dart';
 /// ════════════════════════════════════════════════════════════
 /// EventPublisher Provider
 /// ════════════════════════════════════════════════════════════
-/// 
+///
 /// Provides singleton instance of EventPublisher
-/// 
+///
 /// Usage:
 /// ```dart
 /// final publisher = ref.watch(eventPublisherProvider);
@@ -20,7 +20,7 @@ import 'package:serenutos/domain/events/domain_event.dart';
 /// ```
 
 /// EventPublisher singleton provider
-/// 
+///
 /// Initialized once and reused across the app
 /// Safe for concurrent access
 final eventPublisherProvider = Provider<EventPublisher>((ref) {
@@ -30,10 +30,10 @@ final eventPublisherProvider = Provider<EventPublisher>((ref) {
 });
 
 /// Event stream provider
-/// 
+///
 /// Returns a stream of all domain events
 /// Useful for reactive UI updates
-/// 
+///
 /// Usage:
 /// ```dart
 /// final eventStream = ref.watch(eventStreamProvider);
@@ -49,10 +49,10 @@ final eventStreamProvider = StreamProvider<DomainEvent>((ref) {
 });
 
 /// Event history provider
-/// 
+///
 /// Returns audit trail of all published events
 /// Useful for debugging and analytics
-/// 
+///
 /// Usage:
 /// ```dart
 /// final history = ref.watch(eventHistoryProvider);
@@ -66,10 +66,10 @@ final eventHistoryProvider = Provider<List<DomainEvent>>((ref) {
 });
 
 /// Last event provider
-/// 
+///
 /// Returns the most recently published event
 /// Useful for UI notifications
-/// 
+///
 /// Usage:
 /// ```dart
 /// final lastEventAsync = ref.watch(lastEventProvider);
@@ -87,14 +87,14 @@ final lastEventProvider = FutureProvider<DomainEvent?>((ref) async {
 /// ════════════════════════════════════════════════════════════
 /// Example Usage in Widgets
 /// ════════════════════════════════════════════════════════════
-/// 
+///
 /// Listen to events in real-time:
 /// ```dart
 /// class EventListener extends ConsumerStatefulWidget {
 ///   @override
 ///   ConsumerState<EventListener> createState() => _EventListenerState();
 /// }
-/// 
+///
 /// class _EventListenerState extends ConsumerState<EventListener> {
 ///   @override
 ///   void initState() {
@@ -107,7 +107,7 @@ final lastEventProvider = FutureProvider<DomainEvent?>((ref) async {
 ///       );
 ///     });
 ///   }
-/// 
+///
 ///   @override
 ///   Widget build(BuildContext context) {
 ///     final eventStream = ref.watch(eventStreamProvider);
@@ -119,18 +119,18 @@ final lastEventProvider = FutureProvider<DomainEvent?>((ref) async {
 ///   }
 /// }
 /// ```
-/// 
+///
 /// Publish events from services:
 /// ```dart
 /// class SalesService {
 ///   final EventPublisher _publisher;
-/// 
+///
 ///   SalesService(this._publisher);
-/// 
+///
 ///   Future<void> createSale(Sale sale) async {
 ///     // Create sale in database
 ///     await _repo.create(sale);
-///     
+///
 ///     // Publish event
 ///     _publisher.publish(SaleCreatedEvent(
 ///       saleId: sale.id,
@@ -141,5 +141,5 @@ final lastEventProvider = FutureProvider<DomainEvent?>((ref) async {
 ///   }
 /// }
 /// ```
-/// 
+///
 /// ════════════════════════════════════════════════════════════

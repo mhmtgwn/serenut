@@ -1,4 +1,4 @@
-﻿// test/device/scanner_stress_test.dart
+// test/device/scanner_stress_test.dart
 // Serenut POS — Scanner Stress & Deduplication Tests
 // Tests: spam scan prevention, debounce, offline buffer, USB keyboard mode
 // Created: 24 Jun 2026
@@ -66,7 +66,8 @@ void main() {
       expect(received.first.barcode, equals('1234567890'));
     });
 
-    test('same barcode after 1600ms is accepted (debounce window expired)', () async {
+    test('same barcode after 1600ms is accepted (debounce window expired)',
+        () async {
       scanner.injectBarcode('BARCODE-A');
       await Future.delayed(const Duration(milliseconds: 1600));
       scanner.injectBarcode('BARCODE-A');
@@ -179,13 +180,21 @@ void main() {
       final after = DateTime.now();
 
       final event = received.first;
-      expect(event.scannedAt.isAfter(before.subtract(const Duration(milliseconds: 100))), isTrue);
-      expect(event.scannedAt.isBefore(after.add(const Duration(milliseconds: 100))), isTrue);
+      expect(
+          event.scannedAt
+              .isAfter(before.subtract(const Duration(milliseconds: 100))),
+          isTrue);
+      expect(
+          event.scannedAt
+              .isBefore(after.add(const Duration(milliseconds: 100))),
+          isTrue);
     });
 
     // ── Concurrent scan stress ────────────────────────────────────────────
 
-    test('50 concurrent rapid scans of different barcodes — no crash, bounded output', () async {
+    test(
+        '50 concurrent rapid scans of different barcodes — no crash, bounded output',
+        () async {
       final tasks = List.generate(50, (i) async {
         scanner.injectBarcode('CONCURRENT-${i.toString().padLeft(3, '0')}');
       });

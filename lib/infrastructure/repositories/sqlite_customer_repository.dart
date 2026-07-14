@@ -13,7 +13,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   @override
   Future<List<CustomerEntity>> findAll() async {
-    final rows = await _executor.query('customers', where: "is_active = 1 AND id != ''");
+    final rows =
+        await _executor.query('customers', where: "is_active = 1 AND id != ''");
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
   }
 
@@ -105,7 +106,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
     List<dynamic>? whereArgs;
 
     if (searchQuery != null && searchQuery.isNotEmpty) {
-      whereClause = "(name LIKE ? OR phone LIKE ? OR email LIKE ?) AND is_active = 1 AND id != ''";
+      whereClause =
+          "(name LIKE ? OR phone LIKE ? OR email LIKE ?) AND is_active = 1 AND id != ''";
       whereArgs = ['%$searchQuery%', '%$searchQuery%', '%$searchQuery%'];
     } else {
       whereClause = "is_active = 1 AND id != ''";

@@ -42,12 +42,12 @@ void main() async {
       WidgetsFlutterBinding.ensureInitialized();
       ErrorBoundary.install();
       await initializeDateFormatting('tr_TR', null);
-      
+
       if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;
       }
-      
+
       // Initialize SharedPreferences
       final prefs = await SharedPreferences.getInstance();
 
@@ -78,14 +78,17 @@ void main() async {
 
       // Initialize Auth service
       await authService.initialize();
-      
+
       // If database contains no users, reset onboarding status to show the wizard
       try {
         final users = await authService.getUsers();
         if (users.isEmpty) {
           // Clear admin PIN from SQLite settings (single source of truth)
           final db = await dbManager.getDatabase();
-          await db.update('settings', {'admin_pin_code': null, 'updated_at': DateTime.now().toIso8601String()});
+          await db.update('settings', {
+            'admin_pin_code': null,
+            'updated_at': DateTime.now().toIso8601String()
+          });
         }
       } catch (e) {
         debugPrint('Failed to check or reset onboarding status: $e');
@@ -94,7 +97,7 @@ void main() async {
       // Initialize DatasetLoaderService
       final datasetLoader = DatasetLoaderService(prefs);
       await datasetLoader.init();
-      
+
       runApp(
         ProviderScope(
           overrides: [
@@ -134,7 +137,6 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   Future<void> _runIntegrityDiagnostics() async {
-
     try {
       final diag = ref.read(integrityCheckServiceProvider);
       final report = await diag.runDiagnostics();
@@ -234,7 +236,8 @@ class _MyAppState extends ConsumerState<MyApp> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.redAccent),
+                  const Icon(Icons.warning_amber_rounded,
+                      size: 80, color: Colors.redAccent),
                   const SizedBox(height: 24),
                   const Text(
                     'Veritabanı Bütünlük Hatası!',
@@ -255,7 +258,8 @@ class _MyAppState extends ConsumerState<MyApp> {
                     ),
                     child: Text(
                       _integrityError!,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 12),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -298,17 +302,17 @@ class _MyAppState extends ConsumerState<MyApp> {
     }
 
     final router = ref.watch(routerProvider);
-    
+
     // Eagerly initialize global event publisher
     ref.watch(eventPublisherProvider);
 
     // Eagerly initialize sync provider so AppLifecycle observer is registered
     // and auto-sync fires when app resumes from background.
     ref.watch(syncProvider);
-    
+
     // Eagerly initialize SMS notification handler to subscribe to domain events on startup
     ref.watch(smsNotificationHandlerProvider);
-    
+
     return MaterialApp.router(
       title: 'Serenut POS',
       debugShowCheckedModeBanner: false,

@@ -16,7 +16,9 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
   String? _errorMessage;
   String? _loadedFileName;
 
-  bool get _useFileImport => kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux));
+  bool get _useFileImport =>
+      kIsWeb ||
+      (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux));
 
   @override
   void initState() {
@@ -48,11 +50,11 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
             withProperties: true,
             withPhoto: false,
           );
-          
+
           final List<Map<String, String>> loaded = [];
           for (var c in nativeContacts) {
             final name = c.displayName.trim();
-            
+
             // Find first valid phone number
             String phone = '';
             for (var p in c.phones) {
@@ -82,10 +84,11 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
               });
             }
           }
-          
+
           // Sort by name case-insensitive
-          loaded.sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
-          
+          loaded.sort((a, b) =>
+              a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
+
           _contacts = loaded;
           _hasPermission = true;
         } else {
@@ -131,7 +134,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       String name = '';
       String phone = '';
       String email = '';
-      
+
       final lines = card.split('\n');
       for (var line in lines) {
         line = line.trim();
@@ -167,46 +170,57 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
     final List<Map<String, String>> contacts = [];
     final lines = text.split('\n');
     if (lines.isEmpty) return contacts;
-    
+
     String separator = ',';
     final firstLine = lines.first;
     if (firstLine.contains(';')) {
       separator = ';';
     }
-    
+
     int nameCol = -1;
     int phoneCol = -1;
     int emailCol = -1;
-    
+
     final headers = firstLine.split(separator);
     for (int i = 0; i < headers.length; i++) {
       final cell = headers[i].toLowerCase().trim();
-      if (cell.contains('isim') || cell.contains('ad') || cell.contains('name')) {
+      if (cell.contains('isim') ||
+          cell.contains('ad') ||
+          cell.contains('name')) {
         nameCol = i;
-      } else if (cell.contains('tel') || cell.contains('telefon') || cell.contains('phone')) {
+      } else if (cell.contains('tel') ||
+          cell.contains('telefon') ||
+          cell.contains('phone')) {
         phoneCol = i;
-      } else if (cell.contains('mail') || cell.contains('eposta') || cell.contains('email')) {
+      } else if (cell.contains('mail') ||
+          cell.contains('eposta') ||
+          cell.contains('email')) {
         emailCol = i;
       }
     }
-    
+
     if (nameCol == -1 && phoneCol == -1) {
       nameCol = 0;
       phoneCol = 1;
       if (headers.length > 2) emailCol = 2;
     }
-    
+
     for (int i = 1; i < lines.length; i++) {
       final line = lines[i].trim();
       if (line.isEmpty) continue;
-      
+
       final cells = line.split(separator);
       if (cells.length <= nameCol || cells.length <= phoneCol) continue;
-      
+
       final name = cells[nameCol].replaceAll('"', '').trim();
-      final phone = cells[phoneCol].replaceAll('"', '').replaceAll(RegExp(r'\s+'), '').trim();
-      final email = emailCol != -1 && cells.length > emailCol ? cells[emailCol].replaceAll('"', '').trim() : '';
-      
+      final phone = cells[phoneCol]
+          .replaceAll('"', '')
+          .replaceAll(RegExp(r'\s+'), '')
+          .trim();
+      final email = emailCol != -1 && cells.length > emailCol
+          ? cells[emailCol].replaceAll('"', '').trim()
+          : '';
+
       if (phone.isNotEmpty) {
         contacts.add({
           'name': name.isEmpty ? 'İsimsiz' : name,
@@ -225,37 +239,48 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       for (var table in excel.tables.keys) {
         final sheet = excel.tables[table];
         if (sheet == null || sheet.maxRows <= 1) continue;
-        
+
         int nameCol = -1;
         int phoneCol = -1;
         int emailCol = -1;
-        
+
         final firstRow = sheet.rows.first;
         for (int i = 0; i < firstRow.length; i++) {
-          final cellValue = firstRow[i]?.value?.toString().toLowerCase().trim() ?? '';
-          if (cellValue.contains('isim') || cellValue.contains('ad') || cellValue.contains('name')) {
+          final cellValue =
+              firstRow[i]?.value?.toString().toLowerCase().trim() ?? '';
+          if (cellValue.contains('isim') ||
+              cellValue.contains('ad') ||
+              cellValue.contains('name')) {
             nameCol = i;
-          } else if (cellValue.contains('tel') || cellValue.contains('telefon') || cellValue.contains('phone')) {
+          } else if (cellValue.contains('tel') ||
+              cellValue.contains('telefon') ||
+              cellValue.contains('phone')) {
             phoneCol = i;
-          } else if (cellValue.contains('mail') || cellValue.contains('eposta') || cellValue.contains('email')) {
+          } else if (cellValue.contains('mail') ||
+              cellValue.contains('eposta') ||
+              cellValue.contains('email')) {
             emailCol = i;
           }
         }
-        
+
         if (nameCol == -1 && phoneCol == -1) {
           nameCol = 0;
           phoneCol = 1;
           if (sheet.maxColumns > 2) emailCol = 2;
         }
-        
+
         for (int r = 1; r < sheet.maxRows; r++) {
           final row = sheet.rows[r];
           if (row.length <= nameCol || row.length <= phoneCol) continue;
-          
+
           final name = row[nameCol]?.value?.toString().trim() ?? '';
-          final phone = row[phoneCol]?.value?.toString().replaceAll(RegExp(r'\s+'), '') ?? '';
-          final email = emailCol != -1 && row.length > emailCol ? row[emailCol]?.value?.toString().trim() ?? '' : '';
-          
+          final phone =
+              row[phoneCol]?.value?.toString().replaceAll(RegExp(r'\s+'), '') ??
+                  '';
+          final email = emailCol != -1 && row.length > emailCol
+              ? row[emailCol]?.value?.toString().trim() ?? ''
+              : '';
+
           if (phone.isNotEmpty) {
             contacts.add({
               'name': name.isEmpty ? 'İsimsiz' : name,
@@ -342,7 +367,8 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
     final List<int> filteredIndices = [];
     for (int i = 0; i < _contacts.length; i++) {
       final c = _contacts[i];
-      final nameMatches = c['name']!.toLowerCase().contains(_searchQuery.toLowerCase());
+      final nameMatches =
+          c['name']!.toLowerCase().contains(_searchQuery.toLowerCase());
       final phoneMatches = c['phone']!.contains(_searchQuery);
       if (_searchQuery.isEmpty || nameMatches || phoneMatches) {
         filteredIndices.add(i);
@@ -372,7 +398,10 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                   Expanded(
                     child: Text(
                       'Web sürümünde cihaz rehberine erişim desteklenmediği için kendi yedek dosyanızı (.xlsx, .csv, .vcf) aktarabilirsiniz.',
-                      style: TextStyle(color: _kOrange, fontSize: 12, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          color: _kOrange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -391,16 +420,21 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.file_present_rounded, color: _kBlue, size: 20),
+                  const Icon(Icons.file_present_rounded,
+                      color: _kBlue, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '$_loadedFileName dosyasından ${_contacts.length} kişi yüklendi.',
-                      style: const TextStyle(color: _kBlue, fontSize: 12, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                          color: _kBlue,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: _kBlue, size: 18),
+                    icon: const Icon(Icons.close_rounded,
+                        color: _kBlue, size: 18),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     onPressed: () {
@@ -441,31 +475,44 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.cloud_upload_outlined, size: 72, color: _kBlue),
+                        const Icon(Icons.cloud_upload_outlined,
+                            size: 72, color: _kBlue),
                         const SizedBox(height: 16),
                         const Text(
                           'Rehber Yedek Dosyası Yükle',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kTextPrimary),
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _kTextPrimary),
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'Müşterilerinizi toplu olarak eklemek için Excel (.xlsx), CSV (.csv) veya vCard (.vcf) formatındaki rehber dosyanızı seçin.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: _kTextSecondary, height: 1.4),
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: _kTextSecondary,
+                              height: 1.4),
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton.icon(
                           onPressed: _importFromFile,
-                          icon: const Icon(Icons.folder_open_rounded, color: Colors.white, size: 18),
+                          icon: const Icon(Icons.folder_open_rounded,
+                              color: Colors.white, size: 18),
                           label: const Text(
                             'Dosya Seçin',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 14),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _kBlue,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
                             elevation: 0,
                           ),
                         ),
@@ -485,29 +532,39 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.contact_phone_rounded, size: 64, color: _kTextSecondary),
+                        const Icon(Icons.contact_phone_rounded,
+                            size: 64, color: _kTextSecondary),
                         const SizedBox(height: 16),
                         const Text(
                           'Rehber İzni Gerekli',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kTextPrimary),
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _kTextPrimary),
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'Müşterilerinizi hızlıca aktarabilmek için uygulamanın rehberinize erişmesine izin vermelisiniz.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: _kTextSecondary),
+                          style:
+                              TextStyle(fontSize: 14, color: _kTextSecondary),
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: _requestPermission,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _kGreen,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
                           ),
                           child: const Text(
                             'İzin Ver',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: Colors.white),
                           ),
                         ),
                       ],
@@ -525,12 +582,14 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline_rounded, size: 64, color: _kPink),
+                        const Icon(Icons.error_outline_rounded,
+                            size: 64, color: _kPink),
                         const SizedBox(height: 16),
                         Text(
                           _errorMessage!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 14, color: _kTextSecondary),
+                          style: const TextStyle(
+                              fontSize: 14, color: _kTextSecondary),
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton(
@@ -544,9 +603,11 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _kGreen,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
-                          child: const Text('Yeniden Dene', style: TextStyle(color: Colors.white)),
+                          child: const Text('Yeniden Dene',
+                              style: TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
@@ -566,7 +627,8 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
               child: TextField(
                 style: const TextStyle(fontSize: 14, color: _kTextPrimary),
                 decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded, color: _kTextSecondary, size: 18),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      color: _kTextSecondary, size: 18),
                   hintText: 'Rehberde Ara...',
                   hintStyle: TextStyle(color: _kTextSecondary, fontSize: 14),
                   border: InputBorder.none,
@@ -586,17 +648,22 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
               children: [
                 TextButton.icon(
                   icon: Icon(
-                    (_selectedIndices.length == filteredIndices.length && filteredIndices.isNotEmpty)
-                        ? Icons.check_box_rounded 
+                    (_selectedIndices.length == filteredIndices.length &&
+                            filteredIndices.isNotEmpty)
+                        ? Icons.check_box_rounded
                         : Icons.check_box_outline_blank_rounded,
                     size: 20,
                     color: _kGreen,
                   ),
                   label: Text(
-                    (_selectedIndices.length == filteredIndices.length && filteredIndices.isNotEmpty)
-                        ? 'Seçilenleri Temizle' 
+                    (_selectedIndices.length == filteredIndices.length &&
+                            filteredIndices.isNotEmpty)
+                        ? 'Seçilenleri Temizle'
                         : 'Tümünü Seç',
-                    style: const TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13),
+                    style: const TextStyle(
+                        color: _kGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13),
                   ),
                   onPressed: () {
                     setState(() {
@@ -611,7 +678,10 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                 ),
                 Text(
                   '${_selectedIndices.length} / ${filteredIndices.length} Seçildi',
-                  style: const TextStyle(fontSize: 13, color: _kTextSecondary, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      color: _kTextSecondary,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -629,21 +699,27 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                   : ListView.separated(
                       padding: EdgeInsets.zero,
                       itemCount: filteredIndices.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1, color: _kBorderColor),
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1, color: _kBorderColor),
                       itemBuilder: (context, index) {
                         final contactIdx = filteredIndices[index];
                         final contact = _contacts[contactIdx];
-                        final isSelected = _selectedIndices.contains(contactIdx);
+                        final isSelected =
+                            _selectedIndices.contains(contactIdx);
                         return CheckboxListTile(
                           value: isSelected,
                           activeColor: _kGreen,
                           title: Text(
                             contact['name']!,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _kTextPrimary),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: _kTextPrimary),
                           ),
                           subtitle: Text(
                             contact['phone']!,
-                            style: const TextStyle(color: _kTextSecondary, fontSize: 13),
+                            style: const TextStyle(
+                                color: _kTextSecondary, fontSize: 13),
                           ),
                           secondary: Container(
                             width: 36,
@@ -654,8 +730,13 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                             ),
                             child: Center(
                               child: Text(
-                                contact['name']!.isNotEmpty ? contact['name']![0].toUpperCase() : '👤',
-                                style: const TextStyle(color: _kBlue, fontWeight: FontWeight.bold, fontSize: 14),
+                                contact['name']!.isNotEmpty
+                                    ? contact['name']![0].toUpperCase()
+                                    : '👤',
+                                style: const TextStyle(
+                                    color: _kBlue,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14),
                               ),
                             ),
                           ),
@@ -674,7 +755,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                     ),
             ),
             const SizedBox(height: 16),
-            
+
             // İçe Aktarma Butonu
             SizedBox(
               width: double.infinity,
@@ -683,7 +764,8 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                 onPressed: _selectedIndices.isEmpty
                     ? null
                     : () async {
-                        final customers = ref.read(customersControllerProvider).value ?? [];
+                        final customers =
+                            ref.read(customersControllerProvider).value ?? [];
                         int importedCount = 0;
                         int skippedCount = 0;
 
@@ -693,7 +775,8 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                           barrierDismissible: false,
                           builder: (ctx) => const Center(
                             child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(_kGreen),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(_kGreen),
                             ),
                           ),
                         );
@@ -702,7 +785,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                           for (final idx in _selectedIndices) {
                             final contact = _contacts[idx];
                             final phone = contact['phone']!;
-                            
+
                             if (customers.any((c) => c.phone == phone)) {
                               skippedCount++;
                               continue;
@@ -716,12 +799,15 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                               balance: 0.0,
                               createdAt: DateTime.now(),
                             );
-                            await ref.read(customersControllerProvider.notifier).addCustomer(newCustomer);
+                            await ref
+                                .read(customersControllerProvider.notifier)
+                                .addCustomer(newCustomer);
                             importedCount++;
                           }
                         } finally {
                           if (context.mounted) {
-                            Navigator.pop(context); // Dismiss the progress loading dialog
+                            Navigator.pop(
+                                context); // Dismiss the progress loading dialog
                           }
                         }
 
@@ -734,7 +820,8 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                                     ? '$importedCount kişi rehberden başarıyla içe aktarıldı.${skippedCount > 0 ? " ($skippedCount kişi zaten kayıtlı olduğu için atlandı.)" : ""}'
                                     : 'Seçilen kişilerin tamamı zaten sistemde kayıtlı.',
                               ),
-                              backgroundColor: importedCount > 0 ? _kGreen : _kOrange,
+                              backgroundColor:
+                                  importedCount > 0 ? _kGreen : _kOrange,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -743,14 +830,18 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kGreen,
                   disabledBackgroundColor: Colors.grey[300],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: Text(
-                  _selectedIndices.isEmpty 
-                      ? 'Lütfen Kişi Seçin' 
+                  _selectedIndices.isEmpty
+                      ? 'Lütfen Kişi Seçin'
                       : 'Seçilenleri İçe Aktar (${_selectedIndices.length})',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.white),
                 ),
               ),
             ),

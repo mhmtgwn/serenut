@@ -30,17 +30,21 @@ class AccessManager {
   /// 2. If trial expired but valid license exists and device limit is satisfied -> AccessStatus.licensed
   /// 3. Otherwise -> AccessStatus.paywall
   AccessStatus checkAccess({required AuthUser? currentUser}) {
-    if (currentUser == null) return AccessStatus.trialActive; // Handled by auth guard
-    
+    if (currentUser == null)
+      return AccessStatus.trialActive; // Handled by auth guard
+
     final state = _trialManager.getEntitlementState();
-    
-    if (state == EntitlementState.active || state == EntitlementState.graceActive) {
+
+    if (state == EntitlementState.active ||
+        state == EntitlementState.graceActive) {
       return AccessStatus.trialActive; // Or licensed
     }
 
     // state is graceExpired, revoked, or unknown
     final role = currentUser.role;
-    if (role == UserRole.owner || role == UserRole.admin || role == UserRole.sysadmin) {
+    if (role == UserRole.owner ||
+        role == UserRole.admin ||
+        role == UserRole.sysadmin) {
       return AccessStatus.paywall;
     } else {
       return AccessStatus.restrictedOperation;

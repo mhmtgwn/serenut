@@ -1,4 +1,4 @@
-﻿// test/integration/stress_transactions_test.dart
+// test/integration/stress_transactions_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
@@ -55,7 +55,7 @@ void main() {
 
     test('Simulate 1000 rapid parallel transactions and reads', () async {
       final futures = <Future<void>>[];
-      
+
       // Perform 500 parallel writes and 500 parallel reads
       for (int i = 0; i < 500; i++) {
         // Asynchronous write
@@ -79,9 +79,11 @@ void main() {
       stopwatch.stop();
 
       print('Executed 1000 operations in ${stopwatch.elapsedMilliseconds} ms');
-      
+
       // Verify count
-      final count = await db.rawQuery('SELECT COUNT(*) as count FROM sales WHERE id LIKE ?', ['stress-sale-%']);
+      final count = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM sales WHERE id LIKE ?',
+          ['stress-sale-%']);
       expect(count.first['count'] as int, equals(500));
     });
   });

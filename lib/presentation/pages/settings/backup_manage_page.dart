@@ -50,7 +50,9 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
       final path = await ref.read(backupServiceProvider).backupDatabase();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Yeni yedek başarıyla oluşturuldu: ${path.split(Platform.pathSeparator).last}')),
+          SnackBar(
+              content: Text(
+                  'Yeni yedek başarıyla oluşturuldu: ${path.split(Platform.pathSeparator).last}')),
         );
       }
       _refreshBackups();
@@ -69,7 +71,8 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Veritabanını Geri Yükle', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Veritabanını Geri Yükle',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         content: const Text(
           'Bu yedek dosyasını geri yüklemek istediğinize emin misiniz? Mevcut tüm verilerinizin üzerine yazılacaktır ve bu işlem geri alınamaz.',
         ),
@@ -82,7 +85,8 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: kPink,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Geri Yükle'),
@@ -94,12 +98,11 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
     if (confirm != true) return;
 
     if (!mounted) return;
-    requirePermissionAccess(
-      context,
-      permission: Permission.settingsDatabase,
-      title: 'Yedek Geri Yükleme Yetkisi',
-      requirePin: true,
-      onGranted: (approvedByUserId, approvedByUserName) async {
+    requirePermissionAccess(context,
+        permission: Permission.settingsDatabase,
+        title: 'Yedek Geri Yükleme Yetkisi',
+        requirePin: true,
+        onGranted: (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
         await ref.read(backupServiceProvider).restoreDatabase(file.path);
@@ -108,9 +111,12 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
             context: context,
             barrierDismissible: false,
             builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Başarılı', style: TextStyle(fontWeight: FontWeight.bold)),
-              content: const Text('Veritabanı yedekten başarıyla geri yüklendi. Uygulama güncellendi.'),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Text('Başarılı',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              content: const Text(
+                  'Veritabanı yedekten başarıyla geri yüklendi. Uygulama güncellendi.'),
               actions: [
                 ElevatedButton(
                   onPressed: () {
@@ -138,12 +144,11 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final hasAccess = currentUser != null && (
-      currentUser.role == UserRole.sysadmin ||
-      currentUser.role == UserRole.owner ||
-      currentUser.role == UserRole.admin ||
-      currentUser.hasPermission(Permission.settingsDatabase.value)
-    );
+    final hasAccess = currentUser != null &&
+        (currentUser.role == UserRole.sysadmin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.hasPermission(Permission.settingsDatabase.value));
 
     if (!hasAccess) {
       return const Scaffold(
@@ -182,7 +187,10 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
                     children: [
                       Text(
                         'Verilerinizi Güvende Tutun',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: kTextPrimary),
                       ),
                       SizedBox(height: 4),
                       Text(
@@ -198,11 +206,19 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
           const SizedBox(height: 20),
           const Text(
             'YEREL YEDEKLER',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.3),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kTextSecondary,
+                letterSpacing: 0.3),
           ),
           const SizedBox(height: 8),
           if (_isLoading && _backupFiles.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(kGreen))))
+            const Center(
+                child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(kGreen))))
           else if (_backupFiles.isEmpty)
             Container(
               padding: const EdgeInsets.all(32),
@@ -213,9 +229,11 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.backup_table_rounded, size: 48, color: kBorderColor),
+                  const Icon(Icons.backup_table_rounded,
+                      size: 48, color: kBorderColor),
                   const SizedBox(height: 12),
-                  const Text('Kayıtlı yedek bulunamadı.', style: TextStyle(color: kTextSecondary, fontSize: 14)),
+                  const Text('Kayıtlı yedek bulunamadı.',
+                      style: TextStyle(color: kTextSecondary, fontSize: 14)),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: _createBackup,
@@ -224,7 +242,8 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kGreen,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],
@@ -249,25 +268,34 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
                   final sizeKB = (file.lengthSync() / 1024).toStringAsFixed(1);
 
                   return ListTile(
-                    leading: const Icon(Icons.settings_backup_restore_rounded, color: kBlue),
+                    leading: const Icon(Icons.settings_backup_restore_rounded,
+                        color: kBlue),
                     title: Text(
                       name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kTextPrimary),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: kTextPrimary),
                     ),
                     subtitle: Text(
                       'Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(date)} • Boyut: $sizeKB KB',
-                      style: const TextStyle(fontSize: 11, color: kTextSecondary),
+                      style:
+                          const TextStyle(fontSize: 11, color: kTextSecondary),
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.share_rounded, color: kGreen, size: 20),
+                          icon: const Icon(Icons.share_rounded,
+                              color: kGreen, size: 20),
                           tooltip: 'Paylaş',
-                          onPressed: () => ref.read(backupServiceProvider).shareBackup(file.path),
+                          onPressed: () => ref
+                              .read(backupServiceProvider)
+                              .shareBackup(file.path),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.restore_rounded, color: kPink, size: 20),
+                          icon: const Icon(Icons.restore_rounded,
+                              color: kPink, size: 20),
                           tooltip: 'Geri Yükle',
                           onPressed: () => _restoreBackup(file),
                         ),

@@ -7,7 +7,8 @@ class _AnimatedCartTab extends ConsumerStatefulWidget {
   ConsumerState<_AnimatedCartTab> createState() => _AnimatedCartTabState();
 }
 
-class _AnimatedCartTabState extends ConsumerState<_AnimatedCartTab> with SingleTickerProviderStateMixin {
+class _AnimatedCartTabState extends ConsumerState<_AnimatedCartTab>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   int _lastCount = 0;

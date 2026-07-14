@@ -1,4 +1,4 @@
-﻿import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 
 class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
@@ -26,10 +26,9 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
         AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
       LIMIT 50
     ''', [searchPattern, searchPattern, searchPattern]);
-    
-    final List<CustomerEntity> customers = customerRows
-        .map((map) => CustomerEntity.fromMap(map))
-        .toList();
+
+    final List<CustomerEntity> customers =
+        customerRows.map((map) => CustomerEntity.fromMap(map)).toList();
 
     // 2. Search Products
     final productRows = await _gateway.rawQuery('''
@@ -37,11 +36,16 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
       WHERE is_active = 1 
         AND (name LIKE ? OR category LIKE ? OR description LIKE ? OR id LIKE ? OR sku LIKE ?)
       LIMIT 50
-    ''', [searchPattern, searchPattern, searchPattern, searchPattern, searchPattern]);
+    ''', [
+      searchPattern,
+      searchPattern,
+      searchPattern,
+      searchPattern,
+      searchPattern
+    ]);
 
-    final List<ProductEntity> products = productRows
-        .map((map) => ProductEntity.fromMap(map))
-        .toList();
+    final List<ProductEntity> products =
+        productRows.map((map) => ProductEntity.fromMap(map)).toList();
 
     // 3. Search Sales
     final saleRows = await _gateway.rawQuery('''
@@ -50,9 +54,8 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
       LIMIT 50
     ''', [searchPattern, searchPattern, searchPattern, searchPattern]);
 
-    final List<SaleEntity> sales = saleRows
-        .map((map) => SaleEntity.fromMap(map))
-        .toList();
+    final List<SaleEntity> sales =
+        saleRows.map((map) => SaleEntity.fromMap(map)).toList();
 
     // 4. Search Financial Transactions
     final txRows = await _gateway.rawQuery('''
@@ -61,9 +64,8 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
       LIMIT 50
     ''', [searchPattern, searchPattern, searchPattern, searchPattern]);
 
-    final List<FinancialTransactionEntity> transactions = txRows
-        .map((map) => FinancialTransactionEntity.fromMap(map))
-        .toList();
+    final List<FinancialTransactionEntity> transactions =
+        txRows.map((map) => FinancialTransactionEntity.fromMap(map)).toList();
 
     return GlobalSearchResult(
       customers: customers,

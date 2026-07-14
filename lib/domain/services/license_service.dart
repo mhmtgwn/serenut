@@ -12,8 +12,10 @@ import 'package:pointycastle/export.dart';
 
 class LicenseInfo {
   final String merchantId;
+
   /// V2: device-specific binding. V1 legacy tokens may contain null (treated as wildcard grace period).
   final String? deviceId;
+
   /// Legacy V1 field — kept for backward compat during wildcard grace period only.
   final List<String>? allowedDevices;
   final DateTime expiryDate;
@@ -38,13 +40,14 @@ class LicenseInfo {
   factory LicenseInfo.fromJson(Map<String, dynamic> json) {
     final tierStr = (json['tier'] as String? ?? 'BASIC').toUpperCase();
     final tier = LicenseTier.values.firstWhere(
-      (t) => t.name.toUpperCase() == tierStr || t.name.toUpperCase().replaceAll('_', '') == tierStr,
+      (t) =>
+          t.name.toUpperCase() == tierStr ||
+          t.name.toUpperCase().replaceAll('_', '') == tierStr,
       orElse: () => LicenseTier.basic,
     );
 
-    final List<String> features = json['features'] != null
-        ? List<String>.from(json['features'])
-        : [];
+    final List<String> features =
+        json['features'] != null ? List<String>.from(json['features']) : [];
 
     List<String>? legacyDevices;
     if (json['allowed_devices'] != null) {
@@ -55,7 +58,8 @@ class LicenseInfo {
       merchantId: (json['merchant_id'] ?? json['merchantId']) as String? ?? '',
       deviceId: json['device_id'] as String?,
       allowedDevices: legacyDevices,
-      expiryDate: DateTime.parse((json['expiry_date'] ?? json['expiryDate']) as String),
+      expiryDate:
+          DateTime.parse((json['expiry_date'] ?? json['expiryDate']) as String),
       tier: tier,
       features: features,
       signature: (json['signature'] as String? ?? ''),
@@ -83,9 +87,10 @@ class LicenseService {
   static const String _deviceUuidKey = 'device_uuid';
   static const String _lastSystemTimeKey = 'last_system_time';
   static const String _maxTimestampSeenKey = 'max_timestamp_seen';
-  
+
   // RSA-2048 Public Key Modulus & Exponent
-  static const String _rsaModulusHex = '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
+  static const String _rsaModulusHex =
+      '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
   static const String _rsaExponentHex = '65537';
 
   String? _cachedLicenseToken;
@@ -118,7 +123,8 @@ class LicenseService {
       final rows = await db.query('settings', columns: ['id'], limit: 1);
       if (rows.isNotEmpty) {
         final id = rows.first['id'] as int;
-        await db.update('settings', {column: value}, where: 'id = ?', whereArgs: [id]);
+        await db.update('settings', {column: value},
+            where: 'id = ?', whereArgs: [id]);
       } else {
         await db.insert('settings', {
           column: value,
@@ -137,7 +143,9 @@ class LicenseService {
   Future<void> initialize() async {
     try {
       final db = await _getDb();
-      final rows = await db.query('settings', columns: ['license_token', 'last_system_time', 'max_timestamp_seen'], limit: 1);
+      final rows = await db.query('settings',
+          columns: ['license_token', 'last_system_time', 'max_timestamp_seen'],
+          limit: 1);
       if (rows.isNotEmpty) {
         final row = rows.first;
         _cachedLicenseToken = row['license_token'] as String?;
@@ -193,7 +201,9 @@ class LicenseService {
           'expiry_date': info.expiryDate.toIso8601String(),
           'features': info.features,
           'merchant_id': info.merchantId,
-          'tier': info.tier == LicenseTier.proPlus ? 'pro_plus' : info.tier.name.toLowerCase(),
+          'tier': info.tier == LicenseTier.proPlus
+              ? 'pro_plus'
+              : info.tier.name.toLowerCase(),
           'token_version': info.tokenVersion,
         };
       } else {
@@ -202,7 +212,9 @@ class LicenseService {
           'expiry_date': info.expiryDate.toIso8601String(),
           'features': info.features,
           'merchant_id': info.merchantId,
-          'tier': info.tier == LicenseTier.proPlus ? 'pro_plus' : info.tier.name.toLowerCase(),
+          'tier': info.tier == LicenseTier.proPlus
+              ? 'pro_plus'
+              : info.tier.name.toLowerCase(),
         };
       }
 
@@ -243,7 +255,7 @@ class LicenseService {
   LicenseInfo? getLicenseInfo() {
     final tokenStr = getLicenseToken();
     if (tokenStr == null || tokenStr.isEmpty) return null;
-    
+
     try {
       final decodedJson = utf8.decode(base64.decode(tokenStr.trim()));
       final jsonMap = json.decode(decodedJson) as Map<String, dynamic>;
@@ -272,7 +284,8 @@ class LicenseService {
   /// Updates the max observed timestamp seen from any source (sales, backups, clocks)
   void updateMaxTimestampSeen(DateTime time) {
     final utcTime = time.toUtc();
-    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
+    final maxTimeStr =
+        _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
     if (maxTimeStr != null) {
       try {
         final currentMax = _parseLegacyOrUtc(maxTimeStr);
@@ -315,16 +328,18 @@ class LicenseService {
     if (_isTampered) return false;
 
     final now = DateTime.now().toUtc();
-    
+
     // 1. Check last recorded system time
-    final lastTimeStr = _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
+    final lastTimeStr =
+        _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
     if (lastTimeStr != null) {
       try {
         final lastTime = _parseLegacyOrUtc(lastTimeStr);
         final isLegacy = !lastTimeStr.endsWith('Z');
         // Legacy local times get a wider 2-hour grace margin to absorb timezone/DST shifts on first-run migration.
         // New UTC times get a precise 5-minute margin.
-        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        final grace =
+            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
         if (now.add(grace).isBefore(lastTime)) {
           _isTampered = true;
           return false;
@@ -336,12 +351,14 @@ class LicenseService {
     }
 
     // 2. Check max observed timestamp seen
-    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
+    final maxTimeStr =
+        _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
     if (maxTimeStr != null) {
       try {
         final maxTime = _parseLegacyOrUtc(maxTimeStr);
         final isLegacy = !maxTimeStr.endsWith('Z');
-        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        final grace =
+            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
         if (now.add(grace).isBefore(maxTime)) {
           _isTampered = true;
           return false;
@@ -370,21 +387,23 @@ class LicenseService {
     _cachedLastSystemTime = nowStr;
     _prefs.setString(_lastSystemTimeKey, nowStr);
     await _setSettingsValue('last_system_time', nowStr);
-    
+
     updateMaxTimestampSeen(now);
     return true;
   }
 
   bool _checkClockIntegritySync() {
     final now = DateTime.now().toUtc();
-    
+
     // 1. Check last recorded system time
-    final lastTimeStr = _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
+    final lastTimeStr =
+        _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
     if (lastTimeStr != null) {
       try {
         final lastTime = _parseLegacyOrUtc(lastTimeStr);
         final isLegacy = !lastTimeStr.endsWith('Z');
-        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        final grace =
+            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
         if (now.add(grace).isBefore(lastTime)) {
           return false;
         }
@@ -394,12 +413,14 @@ class LicenseService {
     }
 
     // 2. Check max observed timestamp seen
-    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
+    final maxTimeStr =
+        _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
     if (maxTimeStr != null) {
       try {
         final maxTime = _parseLegacyOrUtc(maxTimeStr);
         final isLegacy = !maxTimeStr.endsWith('Z');
-        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        final grace =
+            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
         if (now.add(grace).isBefore(maxTime)) {
           return false;
         }
@@ -413,7 +434,7 @@ class LicenseService {
     _cachedLastSystemTime = nowStr;
     _prefs.setString(_lastSystemTimeKey, nowStr);
     _setSettingsValue('last_system_time', nowStr);
-    
+
     updateMaxTimestampSeen(now);
     return true;
   }
@@ -421,15 +442,17 @@ class LicenseService {
   /// Strong clock integrity check
   bool checkClockIntegrity() {
     if (_isTampered) return false;
-    
+
     final now = DateTime.now().toUtc();
-    
-    final lastTimeStr = _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
+
+    final lastTimeStr =
+        _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
     if (lastTimeStr != null) {
       try {
         final lastTime = _parseLegacyOrUtc(lastTimeStr);
         final isLegacy = !lastTimeStr.endsWith('Z');
-        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        final grace =
+            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
         if (now.add(grace).isBefore(lastTime)) {
           _isTampered = true;
           return false;
@@ -440,12 +463,14 @@ class LicenseService {
       }
     }
 
-    final maxTimeStr = _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
+    final maxTimeStr =
+        _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
     if (maxTimeStr != null) {
       try {
         final maxTime = _parseLegacyOrUtc(maxTimeStr);
         final isLegacy = !maxTimeStr.endsWith('Z');
-        final grace = isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
+        final grace =
+            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
         if (now.add(grace).isBefore(maxTime)) {
           _isTampered = true;
           return false;
@@ -460,7 +485,7 @@ class LicenseService {
     _cachedLastSystemTime = nowStr;
     _prefs.setString(_lastSystemTimeKey, nowStr);
     _setSettingsValue('last_system_time', nowStr);
-    
+
     updateMaxTimestampSeen(now);
     return true;
   }
@@ -515,7 +540,8 @@ class LicenseService {
     _heartbeatTimer = Timer.periodic(const Duration(hours: 12), (_) async {
       await performHeartbeatCheck(apiClient);
     });
-    Future.delayed(const Duration(seconds: 5), () => performHeartbeatCheck(apiClient));
+    Future.delayed(
+        const Duration(seconds: 5), () => performHeartbeatCheck(apiClient));
   }
 
   /// Cancels periodic heartbeat checks.
@@ -546,7 +572,8 @@ class LicenseService {
 
         if (licenseInfo != null && signature != null) {
           final Map<String, dynamic> localTokenMap = {
-            'merchant_id': licenseInfo['merchant_id'] ?? licenseInfo['merchantId'],
+            'merchant_id':
+                licenseInfo['merchant_id'] ?? licenseInfo['merchantId'],
             if (licenseInfo.containsKey('device_id'))
               'device_id': licenseInfo['device_id']
             else
@@ -560,7 +587,8 @@ class LicenseService {
               'device_token_version': licenseInfo['device_token_version'],
           };
 
-          final tokenStr = base64.encode(utf8.encode(json.encode(localTokenMap)));
+          final tokenStr =
+              base64.encode(utf8.encode(json.encode(localTokenMap)));
           return await saveLicenseToken(tokenStr);
         }
       } else if (response.statusCode == 403 || response.statusCode == 404) {
@@ -574,15 +602,18 @@ class LicenseService {
   /// Sync license from server bootstrap and perform heartbeat validation
   Future<bool> syncLicenseFromServer(ApiClient apiClient) async {
     try {
-      final response = await apiClient.send('GET', '/api/v1/sync/bootstrap/license-config');
-      debugPrint('[LicenseSync] GET /sync/bootstrap/license-config → ${response.statusCode}');
+      final response =
+          await apiClient.send('GET', '/api/v1/sync/bootstrap/license-config');
+      debugPrint(
+          '[LicenseSync] GET /sync/bootstrap/license-config → ${response.statusCode}');
       if (response.isSuccess) {
         final payload = response.json;
         final data = payload['data'] as Map<String, dynamic>?;
         if (data != null && data.containsKey('license_key')) {
           final licenseKey = data['license_key'] as String?;
           if (licenseKey != null && licenseKey.isNotEmpty) {
-            debugPrint('[LicenseSync] license_key alındı: ${licenseKey.substring(0, licenseKey.length > 8 ? 8 : licenseKey.length)}...');
+            debugPrint(
+                '[LicenseSync] license_key alındı: ${licenseKey.substring(0, licenseKey.length > 8 ? 8 : licenseKey.length)}...');
             await _prefs.setString('activated_license_key', licenseKey);
             final result = await performHeartbeatCheck(apiClient);
             debugPrint('[LicenseSync] Heartbeat sonucu: $result');

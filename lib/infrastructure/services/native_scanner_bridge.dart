@@ -6,8 +6,9 @@
 import 'package:flutter/services.dart';
 
 class NativeScannerBridge {
-  static const MethodChannel _channel      = MethodChannel('com.sunmi.scanner');
-  static const EventChannel  _eventChannel = EventChannel('com.sunmi.scanner/events');
+  static const MethodChannel _channel = MethodChannel('com.sunmi.scanner');
+  static const EventChannel _eventChannel =
+      EventChannel('com.sunmi.scanner/events');
 
   // ── Scanner Availability ───────────────────────────────────────────────────
 

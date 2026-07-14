@@ -129,7 +129,8 @@ class DatabaseSchema {
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_ft_logical ON financial_transactions (logical_clock, device_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_ft_logical ON financial_transactions (logical_clock, device_id)');
 
     // Orders table
     await db.execute('''
@@ -181,27 +182,48 @@ class DatabaseSchema {
     await createAuditLogsTable(db);
 
     // Create indexes
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_financial_transactions_customer ON financial_transactions(customer_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_ft_created ON financial_transactions(created_at)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
-    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency ON sales(idempotency_key)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_synced ON sales(is_synced)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_ft_reference ON financial_transactions(reference_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_financial_transactions_customer ON financial_transactions(customer_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_ft_created ON financial_transactions(created_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
+    await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency ON sales(idempotency_key)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_synced ON sales(is_synced)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_ft_reference ON financial_transactions(reference_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
 
     // Create financial ledger view
     await db.execute('''
@@ -297,8 +319,10 @@ class DatabaseSchema {
         resolved INTEGER NOT NULL DEFAULT 0
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_failed_push_resolved ON failed_push_log(resolved)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_failed_push_next_retry ON failed_push_log(next_retry_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_failed_push_resolved ON failed_push_log(resolved)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_failed_push_next_retry ON failed_push_log(next_retry_at)');
 
     // Sync state machine audit trail
     await db.execute('''
@@ -314,8 +338,10 @@ class DatabaseSchema {
         occurred_at TEXT NOT NULL
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sync_state_session ON sync_state_log(session_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sync_state_occurred ON sync_state_log(occurred_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sync_state_session ON sync_state_log(session_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sync_state_occurred ON sync_state_log(occurred_at)');
 
     // Create sms_logs table and indexes
     await db.execute('''
@@ -331,8 +357,10 @@ class DatabaseSchema {
         retry_count INTEGER NOT NULL DEFAULT 0
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_status ON sms_logs(status)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_created ON sms_logs(created_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sms_logs_status ON sms_logs(status)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sms_logs_created ON sms_logs(created_at)');
 
     // Create print_queue table and indexes
     await db.execute('''
@@ -346,8 +374,10 @@ class DatabaseSchema {
         last_error TEXT
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
 
     // Audit Events table
     await db.execute('''
@@ -365,8 +395,10 @@ class DatabaseSchema {
         notes TEXT
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events(timestamp)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events(timestamp)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type)');
 
     // business_profile table
     await db.execute('''
@@ -423,14 +455,16 @@ class DatabaseSchema {
         timestamp TEXT NOT NULL
       )
     ''');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_trigger_audit_customer ON trigger_audit_logs(customer_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_trigger_audit_customer ON trigger_audit_logs(customer_id)');
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS ledger_bypass_flag (
         active INTEGER NOT NULL DEFAULT 0
       )
     ''');
-    final countResult = await db.rawQuery('SELECT COUNT(*) as cnt FROM ledger_bypass_flag');
+    final countResult =
+        await db.rawQuery('SELECT COUNT(*) as cnt FROM ledger_bypass_flag');
     if (Sqflite.firstIntValue(countResult) == 0) {
       await db.rawInsert('INSERT INTO ledger_bypass_flag (active) VALUES (0)');
     }

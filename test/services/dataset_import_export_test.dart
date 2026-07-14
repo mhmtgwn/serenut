@@ -1,4 +1,4 @@
-﻿// test/services/dataset_import_export_test.dart
+// test/services/dataset_import_export_test.dart
 // Unit and integration tests for DatasetImportService import and export pipelines.
 
 import 'dart:io';
@@ -17,7 +17,8 @@ void main() {
 
   setUpAll(() {
     tempDir = Directory.systemTemp.createTempSync('dataset_import_test');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
       (MethodCall methodCall) async {
         if (methodCall.method == 'getApplicationDocumentsDirectory') {
@@ -75,7 +76,8 @@ void main() {
 
       // 2. Export catalog to ZIP
       final zipProgress = <double>[];
-      final zipBytes = await importService.exportToZip((p) => zipProgress.add(p));
+      final zipBytes =
+          await importService.exportToZip((p) => zipProgress.add(p));
 
       expect(zipProgress, isNotEmpty);
       expect(zipProgress.last, equals(1.0));
@@ -98,7 +100,7 @@ void main() {
       // 5. Import from the generated ZIP
       final importProgress = <double>[];
       final importResult = await importService.importFromZip(
-        zipBytes, 
+        zipBytes,
         (p, msg) => importProgress.add(p),
       );
 
@@ -110,7 +112,7 @@ void main() {
       // 6. Verify imported repository products
       final importedProducts = await productRepo.findAll();
       expect(importedProducts, hasLength(2));
-      
+
       final imp1 = importedProducts.firstWhere((p) => p.id == p1.id);
       expect(imp1.name, equals(p1.name));
       expect(imp1.description, equals(p1.description));
@@ -129,7 +131,7 @@ void main() {
       final excel = ex.Excel.createExcel();
       final sheet = excel['market_data_catalog'];
       excel.delete('Sheet1');
-      
+
       sheet.appendRow([
         ex.TextCellValue('Barkod'),
         ex.TextCellValue('Urun Adi'),
@@ -152,9 +154,10 @@ void main() {
 
       final excelBytes = excel.save();
       expect(excelBytes, isNotNull);
-      
+
       final archive = Archive();
-      archive.addFile(ArchiveFile('market_data_catalog.xlsx', excelBytes!.length, excelBytes));
+      archive.addFile(ArchiveFile(
+          'market_data_catalog.xlsx', excelBytes!.length, excelBytes));
       final zipBytes = ZipEncoder().encode(archive);
       expect(zipBytes, isNotNull);
 

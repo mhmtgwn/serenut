@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/dashboard_repository.dart
+// lib/infrastructure/repositories/dashboard_repository.dart
 // Phase 3 — Dashboard Repository and SQLite Engine
 // Generated: 21 Jun 2026
 
@@ -88,7 +88,8 @@ abstract class IDashboardRepository {
   Future<List<SaleEntity>> getRecentSales({int limit = 5});
 
   /// Fetches critical low stock products
-  Future<List<ProductEntity>> getLowStockProducts({int threshold = 5, int limit = 5});
+  Future<List<ProductEntity>> getLowStockProducts(
+      {int threshold = 5, int limit = 5});
 }
 
 /// SQLite Implementation of IDashboardRepository
@@ -101,7 +102,8 @@ class SqliteDashboardRepository implements IDashboardRepository {
   Future<DashboardSummary> getTodaySummary() async {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
+    final todayEnd =
+        DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
 
     // 1. Query pending orders count
     final orderResult = await _gateway.rawQuery('''
@@ -117,7 +119,9 @@ class SqliteDashboardRepository implements IDashboardRepository {
       FROM customers 
       WHERE balance < 0
     ''');
-    final totalReceivables = (receivablesResult.first['total_receivables'] as num?)?.toDouble() ?? 0.0;
+    final totalReceivables =
+        (receivablesResult.first['total_receivables'] as num?)?.toDouble() ??
+            0.0;
 
     // 2. Query today's sales from v_financial_ledger first (as primary financial ledger)
     final ftSummary = await _gateway.rawQuery('''
@@ -176,7 +180,8 @@ class SqliteDashboardRepository implements IDashboardRepository {
   Future<List<SalesTrendPoint>> getWeeklyTrend() async {
     final now = DateTime.now();
     // 7 days ago start
-    final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+    final sevenDaysAgo = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 6));
     final startDate = sevenDaysAgo.toIso8601String();
 
     // Query daily revenue trend from v_financial_ledger
@@ -226,8 +231,10 @@ class SqliteDashboardRepository implements IDashboardRepository {
     final List<SalesTrendPoint> trend = [];
     for (int i = 0; i < 7; i++) {
       final date = sevenDaysAgo.add(Duration(days: i));
-      final dateKey = DateTime(date.year, date.month, date.day).toIso8601String().substring(0, 10);
-      
+      final dateKey = DateTime(date.year, date.month, date.day)
+          .toIso8601String()
+          .substring(0, 10);
+
       final data = merged[dateKey];
       trend.add(SalesTrendPoint(
         date: date,
@@ -240,9 +247,12 @@ class SqliteDashboardRepository implements IDashboardRepository {
   }
 
   @override
-  Future<List<DashboardProductPerformance>> getTopProducts({int limit = 5}) async {
+  Future<List<DashboardProductPerformance>> getTopProducts(
+      {int limit = 5}) async {
     final now = DateTime.now();
-    final thirtyDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 29)).toIso8601String();
+    final thirtyDaysAgo = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 29))
+        .toIso8601String();
 
     final rows = await _gateway.rawQuery('''
       SELECT 
@@ -278,7 +288,9 @@ class SqliteDashboardRepository implements IDashboardRepository {
   @override
   Future<List<DashboardCategoryShare>> getCategoryShares() async {
     final now = DateTime.now();
-    final thirtyDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 29)).toIso8601String();
+    final thirtyDaysAgo = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 29))
+        .toIso8601String();
 
     final rows = await _gateway.rawQuery('''
       SELECT 
@@ -295,7 +307,8 @@ class SqliteDashboardRepository implements IDashboardRepository {
 
     if (rows.isEmpty) return [];
 
-    final grandTotal = rows.fold<double>(0.0, (sum, r) => sum + ((r['total'] as num?)?.toDouble() ?? 0.0));
+    final grandTotal = rows.fold<double>(
+        0.0, (sum, r) => sum + ((r['total'] as num?)?.toDouble() ?? 0.0));
 
     return rows.map((r) {
       final category = r['category'] as String? ?? 'Diğer';
@@ -320,7 +333,8 @@ class SqliteDashboardRepository implements IDashboardRepository {
   }
 
   @override
-  Future<List<ProductEntity>> getLowStockProducts({int threshold = 5, int limit = 5}) async {
+  Future<List<ProductEntity>> getLowStockProducts(
+      {int threshold = 5, int limit = 5}) async {
     final rows = await _gateway.query(
       'products',
       where: 'quantity <= ? AND is_active = 1',

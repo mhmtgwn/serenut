@@ -28,17 +28,21 @@ void main() {
     });
 
     // ── 1. Kritik B: Windows Spooler FFI robustness test ────────────────────
-    test('Kritik B: Windows USB printing FFI handles invalid printer names without crash', () async {
+    test(
+        'Kritik B: Windows USB printing FFI handles invalid printer names without crash',
+        () async {
       // Calling printUsbRaw with an invalid/non-existent printer should catch error and return false
       // instead of crashing the Dart VM.
-      final result = await NativePrinterBridge.printUsbRaw('Invalid_Printer_XYZ_999', [0x1B, 0x40, 0x0A]);
+      final result = await NativePrinterBridge.printUsbRaw(
+          'Invalid_Printer_XYZ_999', [0x1B, 0x40, 0x0A]);
       expect(result, isFalse);
     });
 
     // ── 2. Kritik H: License Clock Tampering Protection test ──────────────────
-    test('Kritik H: SQLite operational logs protect against clock manipulation', () async {
+    test('Kritik H: SQLite operational logs protect against clock manipulation',
+        () async {
       final db = await dbManager.getDatabase();
-      
+
       // Initially, when DB is empty, license service should initialize as not tampered
       final licenseService = LicenseService(prefs);
       await licenseService.initialize();
@@ -70,7 +74,9 @@ void main() {
     });
 
     // ── 3. Yüksek B: SharedPreferences Concurrency stress test ───────────────
-    test('Yuksek B: Concurrency lock prevents lost writes in SharedPreferences lists', () async {
+    test(
+        'Yuksek B: Concurrency lock prevents lost writes in SharedPreferences lists',
+        () async {
       final auditLogger = AuditLogger(dbManager);
       final operationQueue = OperationQueueService(prefs);
 
@@ -104,8 +110,10 @@ void main() {
       final logIndices = logs.map((l) {
         final meta = l['metadata'] as Map<String, dynamic>;
         return meta['index'] as int;
-      }).toList()..sort();
-      final queueIndices = queue.map((q) => q.payload['index'] as int).toList()..sort();
+      }).toList()
+        ..sort();
+      final queueIndices = queue.map((q) => q.payload['index'] as int).toList()
+        ..sort();
 
       expect(logIndices, equals(List.generate(50, (i) => i)));
       expect(queueIndices, equals(List.generate(50, (i) => i)));

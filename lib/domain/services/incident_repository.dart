@@ -1,4 +1,4 @@
-﻿// lib/domain/services/incident_repository.dart
+// lib/domain/services/incident_repository.dart
 // Incident Repository — deduplicated incident access layer on top of SyncTraceService.
 
 import 'package:serenutos/domain/services/sync_trace_service.dart';
@@ -15,14 +15,13 @@ class IncidentRepository {
   ///
   /// Incidents with the same fingerprint (same error type + entity + transition)
   /// are merged into a single [DedupedIncident] with an occurrence count.
-  Future<List<DedupedIncident>> getDeduplicatedIncidents({int hours = 48}) async {
+  Future<List<DedupedIncident>> getDeduplicatedIncidents(
+      {int hours = 48}) async {
     final incidents = await _tracer.getRecentCriticals(hours: hours);
     final byFingerprint = <String, List<SyncIncident>>{};
 
     for (final incident in incidents) {
-      byFingerprint
-          .putIfAbsent(incident.fingerprint, () => [])
-          .add(incident);
+      byFingerprint.putIfAbsent(incident.fingerprint, () => []).add(incident);
     }
 
     return byFingerprint.entries.map((e) {
@@ -34,12 +33,14 @@ class IncidentRepository {
         firstSeen: group.last.firstSeen,
         hasCritical: group.any((i) => i.hasCritical),
         representativeEvent: group.first.events
-            .where((ev) => ev.level.index >= LogLevel.error.index)
-            .map((ev) => ev.event)
-            .firstOrNull ?? 'unknown',
+                .where((ev) => ev.level.index >= LogLevel.error.index)
+                .map((ev) => ev.event)
+                .firstOrNull ??
+            'unknown',
       );
     }).toList()
-      ..sort((a, b) => b.mostRecent.firstSeen.compareTo(a.mostRecent.firstSeen));
+      ..sort(
+          (a, b) => b.mostRecent.firstSeen.compareTo(a.mostRecent.firstSeen));
   }
 
   /// Returns all correlationIds associated with a specific [saleId].
@@ -47,8 +48,7 @@ class IncidentRepository {
     final all = await _tracer.getAllTelemetryEvents();
     return all
         .where((e) =>
-            e.metadata['sale_id'] == saleId ||
-            e.metadata['saleId'] == saleId)
+            e.metadata['sale_id'] == saleId || e.metadata['saleId'] == saleId)
         .map((e) => e.correlationId)
         .toSet()
         .toList();

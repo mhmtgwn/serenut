@@ -45,7 +45,8 @@ class SqliteSaleRepository implements ISaleRepository {
   Future<List<SaleEntity>> findAll() async {
     List<Map<String, dynamic>> rows;
     try {
-      rows = await _executor.query('sales', where: 'is_deleted = 0 OR is_deleted IS NULL');
+      rows = await _executor.query('sales',
+          where: 'is_deleted = 0 OR is_deleted IS NULL');
     } catch (_) {
       rows = await _executor.query('sales');
     }
@@ -69,7 +70,7 @@ class SqliteSaleRepository implements ISaleRepository {
       );
     }
     if (rows.isEmpty) return null;
-    
+
     final sale = SaleEntity.fromMap(rows.first);
     // Load sale items
     final items = await _executor.query(
@@ -98,7 +99,7 @@ class SqliteSaleRepository implements ISaleRepository {
       );
     }
     if (rows.isEmpty) return null;
-    
+
     final sale = SaleEntity.fromMap(rows.first);
     // Load sale items
     final items = await _executor.query(
@@ -208,7 +209,9 @@ class SqliteSaleRepository implements ISaleRepository {
 
       for (final item in entity.items) {
         final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-        final price = (item['unit_price'] ?? item['unitPrice'] as num?)?.toDouble() ?? 0.0;
+        final price =
+            (item['unit_price'] ?? item['unitPrice'] as num?)?.toDouble() ??
+                0.0;
         await _executor.insert('sale_items', {
           'id': 'item-${entity.id}-${item['product_id']}',
           'sale_id': entity.id,
@@ -239,7 +242,8 @@ class SqliteSaleRepository implements ISaleRepository {
 
   @override
   Future<int> count() async {
-    final result = await _executor.rawQuery('SELECT COUNT(*) as count FROM sales');
+    final result =
+        await _executor.rawQuery('SELECT COUNT(*) as count FROM sales');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -258,8 +262,9 @@ class SqliteSaleRepository implements ISaleRepository {
   Future<List<SaleEntity>> getTodaySales() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
-    
+    final endOfDay =
+        DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
+
     final rows = await _executor.query(
       'sales',
       where: 'created_at BETWEEN ? AND ?',
@@ -270,7 +275,8 @@ class SqliteSaleRepository implements ISaleRepository {
   }
 
   @override
-  Future<List<SaleEntity>> getSalesByDateRange(DateTime from, DateTime to) async {
+  Future<List<SaleEntity>> getSalesByDateRange(
+      DateTime from, DateTime to) async {
     final rows = await _executor.query(
       'sales',
       where: 'created_at BETWEEN ? AND ?',
@@ -306,8 +312,9 @@ class SqliteSaleRepository implements ISaleRepository {
   Future<double> getTodayRevenue() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
-    
+    final endOfDay =
+        DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
+
     final result = await _executor.rawQuery(
       'SELECT SUM(total_amount) as revenue FROM sales '
       'WHERE created_at BETWEEN ? AND ? AND status = ?',
@@ -338,7 +345,8 @@ class SqliteSaleRepository implements ISaleRepository {
   }
 }
 
-class SqliteFinancialTransactionRepository implements IFinancialTransactionRepository {
+class SqliteFinancialTransactionRepository
+    implements IFinancialTransactionRepository {
   final DbGateway _gateway;
   final String? deviceId;
 
@@ -348,7 +356,8 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
 
   @override
   Future<List<FinancialTransactionEntity>> findAll() async {
-    final rows = await _executor.query('financial_transactions', orderBy: 'logical_clock DESC, device_id DESC');
+    final rows = await _executor.query('financial_transactions',
+        orderBy: 'logical_clock DESC, device_id DESC');
     return rows.map((row) => FinancialTransactionEntity.fromMap(row)).toList();
   }
 
@@ -388,7 +397,8 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
   Future<int> create(FinancialTransactionEntity entity) async {
     int nextClock = entity.logicalClock;
     if (nextClock == 0) {
-      final result = await _executor.rawQuery('SELECT MAX(logical_clock) as max_clock FROM financial_transactions');
+      final result = await _executor.rawQuery(
+          'SELECT MAX(logical_clock) as max_clock FROM financial_transactions');
       final maxClock = Sqflite.firstIntValue(result) ?? 0;
       nextClock = maxClock + 1;
     }
@@ -413,20 +423,19 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
   @override
   Future<int> update(FinancialTransactionEntity entity) async {
     throw UnsupportedError(
-      'Finansal defter kayÄ±tlarÄ± gÃ¼ncellenemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.'
-    );
+        'Finansal defter kayÄ±tlarÄ± gÃ¼ncellenemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.');
   }
 
   @override
   Future<int> delete(dynamic id) async {
     throw UnsupportedError(
-      'Finansal defter kayÄ±tlarÄ± silinemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.'
-    );
+        'Finansal defter kayÄ±tlarÄ± silinemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.');
   }
 
   @override
   Future<int> count() async {
-    final result = await _executor.rawQuery('SELECT COUNT(*) as count FROM financial_transactions');
+    final result = await _executor
+        .rawQuery('SELECT COUNT(*) as count FROM financial_transactions');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -442,7 +451,8 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
   }
 
   @override
-  Future<List<FinancialTransactionEntity>> getByCustomerId(String customerId) async {
+  Future<List<FinancialTransactionEntity>> getByCustomerId(
+      String customerId) async {
     final rows = await _executor.query(
       'financial_transactions',
       where: 'customer_id = ?',
@@ -464,7 +474,8 @@ class SqliteFinancialTransactionRepository implements IFinancialTransactionRepos
   }
 
   @override
-  Future<List<FinancialTransactionEntity>> getByDateRange(DateTime from, DateTime to) async {
+  Future<List<FinancialTransactionEntity>> getByDateRange(
+      DateTime from, DateTime to) async {
     final rows = await _executor.query(
       'financial_transactions',
       where: 'created_at BETWEEN ? AND ?',

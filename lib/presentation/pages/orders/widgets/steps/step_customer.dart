@@ -10,12 +10,17 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
     final customersVal = ref.watch(ordersCustomersControllerProvider);
 
     return customersVal.when(
-      loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen))),
-      error: (err, _) => Center(child: Text('Müşteriler yüklenemedi: $err', style: const TextStyle(color: _kRed))),
+      loading: () => const Center(
+          child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(_kGreen))),
+      error: (err, _) => Center(
+          child: Text('Müşteriler yüklenemedi: $err',
+              style: const TextStyle(color: _kRed))),
       data: (customersList) {
         final filtered = customersList.where((c) {
           final query = _customerQuery.toLowerCase();
-          return c.name.toLowerCase().contains(query) || c.phone.contains(query);
+          return c.name.toLowerCase().contains(query) ||
+              c.phone.contains(query);
         }).toList();
 
         return Padding(
@@ -29,15 +34,19 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                   final searchField = TextField(
                     decoration: InputDecoration(
                       hintText: 'Müşteri ara (isim veya telefon)...',
-                      prefixIcon: const Icon(Icons.search_rounded, color: _kTextSecondary),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: _kTextSecondary),
                       suffixIcon: _customerQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, size: 18),
-                              onPressed: () => updateState(() => _customerQuery = ''),
+                              onPressed: () =>
+                                  updateState(() => _customerQuery = ''),
                             )
                           : null,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                     ),
                     onChanged: (val) => updateState(() => _customerQuery = val),
                   );
@@ -57,10 +66,12 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                         borderRadius: BorderRadius.circular(10),
                         side: BorderSide(color: _kGreen.withValues(alpha: 0.3)),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                     ),
                     icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                    label: const Text('Yeni Müşteri Ekle', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text('Yeni Müşteri Ekle',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   );
 
                   if (isWide) {
@@ -91,11 +102,13 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey[300]),
+                            Icon(Icons.people_outline_rounded,
+                                size: 64, color: Colors.grey[300]),
                             const SizedBox(height: 12),
                             const Text(
                               'Aradığınız müşteri bulunamadı.',
-                              style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                              style: TextStyle(
+                                  color: _kTextSecondary, fontSize: 14),
                             ),
                           ],
                         ),
@@ -108,38 +121,58 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                           final isDebt = c.balance < 0;
 
                           return GestureDetector(
-                            onTap: () => updateState(() => _selectedCustomer = c),
+                            onTap: () =>
+                                updateState(() => _selectedCustomer = c),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
                               margin: const EdgeInsets.only(bottom: 8),
                               decoration: BoxDecoration(
-                                color: isSel ? _kGreen.withValues(alpha: 0.05) : Colors.white,
+                                color: isSel
+                                    ? _kGreen.withValues(alpha: 0.05)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isSel ? _kGreen : _kBorder,
                                   width: 1.5,
                                 ),
                                 boxShadow: isSel
-                                    ? [BoxShadow(color: _kGreen.withValues(alpha: 0.08), blurRadius: 6)]
+                                    ? [
+                                        BoxShadow(
+                                            color:
+                                                _kGreen.withValues(alpha: 0.08),
+                                            blurRadius: 6)
+                                      ]
                                     : null,
                               ),
                               child: ListTile(
                                 dense: true,
                                 leading: CircleAvatar(
-                                  backgroundColor: isSel ? _kGreen : (isDebt ? _kRedLight : _kGreenLight),
-                                  foregroundColor: isSel ? Colors.white : (isDebt ? _kRed : _kGreenDark),
+                                  backgroundColor: isSel
+                                      ? _kGreen
+                                      : (isDebt ? _kRedLight : _kGreenLight),
+                                  foregroundColor: isSel
+                                      ? Colors.white
+                                      : (isDebt ? _kRed : _kGreenDark),
                                   child: Text(
-                                    c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    c.name.isNotEmpty
+                                        ? c.name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13),
                                   ),
                                 ),
                                 title: Text(
                                   c.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, color: _kText, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: _kText,
+                                      fontSize: 13),
                                 ),
                                 subtitle: Text(
                                   c.phone.isNotEmpty ? c.phone : 'Telefon Yok',
-                                  style: const TextStyle(color: _kTextSecondary, fontSize: 11),
+                                  style: const TextStyle(
+                                      color: _kTextSecondary, fontSize: 11),
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -157,7 +190,10 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                                       width: 20,
                                       height: 20,
                                       child: isSel
-                                          ? const Icon(Icons.check_circle_rounded, color: _kGreen, size: 20)
+                                          ? const Icon(
+                                              Icons.check_circle_rounded,
+                                              color: _kGreen,
+                                              size: 20)
                                           : null,
                                     ),
                                   ],
@@ -188,12 +224,17 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: _kTextSecondary),
-                    onPressed: () => updateState(() => _isAddingCustomer = false),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: _kTextSecondary),
+                    onPressed: () =>
+                        updateState(() => _isAddingCustomer = false),
                   ),
                   const Text(
                     'Yeni Müşteri Ekle',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kText),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _kText),
                   ),
                 ],
               ),
@@ -203,10 +244,14 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                 controller: _newCustNameController,
                 decoration: InputDecoration(
                   labelText: 'Müşteri Adı Soyadı *',
-                  prefixIcon: const Icon(Icons.person_rounded, color: _kTextSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon:
+                      const Icon(Icons.person_rounded, color: _kTextSecondary),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                validator: (val) => (val == null || val.trim().isEmpty) ? 'Lütfen ad soyad girin' : null,
+                validator: (val) => (val == null || val.trim().isEmpty)
+                    ? 'Lütfen ad soyad girin'
+                    : null,
               ),
               const SizedBox(height: 16),
               // Phone Field
@@ -215,8 +260,10 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
                   labelText: 'Telefon Numarası',
-                  prefixIcon: const Icon(Icons.phone_rounded, color: _kTextSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon:
+                      const Icon(Icons.phone_rounded, color: _kTextSecondary),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   hintText: '5xx xxx xx xx',
                 ),
                 inputFormatters: [
@@ -228,12 +275,16 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
               // Starting Balance Field
               TextFormField(
                 controller: _newCustBalanceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true, signed: true),
                 decoration: InputDecoration(
                   labelText: 'Başlangıç Bakiyesi (₺)',
-                  prefixIcon: const Icon(Icons.account_balance_wallet_rounded, color: _kTextSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  helperText: 'Negatif: Müşteri borçlu, Pozitif: Müşteri alacaklı',
+                  prefixIcon: const Icon(Icons.account_balance_wallet_rounded,
+                      color: _kTextSecondary),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  helperText:
+                      'Negatif: Müşteri borçlu, Pozitif: Müşteri alacaklı',
                 ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^-?\d*[.,]?\d*')),
@@ -245,9 +296,11 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => updateState(() => _isAddingCustomer = false),
+                      onPressed: () =>
+                          updateState(() => _isAddingCustomer = false),
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: const Text('İptal'),
@@ -260,16 +313,19 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _kGreen,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: _isSavingCustomer
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Kaydet ve Seç', style: TextStyle(fontWeight: FontWeight.bold)),
+                          : const Text('Kaydet ve Seç',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -301,12 +357,16 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
       );
 
       // Save customer to local database
-      await ref.read(ordersCustomersControllerProvider.notifier).addCustomer(newCustomer);
-      
+      await ref
+          .read(ordersCustomersControllerProvider.notifier)
+          .addCustomer(newCustomer);
+
       // If there's initial balance (either positive or negative), record initial ledger transaction
       if (balance != 0) {
-        final txRepo = await ref.read(financialTransactionRepositoryProvider.future);
-        final transactionId = 'trans-init-${DateTime.now().microsecondsSinceEpoch}';
+        final txRepo =
+            await ref.read(financialTransactionRepositoryProvider.future);
+        final transactionId =
+            'trans-init-${DateTime.now().microsecondsSinceEpoch}';
         await txRepo.create(
           FinancialTransactionEntity(
             id: transactionId,
@@ -332,14 +392,18 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
           _customerQuery = '';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Müşteri başarıyla kaydedildi.'), backgroundColor: _kGreen),
+          const SnackBar(
+              content: Text('Müşteri başarıyla kaydedildi.'),
+              backgroundColor: _kGreen),
         );
       }
     } catch (e) {
       updateState(() => _isSavingCustomer = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Müşteri kaydedilirken hata: $e'), backgroundColor: _kRed),
+          SnackBar(
+              content: Text('Müşteri kaydedilirken hata: $e'),
+              backgroundColor: _kRed),
         );
       }
     }

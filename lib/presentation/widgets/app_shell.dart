@@ -49,7 +49,6 @@ class AppShell extends ConsumerWidget {
       }
     });
 
-
     const navItems = [
       _NavItem(
         label: 'Ana Sayfa',

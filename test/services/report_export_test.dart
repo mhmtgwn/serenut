@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -41,7 +41,8 @@ class MockPathProviderPlatform extends Fake
   }
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async {
+  Future<List<String>?> getExternalStoragePaths(
+      {StorageDirectory? type}) async {
     return [Directory.current.absolute.path];
   }
 
@@ -65,7 +66,9 @@ void main() {
       exportService = DocumentExportService();
     });
 
-    test('exportEndOfDayReportExcel generates a valid file containing Z-report data', () async {
+    test(
+        'exportEndOfDayReportExcel generates a valid file containing Z-report data',
+        () async {
       final today = DateTime.now();
       final sales = [
         SaleEntity(
@@ -109,18 +112,28 @@ void main() {
       expect(sheet, isNotNull);
 
       // Verify some cells contain the correct data
-      final ciroRow = sheet.rows.firstWhere((row) => row.any((cell) => cell?.value?.toString().contains('Toplam Ciro') ?? false));
+      final ciroRow = sheet.rows.firstWhere((row) => row.any(
+          (cell) => cell?.value?.toString().contains('Toplam Ciro') ?? false));
       expect(ciroRow, isNotNull);
-      expect(ciroRow.any((cell) => cell?.value?.toString().contains('370') ?? false), isTrue);
+      expect(
+          ciroRow
+              .any((cell) => cell?.value?.toString().contains('370') ?? false),
+          isTrue);
 
-      final countRow = sheet.rows.firstWhere((row) => row.any((cell) => cell?.value?.toString().contains('Toplam Satış Adedi') ?? false));
+      final countRow = sheet.rows.firstWhere((row) => row.any((cell) =>
+          cell?.value?.toString().contains('Toplam Satış Adedi') ?? false));
       expect(countRow, isNotNull);
-      expect(countRow.any((cell) => cell?.value?.toString().contains('2') ?? false), isTrue);
+      expect(
+          countRow
+              .any((cell) => cell?.value?.toString().contains('2') ?? false),
+          isTrue);
 
       await file.delete();
     });
 
-    test('exportVatReportExcel generates a valid file containing VAT rates and sums', () async {
+    test(
+        'exportVatReportExcel generates a valid file containing VAT rates and sums',
+        () async {
       final startDate = DateTime.now().subtract(const Duration(days: 7));
       final endDate = DateTime.now();
       final vatSummary = [
@@ -152,15 +165,33 @@ void main() {
       expect(sheet, isNotNull);
 
       // Verify that KDV values are correctly written
-      final vatRow18 = sheet.rows.firstWhere((row) => row.any((cell) => cell?.value?.toString() == '18'));
+      final vatRow18 = sheet.rows.firstWhere(
+          (row) => row.any((cell) => cell?.value?.toString() == '18'));
       expect(vatRow18, isNotNull);
-      expect(vatRow18.any((cell) => cell?.value?.toString() == '1000.0' || cell?.value?.toString() == '1000'), isTrue);
-      expect(vatRow18.any((cell) => cell?.value?.toString() == '180.0' || cell?.value?.toString() == '180'), isTrue);
+      expect(
+          vatRow18.any((cell) =>
+              cell?.value?.toString() == '1000.0' ||
+              cell?.value?.toString() == '1000'),
+          isTrue);
+      expect(
+          vatRow18.any((cell) =>
+              cell?.value?.toString() == '180.0' ||
+              cell?.value?.toString() == '180'),
+          isTrue);
 
-      final totalRow = sheet.rows.firstWhere((row) => row.any((cell) => cell?.value?.toString().contains('GENEL TOPLAM') ?? false));
+      final totalRow = sheet.rows.firstWhere((row) => row.any(
+          (cell) => cell?.value?.toString().contains('GENEL TOPLAM') ?? false));
       expect(totalRow, isNotNull);
-      expect(totalRow.any((cell) => cell?.value?.toString() == '1500.0' || cell?.value?.toString() == '1500'), isTrue); // Total matrah
-      expect(totalRow.any((cell) => cell?.value?.toString() == '220.0' || cell?.value?.toString() == '220'), isTrue); // Total vat
+      expect(
+          totalRow.any((cell) =>
+              cell?.value?.toString() == '1500.0' ||
+              cell?.value?.toString() == '1500'),
+          isTrue); // Total matrah
+      expect(
+          totalRow.any((cell) =>
+              cell?.value?.toString() == '220.0' ||
+              cell?.value?.toString() == '220'),
+          isTrue); // Total vat
 
       await file.delete();
     });

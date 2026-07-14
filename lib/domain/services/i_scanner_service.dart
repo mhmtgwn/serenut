@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 
 enum ScannerMode {
   sunmiHardware, // Sunmi built-in scanner (Android)
-  camera,        // Camera-based (Android + iOS)
-  usbKeyboard,   // USB scanner in HID keyboard mode (Windows)
-  none,          // Not available / web
+  camera, // Camera-based (Android + iOS)
+  usbKeyboard, // USB scanner in HID keyboard mode (Windows)
+  none, // Not available / web
 }
 
 class ScanEvent {

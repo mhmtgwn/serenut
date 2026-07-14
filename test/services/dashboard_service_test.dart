@@ -1,4 +1,4 @@
-﻿// test/services/dashboard_service_test.dart
+// test/services/dashboard_service_test.dart
 // Phase 3 — Dashboard Repository and Service Integration Tests
 // Generated: 21 Jun 2026
 
@@ -272,10 +272,11 @@ void main() {
       expect(summary.pendingOrdersCount, equals(1));
     });
 
-    test('getWeeklyTrend includes today and shows correct daily metrics', () async {
+    test('getWeeklyTrend includes today and shows correct daily metrics',
+        () async {
       final trend = await dashboardRepo.getWeeklyTrend();
       expect(trend.length, equals(7));
-      
+
       // Last element is today
       final todayPoint = trend.last;
       expect(todayPoint.revenue, equals(100.0));
@@ -285,7 +286,7 @@ void main() {
     test('getTopProducts lists best products with correct ranks', () async {
       final top = await dashboardRepo.getTopProducts(limit: 5);
       expect(top.length, equals(2));
-      
+
       // Milk should be first since ciro = 90
       expect(top.first.productName, equals('Süt'));
       expect(top.first.totalRevenue, equals(90.0));
@@ -319,9 +320,11 @@ void main() {
       expect(lowStock.first.quantity, equals(2));
     });
 
-    test('DashboardService getDashboardData returns populated aggregated data object', () async {
+    test(
+        'DashboardService getDashboardData returns populated aggregated data object',
+        () async {
       final data = await dashboardService.getDashboardData();
-      
+
       expect(data.summary.todayRevenue, equals(100.0));
       expect(data.weeklyTrend.last.revenue, equals(100.0));
       expect(data.topProducts.first.productName, equals('Süt'));

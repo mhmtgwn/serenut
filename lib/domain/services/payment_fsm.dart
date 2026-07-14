@@ -69,7 +69,8 @@ class PaymentFSM {
   /// Prevents starting a transaction if the machine is not idle (Double charge guard).
   void initiate(String transactionId, double amount, String idempotencyKey) {
     if (_state != PaymentState.idle) {
-      throw StateError('Cannot initiate transaction: Payment FSM is in $_state state. Reset or complete the current transaction first.');
+      throw StateError(
+          'Cannot initiate transaction: Payment FSM is in $_state state. Reset or complete the current transaction first.');
     }
     _activeTransactionId = transactionId;
     _activeAmount = amount;
@@ -97,13 +98,21 @@ class PaymentFSM {
 
   /// Successfully complete transaction and persist to database.
   void complete() {
-    _verifyStateIn([PaymentState.authorized, PaymentState.initiated, PaymentState.unreconciled]);
+    _verifyStateIn([
+      PaymentState.authorized,
+      PaymentState.initiated,
+      PaymentState.unreconciled
+    ]);
     _transitionTo(PaymentState.completed);
   }
 
   /// Mark transaction as UNRECONCILED if payment completed but local database update failed.
   void markUnreconciled() {
-    _verifyStateIn([PaymentState.authorized, PaymentState.terminalSent, PaymentState.timeout]);
+    _verifyStateIn([
+      PaymentState.authorized,
+      PaymentState.terminalSent,
+      PaymentState.timeout
+    ]);
     _transitionTo(PaymentState.unreconciled);
   }
 
@@ -118,14 +127,16 @@ class PaymentFSM {
   void _transitionTo(PaymentState newState) {
     // Define strict transition constraints
     if (_state == PaymentState.completed && newState != PaymentState.idle) {
-      throw StateError('Cannot transition from completed state to $newState without resetting FSM.');
+      throw StateError(
+          'Cannot transition from completed state to $newState without resetting FSM.');
     }
     _state = newState;
   }
 
   void _verifyStateIn(List<PaymentState> allowedStates) {
     if (!allowedStates.contains(_state)) {
-      throw StateError('Invalid FSM transition: Attempted state modification from $_state which is not in allowed sources: $allowedStates');
+      throw StateError(
+          'Invalid FSM transition: Attempted state modification from $_state which is not in allowed sources: $allowedStates');
     }
   }
 }

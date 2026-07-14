@@ -39,7 +39,8 @@ class OnboardingStep1Page extends ConsumerStatefulWidget {
   const OnboardingStep1Page({super.key});
 
   @override
-  ConsumerState<OnboardingStep1Page> createState() => _OnboardingStep1PageState();
+  ConsumerState<OnboardingStep1Page> createState() =>
+      _OnboardingStep1PageState();
 }
 
 class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
@@ -53,7 +54,7 @@ class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
   }
 
   void _load() {
-    final prefs  = ref.read(sharedPreferencesProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
     _persistence = OnboardingPersistence(prefs);
     setState(() => _state = _persistence.loadState());
   }
@@ -69,7 +70,7 @@ class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
   Widget build(BuildContext context) {
     return Step1BusinessInfo(
       initialData: _state.business,
-      onComplete:  _onComplete,
+      onComplete: _onComplete,
     );
   }
 }
@@ -81,7 +82,8 @@ class OnboardingStep2Page extends ConsumerStatefulWidget {
   const OnboardingStep2Page({super.key});
 
   @override
-  ConsumerState<OnboardingStep2Page> createState() => _OnboardingStep2PageState();
+  ConsumerState<OnboardingStep2Page> createState() =>
+      _OnboardingStep2PageState();
 }
 
 class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
@@ -96,7 +98,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
   }
 
   void _load() {
-    final prefs  = ref.read(sharedPreferencesProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
     _persistence = OnboardingPersistence(prefs);
     setState(() => _state = _persistence.loadState());
   }
@@ -129,9 +131,9 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
   }
 
   Future<void> _saveOnboardingData(OnboardingState state) async {
-    final prefs       = ref.read(sharedPreferencesProvider);
-    final dbManager   = DatabaseManager();
-    final gateway     = DbGatewayImpl(dbManager);
+    final prefs = ref.read(sharedPreferencesProvider);
+    final dbManager = DatabaseManager();
+    final gateway = DbGatewayImpl(dbManager);
 
     // 1. Admin kimlik bilgilerini kaydet
     // PIN: SQLite settings tablosuna yaz (tek kaynak)
@@ -160,49 +162,54 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       permissions: AuthService.getPermissionsForRole(UserRole.admin),
       createdAt: DateTime.now(),
     );
-    final rawPassword = state.admin.password.isNotEmpty ? state.admin.password : state.admin.pin;
+    final rawPassword = state.admin.password.isNotEmpty
+        ? state.admin.password
+        : state.admin.pin;
     await authService.createUser(adminUser, rawPassword, pin: state.admin.pin);
 
     // 2. İşletme profilini DB'ye kaydet
     final profileRepo = SqliteBusinessProfileRepository(gateway);
     final profile = BusinessProfile(
-      name:        state.business.businessName,
-      ownerName:   state.business.ownerName,
-      type:        state.business.businessType,
-      phone:       state.business.phone,
-      email:       state.business.email.isEmpty ? null : state.business.email,
-      taxNumber:   state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
-      city:        state.business.city,
-      district:    state.business.district,
-      currency:    state.business.currency,
+      name: state.business.businessName,
+      ownerName: state.business.ownerName,
+      type: state.business.businessType,
+      phone: state.business.phone,
+      email: state.business.email.isEmpty ? null : state.business.email,
+      taxNumber:
+          state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
+      city: state.business.city,
+      district: state.business.district,
+      currency: state.business.currency,
       taxIncluded: state.business.taxIncluded,
-      logoPath:    state.business.logoPath,
-      createdAt:   DateTime.now(),
+      logoPath: state.business.logoPath,
+      createdAt: DateTime.now(),
     );
     await profileRepo.saveProfile(profile);
 
     // 3. Settings tablosuna kaydet
     final settingsRepo = SqliteSettingsRepository(gateway);
     await settingsRepo.updateSettings(Settings(
-      businessName:    state.business.businessName,
-      businessPhone:   state.business.phone,
+      businessName: state.business.businessName,
+      businessPhone: state.business.phone,
       businessAddress: '${state.business.district}, ${state.business.city}',
-      businessTaxId:   state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
-      businessLogo:    state.business.logoPath,
-      ownerName:       state.business.ownerName,
-      businessEmail:   state.business.email.isEmpty ? null : state.business.email,
-      businessCity:    state.business.city,
+      businessTaxId:
+          state.business.taxNumber.isEmpty ? null : state.business.taxNumber,
+      businessLogo: state.business.logoPath,
+      ownerName: state.business.ownerName,
+      businessEmail: state.business.email.isEmpty ? null : state.business.email,
+      businessCity: state.business.city,
       businessDistrict: state.business.district,
-      businessType:    state.business.businessType,
-      currency:        state.business.currency,
-      createdAt:       DateTime.now(),
+      businessType: state.business.businessType,
+      currency: state.business.currency,
+      createdAt: DateTime.now(),
     ));
 
     // Mark company patch as pending so it gets synced to the server on initial sync
     await prefs.setBool('serenut_pending_company_patch', true);
 
     // 4. Sektör şablonundaki ürünleri SQLite'a tohumla (seed)
-    final template = IndustryTemplateRegistry.getTemplate(state.business.businessType);
+    final template =
+        IndustryTemplateRegistry.getTemplate(state.business.businessType);
     if (template != null) {
       final productRepo = SqliteProductRepository(gateway);
       for (final p in template.products) {
@@ -223,7 +230,9 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     // Bu kaynak doğruluk noktasını backend'de de oluşturur
     try {
       final apiClient = ref.read(apiClientProvider);
-      final rawPassword = state.admin.password.isNotEmpty ? state.admin.password : state.admin.pin;
+      final rawPassword = state.admin.password.isNotEmpty
+          ? state.admin.password
+          : state.admin.pin;
       final res = await apiClient.post('/auth/register', {
         'company_name': state.business.businessName,
         'name': state.admin.adminFullName,
@@ -233,17 +242,22 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       });
       if (res.isSuccess) {
         final data = res.json;
-        await prefs.setString('auth_jwt_token', data['access_token'] as String? ?? '');
-        await prefs.setString('auth_refresh_token', data['refresh_token'] as String? ?? '');
+        await prefs.setString(
+            'auth_jwt_token', data['access_token'] as String? ?? '');
+        await prefs.setString(
+            'auth_refresh_token', data['refresh_token'] as String? ?? '');
         debugPrint('Onboarding: Backend kayıt başarılı ✓');
       } else {
-        throw Exception(res.json['error']?['message'] ?? 'Sunucu kayıt hatası.');
+        throw Exception(
+            res.json['error']?['message'] ?? 'Sunucu kayıt hatası.');
       }
     } catch (e) {
       // Split-brain oluşmasını engellemek için işlem yarıda kesiliyor.
       debugPrint('Onboarding: Backend kayıt başarısız: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kayıt başarısız: $e. İnternet bağlantınızı kontrol edin.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                'Kayıt başarısız: $e. İnternet bağlantınızı kontrol edin.')));
       }
       return;
     }
@@ -254,7 +268,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
 
   /// Basit PIN hash'leme (HMAC-SHA256)
   String _hashPin(String pin) {
-    final bytes  = utf8.encode(pin);
+    final bytes = utf8.encode(pin);
     final digest = sha256.convert(bytes);
     return digest.toString();
   }
@@ -272,7 +286,8 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
               SizedBox(height: 20),
               Text('Kurulum tamamlanıyor...',
                   style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                       color: POSColors.textSecondary)),
             ],
           ),
@@ -282,7 +297,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
 
     return Step2AdminAccount(
       initialData: _state.admin,
-      onComplete:  _onComplete,
+      onComplete: _onComplete,
     );
   }
 }
@@ -309,13 +324,14 @@ class _OnboardingSuccessPageState extends ConsumerState<OnboardingSuccessPage> {
   }
 
   Future<void> _load() async {
-    final prefs       = ref.read(sharedPreferencesProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
     final persistence = OnboardingPersistence(prefs);
     final trialManager = ref.read(trialManagerProvider);
-    final expiry      = await trialManager.getExpiryDate() ?? DateTime.now().add(const Duration(days: 30));
+    final expiry = await trialManager.getExpiryDate() ??
+        DateTime.now().add(const Duration(days: 30));
     if (mounted) {
       setState(() {
-        _state      = persistence.loadState();
+        _state = persistence.loadState();
         _expiryDate = expiry;
       });
     }
@@ -324,10 +340,10 @@ class _OnboardingSuccessPageState extends ConsumerState<OnboardingSuccessPage> {
   @override
   Widget build(BuildContext context) {
     return Step3Success(
-      state:           _state,
+      state: _state,
       trialExpiryDate: _expiryDate,
-      appVersion:      '1.0.0',
-      onLaunch:        () => context.go('/onboarding/bootstrap'),
+      appVersion: '1.0.0',
+      onLaunch: () => context.go('/onboarding/bootstrap'),
     );
   }
 }

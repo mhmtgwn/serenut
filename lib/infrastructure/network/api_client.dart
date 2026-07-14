@@ -39,7 +39,7 @@ class ApiClient {
   final http.Client _client;
   final EnvironmentConfig _config;
   String? _jwtToken;
-  
+
   // Callbacks for dynamic token refresh and session expiration
   Future<bool> Function()? onTokenExpired;
   void Function()? onSessionExpired;
@@ -89,12 +89,14 @@ class ApiClient {
     String? idempotencyKey,
   }) async {
     String? resolvedIdempotencyKey = idempotencyKey;
-    if (resolvedIdempotencyKey == null && (method == 'POST' || method == 'PUT' || method == 'DELETE')) {
+    if (resolvedIdempotencyKey == null &&
+        (method == 'POST' || method == 'PUT' || method == 'DELETE')) {
       resolvedIdempotencyKey = const Uuid().v4();
     }
 
     String cleanPath = path;
-    if (cleanPath.startsWith('/api/v1') && _config.apiBaseUrl.endsWith('/api/v1')) {
+    if (cleanPath.startsWith('/api/v1') &&
+        _config.apiBaseUrl.endsWith('/api/v1')) {
       cleanPath = cleanPath.substring(7);
     }
     final uri = Uri.parse('${_config.apiBaseUrl}$cleanPath');
@@ -124,7 +126,7 @@ class ApiClient {
     try {
       final streamedResponse = await _client.send(request);
       final response = await http.Response.fromStream(streamedResponse);
-      
+
       final apiResponse = ApiResponse(
         statusCode: response.statusCode,
         body: response.body,
@@ -132,13 +134,16 @@ class ApiClient {
       );
 
       // Handle transparent JWT token refresh on 401s
-      if (response.statusCode == 401 && !path.startsWith('/auth/') && onTokenExpired != null) {
+      if (response.statusCode == 401 &&
+          !path.startsWith('/auth/') &&
+          onTokenExpired != null) {
         _refreshFuture ??= onTokenExpired!();
         final success = await _refreshFuture!;
         _refreshFuture = null; // reset for next time
 
         if (success) {
-          final newHeaders = _buildHeaders(idempotencyKey: resolvedIdempotencyKey);
+          final newHeaders =
+              _buildHeaders(idempotencyKey: resolvedIdempotencyKey);
           final retryRequest = http.Request(method, uri);
           retryRequest.headers.addAll(newHeaders);
           if (bodyString != null) {
@@ -147,7 +152,7 @@ class ApiClient {
 
           final retryStreamed = await _client.send(retryRequest);
           final retryResponse = await http.Response.fromStream(retryStreamed);
-          
+
           final retryApiResponse = ApiResponse(
             statusCode: retryResponse.statusCode,
             body: retryResponse.body,
@@ -189,11 +194,13 @@ class ApiClient {
   Future<ApiResponse> get(String path) => send('GET', path);
 
   /// Helper for POST requests.
-  Future<ApiResponse> post(String path, Map<String, dynamic> body, {String? idempotencyKey}) =>
+  Future<ApiResponse> post(String path, Map<String, dynamic> body,
+          {String? idempotencyKey}) =>
       send('POST', path, body: body, idempotencyKey: idempotencyKey);
 
   /// Helper for PUT requests.
-  Future<ApiResponse> put(String path, Map<String, dynamic> body, {String? idempotencyKey}) =>
+  Future<ApiResponse> put(String path, Map<String, dynamic> body,
+          {String? idempotencyKey}) =>
       send('PUT', path, body: body, idempotencyKey: idempotencyKey);
 
   /// Helper for DELETE requests.

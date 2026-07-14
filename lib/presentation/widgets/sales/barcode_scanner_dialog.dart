@@ -6,12 +6,14 @@ class BarcodeScannerDialog extends StatefulWidget {
 
   const BarcodeScannerDialog({super.key, required this.onBarcodeScanned});
 
-  static Future<void> show(BuildContext context, {required Function(String) onBarcodeScanned}) {
+  static Future<void> show(BuildContext context,
+      {required Function(String) onBarcodeScanned}) {
     return showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Barcode Scanner',
-      pageBuilder: (context, _, __) => BarcodeScannerDialog(onBarcodeScanned: onBarcodeScanned),
+      pageBuilder: (context, _, __) =>
+          BarcodeScannerDialog(onBarcodeScanned: onBarcodeScanned),
     );
   }
 
@@ -59,7 +61,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
                 }
               },
             ),
-            
+
             // Visual viewfinder target area
             Center(
               child: Container(
@@ -92,7 +94,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
                 ),
               ),
             ),
-            
+
             // Bottom Instruction
             const Positioned(
               bottom: 48,
@@ -101,10 +103,13 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
               child: Text(
                 'Ürün barkodunu çerçevenin ortasına hizalayın',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
               ),
             ),
-            
+
             // Header actions
             Positioned(
               top: 16,
@@ -114,12 +119,16 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    icon:
+                        const Icon(Icons.close, color: Colors.white, size: 28),
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Text(
                     'Kamera Barkod Okuyucu',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
                   ),
                   Row(
                     children: [
@@ -129,18 +138,22 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> {
                           builder: (context, state, child) {
                             switch (state.torchState) {
                               case TorchState.off:
-                                return const Icon(Icons.flash_off, color: Colors.white);
+                                return const Icon(Icons.flash_off,
+                                    color: Colors.white);
                               case TorchState.on:
-                                return const Icon(Icons.flash_on, color: kGreen);
+                                return const Icon(Icons.flash_on,
+                                    color: kGreen);
                               default:
-                                return const Icon(Icons.flash_off, color: Colors.white);
+                                return const Icon(Icons.flash_off,
+                                    color: Colors.white);
                             }
                           },
                         ),
                         onPressed: () => _controller.toggleTorch(),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.flip_camera_ios, color: Colors.white),
+                        icon: const Icon(Icons.flip_camera_ios,
+                            color: Colors.white),
                         onPressed: () => _controller.switchCamera(),
                       ),
                     ],

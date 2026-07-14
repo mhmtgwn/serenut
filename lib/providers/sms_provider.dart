@@ -36,7 +36,7 @@ SmsConfig? _buildSmsConfig(Settings? settings) {
   }
 
   if (smsProvider == SmsProvider.none) return null;
-  
+
   if (smsProvider != SmsProvider.sim) {
     if (settings.smsApiKey == null || settings.smsApiKey!.isEmpty) return null;
   }
@@ -45,14 +45,13 @@ SmsConfig? _buildSmsConfig(Settings? settings) {
   final username = apiKey.isNotEmpty ? apiKey.split(':').first : '';
 
   return SmsConfig(
-    provider:  smsProvider,
-    apiKey:    apiKey,
-    username:  username,
-    sender:    settings.businessPhone.isNotEmpty ? settings.businessPhone : 'SERENUT',
+    provider: smsProvider,
+    apiKey: apiKey,
+    username: username,
+    sender:
+        settings.businessPhone.isNotEmpty ? settings.businessPhone : 'SERENUT',
     apiSecret: smsProvider == SmsProvider.twilio
-        ? (apiKey.contains(':')
-            ? apiKey.split(':').last
-            : null)
+        ? (apiKey.contains(':') ? apiKey.split(':').last : null)
         : null,
     simSubscriptionId: settings.smsSimSubscriptionId,
     monthlyLimit: settings.smsMonthlyLimit,
@@ -65,7 +64,7 @@ SmsConfig? _buildSmsConfig(Settings? settings) {
 final smsServiceProvider = Provider<SmsService>((ref) {
   final settingsAsync = ref.watch(settingsNotifierProvider);
   final settings = settingsAsync.value;
-  final config   = _buildSmsConfig(settings);
+  final config = _buildSmsConfig(settings);
   final apiClient = ref.watch(apiClientProvider);
 
   return SmsService(
@@ -108,7 +107,8 @@ final smsLogRepositoryProvider = Provider<SmsLogRepository>((ref) {
 });
 
 /// Provider for SmsNotificationHandler (eagerly listens to events)
-final smsNotificationHandlerProvider = FutureProvider<SmsNotificationHandler>((ref) async {
+final smsNotificationHandlerProvider =
+    FutureProvider<SmsNotificationHandler>((ref) async {
   final eventPublisher = ref.watch(eventPublisherProvider);
   final customerRepo = await ref.watch(customerRepositoryProvider.future);
   final smsService = ref.watch(smsServiceProvider);
@@ -134,7 +134,8 @@ final smsNotificationHandlerProvider = FutureProvider<SmsNotificationHandler>((r
 });
 
 /// Provider for list of SmsLogEntry from repository
-final smsLogsProvider = FutureProvider.autoDispose<List<SmsLogEntry>>((ref) async {
+final smsLogsProvider =
+    FutureProvider.autoDispose<List<SmsLogEntry>>((ref) async {
   final repo = ref.watch(smsLogRepositoryProvider);
   return repo.getRecentLogs(limit: 100);
 });

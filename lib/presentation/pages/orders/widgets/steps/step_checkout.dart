@@ -10,7 +10,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
       children: [
         const Text(
           'Ödeme Detayları',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
         ),
         const SizedBox(height: 12),
         _buildSummaryRow(
@@ -28,7 +29,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         _buildSummaryRow(
           icon: Icons.shopping_basket_outlined,
           label: 'Toplam Ürün',
-          value: _formatQuantity(_cart.values.fold(0.0, (sum, val) => sum + val)),
+          value:
+              _formatQuantity(_cart.values.fold(0.0, (sum, val) => sum + val)),
         ),
         const SizedBox(height: 8),
         _buildSummaryRow(
@@ -52,7 +54,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             ),
             const Text(
               'Fiş Yazdır',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
             ),
             if (_printReceipt) ...[
               const SizedBox(width: 8),
@@ -62,8 +65,11 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 }),
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(border: Border.all(color: _kBorder), borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.remove, size: 12, color: _kTextSecondary),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: _kBorder),
+                      borderRadius: BorderRadius.circular(6)),
+                  child: const Icon(Icons.remove,
+                      size: 12, color: _kTextSecondary),
                 ),
               ),
               const SizedBox(width: 6),
@@ -76,12 +82,15 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 onTap: () => updateState(() => _printCopies++),
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(border: Border.all(color: _kBorder), borderRadius: BorderRadius.circular(6)),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: _kBorder),
+                      borderRadius: BorderRadius.circular(6)),
                   child: const Icon(Icons.add, size: 12, color: _kGreen),
                 ),
               ),
               const SizedBox(width: 4),
-              const Text('Kopya', style: TextStyle(fontSize: 11, color: _kTextSecondary)),
+              const Text('Kopya',
+                  style: TextStyle(fontSize: 11, color: _kTextSecondary)),
             ],
           ],
         ),
@@ -99,7 +108,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             ),
             const Text(
               'Sipariş Etiketi Yazdır',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
             ),
             if (_printLabel) ...[
               const SizedBox(width: 8),
@@ -112,8 +122,11 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(border: Border.all(color: _kBorder), borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.remove, size: 12, color: _kTextSecondary),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: _kBorder),
+                      borderRadius: BorderRadius.circular(6)),
+                  child: const Icon(Icons.remove,
+                      size: 12, color: _kTextSecondary),
                 ),
               ),
               const SizedBox(width: 6),
@@ -132,12 +145,15 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 },
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(border: Border.all(color: _kBorder), borderRadius: BorderRadius.circular(6)),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: _kBorder),
+                      borderRadius: BorderRadius.circular(6)),
                   child: const Icon(Icons.add, size: 12, color: _kGreen),
                 ),
               ),
               const SizedBox(width: 4),
-              const Text('Kopya', style: TextStyle(fontSize: 11, color: _kTextSecondary)),
+              const Text('Kopya',
+                  style: TextStyle(fontSize: 11, color: _kTextSecondary)),
             ],
           ],
         ),
@@ -149,7 +165,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
       children: [
         const Text(
           'Ödeme Yöntemi Seçin',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
+          style: TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
         ),
         const SizedBox(height: 12),
         _buildPaymentSelectionGrid(),
@@ -199,7 +216,11 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
     );
   }
 
-  Widget _buildSummaryRow({required IconData icon, required String label, required String value, Color? valueColor}) {
+  Widget _buildSummaryRow(
+      {required IconData icon,
+      required String label,
+      required String value,
+      Color? valueColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -211,7 +232,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         children: [
           Icon(icon, size: 16, color: _kTextSecondary),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
           const Spacer(),
           Text(
             value,
@@ -242,7 +264,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         children: [
           const Text(
             'Karma Ödeme Tutarları',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
           ),
           const SizedBox(height: 12),
           _buildSplitField(
@@ -279,16 +302,26 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Dağıtılan Toplam:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text('₺${_karmaTotal.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _karmaValid ? _kGreenDark : _kRed)),
+              const Text('Dağıtılan Toplam:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text('₺${_karmaTotal.toStringAsFixed(2)}',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: _karmaValid ? _kGreenDark : _kRed)),
             ],
           ),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Kalan Tutar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text('₺${_karmaRemainder.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _kText)),
+              const Text('Kalan Tutar:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text('₺${_karmaRemainder.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: _kText)),
             ],
           ),
         ],
@@ -296,9 +329,10 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
     );
   }
 
-  void _onSplitFieldChanged(String field, String valStr, double remaining, bool hasCustomer) {
+  void _onSplitFieldChanged(
+      String field, String valStr, double remaining, bool hasCustomer) {
     final val = double.tryParse(valStr.replaceAll(',', '.')) ?? 0.0;
-    
+
     if (!hasCustomer) {
       _debtSplitController.text = '0.00';
       if (field == 'cash') {
@@ -310,15 +344,21 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
       }
     } else {
       if (field == 'cash') {
-        final currentCard = double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ?? 0.0;
+        final currentCard =
+            double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ??
+                0.0;
         final debtVal = (remaining - (val + currentCard)).clamp(0.0, remaining);
         _debtSplitController.text = debtVal.toStringAsFixed(2);
       } else if (field == 'card') {
-        final currentCash = double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ?? 0.0;
+        final currentCash =
+            double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ??
+                0.0;
         final debtVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
         _debtSplitController.text = debtVal.toStringAsFixed(2);
       } else if (field == 'debt') {
-        final currentCash = double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ?? 0.0;
+        final currentCash =
+            double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ??
+                0.0;
         final cardVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
         _cardSplitController.text = cardVal.toStringAsFixed(2);
       }
@@ -341,7 +381,11 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         Icon(icon, size: 16, color: isEnabled ? color : Colors.grey),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isEnabled ? _kText : Colors.grey)),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isEnabled ? _kText : Colors.grey)),
         ),
         SizedBox(
           width: 100,
@@ -351,7 +395,10 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             enabled: isEnabled,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.end,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isEnabled ? _kText : Colors.grey),
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: isEnabled ? _kText : Colors.grey),
             decoration: const InputDecoration(
               isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -360,7 +407,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
             ],
-            onChanged: (val) => _onSplitFieldChanged(fieldId, val, remaining, hasCustomer),
+            onChanged: (val) =>
+                _onSplitFieldChanged(fieldId, val, remaining, hasCustomer),
           ),
         ),
       ],
@@ -369,11 +417,31 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
 
   Widget _buildPaymentSelectionGrid() {
     final methods = [
-      {'id': 'cash', 'label': 'Nakit', 'icon': Icons.money_rounded, 'color': _kGreen},
-      {'id': 'card', 'label': 'Kredi Kartı', 'icon': Icons.credit_card_rounded, 'color': Colors.blue},
+      {
+        'id': 'cash',
+        'label': 'Nakit',
+        'icon': Icons.money_rounded,
+        'color': _kGreen
+      },
+      {
+        'id': 'card',
+        'label': 'Kredi Kartı',
+        'icon': Icons.credit_card_rounded,
+        'color': Colors.blue
+      },
       if (_selectedCustomer != null)
-        {'id': 'debt', 'label': 'Veresiye / Cari', 'icon': Icons.people_outline_rounded, 'color': _kRed},
-      {'id': 'karma', 'label': 'Karma Ödeme', 'icon': Icons.account_balance_wallet_rounded, 'color': _kAmberDark},
+        {
+          'id': 'debt',
+          'label': 'Veresiye / Cari',
+          'icon': Icons.people_outline_rounded,
+          'color': _kRed
+        },
+      {
+        'id': 'karma',
+        'label': 'Karma Ödeme',
+        'icon': Icons.account_balance_wallet_rounded,
+        'color': _kAmberDark
+      },
     ];
 
     return GridView.builder(

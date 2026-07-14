@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 // Basit test widget'ları
 class TestApp extends StatelessWidget {
   final Widget child;
-  
+
   const TestApp({super.key, required this.child});
 
   @override
@@ -114,7 +114,8 @@ void main() {
   });
 
   group('Error Handling Tests', () {
-    testWidgets('Widget handles null values gracefully', (WidgetTester tester) async {
+    testWidgets('Widget handles null values gracefully',
+        (WidgetTester tester) async {
       // Test widget that might receive null values
       const testWidget = TestApp(
         child: Center(
@@ -126,7 +127,8 @@ void main() {
       expect(find.text('Test'), findsOneWidget);
     });
 
-    testWidgets('Widget rebuilds correctly after state change', (WidgetTester tester) async {
+    testWidgets('Widget rebuilds correctly after state change',
+        (WidgetTester tester) async {
       await tester.pumpWidget(const TestApp(child: SimpleCounter()));
 
       // Initial build
@@ -143,18 +145,20 @@ void main() {
   });
 
   group('Performance Tests', () {
-    testWidgets('Widget renders within reasonable time', (WidgetTester tester) async {
+    testWidgets('Widget renders within reasonable time',
+        (WidgetTester tester) async {
       final stopwatch = Stopwatch()..start();
-      
+
       await tester.pumpWidget(const TestApp(child: SimpleCounter()));
-      
+
       stopwatch.stop();
-      
+
       // Widget should render in less than 100ms
       expect(stopwatch.elapsedMilliseconds, lessThan(100));
     });
 
-    testWidgets('Multiple rapid taps handled correctly', (WidgetTester tester) async {
+    testWidgets('Multiple rapid taps handled correctly',
+        (WidgetTester tester) async {
       await tester.pumpWidget(const TestApp(child: SimpleCounter()));
 
       // Rapid taps
@@ -181,7 +185,7 @@ void main() {
       await tester.pumpWidget(const TestApp(child: SimpleCounter()));
 
       final buttonFinder = find.byKey(const Key('increment_button'));
-      
+
       // Focus the button
       await tester.tap(buttonFinder);
       await tester.pump();

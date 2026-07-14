@@ -67,9 +67,11 @@ class PaymentBreakdown {
   final int card;
   final int credit;
 
-  const PaymentBreakdown({required this.cash, required this.card, required this.credit});
+  const PaymentBreakdown(
+      {required this.cash, required this.card, required this.credit});
 
-  factory PaymentBreakdown.fromJson(Map<String, dynamic> json) => PaymentBreakdown(
+  factory PaymentBreakdown.fromJson(Map<String, dynamic> json) =>
+      PaymentBreakdown(
         cash: json['cash'] as int? ?? 0,
         card: json['card'] as int? ?? 0,
         credit: json['credit'] as int? ?? 0,
@@ -81,9 +83,11 @@ class SalesTrendPoint {
   final double revenue;
   final int count;
 
-  const SalesTrendPoint({required this.time, required this.revenue, required this.count});
+  const SalesTrendPoint(
+      {required this.time, required this.revenue, required this.count});
 
-  factory SalesTrendPoint.fromJson(Map<String, dynamic> json) => SalesTrendPoint(
+  factory SalesTrendPoint.fromJson(Map<String, dynamic> json) =>
+      SalesTrendPoint(
         time: json['time'] as String? ?? '',
         revenue: (json['revenue'] as num? ?? 0.0).toDouble(),
         count: json['count'] as int? ?? 0,
@@ -121,12 +125,14 @@ class StockAnalytics {
   final List<CriticalStockItem> criticalItems;
   final int criticalCount;
 
-  const StockAnalytics({required this.criticalItems, required this.criticalCount});
+  const StockAnalytics(
+      {required this.criticalItems, required this.criticalCount});
 
   factory StockAnalytics.fromJson(Map<String, dynamic> json) {
     final list = json['criticalItems'] as List<dynamic>? ?? [];
     return StockAnalytics(
-      criticalItems: list.map((item) => CriticalStockItem.fromJson(item)).toList(),
+      criticalItems:
+          list.map((item) => CriticalStockItem.fromJson(item)).toList(),
       criticalCount: json['criticalCount'] as int? ?? 0,
     );
   }
@@ -138,9 +144,14 @@ class CriticalStockItem {
   final String? category;
   final int quantity;
 
-  const CriticalStockItem({required this.id, required this.name, this.category, required this.quantity});
+  const CriticalStockItem(
+      {required this.id,
+      required this.name,
+      this.category,
+      required this.quantity});
 
-  factory CriticalStockItem.fromJson(Map<String, dynamic> json) => CriticalStockItem(
+  factory CriticalStockItem.fromJson(Map<String, dynamic> json) =>
+      CriticalStockItem(
         id: json['id'] as String? ?? '',
         name: json['name'] as String? ?? '',
         category: json['category'] as String?,
@@ -153,7 +164,10 @@ class FinanceAnalytics {
   final double payables;
   final List<DebtorStat> topDebtors;
 
-  const FinanceAnalytics({required this.receivables, required this.payables, required this.topDebtors});
+  const FinanceAnalytics(
+      {required this.receivables,
+      required this.payables,
+      required this.topDebtors});
 
   factory FinanceAnalytics.fromJson(Map<String, dynamic> json) {
     final list = json['topDebtors'] as List<dynamic>? ?? [];
@@ -171,7 +185,11 @@ class DebtorStat {
   final String? phone;
   final double balance;
 
-  const DebtorStat({required this.id, required this.name, this.phone, required this.balance});
+  const DebtorStat(
+      {required this.id,
+      required this.name,
+      this.phone,
+      required this.balance});
 
   factory DebtorStat.fromJson(Map<String, dynamic> json) => DebtorStat(
         id: json['id'] as String? ?? '',
@@ -187,7 +205,11 @@ class BranchStat {
   final double revenue;
   final int orders;
 
-  const BranchStat({required this.id, required this.name, required this.revenue, required this.orders});
+  const BranchStat(
+      {required this.id,
+      required this.name,
+      required this.revenue,
+      required this.orders});
 
   factory BranchStat.fromJson(Map<String, dynamic> json) => BranchStat(
         id: json['id'] as String? ?? '',
@@ -203,7 +225,11 @@ class StaffStat {
   final int salesCount;
   final double revenue;
 
-  const StaffStat({required this.id, required this.name, required this.salesCount, required this.revenue});
+  const StaffStat(
+      {required this.id,
+      required this.name,
+      required this.salesCount,
+      required this.revenue});
 
   factory StaffStat.fromJson(Map<String, dynamic> json) => StaffStat(
         id: json['id'] as String? ?? '',

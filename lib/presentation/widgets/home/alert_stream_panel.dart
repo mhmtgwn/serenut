@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
-final telemetryCollapsedProvider = StateProvider.autoDispose<bool>((ref) => true);
+final telemetryCollapsedProvider =
+    StateProvider.autoDispose<bool>((ref) => true);
 
-final recentAlertsProvider = FutureProvider.autoDispose<List<String>>((ref) async {
+final recentAlertsProvider =
+    FutureProvider.autoDispose<List<String>>((ref) async {
   try {
     final telemetry = TelemetryService();
     final events = await telemetry.getEvents();
@@ -46,11 +48,13 @@ class AlertStreamPanel extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () => ref.read(telemetryCollapsedProvider.notifier).state = !isCollapsed,
+            onTap: () => ref.read(telemetryCollapsedProvider.notifier).state =
+                !isCollapsed,
             behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
-                const Icon(Icons.terminal_rounded, color: Color(0xFF10B981), size: 16),
+                const Icon(Icons.terminal_rounded,
+                    color: Color(0xFF10B981), size: 16),
                 const SizedBox(width: 8),
                 const Text(
                   'CANLI TELEMETRİ ALERTLERİ',
@@ -63,7 +67,9 @@ class AlertStreamPanel extends ConsumerWidget {
                 ),
                 const SizedBox(width: 4),
                 Icon(
-                  isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                  isCollapsed
+                      ? Icons.keyboard_arrow_down_rounded
+                      : Icons.keyboard_arrow_up_rounded,
                   color: const Color(0xFF94A3B8),
                   size: 14,
                 ),
@@ -74,10 +80,14 @@ class AlertStreamPanel extends ConsumerWidget {
                     children: [
                       Text(
                         'İncele',
-                        style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Color(0xFF10B981),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
                       ),
                       SizedBox(width: 2),
-                      Icon(Icons.chevron_right_rounded, color: Color(0xFF10B981), size: 12),
+                      Icon(Icons.chevron_right_rounded,
+                          color: Color(0xFF10B981), size: 12),
                     ],
                   ),
                 ),
@@ -87,8 +97,12 @@ class AlertStreamPanel extends ConsumerWidget {
           if (!isCollapsed) ...[
             const SizedBox(height: 12),
             alertsAsync.when(
-              loading: () => const SizedBox(height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
-              error: (e, _) => Text('Hata: $e', style: const TextStyle(color: Colors.red, fontSize: 11)),
+              loading: () => const SizedBox(
+                  height: 60,
+                  child:
+                      Center(child: CircularProgressIndicator(strokeWidth: 2))),
+              error: (e, _) => Text('Hata: $e',
+                  style: const TextStyle(color: Colors.red, fontSize: 11)),
               data: (logs) {
                 if (logs.isEmpty) {
                   return const Text(

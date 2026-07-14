@@ -44,18 +44,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   int _step = 0; // 0 = Hesap bilgileri, 1 = İşletme bilgileri
 
   // ── Sayfa 0: Hesap ──
-  final _emailCtrl      = TextEditingController();
-  final _usernameCtrl   = TextEditingController();
-  final _passwordCtrl   = TextEditingController();
-  final _password2Ctrl  = TextEditingController();
-  bool _obscurePass  = true;
+  final _emailCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _password2Ctrl = TextEditingController();
+  bool _obscurePass = true;
   bool _obscurePass2 = true;
 
   // ── Sayfa 1: İşletme (fiş bilgileri) ──
-  final _bizNameCtrl    = TextEditingController();
-  final _ownerNameCtrl  = TextEditingController();
-  final _phoneCtrl      = TextEditingController();
-  final _taxNoCtrl      = TextEditingController();
+  final _bizNameCtrl = TextEditingController();
+  final _ownerNameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _taxNoCtrl = TextEditingController();
 
   String? _selectedCity;
   String? _selectedDistrict;
@@ -71,8 +71,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   String? _error;
 
   static const _businessTypes = [
-    'Market', 'Kafe', 'Restoran', 'Kuruyemişçi', 'Pastane',
-    'Büfe', 'Kasap', 'Manav', 'Eczane', 'Diğer',
+    'Market',
+    'Kafe',
+    'Restoran',
+    'Kuruyemişçi',
+    'Pastane',
+    'Büfe',
+    'Kasap',
+    'Manav',
+    'Eczane',
+    'Diğer',
   ];
 
   @override
@@ -97,7 +105,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   Future<void> _loadCities() async {
     try {
-      final raw  = await rootBundle.loadString('assets/data/cities.json');
+      final raw = await rootBundle.loadString('assets/data/cities.json');
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final countries = json['countries'] as List<dynamic>;
       final tr = countries.firstWhere(
@@ -105,17 +113,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         orElse: () => null,
       );
       if (tr != null) {
-        final cityList = (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
+        final cityList =
+            (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
         final Map<String, List<String>> map = {};
         for (final c in cityList) {
-          final name      = (c as Map<String, dynamic>)['name'] as String;
+          final name = (c as Map<String, dynamic>)['name'] as String;
           final districts = (c['districts'] as List<dynamic>).cast<String>();
-          map[name]       = districts;
+          map[name] = districts;
         }
         if (mounted) {
           setState(() {
-            _cityMap      = map;
-            _cities       = map.keys.toList()..sort();
+            _cityMap = map;
+            _cities = map.keys.toList()..sort();
             _citiesLoaded = true;
           });
         }
@@ -142,21 +151,24 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       return;
     }
 
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
 
     try {
-      final gateway    = ref.read(dbGatewayProvider);
+      final gateway = ref.read(dbGatewayProvider);
       final authService = ref.read(authServiceProvider);
-      final prefs      = ref.read(sharedPreferencesProvider);
+      final prefs = ref.read(sharedPreferencesProvider);
 
       // 1. Admin kullanıcı oluştur
       final adminUser = AuthUser(
-        id:          const Uuid().v4(),
-        name:        _ownerNameCtrl.text.trim(),
-        email:       _emailCtrl.text.trim(),
-        role:        UserRole.admin,
+        id: const Uuid().v4(),
+        name: _ownerNameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        role: UserRole.admin,
         permissions: AuthService.getPermissionsForRole(UserRole.admin),
-        createdAt:   DateTime.now(),
+        createdAt: DateTime.now(),
       );
       await authService.createUser(adminUser, _passwordCtrl.text);
       await prefs.setString('admin_username', _usernameCtrl.text.trim());
@@ -165,33 +177,34 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       // 2. İşletme profilini kaydet
       final profileRepo = SqliteBusinessProfileRepository(gateway);
       final profile = BusinessProfile(
-        name:       _bizNameCtrl.text.trim(),
-        ownerName:  _ownerNameCtrl.text.trim(),
-        type:       _selectedType ?? '',
-        phone:      _phoneCtrl.text.trim(),
-        email:      _emailCtrl.text.trim(),
-        taxNumber:  _taxNoCtrl.text.trim(),
-        city:       _selectedCity ?? '',
-        district:   _selectedDistrict ?? '',
-        logoPath:   _logoPath, // null = varsayılan logo
-        createdAt:  DateTime.now(),
+        name: _bizNameCtrl.text.trim(),
+        ownerName: _ownerNameCtrl.text.trim(),
+        type: _selectedType ?? '',
+        phone: _phoneCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        taxNumber: _taxNoCtrl.text.trim(),
+        city: _selectedCity ?? '',
+        district: _selectedDistrict ?? '',
+        logoPath: _logoPath, // null = varsayılan logo
+        createdAt: DateTime.now(),
       );
       await profileRepo.saveProfile(profile);
 
       // 3. Settings tablosuna da yaz (fişte kullanılır)
       final settingsRepo = SqliteSettingsRepository(gateway);
       await settingsRepo.updateSettings(Settings(
-        businessName:    _bizNameCtrl.text.trim(),
-        businessPhone:   _phoneCtrl.text.trim(),
+        businessName: _bizNameCtrl.text.trim(),
+        businessPhone: _phoneCtrl.text.trim(),
         businessAddress: '${_selectedDistrict ?? ''}, ${_selectedCity ?? ''}',
-        businessTaxId:   _taxNoCtrl.text.trim(),
-        businessLogo:    _logoPath,
-        ownerName:       _ownerNameCtrl.text.trim(),
-        businessEmail:   _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-        businessCity:    _selectedCity ?? '',
+        businessTaxId: _taxNoCtrl.text.trim(),
+        businessLogo: _logoPath,
+        ownerName: _ownerNameCtrl.text.trim(),
+        businessEmail:
+            _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+        businessCity: _selectedCity ?? '',
         businessDistrict: _selectedDistrict ?? '',
-        businessType:    _selectedType ?? '',
-        createdAt:       DateTime.now(),
+        businessType: _selectedType ?? '',
+        createdAt: DateTime.now(),
       ));
 
       // 4. Backend'e kayıt (opsiyonel — network yoksa silent fail)
@@ -199,11 +212,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         final apiClient = ref.read(apiClientProvider);
         await apiClient.post('/auth/register', {
           'company_name': _bizNameCtrl.text.trim(),
-          'name':         _ownerNameCtrl.text.trim(),
-          'username':     _usernameCtrl.text.trim(),
-          'email':        _emailCtrl.text.trim(),
-          'password':     _passwordCtrl.text,
-          'phone':        _phoneCtrl.text.trim(),
+          'name': _ownerNameCtrl.text.trim(),
+          'username': _usernameCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'password': _passwordCtrl.text,
+          'phone': _phoneCtrl.text.trim(),
         });
       } catch (_) {
         // Network yoksa local'e devam
@@ -221,7 +234,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     } catch (e) {
       setState(() {
         _saving = false;
-        _error  = 'Kayıt sırasında hata oluştu: $e';
+        _error = 'Kayıt sırasında hata oluştu: $e';
       });
     }
   }
@@ -244,7 +257,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final size   = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
 
     if (_saving) {
@@ -258,7 +271,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               const SizedBox(height: 20),
               Text(
                 'Hesabınız oluşturuluyor…',
-                style: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 15, fontWeight: FontWeight.w500),
+                style: GoogleFonts.inter(
+                    color: POSColors.textSecondary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -272,7 +288,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         backgroundColor: POSColors.card,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: POSColors.text, size: 18),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: POSColors.text, size: 18),
           onPressed: () {
             if (_step == 1) {
               setState(() => _step = 0);
@@ -286,7 +303,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         ),
         title: Text(
           _step == 0 ? 'Hesap Oluştur' : 'İşletme Bilgileri',
-          style: GoogleFonts.inter(color: POSColors.text, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+              color: POSColors.text, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         bottom: PreferredSize(
@@ -333,7 +351,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 icon: Icons.email_outlined,
                 keyboard: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'E-posta zorunludur';
+                  if (v == null || v.trim().isEmpty)
+                    return 'E-posta zorunludur';
                   if (!v.contains('@')) return 'Geçerli bir e-posta girin';
                   return null;
                 },
@@ -345,7 +364,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 hint: 'kullanici_adi',
                 icon: Icons.person_outline_rounded,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Kullanıcı adı zorunludur';
+                  if (v == null || v.trim().isEmpty)
+                    return 'Kullanıcı adı zorunludur';
                   if (v.trim().length < 3) return 'En az 3 karakter olmalı';
                   return null;
                 },
@@ -359,8 +379,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 obscureText: _obscurePass,
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscurePass ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                    color: POSColors.textSecondary, size: 20,
+                    _obscurePass
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: POSColors.textSecondary,
+                    size: 20,
                   ),
                   onPressed: () => setState(() => _obscurePass = !_obscurePass),
                 ),
@@ -379,10 +402,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 obscureText: _obscurePass2,
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscurePass2 ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                    color: POSColors.textSecondary, size: 20,
+                    _obscurePass2
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: POSColors.textSecondary,
+                    size: 20,
                   ),
-                  onPressed: () => setState(() => _obscurePass2 = !_obscurePass2),
+                  onPressed: () =>
+                      setState(() => _obscurePass2 = !_obscurePass2),
                 ),
                 validator: (v) {
                   if (v != _passwordCtrl.text) return 'Şifreler eşleşmiyor';
@@ -391,12 +418,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ),
             ],
           ),
-
           if (_error != null) ...[
             const SizedBox(height: 16),
             _ErrorBox(message: _error!),
           ],
-
           const SizedBox(height: 28),
           _GreenButton(
             label: 'İleri — İşletme Bilgileri',
@@ -409,12 +434,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('Hesabınız var mı? ',
-                    style: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13)),
+                    style: GoogleFonts.inter(
+                        color: POSColors.textSecondary, fontSize: 13)),
                 GestureDetector(
                   onTap: () => context.go('/login/form'),
                   child: Text('Giriş Yap',
                       style: GoogleFonts.inter(
-                        color: POSColors.green, fontSize: 13,
+                        color: POSColors.green,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                       )),
                 ),
@@ -447,7 +474,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 label: 'İşletme Adı *',
                 hint: 'ABC Market',
                 icon: Icons.storefront_rounded,
-                validator: (v) => (v?.trim().isEmpty ?? true) ? 'İşletme adı zorunludur' : null,
+                validator: (v) => (v?.trim().isEmpty ?? true)
+                    ? 'İşletme adı zorunludur'
+                    : null,
               ),
               const SizedBox(height: 14),
               _LightFormField(
@@ -455,7 +484,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 label: 'Yetkili Adı Soyadı *',
                 hint: 'Ahmet Yılmaz',
                 icon: Icons.person_rounded,
-                validator: (v) => (v?.trim().isEmpty ?? true) ? 'Ad Soyad zorunludur' : null,
+                validator: (v) =>
+                    (v?.trim().isEmpty ?? true) ? 'Ad Soyad zorunludur' : null,
               ),
               const SizedBox(height: 14),
               _LightFormField(
@@ -489,9 +519,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   icon: Icons.location_city_rounded,
                   value: _selectedCity,
                   hint: 'Şehir seçin',
-                  items: _cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  items: _cities
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .toList(),
                   onChanged: (v) => setState(() {
-                    _selectedCity     = v;
+                    _selectedCity = v;
                     _selectedDistrict = null;
                     _districts = v != null ? (_cityMap[v] ?? []) : [];
                   }),
@@ -506,7 +538,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   icon: Icons.map_outlined,
                   value: _selectedDistrict,
                   hint: 'İlçe seçin',
-                  items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                  items: _districts
+                      .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                      .toList(),
                   onChanged: (v) => setState(() => _selectedDistrict = v),
                 ),
               ],
@@ -527,10 +561,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 children: _businessTypes.map((type) {
                   final sel = _selectedType == type;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedType = sel ? null : type),
+                    onTap: () =>
+                        setState(() => _selectedType = sel ? null : type),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         color: sel ? POSColors.green : POSColors.surface,
                         borderRadius: BorderRadius.circular(20),
@@ -583,7 +619,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               const SizedBox(height: 4),
                               Text('Varsayılan',
                                   style: GoogleFonts.inter(
-                                      fontSize: 9, color: POSColors.textDisabled, fontWeight: FontWeight.w500)),
+                                      fontSize: 9,
+                                      color: POSColors.textDisabled,
+                                      fontWeight: FontWeight.w500)),
                             ],
                           ),
                   ),
@@ -609,7 +647,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                             onTap: () => setState(() => _logoPath = null),
                             child: Text('Kaldır (varsayılan kullan)',
                                 style: GoogleFonts.inter(
-                                    fontSize: 12, color: POSColors.red, fontWeight: FontWeight.w500)),
+                                    fontSize: 12,
+                                    color: POSColors.red,
+                                    fontWeight: FontWeight.w500)),
                           ),
                         ],
                       ],
@@ -700,7 +740,8 @@ class _SectionCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 34, height: 34,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: POSColors.greenLight,
                   borderRadius: BorderRadius.circular(8),
@@ -766,8 +807,10 @@ class _LightFormField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: GoogleFonts.inter(color: POSColors.textDisabled, fontSize: 13),
-        labelStyle: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13),
+        hintStyle:
+            GoogleFonts.inter(color: POSColors.textDisabled, fontSize: 13),
+        labelStyle:
+            GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13),
         prefixIcon: Icon(icon, color: POSColors.textSecondary, size: 19),
         suffixIcon: suffixIcon,
         filled: true,
@@ -788,8 +831,10 @@ class _LightFormField extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: POSColors.red, width: 1.5),
         ),
-        errorStyle: GoogleFonts.inter(color: POSColors.red, fontSize: 12, fontWeight: FontWeight.w500),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        errorStyle: GoogleFonts.inter(
+            color: POSColors.red, fontSize: 12, fontWeight: FontWeight.w500),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
@@ -827,8 +872,10 @@ class _LightDropdown<T> extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: GoogleFonts.inter(color: POSColors.textDisabled, fontSize: 13),
-        labelStyle: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13),
+        hintStyle:
+            GoogleFonts.inter(color: POSColors.textDisabled, fontSize: 13),
+        labelStyle:
+            GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13),
         prefixIcon: Icon(icon, color: POSColors.textSecondary, size: 19),
         filled: true,
         fillColor: POSColors.card,
@@ -844,7 +891,8 @@ class _LightDropdown<T> extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: POSColors.red),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
@@ -867,12 +915,17 @@ class _LoadingField extends StatelessWidget {
         children: [
           const SizedBox(width: 14),
           const SizedBox(
-            width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: POSColors.textSecondary),
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: POSColors.textSecondary),
           ),
           const SizedBox(width: 12),
           Text(label,
-              style: GoogleFonts.inter(color: POSColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
+              style: GoogleFonts.inter(
+                  color: POSColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -884,7 +937,8 @@ class _GreenButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _GreenButton({required this.label, required this.icon, required this.onTap});
+  const _GreenButton(
+      {required this.label, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -949,12 +1003,16 @@ class _ErrorBox extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: POSColors.red, size: 20),
+          const Icon(Icons.error_outline_rounded,
+              color: POSColors.red, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: GoogleFonts.inter(color: POSColors.red, fontSize: 13, fontWeight: FontWeight.w500),
+              style: GoogleFonts.inter(
+                  color: POSColors.red,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
             ),
           ),
         ],

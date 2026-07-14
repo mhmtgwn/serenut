@@ -36,7 +36,8 @@ class RealtimeEvent {
         id: map['id'] as String? ?? '',
         type: map['type'] as String? ?? '',
         tenantId: map['tenantId'] as String? ?? '',
-        timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ?? DateTime.now(),
+        timestamp: DateTime.tryParse(map['timestamp'] as String? ?? '') ??
+            DateTime.now(),
         payload: Map<String, dynamic>.from(map['payload'] as Map? ?? {}),
         version: map['version'] as int? ?? 1,
         correlationId: map['correlationId'] as String? ?? '',

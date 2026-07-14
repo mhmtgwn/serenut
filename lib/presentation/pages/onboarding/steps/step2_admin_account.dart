@@ -36,17 +36,17 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
 
   bool _obscurePassword = true;
   bool _showPasswordField = false;
-  int  _pinLength = 4; // 4 veya 6
+  int _pinLength = 4; // 4 veya 6
 
   @override
   void initState() {
     super.initState();
-    _data          = widget.initialData;
-    _fullNameCtrl  = TextEditingController(text: _data.adminFullName);
-    _usernameCtrl  = TextEditingController(text: _data.username);
-    _pinCtrl       = TextEditingController();
+    _data = widget.initialData;
+    _fullNameCtrl = TextEditingController(text: _data.adminFullName);
+    _usernameCtrl = TextEditingController(text: _data.username);
+    _pinCtrl = TextEditingController();
     _pinConfirmCtrl = TextEditingController();
-    _passwordCtrl  = TextEditingController();
+    _passwordCtrl = TextEditingController();
   }
 
   @override
@@ -63,16 +63,16 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     widget.onComplete(_data.copyWith(
       adminFullName: _fullNameCtrl.text.trim(),
-      username:      _usernameCtrl.text.trim(),
-      pin:           _pinCtrl.text,
-      pinConfirm:    _pinConfirmCtrl.text,
-      password:      _passwordCtrl.text,
+      username: _usernameCtrl.text.trim(),
+      pin: _pinCtrl.text,
+      pinConfirm: _pinConfirmCtrl.text,
+      password: _passwordCtrl.text,
     ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final size   = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
 
     return Scaffold(
@@ -82,10 +82,10 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
           children: [
             // ── Header ───────────────────────────────────────────────────
             _OnboardingHeader(
-              title:       'Admin Hesabı',
-              stepLabel:   'Adım 2 / 3',
+              title: 'Admin Hesabı',
+              stepLabel: 'Adım 2 / 3',
               currentStep: 1,
-              onBack:      () => context.go('/onboarding/business'),
+              onBack: () => context.go('/onboarding/business'),
             ),
 
             // ── Content ──────────────────────────────────────────────────
@@ -105,14 +105,18 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.manage_accounts_rounded, text: 'Kimlik Bilgileri'),
+                            const _SectionTitle(
+                                icon: Icons.manage_accounts_rounded,
+                                text: 'Kimlik Bilgileri'),
                             const SizedBox(height: 16),
                             _Field(
                               controller: _fullNameCtrl,
                               label: 'Ad Soyad *',
                               hint: 'Adınız Soyadınız',
                               icon: Icons.person_rounded,
-                              validator: (v) => (v?.trim().isEmpty ?? true) ? 'Ad Soyad gerekli' : null,
+                              validator: (v) => (v?.trim().isEmpty ?? true)
+                                  ? 'Ad Soyad gerekli'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             _Field(
@@ -122,8 +126,10 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                               icon: Icons.alternate_email_rounded,
                               keyboard: TextInputType.text,
                               validator: (v) {
-                                if (v?.trim().isEmpty ?? true) return 'Kullanıcı adı gerekli';
-                                if ((v?.length ?? 0) < 3) return 'En az 3 karakter olmalı';
+                                if (v?.trim().isEmpty ?? true)
+                                  return 'Kullanıcı adı gerekli';
+                                if ((v?.length ?? 0) < 3)
+                                  return 'En az 3 karakter olmalı';
                                 return null;
                               },
                             ),
@@ -138,12 +144,15 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.pin_rounded, text: 'Giriş PIN\'i'),
+                            const _SectionTitle(
+                                icon: Icons.pin_rounded, text: 'Giriş PIN\'i'),
                             const SizedBox(height: 8),
                             Text(
                               'Hızlı giriş için 4 veya 6 haneli PIN belirleyin',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: POSColors.textSecondary),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: POSColors.textSecondary),
                             ),
                             const SizedBox(height: 16),
                             // PIN uzunluk seçici
@@ -183,9 +192,13 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                               keyboardType: TextInputType.number,
                               obscureText: true,
                               maxLength: _pinLength,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                               style: const TextStyle(
-                                  fontSize: 24, letterSpacing: 8, color: POSColors.text),
+                                  fontSize: 24,
+                                  letterSpacing: 8,
+                                  color: POSColors.text),
                               decoration: InputDecoration(
                                 labelText: 'PIN *',
                                 hintText: '•' * _pinLength,
@@ -194,8 +207,10 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                     size: 20, color: POSColors.textSecondary),
                               ),
                               validator: (v) {
-                                if (v == null || v.isEmpty) return 'PIN gerekli';
-                                if (v.length != _pinLength) return '$_pinLength haneli PIN girin';
+                                if (v == null || v.isEmpty)
+                                  return 'PIN gerekli';
+                                if (v.length != _pinLength)
+                                  return '$_pinLength haneli PIN girin';
                                 return null;
                               },
                             ),
@@ -206,18 +221,25 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                               keyboardType: TextInputType.number,
                               obscureText: true,
                               maxLength: _pinLength,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                               style: const TextStyle(
-                                  fontSize: 24, letterSpacing: 8, color: POSColors.text),
+                                  fontSize: 24,
+                                  letterSpacing: 8,
+                                  color: POSColors.text),
                               decoration: InputDecoration(
                                 labelText: 'PIN Tekrar *',
                                 hintText: '•' * _pinLength,
                                 counterText: '',
-                                prefixIcon: const Icon(Icons.lock_outline_rounded,
-                                    size: 20, color: POSColors.textSecondary),
+                                prefixIcon: const Icon(
+                                    Icons.lock_outline_rounded,
+                                    size: 20,
+                                    color: POSColors.textSecondary),
                               ),
                               validator: (v) {
-                                if (v != _pinCtrl.text) return 'PIN\'ler eşleşmiyor';
+                                if (v != _pinCtrl.text)
+                                  return 'PIN\'ler eşleşmiyor';
                                 return null;
                               },
                             ),
@@ -232,14 +254,18 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.security_rounded, text: 'Ek Güvenlik (İsteğe Bağlı)'),
+                            const _SectionTitle(
+                                icon: Icons.security_rounded,
+                                text: 'Ek Güvenlik (İsteğe Bağlı)'),
                             const SizedBox(height: 12),
                             _SwitchTile(
                               icon: Icons.password_rounded,
                               title: 'Güçlü Şifre Ekle',
-                              subtitle: 'Yedek giriş yöntemi olarak şifre belirle',
+                              subtitle:
+                                  'Yedek giriş yöntemi olarak şifre belirle',
                               value: _showPasswordField,
-                              onChanged: (v) => setState(() => _showPasswordField = v),
+                              onChanged: (v) =>
+                                  setState(() => _showPasswordField = v),
                             ),
                             if (_showPasswordField) ...[
                               const SizedBox(height: 12),
@@ -258,13 +284,14 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                           : Icons.visibility_off_outlined,
                                       color: POSColors.textSecondary,
                                     ),
-                                    onPressed: () => setState(
-                                        () => _obscurePassword = !_obscurePassword),
+                                    onPressed: () => setState(() =>
+                                        _obscurePassword = !_obscurePassword),
                                   ),
                                 ),
                                 validator: (v) {
                                   if (!_showPasswordField) return null;
-                                  if ((v?.length ?? 0) < 8) return 'En az 8 karakter';
+                                  if ((v?.length ?? 0) < 8)
+                                    return 'En az 8 karakter';
                                   return null;
                                 },
                               ),
@@ -277,9 +304,10 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
 
                       // Parmak izi: Yakında kartı
                       const _ComingSoonCard(
-                        icon:    Icons.fingerprint_rounded,
-                        title:   'Parmak İzi ile Giriş',
-                        message: 'Bu özellik yakında kullanılabilir olacak. Etkinleştirildiğinde PIN yerine parmak izi ile hızlıca giriş yapabileceksiniz.',
+                        icon: Icons.fingerprint_rounded,
+                        title: 'Parmak İzi ile Giriş',
+                        message:
+                            'Bu özellik yakında kullanılabilir olacak. Etkinleştirildiğinde PIN yerine parmak izi ile hızlıca giriş yapabileceksiniz.',
                       ),
 
                       const SizedBox(height: 28),
@@ -307,7 +335,9 @@ class _PinLengthChip extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PinLengthChip({
-    required this.label, required this.selected, required this.onTap,
+    required this.label,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
@@ -345,7 +375,9 @@ class _ComingSoonCard extends StatelessWidget {
   final String message;
 
   const _ComingSoonCard({
-    required this.icon, required this.title, required this.message,
+    required this.icon,
+    required this.title,
+    required this.message,
   });
 
   @override
@@ -360,7 +392,8 @@ class _ComingSoonCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: POSColors.border,
               borderRadius: BorderRadius.circular(12),
@@ -376,18 +409,21 @@ class _ComingSoonCard extends StatelessWidget {
                   children: [
                     Text(title,
                         style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: POSColors.text)),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: POSColors.amberLight,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text('Yakında',
                           style: TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
                               color: POSColors.amberDark)),
                     ),
                   ],
@@ -395,7 +431,9 @@ class _ComingSoonCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(message,
                     style: const TextStyle(
-                        fontSize: 12, color: POSColors.textSecondary, height: 1.4)),
+                        fontSize: 12,
+                        color: POSColors.textSecondary,
+                        height: 1.4)),
               ],
             ),
           ),
@@ -416,8 +454,10 @@ class _OnboardingHeader extends StatelessWidget {
   final VoidCallback? onBack;
 
   const _OnboardingHeader({
-    required this.title, required this.stepLabel,
-    required this.currentStep, this.onBack,
+    required this.title,
+    required this.stepLabel,
+    required this.currentStep,
+    this.onBack,
   });
 
   @override
@@ -442,7 +482,8 @@ class _OnboardingHeader extends StatelessWidget {
               const Spacer(),
               Text(stepLabel,
                   style: const TextStyle(
-                      fontSize: 13, color: POSColors.textSecondary,
+                      fontSize: 13,
+                      color: POSColors.textSecondary,
                       fontWeight: FontWeight.w500)),
               const Spacer(),
               const SizedBox(width: 24),
@@ -468,14 +509,14 @@ class _Card extends StatelessWidget {
   const _Card({required this.child});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: POSColors.border),
-    ),
-    child: child,
-  );
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: POSColors.border),
+        ),
+        child: child,
+      );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -484,20 +525,23 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.icon, required this.text});
   @override
   Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 32, height: 32,
-        decoration: BoxDecoration(
-            color: POSColors.greenLight,
-            borderRadius: BorderRadius.circular(8)),
-        child: Icon(icon, size: 17, color: POSColors.green),
-      ),
-      const SizedBox(width: 10),
-      Text(text,
-          style: const TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w700, color: POSColors.text)),
-    ],
-  );
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+                color: POSColors.greenLight,
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 17, color: POSColors.green),
+          ),
+          const SizedBox(width: 10),
+          Text(text,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: POSColors.text)),
+        ],
+      );
 }
 
 class _Field extends StatelessWidget {
@@ -509,21 +553,26 @@ class _Field extends StatelessWidget {
   final String? Function(String?)? validator;
 
   const _Field({
-    required this.controller, required this.label, required this.hint,
-    required this.icon, this.keyboard, this.validator,
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.icon,
+    this.keyboard,
+    this.validator,
   });
 
   @override
   Widget build(BuildContext context) => TextFormField(
-    controller: controller,
-    keyboardType: keyboard,
-    validator: validator,
-    style: const TextStyle(fontSize: 15, color: POSColors.text),
-    decoration: InputDecoration(
-      labelText: label, hintText: hint,
-      prefixIcon: Icon(icon, size: 20, color: POSColors.textSecondary),
-    ),
-  );
+        controller: controller,
+        keyboardType: keyboard,
+        validator: validator,
+        style: const TextStyle(fontSize: 15, color: POSColors.text),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixIcon: Icon(icon, size: 20, color: POSColors.textSecondary),
+        ),
+      );
 }
 
 class _SwitchTile extends StatelessWidget {
@@ -534,30 +583,36 @@ class _SwitchTile extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   const _SwitchTile({
-    required this.icon, required this.title, required this.subtitle,
-    required this.value, required this.onChanged,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, size: 20, color: POSColors.textSecondary),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600, color: POSColors.text)),
-            Text(subtitle,
-                style: const TextStyle(fontSize: 12, color: POSColors.textSecondary)),
-          ],
-        ),
-      ),
-      Switch(value: value, onChanged: onChanged),
-    ],
-  );
+        children: [
+          Icon(icon, size: 20, color: POSColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: POSColors.text)),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 12, color: POSColors.textSecondary)),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      );
 }
 
 class _BottomButton extends StatelessWidget {
@@ -566,19 +621,21 @@ class _BottomButton extends StatelessWidget {
   const _BottomButton({required this.label, required this.onTap});
   @override
   Widget build(BuildContext context) => Container(
-    color: Colors.white,
-    padding: EdgeInsets.fromLTRB(
-        20, 12, 20, 12 + MediaQuery.paddingOf(context).bottom),
-    child: FilledButton(
-      onPressed: onTap,
-      style: FilledButton.styleFrom(
-        backgroundColor: POSColors.green,
-        foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      child: Text(label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-    ),
-  );
+        color: Colors.white,
+        padding: EdgeInsets.fromLTRB(
+            20, 12, 20, 12 + MediaQuery.paddingOf(context).bottom),
+        child: FilledButton(
+          onPressed: onTap,
+          style: FilledButton.styleFrom(
+            backgroundColor: POSColors.green,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(52),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          child: Text(label,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        ),
+      );
 }

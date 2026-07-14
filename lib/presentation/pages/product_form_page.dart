@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/product_form_page.dart
+// lib/presentation/pages/product_form_page.dart
 // Serenut POS — Ürün Ekleme / Düzenleme (Tam Ekran, Çok Bölümlü Form)
 // UX Redesign v3: Full-screen form, Shopify admin style, no dialogs
 
@@ -13,14 +13,14 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:uuid/uuid.dart';
 
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
-const _kAmber      = Color(0xFFEAB308);
-const _kRed        = Color(0xFFDC2626);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
+const _kAmber = Color(0xFFEAB308);
+const _kRed = Color(0xFFDC2626);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class ProductFormPage extends ConsumerStatefulWidget {
   final bool isEditing;
@@ -60,34 +60,41 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   void initState() {
     super.initState();
     final p = widget.existingProduct;
-    _nameCtrl         = TextEditingController(text: p?.name ?? '');
-    _descCtrl         = TextEditingController(text: p?.description ?? '');
-    _priceCtrl        = TextEditingController(
+    _nameCtrl = TextEditingController(text: p?.name ?? '');
+    _descCtrl = TextEditingController(text: p?.description ?? '');
+    _priceCtrl = TextEditingController(
         text: p != null ? p.price.toStringAsFixed(2) : '');
     _purchasePriceCtrl = TextEditingController(text: '');
-    _qtyCtrl          = TextEditingController(
-        text: p != null ? p.quantity.toString() : '');
-    _minStockCtrl     = TextEditingController(text: '');
-    _vatCtrl          = TextEditingController(
-        text: p?.vat?.toString() ?? '18');
+    _qtyCtrl =
+        TextEditingController(text: p != null ? p.quantity.toString() : '');
+    _minStockCtrl = TextEditingController(text: '');
+    _vatCtrl = TextEditingController(text: p?.vat?.toString() ?? '18');
     final barcodeText = p != null
-        ? (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(p.id)
+        ? (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+                .hasMatch(p.id)
             ? ''
             : p.id)
         : '';
-    _barcodeCtrl      = TextEditingController(text: barcodeText);
-    _supplierCtrl     = TextEditingController(text: '');
-    _unitCtrl         = TextEditingController(text: 'Adet');
-    _notesCtrl        = TextEditingController(text: '');
+    _barcodeCtrl = TextEditingController(text: barcodeText);
+    _supplierCtrl = TextEditingController(text: '');
+    _unitCtrl = TextEditingController(text: 'Adet');
+    _notesCtrl = TextEditingController(text: '');
     _selectedCategory = p?.category;
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _descCtrl.dispose(); _priceCtrl.dispose();
-    _purchasePriceCtrl.dispose(); _qtyCtrl.dispose(); _minStockCtrl.dispose();
-    _vatCtrl.dispose(); _barcodeCtrl.dispose(); _supplierCtrl.dispose();
-    _unitCtrl.dispose(); _notesCtrl.dispose();
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    _priceCtrl.dispose();
+    _purchasePriceCtrl.dispose();
+    _qtyCtrl.dispose();
+    _minStockCtrl.dispose();
+    _vatCtrl.dispose();
+    _barcodeCtrl.dispose();
+    _supplierCtrl.dispose();
+    _unitCtrl.dispose();
+    _notesCtrl.dispose();
     super.dispose();
   }
 
@@ -107,8 +114,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     try {
       final oldId = widget.isEditing ? widget.existingProduct!.id : null;
       final id = widget.isEditing
-          ? (_barcodeCtrl.text.trim().isNotEmpty ? _barcodeCtrl.text.trim() : widget.existingProduct!.id)
-          : (_barcodeCtrl.text.trim().isNotEmpty ? _barcodeCtrl.text.trim() : const Uuid().v4());
+          ? (_barcodeCtrl.text.trim().isNotEmpty
+              ? _barcodeCtrl.text.trim()
+              : widget.existingProduct!.id)
+          : (_barcodeCtrl.text.trim().isNotEmpty
+              ? _barcodeCtrl.text.trim()
+              : const Uuid().v4());
 
       final product = ProductEntity(
         id: id,
@@ -134,14 +145,18 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           if (settings.vatCategories.isNotEmpty) {
             final decoded = jsonDecode(settings.vatCategories);
             if (decoded is List) {
-              vatList = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+              vatList = decoded
+                  .map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList();
             }
           }
 
           final categoryName = _selectedCategory!.trim();
           final currentVat = product.vat;
 
-          final index = vatList.indexWhere((e) => e['name']?.toString().toLowerCase().trim() == categoryName.toLowerCase());
+          final index = vatList.indexWhere((e) =>
+              e['name']?.toString().toLowerCase().trim() ==
+              categoryName.toLowerCase());
           bool needUpdate = false;
           if (index == -1) {
             vatList.add({'name': categoryName, 'rate': currentVat});
@@ -155,7 +170,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             final updatedSettings = settings.copyWith(
               vatCategories: jsonEncode(vatList),
             );
-            await ref.read(settingsNotifierProvider.notifier).updateSettings(updatedSettings);
+            await ref
+                .read(settingsNotifierProvider.notifier)
+                .updateSettings(updatedSettings);
           }
         }
       } catch (_) {
@@ -178,7 +195,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Bir hata oluştu: $e'), backgroundColor: _kRed,
+          SnackBar(
+              content: Text('Bir hata oluştu: $e'),
+              backgroundColor: _kRed,
               behavior: SnackBarBehavior.floating),
         );
       }
@@ -228,11 +247,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             child: _isSaving
                 ? const Center(
                     child: SizedBox(
-                      width: 22, height: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation(_kGreen)),
-                    ))
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation(_kGreen)),
+                  ))
                 : TextButton(
                     onPressed: _save,
                     style: TextButton.styleFrom(
@@ -244,8 +264,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           horizontal: 16, vertical: 8),
                     ),
                     child: Text(widget.isEditing ? 'Kaydet' : 'Ekle',
-                        style:
-                            const TextStyle(fontWeight: FontWeight.bold)),
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
           ),
         ],
@@ -255,7 +274,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-
             // ── Bölüm 1: Temel Bilgiler ────────────────────────────────────
             _buildSectionHeader(
                 icon: Icons.inventory_2_rounded,
@@ -268,8 +286,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 label: 'Ürün Adı *',
                 icon: Icons.shopping_bag_rounded,
                 textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Lütfen ürün adı giriniz.' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Lütfen ürün adı giriniz.'
+                    : null,
               ),
               const SizedBox(height: 12),
               _buildField(
@@ -299,11 +318,16 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       label: 'Satış Fiyatı *',
                       icon: Icons.sell_rounded,
                       prefix: '₺',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))],
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                      ],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Lütfen bir satış fiyatı giriniz.';
-                        if (double.tryParse(v.trim().replaceAll(',', '.')) == null) {
+                        if (v == null || v.trim().isEmpty)
+                          return 'Lütfen bir satış fiyatı giriniz.';
+                        if (double.tryParse(v.trim().replaceAll(',', '.')) ==
+                            null) {
                           return 'Lütfen geçerli bir satış fiyatı giriniz.';
                         }
                         return null;
@@ -317,8 +341,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       label: 'Alış Fiyatı',
                       icon: Icons.store_rounded,
                       prefix: '₺',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))],
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
+                      ],
                     ),
                   ),
                 ],
@@ -334,8 +361,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Lütfen stok miktarı giriniz.';
-                        if (int.tryParse(v.trim()) == null) return 'Lütfen geçerli bir tam sayı giriniz.';
+                        if (v == null || v.trim().isEmpty)
+                          return 'Lütfen stok miktarı giriniz.';
+                        if (int.tryParse(v.trim()) == null)
+                          return 'Lütfen geçerli bir tam sayı giriniz.';
                         return null;
                       },
                     ),
@@ -373,8 +402,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Lütfen KDV oranı giriniz.';
-                        if (int.tryParse(v.trim()) == null) return 'Lütfen geçerli bir tam sayı giriniz.';
+                        if (v == null || v.trim().isEmpty)
+                          return 'Lütfen KDV oranı giriniz.';
+                        if (int.tryParse(v.trim()) == null)
+                          return 'Lütfen geçerli bir tam sayı giriniz.';
                         return null;
                       },
                     ),
@@ -397,7 +428,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             GestureDetector(
               onTap: () => setState(() => _showOptional = !_showOptional),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -405,7 +437,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.tune_rounded, size: 16, color: _kTextSecondary),
+                    const Icon(Icons.tune_rounded,
+                        size: 16, color: _kTextSecondary),
                     const SizedBox(width: 8),
                     const Text(
                       'Gelişmiş Seçenekler',
@@ -472,7 +505,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 ),
                 icon: _isSaving
                     ? const SizedBox(
-                        width: 20, height: 20,
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
                     : Icon(widget.isEditing
@@ -528,7 +562,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
-  Widget _buildCategoryField(List<String> allCategories, List<Map<String, dynamic>> parsedVatCategories) {
+  Widget _buildCategoryField(List<String> allCategories,
+      List<Map<String, dynamic>> parsedVatCategories) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -539,8 +574,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           hint: const Text('Kategori Seç *',
               style: TextStyle(color: _kTextSecondary)),
           decoration: InputDecoration(
-            prefixIcon:
-                const Icon(Icons.category_rounded, size: 20, color: _kTextSecondary),
+            prefixIcon: const Icon(Icons.category_rounded,
+                size: 20, color: _kTextSecondary),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: _kBorder),
@@ -583,7 +618,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 setState(() {
                   _selectedCategory = newCat;
                   final match = parsedVatCategories.firstWhere(
-                    (item) => item['name']?.toString().toLowerCase() == newCat.toLowerCase(),
+                    (item) =>
+                        item['name']?.toString().toLowerCase() ==
+                        newCat.toLowerCase(),
                     orElse: () => <String, dynamic>{},
                   );
                   if (match.isNotEmpty && match['rate'] != null) {
@@ -596,7 +633,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 _selectedCategory = val;
                 if (val != null) {
                   final match = parsedVatCategories.firstWhere(
-                    (item) => item['name']?.toString().toLowerCase() == val.toLowerCase(),
+                    (item) =>
+                        item['name']?.toString().toLowerCase() ==
+                        val.toLowerCase(),
                     orElse: () => <String, dynamic>{},
                   );
                   if (match.isNotEmpty && match['rate'] != null) {
@@ -629,7 +668,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: _kBorder,
                 borderRadius: BorderRadius.circular(2),
@@ -646,8 +686,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 labelText: 'Kategori adı',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: _kGreen, width: 2)),
@@ -659,8 +699,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               height: 48,
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () =>
-                    Navigator.pop(ctx, ctrl.text.trim()),
+                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kGreen,
                   foregroundColor: Colors.white,

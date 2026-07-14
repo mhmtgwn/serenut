@@ -122,7 +122,8 @@ class SqliteReportRepository implements IReportRepository {
     // Also try categories table for names
     final categoryNames = <String, String>{};
     try {
-      final catRows = await _gateway.query('categories', columns: ['id', 'name']);
+      final catRows =
+          await _gateway.query('categories', columns: ['id', 'name']);
       for (final r in catRows) {
         categoryNames[(r['id'] as int).toString()] = r['name'] as String;
       }
@@ -156,8 +157,8 @@ class SqliteReportRepository implements IReportRepository {
   // 3. Top-N Ürün Performansı
   // ──────────────────────────────────────────────────────────
   @override
-  Future<List<ProductPerformance>> getTopProducts(
-      DateRange range, {int limit = 10}) async {
+  Future<List<ProductPerformance>> getTopProducts(DateRange range,
+      {int limit = 10}) async {
     final rows = await _gateway.rawQuery('''
       SELECT 
         CAST(si.product_id AS TEXT) AS pid,
@@ -180,7 +181,8 @@ class SqliteReportRepository implements IReportRepository {
     // Resolve category names
     final categoryNames = <String, String>{};
     try {
-      final catRows = await _gateway.query('categories', columns: ['id', 'name']);
+      final catRows =
+          await _gateway.query('categories', columns: ['id', 'name']);
       for (final r in catRows) {
         categoryNames[(r['id'] as int).toString()] = r['name'] as String;
       }
@@ -326,9 +328,8 @@ class SqliteReportRepository implements IReportRepository {
     final totalDebt = usesFT
         ? (ftData['total_debt'] as num?)?.toDouble() ?? 0.0
         : (salesData['total_debt'] as num?)?.toDouble() ?? 0.0;
-    final totalSales = usesFT
-        ? ftSales
-        : (salesData['total_sales'] as num?)?.toInt() ?? 0;
+    final totalSales =
+        usesFT ? ftSales : (salesData['total_sales'] as num?)?.toInt() ?? 0;
 
     return ReportSummary(
       totalRevenue: totalRevenue,
@@ -351,7 +352,8 @@ class SqliteReportRepository implements IReportRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getVatBreakdown(DateTime start, DateTime end) async {
+  Future<List<Map<String, dynamic>>> getVatBreakdown(
+      DateTime start, DateTime end) async {
     return await _gateway.rawQuery('''
       SELECT 
         COALESCE(p.vat, 0) as vat_rate,
@@ -367,4 +369,3 @@ class SqliteReportRepository implements IReportRepository {
     ''', [start.toIso8601String(), end.toIso8601String()]);
   }
 }
-

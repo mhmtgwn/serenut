@@ -13,16 +13,56 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
 
   void _showContactImportSheet() {
     final List<Map<String, String>> simulatedContacts = [
-      {'name': 'Ahmet Yılmaz', 'phone': '05321112233', 'email': 'ahmet.yilmaz@gmail.com'},
-      {'name': 'Elif Demir', 'phone': '05422223344', 'email': 'elif.demir@hotmail.com'},
-      {'name': 'Mehmet Kaya', 'phone': '05053334455', 'email': 'mehmet.kaya@yahoo.com'},
-      {'name': 'Zeynep Çelik', 'phone': '05304445566', 'email': 'zeynep.celik@gmail.com'},
-      {'name': 'Mustafa Öztürk', 'phone': '05555556677', 'email': 'mustafa.ozturk@outlook.com'},
-      {'name': 'Fatma Yıldız', 'phone': '05336667788', 'email': 'fatmayildiz@gmail.com'},
-      {'name': 'Can Arslan', 'phone': '05447778899', 'email': 'can.arslan@gmail.com'},
-      {'name': 'Selin Yurt', 'phone': '05359998877', 'email': 'selin.yurt@gmail.com'},
-      {'name': 'Burak Şahin', 'phone': '05411234567', 'email': 'burak.sahin@hotmail.com'},
-      {'name': 'Aslı Karaca', 'phone': '05399876543', 'email': 'asli.karaca@gmail.com'},
+      {
+        'name': 'Ahmet Yılmaz',
+        'phone': '05321112233',
+        'email': 'ahmet.yilmaz@gmail.com'
+      },
+      {
+        'name': 'Elif Demir',
+        'phone': '05422223344',
+        'email': 'elif.demir@hotmail.com'
+      },
+      {
+        'name': 'Mehmet Kaya',
+        'phone': '05053334455',
+        'email': 'mehmet.kaya@yahoo.com'
+      },
+      {
+        'name': 'Zeynep Çelik',
+        'phone': '05304445566',
+        'email': 'zeynep.celik@gmail.com'
+      },
+      {
+        'name': 'Mustafa Öztürk',
+        'phone': '05555556677',
+        'email': 'mustafa.ozturk@outlook.com'
+      },
+      {
+        'name': 'Fatma Yıldız',
+        'phone': '05336667788',
+        'email': 'fatmayildiz@gmail.com'
+      },
+      {
+        'name': 'Can Arslan',
+        'phone': '05447778899',
+        'email': 'can.arslan@gmail.com'
+      },
+      {
+        'name': 'Selin Yurt',
+        'phone': '05359998877',
+        'email': 'selin.yurt@gmail.com'
+      },
+      {
+        'name': 'Burak Şahin',
+        'phone': '05411234567',
+        'email': 'burak.sahin@hotmail.com'
+      },
+      {
+        'name': 'Aslı Karaca',
+        'phone': '05399876543',
+        'email': 'asli.karaca@gmail.com'
+      },
     ];
 
     final List<int> selectedIndices = [];
@@ -38,7 +78,9 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
               for (int i = 0; i < simulatedContacts.length; i++) {
                 final c = simulatedContacts[i];
                 if (searchQuery.isEmpty ||
-                    c['name']!.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                    c['name']!
+                        .toLowerCase()
+                        .contains(searchQuery.toLowerCase()) ||
                     c['phone']!.contains(searchQuery)) {
                   filteredIndices.add(i);
                 }
@@ -54,11 +96,12 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                         padding: EdgeInsets.only(bottom: 12),
                         child: Text(
                           'Cihazınızdaki kişileri sisteme müşteri olarak ekleyin. Çakışan telefon numaraları otomatik olarak filtrelenecektir.',
-                          style: TextStyle(fontSize: 13, color: _kTextSecondary),
+                          style:
+                              TextStyle(fontSize: 13, color: _kTextSecondary),
                         ),
                       ),
                     ),
-                    
+
                     // Arama kutusu
                     Container(
                       height: 38,
@@ -68,11 +111,14 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: TextField(
-                        style: const TextStyle(fontSize: 14, color: _kTextPrimary),
+                        style:
+                            const TextStyle(fontSize: 14, color: _kTextPrimary),
                         decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search_rounded, color: _kTextSecondary, size: 18),
+                          prefixIcon: Icon(Icons.search_rounded,
+                              color: _kTextSecondary, size: 18),
                           hintText: 'Rehberde Ara...',
-                          hintStyle: TextStyle(color: _kTextSecondary, fontSize: 14),
+                          hintStyle:
+                              TextStyle(color: _kTextSecondary, fontSize: 14),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(vertical: 9),
                         ),
@@ -90,21 +136,27 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                       children: [
                         TextButton.icon(
                           icon: Icon(
-                            (selectedIndices.length == filteredIndices.length && filteredIndices.isNotEmpty)
-                                ? Icons.check_box_rounded 
+                            (selectedIndices.length == filteredIndices.length &&
+                                    filteredIndices.isNotEmpty)
+                                ? Icons.check_box_rounded
                                 : Icons.check_box_outline_blank_rounded,
                             size: 20,
                             color: _kGreen,
                           ),
                           label: Text(
-                            (selectedIndices.length == filteredIndices.length && filteredIndices.isNotEmpty)
-                                ? 'Seçilenleri Temizle' 
+                            (selectedIndices.length == filteredIndices.length &&
+                                    filteredIndices.isNotEmpty)
+                                ? 'Seçilenleri Temizle'
                                 : 'Tümünü Seç',
-                            style: const TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(
+                                color: _kGreen,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
                           ),
                           onPressed: () {
                             setModalState(() {
-                              if (selectedIndices.length == filteredIndices.length) {
+                              if (selectedIndices.length ==
+                                  filteredIndices.length) {
                                 selectedIndices.clear();
                               } else {
                                 selectedIndices.clear();
@@ -115,7 +167,10 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                         ),
                         Text(
                           '${selectedIndices.length} / ${filteredIndices.length} Seçildi',
-                          style: const TextStyle(fontSize: 13, color: _kTextSecondary, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: _kTextSecondary,
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -128,7 +183,8 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                         child: Center(
                           child: Text(
                             'Aranan kişi bulunamadı.',
-                            style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                            style:
+                                TextStyle(color: _kTextSecondary, fontSize: 14),
                           ),
                         ),
                       )
@@ -136,54 +192,62 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                       Column(
                         children: [
                           for (final contactIdx in filteredIndices) ...[
-                            Builder(
-                              builder: (context) {
-                                final contact = simulatedContacts[contactIdx];
-                                final isSelected = selectedIndices.contains(contactIdx);
-                                return CheckboxListTile(
-                                  value: isSelected,
-                                  activeColor: _kGreen,
-                                  title: Text(
-                                    contact['name']!,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _kTextPrimary),
+                            Builder(builder: (context) {
+                              final contact = simulatedContacts[contactIdx];
+                              final isSelected =
+                                  selectedIndices.contains(contactIdx);
+                              return CheckboxListTile(
+                                value: isSelected,
+                                activeColor: _kGreen,
+                                title: Text(
+                                  contact['name']!,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      color: _kTextPrimary),
+                                ),
+                                subtitle: Text(
+                                  contact['phone']!,
+                                  style: const TextStyle(
+                                      color: _kTextSecondary, fontSize: 13),
+                                ),
+                                secondary: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: _kBlue.withOpacity(0.1),
+                                    shape: BoxShape.circle,
                                   ),
-                                  subtitle: Text(
-                                    contact['phone']!,
-                                    style: const TextStyle(color: _kTextSecondary, fontSize: 13),
-                                  ),
-                                  secondary: Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: _kBlue.withOpacity(0.1),
-                                      shape: BoxShape.circle,
+                                  child: Center(
+                                    child: Text(
+                                      contact['name']!.isNotEmpty
+                                          ? contact['name']![0].toUpperCase()
+                                          : '👤',
+                                      style: const TextStyle(
+                                          color: _kBlue,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14),
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        contact['name']!.isNotEmpty ? contact['name']![0].toUpperCase() : '👤',
-                                        style: const TextStyle(color: _kBlue, fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                    ),
                                   ),
-                                  contentPadding: EdgeInsets.zero,
-                                  onChanged: (checked) {
-                                    setModalState(() {
-                                      if (checked == true) {
-                                        selectedIndices.add(contactIdx);
-                                      } else {
-                                        selectedIndices.remove(contactIdx);
-                                      }
-                                    });
-                                  },
-                                );
-                              }
-                            ),
+                                ),
+                                contentPadding: EdgeInsets.zero,
+                                onChanged: (checked) {
+                                  setModalState(() {
+                                    if (checked == true) {
+                                      selectedIndices.add(contactIdx);
+                                    } else {
+                                      selectedIndices.remove(contactIdx);
+                                    }
+                                  });
+                                },
+                              );
+                            }),
                             const Divider(height: 1, color: _kBorderColor),
                           ]
                         ],
                       ),
                     const SizedBox(height: 16),
-                    
+
                     // İçe Aktarma Butonu
                     SizedBox(
                       width: double.infinity,
@@ -192,14 +256,17 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                         onPressed: selectedIndices.isEmpty
                             ? null
                             : () async {
-                                final customers = ref.read(customersControllerProvider).value ?? [];
+                                final customers = ref
+                                        .read(customersControllerProvider)
+                                        .value ??
+                                    [];
                                 int importedCount = 0;
                                 int skippedCount = 0;
 
                                 for (final idx in selectedIndices) {
                                   final contact = simulatedContacts[idx];
                                   final phone = contact['phone']!;
-                                  
+
                                   if (customers.any((c) => c.phone == phone)) {
                                     skippedCount++;
                                     continue;
@@ -213,7 +280,10 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                                     balance: 0.0,
                                     createdAt: DateTime.now(),
                                   );
-                                  await ref.read(customersControllerProvider.notifier).addCustomer(newCustomer);
+                                  await ref
+                                      .read(
+                                          customersControllerProvider.notifier)
+                                      .addCustomer(newCustomer);
                                   importedCount++;
                                 }
 
@@ -226,7 +296,9 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                                             ? '$importedCount kişi rehberden başarıyla içe aktarıldı.${skippedCount > 0 ? " ($skippedCount kişi zaten kayıtlı olduğu için atlandı.)" : ""}'
                                             : 'Seçilen kişilerin tamamı zaten sistemde kayıtlı.',
                                       ),
-                                      backgroundColor: importedCount > 0 ? _kGreen : _kOrange,
+                                      backgroundColor: importedCount > 0
+                                          ? _kGreen
+                                          : _kOrange,
                                       behavior: SnackBarBehavior.floating,
                                     ),
                                   );
@@ -235,14 +307,18 @@ extension SettingsBackupSmsSheets on _SettingsPageState {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _kGreen,
                           disabledBackgroundColor: Colors.grey[300],
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                           elevation: 0,
                         ),
                         child: Text(
-                          selectedIndices.isEmpty 
-                              ? 'Lütfen Kişi Seçin' 
+                          selectedIndices.isEmpty
+                              ? 'Lütfen Kişi Seçin'
                               : 'Seçilenleri İçe Aktar (${selectedIndices.length})',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white),
                         ),
                       ),
                     ),

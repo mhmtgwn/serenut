@@ -11,7 +11,8 @@ class ReportSectionHeader extends StatelessWidget {
   final String? subtitle;
   final IconData icon;
 
-  const ReportSectionHeader({super.key, required this.title, this.subtitle, required this.icon});
+  const ReportSectionHeader(
+      {super.key, required this.title, this.subtitle, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -19,10 +20,12 @@ class ReportSectionHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 20, color: POSColors.greenDark),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         if (subtitle != null) ...[
           const SizedBox(width: 8),
-          Text(subtitle!, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+          Text(subtitle!,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500])),
         ],
       ],
     );
@@ -120,7 +123,8 @@ class AgingBucketCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             formatReportCurrency(amount),
-            style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: color, fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(label,

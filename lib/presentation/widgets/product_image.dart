@@ -36,7 +36,8 @@ class ProductImage extends ConsumerWidget {
 
     // 1. Web execution
     if (kIsWeb) {
-      if (imageUrl != null && (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:'))) {
+      if (imageUrl != null &&
+          (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:'))) {
         return _buildNetworkImage(context, imageUrl!);
       }
       return _buildPlaceholder();

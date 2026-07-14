@@ -55,8 +55,8 @@ class OfflineSyncService {
   /// Optional state machine for formal sync state transition auditing.
   SyncStateMachine? _stateMachine;
 
-  static const int _maxRetries       = 3;
-  static const int _baseBackoffMs    = 1000; // 1s base
+  static const int _maxRetries = 3;
+  static const int _baseBackoffMs = 1000; // 1s base
 
   bool _isSyncing = false;
 
@@ -70,11 +70,11 @@ class OfflineSyncService {
     SyncStateMachine? stateMachine,
   })  : _saleRepository = saleRepository,
         _transactionRepository = transactionRepository,
-        _licenseService  = licenseService,
-        _trialManager    = trialManager,
-        _apiClient       = apiClient ?? ApiClient(),
-        _chaosInjector   = chaosInjector,
-        _stateMachine    = stateMachine;
+        _licenseService = licenseService,
+        _trialManager = trialManager,
+        _apiClient = apiClient ?? ApiClient(),
+        _chaosInjector = chaosInjector,
+        _stateMachine = stateMachine;
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -97,14 +97,18 @@ class OfflineSyncService {
     if (!isTrial) {
       final info = _licenseService.getLicenseInfo();
       final token = _licenseService.getLicenseToken();
-      if (info == null || token == null || !_licenseService.verifyLicenseToken(token)) {
+      if (info == null ||
+          token == null ||
+          !_licenseService.verifyLicenseToken(token)) {
         await TelemetryService().logStructured(
           event: 'sync_license_invalid',
           level: LogLevel.error,
           correlationId: _stateMachine?.sessionId,
           metadata: {'reason': 'Invalid or missing license token'},
         );
-        return const SyncResult(synced: 0, failed: 0, errors: ['Bulut senkronizasyonu için geçerli bir ticari lisans bulunamadı.']);
+        return const SyncResult(synced: 0, failed: 0, errors: [
+          'Bulut senkronizasyonu için geçerli bir ticari lisans bulunamadı.'
+        ]);
       }
       if (!info.features.contains('cloud_sync')) {
         await TelemetryService().logStructured(
@@ -113,7 +117,9 @@ class OfflineSyncService {
           correlationId: _stateMachine?.sessionId,
           metadata: {'reason': 'cloud_sync feature disabled'},
         );
-        return const SyncResult(synced: 0, failed: 0, errors: ['Mevcut lisans paketiniz bulut senkronizasyonu (cloud_sync) özelliğini desteklemiyor.']);
+        return const SyncResult(synced: 0, failed: 0, errors: [
+          'Mevcut lisans paketiniz bulut senkronizasyonu (cloud_sync) özelliğini desteklemiyor.'
+        ]);
       }
     }
 
@@ -131,18 +137,21 @@ class OfflineSyncService {
       return const SyncResult(
         synced: 0,
         failed: 0,
-        errors: ['Veritabanı şema uyuşmazlığı tespit edildi. Senkronizasyon güvenlik nedeniyle durduruldu. Lütfen uygulamayı güncelleyin.'],
+        errors: [
+          'Veritabanı şema uyuşmazlığı tespit edildi. Senkronizasyon güvenlik nedeniyle durduruldu. Lütfen uygulamayı güncelleyin.'
+        ],
       );
     }
 
     if (_isSyncing) {
-      return const SyncResult(synced: 0, failed: 0, errors: ['Sync already in progress']);
+      return const SyncResult(
+          synced: 0, failed: 0, errors: ['Sync already in progress']);
     }
 
     _isSyncing = true;
     final errors = <String>[];
-    int synced  = 0;
-    int failed  = 0;
+    int synced = 0;
+    int failed = 0;
 
     try {
       if (_stateMachine != null) {
@@ -173,27 +182,29 @@ class OfflineSyncService {
         final ok = await _syncSaleWithRetry(sale);
         if (ok) {
           if (_chaosInjector != null) {
-            await _chaosInjector!.trigger(FaultHook.afterPushBeforeCommit, saleId: sale.id);
+            await _chaosInjector!
+                .trigger(FaultHook.afterPushBeforeCommit, saleId: sale.id);
           }
 
           // Mark as synced in local DB — ONLY after remote confirmation
           final updated = SaleEntity(
-            id:             sale.id,
-            customerId:     sale.customerId,
-            totalAmount:    sale.totalAmount,
-            paidAmount:     sale.paidAmount,
-            paymentMethod:  sale.paymentMethod,
-            status:         sale.status,
-            createdAt:      sale.createdAt,
-            items:          sale.items,
+            id: sale.id,
+            customerId: sale.customerId,
+            totalAmount: sale.totalAmount,
+            paidAmount: sale.paidAmount,
+            paymentMethod: sale.paymentMethod,
+            status: sale.status,
+            createdAt: sale.createdAt,
+            items: sale.items,
             idempotencyKey: sale.idempotencyKey,
-            isSynced:       1,
+            isSynced: 1,
           );
           try {
             await _saleRepository.update(updated);
             synced++;
             if (_stateMachine != null) {
-              await _stateMachine!.transition(SyncTrigger.pushSuccess, saleId: sale.id);
+              await _stateMachine!
+                  .transition(SyncTrigger.pushSuccess, saleId: sale.id);
             }
           } catch (e, st) {
             await TelemetryService().logError(
@@ -216,7 +227,8 @@ class OfflineSyncService {
           );
           if (_stateMachine != null) {
             try {
-              await _stateMachine!.transition(SyncTrigger.maxRetriesExceeded, saleId: sale.id);
+              await _stateMachine!
+                  .transition(SyncTrigger.maxRetriesExceeded, saleId: sale.id);
             } catch (_) {}
           }
         }
@@ -228,7 +240,8 @@ class OfflineSyncService {
       }
       await _pullUpdates(errors);
 
-      if (_stateMachine != null && _stateMachine!.currentState == SyncState.syncing) {
+      if (_stateMachine != null &&
+          _stateMachine!.currentState == SyncState.syncing) {
         await _stateMachine!.transition(SyncTrigger.pullComplete);
       }
     } catch (e, st) {
@@ -259,7 +272,8 @@ class OfflineSyncService {
       final sharedPrefs = _licenseService.prefs; // SharedPreferences reference
       final lastTimestamp = sharedPrefs.getInt('last_sync_timestamp') ?? 0;
 
-      final response = await _apiClient.get('/sync/pull?last_timestamp=$lastTimestamp');
+      final response =
+          await _apiClient.get('/sync/pull?last_timestamp=$lastTimestamp');
       if (response.statusCode == 200) {
         final data = response.json;
 
@@ -267,7 +281,7 @@ class OfflineSyncService {
           final txs = data['transactions'] as List<dynamic>;
           final db = await DatabaseManager().getDatabase();
           final affectedCustomerIds = <String>{};
-          
+
           // YÜKSEK A DÜZELTMESİ: findAll() + döngü (O(n) RAM) yerine tek SQL MAX() sorgusu.
           // Önceki kod: tüm yerel transaction listesini RAM'e çekip döngüyle max'ı arıyordu.
           // Yeni kod: getMaxLogicalClock() → SELECT MAX(logical_clock) FROM financial_transactions
@@ -279,7 +293,8 @@ class OfflineSyncService {
           await db.transaction((txn) async {
             for (final txMap in txs) {
               if (txMap is Map<String, dynamic>) {
-                final type = txMap['type'] as String? ?? 'financial_transaction';
+                final type =
+                    txMap['type'] as String? ?? 'financial_transaction';
                 final payload = txMap['payload'] as Map<String, dynamic>;
                 final id = payload['id'] as String;
 
@@ -290,13 +305,24 @@ class OfflineSyncService {
                       'id': payload['id'],
                       'name': payload['name'],
                       'barcode': payload['barcode'],
-                      'price': payload['price'] != null ? (payload['price'] as num).toDouble() : 0.0,
-                      'cost': payload['cost'] != null ? (payload['cost'] as num).toDouble() : 0.0,
-                      'vat_rate': payload['vat_rate'] != null ? (payload['vat_rate'] as num).toDouble() : 0.0,
+                      'price': payload['price'] != null
+                          ? (payload['price'] as num).toDouble()
+                          : 0.0,
+                      'cost': payload['cost'] != null
+                          ? (payload['cost'] as num).toDouble()
+                          : 0.0,
+                      'vat_rate': payload['vat_rate'] != null
+                          ? (payload['vat_rate'] as num).toDouble()
+                          : 0.0,
                       'category': payload['category'],
                       'image_url': payload['image_url'],
-                      'stock': payload['stock'] != null ? (payload['stock'] as num).toInt() : 0,
-                      'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                      'stock': payload['stock'] != null
+                          ? (payload['stock'] as num).toInt()
+                          : 0,
+                      'is_deleted': (payload['is_deleted'] == true ||
+                              payload['is_deleted'] == 1)
+                          ? 1
+                          : 0,
                       'created_at': payload['created_at'],
                       'updated_at': payload['updated_at'],
                     },
@@ -314,8 +340,13 @@ class OfflineSyncService {
                       'name': payload['name'],
                       'email': payload['email'],
                       'phone': payload['phone'],
-                      'balance': payload['balance'] != null ? (payload['balance'] as num).toDouble() : 0.0,
-                      'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                      'balance': payload['balance'] != null
+                          ? (payload['balance'] as num).toDouble()
+                          : 0.0,
+                      'is_deleted': (payload['is_deleted'] == true ||
+                              payload['is_deleted'] == 1)
+                          ? 1
+                          : 0,
                       'created_at': payload['created_at'],
                       'updated_at': payload['updated_at'],
                     },
@@ -327,8 +358,12 @@ class OfflineSyncService {
                     {
                       'id': payload['id'],
                       'customer_id': payload['customer_id'],
-                      'total_amount': payload['total_amount'] != null ? (payload['total_amount'] as num).toDouble() : 0.0,
-                      'paid_amount': payload['paid_amount'] != null ? (payload['paid_amount'] as num).toDouble() : 0.0,
+                      'total_amount': payload['total_amount'] != null
+                          ? (payload['total_amount'] as num).toDouble()
+                          : 0.0,
+                      'paid_amount': payload['paid_amount'] != null
+                          ? (payload['paid_amount'] as num).toDouble()
+                          : 0.0,
                       'payment_method': payload['payment_method'],
                       'status': payload['status'],
                       'created_at': payload['created_at'],
@@ -336,26 +371,42 @@ class OfflineSyncService {
                       'idempotency_key': payload['idempotency_key'],
                       'is_synced': 1,
                       'created_by': payload['created_by'],
-                      'is_deleted': (payload['is_deleted'] == true || payload['is_deleted'] == 1) ? 1 : 0,
+                      'is_deleted': (payload['is_deleted'] == true ||
+                              payload['is_deleted'] == 1)
+                          ? 1
+                          : 0,
                     },
                     conflictAlgorithm: ConflictAlgorithm.replace,
                   );
 
                   if (payload['items'] != null) {
                     final items = payload['items'] as List<dynamic>;
-                    await txn.delete('sale_items', where: 'sale_id = ?', whereArgs: [payload['id']]);
-                    
+                    await txn.delete('sale_items',
+                        where: 'sale_id = ?', whereArgs: [payload['id']]);
+
                     for (final item in items) {
                       if (item is Map<String, dynamic>) {
                         await txn.insert(
                           'sale_items',
                           {
-                            'id': item['id'] ?? 'si-${payload['id']}-${item['product_id'] ?? item['productId']}',
+                            'id': item['id'] ??
+                                'si-${payload['id']}-${item['product_id'] ?? item['productId']}',
                             'sale_id': payload['id'],
-                            'product_id': item['product_id'] ?? item['productId'],
-                            'quantity': item['quantity'] != null ? (item['quantity'] as num).toDouble() : (item['qty'] != null ? (item['qty'] as num).toDouble() : 0.0),
-                            'unit_price': item['unit_price'] != null ? (item['unit_price'] as num).toDouble() : (item['unitPrice'] != null ? (item['unitPrice'] as num).toDouble() : 0.0),
-                            'total_price': item['total_price'] != null ? (item['total_price'] as num).toDouble() : 0.0,
+                            'product_id':
+                                item['product_id'] ?? item['productId'],
+                            'quantity': item['quantity'] != null
+                                ? (item['quantity'] as num).toDouble()
+                                : (item['qty'] != null
+                                    ? (item['qty'] as num).toDouble()
+                                    : 0.0),
+                            'unit_price': item['unit_price'] != null
+                                ? (item['unit_price'] as num).toDouble()
+                                : (item['unitPrice'] != null
+                                    ? (item['unitPrice'] as num).toDouble()
+                                    : 0.0),
+                            'total_price': item['total_price'] != null
+                                ? (item['total_price'] as num).toDouble()
+                                : 0.0,
                           },
                           conflictAlgorithm: ConflictAlgorithm.replace,
                         );
@@ -367,22 +418,24 @@ class OfflineSyncService {
                   if (customerId != null && customerId.isNotEmpty) {
                     affectedCustomerIds.add(customerId);
                   }
-                  
+
                   final existing = await txn.query(
                     'financial_transactions',
                     where: 'id = ?',
                     whereArgs: [id],
                     limit: 1,
                   );
-                  
+
                   if (existing.isEmpty) {
                     final entity = FinancialTransactionEntity.fromMap(payload);
 
                     // Validation Guard 1: Logical Clock Spoofing Check
-                    final bool isLogicalClockInflated = entity.logicalClock > maxLocalClock + 10000;
-                    
+                    final bool isLogicalClockInflated =
+                        entity.logicalClock > maxLocalClock + 10000;
+
                     // Validation Guard 2: Future Timestamp spoofing check (1-day grace window)
-                    final bool isFutureClock = entity.date.isAfter(DateTime.now().add(const Duration(days: 1)));
+                    final bool isFutureClock = entity.date
+                        .isAfter(DateTime.now().add(const Duration(days: 1)));
 
                     if (isLogicalClockInflated || isFutureClock) {
                       final String reason = isLogicalClockInflated
@@ -401,13 +454,15 @@ class OfflineSyncService {
                           'date': entity.date.toIso8601String(),
                         },
                       );
-                      errors.add('Security anomaly: Transaction ${entity.id} rejected due to: $reason');
+                      errors.add(
+                          'Security anomaly: Transaction ${entity.id} rejected due to: $reason');
                       continue;
                     }
 
                     int nextClock = entity.logicalClock;
                     if (nextClock == 0) {
-                      final result = await txn.rawQuery('SELECT MAX(logical_clock) as max_clock FROM financial_transactions');
+                      final result = await txn.rawQuery(
+                          'SELECT MAX(logical_clock) as max_clock FROM financial_transactions');
                       final maxClock = Sqflite.firstIntValue(result) ?? 0;
                       nextClock = maxClock + 1;
                     }
@@ -422,7 +477,9 @@ class OfflineSyncService {
                       'paid_amount': entity.paidAmount,
                       'debt_amount': entity.debtAmount,
                       'reference_id': entity.referenceId,
-                      'metadata': entity.metadata != null ? jsonEncode(entity.metadata) : null,
+                      'metadata': entity.metadata != null
+                          ? jsonEncode(entity.metadata)
+                          : null,
                       'created_at': entity.date.toIso8601String(),
                       'logical_clock': nextClock,
                       'device_id': txDeviceId,
@@ -434,16 +491,19 @@ class OfflineSyncService {
 
             if (affectedCustomerIds.isNotEmpty) {
               for (final customerId in affectedCustomerIds) {
-                final expectedResult = await txn.rawQuery(DatabaseManager.customerBalanceSql, [customerId]);
-                
-                final expectedBalance = (expectedResult.first['expected'] as num?)?.toDouble() ?? 0.0;
+                final expectedResult = await txn
+                    .rawQuery(DatabaseManager.customerBalanceSql, [customerId]);
+
+                final expectedBalance =
+                    (expectedResult.first['expected'] as num?)?.toDouble() ??
+                        0.0;
                 await txn.update(
                   'customers',
                   {'balance': expectedBalance},
                   where: 'id = ?',
                   whereArgs: [customerId],
                 );
-                
+
                 await TelemetryService().logStructured(
                   event: 'sync_customer_balance_updated',
                   level: LogLevel.info,
@@ -498,8 +558,13 @@ class OfflineSyncService {
         return false; // Stop retrying immediately
       } on ApiException catch (e) {
         // Permanent 4xx validation or auth errors (excluding 408/429) shouldn't be retried
-        if (e.statusCode != null && e.statusCode! >= 400 && e.statusCode! < 500 && e.statusCode! != 408 && e.statusCode! != 429) {
-          debugPrint('[OfflineSync] ❌ Permanent client error (${e.statusCode}). Skipping retry.');
+        if (e.statusCode != null &&
+            e.statusCode! >= 400 &&
+            e.statusCode! < 500 &&
+            e.statusCode! != 408 &&
+            e.statusCode! != 429) {
+          debugPrint(
+              '[OfflineSync] ❌ Permanent client error (${e.statusCode}). Skipping retry.');
           return false;
         }
         // Otherwise (5xx, 408, 429) retry
@@ -529,13 +594,20 @@ class OfflineSyncService {
           await _stateMachine!.transition(
             SyncTrigger.pushConflict,
             saleId: sale.id,
-            metadata: {'http_status': 409, 'message': 'Duplicate push conflict detected'},
+            metadata: {
+              'http_status': 409,
+              'message': 'Duplicate push conflict detected'
+            },
           );
-          await _stateMachine!.transition(SyncTrigger.startSync, saleId: sale.id);
+          await _stateMachine!
+              .transition(SyncTrigger.startSync, saleId: sale.id);
           await _stateMachine!.transition(
             SyncTrigger.mergeComplete,
             saleId: sale.id,
-            metadata: {'policy': 'server-authoritative', 'action': 'marked_synced'},
+            metadata: {
+              'policy': 'server-authoritative',
+              'action': 'marked_synced'
+            },
           );
         }
         return true;
@@ -544,22 +616,31 @@ class OfflineSyncService {
     }
 
     try {
-      final response = await _apiClient.post('/sales', payload, idempotencyKey: sale.id);
+      final response =
+          await _apiClient.post('/sales', payload, idempotencyKey: sale.id);
       return response.statusCode == 200 || response.statusCode == 201;
     } on ApiException catch (e) {
-      debugPrint('[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['paymentMethod']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
+      debugPrint(
+          '[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['paymentMethod']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
       if (e.statusCode == 409) {
         if (_stateMachine != null) {
           await _stateMachine!.transition(
             SyncTrigger.pushConflict,
             saleId: sale.id,
-            metadata: {'http_status': 409, 'message': 'Duplicate push conflict detected'},
+            metadata: {
+              'http_status': 409,
+              'message': 'Duplicate push conflict detected'
+            },
           );
-          await _stateMachine!.transition(SyncTrigger.startSync, saleId: sale.id);
+          await _stateMachine!
+              .transition(SyncTrigger.startSync, saleId: sale.id);
           await _stateMachine!.transition(
             SyncTrigger.mergeComplete,
             saleId: sale.id,
-            metadata: {'policy': 'server-authoritative', 'action': 'marked_synced'},
+            metadata: {
+              'policy': 'server-authoritative',
+              'action': 'marked_synced'
+            },
           );
         }
         return true;
@@ -570,7 +651,7 @@ class OfflineSyncService {
 
   Map<String, dynamic> _buildPayload(SaleEntity sale) {
     final String serverPaymentMethod = sale.paymentMethod.toLowerCase().trim();
-    
+
     const methodMapping = {
       'cash': 'cash',
       'nakit': 'cash',
@@ -585,26 +666,27 @@ class OfflineSyncService {
 
     final mapped = methodMapping[serverPaymentMethod];
     if (mapped == null) {
-      throw ArgumentError('Belirtilen ödeme yöntemi backend şemasına eşlenemedi (Geçersiz yöntem: ${sale.paymentMethod})');
+      throw ArgumentError(
+          'Belirtilen ödeme yöntemi backend şemasına eşlenemedi (Geçersiz yöntem: ${sale.paymentMethod})');
     }
 
     return {
-      'id':              sale.id,
-      'idempotencyKey':  sale.idempotencyKey,
-      'customerId':      sale.customerId,
-      'totalAmount':     sale.totalAmount,
-      'paidAmount':      sale.paidAmount,
-      'paymentMethod':   mapped,
-      'status':          sale.status,
-      'createdAt':       sale.createdAt.toIso8601String(),
+      'id': sale.id,
+      'idempotencyKey': sale.idempotencyKey,
+      'customerId': sale.customerId,
+      'totalAmount': sale.totalAmount,
+      'paidAmount': sale.paidAmount,
+      'paymentMethod': mapped,
+      'status': sale.status,
+      'createdAt': sale.createdAt.toIso8601String(),
       'entitlement_snapshot': sale.entitlementSnapshot,
-      'items':           sale.items.map((item) {
+      'items': sale.items.map((item) {
         return {
           'productId': item['product_id'],
           'qty': item['quantity'] ?? item['qty'],
           'unitPrice': item['unit_price'] ?? item['unitPrice'],
         };
-              return item;
+        return item;
       }).toList(),
     };
   }

@@ -7,19 +7,19 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/config/utils.dart';
 
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kBlue       = Color(0xFF2563EB);
-const _kBlueLight  = Color(0xFFDBEAFE);
-const _kOrange     = Color(0xFFEA580C);
-const _kOrangeLight= Color(0xFFFFEDD5);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kBlue = Color(0xFF2563EB);
+const _kBlueLight = Color(0xFFDBEAFE);
+const _kOrange = Color(0xFFEA580C);
+const _kOrangeLight = Color(0xFFFFEDD5);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class SalesHistoryPage extends ConsumerStatefulWidget {
   const SalesHistoryPage({super.key});
@@ -69,7 +69,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       appBar: AppBar(
         title: const Text(
           'Satış Geçmişi',
-          style: TextStyle(fontWeight: FontWeight.w800, color: _kText, fontSize: 18),
+          style: TextStyle(
+              fontWeight: FontWeight.w800, color: _kText, fontSize: 18),
         ),
         backgroundColor: Colors.white,
         foregroundColor: _kText,
@@ -87,23 +88,31 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               controller: _searchController,
               onChanged: (val) {
                 setState(() => _searchQuery = val);
-                ref.read(salesHistoryControllerProvider.notifier).applySearch(val);
+                ref
+                    .read(salesHistoryControllerProvider.notifier)
+                    .applySearch(val);
               },
               decoration: InputDecoration(
                 hintText: 'Satış no veya müşteri adı ara...',
-                hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 13),
-                prefixIcon: const Icon(Icons.search_rounded, size: 20, color: _kTextSecondary),
+                hintStyle:
+                    const TextStyle(color: _kTextSecondary, fontSize: 13),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    size: 20, color: _kTextSecondary),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18, color: _kTextSecondary),
+                        icon: const Icon(Icons.clear_rounded,
+                            size: 18, color: _kTextSecondary),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
-                          ref.read(salesHistoryControllerProvider.notifier).applySearch(null);
+                          ref
+                              .read(salesHistoryControllerProvider.notifier)
+                              .applySearch(null);
                         },
                       )
                     : null,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: _kBorder),
@@ -127,12 +136,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           Expanded(
             child: salesAsync.when(
               loading: () => const Center(
-                child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen)),
+                child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(_kGreen)),
               ),
               error: (err, _) => Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text('Hata: $err', style: const TextStyle(color: _kRed)),
+                  child:
+                      Text('Hata: $err', style: const TextStyle(color: _kRed)),
                 ),
               ),
               data: (salesList) {
@@ -144,11 +155,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history_rounded, size: 64, color: Colors.grey[300]),
+                        Icon(Icons.history_rounded,
+                            size: 64, color: Colors.grey[300]),
                         const SizedBox(height: 12),
                         const Text(
                           'Kayıtlı satış bulunamadı.',
-                          style: TextStyle(color: _kTextSecondary, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              color: _kTextSecondary,
+                              fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -161,7 +175,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                   itemCount: filteredSales.length + 1,
                   itemBuilder: (context, index) {
                     if (index == filteredSales.length) {
-                      final hasMore = ref.read(salesHistoryControllerProvider.notifier).hasMore;
+                      final hasMore = ref
+                          .read(salesHistoryControllerProvider.notifier)
+                          .hasMore;
                       if (!hasMore) return const SizedBox.shrink();
                       return const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
@@ -169,30 +185,47 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       );
                     }
                     final sale = filteredSales[index];
-                    final customerName = customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
-                    final dateStr = DateFormat('dd.MM.yyyy HH:mm', 'tr_TR').format(sale.createdAt);
+                    final customerName =
+                        customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
+                    final dateStr = DateFormat('dd.MM.yyyy HH:mm', 'tr_TR')
+                        .format(sale.createdAt);
 
                     // Color and labels for payments
                     final paymentLabel = {
-                      'cash': 'Nakit', 'nakit': 'Nakit',
-                      'card': 'Kart', 'kart': 'Kart',
-                      'debt': 'Vadeli', 'vadeli': 'Vadeli',
-                      'mixed': 'Karma', 'karma': 'Karma',
-                    }[sale.paymentMethod.toLowerCase()] ?? sale.paymentMethod;
+                          'cash': 'Nakit',
+                          'nakit': 'Nakit',
+                          'card': 'Kart',
+                          'kart': 'Kart',
+                          'debt': 'Vadeli',
+                          'vadeli': 'Vadeli',
+                          'mixed': 'Karma',
+                          'karma': 'Karma',
+                        }[sale.paymentMethod.toLowerCase()] ??
+                        sale.paymentMethod;
 
                     final paymentColor = {
-                      'cash': _kGreen, 'nakit': _kGreen,
-                      'card': _kBlue, 'kart': _kBlue,
-                      'debt': _kOrange, 'vadeli': _kOrange,
-                      'mixed': _kGreenDark, 'karma': _kGreenDark,
-                    }[sale.paymentMethod.toLowerCase()] ?? _kTextSecondary;
+                          'cash': _kGreen,
+                          'nakit': _kGreen,
+                          'card': _kBlue,
+                          'kart': _kBlue,
+                          'debt': _kOrange,
+                          'vadeli': _kOrange,
+                          'mixed': _kGreenDark,
+                          'karma': _kGreenDark,
+                        }[sale.paymentMethod.toLowerCase()] ??
+                        _kTextSecondary;
 
                     final paymentBg = {
-                      'cash': _kGreenLight, 'nakit': _kGreenLight,
-                      'card': _kBlueLight, 'kart': _kBlueLight,
-                      'debt': _kOrangeLight, 'vadeli': _kOrangeLight,
-                      'mixed': _kGreenLight, 'karma': _kGreenLight,
-                    }[sale.paymentMethod.toLowerCase()] ?? _kSurface;
+                          'cash': _kGreenLight,
+                          'nakit': _kGreenLight,
+                          'card': _kBlueLight,
+                          'kart': _kBlueLight,
+                          'debt': _kOrangeLight,
+                          'vadeli': _kOrangeLight,
+                          'mixed': _kGreenLight,
+                          'karma': _kGreenLight,
+                        }[sale.paymentMethod.toLowerCase()] ??
+                        _kSurface;
 
                     final isCancelled = sale.status == 'cancelled';
 
@@ -221,11 +254,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: isCancelled ? _kRedLight : _kGreenLight,
+                                  color:
+                                      isCancelled ? _kRedLight : _kGreenLight,
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
-                                  isCancelled ? Icons.cancel_rounded : Icons.receipt_long_rounded,
+                                  isCancelled
+                                      ? Icons.cancel_rounded
+                                      : Icons.receipt_long_rounded,
                                   color: isCancelled ? _kRed : _kGreen,
                                   size: 20,
                                 ),
@@ -250,10 +286,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                         if (isCancelled) ...[
                                           const SizedBox(width: 6),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
                                               color: _kRedLight,
-                                              borderRadius: BorderRadius.circular(6),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
                                             child: const Text(
                                               'İPTAL',
@@ -298,12 +336,15 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                       fontWeight: FontWeight.w900,
                                       fontSize: 15,
                                       color: isCancelled ? _kRed : _kText,
-                                      decoration: isCancelled ? TextDecoration.lineThrough : null,
+                                      decoration: isCancelled
+                                          ? TextDecoration.lineThrough
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: paymentBg,
                                       borderRadius: BorderRadius.circular(20),

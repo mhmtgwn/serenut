@@ -38,42 +38,41 @@ class AuthUser {
       required.every(hasPermission);
 
   /// Check if user has ANY of the required permissions
-  bool hasAnyPermission(List<String> any) =>
-      any.any(hasPermission);
+  bool hasAnyPermission(List<String> any) => any.any(hasPermission);
 
   /// Get all permission names for UI display
   List<String> getAllPermissions() => List.unmodifiable(permissions);
 
   /// Serialization for SharedPreferences storage
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'companyId': companyId,
-    'name': name,
-    'email': email,
-    'username': username,
-    'pin': pin,
-    'businessCode': businessCode,
-    'role': role.name,
-    'permissions': permissions,
-    'created_at': createdAt.toIso8601String(),
-  };
+        'id': id,
+        'companyId': companyId,
+        'name': name,
+        'email': email,
+        'username': username,
+        'pin': pin,
+        'businessCode': businessCode,
+        'role': role.name,
+        'permissions': permissions,
+        'created_at': createdAt.toIso8601String(),
+      };
 
   /// Deserialization from SharedPreferences
   factory AuthUser.fromMap(Map<String, dynamic> map) => AuthUser(
-    id: map['id'] as String,
-    companyId: map['companyId'] as String? ?? 'TEST_COMPANY',
-    name: map['name'] as String,
-    email: map['email'] as String? ?? '',
-    username: map['username'] as String?,
-    pin: map['pin'] as String?,
-    businessCode: map['businessCode'] as String?,
-    role: UserRole.values.firstWhere(
-      (r) => r.name == map['role'],
-      orElse: () => UserRole.cashier,
-    ),
-    permissions: List<String>.from(map['permissions'] as List),
-    createdAt: DateTime.parse(map['created_at'] as String),
-  );
+        id: map['id'] as String,
+        companyId: map['companyId'] as String? ?? 'TEST_COMPANY',
+        name: map['name'] as String,
+        email: map['email'] as String? ?? '',
+        username: map['username'] as String?,
+        pin: map['pin'] as String?,
+        businessCode: map['businessCode'] as String?,
+        role: UserRole.values.firstWhere(
+          (r) => r.name == map['role'],
+          orElse: () => UserRole.cashier,
+        ),
+        permissions: List<String>.from(map['permissions'] as List),
+        createdAt: DateTime.parse(map['created_at'] as String),
+      );
 
   /// JSON serialization
   String toJson() => jsonEncode(toMap());
@@ -83,7 +82,8 @@ class AuthUser {
       AuthUser.fromMap(jsonDecode(source) as Map<String, dynamic>);
 
   @override
-  String toString() => 'AuthUser(id: $id, companyId: $companyId, name: $name, email: $email, username: $username, role: ${role.name})';
+  String toString() =>
+      'AuthUser(id: $id, companyId: $companyId, name: $name, email: $email, username: $username, role: ${role.name})';
 
   AuthUser copyWith({
     String? id,
@@ -126,5 +126,10 @@ class AuthUser {
           role == other.role;
 
   @override
-  int get hashCode => id.hashCode ^ companyId.hashCode ^ name.hashCode ^ email.hashCode ^ role.hashCode;
+  int get hashCode =>
+      id.hashCode ^
+      companyId.hashCode ^
+      name.hashCode ^
+      email.hashCode ^
+      role.hashCode;
 }

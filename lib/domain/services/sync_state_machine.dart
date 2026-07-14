@@ -44,9 +44,9 @@ extension SyncStateLabel on SyncState {
 enum SyncTrigger {
   startSync,
   pushSuccess,
-  pushConflict,     // 409 from server
+  pushConflict, // 409 from server
   pushNetworkError, // SocketException / timeout
-  mergeComplete,    // server-auth resolution applied
+  mergeComplete, // server-auth resolution applied
   maxRetriesExceeded,
   noSalesFound,
   pullComplete,
@@ -58,30 +58,30 @@ enum SyncTrigger {
 /// Any unlisted combination is rejected with [InvalidSyncTransitionError].
 const Map<SyncState, Map<SyncTrigger, SyncState>> _transitions = {
   SyncState.idle: {
-    SyncTrigger.startSync:   SyncState.syncing,
+    SyncTrigger.startSync: SyncState.syncing,
     SyncTrigger.noSalesFound: SyncState.synced,
   },
   SyncState.syncing: {
-    SyncTrigger.pushSuccess:       SyncState.syncing,   // more sales pending
-    SyncTrigger.pullComplete:      SyncState.synced,    // all done
-    SyncTrigger.pushConflict:      SyncState.conflictDetected,
-    SyncTrigger.pushNetworkError:  SyncState.syncing,   // retry in-flight
+    SyncTrigger.pushSuccess: SyncState.syncing, // more sales pending
+    SyncTrigger.pullComplete: SyncState.synced, // all done
+    SyncTrigger.pushConflict: SyncState.conflictDetected,
+    SyncTrigger.pushNetworkError: SyncState.syncing, // retry in-flight
     SyncTrigger.maxRetriesExceeded: SyncState.failed,
-    SyncTrigger.noSalesFound:      SyncState.synced,
+    SyncTrigger.noSalesFound: SyncState.synced,
   },
   SyncState.conflictDetected: {
-    SyncTrigger.startSync:   SyncState.resolving,
+    SyncTrigger.startSync: SyncState.resolving,
     SyncTrigger.maxRetriesExceeded: SyncState.failed,
   },
   SyncState.resolving: {
-    SyncTrigger.mergeComplete:      SyncState.syncing,  // resume after merge
+    SyncTrigger.mergeComplete: SyncState.syncing, // resume after merge
     SyncTrigger.maxRetriesExceeded: SyncState.failed,
   },
   SyncState.synced: {
-    SyncTrigger.startSync: SyncState.syncing,           // next cycle
+    SyncTrigger.startSync: SyncState.syncing, // next cycle
   },
   SyncState.failed: {
-    SyncTrigger.startSync: SyncState.syncing,           // manual retry
+    SyncTrigger.startSync: SyncState.syncing, // manual retry
   },
 };
 
@@ -147,14 +147,14 @@ class SyncStateMachine {
     // Persist the transition for post-incident replay
     if (_db != null) {
       await _db!.insert('sync_state_log', {
-        'session_id':    _sessionId,
-        'from_state':    from.label,
-        'to_state':      to.label,
+        'session_id': _sessionId,
+        'from_state': from.label,
+        'to_state': to.label,
         'trigger_event': trigger.name,
-        'sale_id':       saleId,
-        'device_id':     _deviceId,
-        'metadata':      metadata != null ? jsonEncode(metadata) : null,
-        'occurred_at':   DateTime.now().toIso8601String(),
+        'sale_id': saleId,
+        'device_id': _deviceId,
+        'metadata': metadata != null ? jsonEncode(metadata) : null,
+        'occurred_at': DateTime.now().toIso8601String(),
       });
     }
 

@@ -32,21 +32,23 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      
+
       final success = await authService.refreshEntitlement();
       if (success) {
         // Router will automatically re-evaluate state based on TrialManager via authNotifierProvider
         // But we can explicitly force a refresh just in case
         ref.read(authNotifierProvider.notifier).checkAuth();
         setState(() {
-          _successMessage = 'Lisans durumu başarıyla yenilendi! Giriş yapılıyor...';
+          _successMessage =
+              'Lisans durumu başarıyla yenilendi! Giriş yapılıyor...';
         });
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           context.go('/');
         }
       } else {
-        throw Exception('Aktif lisans bulunamadı veya doğrulanamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.');
+        throw Exception(
+            'Aktif lisans bulunamadı veya doğrulanamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.');
       }
     } catch (e) {
       setState(() {
@@ -185,7 +187,8 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
 
                     // Web site actions
                     ElevatedButton.icon(
-                      onPressed: () => _launchWebUrl('https://serenut.com/portal/'),
+                      onPressed: () =>
+                          _launchWebUrl('https://serenut.com/portal/'),
                       icon: const Icon(Icons.shopping_bag_rounded),
                       label: const Text('Lisans Satın Al / Yenile (Web)'),
                       style: ElevatedButton.styleFrom(
@@ -204,26 +207,32 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _launchWebUrl('https://serenut.com/portal/#register'),
-                            icon: const Icon(Icons.person_add_rounded, size: 18),
+                            onPressed: () => _launchWebUrl(
+                                'https://serenut.com/portal/#register'),
+                            icon:
+                                const Icon(Icons.person_add_rounded, size: 18),
                             label: const Text('Kayıt Ol'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
                               side: const BorderSide(color: Color(0xFF475569)),
-                              padding: const EdgeInsets.symmetric(vertical: 12.0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12.0),
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _launchWebUrl('https://serenut.com/portal/#reset'),
-                            icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                            onPressed: () => _launchWebUrl(
+                                'https://serenut.com/portal/#reset'),
+                            icon:
+                                const Icon(Icons.lock_reset_rounded, size: 18),
                             label: const Text('Şifremi Unuttum'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
                               side: const BorderSide(color: Color(0xFF475569)),
-                              padding: const EdgeInsets.symmetric(vertical: 12.0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12.0),
                             ),
                           ),
                         ),
@@ -237,7 +246,8 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                     if (_errorMessage != null) ...[
                       Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        style: const TextStyle(
+                            color: Colors.redAccent, fontSize: 13),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),

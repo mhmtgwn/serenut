@@ -59,7 +59,8 @@ class _UpdateDialog extends ConsumerStatefulWidget {
   ConsumerState<_UpdateDialog> createState() => _UpdateDialogState();
 }
 
-class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerProviderStateMixin {
+class _UpdateDialogState extends ConsumerState<_UpdateDialog>
+    with SingleTickerProviderStateMixin {
   _DialogState _state = _DialogState.offer;
   double _progress = 0.0;
   String _progressText = '';
@@ -74,7 +75,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeInOut);
+    _fadeAnim =
+        CurvedAnimation(parent: _animController, curve: Curves.easeInOut);
     _animController.forward();
   }
 
@@ -96,7 +98,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
     if (!specResult.isAllPass) {
       setState(() {
         _state = _DialogState.error;
-        _errorMessage = 'Sistem gereksinimleri karşılanamadı:\n${specResult.issues.join('\n')}';
+        _errorMessage =
+            'Sistem gereksinimleri karşılanamadı:\n${specResult.issues.join('\n')}';
       });
       return;
     }
@@ -108,7 +111,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
     if (!backupSuccess) {
       setState(() {
         _state = _DialogState.error;
-        _errorMessage = 'Mevcut sürüm yedeklenemedi. Güncelleme güvenliğiniz için iptal edildi.';
+        _errorMessage =
+            'Mevcut sürüm yedeklenemedi. Güncelleme güvenliğiniz için iptal edildi.';
       });
       return;
     }
@@ -130,8 +134,11 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
         deviceId: widget.deviceId,
       )) {
         if (!mounted) return;
-        final totalMB = progress.totalBytes != null ? (progress.totalBytes! / 1024 / 1024).toStringAsFixed(1) : '?';
-        final downloadedMB = (progress.bytesDownloaded / 1024 / 1024).toStringAsFixed(1);
+        final totalMB = progress.totalBytes != null
+            ? (progress.totalBytes! / 1024 / 1024).toStringAsFixed(1)
+            : '?';
+        final downloadedMB =
+            (progress.bytesDownloaded / 1024 / 1024).toStringAsFixed(1);
         setState(() {
           _progress = progress.percentage;
           _progressText = '$downloadedMB MB / $totalMB MB';
@@ -169,7 +176,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
         }
         setState(() {
           _state = _DialogState.error;
-          _errorMessage = 'Dosya bütünlüğü veya dijital imza doğrulanamadı. Güvenlik nedeniyle kurulum iptal edildi.';
+          _errorMessage =
+              'Dosya bütünlüğü veya dijital imza doğrulanamadı. Güvenlik nedeniyle kurulum iptal edildi.';
         });
         return;
       }
@@ -180,7 +188,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
         _progressText = 'Kurulum başlatılıyor...';
       });
 
-      final result = await widget.releaseManager.installUpdate(downloadedFile, widget.platform);
+      final result = await widget.releaseManager
+          .installUpdate(downloadedFile, widget.platform);
 
       if (result == InstallResult.success) {
         if (mounted) Navigator.of(context).pop(true);
@@ -189,7 +198,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
         await rollback.triggerRollback();
         setState(() {
           _state = _DialogState.error;
-          _errorMessage = 'Kurulum başlatılamadı (${result.name}). Sistem önceki stabil sürüme geri döndürüldü (Rollback).';
+          _errorMessage =
+              'Kurulum başlatılamadı (${result.name}). Sistem önceki stabil sürüme geri döndürüldü (Rollback).';
         });
       }
     } catch (e) {
@@ -198,7 +208,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
       await rollback.triggerRollback();
       setState(() {
         _state = _DialogState.error;
-        _errorMessage = 'Güncelleme hatası: ${e.toString()}. Sistem geri döndürüldü (Rollback).';
+        _errorMessage =
+            'Güncelleme hatası: ${e.toString()}. Sistem geri döndürüldü (Rollback).';
       });
     }
   }
@@ -220,11 +231,15 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: info.isForceUpdate ? Colors.red.withOpacity(0.15) : Colors.blue.withOpacity(0.15),
+                color: info.isForceUpdate
+                    ? Colors.red.withOpacity(0.15)
+                    : Colors.blue.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                info.isForceUpdate ? Icons.system_update_alt_rounded : Icons.system_update_rounded,
+                info.isForceUpdate
+                    ? Icons.system_update_alt_rounded
+                    : Icons.system_update_rounded,
                 color: info.isForceUpdate ? Colors.red : Colors.blue,
                 size: 28,
               ),
@@ -235,7 +250,9 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    info.isForceUpdate ? 'Zorunlu Güncelleme' : 'Güncelleme Mevcut',
+                    info.isForceUpdate
+                        ? 'Zorunlu Güncelleme'
+                        : 'Güncelleme Mevcut',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: info.isForceUpdate ? Colors.red : null,
@@ -279,7 +296,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                    Icon(Icons.warning_amber_rounded,
+                        color: Colors.red, size: 18),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -294,7 +312,10 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
               const SizedBox(height: 12),
               Text(
                 'Yenilikler',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Container(
@@ -311,7 +332,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.file_download_outlined, size: 14, color: Colors.grey),
+                  const Icon(Icons.file_download_outlined,
+                      size: 14, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(
                     'Dosya boyutu: ${(info.fileSizeBytes! / 1024 / 1024).toStringAsFixed(1)} MB',
@@ -332,7 +354,9 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
             _AnimatedProgressBar(value: _progress),
             const SizedBox(height: 12),
             Text(
-              _state == _DialogState.verifying ? '🔐 SHA-256 doğrulanıyor...' : _progressText,
+              _state == _DialogState.verifying
+                  ? '🔐 SHA-256 doğrulanıyor...'
+                  : _progressText,
               style: const TextStyle(fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -340,7 +364,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
             if (_state == _DialogState.downloading)
               Text(
                 '${(_progress * 100).toInt()}%',
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
             if (_state == _DialogState.verifying)
               const Padding(
@@ -357,7 +382,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
             SizedBox(height: 16),
             Icon(Icons.check_circle_rounded, color: Colors.green, size: 56),
             SizedBox(height: 8),
-            Text('Güncelleme hazır! Kurulum başlatılıyor...', textAlign: TextAlign.center),
+            Text('Güncelleme hazır! Kurulum başlatılıyor...',
+                textAlign: TextAlign.center),
           ],
         );
 
@@ -371,7 +397,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
               children: [
                 Icon(Icons.error_outline, color: Colors.red),
                 SizedBox(width: 8),
-                Text('Güncelleme başarısız', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Güncelleme başarısız',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 8),
@@ -400,7 +427,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
             style: ElevatedButton.styleFrom(
               backgroundColor: info.isForceUpdate ? Colors.red : Colors.blue,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
           const SizedBox(width: 4),
@@ -412,7 +440,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
         return [
           const Padding(
             padding: EdgeInsets.only(right: 16, bottom: 8),
-            child: Text('Lütfen bekleyin...', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            child: Text('Lütfen bekleyin...',
+                style: TextStyle(color: Colors.grey, fontSize: 12)),
           ),
         ];
 
@@ -454,7 +483,9 @@ class _AnimatedProgressBar extends StatelessWidget {
           value: value,
           backgroundColor: Colors.grey.withOpacity(0.2),
           valueColor: AlwaysStoppedAnimation<Color>(
-            value < 0.5 ? Colors.blue : (value < 0.9 ? Colors.cyan : Colors.green),
+            value < 0.5
+                ? Colors.blue
+                : (value < 0.9 ? Colors.cyan : Colors.green),
           ),
         ),
       ),

@@ -21,7 +21,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 
-
 // ── Sync Status ───────────────────────────────────────────────────────────────
 enum SyncStatus { idle, syncing, success, error }
 
@@ -45,16 +44,17 @@ class SyncState {
     DateTime? lastSyncAt,
   }) {
     return SyncState(
-      status:           status ?? this.status,
-      lastSyncedCount:  lastSyncedCount ?? this.lastSyncedCount,
-      lastError:        lastError ?? this.lastError,
-      lastSyncAt:       lastSyncAt ?? this.lastSyncAt,
+      status: status ?? this.status,
+      lastSyncedCount: lastSyncedCount ?? this.lastSyncedCount,
+      lastError: lastError ?? this.lastError,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
     );
   }
 }
 
 // ── Sync Notifier ─────────────────────────────────────────────────────────────
-class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver {
+class SyncNotifier extends StateNotifier<SyncState>
+    with WidgetsBindingObserver {
   final Ref _ref;
   OfflineSyncService? _syncService;
 
@@ -70,11 +70,12 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
 
   Future<void> _initAndSync() async {
     try {
-      final saleRepo   = await _ref.read(saleRepositoryProvider.future);
-      final transactionRepo = await _ref.read(financialTransactionRepositoryProvider.future);
+      final saleRepo = await _ref.read(saleRepositoryProvider.future);
+      final transactionRepo =
+          await _ref.read(financialTransactionRepositoryProvider.future);
       final licenseService = _ref.read(licenseServiceProvider);
-      final trialManager   = _ref.read(trialManagerProvider);
-      _syncService     = OfflineSyncService(
+      final trialManager = _ref.read(trialManagerProvider);
+      _syncService = OfflineSyncService(
         saleRepository: saleRepo,
         transactionRepository: transactionRepo,
         licenseService: licenseService,
@@ -129,7 +130,8 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
           );
           if (response.isSuccess) {
             final updatedMap = response.json as Map<String, dynamic>;
-            final newVersion = updatedMap['version'] as int? ?? (expectedVersion + 1);
+            final newVersion =
+                updatedMap['version'] as int? ?? (expectedVersion + 1);
             await gateway.update(
               'business_profile',
               {
@@ -171,10 +173,10 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
 
       if (result.synced > 0 || result.failed == 0) {
         state = state.copyWith(
-          status:          SyncStatus.success,
+          status: SyncStatus.success,
           lastSyncedCount: result.synced,
-          lastSyncAt:      DateTime.now(),
-          lastError:       null,
+          lastSyncAt: DateTime.now(),
+          lastError: null,
         );
       } else {
         // Log the partial sync failure event
@@ -189,8 +191,9 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
           },
         );
         state = state.copyWith(
-          status:    SyncStatus.error,
-          lastError: result.errors.isNotEmpty ? result.errors.first : 'Sync failed',
+          status: SyncStatus.error,
+          lastError:
+              result.errors.isNotEmpty ? result.errors.first : 'Sync failed',
         );
       }
     } catch (e, st) {
@@ -201,7 +204,7 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
         correlationId: _machine?.sessionId,
       );
       state = state.copyWith(
-        status:    SyncStatus.error,
+        status: SyncStatus.error,
         lastError: e.toString(),
       );
     }
@@ -227,12 +230,12 @@ class SyncNotifier extends StateNotifier<SyncState> with WidgetsBindingObserver 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 /// Global sync state provider.
-/// 
+///
 /// Usage:
 /// ```dart
 /// // Trigger sync manually
 /// ref.read(syncProvider.notifier).triggerSync();
-/// 
+///
 /// // Watch sync status
 /// final syncState = ref.watch(syncProvider);
 /// if (syncState.status == SyncStatus.syncing) { ... }
@@ -276,7 +279,8 @@ final recentSessionsProvider = FutureProvider.autoDispose(
 );
 
 /// Provides a family provider to generate a ReplayReport for a given correlationId.
-final incidentReplayProvider = FutureProvider.family.autoDispose<ReplayReport, String>(
+final incidentReplayProvider =
+    FutureProvider.family.autoDispose<ReplayReport, String>(
   (ref, correlationId) async {
     ref.watch(syncProvider);
     final db = kIsWeb ? null : await DatabaseManager().getDatabase();

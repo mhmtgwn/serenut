@@ -87,12 +87,11 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final hasAccess = currentUser != null && (
-      currentUser.role == UserRole.sysadmin ||
-      currentUser.role == UserRole.owner ||
-      currentUser.role == UserRole.admin ||
-      currentUser.hasPermission(Permission.settingsAudit.value)
-    );
+    final hasAccess = currentUser != null &&
+        (currentUser.role == UserRole.sysadmin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.hasPermission(Permission.settingsAudit.value));
 
     if (!hasAccess) {
       return const Scaffold(
@@ -117,7 +116,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
       appBar: AppBar(
         title: const Text(
           'Denetim Merkezi (Audit Center)',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Colors.white),
+          style: TextStyle(
+              fontWeight: FontWeight.w800, fontSize: 18, color: Colors.white),
         ),
         backgroundColor: kCardBg,
         elevation: 0,
@@ -142,11 +142,14 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                     Expanded(
                       child: TextField(
                         controller: _searchController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Arama yapın (Kullanıcı, varlık, notlar)...',
+                          hintText:
+                              'Arama yapın (Kullanıcı, varlık, notlar)...',
                           hintStyle: const TextStyle(color: kTextSecondary),
-                          prefixIcon: const Icon(Icons.search_rounded, color: kTextSecondary),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: kTextSecondary),
                           filled: true,
                           fillColor: kDarkBackground,
                           border: OutlineInputBorder(
@@ -161,7 +164,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                             borderRadius: BorderRadius.circular(12),
                             borderSide: const BorderSide(color: kAccentColor),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                         ),
                         onSubmitted: (val) {
                           setState(() => _searchQuery = val);
@@ -174,14 +178,17 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kAccentColor,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () {
                         setState(() => _searchQuery = _searchController.text);
                         _loadEvents();
                       },
-                      child: const Text('Ara', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Ara',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -200,8 +207,12 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                           child: DropdownButton<String>(
                             dropdownColor: kCardBg,
                             value: _selectedType,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextSecondary),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                color: kTextSecondary),
                             items: _eventTypes.map((t) {
                               return DropdownMenuItem<String>(
                                 value: t,
@@ -225,7 +236,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                           final range = await showDateRangePicker(
                             context: context,
                             firstDate: DateTime(2025),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
                             initialDateRange: _selectedDateRange,
                           );
                           if (range != null) {
@@ -234,7 +246,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
                           decoration: BoxDecoration(
                             color: kDarkBackground,
                             borderRadius: BorderRadius.circular(12),
@@ -247,21 +260,28 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                                 _selectedDateRange == null
                                     ? 'Tarih Aralığı Seçin'
                                     : '${DateFormat('dd.MM.yy').format(_selectedDateRange!.start)} - ${DateFormat('dd.MM.yy').format(_selectedDateRange!.end)}',
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold),
                               ),
-                              const Icon(Icons.calendar_month_rounded, color: kTextSecondary, size: 18),
+                              const Icon(Icons.calendar_month_rounded,
+                                  color: kTextSecondary, size: 18),
                             ],
                           ),
                         ),
                       ),
                     ),
-                    if (_selectedDateRange != null || _selectedType != 'Tümü' || _searchQuery.isNotEmpty) ...[
+                    if (_selectedDateRange != null ||
+                        _selectedType != 'Tümü' ||
+                        _searchQuery.isNotEmpty) ...[
                       const SizedBox(width: 12),
                       IconButton(
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.red.withValues(alpha: 0.1),
                           foregroundColor: Colors.redAccent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         icon: const Icon(Icons.clear_all_rounded),
                         onPressed: _clearFilters,
@@ -276,7 +296,9 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
           // Event list
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(kAccentColor)))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(kAccentColor)))
                 : _events.isEmpty
                     ? const Center(
                         child: Text(
@@ -297,15 +319,20 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                             ),
                             margin: const EdgeInsets.only(bottom: 12),
                             child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
                               title: Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: _getEventColor(event.eventType).withValues(alpha: 0.1),
+                                      color: _getEventColor(event.eventType)
+                                          .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: _getEventColor(event.eventType).withValues(alpha: 0.3)),
+                                      border: Border.all(
+                                          color: _getEventColor(event.eventType)
+                                              .withValues(alpha: 0.3)),
                                     ),
                                     child: Text(
                                       event.eventType.toUpperCase(),
@@ -318,8 +345,10 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                                   ),
                                   const Spacer(),
                                   Text(
-                                    DateFormat('dd.MM.yyyy HH:mm:ss').format(event.timestamp),
-                                    style: const TextStyle(color: kTextSecondary, fontSize: 11),
+                                    DateFormat('dd.MM.yyyy HH:mm:ss')
+                                        .format(event.timestamp),
+                                    style: const TextStyle(
+                                        color: kTextSecondary, fontSize: 11),
                                   ),
                                 ],
                               ),
@@ -329,31 +358,44 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      event.notes ?? '${event.entityType} mutation',
-                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                      event.notes ??
+                                          '${event.entityType} mutation',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 6),
                                     Row(
                                       children: [
-                                        const Icon(Icons.person_outline_rounded, color: kTextSecondary, size: 14),
+                                        const Icon(Icons.person_outline_rounded,
+                                            color: kTextSecondary, size: 14),
                                         const SizedBox(width: 4),
                                         Text(
                                           event.userName ?? 'System',
-                                          style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                                          style: const TextStyle(
+                                              color: kTextSecondary,
+                                              fontSize: 12),
                                         ),
                                         const SizedBox(width: 12),
-                                        const Icon(Icons.devices_rounded, color: kTextSecondary, size: 14),
+                                        const Icon(Icons.devices_rounded,
+                                            color: kTextSecondary, size: 14),
                                         const SizedBox(width: 4),
                                         Text(
-                                          event.deviceId != null ? event.deviceId!.substring(0, 8) : 'unknown',
-                                          style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                                          event.deviceId != null
+                                              ? event.deviceId!.substring(0, 8)
+                                              : 'unknown',
+                                          style: const TextStyle(
+                                              color: kTextSecondary,
+                                              fontSize: 12),
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
                               ),
-                              trailing: const Icon(Icons.chevron_right_rounded, color: kTextSecondary),
+                              trailing: const Icon(Icons.chevron_right_rounded,
+                                  color: kTextSecondary),
                               onTap: () => _showDetailDialog(event),
                             ),
                           );
@@ -368,7 +410,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
   Color _getEventColor(String type) {
     if (type.contains('create')) return Colors.greenAccent;
     if (type.contains('delete')) return Colors.redAccent;
-    if (type.contains('price') || type.contains('change')) return Colors.orangeAccent;
+    if (type.contains('price') || type.contains('change'))
+      return Colors.orangeAccent;
     if (type.contains('restore')) return Colors.lightBlueAccent;
     return Colors.amberAccent;
   }
@@ -385,7 +428,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
           ),
           title: Text(
             'Detay: ${event.eventType.toUpperCase()}',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -393,32 +437,54 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _detailField('İşlem ID', event.id),
-                _detailField('İşlem Zamanı', DateFormat('dd.MM.yyyy HH:mm:ss').format(event.timestamp)),
-                _detailField('Kullanıcı', '${event.userName} (${event.userId})'),
+                _detailField('İşlem Zamanı',
+                    DateFormat('dd.MM.yyyy HH:mm:ss').format(event.timestamp)),
+                _detailField(
+                    'Kullanıcı', '${event.userName} (${event.userId})'),
                 _detailField('Varlık Tipi', event.entityType),
                 _detailField('Varlık ID', event.entityId ?? '-'),
                 _detailField('Cihaz UUID', event.deviceId ?? '-'),
                 _detailField('Açıklama/Not', event.notes ?? '-'),
                 const Divider(color: Color(0xFF334155), height: 24),
                 if (event.oldValue != null) ...[
-                  const Text('Eski Değer:', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, fontSize: 12)),
+                  const Text('Eski Değer:',
+                      style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12)),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)),
-                    child: Text(event.oldValue!, style: const TextStyle(color: Colors.redAccent, fontFamily: 'monospace', fontSize: 13)),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(event.oldValue!,
+                        style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontFamily: 'monospace',
+                            fontSize: 13)),
                   ),
                   const SizedBox(height: 12),
                 ],
                 if (event.newValue != null) ...[
-                  const Text('Yeni Değer:', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold, fontSize: 12)),
+                  const Text('Yeni Değer:',
+                      style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12)),
                   const SizedBox(height: 4),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)),
-                    child: Text(event.newValue!, style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 13)),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(event.newValue!,
+                        style: const TextStyle(
+                            color: Colors.greenAccent,
+                            fontFamily: 'monospace',
+                            fontSize: 13)),
                   ),
                 ],
               ],
@@ -427,7 +493,9 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Kapat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text('Kapat',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -441,9 +509,14 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(label,
+              style: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 13)),
+          Text(value,
+              style: const TextStyle(color: Colors.white, fontSize: 13)),
         ],
       ),
     );

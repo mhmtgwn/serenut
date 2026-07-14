@@ -58,7 +58,6 @@ class SaleDetailsPage extends ConsumerWidget {
               children: [
                 _buildSaleSummaryCard(sale, customerName),
                 const SizedBox(height: 16),
-
                 if (sale.items.isNotEmpty) ...[
                   const Text(
                     'Ürünler',
@@ -72,10 +71,8 @@ class SaleDetailsPage extends ConsumerWidget {
                   _buildItemsCard(sale.items, productNameMap),
                   const SizedBox(height: 16),
                 ],
-
                 _buildPaymentSummaryCard(sale),
                 const SizedBox(height: 16),
-
                 if (sale.status != 'cancelled')
                   _buildActionBar(context, ref, sale),
               ],
@@ -106,7 +103,8 @@ class SaleDetailsPage extends ConsumerWidget {
       'cancelled': 'İptal Edildi',
     };
 
-    final colors = statusColors[sale.status] ?? [Colors.grey[100]!, Colors.grey[600]!];
+    final colors =
+        statusColors[sale.status] ?? [Colors.grey[100]!, Colors.grey[600]!];
     final label = statusLabels[sale.status] ?? sale.status;
 
     return Card(
@@ -124,31 +122,41 @@ class SaleDetailsPage extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Satış #${saleId.toShortId}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 4),
-                      Text(DateFormat('dd MMMM yyyy, HH:mm', 'tr_TR').format(sale.createdAt),
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text(
+                          DateFormat('dd MMMM yyyy, HH:mm', 'tr_TR')
+                              .format(sale.createdAt),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600])),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: colors[0],
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(label,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: colors[1], fontSize: 12)),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: colors[1],
+                          fontSize: 12)),
                 ),
               ],
             ),
             const Divider(height: 24),
             _infoRow(Icons.person_outline, 'Müşteri', customerName),
             const SizedBox(height: 8),
-            _infoRow(Icons.payment_outlined, 'Ödeme Yöntemi', _paymentLabel(sale.paymentMethod)),
+            _infoRow(Icons.payment_outlined, 'Ödeme Yöntemi',
+                _paymentLabel(sale.paymentMethod)),
             if (sale.createdBy != null && sale.createdBy!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _infoRow(Icons.badge_outlined, 'Kasiyer / İşlemi Yapan', sale.createdBy!),
+              _infoRow(Icons.badge_outlined, 'Kasiyer / İşlemi Yapan',
+                  sale.createdBy!),
             ],
           ],
         ),
@@ -161,18 +169,24 @@ class SaleDetailsPage extends ConsumerWidget {
       children: [
         Icon(icon, size: 16, color: Colors.grey[500]),
         const SizedBox(width: 8),
-        Text('$label: ', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        Text('$label: ',
+            style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+        Text(value,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
       ],
     );
   }
 
   String _paymentLabel(String method) {
     const labels = {
-      'cash': 'Nakit', 'nakit': 'Nakit',
-      'card': 'Kart', 'kart': 'Kart',
-      'debt': 'Vadeli', 'vadeli': 'Vadeli',
-      'transfer': 'Havale', 'havale': 'Havale',
+      'cash': 'Nakit',
+      'nakit': 'Nakit',
+      'card': 'Kart',
+      'kart': 'Kart',
+      'debt': 'Vadeli',
+      'vadeli': 'Vadeli',
+      'transfer': 'Havale',
+      'havale': 'Havale',
     };
     return labels[method.toLowerCase()] ?? method;
   }
@@ -200,25 +214,32 @@ class SaleDetailsPage extends ConsumerWidget {
             final i = entry.key;
             final item = entry.value;
             final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-            final price = (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0;
+            final price =
+                (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0;
             final productId = item['product_id']?.toString() ?? '';
             // UUID → gerçek ürün adına çevir
-            final productName = productNameMap[productId] ?? item['product_name']?.toString() ?? productId;
+            final productName = productNameMap[productId] ??
+                item['product_name']?.toString() ??
+                productId;
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       Container(
-                        width: 36, height: 36,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           color: const Color(0xFFDCFCE7),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
                           child: Text(
-                            qty % 1 == 0 ? qty.toInt().toString() : qty.toString(),
+                            qty % 1 == 0
+                                ? qty.toInt().toString()
+                                : qty.toString(),
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF16A34A),
@@ -261,8 +282,7 @@ class SaleDetailsPage extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (i < items.length - 1)
-                  const Divider(height: 1, indent: 64),
+                if (i < items.length - 1) const Divider(height: 1, indent: 64),
               ],
             );
           }),
@@ -323,7 +343,8 @@ class SaleDetailsPage extends ConsumerWidget {
     );
   }
 
-  Widget _paymentRow(String label, double amount, Color color, {bool bold = false}) {
+  Widget _paymentRow(String label, double amount, Color color,
+      {bool bold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -349,13 +370,16 @@ class SaleDetailsPage extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _showPartialPaymentDialog(context, ref, sale, remaining),
+              onPressed: () =>
+                  _showPartialPaymentDialog(context, ref, sale, remaining),
               icon: const Icon(Icons.payments_outlined),
-              label: Text('Kısmi Ödeme Yap (${remaining.toStringAsFixed(2)} TL borç)'),
+              label: Text(
+                  'Kısmi Ödeme Yap (${remaining.toStringAsFixed(2)} TL borç)'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
@@ -374,7 +398,8 @@ class SaleDetailsPage extends ConsumerWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.orange[800],
                 side: BorderSide(color: Colors.orange[600]!),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
@@ -392,7 +417,8 @@ class SaleDetailsPage extends ConsumerWidget {
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red[700],
               side: BorderSide(color: Colors.red[400]!),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
@@ -413,19 +439,25 @@ class SaleDetailsPage extends ConsumerWidget {
           'Toplam: ${sale.totalAmount.toStringAsFixed(2)} TL',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Vazgeç')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Vazgeç')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(salesControllerProvider.notifier).cancelSale(sale.id);
+              await ref
+                  .read(salesControllerProvider.notifier)
+                  .cancelSale(sale.id);
               ref.invalidate(saleDetailProvider(sale.id));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Satış iptal edildi.'), backgroundColor: Colors.red),
+                  const SnackBar(
+                      content: Text('Satış iptal edildi.'),
+                      backgroundColor: Colors.red),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
             child: const Text('İptal Et'),
           ),
         ],
@@ -433,10 +465,12 @@ class SaleDetailsPage extends ConsumerWidget {
     );
   }
 
-  void _showPartialPaymentDialog(BuildContext context, WidgetRef ref, SaleEntity sale, double remaining) {
+  void _showPartialPaymentDialog(
+      BuildContext context, WidgetRef ref, SaleEntity sale, double remaining) {
     showDialog(
       context: context,
-      builder: (ctx) => _PartialPaymentDialog(sale: sale, remaining: remaining, parentContext: context),
+      builder: (ctx) => _PartialPaymentDialog(
+          sale: sale, remaining: remaining, parentContext: context),
     );
   }
 
@@ -466,7 +500,8 @@ class SaleDetailsPage extends ConsumerWidget {
           final refundTotal = returnItems.fold<double>(
               0.0, (s, i) => s + (i.returnQty * i.unitPrice));
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
               children: [
                 Icon(Icons.undo, color: Colors.orange),
@@ -486,34 +521,41 @@ class SaleDetailsPage extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 6),
                         child: Row(
                           children: [
-                            Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w500))),
-                          IconButton(
-                            onPressed: ri.returnQty > 0
-                                ? () => setDialog(() => ri.returnQty--)
-                                : null,
-                            icon: const Icon(Icons.remove_circle_outline),
-                            color: const Color(0xFF16A34A),
-                          ),
-                          Text('${ri.returnQty} / ${ri.maxQty}',
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
-                          IconButton(
-                            onPressed: ri.returnQty < ri.maxQty
-                                ? () => setDialog(() => ri.returnQty++)
-                                : null,
-                            icon: const Icon(Icons.add_circle_outline),
-                            color: const Color(0xFF16A34A),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                            Expanded(
+                                child: Text(name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500))),
+                            IconButton(
+                              onPressed: ri.returnQty > 0
+                                  ? () => setDialog(() => ri.returnQty--)
+                                  : null,
+                              icon: const Icon(Icons.remove_circle_outline),
+                              color: const Color(0xFF16A34A),
+                            ),
+                            Text('${ri.returnQty} / ${ri.maxQty}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                            IconButton(
+                              onPressed: ri.returnQty < ri.maxQty
+                                  ? () => setDialog(() => ri.returnQty++)
+                                  : null,
+                              icon: const Icon(Icons.add_circle_outline),
+                              color: const Color(0xFF16A34A),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                     const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('İade Tutarı:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('İade Tutarı:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         Text('${refundTotal.toStringAsFixed(2)} TL',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange[700])),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange[700])),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -521,20 +563,27 @@ class SaleDetailsPage extends ConsumerWidget {
                       value: refundMethod,
                       decoration: InputDecoration(
                         labelText: 'İade Yöntemi',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'balance', child: Text('Müşteri Bakiyesine Ekle')),
-                        DropdownMenuItem(value: 'cash', child: Text('Nakit İade')),
+                        DropdownMenuItem(
+                            value: 'balance',
+                            child: Text('Müşteri Bakiyesine Ekle')),
+                        DropdownMenuItem(
+                            value: 'cash', child: Text('Nakit İade')),
                       ],
-                      onChanged: (v) => setDialog(() => refundMethod = v ?? 'balance'),
+                      onChanged: (v) =>
+                          setDialog(() => refundMethod = v ?? 'balance'),
                     ),
                   ],
                 ),
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('İptal')),
               ElevatedButton(
                 onPressed: refundTotal > 0
                     ? () async {
@@ -558,7 +607,8 @@ class SaleDetailsPage extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('İade tamamlandı. ${refundTotal.toStringAsFixed(2)} TL iade edildi.'),
+                              content: Text(
+                                  'İade tamamlandı. ${refundTotal.toStringAsFixed(2)} TL iade edildi.'),
                               backgroundColor: Colors.orange,
                             ),
                           );
@@ -605,7 +655,8 @@ class _PartialPaymentDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_PartialPaymentDialog> createState() => _PartialPaymentDialogState();
+  ConsumerState<_PartialPaymentDialog> createState() =>
+      _PartialPaymentDialogState();
 }
 
 class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
@@ -646,10 +697,12 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
             const SizedBox(height: 12),
             TextFormField(
               controller: amtCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: 'Ödenecek Tutar (TL)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) return 'Tutar girin';
@@ -664,7 +717,8 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
               value: method,
               decoration: InputDecoration(
                 labelText: 'Yöntem',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
               items: const [
                 DropdownMenuItem(value: 'cash', child: Text('Nakit')),
@@ -677,19 +731,24 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal')),
         ElevatedButton(
           onPressed: () async {
             if (!(_formKey.currentState?.validate() ?? false)) return;
             final amount = double.parse(amtCtrl.text);
             Navigator.pop(context);
-            await ref.read(salesControllerProvider.notifier)
-                .recordPartialPayment(saleId: widget.sale.id, amount: amount, method: method);
+            await ref
+                .read(salesControllerProvider.notifier)
+                .recordPartialPayment(
+                    saleId: widget.sale.id, amount: amount, method: method);
             ref.invalidate(saleDetailProvider(widget.sale.id));
             if (widget.parentContext.mounted) {
               ScaffoldMessenger.of(widget.parentContext).showSnackBar(
                 SnackBar(
-                  content: Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
+                  content:
+                      Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
                   backgroundColor: Colors.green,
                 ),
               );

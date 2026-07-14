@@ -12,24 +12,23 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:uuid/uuid.dart';
 
-
 part 'checkout/karma_fields.dart';
 part 'checkout/pay_buttons.dart';
 part 'checkout/customer_selection.dart';
 
 // ── POS Tema Renkleri (korundu) ───────────────────────────────────────────────
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kBlue       = Color(0xFF2563EB);
-const _kOrange     = Color(0xFFEA580C);
-const _kOrangeLight= Color(0xFFFFEDD5);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kBlue = Color(0xFF2563EB);
+const _kOrange = Color(0xFFEA580C);
+const _kOrangeLight = Color(0xFFFFEDD5);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class CheckoutSection extends ConsumerStatefulWidget {
   final double total;
@@ -79,15 +78,19 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
     super.dispose();
   }
 
-  double get _karmaCash => double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ?? 0.0;
-  double get _karmaCard => double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaCash =>
+      double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ?? 0.0;
+  double get _karmaCard =>
+      double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ?? 0.0;
   double get _karmaDebt => widget.selectedCustomer != null
       ? (double.tryParse(_debtSplitController.text.replaceAll(',', '.')) ?? 0.0)
       : 0.0;
 
   double get _karmaTotal => _karmaCash + _karmaCard + _karmaDebt;
-  double get _karmaRemainder => (widget.total - _karmaTotal).clamp(0.0, double.infinity);
-  bool get _karmaValid => widget.total > 0 && (_karmaTotal - widget.total).abs() < 0.01;
+  double get _karmaRemainder =>
+      (widget.total - _karmaTotal).clamp(0.0, double.infinity);
+  bool get _karmaValid =>
+      widget.total > 0 && (_karmaTotal - widget.total).abs() < 0.01;
 
   void _handlePayment(String method) {
     widget.onPaymentMethodChanged(method);
@@ -168,8 +171,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
 
   void _togglePrintReceipt(bool currentVal, dynamic settings) {
     ref.read(settingsNotifierProvider.notifier).updateSettings(
-      settings.copyWith(printReceipt: !currentVal),
-    );
+          settings.copyWith(printReceipt: !currentVal),
+        );
   }
 
   Widget _buildPrintReceiptToggle() {
@@ -184,7 +187,9 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
             color: isActive ? _kGreen : _kTextSecondary,
             size: 18,
           ),
-          tooltip: isActive ? 'Otomatik Fiş Yazdırma Açık' : 'Otomatik Fiş Yazdırma Kapalı',
+          tooltip: isActive
+              ? 'Otomatik Fiş Yazdırma Açık'
+              : 'Otomatik Fiş Yazdırma Kapalı',
           style: IconButton.styleFrom(
             backgroundColor: isActive ? _kGreenLight : Colors.white,
             padding: const EdgeInsets.all(8),
@@ -252,7 +257,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
           const SizedBox(width: 8),
           IconButton(
             onPressed: () => _showCustomerSelection(context),
-            icon: const Icon(Icons.person_add_rounded, color: _kGreen, size: 20),
+            icon:
+                const Icon(Icons.person_add_rounded, color: _kGreen, size: 20),
             tooltip: 'Müşteri Seç veya Ekle',
             style: IconButton.styleFrom(
               backgroundColor: _kGreenLight,
@@ -292,14 +298,18 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                     children: [
                       Text(
                         cust.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: _kText),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (cust.phone.isNotEmpty)
                         Text(
                           cust.phone,
-                          style: const TextStyle(color: _kTextSecondary, fontSize: 10),
+                          style: const TextStyle(
+                              color: _kTextSecondary, fontSize: 10),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -363,7 +373,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                 ),
                 child: const Text(
                   'Temizle',
-                  style: TextStyle(fontSize: 11, color: _kRed, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      fontSize: 11, color: _kRed, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -415,9 +426,12 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
   // ── KARMA Split Alanlar ────────────────────────────────────────────────────
 
   Widget _buildKarmaSplit() {
-    final remainderForCash = (widget.total - _karmaCard - _karmaDebt).clamp(0.0, double.infinity);
-    final remainderForCard = (widget.total - _karmaCash - _karmaDebt).clamp(0.0, double.infinity);
-    final remainderForDebt = (widget.total - _karmaCash - _karmaCard).clamp(0.0, double.infinity);
+    final remainderForCash =
+        (widget.total - _karmaCard - _karmaDebt).clamp(0.0, double.infinity);
+    final remainderForCard =
+        (widget.total - _karmaCash - _karmaDebt).clamp(0.0, double.infinity);
+    final remainderForDebt =
+        (widget.total - _karmaCash - _karmaCard).clamp(0.0, double.infinity);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -434,7 +448,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
         children: [
           Row(
             children: [
-              const Icon(Icons.call_split_rounded, size: 14, color: _kTextSecondary),
+              const Icon(Icons.call_split_rounded,
+                  size: 14, color: _kTextSecondary),
               const SizedBox(width: 6),
               const Text(
                 'Karma Ödeme Dağılımı',
@@ -444,14 +459,17 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
               const Spacer(),
               if (_karmaValid)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: _kGreenLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text('✓ Tamam',
                       style: TextStyle(
-                          fontSize: 10, color: _kGreenDark, fontWeight: FontWeight.w800)),
+                          fontSize: 10,
+                          color: _kGreenDark,
+                          fontWeight: FontWeight.w800)),
                 ),
             ],
           ),
@@ -466,7 +484,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                   color: _kGreen,
                   remainder: remainderForCash,
                   onSuffixTap: () => setState(() {
-                    _cashSplitController.text = remainderForCash.toStringAsFixed(2);
+                    _cashSplitController.text =
+                        remainderForCash.toStringAsFixed(2);
                     widget.onPaidAmountChanged(_karmaCash + _karmaCard);
                   }),
                   onChanged: (_) => setState(() {
@@ -483,7 +502,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                   color: _kBlue,
                   remainder: remainderForCard,
                   onSuffixTap: () => setState(() {
-                    _cardSplitController.text = remainderForCard.toStringAsFixed(2);
+                    _cardSplitController.text =
+                        remainderForCard.toStringAsFixed(2);
                     widget.onPaidAmountChanged(_karmaCash + _karmaCard);
                   }),
                   onChanged: (_) => setState(() {
@@ -501,7 +521,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                     color: _kOrange,
                     remainder: remainderForDebt,
                     onSuffixTap: () => setState(() {
-                      _debtSplitController.text = remainderForDebt.toStringAsFixed(2);
+                      _debtSplitController.text =
+                          remainderForDebt.toStringAsFixed(2);
                       widget.onPaidAmountChanged(_karmaCash + _karmaCard);
                     }),
                     onChanged: (_) => setState(() {
@@ -518,7 +539,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
               _karmaTotal > widget.total
                   ? '₺${(_karmaTotal - widget.total).toStringAsFixed(2)} fazla girildi'
                   : '₺${_karmaRemainder.toStringAsFixed(2)} eksik',
-              style: const TextStyle(color: _kRed, fontSize: 11, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  color: _kRed, fontSize: 11, fontWeight: FontWeight.w600),
             ),
           ],
         ],
@@ -602,7 +624,9 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
         Expanded(
           child: _PayButton(
             label: 'VADELİ',
-            sublabel: debtDisabled && !disabled ? 'Müşteri Seçin' : '₺${widget.total.toStringAsFixed(2)}',
+            sublabel: debtDisabled && !disabled
+                ? 'Müşteri Seçin'
+                : '₺${widget.total.toStringAsFixed(2)}',
             icon: Icons.account_balance_wallet_rounded,
             color: _kOrange,
             disabled: debtDisabled,
@@ -630,4 +654,3 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
 }
 
 // ── Karma Split TextField ─────────────────────────────────────────────────────
-

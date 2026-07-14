@@ -6,7 +6,8 @@ class ImportProgressDialog extends ConsumerStatefulWidget {
   const ImportProgressDialog({this.zipBytes, this.filePath, super.key});
 
   @override
-  ConsumerState<ImportProgressDialog> createState() => _ImportProgressDialogState();
+  ConsumerState<ImportProgressDialog> createState() =>
+      _ImportProgressDialogState();
 }
 
 class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
@@ -31,7 +32,7 @@ class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
 
     try {
       Uint8List? bytes = widget.zipBytes;
-      
+
       if (bytes == null && widget.filePath != null) {
         setState(() {
           statusText = 'Dosya okunuyor...';
@@ -79,7 +80,9 @@ class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
-        errorMessage != null ? 'İçe Aktarma Başarısız' : (isDone ? 'İçe Aktarma Tamamlandı' : 'İçe Aktarılıyor...'),
+        errorMessage != null
+            ? 'İçe Aktarma Başarısız'
+            : (isDone ? 'İçe Aktarma Tamamlandı' : 'İçe Aktarılıyor...'),
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       content: Column(
@@ -112,7 +115,8 @@ class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
               ),
             ),
           ] else ...[
-            const Icon(Icons.check_circle_outline_rounded, color: _kGreen, size: 48),
+            const Icon(Icons.check_circle_outline_rounded,
+                color: _kGreen, size: 48),
             const SizedBox(height: 16),
             Text(
               'Katalog başarıyla içe aktarıldı!\n\nBaşarılı: ${resultSummary?['success'] ?? 0}\nHatalı: ${resultSummary?['error'] ?? 0}',
@@ -126,10 +130,10 @@ class _ImportProgressDialogState extends ConsumerState<ImportProgressDialog> {
         if (isDone || errorMessage != null)
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Kapat', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold)),
+            child: const Text('Kapat',
+                style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold)),
           ),
       ],
     );
   }
 }
-

@@ -1,4 +1,4 @@
-﻿// lib/domain/realtime/event_parser.dart
+// lib/domain/realtime/event_parser.dart
 // Parse helper for WS communication
 
 import 'dart:convert';
@@ -21,7 +21,9 @@ class EventParser {
       final decoded = jsonDecode(data);
       if (decoded is Map<String, dynamic>) {
         // Check if this map aligns with the RealtimeEvent format
-        if (decoded.containsKey('type') && decoded.containsKey('tenantId') && decoded.containsKey('payload')) {
+        if (decoded.containsKey('type') &&
+            decoded.containsKey('tenantId') &&
+            decoded.containsKey('payload')) {
           return RealtimeEvent.fromMap(decoded);
         }
       }

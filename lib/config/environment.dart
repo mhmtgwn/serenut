@@ -14,7 +14,8 @@ class EnvironmentConfig {
   final String syncEndpoint;
   final String updateEndpoint;
   final String releaseEndpoint;
-  final String releaseChannel; // 'stable' | 'beta' | 'alpha' | 'nightly' | 'internal'
+  final String
+      releaseChannel; // 'stable' | 'beta' | 'alpha' | 'nightly' | 'internal'
   final String? sentryDsn;
 
   const EnvironmentConfig({
@@ -79,7 +80,8 @@ class EnvironmentConfig {
   static EnvironmentConfig get current {
     const envString = String.fromEnvironment('ENVIRONMENT', defaultValue: '');
     if (envString.isEmpty) {
-      return EnvironmentConfig.fromEnv(kDebugMode ? AppEnvironment.dev : AppEnvironment.prod);
+      return EnvironmentConfig.fromEnv(
+          kDebugMode ? AppEnvironment.dev : AppEnvironment.prod);
     }
     switch (envString.toLowerCase()) {
       case 'prod':

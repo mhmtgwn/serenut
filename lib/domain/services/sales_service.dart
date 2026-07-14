@@ -11,7 +11,8 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
 
-export 'package:serenutos/domain/services/inventory_service.dart' show SaleItemInput, ProductNotFoundException, InsufficientStockException;
+export 'package:serenutos/domain/services/inventory_service.dart'
+    show SaleItemInput, ProductNotFoundException, InsufficientStockException;
 
 import 'package:serenutos/domain/services/data_integrity_service.dart';
 
@@ -52,10 +53,10 @@ class SalesService {
     DataIntegrityService? dataIntegrityService,
   }) =>
       SalesService(
-        saleRepository:   saleRepository,
+        saleRepository: saleRepository,
         inventoryService: inventoryService,
-        paymentService:   paymentService,
-        eventPublisher:   eventPublisher,
+        paymentService: paymentService,
+        eventPublisher: eventPublisher,
         transactionRunner: transactionRunner ?? _DummyTransactionRunner(),
         securityGate: securityGate,
         dataIntegrityService: dataIntegrityService,
@@ -84,7 +85,8 @@ class SalesService {
 
     // Idempotency check:
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
-      final existingSale = await _saleRepository.findByIdempotencyKey(idempotencyKey);
+      final existingSale =
+          await _saleRepository.findByIdempotencyKey(idempotencyKey);
       if (existingSale != null) {
         return existingSale;
       }
@@ -491,8 +493,8 @@ class SalesService {
       final rawPrice = item['unit_price'] ?? item['unitPrice'];
       final price = (rawPrice as num?)?.toDouble() ?? 0.0;
 
-      
-      final returnMatchIndex = itemsToReturn.indexWhere((ri) => ri.productId == productId);
+      final returnMatchIndex =
+          itemsToReturn.indexWhere((ri) => ri.productId == productId);
       if (returnMatchIndex != -1) {
         final returnedQty = itemsToReturn[returnMatchIndex].quantity;
         final newQty = originalQty - returnedQty;
@@ -510,7 +512,11 @@ class SalesService {
 
     final double newTotalAmount = updatedItems.fold<double>(
       0.0,
-      (sum, item) => sum + (((item['quantity'] as num).toDouble()) * ((item['unit_price'] ?? item['unitPrice'] ?? 0.0) as num).toDouble()),
+      (sum, item) =>
+          sum +
+          (((item['quantity'] as num).toDouble()) *
+              ((item['unit_price'] ?? item['unitPrice'] ?? 0.0) as num)
+                  .toDouble()),
     );
 
     double newPaidAmount = sale.paidAmount;
@@ -634,9 +640,9 @@ class SaleFailedEvent extends DomainEvent {
     super.occurredAt,
     super.metadata,
   }) : super(
-    type: EventType.saleCancelled,
-    aggregateType: 'Sale',
-  );
+          type: EventType.saleCancelled,
+          aggregateType: 'Sale',
+        );
 }
 
 /// Dummy transaction runner for fallback contexts where transactions are not supported.

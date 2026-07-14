@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/services/password_hash_service.dart
+// lib/infrastructure/services/password_hash_service.dart
 // Serenut POS — Password Security Layer
 // PBKDF2-HMAC-SHA256 with salt — production-grade implementation
 // Created: 24 Jun 2026
@@ -62,10 +62,11 @@ class PasswordHashService {
       if (parts.length != 4 || parts[0] != _algorithm) return false;
 
       final iterations = int.parse(parts[1]);
-      final salt       = base64.decode(parts[2]);
-      final expected   = base64.decode(parts[3]);
+      final salt = base64.decode(parts[2]);
+      final expected = base64.decode(parts[3]);
 
-      final actual = _pbkdf2(utf8.encode(password), salt, iterations, expected.length);
+      final actual =
+          _pbkdf2(utf8.encode(password), salt, iterations, expected.length);
       return _constantTimeCompare(actual, expected);
     } catch (_) {
       return false;
@@ -95,7 +96,7 @@ class PasswordHashService {
     int iterations,
     int keyLength,
   ) {
-    final hmac   = Hmac(sha256, password);
+    final hmac = Hmac(sha256, password);
     final blocks = (keyLength / 32).ceil(); // SHA-256 block = 32 bytes
     final output = <int>[];
 
@@ -107,16 +108,17 @@ class PasswordHashService {
   }
 
   /// PRF block function F(password, salt, c, i)
-  static List<int> _f(Hmac hmac, List<int> salt, int iterations, int blockIndex) {
+  static List<int> _f(
+      Hmac hmac, List<int> salt, int iterations, int blockIndex) {
     // U1 = HMAC(password, salt || INT(blockIndex))
     final saltBlock = Uint8List(salt.length + 4);
     for (var i = 0; i < salt.length; i++) {
       saltBlock[i] = salt[i];
     }
-    saltBlock[salt.length    ] = (blockIndex >> 24) & 0xFF;
+    saltBlock[salt.length] = (blockIndex >> 24) & 0xFF;
     saltBlock[salt.length + 1] = (blockIndex >> 16) & 0xFF;
-    saltBlock[salt.length + 2] = (blockIndex >> 8)  & 0xFF;
-    saltBlock[salt.length + 3] =  blockIndex        & 0xFF;
+    saltBlock[salt.length + 2] = (blockIndex >> 8) & 0xFF;
+    saltBlock[salt.length + 3] = blockIndex & 0xFF;
 
     var u = hmac.convert(saltBlock).bytes;
     final result = List<int>.from(u);
@@ -160,13 +162,16 @@ class PasswordHashService {
 
 class PasswordHashServiceImpl implements IHashService {
   @override
-  String hashPassword(String password) => PasswordHashService.hashPassword(password);
+  String hashPassword(String password) =>
+      PasswordHashService.hashPassword(password);
 
   @override
-  bool verifyPassword(String password, String storedHash) => PasswordHashService.verifyPassword(password, storedHash);
+  bool verifyPassword(String password, String storedHash) =>
+      PasswordHashService.verifyPassword(password, storedHash);
 
   @override
-  bool isLegacyHash(String storedHash) => PasswordHashService.isLegacyHash(storedHash);
+  bool isLegacyHash(String storedHash) =>
+      PasswordHashService.isLegacyHash(storedHash);
 
   @override
   Uint8List deriveKey({

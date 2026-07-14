@@ -47,7 +47,9 @@ void main() {
       ));
     });
 
-    test('100 concurrent transactions on a single customer balance result in correct final balance without race conditions', () async {
+    test(
+        '100 concurrent transactions on a single customer balance result in correct final balance without race conditions',
+        () async {
       final futures = <Future<void>>[];
       double expectedBalance = 0.0;
 

@@ -50,7 +50,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
 
   Future<void> loadNextPage() async {
     if (_paginationService == null) return;
-    if (_paginationService!.isLoading || !_paginationService!.hasMoreData) return;
+    if (_paginationService!.isLoading || !_paginationService!.hasMoreData)
+      return;
     try {
       await _paginationService!.loadNextPage();
       state = AsyncValue.data(List.from(_paginationService!.items));
@@ -69,19 +70,20 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
           eventType: 'product_created',
           entityType: 'product',
           entityId: product.id,
-          newValue: 'Ad: ${product.name}, Fiyat: ₺${product.price}, Miktar: ${product.quantity}',
+          newValue:
+              'Ad: ${product.name}, Fiyat: ₺${product.price}, Miktar: ${product.quantity}',
           notes: 'Yeni ürün eklendi: ${product.name}',
         );
       } catch (_) {}
       ref.read(auditLogServiceProvider).log(
-        action: 'product_created',
-        details: jsonEncode({
-          'id': product.id,
-          'name': product.name,
-          'price': product.price,
-          'quantity': product.quantity,
-        }),
-      );
+            action: 'product_created',
+            details: jsonEncode({
+              'id': product.id,
+              'name': product.name,
+              'price': product.price,
+              'quantity': product.quantity,
+            }),
+          );
       await _loadCategories();
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
@@ -95,17 +97,20 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(oldId ?? product.id);
       await _repository.update(product, oldId: oldId);
-      
+
       final Map<String, dynamic> changes = {};
       String logAction = 'product_updated';
-      
+
       if (original != null) {
         if (original.price != product.price) {
           changes['price'] = {'old': original.price, 'new': product.price};
           logAction = 'price_changed';
         }
         if (original.quantity != product.quantity) {
-          changes['quantity'] = {'old': original.quantity, 'new': product.quantity};
+          changes['quantity'] = {
+            'old': original.quantity,
+            'new': product.quantity
+          };
           if (logAction != 'price_changed') logAction = 'stock_adjusted';
         }
         if (original.name != product.name) {
@@ -116,28 +121,32 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       try {
         final auditService = await ref.read(auditServiceProvider.future);
         if (original != null && original.price != product.price) {
-          await auditService.logPriceChange(product.id, product.name, original.price, product.price);
+          await auditService.logPriceChange(
+              product.id, product.name, original.price, product.price);
         } else {
           await auditService.logEvent(
             eventType: logAction,
             entityType: 'product',
             entityId: product.id,
-            oldValue: original != null ? 'Ad: ${original.name}, Fiyat: ₺${original.price}, Miktar: ${original.quantity}' : null,
-            newValue: 'Ad: ${product.name}, Fiyat: ₺${product.price}, Miktar: ${product.quantity}',
+            oldValue: original != null
+                ? 'Ad: ${original.name}, Fiyat: ₺${original.price}, Miktar: ${original.quantity}'
+                : null,
+            newValue:
+                'Ad: ${product.name}, Fiyat: ₺${product.price}, Miktar: ${product.quantity}',
             notes: 'Ürün güncellendi: ${product.name}',
           );
         }
       } catch (_) {}
-      
+
       ref.read(auditLogServiceProvider).log(
-        action: logAction,
-        details: jsonEncode({
-          'id': product.id,
-          'old_id': oldId,
-          'name': product.name,
-          'changes': changes,
-        }),
-      );
+            action: logAction,
+            details: jsonEncode({
+              'id': product.id,
+              'old_id': oldId,
+              'name': product.name,
+              'changes': changes,
+            }),
+          );
       await _loadCategories();
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
@@ -146,7 +155,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     });
   }
 
-  Future<void> deleteProduct(String id, {String? approvedByUserId, String? approvedByUserName}) async {
+  Future<void> deleteProduct(String id,
+      {String? approvedByUserId, String? approvedByUserName}) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final original = await _repository.findById(id);
@@ -162,12 +172,12 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
         );
       } catch (_) {}
       ref.read(auditLogServiceProvider).log(
-        action: 'product_deleted',
-        details: jsonEncode({
-          'id': id,
-          'name': original?.name ?? 'Bilinmeyen Ürün',
-        }),
-      );
+            action: 'product_deleted',
+            details: jsonEncode({
+              'id': id,
+              'name': original?.name ?? 'Bilinmeyen Ürün',
+            }),
+          );
       await _loadCategories();
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
@@ -196,10 +206,12 @@ final productSearchQueryProvider = StateProvider<String>((ref) => '');
 final productCategoryFilterProvider = StateProvider<String?>((ref) => null);
 
 final salesProductSearchQueryProvider = StateProvider<String>((ref) => '');
-final salesProductCategoryFilterProvider = StateProvider<String?>((ref) => null);
+final salesProductCategoryFilterProvider =
+    StateProvider<String?>((ref) => null);
 
 final ordersProductSearchQueryProvider = StateProvider<String>((ref) => '');
-final ordersProductCategoryFilterProvider = StateProvider<String?>((ref) => null);
+final ordersProductCategoryFilterProvider =
+    StateProvider<String?>((ref) => null);
 
 final productPageProvider = StateProvider<int>((ref) => 1);
 
@@ -213,14 +225,22 @@ final productCategoriesProvider = Provider<List<String>>((ref) {
 
 final categoryPoolProvider = Provider<List<String>>((ref) {
   const defaultCats = [
-    'Gıda', 'İçecek', 'Kuruyemiş', 'Şekerleme', 'Temizlik',
-    'Kişisel Bakım', 'Ev & Yaşam', 'Kırtasiye', 'Elektronik',
-    'Sigara & Tütün', 'Diğer',
+    'Gıda',
+    'İçecek',
+    'Kuruyemiş',
+    'Şekerleme',
+    'Temizlik',
+    'Kişisel Bakım',
+    'Ev & Yaşam',
+    'Kırtasiye',
+    'Elektronik',
+    'Sigara & Tütün',
+    'Diğer',
   ];
   final existingCats = ref.watch(productCategoriesProvider);
   final settingsAsync = ref.watch(settingsNotifierProvider);
   final settingsCats = <String>[];
-  
+
   settingsAsync.whenOrNull(
     data: (settings) {
       if (settings.vatCategories.isNotEmpty) {
@@ -242,11 +262,13 @@ final categoryPoolProvider = Provider<List<String>>((ref) {
     ...defaultCats,
     ...existingCats,
     ...settingsCats,
-  }.where((cat) => cat.trim().isNotEmpty).toList()..sort();
+  }.where((cat) => cat.trim().isNotEmpty).toList()
+    ..sort();
 });
 
 // Reactive Filtered Products Provider pointing to productsControllerProvider
-final filteredProductsProvider = Provider<AsyncValue<List<ProductEntity>>>((ref) {
+final filteredProductsProvider =
+    Provider<AsyncValue<List<ProductEntity>>>((ref) {
   return ref.watch(productsControllerProvider);
 });
 

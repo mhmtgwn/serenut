@@ -7,8 +7,12 @@ extension OrderCreationProductStep on OrderCreationDialogState {
     final categories = ref.watch(productCategoriesProvider);
 
     return productsVal.when(
-      loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen))),
-      error: (err, _) => Center(child: Text('Ürünler yüklenemedi: $err', style: const TextStyle(color: _kRed))),
+      loading: () => const Center(
+          child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(_kGreen))),
+      error: (err, _) => Center(
+          child: Text('Ürünler yüklenemedi: $err',
+              style: const TextStyle(color: _kRed))),
       data: (productsList) {
         final filtered = productsList;
 
@@ -35,15 +39,24 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                             controller: _productSearchController,
                             decoration: const InputDecoration(
                               hintText: 'Ürün ara...',
-                              hintStyle: TextStyle(color: _kTextSecondary, fontSize: 13),
-                              prefixIcon: Icon(Icons.search_rounded, color: _kTextSecondary, size: 18),
+                              hintStyle: TextStyle(
+                                  color: _kTextSecondary, fontSize: 13),
+                              prefixIcon: Icon(Icons.search_rounded,
+                                  color: _kTextSecondary, size: 18),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                              contentPadding: EdgeInsets.symmetric(
+                                  vertical: 9, horizontal: 12),
                             ),
-                            style: const TextStyle(color: _kText, fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                                color: _kText,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
                             onChanged: (val) {
                               updateState(() => _productQuery = val);
-                              ref.read(ordersProductSearchQueryProvider.notifier).state = val;
+                              ref
+                                  .read(
+                                      ordersProductSearchQueryProvider.notifier)
+                                  .state = val;
                             },
                           ),
                         ),
@@ -56,7 +69,9 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                             _productQuery = '';
                             _productSearchController.clear();
                           });
-                          ref.read(ordersProductSearchQueryProvider.notifier).state = '';
+                          ref
+                              .read(ordersProductSearchQueryProvider.notifier)
+                              .state = '';
                         },
                       ),
                     ] else ...[
@@ -71,18 +86,22 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                       ),
                       Expanded(
                         child: InkWell(
-                          onTap: () => _showCategoryBottomSheet(context, categories),
+                          onTap: () =>
+                              _showCategoryBottomSheet(context, categories),
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9), // Slate 100
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border:
+                                  Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.filter_list_rounded, size: 16, color: _kGreenDark),
+                                const Icon(Icons.filter_list_rounded,
+                                    size: 16, color: _kGreenDark),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
@@ -97,7 +116,8 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _kTextSecondary),
+                                const Icon(Icons.keyboard_arrow_down_rounded,
+                                    size: 16, color: _kTextSecondary),
                               ],
                             ),
                           ),
@@ -115,7 +135,8 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                           },
                         );
                       },
-                      icon: const Icon(Icons.photo_camera_rounded, color: _kGreen),
+                      icon: const Icon(Icons.photo_camera_rounded,
+                          color: _kGreen),
                       tooltip: 'Kamera Tarayıcı',
                     ),
                   ],
@@ -130,18 +151,21 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
+                            Icon(Icons.inventory_2_outlined,
+                                size: 64, color: Colors.grey[300]),
                             const SizedBox(height: 12),
                             const Text(
                               'Eşleşen ürün bulunamadı.',
-                              style: TextStyle(color: _kTextSecondary, fontSize: 14),
+                              style: TextStyle(
+                                  color: _kTextSecondary, fontSize: 14),
                             ),
                           ],
                         ),
                       )
                     : GridView.builder(
                         controller: _productScrollController,
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 200,
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
@@ -158,12 +182,16 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                               : (isLowStock ? _kAmberLight : _kGreenLight);
                           final Color badgeTextColor = outOfStock
                               ? _kRed
-                              : (isLowStock ? const Color(0xFF854D0E) : _kGreenDark);
+                              : (isLowStock
+                                  ? const Color(0xFF854D0E)
+                                  : _kGreenDark);
                           final Color borderColor = qtyInCart > 0
                               ? _kGreen
                               : (outOfStock
                                   ? _kRed.withValues(alpha: 0.25)
-                                  : (isLowStock ? _kAmber.withValues(alpha: 0.35) : _kBorder));
+                                  : (isLowStock
+                                      ? _kAmber.withValues(alpha: 0.35)
+                                      : _kBorder));
 
                           return AnimatedOpacity(
                             opacity: outOfStock ? 0.85 : 1.0,
@@ -174,7 +202,11 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: borderColor,
-                                  width: qtyInCart > 0 ? 2.0 : ((outOfStock || isLowStock) ? 1.5 : 1.0),
+                                  width: qtyInCart > 0
+                                      ? 2.0
+                                      : ((outOfStock || isLowStock)
+                                          ? 1.5
+                                          : 1.0),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -190,18 +222,23 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                 color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(14),
                                 child: InkWell(
-                                  onTap: () => updateState(() => _cart[p] = qtyInCart + 1.0),
+                                  onTap: () => updateState(
+                                      () => _cart[p] = qtyInCart + 1.0),
                                   borderRadius: BorderRadius.circular(14),
                                   splashColor: _kGreenLight,
-                                  highlightColor: _kGreenLight.withValues(alpha: 0.5),
+                                  highlightColor:
+                                      _kGreenLight.withValues(alpha: 0.5),
                                   child: Padding(
                                     padding: const EdgeInsets.all(11),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Expanded(
                                               child: Text(
@@ -218,15 +255,21 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                             ),
                                             const SizedBox(width: 4),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 3),
                                               decoration: BoxDecoration(
                                                 color: badgeBgColor,
-                                                borderRadius: BorderRadius.circular(6),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
                                               child: Text(
                                                 outOfStock
                                                     ? 'Tükendi'
-                                                    : (isLowStock ? '${p.quantity} adet' : '${p.quantity}'),
+                                                    : (isLowStock
+                                                        ? '${p.quantity} adet'
+                                                        : '${p.quantity}'),
                                                 style: TextStyle(
                                                   fontSize: 9,
                                                   color: badgeTextColor,
@@ -250,8 +293,10 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                         ),
                                         const SizedBox(height: 10),
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
                                           children: [
                                             Expanded(
                                               child: Text(
@@ -273,7 +318,9 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                                     height: 32,
                                                     decoration: BoxDecoration(
                                                       color: _kGreen,
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
                                                     ),
                                                     child: const Icon(
                                                       Icons.add_rounded,
@@ -282,47 +329,86 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                                     ),
                                                   )
                                                 : GestureDetector(
-                                                    onTap: () {}, // Swallows taps on the controller container to prevent card onTap trigger
+                                                    onTap:
+                                                        () {}, // Swallows taps on the controller container to prevent card onTap trigger
                                                     child: Container(
                                                       height: 32,
                                                       decoration: BoxDecoration(
                                                         color: Colors.white,
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        border: Border.all(color: _kGreen, width: 1.5),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8),
+                                                        border: Border.all(
+                                                            color: _kGreen,
+                                                            width: 1.5),
                                                       ),
                                                       child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
                                                         children: [
                                                           GestureDetector(
-                                                            onTap: () => updateState(() {
-                                                              if (qtyInCart - 1.0 <= 0.0001) {
+                                                            onTap: () =>
+                                                                updateState(() {
+                                                              if (qtyInCart -
+                                                                      1.0 <=
+                                                                  0.0001) {
                                                                 _cart.remove(p);
                                                               } else {
-                                                                _cart[p] = qtyInCart - 1.0;
+                                                                _cart[p] =
+                                                                    qtyInCart -
+                                                                        1.0;
                                                               }
                                                             }),
-                                                            child: const Padding(
-                                                              padding: EdgeInsets.symmetric(horizontal: 6),
-                                                              child: Icon(Icons.remove_rounded, color: _kRed, size: 14),
+                                                            child:
+                                                                const Padding(
+                                                              padding: EdgeInsets
+                                                                  .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Icon(
+                                                                  Icons
+                                                                      .remove_rounded,
+                                                                  color: _kRed,
+                                                                  size: 14),
                                                             ),
                                                           ),
                                                           _InlineQuantityField(
                                                             quantity: qtyInCart,
                                                             hasBorder: false,
-                                                            onChanged: (val) => updateState(() {
-                                                              if (val <= 0.0001) {
+                                                            onChanged: (val) =>
+                                                                updateState(() {
+                                                              if (val <=
+                                                                  0.0001) {
                                                                 _cart.remove(p);
                                                               } else {
                                                                 _cart[p] = val;
                                                               }
                                                             }),
-                                                            onRemove: () => updateState(() => _cart.remove(p)),
+                                                            onRemove: () =>
+                                                                updateState(
+                                                                    () => _cart
+                                                                        .remove(
+                                                                            p)),
                                                           ),
                                                           GestureDetector(
-                                                            onTap: () => updateState(() => _cart[p] = qtyInCart + 1.0),
-                                                            child: const Padding(
-                                                              padding: EdgeInsets.symmetric(horizontal: 6),
-                                                              child: Icon(Icons.add_rounded, color: _kGreen, size: 14),
+                                                            onTap: () =>
+                                                                updateState(
+                                                                    () => _cart[
+                                                                            p] =
+                                                                        qtyInCart +
+                                                                            1.0),
+                                                            child:
+                                                                const Padding(
+                                                              padding: EdgeInsets
+                                                                  .symmetric(
+                                                                      horizontal:
+                                                                          6),
+                                                              child: Icon(
+                                                                  Icons
+                                                                      .add_rounded,
+                                                                  color:
+                                                                      _kGreen,
+                                                                  size: 14),
                                                             ),
                                                           ),
                                                         ],

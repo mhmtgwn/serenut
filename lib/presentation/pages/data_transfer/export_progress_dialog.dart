@@ -4,7 +4,8 @@ class ExportProgressDialog extends ConsumerStatefulWidget {
   const ExportProgressDialog({super.key});
 
   @override
-  ConsumerState<ExportProgressDialog> createState() => _ExportProgressDialogState();
+  ConsumerState<ExportProgressDialog> createState() =>
+      _ExportProgressDialogState();
 }
 
 class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
@@ -34,7 +35,8 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
             if (p < 0.15) {
               statusText = 'Katalog Excel dosyası oluşturuluyor...';
             } else if (p < 0.85) {
-              statusText = 'Görseller arşivleniyor... (%${(p * 100).toStringAsFixed(0)})';
+              statusText =
+                  'Görseller arşivleniyor... (%${(p * 100).toStringAsFixed(0)})';
             } else if (p < 0.95) {
               statusText = 'Arşiv sıkıştırılıyor...';
             } else {
@@ -86,7 +88,9 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
-        errorMessage != null ? 'Dışarı Aktarma Başarısız' : (isDone ? 'İşlem Tamamlandı' : 'Dışarı Aktarılıyor...'),
+        errorMessage != null
+            ? 'Dışarı Aktarma Başarısız'
+            : (isDone ? 'İşlem Tamamlandı' : 'Dışarı Aktarılıyor...'),
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       content: Column(
@@ -94,7 +98,7 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
         children: [
           if (errorMessage == null && !isDone) ...[
             const CircularProgressIndicator(
-               valueColor: AlwaysStoppedAnimation<Color>(_kGreen),
+              valueColor: AlwaysStoppedAnimation<Color>(_kGreen),
             ),
             const SizedBox(height: 16),
             Text(statusText, style: const TextStyle(fontSize: 14)),
@@ -107,11 +111,16 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
           ] else if (errorMessage != null) ...[
             const Icon(Icons.error_outline_rounded, color: _kPink, size: 48),
             const SizedBox(height: 16),
-            Text(errorMessage!, style: const TextStyle(fontSize: 14), textAlign: TextAlign.center),
+            Text(errorMessage!,
+                style: const TextStyle(fontSize: 14),
+                textAlign: TextAlign.center),
           ] else ...[
-            const Icon(Icons.check_circle_outline_rounded, color: _kGreen, size: 48),
+            const Icon(Icons.check_circle_outline_rounded,
+                color: _kGreen, size: 48),
             const SizedBox(height: 16),
-            Text(statusText, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            Text(statusText,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           ]
         ],
       ),
@@ -119,7 +128,8 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
         if (errorMessage != null)
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Kapat', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold)),
+            child: const Text('Kapat',
+                style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold)),
           ),
       ],
     );
@@ -129,4 +139,3 @@ class _ExportProgressDialogState extends ConsumerState<ExportProgressDialog> {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── REHBERDEN MÜŞTERİ İÇE AKTARMA EKRANI (PLATFORM DESTEKLİ) ─────────────────
 // ══════════════════════════════════════════════════════════════════════════════
-

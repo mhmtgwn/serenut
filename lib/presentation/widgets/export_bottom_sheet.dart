@@ -1,4 +1,4 @@
-﻿// lib/presentation/widgets/export_bottom_sheet.dart
+// lib/presentation/widgets/export_bottom_sheet.dart
 // Serenut POS — Cari Hesap Dışa Aktarma Bottom Sheet
 // Backend: DocumentExportService — sıfır değişiklik
 // Created: Phase 4 — 01 Jul 2026
@@ -11,14 +11,14 @@ import 'package:serenutos/domain/services/document_export_service.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kGreen   = Color(0xFF10B981);
-const _kBlue    = Color(0xFF3B82F6);
-const _kPurple  = Color(0xFF8B5CF6);
-const _kTeal    = Color(0xFF0D9488);
-const _kRed     = Color(0xFFEF4444);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kGreen = Color(0xFF10B981);
+const _kBlue = Color(0xFF3B82F6);
+const _kPurple = Color(0xFF8B5CF6);
+const _kTeal = Color(0xFF0D9488);
+const _kRed = Color(0xFFEF4444);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorderColor   = Color(0xFFE2E8F0);
+const _kBorderColor = Color(0xFFE2E8F0);
 
 // ── Export Bottom Sheet ───────────────────────────────────────────────────────
 
@@ -97,7 +97,8 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
                       color: _kGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.upload_rounded, color: _kGreen, size: 22),
+                    child: const Icon(Icons.upload_rounded,
+                        color: _kGreen, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Column(
@@ -180,7 +181,10 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
   // ── Export Actions ─────────────────────────────────────────────────────────
 
   Future<void> _exportPdf() async {
-    setState(() { _isLoading = true; _loadingAction = 'pdf'; });
+    setState(() {
+      _isLoading = true;
+      _loadingAction = 'pdf';
+    });
     try {
       final settings = ref.read(settingsNotifierProvider).value;
       final currency = settings?.currency ?? '₺';
@@ -190,17 +194,25 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
         widget.transactions,
         currency,
       );
-      await service.shareFile(path, 'Cari Hesap Ekstresi — ${widget.customer.name}');
+      await service.shareFile(
+          path, 'Cari Hesap Ekstresi — ${widget.customer.name}');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       _showError('PDF oluşturulamadı: $e');
     } finally {
-      if (mounted) setState(() { _isLoading = false; _loadingAction = null; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _loadingAction = null;
+        });
     }
   }
 
   Future<void> _exportExcel() async {
-    setState(() { _isLoading = true; _loadingAction = 'excel'; });
+    setState(() {
+      _isLoading = true;
+      _loadingAction = 'excel';
+    });
     try {
       final settings = ref.read(settingsNotifierProvider).value;
       final currency = settings?.currency ?? '₺';
@@ -210,17 +222,25 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
         widget.transactions,
         currency,
       );
-      await service.shareFile(path, 'Cari Hesap Ekstresi — ${widget.customer.name}');
+      await service.shareFile(
+          path, 'Cari Hesap Ekstresi — ${widget.customer.name}');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       _showError('Excel oluşturulamadı: $e');
     } finally {
-      if (mounted) setState(() { _isLoading = false; _loadingAction = null; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _loadingAction = null;
+        });
     }
   }
 
   Future<void> _sharePdf() async {
-    setState(() { _isLoading = true; _loadingAction = 'share_pdf'; });
+    setState(() {
+      _isLoading = true;
+      _loadingAction = 'share_pdf';
+    });
     try {
       final settings = ref.read(settingsNotifierProvider).value;
       final currency = settings?.currency ?? '₺';
@@ -239,13 +259,20 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
     } catch (e) {
       _showError('Paylaşım başarısız: $e');
     } finally {
-      if (mounted) setState(() { _isLoading = false; _loadingAction = null; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _loadingAction = null;
+        });
     }
   }
 
   Future<void> _sendSms() async {
     if (widget.customer.phone.isEmpty) return;
-    setState(() { _isLoading = true; _loadingAction = 'sms'; });
+    setState(() {
+      _isLoading = true;
+      _loadingAction = 'sms';
+    });
     try {
       // SMS is queued via SmsService — show success immediately
       final balance = widget.customer.balance;
@@ -267,7 +294,11 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
     } catch (e) {
       _showError('SMS gönderilemedi: $e');
     } finally {
-      if (mounted) setState(() { _isLoading = false; _loadingAction = null; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+          _loadingAction = null;
+        });
     }
   }
 

@@ -46,7 +46,8 @@ class AuditService {
   }
 
   // Wrappers
-  Future<void> logPriceChange(String productId, String productName, double oldPrice, double newPrice) async {
+  Future<void> logPriceChange(String productId, String productName,
+      double oldPrice, double newPrice) async {
     await logEvent(
       eventType: 'price_changed',
       entityType: 'product',
@@ -57,7 +58,8 @@ class AuditService {
     );
   }
 
-  Future<void> logCustomerUpdate(String customerId, String customerName, String changeDetails) async {
+  Future<void> logCustomerUpdate(
+      String customerId, String customerName, String changeDetails) async {
     await logEvent(
       eventType: 'customer_updated',
       entityType: 'customer',
@@ -66,7 +68,8 @@ class AuditService {
     );
   }
 
-  Future<void> logPayment(String customerId, String customerName, double amount, String type) async {
+  Future<void> logPayment(String customerId, String customerName, double amount,
+      String type) async {
     await logEvent(
       eventType: 'payment_recorded',
       entityType: 'payment',
@@ -76,7 +79,8 @@ class AuditService {
     );
   }
 
-  Future<void> logDelete(String entityType, String entityId, String entityName, {String? approvedByUserId, String? approvedByUserName}) async {
+  Future<void> logDelete(String entityType, String entityId, String entityName,
+      {String? approvedByUserId, String? approvedByUserName}) async {
     await logEvent(
       eventType: 'entity_deleted',
       entityType: entityType,
@@ -87,7 +91,8 @@ class AuditService {
     );
   }
 
-  Future<void> logSystemAction(String action, String details, {String? approvedByUserId, String? approvedByUserName}) async {
+  Future<void> logSystemAction(String action, String details,
+      {String? approvedByUserId, String? approvedByUserName}) async {
     await logEvent(
       eventType: 'system_action',
       entityType: 'system',

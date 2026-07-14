@@ -20,18 +20,21 @@ class CloudProductRemoteDataSource implements ProductRemoteDataSource {
   @override
   Future<List<ProductEntity>> fetchProducts({int? sinceTimestamp}) async {
     // Under the hood, this will call the client path
-    final response = await _apiClient.get('/products?since=${sinceTimestamp ?? 0}');
+    final response =
+        await _apiClient.get('/products?since=${sinceTimestamp ?? 0}');
     if (response.isSuccess) {
       final List<dynamic> list = response.json['products'] as List<dynamic>;
-      return list.map((item) => ProductEntity(
-        id: item['id'] as String,
-        name: item['name'] as String,
-        description: item['description'] as String? ?? '',
-        price: (item['price'] as num).toDouble(),
-        quantity: (item['quantity'] as num).toInt(),
-        category: item['category'] as String,
-        vat: item['vat'] != null ? (item['vat'] as num).toInt() : null,
-      )).toList();
+      return list
+          .map((item) => ProductEntity(
+                id: item['id'] as String,
+                name: item['name'] as String,
+                description: item['description'] as String? ?? '',
+                price: (item['price'] as num).toDouble(),
+                quantity: (item['quantity'] as num).toInt(),
+                category: item['category'] as String,
+                vat: item['vat'] != null ? (item['vat'] as num).toInt() : null,
+              ))
+          .toList();
     }
     return [];
   }
@@ -63,17 +66,20 @@ class CloudCustomerRemoteDataSource implements CustomerRemoteDataSource {
 
   @override
   Future<List<CustomerEntity>> fetchCustomers({int? sinceTimestamp}) async {
-    final response = await _apiClient.get('/customers?since=${sinceTimestamp ?? 0}');
+    final response =
+        await _apiClient.get('/customers?since=${sinceTimestamp ?? 0}');
     if (response.isSuccess) {
       final List<dynamic> list = response.json['customers'] as List<dynamic>;
-      return list.map((item) => CustomerEntity(
-        id: item['id'] as String,
-        name: item['name'] as String,
-        email: item['email'] as String? ?? '',
-        phone: item['phone'] as String? ?? '',
-        balance: (item['balance'] as num).toDouble(),
-        createdAt: DateTime.parse(item['created_at'] as String),
-      )).toList();
+      return list
+          .map((item) => CustomerEntity(
+                id: item['id'] as String,
+                name: item['name'] as String,
+                email: item['email'] as String? ?? '',
+                phone: item['phone'] as String? ?? '',
+                balance: (item['balance'] as num).toDouble(),
+                createdAt: DateTime.parse(item['created_at'] as String),
+              ))
+          .toList();
     }
     return [];
   }
@@ -104,19 +110,22 @@ class CloudSalesRemoteDataSource implements SalesRemoteDataSource {
 
   @override
   Future<List<SaleEntity>> fetchSales({int? sinceTimestamp}) async {
-    final response = await _apiClient.get('/sales?since=${sinceTimestamp ?? 0}');
+    final response =
+        await _apiClient.get('/sales?since=${sinceTimestamp ?? 0}');
     if (response.isSuccess) {
       final List<dynamic> list = response.json['sales'] as List<dynamic>;
-      return list.map<SaleEntity>((item) => SaleEntity(
-        id: item['id'] as String,
-        customerId: item['customer_id'] as String,
-        paymentMethod: item['payment_method'] as String,
-        totalAmount: (item['total_amount'] as num).toDouble(),
-        paidAmount: (item['paid_amount'] as num).toDouble(),
-        status: item['status'] as String? ?? 'completed',
-        createdAt: DateTime.parse(item['created_at'] as String),
-        items: List<Map<String, dynamic>>.from(item['items'] as List),
-      )).toList();
+      return list
+          .map<SaleEntity>((item) => SaleEntity(
+                id: item['id'] as String,
+                customerId: item['customer_id'] as String,
+                paymentMethod: item['payment_method'] as String,
+                totalAmount: (item['total_amount'] as num).toDouble(),
+                paidAmount: (item['paid_amount'] as num).toDouble(),
+                status: item['status'] as String? ?? 'completed',
+                createdAt: DateTime.parse(item['created_at'] as String),
+                items: List<Map<String, dynamic>>.from(item['items'] as List),
+              ))
+          .toList();
     }
     return [];
   }
@@ -126,7 +135,8 @@ class CloudSalesRemoteDataSource implements SalesRemoteDataSource {
     String serverPaymentMethod = sale.paymentMethod;
     if (serverPaymentMethod == 'debt') {
       serverPaymentMethod = 'credit';
-    } else if (serverPaymentMethod == 'karma' || serverPaymentMethod == 'mixed') {
+    } else if (serverPaymentMethod == 'karma' ||
+        serverPaymentMethod == 'mixed') {
       serverPaymentMethod = 'cash';
     } else if (!['cash', 'card', 'credit'].contains(serverPaymentMethod)) {
       serverPaymentMethod = 'cash';
@@ -143,4 +153,3 @@ class CloudSalesRemoteDataSource implements SalesRemoteDataSource {
     });
   }
 }
-

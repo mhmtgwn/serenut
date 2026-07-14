@@ -13,20 +13,22 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/config/theme.dart';
 
 class LicenseActivationFlow extends ConsumerStatefulWidget {
-  final void Function(String licenseKey, String licenseType)? onLicenseActivated;
+  final void Function(String licenseKey, String licenseType)?
+      onLicenseActivated;
 
   const LicenseActivationFlow({super.key, this.onLicenseActivated});
 
   @override
-  ConsumerState<LicenseActivationFlow> createState() => _LicenseActivationFlowState();
+  ConsumerState<LicenseActivationFlow> createState() =>
+      _LicenseActivationFlowState();
 }
 
 class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
-  final _ctrl   = TextEditingController();
+  final _ctrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  bool _isLoading      = false;
-  bool _showScanner    = false;
+  bool _isLoading = false;
+  bool _showScanner = false;
   String? _errorMsg;
   String? _successType; // 'Professional', 'Kurumsal', 'Enterprise'
   DateTime? _expiryDate;
@@ -34,7 +36,10 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
 
   Future<void> _activate() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() { _isLoading = true; _errorMsg = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
 
     final rawKey = _ctrl.text.replaceAll('-', '').trim().toUpperCase();
 
@@ -42,12 +47,14 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
       final apiClient = ref.read(apiClientProvider);
       final licenseService = ref.read(licenseServiceProvider);
       final deviceId = licenseService.getDeviceUuid();
-      
+
       final fingerprintService = ref.read(deviceFingerprintServiceProvider);
       final fingerprint = await fingerprintService.getFingerprint();
-      
+
       // Get device name fallback
-      final deviceName = Platform.isAndroid ? 'Android POS' : (Platform.isWindows ? 'Windows POS' : 'POS Cihazı');
+      final deviceName = Platform.isAndroid
+          ? 'Android POS'
+          : (Platform.isWindows ? 'Windows POS' : 'POS Cihazı');
 
       final response = await apiClient.send(
         'POST',
@@ -88,7 +95,8 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
 
         if (saved) {
           licenseService.startHeartbeat(apiClient);
-          final tierStr = (licenseInfo['tier'] as String? ?? 'BASIC').toUpperCase();
+          final tierStr =
+              (licenseInfo['tier'] as String? ?? 'BASIC').toUpperCase();
           setState(() {
             _isLoading = false;
             _successType = tierStr;
@@ -102,13 +110,15 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
         } else {
           setState(() {
             _isLoading = false;
-            _errorMsg = 'Lisans imza doğrulaması yerelde başarısız oldu. Lütfen sistem yöneticisiyle iletişime geçin.';
+            _errorMsg =
+                'Lisans imza doğrulaması yerelde başarısız oldu. Lütfen sistem yöneticisiyle iletişime geçin.';
           });
         }
       } else {
         setState(() {
           _isLoading = false;
-          _errorMsg = 'Lisans aktivasyon sunucu hatası. Lütfen anahtarınızı kontrol edin.';
+          _errorMsg =
+              'Lisans aktivasyon sunucu hatası. Lütfen anahtarınızı kontrol edin.';
         });
       }
     } catch (e) {
@@ -122,11 +132,14 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
   void _onQrDetected(BarcodeCapture capture) {
     final code = capture.barcodes.firstOrNull?.rawValue;
     if (code != null && code.isNotEmpty) {
-      setState(() { _showScanner = false; });
+      setState(() {
+        _showScanner = false;
+      });
       // QR içeriğini XXXX-XXXX-XXXX-XXXX formatına dönüştür
       final cleaned = code.replaceAll('-', '').toUpperCase();
       if (cleaned.length == 16) {
-        final formatted = '${cleaned.substring(0,4)}-${cleaned.substring(4,8)}-${cleaned.substring(8,12)}-${cleaned.substring(12,16)}';
+        final formatted =
+            '${cleaned.substring(0, 4)}-${cleaned.substring(4, 8)}-${cleaned.substring(8, 12)}-${cleaned.substring(12, 16)}';
         _ctrl.text = formatted;
       } else {
         _ctrl.text = code;
@@ -151,8 +164,8 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
 
     if (_successType != null) {
       return _SuccessView(
-        licenseType:  _successType!,
-        expiryDate:   _expiryDate,
+        licenseType: _successType!,
+        expiryDate: _expiryDate,
         supportUntil: _supportUntil,
         onContinue: () {
           widget.onLicenseActivated?.call(_ctrl.text, _successType!);
@@ -161,7 +174,7 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
       );
     }
 
-    final size   = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
 
     return Scaffold(
@@ -176,7 +189,8 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
           onPressed: () => context.go('/onboarding'),
         ),
         title: const Text('Lisans Aktivasyonu',
-            style: TextStyle(fontWeight: FontWeight.w700, color: POSColors.text)),
+            style:
+                TextStyle(fontWeight: FontWeight.w700, color: POSColors.text)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -199,13 +213,16 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
                   'Lisans Anahtarınızı Girin',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.w800, color: POSColors.text),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: POSColors.text),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Satın alma sonrası e-posta ile gönderilen lisans anahtarını girin',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: POSColors.textSecondary),
+                  style:
+                      TextStyle(fontSize: 13, color: POSColors.textSecondary),
                 ),
                 const SizedBox(height: 32),
 
@@ -213,14 +230,17 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
                 TextFormField(
                   controller: _ctrl,
                   style: const TextStyle(
-                      fontSize: 20, letterSpacing: 2, fontWeight: FontWeight.w600,
+                      fontSize: 20,
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w600,
                       color: POSColors.text),
                   textCapitalization: TextCapitalization.characters,
                   maxLength: 19, // XXXX-XXXX-XXXX-XXXX = 19 karakter
                   decoration: InputDecoration(
                     labelText: 'Lisans Anahtarı',
                     hintText: 'XXXX-XXXX-XXXX-XXXX',
-                    hintStyle: const TextStyle(letterSpacing: 2, color: POSColors.textDisabled),
+                    hintStyle: const TextStyle(
+                        letterSpacing: 2, color: POSColors.textDisabled),
                     counterText: '',
                     prefixIcon: const Icon(Icons.vpn_key_rounded,
                         color: POSColors.textSecondary),
@@ -232,7 +252,8 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
                   ],
                   validator: (v) {
                     final clean = v?.replaceAll('-', '') ?? '';
-                    if (clean.length != 16) return 'Geçerli bir lisans anahtarı girin (XXXX-XXXX-XXXX-XXXX)';
+                    if (clean.length != 16)
+                      return 'Geçerli bir lisans anahtarı girin (XXXX-XXXX-XXXX-XXXX)';
                     return null;
                   },
                   onChanged: (_) {
@@ -251,11 +272,11 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20,
-                      color: POSColors.textSecondary),
+                  icon: const Icon(Icons.qr_code_scanner_rounded,
+                      size: 20, color: POSColors.textSecondary),
                   label: const Text('QR Kod ile Tara',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(height: 24),
 
@@ -334,10 +355,13 @@ class _QrScannerView extends StatelessWidget {
           ),
           // Üst çubuk
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             child: SafeArea(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 color: Colors.black54,
                 child: Row(
                   children: [
@@ -362,7 +386,8 @@ class _QrScannerView extends StatelessWidget {
           // Tarama çerçevesi
           Center(
             child: Container(
-              width: 240, height: 240,
+              width: 240,
+              height: 240,
               decoration: BoxDecoration(
                 border: Border.all(color: POSColors.green, width: 3),
                 borderRadius: BorderRadius.circular(16),
@@ -413,12 +438,13 @@ class _SuccessView extends StatelessWidget {
               const Text('Lisans Aktif!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.w800,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
                       color: POSColors.text)),
               const SizedBox(height: 32),
-              _InfoRow(label: 'Lisans Türü',    value: licenseType),
-              _InfoRow(label: 'Geçerlilik',     value: formatDate(expiryDate)),
-              _InfoRow(label: 'Destek Süresi',  value: formatDate(supportUntil)),
+              _InfoRow(label: 'Lisans Türü', value: licenseType),
+              _InfoRow(label: 'Geçerlilik', value: formatDate(expiryDate)),
+              _InfoRow(label: 'Destek Süresi', value: formatDate(supportUntil)),
               const SizedBox(height: 40),
               FilledButton(
                 onPressed: onContinue,
@@ -430,7 +456,8 @@ class _SuccessView extends StatelessWidget {
                 ),
                 child: const Text('Kuruluma Devam Et',
                     style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                         color: Colors.white)),
               ),
             ],
@@ -464,7 +491,8 @@ class _InfoRow extends StatelessWidget {
                   fontSize: 14, color: POSColors.textSecondary)),
           Text(value,
               style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                   color: POSColors.text)),
         ],
       ),
@@ -481,12 +509,14 @@ class _LicenseIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 80, height: 80,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         color: POSColors.greenLight,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Icon(Icons.vpn_key_rounded, size: 40, color: POSColors.green),
+      child:
+          const Icon(Icons.vpn_key_rounded, size: 40, color: POSColors.green),
     );
   }
 }

@@ -39,7 +39,9 @@ class RealtimeMessage {
         status: map['status'] as String?,
         message: map['message'] as String?,
         event: map['event'] as String?,
-        data: map['data'] != null ? Map<String, dynamic>.from(map['data'] as Map) : null,
+        data: map['data'] != null
+            ? Map<String, dynamic>.from(map['data'] as Map)
+            : null,
       );
 
   String toJson() => jsonEncode(toMap());

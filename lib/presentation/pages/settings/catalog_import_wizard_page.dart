@@ -21,19 +21,22 @@ class CatalogImportWizardPage extends ConsumerStatefulWidget {
   const CatalogImportWizardPage({super.key});
 
   @override
-  ConsumerState<CatalogImportWizardPage> createState() => _CatalogImportWizardPageState();
+  ConsumerState<CatalogImportWizardPage> createState() =>
+      _CatalogImportWizardPageState();
 }
 
-class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPage> {
-  int _currentStep = 0; // 0: Select, 1: Analyze, 2: Preview, 3: Import, 4: Results
-  
+class _CatalogImportWizardPageState
+    extends ConsumerState<CatalogImportWizardPage> {
+  int _currentStep =
+      0; // 0: Select, 1: Analyze, 2: Preview, 3: Import, 4: Results
+
   PlatformFile? _selectedFile;
   Uint8List? _fileBytes;
-  
+
   bool _isAnalyzing = false;
   double _analyzeProgress = 0.0;
   String _analyzeStatus = 'Hazırlanıyor...';
-  
+
   ParsedCatalogData? _parsedData;
   String? _parseError;
 
@@ -79,14 +82,16 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Dosya seçilemedi: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(
+            content: Text('Dosya seçilemedi: $e'),
+            backgroundColor: Colors.redAccent),
       );
     }
   }
 
   Future<void> _startAnalysis() async {
     if (_fileBytes == null) return;
-    
+
     setState(() {
       _currentStep = 1;
       _isAnalyzing = true;
@@ -166,7 +171,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
       setState(() {
         _importError = e.toString().replaceAll('Exception:', '').trim();
         _isImporting = false;
-        _currentStep = 2; // fall back to preview page so they can retry or check logs
+        _currentStep =
+            2; // fall back to preview page so they can retry or check logs
       });
     }
   }
@@ -176,7 +182,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
     return Scaffold(
       backgroundColor: _kBackground,
       appBar: AppBar(
-        title: const Text('Katalog İçe Aktarma Sihirbazı', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Katalog İçe Aktarma Sihirbazı',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: _kCardBg,
         elevation: 0,
         leading: IconButton(
@@ -249,7 +256,10 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
                         ? const Icon(Icons.check, color: Colors.white, size: 16)
                         : Text(
                             '${idx + 1}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
                           ),
                   ),
                 ),
@@ -266,14 +276,17 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
                               ? _kPrimary
                               : _kTextMuted,
                       fontSize: 12,
-                      fontWeight: isActive || isCompleted ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isActive || isCompleted
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
                 if (idx < steps.length - 1)
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Icon(Icons.chevron_right_rounded, color: _kBorderColor, size: 16),
+                    child: Icon(Icons.chevron_right_rounded,
+                        color: _kBorderColor, size: 16),
                   ),
               ],
             ),
@@ -286,10 +299,12 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
   // ── ROUTE TO CURRENT VIEW ──────────────────────────────────────────────────
   Widget _buildCurrentStepView() {
     if (_parseError != null) {
-      return _buildErrorStateView(_parseError!, () => setState(() => _parseError = null));
+      return _buildErrorStateView(
+          _parseError!, () => setState(() => _parseError = null));
     }
     if (_importError != null) {
-      return _buildErrorStateView(_importError!, () => setState(() => _importError = null));
+      return _buildErrorStateView(
+          _importError!, () => setState(() => _importError = null));
     }
 
     switch (_currentStep) {
@@ -315,7 +330,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
       children: [
         const Text(
           'Katalog Dosyası Seçin',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -335,7 +351,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
               color: const Color(0xFF0F172A),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _selectedFile != null ? _kPrimary : const Color(0xFF475569),
+                color:
+                    _selectedFile != null ? _kPrimary : const Color(0xFF475569),
                 style: BorderStyle.solid,
                 width: 1.5,
               ),
@@ -344,14 +361,21 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  _selectedFile != null ? Icons.insert_drive_file_rounded : Icons.cloud_upload_rounded,
+                  _selectedFile != null
+                      ? Icons.insert_drive_file_rounded
+                      : Icons.cloud_upload_rounded,
                   color: _selectedFile != null ? _kPrimary : Colors.blueAccent,
                   size: 48,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _selectedFile != null ? _selectedFile!.name : 'Tıklayın ve Dosya Seçin',
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                  _selectedFile != null
+                      ? _selectedFile!.name
+                      : 'Tıklayın ve Dosya Seçin',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
@@ -392,7 +416,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
                   disabledBackgroundColor: const Color(0xFF334155),
                   disabledForegroundColor: _kTextMuted,
                 ),
-                child: const Text('Çözümlemeyi Başlat', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Çözümlemeyi Başlat',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -417,7 +442,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         const SizedBox(height: 32),
         const Text(
           'Katalog Dosyası Çözümleniyor',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
@@ -436,7 +462,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         const SizedBox(height: 8),
         Text(
           '${(_analyzeProgress * 100).toInt()}%',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
         ),
         const SizedBox(height: 24),
       ],
@@ -461,7 +488,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
       children: [
         const Text(
           'Önizleme ve İçe Aktarma Seçenekleri',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
@@ -470,15 +498,18 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         Row(
           children: [
             Expanded(
-              child: _buildStatItem('Toplam Ürün', '$productsCount adet', Icons.inventory_2_rounded, Colors.orangeAccent),
+              child: _buildStatItem('Toplam Ürün', '$productsCount adet',
+                  Icons.inventory_2_rounded, Colors.orangeAccent),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildStatItem('Paketli Görsel', '$imagesCount adet', Icons.image_rounded, Colors.purpleAccent),
+              child: _buildStatItem('Paketli Görsel', '$imagesCount adet',
+                  Icons.image_rounded, Colors.purpleAccent),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildStatItem('Kategoriler', '${categories.length} adet', Icons.category_rounded, _kPrimary),
+              child: _buildStatItem('Kategoriler', '${categories.length} adet',
+                  Icons.category_rounded, _kPrimary),
             ),
           ],
         ),
@@ -490,15 +521,22 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         // Import Strategy Panel Header
         const Text(
           'İçe Aktarma Stratejisi',
-          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
 
         // Checklist options
-        _buildCheckboxTile('Yeni Ürünleri Ekle', 'Katalogda bulunup veritabanında olmayan yeni ürünleri kaydeder.', _insertNew, (val) {
+        _buildCheckboxTile(
+            'Yeni Ürünleri Ekle',
+            'Katalogda bulunup veritabanında olmayan yeni ürünleri kaydeder.',
+            _insertNew, (val) {
           setState(() => _insertNew = val ?? true);
         }),
-        _buildCheckboxTile('Mevcut Ürünleri Güncelle', 'Aynı barkoda sahip mevcut ürünleri yeni verilerle günceller.', _updateExisting, (val) {
+        _buildCheckboxTile(
+            'Mevcut Ürünleri Güncelle',
+            'Aynı barkoda sahip mevcut ürünleri yeni verilerle günceller.',
+            _updateExisting, (val) {
           setState(() => _updateExisting = val ?? true);
         }),
 
@@ -507,38 +545,49 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
             padding: const EdgeInsets.only(left: 32.0, top: 4, bottom: 8),
             child: Column(
               children: [
-                _buildSubCheckboxTile('Fiyatları Güncelle', _syncPrices, (val) => setState(() => _syncPrices = val ?? true)),
-                _buildSubCheckboxTile('Stok Miktarlarını Güncelle', _syncStocks, (val) => setState(() => _syncStocks = val ?? true)),
-                _buildSubCheckboxTile('Açıklamaları Güncelle', _syncDescriptions, (val) => setState(() => _syncDescriptions = val ?? true)),
-                _buildSubCheckboxTile('Görselleri Güncelle', _syncImages, (val) => setState(() => _syncImages = val ?? true)),
+                _buildSubCheckboxTile('Fiyatları Güncelle', _syncPrices,
+                    (val) => setState(() => _syncPrices = val ?? true)),
+                _buildSubCheckboxTile('Stok Miktarlarını Güncelle', _syncStocks,
+                    (val) => setState(() => _syncStocks = val ?? true)),
+                _buildSubCheckboxTile(
+                    'Açıklamaları Güncelle',
+                    _syncDescriptions,
+                    (val) => setState(() => _syncDescriptions = val ?? true)),
+                _buildSubCheckboxTile('Görselleri Güncelle', _syncImages,
+                    (val) => setState(() => _syncImages = val ?? true)),
               ],
             ),
           ),
-          
+
           // Duplicate Resolution Radio
           Padding(
             padding: const EdgeInsets.only(left: 32.0, bottom: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Eşleşen Ürünlerde Stok Davranışı:', style: TextStyle(color: _kTextMuted, fontSize: 12)),
+                const Text('Eşleşen Ürünlerde Stok Davranışı:',
+                    style: TextStyle(color: _kTextMuted, fontSize: 12)),
                 Row(
                   children: [
                     Radio<DuplicateResolution>(
                       value: DuplicateResolution.merge,
                       groupValue: _duplicateResolution,
                       activeColor: _kPrimary,
-                      onChanged: (val) => setState(() => _duplicateResolution = val!),
+                      onChanged: (val) =>
+                          setState(() => _duplicateResolution = val!),
                     ),
-                    const Text('Mevcut Stoka Ekle (Topla)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    const Text('Mevcut Stoka Ekle (Topla)',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
                     const SizedBox(width: 16),
                     Radio<DuplicateResolution>(
                       value: DuplicateResolution.update,
                       groupValue: _duplicateResolution,
                       activeColor: _kPrimary,
-                      onChanged: (val) => setState(() => _duplicateResolution = val!),
+                      onChanged: (val) =>
+                          setState(() => _duplicateResolution = val!),
                     ),
-                    const Text('Yeni Stokla Değiştir (Üzerine Yaz)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    const Text('Yeni Stokla Değiştir (Üzerine Yaz)',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
                   ],
                 ),
               ],
@@ -546,7 +595,10 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
           ),
         ],
 
-        _buildCheckboxTile('Eşleşmeyen Ürünleri Pasifleştir (Riskli!)', 'Excel listesinde bulunmayan veritabanındaki tüm eski aktif ürünleri pasif hale getirir.', _deactivateMissing, (val) {
+        _buildCheckboxTile(
+            'Eşleşmeyen Ürünleri Pasifleştir (Riskli!)',
+            'Excel listesinde bulunmayan veritabanındaki tüm eski aktif ürünleri pasif hale getirir.',
+            _deactivateMissing, (val) {
           setState(() => _deactivateMissing = val ?? false);
         }),
 
@@ -575,7 +627,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                child: const Text('İçe Aktarmayı Başlat', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('İçe Aktarmayı Başlat',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -600,7 +653,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         const SizedBox(height: 32),
         const Text(
           'Katalog Veritabanına Yazılıyor',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
@@ -619,7 +673,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         const SizedBox(height: 8),
         Text(
           '${(_importProgress * 100).toInt()}%',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
         ),
         const SizedBox(height: 24),
       ],
@@ -644,7 +699,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
         const SizedBox(height: 20),
         const Text(
           'İçe Aktarma Tamamlandı!',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -665,9 +721,11 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
           ),
           child: Column(
             children: [
-              _buildResultRow('Başarıyla İşlenen Ürün:', '$successCount adet', _kPrimary),
+              _buildResultRow(
+                  'Başarıyla İşlenen Ürün:', '$successCount adet', _kPrimary),
               const SizedBox(height: 12),
-              _buildResultRow('Hatalı / Atlanan Ürün:', '$errorCount adet', errorCount > 0 ? Colors.redAccent : _kTextMuted),
+              _buildResultRow('Hatalı / Atlanan Ürün:', '$errorCount adet',
+                  errorCount > 0 ? Colors.redAccent : _kTextMuted),
             ],
           ),
         ),
@@ -680,16 +738,19 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
             backgroundColor: _kPrimary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
-          child: const Text('Sihirbazı Kapat', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text('Sihirbazı Kapat',
+              style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );
   }
 
   // ── STATE UTILS / WIDGET BUILDERS ──────────────────────────────────────────
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
@@ -703,29 +764,39 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
           const SizedBox(height: 8),
           Text(label, style: const TextStyle(color: _kTextMuted, fontSize: 12)),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+          Text(value,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildCheckboxTile(String title, String subtitle, bool value, ValueChanged<bool?> onChanged) {
+  Widget _buildCheckboxTile(String title, String subtitle, bool value,
+      ValueChanged<bool?> onChanged) {
     return CheckboxListTile(
       value: value,
       onChanged: onChanged,
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle, style: const TextStyle(color: _kTextMuted, fontSize: 12)),
+      title: Text(title,
+          style: const TextStyle(
+              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(color: _kTextMuted, fontSize: 12)),
       activeColor: _kPrimary,
       checkColor: Colors.white,
       contentPadding: EdgeInsets.zero,
     );
   }
 
-  Widget _buildSubCheckboxTile(String title, bool value, ValueChanged<bool?> onChanged) {
+  Widget _buildSubCheckboxTile(
+      String title, bool value, ValueChanged<bool?> onChanged) {
     return CheckboxListTile(
       value: value,
       onChanged: onChanged,
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 13)),
+      title: Text(title,
+          style: const TextStyle(color: Colors.white, fontSize: 13)),
       activeColor: _kPrimary,
       checkColor: Colors.white,
       contentPadding: EdgeInsets.zero,
@@ -738,7 +809,9 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: _kTextMuted, fontSize: 13)),
-        Text(value, style: TextStyle(color: valueColor, fontSize: 14, fontWeight: FontWeight.bold)),
+        Text(value,
+            style: TextStyle(
+                color: valueColor, fontSize: 14, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -747,11 +820,14 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Center(child: Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 56)),
+        const Center(
+            child: Icon(Icons.error_outline_rounded,
+                color: Colors.redAccent, size: 56)),
         const SizedBox(height: 16),
         const Text(
           'Bir Hata Oluştu',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -764,7 +840,8 @@ class _CatalogImportWizardPageState extends ConsumerState<CatalogImportWizardPag
           ),
           child: Text(
             error,
-            style: const TextStyle(color: Colors.redAccent, fontSize: 13, height: 1.4),
+            style: const TextStyle(
+                color: Colors.redAccent, fontSize: 13, height: 1.4),
             textAlign: TextAlign.center,
           ),
         ),

@@ -6,7 +6,8 @@
 class SmsLogEntry {
   final String id;
   final String phone;
-  final String eventType;   // 'sale_created' | 'debt_created' | 'collection_recorded' | 'order_created'
+  final String
+      eventType; // 'sale_created' | 'debt_created' | 'collection_recorded' | 'order_created'
   final String message;
   final SmsLogStatus status;
   final DateTime createdAt;
@@ -69,7 +70,9 @@ class SmsLogEntry {
         message: map['message'] as String,
         status: SmsLogStatus.fromValue(map['status'] as String? ?? 'pending'),
         createdAt: DateTime.parse(map['created_at'] as String),
-        sentAt: map['sent_at'] != null ? DateTime.parse(map['sent_at'] as String) : null,
+        sentAt: map['sent_at'] != null
+            ? DateTime.parse(map['sent_at'] as String)
+            : null,
         errorMessage: map['error_message'] as String?,
         retryCount: (map['retry_count'] as int?) ?? 0,
       );

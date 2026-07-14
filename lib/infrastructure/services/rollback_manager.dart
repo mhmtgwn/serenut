@@ -21,11 +21,11 @@ class SystemSpecCheckResult {
     required this.issues,
   });
 
-  bool get isAllPass => hasRequiredSpace && hasRequiredRam && hasAdminPrivileges;
+  bool get isAllPass =>
+      hasRequiredSpace && hasRequiredRam && hasAdminPrivileges;
 }
 
 class RollbackManager {
-  
   /// Run diagnostic specs checks before launching updates setup
   Future<SystemSpecCheckResult> verifyInstallationSpecs() async {
     bool hasSpace = true;
@@ -50,10 +50,8 @@ class RollbackManager {
     // 2. Check Disk Space (Requesting min 300MB)
     try {
       if (Platform.isWindows) {
-        final res = await Process.run('powershell', [
-          '-Command',
-          '(Get-Volume -DriveLetter C).SizeRemaining'
-        ]);
+        final res = await Process.run('powershell',
+            ['-Command', '(Get-Volume -DriveLetter C).SizeRemaining']);
         if (res.exitCode == 0) {
           final bytes = int.tryParse(res.stdout.toString().trim()) ?? 0;
           freeGb = bytes / (1024 * 1024 * 1024);
@@ -73,7 +71,8 @@ class RollbackManager {
     // 3. Check RAM memory limits (Requesting min 2GB for POS cache buffers)
     try {
       if (Platform.isWindows) {
-        final res = await Process.run('wmic', ['computersystem', 'get', 'TotalPhysicalMemory']);
+        final res = await Process.run(
+            'wmic', ['computersystem', 'get', 'TotalPhysicalMemory']);
         if (res.exitCode == 0) {
           final lines = res.stdout.toString().split('\n');
           if (lines.length > 1) {
@@ -103,13 +102,15 @@ class RollbackManager {
   Future<bool> backupCurrentVersion() async {
     try {
       final appDir = await getApplicationSupportDirectory();
-      final backupDir = Directory(join(appDir.path, 'update_backups'))..createSync(recursive: true);
+      final backupDir = Directory(join(appDir.path, 'update_backups'))
+        ..createSync(recursive: true);
 
       // 1. Backup current executable (Windows case)
       if (Platform.isWindows) {
         final currentExe = File(Platform.resolvedExecutable);
         if (await currentExe.exists()) {
-          final targetBackup = File(join(backupDir.path, 'serenut_running.exe.bak'));
+          final targetBackup =
+              File(join(backupDir.path, 'serenut_running.exe.bak'));
           await currentExe.copy(targetBackup.path);
         }
       }
@@ -122,7 +123,8 @@ class RollbackManager {
         await dbFile.copy(targetDbBackup.path);
       }
 
-      debugPrint('[RollbackManager] Current version backup completed successfully.');
+      debugPrint(
+          '[RollbackManager] Current version backup completed successfully.');
       return true;
     } catch (e) {
       debugPrint('[RollbackManager] Version backup failed: $e');
@@ -157,7 +159,8 @@ class RollbackManager {
         await backupDb.copy(targetDb.path);
       }
 
-      debugPrint('[RollbackManager] Automated rollback restore completed successfully.');
+      debugPrint(
+          '[RollbackManager] Automated rollback restore completed successfully.');
       return true;
     } catch (e) {
       debugPrint('[RollbackManager] Rollback attempt failed: $e');

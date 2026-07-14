@@ -12,16 +12,16 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor       = Color(0xFFF8FAFC);
-const _kCardBg        = Colors.white;
-const _kBorderColor   = Color(0xFFE2E8F0);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kBgColor = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kGreen         = Color(0xFF10B981);
-const _kRed           = Color(0xFFEF4444);
-const _kAmber         = Color(0xFFF59E0B);
-const _kBlue          = Color(0xFF3B82F6);
-const _kPurple        = Color(0xFF8B5CF6);
+const _kGreen = Color(0xFF10B981);
+const _kRed = Color(0xFFEF4444);
+const _kAmber = Color(0xFFF59E0B);
+const _kBlue = Color(0xFF3B82F6);
+const _kPurple = Color(0xFF8B5CF6);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,8 @@ class LicenseManagementPage extends ConsumerStatefulWidget {
   const LicenseManagementPage({super.key});
 
   @override
-  ConsumerState<LicenseManagementPage> createState() => _LicenseManagementPageState();
+  ConsumerState<LicenseManagementPage> createState() =>
+      _LicenseManagementPageState();
 }
 
 class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
@@ -47,10 +48,10 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
   @override
   Widget build(BuildContext context) {
     final licenseService = ref.watch(licenseServiceProvider);
-    final status         = licenseService.checkLicenseStatus();
-    final info           = licenseService.getLicenseInfo();
-    final daysLeft       = licenseService.getRemainingDays();
-    final deviceUuid     = licenseService.getDeviceUuid();
+    final status = licenseService.checkLicenseStatus();
+    final info = licenseService.getLicenseInfo();
+    final daysLeft = licenseService.getRemainingDays();
+    final deviceUuid = licenseService.getDeviceUuid();
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -87,8 +88,6 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
           _buildFeatureMatrix(info?.tier ?? LicenseTier.basic),
           const SizedBox(height: 16),
 
-
-
           // ── Device UUID ─────────────────────────────────────────────────
           _buildSectionHeader('CİHAZ KİMLİĞİ'),
           const SizedBox(height: 8),
@@ -106,39 +105,40 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
   // ── Status Hero ───────────────────────────────────────────────────────────
 
   Widget _buildStatusHero(String status, dynamic info, int daysLeft) {
-    final (gradient, icon, title, subtitle, chipLabel, chipColor) = switch (status) {
+    final (gradient, icon, title, subtitle, chipLabel, chipColor) =
+        switch (status) {
       'valid' => (
-        [const Color(0xFF059669), const Color(0xFF10B981)],
-        Icons.verified_rounded,
-        'Lisans Aktif',
-        info != null ? '${(info as dynamic).tier.name} Paketi' : 'Aktif',
-        '$daysLeft gün kaldı',
-        _kGreen,
-      ),
+          [const Color(0xFF059669), const Color(0xFF10B981)],
+          Icons.verified_rounded,
+          'Lisans Aktif',
+          info != null ? '${(info as dynamic).tier.name} Paketi' : 'Aktif',
+          '$daysLeft gün kaldı',
+          _kGreen,
+        ),
       'expired' => (
-        [const Color(0xFFDC2626), const Color(0xFFEF4444)],
-        Icons.lock_clock_rounded,
-        'Lisans Sona Erdi',
-        'Sistem kısıtlı modda',
-        'Süresi Doldu',
-        _kRed,
-      ),
+          [const Color(0xFFDC2626), const Color(0xFFEF4444)],
+          Icons.lock_clock_rounded,
+          'Lisans Sona Erdi',
+          'Sistem kısıtlı modda',
+          'Süresi Doldu',
+          _kRed,
+        ),
       'tampered' => (
-        [const Color(0xFFB91C1C), const Color(0xFFDC2626)],
-        Icons.security_rounded,
-        'Güvenlik Uyarısı',
-        'Saat manipülasyonu tespit edildi',
-        'Kilitli',
-        _kRed,
-      ),
+          [const Color(0xFFB91C1C), const Color(0xFFDC2626)],
+          Icons.security_rounded,
+          'Güvenlik Uyarısı',
+          'Saat manipülasyonu tespit edildi',
+          'Kilitli',
+          _kRed,
+        ),
       _ => (
-        [const Color(0xFFB45309), const Color(0xFFF59E0B)],
-        Icons.warning_amber_rounded,
-        'Lisans Bulunamadı',
-        'Sistem deneme modunda',
-        'Lisanssız',
-        _kAmber,
-      ),
+          [const Color(0xFFB45309), const Color(0xFFF59E0B)],
+          Icons.warning_amber_rounded,
+          'Lisans Bulunamadı',
+          'Sistem deneme modunda',
+          'Lisanssız',
+          _kAmber,
+        ),
     };
 
     return Container(
@@ -204,7 +204,8 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.schedule_rounded, color: Colors.white, size: 16),
+                const Icon(Icons.schedule_rounded,
+                    color: Colors.white, size: 16),
                 const SizedBox(width: 6),
                 Text(
                   chipLabel,
@@ -226,8 +227,8 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
 
   Widget _buildDetailsCard(dynamic info, int daysLeft) {
     final expiryDate = info.expiryDate as DateTime;
-    final tier       = info.tier as LicenseTier;
-    final devices    = info.allowedDevices as List<String>;
+    final tier = info.tier as LicenseTier;
+    final devices = info.allowedDevices as List<String>;
     final isWildcard = devices.contains('*');
 
     return Container(
@@ -254,7 +255,11 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
           const Divider(height: 1, color: _kBorderColor),
           _DetailRow(
             icon: Icons.timer_rounded,
-            color: daysLeft > 30 ? _kGreen : daysLeft > 7 ? _kAmber : _kRed,
+            color: daysLeft > 30
+                ? _kGreen
+                : daysLeft > 7
+                    ? _kAmber
+                    : _kRed,
             label: 'Kalan Süre',
             value: '$daysLeft gün',
           ),
@@ -263,7 +268,9 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
             icon: Icons.devices_rounded,
             color: _kTeal,
             label: 'Cihaz Limiti',
-            value: isWildcard ? 'Sınırsız (*)' : '${devices.length}/${tier.deviceLimit}',
+            value: isWildcard
+                ? 'Sınırsız (*)'
+                : '${devices.length}/${tier.deviceLimit}',
           ),
         ],
       ),
@@ -299,35 +306,38 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
               children: [
                 const Expanded(child: SizedBox()),
                 ...LicenseTier.values.map((tier) => SizedBox(
-                  width: 64,
-                  child: Column(
-                    children: [
-                      Text(
-                        tier.name,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: tier == currentTier ? _kGreen : _kTextSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (tier == currentTier)
-                        Container(
-                          margin: const EdgeInsets.only(top: 2),
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: _kGreen,
-                            borderRadius: BorderRadius.circular(4),
+                      width: 64,
+                      child: Column(
+                        children: [
+                          Text(
+                            tier.name,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: tier == currentTier
+                                  ? _kGreen
+                                  : _kTextSecondary,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          child: const Text('Aktif',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold)),
-                        ),
-                    ],
-                  ),
-                )),
+                          if (tier == currentTier)
+                            Container(
+                              margin: const EdgeInsets.only(top: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: _kGreen,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('Aktif',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold)),
+                            ),
+                        ],
+                      ),
+                    )),
               ],
             ),
           ),
@@ -338,7 +348,8 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
             return Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       Expanded(
@@ -346,13 +357,20 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
                             style: const TextStyle(
                                 color: _kTextPrimary, fontSize: 12)),
                       ),
-                      _TierCell(included: feat.$2, isActive: currentTier == LicenseTier.basic),
-                      _TierCell(included: feat.$3, isActive: currentTier == LicenseTier.pro),
-                      _TierCell(included: feat.$4, isActive: currentTier == LicenseTier.proPlus),
+                      _TierCell(
+                          included: feat.$2,
+                          isActive: currentTier == LicenseTier.basic),
+                      _TierCell(
+                          included: feat.$3,
+                          isActive: currentTier == LicenseTier.pro),
+                      _TierCell(
+                          included: feat.$4,
+                          isActive: currentTier == LicenseTier.proPlus),
                     ],
                   ),
                 ),
-                if (!isLast) const Divider(height: 1, indent: 16, color: _kBorderColor),
+                if (!isLast)
+                  const Divider(height: 1, indent: 16, color: _kBorderColor),
               ],
             );
           }),
@@ -404,7 +422,9 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
               ),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _tokenVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  _tokenVisible
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
                   color: _kTextSecondary,
                   size: 18,
                 ),
@@ -441,7 +461,8 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
                     foregroundColor: _kTextSecondary,
                     side: const BorderSide(color: _kBorderColor),
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text('Temizle'),
                 ),
@@ -461,13 +482,16 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
                           ),
                         )
                       : const Icon(Icons.verified_rounded, size: 18),
-                  label: Text(_isValidating ? 'Doğrulanıyor...' : 'Anahtarı Doğrula & Kaydet'),
+                  label: Text(_isValidating
+                      ? 'Doğrulanıyor...'
+                      : 'Anahtarı Doğrula & Kaydet'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kGreen,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
@@ -532,7 +556,8 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
                 foregroundColor: _kBlue,
                 side: const BorderSide(color: _kBlue),
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -604,7 +629,10 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
       return;
     }
 
-    setState(() { _isValidating = true; _validationError = null; });
+    setState(() {
+      _isValidating = true;
+      _validationError = null;
+    });
 
     try {
       final service = ref.read(licenseServiceProvider);

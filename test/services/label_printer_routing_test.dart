@@ -17,7 +17,9 @@ class MockSocket implements Socket {
 
 void main() {
   group('Label Printer Routing Tests', () {
-    test('Ensures printerName is set to network when printing labels to bypass Sunmi/USB overrides', () {
+    test(
+        'Ensures printerName is set to network when printing labels to bypass Sunmi/USB overrides',
+        () {
       final settings = Settings(
         businessName: 'Test Market',
         businessPhone: '123456',
@@ -32,7 +34,7 @@ void main() {
 
       final labelIp = settings.labelPrinterIp ?? '';
       final labelPort = settings.labelPrinterPort ?? 9100;
-      
+
       // Simulate copyWith logic in our updated pages
       final labelSettings = settings.copyWith(
         printerName: 'network',
@@ -43,12 +45,14 @@ void main() {
       expect(labelSettings.printerName, 'network');
       expect(labelSettings.printerIp, '192.168.1.100');
       expect(labelSettings.printerPort, 9100);
-      
+
       // Original settings must not be altered
       expect(settings.printerName, 'sunmi');
     });
 
-    test('PrinterService printOrderLabels automatically routes to network and uses labelPrinterIp', () async {
+    test(
+        'PrinterService printOrderLabels automatically routes to network and uses labelPrinterIp',
+        () async {
       final settings = Settings(
         businessName: 'Test Market',
         businessPhone: '123456',

@@ -8,11 +8,11 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 
 /// Generic repository interface for CRUD operations
-/// 
+///
 /// Implemented by:
 /// - Mock repositories (Phase 1)
 /// - SQLite repositories (Phase 1.5+)
-/// 
+///
 /// Usage:
 /// ```dart
 /// final productRepo = ref.watch(productRepositoryProvider);
@@ -148,7 +148,8 @@ abstract class ISaleRepository implements BaseRepository<SaleEntity> {
 }
 
 /// Financial transaction repository
-abstract class IFinancialTransactionRepository implements BaseRepository<FinancialTransactionEntity> {
+abstract class IFinancialTransactionRepository
+    implements BaseRepository<FinancialTransactionEntity> {
   /// Get transactions by customer
   Future<List<FinancialTransactionEntity>> getByCustomerId(String customerId);
 
@@ -156,7 +157,8 @@ abstract class IFinancialTransactionRepository implements BaseRepository<Financi
   Future<List<FinancialTransactionEntity>> getByType(String type);
 
   /// Get transactions for date range
-  Future<List<FinancialTransactionEntity>> getByDateRange(DateTime from, DateTime to);
+  Future<List<FinancialTransactionEntity>> getByDateRange(
+      DateTime from, DateTime to);
 
   /// Get ledger balance for customer
   Future<double> getBalance(String customerId);
@@ -236,26 +238,26 @@ class ProductEntity {
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'name': name,
-    'description': description,
-    'price': price,
-    'quantity': quantity,
-    'category': category,
-    'vat': vat,
-    'image_url': imageUrl,
-  };
+        'id': id,
+        'name': name,
+        'description': description,
+        'price': price,
+        'quantity': quantity,
+        'category': category,
+        'vat': vat,
+        'image_url': imageUrl,
+      };
 
   factory ProductEntity.fromMap(Map<String, dynamic> map) => ProductEntity(
-    id: map['id'] as String,
-    name: map['name'] as String,
-    description: map['description'] as String,
-    price: map['price'] as double,
-    quantity: map['quantity'] as int,
-    category: map['category'] as String,
-    vat: map['vat'] as int?,
-    imageUrl: map['image_url'] as String?,
-  );
+        id: map['id'] as String,
+        name: map['name'] as String,
+        description: map['description'] as String,
+        price: map['price'] as double,
+        quantity: map['quantity'] as int,
+        category: map['category'] as String,
+        vat: map['vat'] as int?,
+        imageUrl: map['image_url'] as String?,
+      );
 }
 
 /// Customer entity
@@ -277,22 +279,22 @@ class CustomerEntity {
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'name': name,
-    'email': email,
-    'phone': phone,
-    'balance': balance,
-    'created_at': createdAt.toIso8601String(),
-  };
+        'id': id,
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'balance': balance,
+        'created_at': createdAt.toIso8601String(),
+      };
 
   factory CustomerEntity.fromMap(Map<String, dynamic> map) => CustomerEntity(
-    id: map['id'] as String,
-    name: map['name'] as String,
-    email: map['email'] as String,
-    phone: map['phone'] as String,
-    balance: map['balance'] as double,
-    createdAt: DateTime.parse(map['created_at'] as String),
-  );
+        id: map['id'] as String,
+        name: map['name'] as String,
+        email: map['email'] as String,
+        phone: map['phone'] as String,
+        balance: map['balance'] as double,
+        createdAt: DateTime.parse(map['created_at'] as String),
+      );
 }
 
 /// Sale entity
@@ -302,7 +304,8 @@ class SaleEntity {
   final double totalAmount;
   final double paidAmount;
   final String paymentMethod;
-  final String status; // completed, pending, cancelled, processing, failed, reverted
+  final String
+      status; // completed, pending, cancelled, processing, failed, reverted
   final DateTime createdAt;
   final List<Map<String, dynamic>> items; // Sale items
   final String? idempotencyKey;
@@ -328,33 +331,33 @@ class SaleEntity {
   double get remainingAmount => totalAmount - paidAmount;
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'customer_id': customerId,
-    'total_amount': totalAmount,
-    'paid_amount': paidAmount,
-    'payment_method': paymentMethod,
-    'status': status,
-    'created_at': createdAt.toIso8601String(),
-    'idempotency_key': idempotencyKey,
-    'is_synced': isSynced,
-    'created_by': createdBy,
-    'entitlement_snapshot': entitlementSnapshot,
-  };
+        'id': id,
+        'customer_id': customerId,
+        'total_amount': totalAmount,
+        'paid_amount': paidAmount,
+        'payment_method': paymentMethod,
+        'status': status,
+        'created_at': createdAt.toIso8601String(),
+        'idempotency_key': idempotencyKey,
+        'is_synced': isSynced,
+        'created_by': createdBy,
+        'entitlement_snapshot': entitlementSnapshot,
+      };
 
   factory SaleEntity.fromMap(Map<String, dynamic> map) => SaleEntity(
-    id: map['id'] as String,
-    customerId: map['customer_id'] as String,
-    totalAmount: map['total_amount'] as double,
-    paidAmount: map['paid_amount'] as double,
-    paymentMethod: map['payment_method'] as String,
-    status: map['status'] as String,
-    createdAt: DateTime.parse(map['created_at'] as String),
-    idempotencyKey: map['idempotency_key'] as String?,
-    isSynced: map['is_synced'] as int? ?? 0,
-    createdBy: map['created_by'] as String?,
-    entitlementSnapshot: map['entitlement_snapshot'] as String?,
-    items: [],
-  );
+        id: map['id'] as String,
+        customerId: map['customer_id'] as String,
+        totalAmount: map['total_amount'] as double,
+        paidAmount: map['paid_amount'] as double,
+        paymentMethod: map['payment_method'] as String,
+        status: map['status'] as String,
+        createdAt: DateTime.parse(map['created_at'] as String),
+        idempotencyKey: map['idempotency_key'] as String?,
+        isSynced: map['is_synced'] as int? ?? 0,
+        createdBy: map['created_by'] as String?,
+        entitlementSnapshot: map['entitlement_snapshot'] as String?,
+        items: [],
+      );
 }
 
 /// Financial transaction entity
@@ -386,34 +389,38 @@ class FinancialTransactionEntity {
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'type': type,
-    'customer_id': customerId,
-    'amount': amount,
-    'paid_amount': paidAmount,
-    'debt_amount': debtAmount,
-    'date': date.toIso8601String(),
-    'reference_id': referenceId,
-    'metadata': metadata,
-    'logical_clock': logicalClock,
-    'device_id': deviceId,
-  };
+        'id': id,
+        'type': type,
+        'customer_id': customerId,
+        'amount': amount,
+        'paid_amount': paidAmount,
+        'debt_amount': debtAmount,
+        'date': date.toIso8601String(),
+        'reference_id': referenceId,
+        'metadata': metadata,
+        'logical_clock': logicalClock,
+        'device_id': deviceId,
+      };
 
-  factory FinancialTransactionEntity.fromMap(Map<String, dynamic> map) => FinancialTransactionEntity(
-    id: map['id'] as String,
-    type: map['type'] as String,
-    customerId: map['customer_id'] as String,
-    amount: map['amount'] as double,
-    paidAmount: map['paid_amount'] as double,
-    debtAmount: map['debt_amount'] as double,
-    date: DateTime.parse((map['created_at'] ?? map['date'] ?? map['occurred_at'] ?? DateTime.now().toIso8601String()) as String),
-    referenceId: map['reference_id'] as String?,
-    metadata: map['metadata'] is String 
-        ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>?
-        : map['metadata'] as Map<String, dynamic>?,
-    logicalClock: map['logical_clock'] as int? ?? 0,
-    deviceId: map['device_id'] as String?,
-  );
+  factory FinancialTransactionEntity.fromMap(Map<String, dynamic> map) =>
+      FinancialTransactionEntity(
+        id: map['id'] as String,
+        type: map['type'] as String,
+        customerId: map['customer_id'] as String,
+        amount: map['amount'] as double,
+        paidAmount: map['paid_amount'] as double,
+        debtAmount: map['debt_amount'] as double,
+        date: DateTime.parse((map['created_at'] ??
+            map['date'] ??
+            map['occurred_at'] ??
+            DateTime.now().toIso8601String()) as String),
+        referenceId: map['reference_id'] as String?,
+        metadata: map['metadata'] is String
+            ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>?
+            : map['metadata'] as Map<String, dynamic>?,
+        logicalClock: map['logical_clock'] as int? ?? 0,
+        deviceId: map['device_id'] as String?,
+      );
 }
 
 /// Order entity
@@ -442,35 +449,36 @@ class OrderEntity {
 
   bool get isOverdue {
     if (expectedDeliveryDate == null) return false;
-    return DateTime.now().isAfter(expectedDeliveryDate!) && status != 'delivered';
+    return DateTime.now().isAfter(expectedDeliveryDate!) &&
+        status != 'delivered';
   }
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'customer_id': customerId,
-    'status': status,
-    'created_at': createdAt.toIso8601String(),
-    'expected_delivery_date': expectedDeliveryDate?.toIso8601String(),
-    'actual_delivery_date': actualDeliveryDate?.toIso8601String(),
-    'notes': notes,
-    'created_by': createdBy,
-  };
+        'id': id,
+        'customer_id': customerId,
+        'status': status,
+        'created_at': createdAt.toIso8601String(),
+        'expected_delivery_date': expectedDeliveryDate?.toIso8601String(),
+        'actual_delivery_date': actualDeliveryDate?.toIso8601String(),
+        'notes': notes,
+        'created_by': createdBy,
+      };
 
   factory OrderEntity.fromMap(Map<String, dynamic> map) => OrderEntity(
-    id: map['id'].toString(),
-    customerId: map['customer_id'].toString(),
-    status: map['status'] as String,
-    createdAt: DateTime.parse(map['created_at'] as String),
-    expectedDeliveryDate: map['expected_delivery_date'] != null 
-      ? DateTime.parse(map['expected_delivery_date'] as String)
-      : null,
-    actualDeliveryDate: map['actual_delivery_date'] != null
-      ? DateTime.parse(map['actual_delivery_date'] as String)
-      : null,
-    notes: map['notes'] as String?,
-    createdBy: map['created_by'] as String?,
-    items: [],
-  );
+        id: map['id'].toString(),
+        customerId: map['customer_id'].toString(),
+        status: map['status'] as String,
+        createdAt: DateTime.parse(map['created_at'] as String),
+        expectedDeliveryDate: map['expected_delivery_date'] != null
+            ? DateTime.parse(map['expected_delivery_date'] as String)
+            : null,
+        actualDeliveryDate: map['actual_delivery_date'] != null
+            ? DateTime.parse(map['actual_delivery_date'] as String)
+            : null,
+        notes: map['notes'] as String?,
+        createdBy: map['created_by'] as String?,
+        items: [],
+      );
 }
 
 /// Abstract contract for orchestrating database transactions from the domain layer.
@@ -481,7 +489,8 @@ abstract class IDbTransactionRunner {
 /// User repository contract
 abstract class IUserRepository implements BaseRepository<AuthUser> {
   Future<AuthUser?> findByUsername(String username);
-  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username);
+  Future<AuthUser?> findByBusinessCodeAndUsername(
+      String businessCode, String username);
   Future<String?> getPasswordHash(String userId);
   Future<Map<String, String?>> getCredentialHashes(String userId);
   Future<void> updateLastLogin(String userId);
@@ -506,7 +515,8 @@ abstract class IUserRepository implements BaseRepository<AuthUser> {
 
   /// Brute-force lockout support (offline PIN protection)
   Future<Map<String, dynamic>> getFailedPinAttempts(String userId);
-  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5});
+  Future<void> incrementFailedPinAttempts(String userId,
+      {int lockoutMinutes = 5, int maxAttempts = 5});
   Future<void> resetPinAttempts(String userId);
 }
 

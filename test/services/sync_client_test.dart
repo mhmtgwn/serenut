@@ -1,4 +1,4 @@
-﻿// test/services/sync_client_test.dart
+// test/services/sync_client_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/domain/services/sync_client.dart';
@@ -10,7 +10,8 @@ void main() {
     late RealSyncClient syncClient;
 
     setUp(() {
-      apiClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      apiClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       syncClient = RealSyncClient(apiClient);
     });
 

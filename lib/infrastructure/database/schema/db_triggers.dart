@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/database/schema/db_triggers.dart
+// lib/infrastructure/database/schema/db_triggers.dart
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -113,15 +113,16 @@ class DatabaseTriggers {
 
   static Future<void> verifyAndRepairTriggers(Database db) async {
     final rows = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('trg_ft_insert', 'trg_ft_block_update', 'trg_ft_block_delete')"
-    );
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('trg_ft_insert', 'trg_ft_block_update', 'trg_ft_block_delete')");
     if (rows.length < 3) {
       try {
         await createTriggers(db);
-        debugPrint('Self-Healing: Recreated missing or tampered database triggers successfully.');
+        debugPrint(
+            'Self-Healing: Recreated missing or tampered database triggers successfully.');
       } catch (e, st) {
         debugPrint('[DatabaseManager] ❌ Trigger self-healing failed: ');
-        TelemetryService().logError(e, st, context: 'db_trigger_selfheal_failed');
+        TelemetryService()
+            .logError(e, st, context: 'db_trigger_selfheal_failed');
       }
     }
   }

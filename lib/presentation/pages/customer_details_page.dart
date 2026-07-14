@@ -1,6 +1,6 @@
 // lib/presentation/pages/customer_details_page.dart
 // Serenut POS — Müşteri Detay Sayfası (Bankacılık Stili)
-// UX Redesign v3: Hero gradient card, bank-statement transaction list, 
+// UX Redesign v3: Hero gradient card, bank-statement transaction list,
 // full-screen collection push (no dialog). Uses existing providers — zero backend changes.
 
 import 'package:flutter/material.dart';
@@ -14,17 +14,17 @@ import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
 import 'package:serenutos/presentation/pages/customer/ledger_explainability_sheet.dart';
 
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kAmber      = Color(0xFFEAB308);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class CustomerDetailsPage extends ConsumerWidget {
   final String customerId;
@@ -32,13 +32,17 @@ class CustomerDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final customersVal   = ref.watch(customersControllerProvider);
+    final customersVal = ref.watch(customersControllerProvider);
     final transactionsVal = ref.watch(customerTransactionsProvider(customerId));
-    final balanceVal     = ref.watch(customerBalanceDetailsProvider(customerId));
+    final balanceVal = ref.watch(customerBalanceDetailsProvider(customerId));
 
     final customer = customersVal.maybeWhen(
       data: (list) {
-        try { return list.firstWhere((c) => c.id == customerId); } catch (_) { return null; }
+        try {
+          return list.firstWhere((c) => c.id == customerId);
+        } catch (_) {
+          return null;
+        }
       },
       orElse: () => null,
     );
@@ -52,8 +56,9 @@ class CustomerDetailsPage extends ConsumerWidget {
           title: const Text('Müşteri Detayı',
               style: TextStyle(color: _kText, fontWeight: FontWeight.bold)),
         ),
-        body: const Center(child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(_kGreen))),
+        body: const Center(
+            child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(_kGreen))),
       );
     }
 
@@ -73,12 +78,13 @@ class CustomerDetailsPage extends ConsumerWidget {
               IconButton(
                 icon: const Icon(Icons.edit_rounded, color: Colors.white),
                 tooltip: 'Düzenle',
-                onPressed: () =>
-                    context.push('/customers/edit/${customer.id}', extra: customer),
+                onPressed: () => context.push('/customers/edit/${customer.id}',
+                    extra: customer),
               ),
               if (customer.id.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: Colors.white),
                   tooltip: 'Sil',
                   onPressed: () => _confirmDelete(context, ref, customer),
                 ),
@@ -100,9 +106,11 @@ class CustomerDetailsPage extends ConsumerWidget {
               ),
               // ── Phase 4: Ledger Explainability & Verification Button ──
               IconButton(
-                icon: const Icon(Icons.history_toggle_off_rounded, color: Colors.white),
+                icon: const Icon(Icons.history_toggle_off_rounded,
+                    color: Colors.white),
                 tooltip: 'Bakiye Analiz & Doğrulama',
-                onPressed: () => LedgerExplainabilitySheet.show(context, customer),
+                onPressed: () =>
+                    LedgerExplainabilitySheet.show(context, customer),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -166,8 +174,10 @@ class CustomerDetailsPage extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: balanceVal.when(
-                loading: () => const SizedBox(height: 80,
-                    child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                loading: () => const SizedBox(
+                    height: 80,
+                    child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2))),
                 error: (e, _) => Text('Bakiye yüklenemedi: $e',
                     style: const TextStyle(color: _kRed)),
                 data: (details) => _buildBalanceRow(customer, details),
@@ -210,7 +220,8 @@ class CustomerDetailsPage extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                        color: _kGreenLight, borderRadius: BorderRadius.circular(8)),
+                        color: _kGreenLight,
+                        borderRadius: BorderRadius.circular(8)),
                     child: const Icon(Icons.receipt_long_rounded,
                         size: 14, color: _kGreenDark),
                   ),
@@ -218,7 +229,9 @@ class CustomerDetailsPage extends ConsumerWidget {
                   const Text(
                     'Hareket Geçmişi',
                     style: TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 14, color: _kText),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: _kText),
                   ),
                 ],
               ),
@@ -229,10 +242,10 @@ class CustomerDetailsPage extends ConsumerWidget {
             loading: () => const SliverToBoxAdapter(
               child: Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(_kGreen)),
-                  )),
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(_kGreen)),
+              )),
             ),
             error: (e, _) => SliverToBoxAdapter(
               child: Padding(
@@ -327,7 +340,8 @@ class CustomerDetailsPage extends ConsumerWidget {
     return map;
   }
 
-  Widget _buildMonthGroup(String month, List<FinancialTransactionEntity> items) {
+  Widget _buildMonthGroup(
+      String month, List<FinancialTransactionEntity> items) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Column(
@@ -396,43 +410,48 @@ class CustomerDetailsPage extends ConsumerWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, CustomerEntity customer) {
-    requireAdminAccess(
-      context,
-      title: 'Müşteri Silme Yetkisi',
-      requirePin: true,
-      onGranted: (approvedByUserId, approvedByUserName) {
-        showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text('Müşteriyi Sil'),
-              content: Text('"${customer.name}" müşterisini sistemden silmek istediğinize emin misiniz?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('İptal'),
+  void _confirmDelete(
+      BuildContext context, WidgetRef ref, CustomerEntity customer) {
+    requireAdminAccess(context,
+        title: 'Müşteri Silme Yetkisi',
+        requirePin: true, onGranted: (approvedByUserId, approvedByUserName) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Müşteriyi Sil'),
+            content: Text(
+                '"${customer.name}" müşterisini sistemden silmek istediğinize emin misiniz?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('İptal'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kRed,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kRed,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await ref.read(customersControllerProvider.notifier).deleteCustomer(
-                      customer.id,
-                      approvedByUserId: approvedByUserId,
-                      approvedByUserName: approvedByUserName,
-                    );
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await ref
+                      .read(customersControllerProvider.notifier)
+                      .deleteCustomer(
+                        customer.id,
+                        approvedByUserId: approvedByUserId,
+                        approvedByUserName: approvedByUserName,
+                      );
                   final state = ref.read(customersControllerProvider);
                   if (state.hasError) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Müşteri silinemedi: Bu müşteriye ait satış veya işlem kayıtları bulunmaktadır.'),
+                          content: Text(
+                              'Müşteri silinemedi: Bu müşteriye ait satış veya işlem kayıtları bulunmaktadır.'),
                           backgroundColor: _kRed,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -502,10 +521,8 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 13,
-                color: fg),
+            style:
+                TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: fg),
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
@@ -513,8 +530,7 @@ class _StatCard extends StatelessWidget {
               style: TextStyle(
                   fontSize: 10, color: fg, fontWeight: FontWeight.w600)),
           Text(sub,
-              style: TextStyle(
-                  fontSize: 9, color: fg.withValues(alpha: 0.7))),
+              style: TextStyle(fontSize: 9, color: fg.withValues(alpha: 0.7))),
         ],
       ),
     );
@@ -555,11 +571,14 @@ class _TransactionRow extends ConsumerWidget {
                     Text(
                       style.label,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 13, color: _kText),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: _kText),
                     ),
                     Text(
                       DateFormat('dd.MM.yyyy HH:mm').format(txn.date),
-                      style: const TextStyle(fontSize: 11, color: _kTextSecondary),
+                      style:
+                          const TextStyle(fontSize: 11, color: _kTextSecondary),
                     ),
                   ],
                 ),
@@ -578,8 +597,7 @@ class _TransactionRow extends ConsumerWidget {
                     Text(
                       'Borç: ₺${txn.debtAmount.toStringAsFixed(2)}',
                       style: TextStyle(
-                          fontSize: 10,
-                          color: _kRed.withValues(alpha: 0.7)),
+                          fontSize: 10, color: _kRed.withValues(alpha: 0.7)),
                     ),
                 ],
               ),
@@ -601,7 +619,9 @@ class _TransactionRow extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 12, color: _kTextSecondary.withValues(alpha: 0.8)),
+                        Icon(Icons.inventory_2_outlined,
+                            size: 12,
+                            color: _kTextSecondary.withValues(alpha: 0.8)),
                         const SizedBox(width: 4),
                         const Text(
                           'Detaylar:',

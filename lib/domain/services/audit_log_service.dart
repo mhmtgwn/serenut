@@ -1,4 +1,4 @@
-﻿// lib/domain/services/audit_log_service.dart
+// lib/domain/services/audit_log_service.dart
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/models/audit_log.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
@@ -23,7 +23,7 @@ class AuditLogService {
       final user = await _authService.getCurrentUser();
       final userId = user?.id ?? 'system';
       final userName = user?.name ?? 'System';
-      
+
       final db = await _dbManager.getDatabase();
       final record = AuditLog(
         id: const Uuid().v4(),

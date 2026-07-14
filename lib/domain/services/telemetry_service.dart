@@ -17,11 +17,16 @@ extension LogLevelLabel on LogLevel {
   String get label => name.toUpperCase();
   String get emoji {
     switch (this) {
-      case LogLevel.debug:    return '🔍';
-      case LogLevel.info:     return 'ℹ️';
-      case LogLevel.warning:  return '⚠️';
-      case LogLevel.error:    return '❌';
-      case LogLevel.critical: return '🚨';
+      case LogLevel.debug:
+        return '🔍';
+      case LogLevel.info:
+        return 'ℹ️';
+      case LogLevel.warning:
+        return '⚠️';
+      case LogLevel.error:
+        return '❌';
+      case LogLevel.critical:
+        return '🚨';
     }
   }
 }
@@ -55,7 +60,8 @@ class TelemetryEvent {
   factory TelemetryEvent.fromJson(Map<String, dynamic> json) {
     final eventName = json['event'] as String? ?? 'unknown';
     final timestampStr = json['timestamp'] as String?;
-    final timestamp = timestampStr != null ? DateTime.parse(timestampStr) : DateTime.now();
+    final timestamp =
+        timestampStr != null ? DateTime.parse(timestampStr) : DateTime.now();
     final levelStr = json['level'] as String? ?? 'INFO';
     final level = LogLevel.values.firstWhere(
       (l) => l.label == levelStr,
@@ -97,6 +103,7 @@ String _generateCorrelationId() {
 class LogRetentionPolicy {
   /// Maximum number of log lines to retain (rolling window). Default: 1000.
   final int maxLines;
+
   /// How often (in write operations) the trim check runs. Default: every 100 writes.
   final int trimIntervalWrites;
 
@@ -156,7 +163,8 @@ class TelemetryService {
         ' (corr:${telemetryEvent.correlationId})';
 
     if (kIsWeb) {
-      debugPrint('🌐 [TELEMETRY] $msg — ${jsonEncode(telemetryEvent.metadata)}');
+      debugPrint(
+          '🌐 [TELEMETRY] $msg — ${jsonEncode(telemetryEvent.metadata)}');
       return;
     }
 
@@ -290,9 +298,7 @@ class TelemetryService {
   /// Useful for CRITICAL log viewer screens.
   Future<List<TelemetryEvent>> getEventsByLevel(LogLevel minLevel) async {
     final all = await getEvents();
-    return all
-        .where((e) => e.level.index >= minLevel.index)
-        .toList();
+    return all.where((e) => e.level.index >= minLevel.index).toList();
   }
 
   /// Clears all logged telemetry events.

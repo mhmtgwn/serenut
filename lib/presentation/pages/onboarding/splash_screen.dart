@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/onboarding/splash_screen.dart
+// lib/presentation/pages/onboarding/splash_screen.dart
 // Serenut OS — Açılış / Karşılama Ekranı
 // İki seçenek: 30 Gün Ücretsiz Dene | Lisans Anahtarı Gir
 
@@ -16,8 +16,8 @@ class OnboardingSplashScreen extends StatefulWidget {
 class _OnboardingSplashScreenState extends State<OnboardingSplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double>   _fadeAnim;
-  late Animation<Offset>   _slideAnim;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
 
   @override
   void initState() {
@@ -26,7 +26,7 @@ class _OnboardingSplashScreenState extends State<OnboardingSplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _fadeAnim  = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
     _ctrl.forward();
@@ -68,21 +68,22 @@ class _OnboardingSplashScreenState extends State<OnboardingSplashScreen>
                     Text(
                       'İşletmenizi dakikalar içinde\nsatışa hazır hale getirin.',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        height: 1.25,
-                        color: POSColors.text,
-                      ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                height: 1.25,
+                                color: POSColors.text,
+                              ),
                     ),
                     const SizedBox(height: 14),
                     Text(
                       '30 gün boyunca tüm özellikleri ücretsiz deneyebilirsiniz.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: POSColors.textSecondary,
-                      ),
+                            fontSize: 15,
+                            height: 1.5,
+                            color: POSColors.textSecondary,
+                          ),
                     ),
 
                     const SizedBox(height: 52),
@@ -102,7 +103,8 @@ class _OnboardingSplashScreenState extends State<OnboardingSplashScreen>
                       icon: const Icon(Icons.rocket_launch_rounded, size: 20),
                       label: const Text(
                         '30 Gün Ücretsiz Dene',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -112,17 +114,19 @@ class _OnboardingSplashScreenState extends State<OnboardingSplashScreen>
                       onPressed: () => context.go('/onboarding/license'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: POSColors.text,
-                        side: const BorderSide(color: POSColors.border, width: 1.5),
+                        side: const BorderSide(
+                            color: POSColors.border, width: 1.5),
                         minimumSize: const Size.fromHeight(56),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      icon: const Icon(Icons.vpn_key_outlined, size: 20,
-                          color: POSColors.textSecondary),
+                      icon: const Icon(Icons.vpn_key_outlined,
+                          size: 20, color: POSColors.textSecondary),
                       label: const Text(
                         'Lisans Anahtarı Gir',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                     ),
 
@@ -133,10 +137,10 @@ class _OnboardingSplashScreenState extends State<OnboardingSplashScreen>
                       'Daha sonra lisansınızı istediğiniz zaman ekleyebilirsiniz.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: POSColors.textDisabled,
-                        fontSize: 12,
-                        height: 1.5,
-                      ),
+                            color: POSColors.textDisabled,
+                            fontSize: 12,
+                            height: 1.5,
+                          ),
                     ),
                   ],
                 ),
@@ -193,15 +197,19 @@ class _Logo extends StatelessWidget {
               TextSpan(
                 text: 'Serenut ',
                 style: TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.w800,
-                  color: POSColors.text, letterSpacing: -0.5,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: POSColors.text,
+                  letterSpacing: -0.5,
                 ),
               ),
               TextSpan(
                 text: 'OS',
                 style: TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.w800,
-                  color: POSColors.green, letterSpacing: -0.5,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: POSColors.green,
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
@@ -211,7 +219,8 @@ class _Logo extends StatelessWidget {
         const Text(
           'Perakende Yönetim Sistemi',
           style: TextStyle(
-            fontSize: 13, color: POSColors.textSecondary,
+            fontSize: 13,
+            color: POSColors.textSecondary,
             letterSpacing: 0.3,
           ),
         ),

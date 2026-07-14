@@ -17,7 +17,7 @@ void main() {
 
   setUp(() async {
     InMemoryDb.reset();
-    
+
     // Add dummy products
     InMemoryDb.products.addAll([
       ProductEntity(
@@ -39,7 +39,7 @@ void main() {
         vat: 8,
       ),
     ]);
-    
+
     // Add dummy customer
     InMemoryDb.customers.add(
       CustomerEntity(
@@ -61,10 +61,13 @@ void main() {
     return ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
-        productRepositoryProvider.overrideWith((ref) => InMemoryProductRepository()),
-        customerRepositoryProvider.overrideWith((ref) => InMemoryCustomerRepository()),
+        productRepositoryProvider
+            .overrideWith((ref) => InMemoryProductRepository()),
+        customerRepositoryProvider
+            .overrideWith((ref) => InMemoryCustomerRepository()),
         saleRepositoryProvider.overrideWith((ref) => InMemorySaleRepository()),
-        settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+        settingsRepositoryProvider
+            .overrideWith((ref) => InMemorySettingsRepository()),
       ],
       child: const MaterialApp(
         home: SalesPage(),
@@ -83,7 +86,9 @@ void main() {
   }
 
   group('SalesPage Widget Tests', () {
-    testWidgets('SalesPage loads catalog products and category buttons correctly', (WidgetTester tester) async {
+    testWidgets(
+        'SalesPage loads catalog products and category buttons correctly',
+        (WidgetTester tester) async {
       setupWideScreen(tester);
       addTearDown(() => resetScreen(tester));
 
@@ -101,7 +106,8 @@ void main() {
       expect(find.textContaining('90'), findsWidgets);
     });
 
-    testWidgets('Adding product to cart updates total price and list', (WidgetTester tester) async {
+    testWidgets('Adding product to cart updates total price and list',
+        (WidgetTester tester) async {
       setupWideScreen(tester);
       addTearDown(() => resetScreen(tester));
 
@@ -114,13 +120,17 @@ void main() {
 
       // Verify product is in the cart
       // CartPanel shows item name and quantities
-      expect(find.descendant(of: find.byType(CartPanel), matching: find.text('Test Kola')), findsOneWidget);
-      
+      expect(
+          find.descendant(
+              of: find.byType(CartPanel), matching: find.text('Test Kola')),
+          findsOneWidget);
+
       // Total price on checkout section should match product price (25.0)
       expect(find.textContaining('25'), findsWidgets);
     });
 
-    testWidgets('Product search filters product catalog list', (WidgetTester tester) async {
+    testWidgets('Product search filters product catalog list',
+        (WidgetTester tester) async {
       setupWideScreen(tester);
       addTearDown(() => resetScreen(tester));
 
@@ -141,9 +151,9 @@ void main() {
       final searchFinder = find.byType(TextField);
       expect(searchFinder, findsOneWidget);
       await tester.enterText(searchFinder, 'Burger');
-      
+
       // Async pumping sequence to trigger the notifier, await future, and rebuild UI
-      await tester.pump(); 
+      await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       await tester.pump();
 

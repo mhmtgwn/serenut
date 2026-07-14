@@ -27,7 +27,7 @@ class SqliteUserRepository implements IUserRepository {
       pin: row['pin_hash'] as String?,
       businessCode: row['business_code'] as String?,
       role: role,
-      permissions: row['permissions'] != null 
+      permissions: row['permissions'] != null
           ? List<String>.from(jsonDecode(row['permissions'] as String))
           : Permission.forRole(role).map((p) => p.value).toList(),
       createdAt: DateTime.parse(
@@ -44,7 +44,8 @@ class SqliteUserRepository implements IUserRepository {
 
   @override
   Future<AuthUser?> findById(dynamic id) async {
-    final rows = await _executor.query('users', where: 'id = ?', whereArgs: [id]);
+    final rows =
+        await _executor.query('users', where: 'id = ?', whereArgs: [id]);
     if (rows.isEmpty) return null;
     return _mapRowToAuthUser(rows.first);
   }
@@ -116,7 +117,8 @@ class SqliteUserRepository implements IUserRepository {
       if (username != null) 'username': username,
       if (pinHash != null) 'pin_hash': pinHash,
       if (businessCode != null) 'business_code': businessCode,
-      if (deviceTokenVersion != null) 'device_token_version': deviceTokenVersion,
+      if (deviceTokenVersion != null)
+        'device_token_version': deviceTokenVersion,
       'permissions': jsonEncode(user.permissions),
     });
   }
@@ -156,7 +158,8 @@ class SqliteUserRepository implements IUserRepository {
     if (deviceTokenVersion != null) {
       values['device_token_version'] = deviceTokenVersion;
     }
-    await _executor.update('users', values, where: 'id = ?', whereArgs: [user.id]);
+    await _executor
+        .update('users', values, where: 'id = ?', whereArgs: [user.id]);
   }
 
   @override
@@ -178,7 +181,8 @@ class SqliteUserRepository implements IUserRepository {
 
   @override
   Future<int> count() async {
-    final rows = await _executor.rawQuery('SELECT COUNT(*) as count FROM users');
+    final rows =
+        await _executor.rawQuery('SELECT COUNT(*) as count FROM users');
     if (rows.isEmpty) return 0;
     return rows.first['count'] as int? ?? 0;
   }
@@ -190,7 +194,8 @@ class SqliteUserRepository implements IUserRepository {
   }
 
   @override
-  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username) async {
+  Future<AuthUser?> findByBusinessCodeAndUsername(
+      String businessCode, String username) async {
     final rows = await _executor.query(
       'users',
       where: 'business_code = ? AND username = ? AND is_active = 1',
@@ -233,7 +238,8 @@ class SqliteUserRepository implements IUserRepository {
   }
 
   @override
-  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5}) async {
+  Future<void> incrementFailedPinAttempts(String userId,
+      {int lockoutMinutes = 5, int maxAttempts = 5}) async {
     final current = await getFailedPinAttempts(userId);
     final newCount = ((current['failed_pin_attempts'] as int?) ?? 0) + 1;
     final values = <String, dynamic>{
@@ -241,9 +247,12 @@ class SqliteUserRepository implements IUserRepository {
       'updated_at': DateTime.now().toIso8601String(),
     };
     if (newCount >= maxAttempts) {
-      values['locked_until'] = DateTime.now().add(Duration(minutes: lockoutMinutes)).toIso8601String();
+      values['locked_until'] = DateTime.now()
+          .add(Duration(minutes: lockoutMinutes))
+          .toIso8601String();
     }
-    await _executor.update('users', values, where: 'id = ?', whereArgs: [userId]);
+    await _executor
+        .update('users', values, where: 'id = ?', whereArgs: [userId]);
   }
 
   @override
@@ -260,4 +269,3 @@ class SqliteUserRepository implements IUserRepository {
     );
   }
 }
-

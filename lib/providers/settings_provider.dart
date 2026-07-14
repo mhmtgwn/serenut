@@ -11,7 +11,8 @@ import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
 /// Riverpod provider for Settings Repository
-final settingsRepositoryProvider = FutureProvider<ISettingsRepository>((ref) async {
+final settingsRepositoryProvider =
+    FutureProvider<ISettingsRepository>((ref) async {
   if (kIsWeb) {
     return InMemorySettingsRepository();
   }
@@ -48,7 +49,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
     try {
       final repo = await ref.read(settingsRepositoryProvider.future);
       await repo.updateSettings(settings);
-      
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('serenut_pending_company_patch', true);
 
@@ -80,7 +81,8 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
         );
         if (response.isSuccess) {
           final updatedMap = response.json as Map<String, dynamic>;
-          final newVersion = updatedMap['version'] as int? ?? (expectedVersion + 1);
+          final newVersion =
+              updatedMap['version'] as int? ?? (expectedVersion + 1);
           await gateway.update(
             'business_profile',
             {
@@ -104,7 +106,8 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
       } on ApiException catch (e) {
         if (e.statusCode == 409) {
           await prefs.setBool('serenut_pending_company_patch', false);
-          debugPrint('[Settings] ⚠️ Company patch version conflict: 409 returned.');
+          debugPrint(
+              '[Settings] ⚠️ Company patch version conflict: 409 returned.');
         }
       } catch (e) {
         debugPrint('⚠️ Central business profile sync failed: $e');
@@ -113,7 +116,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
       // Reload settings to update state
       final updated = await repo.getSettings();
       state = AsyncValue.data(updated);
-      
+
       // Also invalidate settingsProvider so anything watching it gets the updated settings
       ref.invalidate(settingsProvider);
     } catch (e, st) {
@@ -124,16 +127,16 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
   Future<void> incrementSmsCounter() async {
     final current = state.value;
     if (current == null) return;
-    
+
     final now = DateTime.now();
     int newSent = current.smsSentThisMonth + 1;
     int? currentResetMonth = current.smsLimitResetMonth;
-    
+
     if (currentResetMonth != now.month) {
       newSent = 1;
       currentResetMonth = now.month;
     }
-    
+
     final updated = current.copyWith(
       smsSentThisMonth: newSent,
       smsLimitResetMonth: currentResetMonth,

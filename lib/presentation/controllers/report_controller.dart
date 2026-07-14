@@ -1,4 +1,4 @@
-﻿// lib/presentation/controllers/report_controller.dart
+// lib/presentation/controllers/report_controller.dart
 // Phase 2.3 — Analytics Engine Controller
 // AsyncNotifier with date range state management
 // Generated: 21 Jun 2026
@@ -49,7 +49,8 @@ final reportControllerProvider =
 // ════════════════════════════════════════════════════════════
 
 /// Günlük gelir — bar chart
-final dailyRevenueProvider = FutureProvider.family<List<DailyRevenue>, DateRange>(
+final dailyRevenueProvider =
+    FutureProvider.family<List<DailyRevenue>, DateRange>(
   (ref, range) async {
     final service = await ref.watch(reportServiceProvider.future);
     return service.getRevenueChart(range);

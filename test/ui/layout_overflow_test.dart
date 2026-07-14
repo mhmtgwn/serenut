@@ -11,7 +11,8 @@ void main() {
   ];
 
   for (final device in deviceMatrices) {
-    testWidgets('UI Firewall Stress Check - ${device['name']}', (WidgetTester tester) async {
+    testWidgets('UI Firewall Stress Check - ${device['name']}',
+        (WidgetTester tester) async {
       // Setup dynamic viewport parameters
       final double width = device['width'] as double;
       final double height = device['height'] as double;
@@ -22,7 +23,7 @@ void main() {
       String? overflowMessage;
       final originalOnError = FlutterError.onError;
       FlutterError.onError = (FlutterErrorDetails details) {
-        if (details.exception.toString().contains('overflow') || 
+        if (details.exception.toString().contains('overflow') ||
             details.toString().contains('A RenderFlex overflowed')) {
           overflowMessage = details.exception.toString();
         }
@@ -77,7 +78,8 @@ void main() {
                           10,
                           (index) => Container(
                             margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                             color: Colors.grey[300],
                             child: Text('Preset Date Picker $index'),
                           ),
@@ -95,7 +97,9 @@ void main() {
       // Verify no exceptions were recorded
       expect(tester.takeException(), isNull);
       // Assert that the overflow hook remained clean
-      expect(overflowMessage, isNull, reason: '🔴 UI FIREWALL FAILURE: Layout overflow detected on ${device['name']}! Details: $overflowMessage');
+      expect(overflowMessage, isNull,
+          reason:
+              '🔴 UI FIREWALL FAILURE: Layout overflow detected on ${device['name']}! Details: $overflowMessage');
 
       // Tear down device-specific viewport configurations
       addTearDown(tester.view.resetPhysicalSize);

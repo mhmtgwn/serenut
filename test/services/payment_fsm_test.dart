@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/services/payment_fsm.dart';
 
 void main() {
@@ -13,7 +13,9 @@ void main() {
       expect(fsm.state, equals(PaymentState.idle));
     });
 
-    test('valid transition flow: idle -> initiated -> terminalSent -> authorized -> completed', () {
+    test(
+        'valid transition flow: idle -> initiated -> terminalSent -> authorized -> completed',
+        () {
       fsm.initiate('tx-1', 150.0, 'idemp-1');
       expect(fsm.state, equals(PaymentState.initiated));
       expect(fsm.activeTransactionId, equals('tx-1'));
@@ -58,7 +60,7 @@ void main() {
 
     test('throws StateError on invalid transitions', () {
       fsm.initiate('tx-4', 400.0, 'idemp-4');
-      
+
       // Cannot transition to authorized directly from initiated
       expect(() => fsm.authorize(), throwsStateError);
 
@@ -69,7 +71,7 @@ void main() {
       // Cannot transition from completed without resetting
       expect(() => fsm.sendToTerminal(), throwsStateError);
       expect(() => fsm.initiate('tx-5', 10.0, 'idemp-5'), throwsStateError);
-      
+
       fsm.reset();
       expect(fsm.state, equals(PaymentState.idle));
       expect(fsm.activeTransactionId, isNull);

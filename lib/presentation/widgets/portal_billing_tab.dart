@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:serenutos/config/environment.dart';
+
 class PortalBillingTab extends ConsumerStatefulWidget {
   const PortalBillingTab({super.key});
 
@@ -31,7 +32,8 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
       final token = ref.read(authProvider).token;
       if (token == null) throw Exception('Yetkilendirme anahtarı bulunamadı.');
 
-      final url = '${EnvironmentConfig.current.apiBaseUrl}/billing/invoices/${invoice.id}/pdf';
+      final url =
+          '${EnvironmentConfig.current.apiBaseUrl}/billing/invoices/${invoice.id}/pdf';
       final response = await http.get(
         Uri.parse(url),
         headers: {'Authorization': 'Bearer $token'},
@@ -43,7 +45,8 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
         await file.writeAsBytes(response.bodyBytes);
         await Share.shareXFiles([XFile(file.path)], subject: 'Fatura');
       } else {
-        throw Exception('Fatura PDF indirilemedi (Hata: ${response.statusCode})');
+        throw Exception(
+            'Fatura PDF indirilemedi (Hata: ${response.statusCode})');
       }
     } catch (e) {
       if (mounted) {
@@ -69,7 +72,8 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Faturalar yüklenemedi: ${snapshot.error}'));
+          return Center(
+              child: Text('Faturalar yüklenemedi: ${snapshot.error}'));
         }
 
         final invoices = snapshot.data!;
@@ -80,7 +84,8 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
               children: [
                 Icon(Icons.receipt_long_rounded, size: 48, color: Colors.grey),
                 SizedBox(height: 12),
-                Text('Kayıtlı fatura bulunamadı.', style: TextStyle(color: Colors.grey)),
+                Text('Kayıtlı fatura bulunamadı.',
+                    style: TextStyle(color: Colors.grey)),
               ],
             ),
           );
@@ -96,7 +101,8 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
 
             return Card(
               color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -104,11 +110,13 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
                     color: Colors.green.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.receipt_rounded, color: Colors.green, size: 20),
+                  child: const Icon(Icons.receipt_rounded,
+                      color: Colors.green, size: 20),
                 ),
                 title: Text(
                   inv.invoiceNumber,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 subtitle: Text(
                   'Vade: ${DateFormat('dd.MM.yyyy').format(due)}',
@@ -119,19 +127,24 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
                   children: [
                     Text(
                       '${inv.amount.toStringAsFixed(0)} TL',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: inv.status == 'paid' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                        color: inv.status == 'paid'
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         inv.status == 'paid' ? 'Ödendi' : 'Ödenmedi',
                         style: TextStyle(
-                          color: inv.status == 'paid' ? Colors.green : Colors.red,
+                          color:
+                              inv.status == 'paid' ? Colors.green : Colors.red,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -139,8 +152,10 @@ class _PortalBillingTabState extends ConsumerState<PortalBillingTab> {
                     ),
                     const SizedBox(width: 4),
                     IconButton(
-                      icon: const Icon(Icons.download_rounded, color: Colors.blueAccent, size: 20),
-                      onPressed: _isLoading ? null : () => _downloadInvoicePdf(inv),
+                      icon: const Icon(Icons.download_rounded,
+                          color: Colors.blueAccent, size: 20),
+                      onPressed:
+                          _isLoading ? null : () => _downloadInvoicePdf(inv),
                     ),
                   ],
                 ),

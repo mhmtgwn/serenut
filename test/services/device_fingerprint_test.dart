@@ -4,7 +4,8 @@ import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('DeviceFingerprintService getHardwareHash is stable and computes sha256', () async {
+  test('DeviceFingerprintService getHardwareHash is stable and computes sha256',
+      () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final deviceManager = DeviceManager(prefs);

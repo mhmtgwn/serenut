@@ -56,10 +56,10 @@ class SmsQueueItem {
 class SmsConfig {
   final SmsProvider provider;
   final String apiKey;
-  final String username;   // Netgsm: kullanıcı adı | Twilio: accountSid
-  final String sender;     // Netgsm: başlık | Twilio: phone number
+  final String username; // Netgsm: kullanıcı adı | Twilio: accountSid
+  final String sender; // Netgsm: başlık | Twilio: phone number
   final String? apiSecret; // Twilio only
-  
+
   // SIM Specifics
   final int? simSubscriptionId;
   final int? monthlyLimit;
@@ -81,15 +81,16 @@ class SmsConfig {
 
 // ── SMS Service ───────────────────────────────────────────────────────────────
 class SmsService {
-  static const String _queueKey    = 'serenut_sms_queue';
-  static const String _logKey      = 'serenut_sms_log';
-  static const int    _maxRetries  = 3;
-  static const int    _maxLogItems = 200;
+  static const String _queueKey = 'serenut_sms_queue';
+  static const String _logKey = 'serenut_sms_log';
+  static const int _maxRetries = 3;
+  static const int _maxLogItems = 200;
 
   final SmsConfig? _config;
   final http.Client _httpClient;
   final Future<void> Function()? onSmsSent;
-  final Future<void> Function(String phone, String message, String status, String? errorMessage, String messageId)? onSmsDispatched;
+  final Future<void> Function(String phone, String message, String status,
+      String? errorMessage, String messageId)? onSmsDispatched;
   bool _isSending = false;
 
   SmsService({
@@ -101,7 +102,7 @@ class SmsService {
         _httpClient = httpClient ?? http.Client();
 
   // ── Public API ──────────────────────────────────────────────────────────────
-  
+
   /// Request permissions required for local SIM SMS sending (SMS & Phone state/numbers)
   Future<bool> requestSimPermissions() async {
     final statusSms = await Permission.sms.request();
@@ -161,7 +162,9 @@ class SmsService {
 
     try {
       final queue = await _loadQueue();
-      final pending = queue.where((i) => i.status == 'pending' && i.retryCount < _maxRetries).toList();
+      final pending = queue
+          .where((i) => i.status == 'pending' && i.retryCount < _maxRetries)
+          .toList();
 
       for (final item in pending) {
         final success = await _dispatch(item, config);
@@ -212,18 +215,19 @@ class SmsService {
   }) async {
     if (phone.isEmpty) return;
 
-    final debt    = (totalAmount - paidAmount).clamp(0.0, double.maxFinite);
-    final debtStr = debt > 0 ? ' Bakiye: $currency${debt.toStringAsFixed(2)}' : '';
+    final debt = (totalAmount - paidAmount).clamp(0.0, double.maxFinite);
+    final debtStr =
+        debt > 0 ? ' Bakiye: $currency${debt.toStringAsFixed(2)}' : '';
 
     final message = template != null && template.isNotEmpty
         ? template
-            .replaceAll('{musteri}',  customerName)
-            .replaceAll('{tutar}',    '$currency${totalAmount.toStringAsFixed(2)}')
-            .replaceAll('{odenen}',   '$currency${paidAmount.toStringAsFixed(2)}')
-            .replaceAll('{bakiye}',   debtStr)
-            .replaceAll('{firma}',    businessName ?? 'Serenut POS')
+            .replaceAll('{musteri}', customerName)
+            .replaceAll('{tutar}', '$currency${totalAmount.toStringAsFixed(2)}')
+            .replaceAll('{odenen}', '$currency${paidAmount.toStringAsFixed(2)}')
+            .replaceAll('{bakiye}', debtStr)
+            .replaceAll('{firma}', businessName ?? 'Serenut POS')
         : '${businessName ?? 'Serenut POS'}: Sayın $customerName, '
-          '$currency${totalAmount.toStringAsFixed(2)} tutarındaki alışverişiniz için teşekkürler.$debtStr';
+            '$currency${totalAmount.toStringAsFixed(2)} tutarındaki alışverişiniz için teşekkürler.$debtStr';
 
     await queueSms(phone, message);
     // Process immediately (non-blocking)
@@ -237,7 +241,9 @@ class SmsService {
         config.monthlyLimit != null &&
         config.sentThisMonth >= config.monthlyLimit!) {
       await _logDelivery(item, success: false);
-      unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed', 'Aylık SMS limiti aşıldı.', item.id) ?? Future.value());
+      unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed',
+              'Aylık SMS limiti aşıldı.', item.id) ??
+          Future.value());
       return false;
     }
 
@@ -258,31 +264,37 @@ class SmsService {
         }
         if (success) {
           await _logDelivery(item, success: true);
-          unawaited(onSmsDispatched?.call(item.phone, item.message, 'sent', null, item.id) ?? Future.value());
+          unawaited(onSmsDispatched?.call(
+                  item.phone, item.message, 'sent', null, item.id) ??
+              Future.value());
           return true;
         }
       } catch (_) {
         // retry
       }
       if (attempt < 3) {
-        await Future.delayed(Duration(seconds: attempt * 2)); // Exponential backoff: 2s, 4s
+        await Future.delayed(
+            Duration(seconds: attempt * 2)); // Exponential backoff: 2s, 4s
       }
     }
     await _logDelivery(item, success: false);
-    unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed', 'Operatör/Sağlayıcı hatası veya sinyal yok.', item.id) ?? Future.value());
+    unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed',
+            'Operatör/Sağlayıcı hatası veya sinyal yok.', item.id) ??
+        Future.value());
     return false;
   }
 
   // ── Netgsm HTTP API ────────────────────────────────────────────────────────
   // Docs: https://www.netgsm.com.tr/dokuman/
 
-  Future<bool> _sendNetgsm(String phone, String message, SmsConfig config) async {
+  Future<bool> _sendNetgsm(
+      String phone, String message, SmsConfig config) async {
     final url = Uri.parse('https://api.netgsm.com.tr/sms/send/get/');
     final params = {
       'usercode': config.username,
       'password': config.apiKey,
-      'gsmno':    phone.replaceAll('+', '').replaceAll(' ', ''),
-      'message':  message,
+      'gsmno': phone.replaceAll('+', '').replaceAll(' ', ''),
+      'message': message,
       'msgheader': config.sender,
       'encoding': 'TR',
     };
@@ -299,29 +311,29 @@ class SmsService {
   // ── Twilio REST API ────────────────────────────────────────────────────────
   // Docs: https://www.twilio.com/docs/sms/api
 
-  Future<bool> _sendTwilio(String phone, String message, SmsConfig config) async {
+  Future<bool> _sendTwilio(
+      String phone, String message, SmsConfig config) async {
     if (config.apiSecret == null) return false;
 
     final url = Uri.parse(
       'https://api.twilio.com/2010-04-01/Accounts/${config.username}/Messages.json',
     );
 
-    final credentials = base64.encode(utf8.encode('${config.username}:${config.apiSecret}'));
+    final credentials =
+        base64.encode(utf8.encode('${config.username}:${config.apiSecret}'));
 
-    final response = await _httpClient
-        .post(
-          url,
-          headers: {
-            'Authorization': 'Basic $credentials',
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: {
-            'To':   phone,
-            'From': config.sender,
-            'Body': message,
-          },
-        )
-        .timeout(const Duration(seconds: 15));
+    final response = await _httpClient.post(
+      url,
+      headers: {
+        'Authorization': 'Basic $credentials',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: {
+        'To': phone,
+        'From': config.sender,
+        'Body': message,
+      },
+    ).timeout(const Duration(seconds: 15));
 
     return response.statusCode == 201;
   }
@@ -336,7 +348,7 @@ class SmsService {
 
   Future<List<SmsQueueItem>> _loadQueue() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw   = prefs.getStringList(_queueKey) ?? [];
+    final raw = prefs.getStringList(_queueKey) ?? [];
     return raw
         .map((e) => SmsQueueItem.fromMap(jsonDecode(e) as Map<String, dynamic>))
         .toList();
@@ -345,7 +357,8 @@ class SmsService {
   Future<void> _saveQueue(List<SmsQueueItem> queue) async {
     final prefs = await SharedPreferences.getInstance();
     // Keep only last 500 items to prevent unbounded growth
-    final trimmed = queue.length > 500 ? queue.sublist(queue.length - 500) : queue;
+    final trimmed =
+        queue.length > 500 ? queue.sublist(queue.length - 500) : queue;
     await prefs.setStringList(
       _queueKey,
       trimmed.map((e) => jsonEncode(e.toMap())).toList(),
@@ -356,12 +369,12 @@ class SmsService {
 
   Future<void> _logDelivery(SmsQueueItem item, {required bool success}) async {
     final prefs = await SharedPreferences.getInstance();
-    final log   = prefs.getStringList(_logKey) ?? [];
+    final log = prefs.getStringList(_logKey) ?? [];
     log.add(jsonEncode({
-      'id':        item.id,
-      'phone':     item.phone,
-      'success':   success,
-      'retries':   item.retryCount,
+      'id': item.id,
+      'phone': item.phone,
+      'success': success,
+      'retries': item.retryCount,
       'timestamp': DateTime.now().toIso8601String(),
     }));
     // Rotate log
@@ -381,8 +394,10 @@ class SmsService {
     return p;
   }
 
-  String _buildQuery(Map<String, String> params) =>
-      params.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&');
+  String _buildQuery(Map<String, String> params) => params.entries
+      .map((e) =>
+          '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+      .join('&');
 
   Future<bool> _sendSim(String phone, String message, SmsConfig config) async {
     try {
@@ -395,7 +410,7 @@ class SmsService {
       }
       final bool? result = await const MethodChannel('serenut/sms_sender')
           .invokeMethod<bool>('sendSmsViaSim', args);
-      
+
       final success = result ?? false;
       if (success) {
         await onSmsSent?.call();

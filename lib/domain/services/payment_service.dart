@@ -84,7 +84,8 @@ class PaymentService {
     if (paidAmount > 0) {
       int parsedPaymentId = 0;
       try {
-        parsedPaymentId = int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
+        parsedPaymentId =
+            int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
       } catch (e) {
         debugPrint('[PaymentService] ID parse hatası: $e');
       }
@@ -113,7 +114,7 @@ class PaymentService {
     // remaining <= 0 → ya tam ödeme ya da fazla ödeme (alacak)
     final remaining = totalAmount - newPaidAmount;
     final remainingDebt = remaining > 0 ? remaining : 0.0;
-    final overpayment  = remaining < 0 ? remaining.abs() : 0.0;
+    final overpayment = remaining < 0 ? remaining.abs() : 0.0;
 
     final transactionId = _generateTxId('trans');
     await _transactionRepository.create(
@@ -132,7 +133,8 @@ class PaymentService {
 
     int parsedPaymentId = 0;
     try {
-      parsedPaymentId = int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
+      parsedPaymentId =
+          int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
     } catch (e) {
       debugPrint('[PaymentService] ID parse hatası (partial): $e');
     }
@@ -204,7 +206,8 @@ class PaymentService {
 
     int parsedPaymentId = 0;
     try {
-      parsedPaymentId = int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
+      parsedPaymentId =
+          int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
     } catch (e) {
       debugPrint('[PaymentService] ID parse hatası (collection): $e');
     }

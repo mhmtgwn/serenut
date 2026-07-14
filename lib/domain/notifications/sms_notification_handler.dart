@@ -1,4 +1,4 @@
-﻿// lib/domain/notifications/sms_notification_handler.dart
+// lib/domain/notifications/sms_notification_handler.dart
 // Serenut POS — SMS Notification Handler (Event Subscriber)
 //
 // Responsibilities:
@@ -52,12 +52,12 @@ class SmsNotificationHandler {
         _smsService = smsService,
         _smsLogRepository = smsLogRepository,
         _templateResolver = templateResolver ?? const TemplateResolver() {
-    _saleListener       = _onSaleCreated;
+    _saleListener = _onSaleCreated;
     _collectionListener = _onCollectionRecorded;
-    _orderCreatedListener   = _onOrderCreated;
+    _orderCreatedListener = _onOrderCreated;
     _orderDeliveredListener = _onOrderDelivered;
     _orderPreparingListener = _onOrderPreparing;
-    _orderReadyListener     = _onOrderReady;
+    _orderReadyListener = _onOrderReady;
     _orderCancelledListener = _onOrderCancelled;
 
     _eventPublisher.subscribe<SaleCreatedEvent>(_saleListener);
@@ -129,7 +129,8 @@ class SmsNotificationHandler {
           customerName: customer.name,
           totalAmount: event.totalAmount,
           paidAmount: event.paidAmount,
-          saleId: event.saleIdStr.isNotEmpty ? event.saleIdStr : '${event.saleId}',
+          saleId:
+              event.saleIdStr.isNotEmpty ? event.saleIdStr : '${event.saleId}',
           businessName: business,
           currency: currency,
         ),
@@ -145,7 +146,9 @@ class SmsNotificationHandler {
             customerName: customer.name,
             totalAmount: event.totalAmount,
             paidAmount: event.paidAmount,
-            saleId: event.saleIdStr.isNotEmpty ? event.saleIdStr : '${event.saleId}',
+            saleId: event.saleIdStr.isNotEmpty
+                ? event.saleIdStr
+                : '${event.saleId}',
             businessName: business,
             currentBalance: customer.balance,
             currency: currency,
@@ -199,7 +202,9 @@ class SmsNotificationHandler {
         vars: SmsTemplateVars.forOrder(
           customerName: customer.name,
           totalAmount: event.totalAmount,
-          orderId: event.orderIdStr.isNotEmpty ? event.orderIdStr : '${event.orderId}',
+          orderId: event.orderIdStr.isNotEmpty
+              ? event.orderIdStr
+              : '${event.orderId}',
           businessName: settings.businessName,
           currency: settings.currency,
         ),
@@ -223,7 +228,9 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty ? event.orderIdStr : '${event.orderId}',
+          'id': event.orderIdStr.isNotEmpty
+              ? event.orderIdStr
+              : '${event.orderId}',
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -247,7 +254,9 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty ? event.orderIdStr : '${event.orderId}',
+          'id': event.orderIdStr.isNotEmpty
+              ? event.orderIdStr
+              : '${event.orderId}',
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -271,7 +280,9 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty ? event.orderIdStr : '${event.orderId}',
+          'id': event.orderIdStr.isNotEmpty
+              ? event.orderIdStr
+              : '${event.orderId}',
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -295,7 +306,9 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty ? event.orderIdStr : '${event.orderId}',
+          'id': event.orderIdStr.isNotEmpty
+              ? event.orderIdStr
+              : '${event.orderId}',
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -348,18 +361,22 @@ class SmsNotificationHandler {
     // Send SMS
     _smsService.sendSms(phone, message).then((success) {
       // Update log status
-      _smsLogRepository.updateStatus(
-        logId,
-        success ? SmsLogStatus.sent : SmsLogStatus.failed,
-        sentAt: success ? DateTime.now() : null,
-        errorMessage: success ? null : 'Send failed',
-      ).ignore();
+      _smsLogRepository
+          .updateStatus(
+            logId,
+            success ? SmsLogStatus.sent : SmsLogStatus.failed,
+            sentAt: success ? DateTime.now() : null,
+            errorMessage: success ? null : 'Send failed',
+          )
+          .ignore();
     }).onError((e, _) {
-      _smsLogRepository.updateStatus(
-        logId,
-        SmsLogStatus.failed,
-        errorMessage: e.toString(),
-      ).ignore();
+      _smsLogRepository
+          .updateStatus(
+            logId,
+            SmsLogStatus.failed,
+            errorMessage: e.toString(),
+          )
+          .ignore();
     });
   }
 

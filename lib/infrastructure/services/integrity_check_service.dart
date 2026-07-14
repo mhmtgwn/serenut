@@ -37,17 +37,21 @@ class IntegrityCheckService {
     bool dbHealthy = true;
     bool fsHealthy = true;
 
-    logBuffer.writeln('=== START DIAGNOSTICS: ${DateTime.now().toIso8601String()} ===');
+    logBuffer.writeln(
+        '=== START DIAGNOSTICS: ${DateTime.now().toIso8601String()} ===');
 
     // 1. SQLite Database Checks
     try {
       final db = await DatabaseManager().getDatabase();
-      
+
       // PRAGMA integrity_check
-      final List<Map<String, dynamic>> integrityRes = await db.rawQuery('PRAGMA integrity_check');
+      final List<Map<String, dynamic>> integrityRes =
+          await db.rawQuery('PRAGMA integrity_check');
       if (integrityRes.isEmpty || integrityRes.first.values.first != 'ok') {
         dbHealthy = false;
-        final details = integrityRes.isNotEmpty ? integrityRes.first.values.first.toString() : 'Empty result';
+        final details = integrityRes.isNotEmpty
+            ? integrityRes.first.values.first.toString()
+            : 'Empty result';
         issues.add('Database integrity check failed: $details');
         logBuffer.writeln('❌ DB Integrity Fail: $details');
       } else {
@@ -55,22 +59,28 @@ class IntegrityCheckService {
       }
 
       // PRAGMA foreign_key_check
-      final List<Map<String, dynamic>> fkRes = await db.rawQuery('PRAGMA foreign_key_check');
+      final List<Map<String, dynamic>> fkRes =
+          await db.rawQuery('PRAGMA foreign_key_check');
       if (fkRes.isNotEmpty) {
         dbHealthy = false;
-        issues.add('Foreign key integrity anomalies detected: ${fkRes.length} row violations');
-        logBuffer.writeln('❌ DB Foreign Key Check: FAIL (${fkRes.length} violations)');
+        issues.add(
+            'Foreign key integrity anomalies detected: ${fkRes.length} row violations');
+        logBuffer.writeln(
+            '❌ DB Foreign Key Check: FAIL (${fkRes.length} violations)');
       } else {
         logBuffer.writeln('✅ DB Foreign Key Check: PASS');
       }
 
       // Verify ledger_bypass_flag is active = 0 (ledger immutability safety check)
-      final List<Map<String, dynamic>> bypassRes = await db.rawQuery('SELECT active FROM ledger_bypass_flag LIMIT 1');
+      final List<Map<String, dynamic>> bypassRes =
+          await db.rawQuery('SELECT active FROM ledger_bypass_flag LIMIT 1');
       if (bypassRes.isNotEmpty && bypassRes.first['active'] == 1) {
         // Safe correction
         await db.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-        issues.add('Ledger bypass flag was left active (1). Automatically restored to 0 for security.');
-        logBuffer.writeln('⚠️ Security Check: Ledger bypass flag was stuck at 1. Automatically repaired to 0.');
+        issues.add(
+            'Ledger bypass flag was left active (1). Automatically restored to 0 for security.');
+        logBuffer.writeln(
+            '⚠️ Security Check: Ledger bypass flag was stuck at 1. Automatically repaired to 0.');
         try {
           await TelemetryService().logStructured(
             event: 'ledger_bypass_flag_repaired',
@@ -82,7 +92,8 @@ class IntegrityCheckService {
           );
         } catch (_) {}
       } else {
-        logBuffer.writeln('✅ Security Check: Ledger bypass flag is disabled: PASS');
+        logBuffer
+            .writeln('✅ Security Check: Ledger bypass flag is disabled: PASS');
       }
     } catch (e) {
       dbHealthy = false;
@@ -94,7 +105,7 @@ class IntegrityCheckService {
     try {
       final appSupportDir = await getApplicationSupportDirectory();
       final cacheDir = await getTemporaryDirectory();
-      
+
       // Check crucial folders
       if (!Directory(appSupportDir.path).existsSync()) {
         fsHealthy = false;
@@ -107,11 +118,15 @@ class IntegrityCheckService {
 
       // Verify essential configuration exists in SQLite settings (single source of truth)
       final dbForPin = await DatabaseManager().getDatabase();
-      final pinRows = await dbForPin.query('settings', columns: ['admin_pin_code'], limit: 1);
-      final adminPin = pinRows.isNotEmpty ? pinRows.first['admin_pin_code'] as String? : null;
+      final pinRows = await dbForPin.query('settings',
+          columns: ['admin_pin_code'], limit: 1);
+      final adminPin = pinRows.isNotEmpty
+          ? pinRows.first['admin_pin_code'] as String?
+          : null;
       if (adminPin == null || adminPin.isEmpty) {
         // Warning level only
-        logBuffer.writeln('⚠️ Warning: Admin PIN config is not set (first launch onboarding state)');
+        logBuffer.writeln(
+            '⚠️ Warning: Admin PIN config is not set (first launch onboarding state)');
       } else {
         logBuffer.writeln('✅ Config Verification: PASS');
       }
@@ -121,7 +136,8 @@ class IntegrityCheckService {
       logBuffer.writeln('❌ File System Exception: $e');
     }
 
-    logBuffer.writeln('=== END DIAGNOSTICS: ${dbHealthy && fsHealthy ? "PASS" : "FAIL"} ===');
+    logBuffer.writeln(
+        '=== END DIAGNOSTICS: ${dbHealthy && fsHealthy ? "PASS" : "FAIL"} ===');
 
     return IntegrityReport(
       isDatabaseHealthy: dbHealthy,
@@ -159,14 +175,15 @@ class IntegrityCheckService {
                   f.path.endsWith('.db'))
               .toList();
           if (files.isNotEmpty) {
-            files.sort((a, b) =>
-                b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+            files.sort(
+                (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
             latestBackupFile = files.first;
           }
         }
       } catch (e) {
         // Backup klasörü okunamazsa logla ama işlemi durdurma
-        debugPrint('[IntegrityCheckService] SerenutBackups taraması başarısız: $e');
+        debugPrint(
+            '[IntegrityCheckService] SerenutBackups taraması başarısız: $e');
       }
 
       // 2. Fallback: upgrade backup
@@ -177,7 +194,8 @@ class IntegrityCheckService {
           (await upgradeBackup.exists() ? upgradeBackup : null);
 
       if (sourceFile == null) {
-        debugPrint('[IntegrityCheckService] attemptDatabaseRepair: kullanılabilir backup yok.');
+        debugPrint(
+            '[IntegrityCheckService] attemptDatabaseRepair: kullanılabilir backup yok.');
         return false;
       }
 
@@ -212,17 +230,20 @@ class IntegrityCheckService {
 
         // Başarılı — temp backup'ı sil
         if (await tempFile.exists()) await tempFile.delete();
-        debugPrint('[IntegrityCheckService] Repair başarılı: ${basename(sourceFile.path)}');
+        debugPrint(
+            '[IntegrityCheckService] Repair başarılı: ${basename(sourceFile.path)}');
         return true;
       } catch (e) {
-        debugPrint('[IntegrityCheckService] Repair başarısız, rollback yapılıyor: $e');
+        debugPrint(
+            '[IntegrityCheckService] Repair başarısız, rollback yapılıyor: $e');
         // Rollback: temp backup'ı geri yükle
         if (await dbFile.exists()) await dbFile.delete();
         if (await tempFile.exists()) await tempFile.rename(dbPath);
         return false;
       }
     } catch (e) {
-      debugPrint('[IntegrityCheckService] attemptDatabaseRepair genel hata: $e');
+      debugPrint(
+          '[IntegrityCheckService] attemptDatabaseRepair genel hata: $e');
       return false;
     }
   }

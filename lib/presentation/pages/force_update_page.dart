@@ -110,7 +110,8 @@ class ForceUpdatePage extends StatelessWidget {
                     ],
                     const SizedBox(height: 32),
                     ElevatedButton.icon(
-                      onPressed: downloadUrl.isNotEmpty ? _launchUpdateUrl : null,
+                      onPressed:
+                          downloadUrl.isNotEmpty ? _launchUpdateUrl : null,
                       icon: const Icon(Icons.download_rounded),
                       label: const Text(
                         'Şimdi Güncelle',

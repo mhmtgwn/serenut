@@ -76,7 +76,12 @@ class DownloadProgress {
 }
 
 /// Possible outcomes of an OTA install attempt.
-enum InstallResult { success, sha256Failed, openFileFailed, platformUnsupported }
+enum InstallResult {
+  success,
+  sha256Failed,
+  openFileFailed,
+  platformUnsupported
+}
 
 /// Release Manager Service
 ///
@@ -93,7 +98,8 @@ enum InstallResult { success, sha256Failed, openFileFailed, platformUnsupported 
 /// if (info.hasUpdate) { ... }
 /// ```
 class ReleaseManagerService {
-  static const String _rsaModulusHex = '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
+  static const String _rsaModulusHex =
+      '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
   static const String _rsaExponentHex = '65537';
 
   final EnvironmentConfig _config;
@@ -179,9 +185,14 @@ class ReleaseManagerService {
     // If final file already downloaded and verified, skip
     if (await targetFile.exists()) {
       final existingHash = await _computeSha256(targetFile);
-      if (updateInfo.sha256Hash != null && existingHash == updateInfo.sha256Hash) {
-        debugPrint('[ReleaseManager] Cached file hash match, skipping download.');
-        yield DownloadProgress(bytesDownloaded: totalBytes ?? 0, totalBytes: totalBytes, percentage: 1.0);
+      if (updateInfo.sha256Hash != null &&
+          existingHash == updateInfo.sha256Hash) {
+        debugPrint(
+            '[ReleaseManager] Cached file hash match, skipping download.');
+        yield DownloadProgress(
+            bytesDownloaded: totalBytes ?? 0,
+            totalBytes: totalBytes,
+            percentage: 1.0);
         return;
       }
       await targetFile.delete();
@@ -197,8 +208,10 @@ class ReleaseManagerService {
       fullUrl = downloadPath;
     } else if (downloadPath.startsWith('/api')) {
       final uri = Uri.parse(_config.apiBaseUrl);
-      final origin = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
-      fullUrl = '$origin$downloadPath${deviceId != null ? "?device_id=$deviceId" : ""}';
+      final origin =
+          '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+      fullUrl =
+          '$origin$downloadPath${deviceId != null ? "?device_id=$deviceId" : ""}';
     } else {
       fullUrl = '${_config.apiBaseUrl}${_config.releaseEndpoint}$downloadPath'
           '${deviceId != null ? "?device_id=$deviceId" : ""}';
@@ -209,16 +222,21 @@ class ReleaseManagerService {
       request.headers['Authorization'] = 'Bearer $jwtToken';
     }
 
-    if (existingLength > 0 && totalBytes != null && existingLength < totalBytes) {
+    if (existingLength > 0 &&
+        totalBytes != null &&
+        existingLength < totalBytes) {
       request.headers['Range'] = 'bytes=$existingLength-';
-      debugPrint('[ReleaseManager] Resuming OTA download from offset: $existingLength bytes');
+      debugPrint(
+          '[ReleaseManager] Resuming OTA download from offset: $existingLength bytes');
     }
 
     final streamedResponse = await _httpClient.send(request);
     final isPartial = streamedResponse.statusCode == 206;
 
-    if (streamedResponse.statusCode != 200 && streamedResponse.statusCode != 206) {
-      throw Exception('[ReleaseManager] Download failed: ${streamedResponse.statusCode}');
+    if (streamedResponse.statusCode != 200 &&
+        streamedResponse.statusCode != 206) {
+      throw Exception(
+          '[ReleaseManager] Download failed: ${streamedResponse.statusCode}');
     }
 
     final int startByte = isPartial ? existingLength : 0;
@@ -229,13 +247,16 @@ class ReleaseManagerService {
       }
     }
 
-    final iosink = tmpFile.openWrite(mode: isPartial ? FileMode.append : FileMode.write);
+    final iosink =
+        tmpFile.openWrite(mode: isPartial ? FileMode.append : FileMode.write);
     int downloaded = startByte;
 
     await for (final chunk in streamedResponse.stream) {
       iosink.add(chunk);
       downloaded += chunk.length;
-      final pct = (totalBytes != null && totalBytes > 0) ? downloaded / totalBytes : 0.0;
+      final pct = (totalBytes != null && totalBytes > 0)
+          ? downloaded / totalBytes
+          : 0.0;
       yield DownloadProgress(
         bytesDownloaded: downloaded,
         totalBytes: totalBytes,
@@ -244,14 +265,15 @@ class ReleaseManagerService {
     }
 
     await iosink.close();
-    
+
     // Rename tmp file to final file
     if (await targetFile.exists()) {
       await targetFile.delete();
     }
     await tmpFile.rename(targetFile.path);
 
-    debugPrint('[ReleaseManager] Download complete and merged: ${targetFile.path} ($downloaded bytes)');
+    debugPrint(
+        '[ReleaseManager] Download complete and merged: ${targetFile.path} ($downloaded bytes)');
   }
 
   /// Get the path to the downloaded update file.
@@ -263,36 +285,41 @@ class ReleaseManagerService {
   }
 
   /// Verify SHA-256 hash and RSA digital signature of downloaded file.
-  Future<bool> verifyDownload(File file, String expectedHash, String signature) async {
+  Future<bool> verifyDownload(
+      File file, String expectedHash, String signature) async {
     // 1. Verify SHA-256 integrity
     final actualHash = await _computeSha256(file);
     final validHash = actualHash == expectedHash;
-    debugPrint('[ReleaseManager] SHA-256 verify: expected=$expectedHash actual=$actualHash match=$validHash');
+    debugPrint(
+        '[ReleaseManager] SHA-256 verify: expected=$expectedHash actual=$actualHash match=$validHash');
     if (!validHash) return false;
 
     // 2. Verify RSA Digital Signature
     if (signature.isEmpty) {
-      debugPrint('[ReleaseManager] RSA Signature missing! Rejecting update package.');
+      debugPrint(
+          '[ReleaseManager] RSA Signature missing! Rejecting update package.');
       return false;
     }
 
     try {
       final signatureBytes = base64.decode(signature.trim());
-      final payloadBytes = utf8.encode(actualHash); // The signed data is the file hash
+      final payloadBytes =
+          utf8.encode(actualHash); // The signed data is the file hash
 
       final modulus = BigInt.parse(_rsaModulusHex);
       final publicExponent = BigInt.parse(_rsaExponentHex);
-      
+
       final publicKey = RSAPublicKey(modulus, publicExponent);
       final verifier = RSASigner(SHA256Digest(), '0609608648016503040201');
       verifier.init(false, PublicKeyParameter<RSAPublicKey>(publicKey));
-      
+
       final rsaSignature = RSASignature(signatureBytes);
       final verified = verifier.verifySignature(payloadBytes, rsaSignature);
       debugPrint('[ReleaseManager] RSA signature verify match=$verified');
       return verified;
     } catch (e) {
-      debugPrint('[ReleaseManager] RSA signature verification failed with error: $e');
+      debugPrint(
+          '[ReleaseManager] RSA signature verification failed with error: $e');
       return false;
     }
   }
@@ -304,11 +331,16 @@ class ReleaseManagerService {
     final path = file.path;
 
     if (Platform.isAndroid) {
-      final result = await OpenFilex.open(path, type: 'application/vnd.android.package-archive');
-      return result.type == ResultType.done ? InstallResult.success : InstallResult.openFileFailed;
+      final result = await OpenFilex.open(path,
+          type: 'application/vnd.android.package-archive');
+      return result.type == ResultType.done
+          ? InstallResult.success
+          : InstallResult.openFileFailed;
     } else if (Platform.isWindows) {
       final result = await Process.run('start', [path], runInShell: true);
-      return result.exitCode == 0 ? InstallResult.success : InstallResult.openFileFailed;
+      return result.exitCode == 0
+          ? InstallResult.success
+          : InstallResult.openFileFailed;
     }
 
     return InstallResult.platformUnsupported;
@@ -324,7 +356,8 @@ class ReleaseManagerService {
     try {
       await _httpClient
           .post(
-            Uri.parse('${_config.apiBaseUrl}${_config.releaseEndpoint}/report-version'),
+            Uri.parse(
+                '${_config.apiBaseUrl}${_config.releaseEndpoint}/report-version'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $jwtToken',
@@ -338,7 +371,8 @@ class ReleaseManagerService {
           )
           .timeout(const Duration(seconds: 8));
 
-      debugPrint('[ReleaseManager] Version reported: $currentVersion on $platform');
+      debugPrint(
+          '[ReleaseManager] Version reported: $currentVersion on $platform');
     } catch (e) {
       debugPrint('[ReleaseManager] Version report failed (non-critical): $e');
     }
@@ -353,7 +387,8 @@ class ReleaseManagerService {
     try {
       await _httpClient
           .post(
-            Uri.parse('${_config.apiBaseUrl}${_config.releaseEndpoint}/confirm-download'),
+            Uri.parse(
+                '${_config.apiBaseUrl}${_config.releaseEndpoint}/confirm-download'),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $jwtToken',

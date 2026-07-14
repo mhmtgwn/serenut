@@ -26,23 +26,32 @@ class CloudAdaptiveProductRepository implements IProductRepository {
   Future<bool> exists(id) => _localRepo.exists(id);
 
   @override
-  Future<List<ProductEntity>> searchByName(String query) => _localRepo.searchByName(query);
+  Future<List<ProductEntity>> searchByName(String query) =>
+      _localRepo.searchByName(query);
 
   @override
-  Future<List<ProductEntity>> getByCategory(String category) => _localRepo.getByCategory(category);
+  Future<List<ProductEntity>> getByCategory(String category) =>
+      _localRepo.getByCategory(category);
 
   @override
-  Future<Map<String, List<ProductEntity>>> getGroupedByCategory() => _localRepo.getGroupedByCategory();
+  Future<Map<String, List<ProductEntity>>> getGroupedByCategory() =>
+      _localRepo.getGroupedByCategory();
 
   @override
-  Future<List<ProductEntity>> getLowStockProducts(int threshold) => _localRepo.getLowStockProducts(threshold);
+  Future<List<ProductEntity>> getLowStockProducts(int threshold) =>
+      _localRepo.getLowStockProducts(threshold);
 
   @override
   Future<List<String>> getCategories() => _localRepo.getCategories();
 
   @override
-  Future<List<ProductEntity>> findFiltered({String? searchQuery, String? category, int? limit, int? offset}) =>
-      _localRepo.findFiltered(searchQuery: searchQuery, category: category, limit: limit, offset: offset);
+  Future<List<ProductEntity>> findFiltered(
+          {String? searchQuery, String? category, int? limit, int? offset}) =>
+      _localRepo.findFiltered(
+          searchQuery: searchQuery,
+          category: category,
+          limit: limit,
+          offset: offset);
 
   // ── Write operations (Offline first: write local, then sync remote in bg) ──
   @override

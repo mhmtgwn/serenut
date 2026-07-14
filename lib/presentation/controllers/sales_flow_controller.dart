@@ -10,7 +10,8 @@ import 'package:serenutos/infrastructure/services/cart_persistence_service.dart'
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('Must override sharedPreferencesProvider in ProviderScope');
+  throw UnimplementedError(
+      'Must override sharedPreferencesProvider in ProviderScope');
 });
 
 final cartPersistenceServiceProvider = Provider<CartPersistenceService>((ref) {
@@ -102,7 +103,8 @@ class SalesFlowState {
       status: status ?? this.status,
       cartQuantities: cartQuantities ?? this.cartQuantities,
       cartProducts: cartProducts ?? this.cartProducts,
-      selectedCustomer: selectedCustomer != null ? selectedCustomer() : this.selectedCustomer,
+      selectedCustomer:
+          selectedCustomer != null ? selectedCustomer() : this.selectedCustomer,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paidAmount: paidAmount ?? this.paidAmount,
       isSubmitting: isSubmitting ?? this.isSubmitting,
@@ -115,10 +117,12 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
   final CartPersistenceService? _persistenceService;
   final AuditLogger? _auditLogger;
 
-  SalesFlowNotifier([this._persistenceService, this._auditLogger]) : super(const SalesFlowState());
+  SalesFlowNotifier([this._persistenceService, this._auditLogger])
+      : super(const SalesFlowState());
 
   // ── Transition Table Definition ──────────────────────────────────────────────
-  static const Map<SalesFlowStatus, Map<SalesFlowEvent, SalesFlowStatus>> _transitions = {
+  static const Map<SalesFlowStatus, Map<SalesFlowEvent, SalesFlowStatus>>
+      _transitions = {
     SalesFlowStatus.idle: {
       SalesFlowEvent.selectCustomer: SalesFlowStatus.customerSelected,
       SalesFlowEvent.addProduct: SalesFlowStatus.productsAdded,
@@ -155,36 +159,38 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
       SalesFlowEvent.reset: SalesFlowStatus.idle,
     },
     SalesFlowStatus.completed: {
-      SalesFlowEvent.reset:            SalesFlowStatus.idle,
+      SalesFlowEvent.reset: SalesFlowStatus.idle,
       // Hızlı yeni satış: completed'dan direkt ilerleyebilir
-      SalesFlowEvent.selectCustomer:   SalesFlowStatus.customerSelected,
-      SalesFlowEvent.addProduct:       SalesFlowStatus.productsAdded,
-      SalesFlowEvent.clearCart:        SalesFlowStatus.idle,
+      SalesFlowEvent.selectCustomer: SalesFlowStatus.customerSelected,
+      SalesFlowEvent.addProduct: SalesFlowStatus.productsAdded,
+      SalesFlowEvent.clearCart: SalesFlowStatus.idle,
     },
     SalesFlowStatus.failed: {
-      SalesFlowEvent.reset:               SalesFlowStatus.idle,
-      SalesFlowEvent.proceedToPayment:    SalesFlowStatus.paymentPending,
-      SalesFlowEvent.selectCustomer:      SalesFlowStatus.failed,
-      SalesFlowEvent.deselectCustomer:    SalesFlowStatus.failed,
-      SalesFlowEvent.addProduct:          SalesFlowStatus.productsAdded,
-      SalesFlowEvent.clearCart:           SalesFlowStatus.idle,
-      SalesFlowEvent.submitPayment:       SalesFlowStatus.processing,
-      SalesFlowEvent.removeProduct:       SalesFlowStatus.productsAdded,
+      SalesFlowEvent.reset: SalesFlowStatus.idle,
+      SalesFlowEvent.proceedToPayment: SalesFlowStatus.paymentPending,
+      SalesFlowEvent.selectCustomer: SalesFlowStatus.failed,
+      SalesFlowEvent.deselectCustomer: SalesFlowStatus.failed,
+      SalesFlowEvent.addProduct: SalesFlowStatus.productsAdded,
+      SalesFlowEvent.clearCart: SalesFlowStatus.idle,
+      SalesFlowEvent.submitPayment: SalesFlowStatus.processing,
+      SalesFlowEvent.removeProduct: SalesFlowStatus.productsAdded,
     },
-
   };
 
   void _dispatch(SalesFlowEvent event) {
     final allowedTransitions = _transitions[state.status];
     if (allowedTransitions == null || !allowedTransitions.containsKey(event)) {
-      throw StateError('🔴 FSM TRANSITION FAILURE: Invalid transition from ${state.status} using event $event.');
+      throw StateError(
+          '🔴 FSM TRANSITION FAILURE: Invalid transition from ${state.status} using event $event.');
     }
-    
+
     final before = state.status;
     final after = allowedTransitions[event]!;
-    
+
     String nextKey = state.idempotencyKey;
-    if ((after == SalesFlowStatus.paymentPending || after == SalesFlowStatus.processing) && nextKey.isEmpty) {
+    if ((after == SalesFlowStatus.paymentPending ||
+            after == SalesFlowStatus.processing) &&
+        nextKey.isEmpty) {
       nextKey = IdempotencyKeyGenerator.generateKey();
     }
     if (after == SalesFlowStatus.idle || after == SalesFlowStatus.completed) {
@@ -235,7 +241,9 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
       );
 
       state = SalesFlowState(
-        status: parsedStatus == SalesFlowStatus.processing ? SalesFlowStatus.failed : parsedStatus,
+        status: parsedStatus == SalesFlowStatus.processing
+            ? SalesFlowStatus.failed
+            : parsedStatus,
         cartQuantities: quantities,
         cartProducts: cached['cartProducts'] as Map<String, ProductEntity>,
         selectedCustomer: cached['selectedCustomer'] as CustomerEntity?,
@@ -437,7 +445,8 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     _persistenceService?.clearCart();
   }
 
-  double _calculateTotal(Map<String, int> quantities, Map<String, ProductEntity> products) {
+  double _calculateTotal(
+      Map<String, int> quantities, Map<String, ProductEntity> products) {
     double sum = 0;
     quantities.forEach((id, qty) {
       final prod = products[id];
@@ -449,7 +458,8 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
   }
 }
 
-final salesFlowProvider = StateNotifierProvider<SalesFlowNotifier, SalesFlowState>((ref) {
+final salesFlowProvider =
+    StateNotifierProvider<SalesFlowNotifier, SalesFlowState>((ref) {
   final persistence = ref.watch(cartPersistenceServiceProvider);
   final audit = ref.watch(auditLoggerProvider);
   final notifier = SalesFlowNotifier(persistence, audit);

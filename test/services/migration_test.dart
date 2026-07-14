@@ -22,7 +22,7 @@ void main() {
       if (await file.exists()) await file.delete();
       final backupFile = File(backupPath);
       if (await backupFile.exists()) await backupFile.delete();
-      
+
       final walFile = File('$dbPath-wal');
       if (await walFile.exists()) await walFile.delete();
       final shmFile = File('$dbPath-shm');
@@ -32,22 +32,29 @@ void main() {
     tearDown(() async {
       DatabaseManager.overrideDatabasePath = null;
       await DatabaseManager().close();
-      
+
       final file = File(dbPath);
       if (await file.exists()) await file.delete();
       final backupFile = File(backupPath);
       if (await backupFile.exists()) await backupFile.delete();
     });
 
-    test('Should create a pre-migration backup file before upgrading schema', () async {
+    test('Should create a pre-migration backup file before upgrading schema',
+        () async {
       // 1. Create a version 3 mock database
-      final db = await openDatabase(dbPath, version: 3, onCreate: (db, version) async {
-        await db.execute('CREATE TABLE settings (id INTEGER PRIMARY KEY, business_name TEXT)');
-        await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT, customer_id TEXT)');
+      final db =
+          await openDatabase(dbPath, version: 3, onCreate: (db, version) async {
+        await db.execute(
+            'CREATE TABLE settings (id INTEGER PRIMARY KEY, business_name TEXT)');
+        await db.execute(
+            'CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT, customer_id TEXT)');
         await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY)');
-        await db.execute('CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT)');
-        await db.execute('CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT, product_id TEXT)');
-        await db.execute('CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT)');
+        await db.execute(
+            'CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT)');
+        await db.execute(
+            'CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT, product_id TEXT)');
+        await db
+            .execute('CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT)');
         await db.execute('''
           CREATE TABLE users (
             id TEXT PRIMARY KEY,
@@ -70,9 +77,10 @@ void main() {
 
       // 3. Trigger upgrade using DatabaseManager (upgrades to version 5)
       final upgradedDb = await DatabaseManager().getDatabase();
-      
+
       // Check that tables were upgraded and the pre-migration backup was created
-      final tables = await upgradedDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      final tables = await upgradedDb
+          .rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
       final tableNames = tables.map((t) => t['name'] as String).toList();
       expect(tableNames.contains('settings'), isTrue);
 

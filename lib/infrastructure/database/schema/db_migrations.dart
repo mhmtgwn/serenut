@@ -7,7 +7,8 @@ import 'package:uuid/uuid.dart';
 
 class DatabaseMigrations {
   /// Handle database upgrades
-  static Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
+  static Future<void> onUpgrade(
+      Database db, int oldVersion, int newVersion) async {
     // Enforce app_migration_history existence before running migrations
     await db.execute('''
       CREATE TABLE IF NOT EXISTS app_migration_history (
@@ -33,9 +34,12 @@ class DatabaseMigrations {
         }
 
         if (oldVersion < 4) {
-          await txn.execute('CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)');
-          await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_created ON financial_transactions(created_at)');
-          await txn.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
+          await txn.execute(
+              'CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at)');
+          await txn.execute(
+              'CREATE INDEX IF NOT EXISTS idx_ft_created ON financial_transactions(created_at)');
+          await txn.execute(
+              'CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)');
           await txn.insert('app_migration_history', {
             'version': 4,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -43,9 +47,12 @@ class DatabaseMigrations {
           });
         }
         if (oldVersion < 5) {
-          await txn.execute('ALTER TABLE sales ADD COLUMN idempotency_key TEXT');
-          await txn.execute('ALTER TABLE sales ADD COLUMN is_synced INTEGER DEFAULT 0');
-          await txn.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency ON sales(idempotency_key)');
+          await txn
+              .execute('ALTER TABLE sales ADD COLUMN idempotency_key TEXT');
+          await txn.execute(
+              'ALTER TABLE sales ADD COLUMN is_synced INTEGER DEFAULT 0');
+          await txn.execute(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency ON sales(idempotency_key)');
           await txn.insert('app_migration_history', {
             'version': 5,
             'migrated_at': DateTime.now().toIso8601String(),
@@ -66,22 +73,26 @@ class DatabaseMigrations {
         }
         if (oldVersion < 7) {
           try {
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_sales_synced ON sales(is_synced)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_sales_synced ON sales(is_synced)');
           } catch (e) {
             handleMigrationError(e, 7);
           }
           try {
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id)');
           } catch (e) {
             handleMigrationError(e, 7);
           }
           try {
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_reference ON financial_transactions(reference_id)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_ft_reference ON financial_transactions(reference_id)');
           } catch (e) {
             handleMigrationError(e, 7);
           }
           try {
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
           } catch (e) {
             handleMigrationError(e, 7);
           }
@@ -106,8 +117,10 @@ class DatabaseMigrations {
                 retry_count INTEGER NOT NULL DEFAULT 0
               )
             ''');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_status ON sms_logs(status)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_sms_logs_created ON sms_logs(created_at)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_sms_logs_status ON sms_logs(status)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_sms_logs_created ON sms_logs(created_at)');
           } catch (e) {
             handleMigrationError(e, 8);
           }
@@ -140,9 +153,12 @@ class DatabaseMigrations {
         }
         if (oldVersion < 12) {
           try {
-            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN logical_clock INTEGER NOT NULL DEFAULT 0');
-            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN device_id TEXT');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_logical ON financial_transactions(logical_clock, device_id)');
+            await txn.execute(
+                'ALTER TABLE financial_transactions ADD COLUMN logical_clock INTEGER NOT NULL DEFAULT 0');
+            await txn.execute(
+                'ALTER TABLE financial_transactions ADD COLUMN device_id TEXT');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_ft_logical ON financial_transactions(logical_clock, device_id)');
           } catch (e) {
             handleMigrationError(e, 12);
           }
@@ -169,28 +185,41 @@ class DatabaseMigrations {
                 notes TEXT
               )
             ''');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events(timestamp)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_audit_events_timestamp ON audit_events(timestamp)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_audit_events_type ON audit_events(event_type)');
 
-            await txn.execute('ALTER TABLE products ADD COLUMN is_deleted INTEGER DEFAULT 0');
-            await txn.execute('ALTER TABLE products ADD COLUMN deleted_at TEXT');
-            await txn.execute('ALTER TABLE products ADD COLUMN deleted_by TEXT');
+            await txn.execute(
+                'ALTER TABLE products ADD COLUMN is_deleted INTEGER DEFAULT 0');
+            await txn
+                .execute('ALTER TABLE products ADD COLUMN deleted_at TEXT');
+            await txn
+                .execute('ALTER TABLE products ADD COLUMN deleted_by TEXT');
 
-            await txn.execute('ALTER TABLE customers ADD COLUMN is_deleted INTEGER DEFAULT 0');
-            await txn.execute('ALTER TABLE customers ADD COLUMN deleted_at TEXT');
-            await txn.execute('ALTER TABLE customers ADD COLUMN deleted_by TEXT');
+            await txn.execute(
+                'ALTER TABLE customers ADD COLUMN is_deleted INTEGER DEFAULT 0');
+            await txn
+                .execute('ALTER TABLE customers ADD COLUMN deleted_at TEXT');
+            await txn
+                .execute('ALTER TABLE customers ADD COLUMN deleted_by TEXT');
 
-            await txn.execute('ALTER TABLE sales ADD COLUMN is_deleted INTEGER DEFAULT 0');
+            await txn.execute(
+                'ALTER TABLE sales ADD COLUMN is_deleted INTEGER DEFAULT 0');
             await txn.execute('ALTER TABLE sales ADD COLUMN deleted_at TEXT');
             await txn.execute('ALTER TABLE sales ADD COLUMN deleted_by TEXT');
 
-            await txn.execute('ALTER TABLE orders ADD COLUMN is_deleted INTEGER DEFAULT 0');
+            await txn.execute(
+                'ALTER TABLE orders ADD COLUMN is_deleted INTEGER DEFAULT 0');
             await txn.execute('ALTER TABLE orders ADD COLUMN deleted_at TEXT');
             await txn.execute('ALTER TABLE orders ADD COLUMN deleted_by TEXT');
 
-            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN is_deleted INTEGER DEFAULT 0');
-            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN deleted_at TEXT');
-            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN deleted_by TEXT');
+            await txn.execute(
+                'ALTER TABLE financial_transactions ADD COLUMN is_deleted INTEGER DEFAULT 0');
+            await txn.execute(
+                'ALTER TABLE financial_transactions ADD COLUMN deleted_at TEXT');
+            await txn.execute(
+                'ALTER TABLE financial_transactions ADD COLUMN deleted_by TEXT');
           } catch (e) {
             handleMigrationError(e, 13);
           }
@@ -247,11 +276,16 @@ class DatabaseMigrations {
         }
         if (oldVersion < 16) {
           try {
-            await txn.execute('ALTER TABLE settings ADD COLUMN owner_name TEXT DEFAULT ""');
-            await txn.execute('ALTER TABLE settings ADD COLUMN business_email TEXT');
-            await txn.execute('ALTER TABLE settings ADD COLUMN business_city TEXT DEFAULT ""');
-            await txn.execute('ALTER TABLE settings ADD COLUMN business_district TEXT DEFAULT ""');
-            await txn.execute('ALTER TABLE settings ADD COLUMN business_type TEXT DEFAULT ""');
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN owner_name TEXT DEFAULT ""');
+            await txn
+                .execute('ALTER TABLE settings ADD COLUMN business_email TEXT');
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN business_city TEXT DEFAULT ""');
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN business_district TEXT DEFAULT ""');
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN business_type TEXT DEFAULT ""');
           } catch (e) {
             handleMigrationError(e, 16);
           }
@@ -263,8 +297,10 @@ class DatabaseMigrations {
         }
         if (oldVersion < 17) {
           try {
-            await txn.execute('ALTER TABLE products ADD COLUMN is_synced INTEGER DEFAULT 1');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_products_synced ON products(is_synced)');
+            await txn.execute(
+                'ALTER TABLE products ADD COLUMN is_synced INTEGER DEFAULT 1');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_products_synced ON products(is_synced)');
           } catch (e) {
             handleMigrationError(e, 17);
           }
@@ -296,17 +332,20 @@ class DatabaseMigrations {
         }
         if (oldVersion < 19) {
           try {
-            await txn.execute('ALTER TABLE financial_transactions ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
+            await txn.execute(
+                'ALTER TABLE financial_transactions ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
           } catch (e) {
             handleMigrationError(e, 19);
           }
           try {
-            await txn.execute('ALTER TABLE customers ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
+            await txn.execute(
+                'ALTER TABLE customers ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 1');
           } catch (e) {
             handleMigrationError(e, 19);
           }
           try {
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_ft_customer_id ON financial_transactions(customer_id)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_ft_customer_id ON financial_transactions(customer_id)');
           } catch (e) {
             handleMigrationError(e, 19);
           }
@@ -318,9 +357,12 @@ class DatabaseMigrations {
         }
         if (oldVersion < 20) {
           try {
-            await txn.execute('ALTER TABLE settings ADD COLUMN license_token TEXT');
-            await txn.execute('ALTER TABLE settings ADD COLUMN last_system_time TEXT');
-            await txn.execute('ALTER TABLE settings ADD COLUMN max_timestamp_seen TEXT');
+            await txn
+                .execute('ALTER TABLE settings ADD COLUMN license_token TEXT');
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN last_system_time TEXT');
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN max_timestamp_seen TEXT');
           } catch (e) {
             handleMigrationError(e, 20);
           }
@@ -343,8 +385,10 @@ class DatabaseMigrations {
                 last_error TEXT
               )
             ''');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
           } catch (e) {
             handleMigrationError(e, 21);
           }
@@ -381,11 +425,16 @@ class DatabaseMigrations {
         }
         if (oldVersion < 23) {
           try {
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
-            await txn.execute('CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
           } catch (e) {
             handleMigrationError(e, 23);
           }
@@ -434,7 +483,8 @@ class DatabaseMigrations {
         }
         if (oldVersion < 26) {
           try {
-            await txn.execute('ALTER TABLE business_profile ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+            await txn.execute(
+                'ALTER TABLE business_profile ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
           } catch (e) {
             handleMigrationError(e, 26);
           }
@@ -458,7 +508,8 @@ class DatabaseMigrations {
         }
         if (oldVersion < 28) {
           try {
-            await txn.execute('ALTER TABLE sales ADD COLUMN entitlement_snapshot TEXT');
+            await txn.execute(
+                'ALTER TABLE sales ADD COLUMN entitlement_snapshot TEXT');
           } catch (e) {
             handleMigrationError(e, 28);
           }
@@ -499,18 +550,33 @@ class DatabaseMigrations {
       final settingsRows = await db.query('settings', limit: 1);
       if (settingsRows.isNotEmpty) {
         final existingId = settingsRows.first['id'];
-        await db.update('settings', {
-          'sound_notification_enabled': (prefs.getBool('sound_notification_enabled') ?? false) ? 1 : 0,
-          'sms_auto_debt_reminder_enabled': (prefs.getBool('sms_auto_debt_reminder_enabled') ?? false) ? 1 : 0,
-          'sms_auto_debt_reminder_days': prefs.getInt('sms_auto_debt_reminder_days') ?? 15,
-          'sms_auto_debt_reminder_min_amount': prefs.getDouble('sms_auto_debt_reminder_min_amount') ?? 100.0,
-          'label_printer_enabled': (prefs.getBool('label_printer_enabled') ?? false) ? 1 : 0,
-          'label_printer_ip': prefs.getString('label_printer_ip') ?? '',
-          'label_printer_port': int.tryParse(prefs.getString('label_printer_port') ?? '9100') ?? 9100,
-          'label_printer_copies': prefs.getInt('label_printer_copies') ?? 1,
-          'admin_pin_code': prefs.getString('admin_pin_code'),
-          'updated_at': DateTime.now().toIso8601String(),
-        }, where: 'id = ?', whereArgs: [existingId]);
+        await db.update(
+            'settings',
+            {
+              'sound_notification_enabled':
+                  (prefs.getBool('sound_notification_enabled') ?? false)
+                      ? 1
+                      : 0,
+              'sms_auto_debt_reminder_enabled':
+                  (prefs.getBool('sms_auto_debt_reminder_enabled') ?? false)
+                      ? 1
+                      : 0,
+              'sms_auto_debt_reminder_days':
+                  prefs.getInt('sms_auto_debt_reminder_days') ?? 15,
+              'sms_auto_debt_reminder_min_amount':
+                  prefs.getDouble('sms_auto_debt_reminder_min_amount') ?? 100.0,
+              'label_printer_enabled':
+                  (prefs.getBool('label_printer_enabled') ?? false) ? 1 : 0,
+              'label_printer_ip': prefs.getString('label_printer_ip') ?? '',
+              'label_printer_port': int.tryParse(
+                      prefs.getString('label_printer_port') ?? '9100') ??
+                  9100,
+              'label_printer_copies': prefs.getInt('label_printer_copies') ?? 1,
+              'admin_pin_code': prefs.getString('admin_pin_code'),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [existingId]);
       }
 
       // Clean up migrated SharedPreferences settings keys
@@ -541,24 +607,30 @@ class DatabaseMigrations {
               'after': map['afterState'] ?? '',
               'metadata': map['metadata'] ?? {},
             });
-            await db.insert('audit_logs', {
-              'id': logId,
-              'user_id': 'system',
-              'user_name': 'Migrated (SharedPrefs)',
-              'action': map['action'] ?? 'unknown',
-              'details': details,
-              'created_at': map['timestamp'] ?? DateTime.now().toIso8601String(),
-            }, conflictAlgorithm: ConflictAlgorithm.ignore);
+            await db.insert(
+                'audit_logs',
+                {
+                  'id': logId,
+                  'user_id': 'system',
+                  'user_name': 'Migrated (SharedPrefs)',
+                  'action': map['action'] ?? 'unknown',
+                  'details': details,
+                  'created_at':
+                      map['timestamp'] ?? DateTime.now().toIso8601String(),
+                },
+                conflictAlgorithm: ConflictAlgorithm.ignore);
           } catch (_) {
             // Malformed entry — skip
           }
         }
         // Remove migrated audit log key
         await prefs.remove('serenut_audit_logs');
-        debugPrint('[DB Migration v22] Migrated ${rawLogs.length} SharedPreferences audit logs to SQLite audit_logs.');
+        debugPrint(
+            '[DB Migration v22] Migrated ${rawLogs.length} SharedPreferences audit logs to SQLite audit_logs.');
       }
 
-      debugPrint('[DB Migration v22] SharedPreferences → SQLite migration complete.');
+      debugPrint(
+          '[DB Migration v22] SharedPreferences → SQLite migration complete.');
     } catch (e) {
       debugPrint('[DB Migration v22] Migration failed (non-fatal): $e');
     }

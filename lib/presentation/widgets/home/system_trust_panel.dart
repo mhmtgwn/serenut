@@ -27,7 +27,8 @@ class SystemTrustMetrics {
   });
 }
 
-final systemTrustMetricsProvider = FutureProvider.autoDispose<SystemTrustMetrics>((ref) async {
+final systemTrustMetricsProvider =
+    FutureProvider.autoDispose<SystemTrustMetrics>((ref) async {
   final syncState = ref.watch(syncProvider);
   final licenseStatus = ref.watch(licenseStatusProvider);
 
@@ -37,13 +38,18 @@ final systemTrustMetricsProvider = FutureProvider.autoDispose<SystemTrustMetrics
 
   // Failed SMS count
   final smsLogs = ref.watch(smsLogsProvider).value ?? [];
-  final failedSmsCount = smsLogs.where((log) => log.status == SmsLogStatus.failed).length;
+  final failedSmsCount =
+      smsLogs.where((log) => log.status == SmsLogStatus.failed).length;
 
   // Ledger Health Score based on telemetry error rates
   final telemetry = TelemetryService();
   final events = await telemetry.getEvents();
-  final criticalEvents = events.where((e) => e.level == LogLevel.critical || e.level == LogLevel.error).length;
-  final score = criticalEvents > 0 ? (100.0 - (criticalEvents * 0.15)).clamp(95.0, 99.99) : 100.0;
+  final criticalEvents = events
+      .where((e) => e.level == LogLevel.critical || e.level == LogLevel.error)
+      .length;
+  final score = criticalEvents > 0
+      ? (100.0 - (criticalEvents * 0.15)).clamp(95.0, 99.99)
+      : 100.0;
 
   return SystemTrustMetrics(
     pendingPrintJobs: pendingPrintJobs,
@@ -82,12 +88,16 @@ class _TrustMetric extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 2),
           Text(
             value,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),
@@ -119,8 +129,10 @@ class SystemTrustPanel extends ConsumerWidget {
       }
       return Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-        child: const Text('Sistem telemetri verileri yüklenemedi', style: TextStyle(color: Colors.red, fontSize: 12)),
+        decoration: BoxDecoration(
+            color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
+        child: const Text('Sistem telemetri verileri yüklenemedi',
+            style: TextStyle(color: Colors.red, fontSize: 12)),
       );
     }
 
@@ -146,7 +158,8 @@ class SystemTrustPanel extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.security_rounded, color: Color(0xFF8B5CF6), size: 16),
+              const Icon(Icons.security_rounded,
+                  color: Color(0xFF8B5CF6), size: 16),
               const SizedBox(width: 6),
               const Text(
                 'SİSTEM GÜVENLİK & BÜTÜNLÜK',
@@ -166,9 +179,14 @@ class SystemTrustPanel extends ConsumerWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 10),
+                    Icon(Icons.shield_rounded,
+                        color: Color(0xFF10B981), size: 10),
                     SizedBox(width: 4),
-                    Text('Korumalı', style: TextStyle(color: Color(0xFF047857), fontSize: 9, fontWeight: FontWeight.bold)),
+                    Text('Korumalı',
+                        style: TextStyle(
+                            color: Color(0xFF047857),
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -180,7 +198,8 @@ class SystemTrustPanel extends ConsumerWidget {
             children: [
               _TrustMetric(
                 icon: Icons.cloud_done_rounded,
-                color: syncOk ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                color:
+                    syncOk ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                 label: 'Bulut Sync',
                 value: syncOk ? 'Stabil' : 'Çakışma',
                 onTap: null,
@@ -194,7 +213,8 @@ class SystemTrustPanel extends ConsumerWidget {
               ),
               _TrustMetric(
                 icon: Icons.access_time_filled_rounded,
-                color: clockOk ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                color:
+                    clockOk ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                 label: 'Sistem Saati',
                 value: clockOk ? 'OK' : 'HATA',
                 onTap: () => context.push(AppRoutes.license),
@@ -214,7 +234,10 @@ class SystemTrustPanel extends ConsumerWidget {
                     behavior: HitTestBehavior.opaque,
                     child: Text(
                       '⚠️ Yazıcı: ${metrics.pendingPrintJobs} bekleyen fiş',
-                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          color: Color(0xFFF59E0B),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 if (metrics.failedSmsCount > 0)
@@ -223,7 +246,10 @@ class SystemTrustPanel extends ConsumerWidget {
                     behavior: HitTestBehavior.opaque,
                     child: Text(
                       '⚠️ SMS: ${metrics.failedSmsCount} başarısız gönderim',
-                      style: const TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
               ],

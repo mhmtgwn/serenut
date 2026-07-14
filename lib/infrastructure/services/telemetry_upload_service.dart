@@ -13,7 +13,8 @@ class TelemetryUploadService {
   TelemetryUploadService(this._apiClient);
 
   /// Buffer metric record into local SQLite database
-  Future<void> recordMetric(String name, double value, {String? metadata}) async {
+  Future<void> recordMetric(String name, double value,
+      {String? metadata}) async {
     try {
       final db = await DatabaseManager().getDatabase();
       await db.insert('client_telemetry_logs', {
@@ -40,12 +41,14 @@ class TelemetryUploadService {
 
       if (records.isEmpty) return;
 
-      final payload = records.map((r) => {
-        'metric_name': r['metric_name'],
-        'metric_value': r['metric_value'],
-        'timestamp': r['timestamp'],
-        'metadata': r['metadata'],
-      }).toList();
+      final payload = records
+          .map((r) => {
+                'metric_name': r['metric_name'],
+                'metric_value': r['metric_value'],
+                'timestamp': r['timestamp'],
+                'metadata': r['metadata'],
+              })
+          .toList();
 
       final response = await _apiClient.post(
         '/api/v1/telemetry/upload',
@@ -59,9 +62,11 @@ class TelemetryUploadService {
           'client_telemetry_logs',
           where: 'id IN (${ids.join(",")})',
         );
-        debugPrint('[TelemetryUpload] Batch-uploaded ${ids.length} metrics to SaaS platform.');
+        debugPrint(
+            '[TelemetryUpload] Batch-uploaded ${ids.length} metrics to SaaS platform.');
       } else {
-        debugPrint('[TelemetryUpload] Failed to upload batch: ${response.statusCode}');
+        debugPrint(
+            '[TelemetryUpload] Failed to upload batch: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[TelemetryUpload] Error uploading telemetry batch: $e');

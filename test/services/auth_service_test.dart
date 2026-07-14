@@ -6,6 +6,7 @@ import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/i_hash_service.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
+import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/config/environment.dart';
 
@@ -47,7 +48,8 @@ class MockHashService implements IHashService {
   String hashPassword(String password) => 'hashed_$password';
 
   @override
-  bool verifyPassword(String password, String hash) => hash == 'hashed_$password';
+  bool verifyPassword(String password, String hash) =>
+      hash == 'hashed_$password';
 
   @override
   bool isLegacyHash(String hash) => false;
@@ -65,12 +67,16 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final deviceManager = DeviceManager(prefs);
       userRepo = MockUserRepository();
       hashService = MockHashService();
-      apiClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      apiClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       authService = AuthService(
         userRepository: userRepo,
         hashService: hashService,
+        deviceManager: deviceManager,
         apiClient: apiClient,
       );
 
@@ -87,13 +93,18 @@ void main() {
     });
 
     test('Attaches JWT token to ApiClient on login', () async {
-      expect(apiClient.send('GET', '/dummy').then((res) => res.headers['Authorization']), throwsA(anything)); // Expect fail because no mock handler yet
+      expect(
+          apiClient
+              .send('GET', '/dummy')
+              .then((res) => res.headers['Authorization']),
+          throwsA(anything)); // Expect fail because no mock handler yet
 
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/auth/login')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
+            body:
+                '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
             headers: {},
           );
         }
@@ -109,12 +120,14 @@ void main() {
 
       // JWT should be generated and set on client
       final response = await apiClient.get('/dummy');
-      expect(response.json['auth_header'], startsWith('Bearer jwt_mock_admin_id_'));
+      expect(response.json['auth_header'],
+          startsWith('Bearer jwt_mock_admin_id_'));
 
       // Validate SharedPreferences storage
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.containsKey('auth_jwt_token'), true);
-      expect(prefs.getString('auth_jwt_token'), startsWith('jwt_mock_admin_id_'));
+      expect(
+          prefs.getString('auth_jwt_token'), startsWith('jwt_mock_admin_id_'));
     });
 
     test('Clears JWT token on logout', () async {
@@ -122,7 +135,8 @@ void main() {
         if (request.url.path.contains('/auth/login')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
+            body:
+                '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
             headers: {},
           );
         }
@@ -153,10 +167,13 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'auth_jwt_token': 'jwt_mock_restored_12345',
       });
+      final prefs = await SharedPreferences.getInstance();
+      final deviceManager = DeviceManager(prefs);
 
       final localService = AuthService(
         userRepository: userRepo,
         hashService: hashService,
+        deviceManager: deviceManager,
         apiClient: apiClient,
       );
 
@@ -169,14 +186,15 @@ void main() {
       };
 
       await localService.initialize();
-
     });
 
-    test('Maps unexpected/unknown user role to cashier (fail-secure)', () async {
+    test('Maps unexpected/unknown user role to cashier (fail-secure)',
+        () async {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid", "name": "Test User", "email": "test@serenut.com", "role": "unknown_role_typo"}}',
+          body:
+              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid", "name": "Test User", "email": "test@serenut.com", "role": "unknown_role_typo"}}',
           headers: {},
         );
       };
@@ -190,7 +208,8 @@ void main() {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid1", "name": "Owner User", "email": "owner@serenut.com", "role": "owner"}}',
+          body:
+              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid1", "name": "Owner User", "email": "owner@serenut.com", "role": "owner"}}',
           headers: {},
         );
       };
@@ -202,16 +221,20 @@ void main() {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid2", "name": "Sysadmin User", "email": "sysadmin@serenut.com", "role": "sysadmin"}}',
+          body:
+              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid2", "name": "Sysadmin User", "email": "sysadmin@serenut.com", "role": "sysadmin"}}',
           headers: {},
         );
       };
 
-      final userSysadmin = await authService.login('sysadmin@serenut.com', 'pwd');
+      final userSysadmin =
+          await authService.login('sysadmin@serenut.com', 'pwd');
       expect(userSysadmin.role, equals(UserRole.sysadmin));
     });
 
-    test('Offline lease allows POS sales but strips admin permissions when expired', () async {
+    test(
+        'Offline lease allows POS sales but strips admin permissions when expired',
+        () async {
       final user = AuthUser(
         id: 'lease_user',
         name: 'Lease User',
@@ -226,7 +249,10 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         'serenut_last_authz_verified_at_lease_user',
-        DateTime.now().toUtc().subtract(const Duration(days: 1)).toIso8601String(),
+        DateTime.now()
+            .toUtc()
+            .subtract(const Duration(days: 1))
+            .toIso8601String(),
       );
 
       final loggedInFresh = await authService.login('lease@serenut.com', 'pwd');
@@ -236,24 +262,27 @@ void main() {
       // 2. Expired lease (> 7 days) while already logged in
       await prefs.setString(
         'serenut_last_authz_verified_at_lease_user',
-        DateTime.now().toUtc().subtract(const Duration(days: 8)).toIso8601String(),
+        DateTime.now()
+            .toUtc()
+            .subtract(const Duration(days: 8))
+            .toIso8601String(),
       );
 
       // Verify user is still logged in
-      expect((await authService.getCurrentUser())?.id, 'lease_user'); 
+      expect((await authService.getCurrentUser())?.id, 'lease_user');
 
       // But strips admin permissions
       expect(await authService.hasPermission('admin:settings'), isFalse);
-      
+
       // Basic cashier permissions are still allowed
       expect(await authService.hasPermission('sales:create'), isTrue);
-      
+
       // 3. And explicitly blocks verifyCurrentUserPin
       await expectLater(
         authService.verifyCurrentUserPin('pwd'),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message', contains('Oturum süresi (offline lease) dolmuştur'))),
+        throwsA(isA<AuthException>().having((e) => e.message, 'message',
+            contains('Oturum süresi (offline lease) dolmuştur'))),
       );
     });
   });
 }
-

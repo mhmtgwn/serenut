@@ -1,4 +1,4 @@
-﻿// test/services/audit_recovery_test.dart
+// test/services/audit_recovery_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
@@ -66,7 +66,8 @@ void main() {
       expect(searchResults.first.notes, 'Fiyat arttırıldı.');
     });
 
-    test('Recovery Center - Soft delete, list, restore and purge products', () async {
+    test('Recovery Center - Soft delete, list, restore and purge products',
+        () async {
       final product = ProductEntity(
         id: 'prod-test-99',
         name: 'Test Kola',
@@ -78,7 +79,7 @@ void main() {
 
       // Create product
       await productRepo.create(product);
-      
+
       var list = await productRepo.findAll();
       expect(list.any((p) => p.id == 'prod-test-99'), isTrue);
 
@@ -124,7 +125,7 @@ void main() {
 
       // Create customer
       await customerRepo.create(customer);
-      
+
       var list = await customerRepo.findAll();
       expect(list.any((c) => c.id == 'cust-test-99'), isTrue);
 

@@ -41,7 +41,7 @@ class DeviceFingerprintService {
     buffer.write(Platform.operatingSystem);
     buffer.write(Platform.operatingSystemVersion);
     buffer.write(Platform.numberOfProcessors);
-    
+
     // Add stable environment parameters
     if (Platform.isWindows) {
       buffer.write(Platform.environment['COMPUTERNAME'] ?? '');
@@ -49,7 +49,7 @@ class DeviceFingerprintService {
     } else {
       buffer.write(Platform.environment['HOST'] ?? '');
     }
-    
+
     final bytes = utf8.encode(buffer.toString());
     return sha256.convert(bytes).toString();
   }
@@ -60,8 +60,10 @@ class DeviceFingerprintService {
   String getHardwareHash() {
     final buffer = StringBuffer();
     buffer.write(Platform.numberOfProcessors);
-    buffer.write(Platform.operatingSystemVersion); // OS version — SDK-independent
-    buffer.write(Platform.localHostname);           // Machine name — stable across updates
+    buffer
+        .write(Platform.operatingSystemVersion); // OS version — SDK-independent
+    buffer
+        .write(Platform.localHostname); // Machine name — stable across updates
     if (Platform.isWindows) {
       buffer.write(Platform.environment['PROCESSOR_ARCHITECTURE'] ?? '');
     }
@@ -71,7 +73,7 @@ class DeviceFingerprintService {
 
   /// Collect all details to build the current DeviceFingerprint payload
   Future<DeviceFingerprint> getFingerprint() async {
-    final cpuArch = Platform.isWindows 
+    final cpuArch = Platform.isWindows
         ? (Platform.environment['PROCESSOR_ARCHITECTURE'] ?? 'x64')
         : 'arm64';
 

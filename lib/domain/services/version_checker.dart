@@ -20,12 +20,20 @@ class VersionCheckResult {
 
   factory VersionCheckResult.fromJson(Map<String, dynamic> json) {
     return VersionCheckResult(
-      latestVersion: (json['latest_version'] ?? json['latestVersion']) as String? ?? '1.0.0+1',
-      minRequiredVersion: (json['min_required_version'] ?? json['minRequiredVersion']) as String? ?? '1.0.0+1',
-      isForceUpdate: (json['is_force_update'] ?? json['isForceUpdate']) as bool? ?? false,
-      downloadUrl: (json['download_url'] ?? json['downloadUrl']) as String? ?? '',
-      schemaVersion: (json['schema_version'] ?? json['schemaVersion']) as int? ?? 1,
-      releaseNotes: (json['release_notes'] ?? json['releaseNotes']) as String? ?? '',
+      latestVersion:
+          (json['latest_version'] ?? json['latestVersion']) as String? ??
+              '1.0.0+1',
+      minRequiredVersion: (json['min_required_version'] ??
+              json['minRequiredVersion']) as String? ??
+          '1.0.0+1',
+      isForceUpdate:
+          (json['is_force_update'] ?? json['isForceUpdate']) as bool? ?? false,
+      downloadUrl:
+          (json['download_url'] ?? json['downloadUrl']) as String? ?? '',
+      schemaVersion:
+          (json['schema_version'] ?? json['schemaVersion']) as int? ?? 1,
+      releaseNotes:
+          (json['release_notes'] ?? json['releaseNotes']) as String? ?? '',
     );
   }
 }
@@ -35,7 +43,7 @@ class VersionChecker {
 
   VersionChecker({
     ApiClient? apiClient,
-  })  : _apiClient = apiClient ?? ApiClient();
+  }) : _apiClient = apiClient ?? ApiClient();
 
   static const String currentVersion = '1.0.0+1'; // Current app version
   static const int currentSchemaVersion = 1;
@@ -43,7 +51,8 @@ class VersionChecker {
   /// Check version from backend and decide if a force update is required
   Future<bool> checkForceUpdateRequired() async {
     try {
-      final response = await _apiClient.get('/updates/check?platform=android&current_version=$currentVersion');
+      final response = await _apiClient.get(
+          '/updates/check?platform=android&current_version=$currentVersion');
 
       if (response.statusCode != 200) return false;
 
@@ -61,7 +70,8 @@ class VersionChecker {
   /// Retrieves the detailed version check result from the backend
   Future<VersionCheckResult?> getVersionInfo() async {
     try {
-      final response = await _apiClient.get('/updates/check?platform=android&current_version=$currentVersion');
+      final response = await _apiClient.get(
+          '/updates/check?platform=android&current_version=$currentVersion');
       if (response.statusCode != 200) return null;
       return VersionCheckResult.fromJson(response.json);
     } catch (_) {
@@ -72,7 +82,8 @@ class VersionChecker {
   /// Check if the local database schema version matches the server schema version
   Future<bool> checkSchemaVersionMatch() async {
     try {
-      final response = await _apiClient.get('/updates/check?platform=android&current_version=$currentVersion');
+      final response = await _apiClient.get(
+          '/updates/check?platform=android&current_version=$currentVersion');
 
       if (response.statusCode != 200) return true;
 
@@ -90,15 +101,15 @@ class VersionChecker {
     try {
       final partsCurrent = current.split('+');
       final partsReq = required.split('+');
-      
+
       final verCurrent = partsCurrent[0].split('.').map(int.parse).toList();
       final verReq = partsReq[0].split('.').map(int.parse).toList();
-      
+
       for (int i = 0; i < 3; i++) {
         if (verCurrent[i] < verReq[i]) return true;
         if (verCurrent[i] > verReq[i]) return false;
       }
-      
+
       if (partsCurrent.length > 1 && partsReq.length > 1) {
         final buildCurrent = int.parse(partsCurrent[1]);
         final buildReq = int.parse(partsReq[1]);

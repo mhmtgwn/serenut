@@ -1,4 +1,4 @@
-﻿// test/services/license_client_test.dart
+// test/services/license_client_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/domain/models/license_model.dart';
@@ -11,15 +11,18 @@ void main() {
     late CloudLicenseClient licenseClient;
 
     setUp(() {
-      apiClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      apiClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       licenseClient = CloudLicenseClient(apiClient);
     });
 
-    test('activate sends request and returns CompanyLicense on success', () async {
+    test('activate sends request and returns CompanyLicense on success',
+        () async {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"companyId": "c_123", "tier": "PRO", "activeDeviceIds": ["dev_1"], "isActive": true}',
+          body:
+              '{"companyId": "c_123", "tier": "PRO", "activeDeviceIds": ["dev_1"], "isActive": true}',
           headers: {},
         );
       };

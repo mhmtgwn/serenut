@@ -16,21 +16,20 @@ part 'catalog/catalog_search_field.dart';
 part 'catalog/catalog_product_card.dart';
 
 // ── Mevcut POS Tema Renkleri (korundu) ───────────────────────────────────────
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kAmber      = Color(0xFFEAB308);
+const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kCardBg     = Colors.white;
-const _kText       = Color(0xFF0F172A);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kCardBg = Colors.white;
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class CatalogPanel extends ConsumerStatefulWidget {
-
   final TextEditingController searchController;
   final TextEditingController barcodeController;
   final FocusNode? barcodeFocusNode;
@@ -68,7 +67,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       ref.read(salesProductsControllerProvider.notifier).loadNextPage();
     }
   }
@@ -159,8 +159,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
   @override
   Widget build(BuildContext context) {
     final filteredProductsVal = ref.watch(salesProductsControllerProvider);
-    final categoriesVal       = ref.watch(productCategoriesProvider);
-    final selectedCategory    = ref.watch(salesProductCategoryFilterProvider);
+    final categoriesVal = ref.watch(productCategoriesProvider);
+    final selectedCategory = ref.watch(salesProductCategoryFilterProvider);
 
     return Column(
       children: [
@@ -191,7 +191,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                   },
                 );
               },
-              icon: const Icon(Icons.photo_camera_rounded, color: _kGreen, size: 22),
+              icon: const Icon(Icons.photo_camera_rounded,
+                  color: _kGreen, size: 22),
               tooltip: 'Kamera Tarayıcı',
             ),
             const SizedBox(width: 4),
@@ -212,7 +213,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                 onTap: () => setState(() => _showFilters = !_showFilters),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: _kSurface,
                     borderRadius: BorderRadius.circular(12),
@@ -220,11 +222,14 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.filter_list_rounded, size: 16, color: _kGreenDark),
+                      const Icon(Icons.filter_list_rounded,
+                          size: 16, color: _kGreenDark),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          selectedCategory == null ? 'Kategori: Tümü' : 'Kategori: $selectedCategory',
+                          selectedCategory == null
+                              ? 'Kategori: Tümü'
+                              : 'Kategori: $selectedCategory',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -267,7 +272,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             child: Text(
                               'Kategori Seçin',
                               style: TextStyle(
@@ -280,26 +286,39 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                           if (selectedCategory != null)
                             TextButton(
                               onPressed: () {
-                                ref.read(salesProductCategoryFilterProvider.notifier).state = null;
+                                ref
+                                    .read(salesProductCategoryFilterProvider
+                                        .notifier)
+                                    .state = null;
                                 setState(() => _showFilters = false);
                               },
                               style: TextButton.styleFrom(
                                 foregroundColor: _kGreen,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text('Temizle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              child: const Text('Temizle',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12)),
                             ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Column(
-                        children: List.generate(categoriesVal.length + 1, (index) {
+                        children:
+                            List.generate(categoriesVal.length + 1, (index) {
                           final isAll = index == 0;
-                          final catName = isAll ? 'Tümü' : categoriesVal[index - 1];
-                          final isSelected = isAll ? selectedCategory == null : selectedCategory == catName;
-                          final icon = isAll ? Icons.grid_view_rounded : _getCategoryIcon(catName);
+                          final catName =
+                              isAll ? 'Tümü' : categoriesVal[index - 1];
+                          final isSelected = isAll
+                              ? selectedCategory == null
+                              : selectedCategory == catName;
+                          final icon = isAll
+                              ? Icons.grid_view_rounded
+                              : _getCategoryIcon(catName);
 
                           return _buildCategoryListRow(
                             context,
@@ -307,7 +326,10 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                             icon: icon,
                             isSelected: isSelected,
                             onTap: () {
-                              ref.read(salesProductCategoryFilterProvider.notifier).state = isAll ? null : catName;
+                              ref
+                                  .read(salesProductCategoryFilterProvider
+                                      .notifier)
+                                  .state = isAll ? null : catName;
                               setState(() => _showFilters = false);
                             },
                           );
@@ -316,7 +338,9 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                     ],
                   ),
                 ),
-                crossFadeState: _showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                crossFadeState: _showFilters
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 200),
               ),
             ],
@@ -327,7 +351,6 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
         // ── ÜRÜN GRİDİ ───────────────────────────────────────────────────
         Expanded(
           child: filteredProductsVal.when(
-
             loading: () => const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation(_kGreen),
@@ -339,12 +362,16 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline_rounded, size: 36, color: _kRed.withValues(alpha: 0.6)),
+                    Icon(Icons.error_outline_rounded,
+                        size: 36, color: _kRed.withValues(alpha: 0.6)),
                     const SizedBox(height: 8),
                     const Text(
                       'Ürünler yüklenirken hata oluştu',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: _kRed, fontWeight: FontWeight.w600, fontSize: 13),
+                      style: TextStyle(
+                          color: _kRed,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -352,7 +379,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                       textAlign: TextAlign.center,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _kTextSecondary, fontSize: 11),
+                      style:
+                          const TextStyle(color: _kTextSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -364,7 +392,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
+                      Icon(Icons.inventory_2_outlined,
+                          size: 64, color: Colors.grey[300]),
                       const SizedBox(height: 14),
                       const Text(
                         'Ürün bulunamadı',
@@ -412,4 +441,3 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
 }
 
 // ── Arama Alanı Bileşeni ─────────────────────────────────────────────────────
-

@@ -104,12 +104,14 @@ void main() {
       final gateway = DbGatewayImpl(databaseManager);
       saleRepo = SqliteSaleRepository(gateway);
 
-      apiClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      apiClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       apiClient.mockHandler = (request) {
         if (request.url.path.endsWith('/version/check')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            body:
+                '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
             headers: {},
           );
         }
@@ -137,7 +139,9 @@ void main() {
       await databaseManager.close();
     });
 
-    test('syncPendingSales should fetch unsynced sales and mark them synced in database', () async {
+    test(
+        'syncPendingSales should fetch unsynced sales and mark them synced in database',
+        () async {
       // 1. Create two unsynced sales directly
       final sale1 = SaleEntity(
         id: 'sale-unsynced-1',
@@ -185,20 +189,24 @@ void main() {
       expect(list.every((s) => s.isSynced == 1), isTrue);
     });
 
-    test('syncPendingSales should return success when no unsynced sales', () async {
+    test('syncPendingSales should return success when no unsynced sales',
+        () async {
       final result = await syncService.syncPendingSales();
       expect(result.synced, equals(0));
       expect(result.failed, equals(0));
       expect(result.success, isTrue);
     });
 
-    test('syncPendingSales should mark failed when HTTP returns error', () async {
-      final failingClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+    test('syncPendingSales should mark failed when HTTP returns error',
+        () async {
+      final failingClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       failingClient.mockHandler = (request) {
         if (request.url.path.endsWith('/version/check')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            body:
+                '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
             headers: {},
           );
         }
@@ -237,17 +245,21 @@ void main() {
       expect(list.first.isSynced, equals(0));
     });
 
-    test('syncPendingSales handles 409 Conflict as success (idempotent)', () async {
-      final conflictClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+    test('syncPendingSales handles 409 Conflict as success (idempotent)',
+        () async {
+      final conflictClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       conflictClient.mockHandler = (request) {
         if (request.url.path.endsWith('/version/check')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            body:
+                '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
             headers: {},
           );
         }
-        throw const ApiException('Conflict', statusCode: 409, responseBody: '{"error":"duplicate"}');
+        throw const ApiException('Conflict',
+            statusCode: 409, responseBody: '{"error":"duplicate"}');
       };
 
       final idempotentSync = OfflineSyncService(
@@ -278,12 +290,14 @@ void main() {
     });
 
     test('concurrent sync calls are serialized (no double-sync)', () async {
-      final concurrentClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      final concurrentClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       concurrentClient.mockHandler = (request) {
         if (request.url.path.endsWith('/version/check')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            body:
+                '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
             headers: {},
           );
         }
@@ -317,23 +331,27 @@ void main() {
         serializedSync.syncPendingSales(),
         serializedSync.syncPendingSales(),
       ]);
-
     });
 
-    test('pull sync recalculates customer balance from transaction ledger without double counting', () async {
+    test(
+        'pull sync recalculates customer balance from transaction ledger without double counting',
+        () async {
       // 1. Create a customer with a balance of 0.0 in the local database
-      await db.insert('customers', {
-        'id': 'cust-drift-1',
-        'name': 'Drift Customer 1',
-        'email': 'drift@customer.com',
-        'phone': '333',
-        'balance': 0.0,
-        'credit_limit': 1000.0,
-        'status': 'active',
-        'is_active': 1,
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await db.insert(
+          'customers',
+          {
+            'id': 'cust-drift-1',
+            'name': 'Drift Customer 1',
+            'email': 'drift@customer.com',
+            'phone': '333',
+            'balance': 0.0,
+            'credit_limit': 1000.0,
+            'status': 'active',
+            'is_active': 1,
+            'created_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace);
 
       // 2. Mock pull response containing:
       // - Customer payload from server indicating balance is 500.0
@@ -342,7 +360,8 @@ void main() {
         if (request.url.path.endsWith('/version/check')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            body:
+                '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
             headers: {},
           );
         }
@@ -400,14 +419,16 @@ void main() {
 
       // 4. Verify that customers.balance was recalculated to 100.0 (the ledger value)
       // and NOT 500.0 (direct server balance) or 600.0 (server balance + trigger adjustment)
-      final rows = await db.query('customers', where: 'id = ?', whereArgs: ['cust-drift-1']);
+      final rows = await db
+          .query('customers', where: 'id = ?', whereArgs: ['cust-drift-1']);
       expect(rows.length, equals(1));
-      
+
       final finalBalance = rows.first['balance'] as double;
       expect(finalBalance, equals(100.0));
     });
 
-    test('syncPendingSales should fail and halt when payment mapping fails', () async {
+    test('syncPendingSales should fail and halt when payment mapping fails',
+        () async {
       final invalidSale = SaleEntity(
         id: 'sale-invalid-method',
         customerId: 'cust-1',
@@ -428,14 +449,17 @@ void main() {
       expect(result.errors.first, contains('Remote sync failed for sale'));
     });
 
-    test('syncPendingSales should abort retrying on permanent 400 Bad Request', () async {
-      final badRequestClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+    test('syncPendingSales should abort retrying on permanent 400 Bad Request',
+        () async {
+      final badRequestClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       int requestCount = 0;
       badRequestClient.mockHandler = (request) {
         if (request.url.path.endsWith('/version/check')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
+            body:
+                '{"latestVersion": "1.0.0+1", "minRequiredVersion": "1.0.0+1", "isForceUpdate": false, "downloadUrl": "", "schemaVersion": 1}',
             headers: {},
           );
         }
@@ -473,7 +497,8 @@ void main() {
       final result = await customSyncService.syncPendingSales();
       expect(result.failed, equals(1));
       expect(result.synced, equals(0));
-      expect(requestCount, equals(1)); // Aborted after 1st attempt, did not retry 3 times!
+      expect(requestCount,
+          equals(1)); // Aborted after 1st attempt, did not retry 3 times!
     });
   });
 }

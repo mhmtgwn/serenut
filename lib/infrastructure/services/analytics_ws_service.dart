@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/services/analytics_ws_service.dart
+// lib/infrastructure/services/analytics_ws_service.dart
 // Serenut Platform — Real-time Analytics WebSocket Client (Sprint 7)
 // Auto-reconnect, keepalive listener, and stream broadcaster.
 // Created: 04 Jul 2026
@@ -18,7 +18,8 @@ class AnalyticsWsService {
   int _reconnectDelaySeconds = 2;
   Timer? _reconnectTimer;
 
-  AnalyticsWsService({EnvironmentConfig? config}) : _config = config ?? EnvironmentConfig.current;
+  AnalyticsWsService({EnvironmentConfig? config})
+      : _config = config ?? EnvironmentConfig.current;
 
   /// Stream of real-time sync events from server
   Stream<Map<String, dynamic>> get eventStream => _controller.stream;
@@ -35,11 +36,13 @@ class AnalyticsWsService {
         ? apiBase.replaceAll('https', 'wss')
         : apiBase.replaceAll('http', 'ws');
 
-    final wsUrl = '$wsBase${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/live?token=$jwtToken';
+    final wsUrl =
+        '$wsBase${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/live?token=$jwtToken';
 
     try {
       debugPrint('[AnalyticsWS] Connecting to $wsUrl');
-      _webSocket = await WebSocket.connect(wsUrl).timeout(const Duration(seconds: 10));
+      _webSocket =
+          await WebSocket.connect(wsUrl).timeout(const Duration(seconds: 10));
       _isConnecting = false;
       _reconnectDelaySeconds = 2; // Reset delay
       debugPrint('[AnalyticsWS] Connected successfully');
@@ -75,8 +78,9 @@ class AnalyticsWsService {
     if (!_shouldReconnect) return;
 
     _reconnectTimer?.cancel();
-    debugPrint('[AnalyticsWS] Scheduling reconnect in $_reconnectDelaySeconds seconds...');
-    
+    debugPrint(
+        '[AnalyticsWS] Scheduling reconnect in $_reconnectDelaySeconds seconds...');
+
     _reconnectTimer = Timer(Duration(seconds: _reconnectDelaySeconds), () {
       if (_reconnectDelaySeconds < 64) {
         _reconnectDelaySeconds *= 2; // Exponential backoff

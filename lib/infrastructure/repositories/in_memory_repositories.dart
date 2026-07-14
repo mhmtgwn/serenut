@@ -8,8 +8,6 @@ import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
 import 'package:serenutos/domain/models/settings.dart';
 
-
-
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�
 /// In-Memory Unified State
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�
@@ -231,7 +229,9 @@ class InMemoryProductRepository implements IProductRepository {
     }
     if (searchQuery != null && searchQuery.isNotEmpty) {
       final q = searchQuery.toLowerCase();
-      results = results.where((p) => p.name.toLowerCase().contains(q) || p.description.toLowerCase().contains(q));
+      results = results.where((p) =>
+          p.name.toLowerCase().contains(q) ||
+          p.description.toLowerCase().contains(q));
     }
     var list = results.toList();
     if (offset != null) {
@@ -312,7 +312,9 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   Future<List<CustomerEntity>> search(String query) async {
     final q = query.toLowerCase();
     return InMemoryDb.customers
-        .where((c) => c.name.toLowerCase().contains(q) || c.email.toLowerCase().contains(q))
+        .where((c) =>
+            c.name.toLowerCase().contains(q) ||
+            c.email.toLowerCase().contains(q))
         .toList();
   }
 
@@ -427,10 +429,12 @@ class InMemorySaleRepository implements ISaleRepository {
     int limit = 25,
     int offset = 0,
   }) async {
-    var list = InMemoryDb.sales.where((s) =>
-        searchQuery == null || searchQuery.isEmpty ||
-        s.id.toLowerCase().contains(searchQuery.toLowerCase())
-    ).toList()
+    var list = InMemoryDb.sales
+        .where((s) =>
+            searchQuery == null ||
+            searchQuery.isEmpty ||
+            s.id.toLowerCase().contains(searchQuery.toLowerCase()))
+        .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     if (offset >= list.length) return [];
     return list.skip(offset).take(limit).toList();
@@ -476,12 +480,16 @@ class InMemorySaleRepository implements ISaleRepository {
   Future<List<SaleEntity>> getTodaySales() async {
     final now = DateTime.now();
     return InMemoryDb.sales
-        .where((s) => s.createdAt.year == now.year && s.createdAt.month == now.month && s.createdAt.day == now.day)
+        .where((s) =>
+            s.createdAt.year == now.year &&
+            s.createdAt.month == now.month &&
+            s.createdAt.day == now.day)
         .toList();
   }
 
   @override
-  Future<List<SaleEntity>> getSalesByDateRange(DateTime from, DateTime to) async {
+  Future<List<SaleEntity>> getSalesByDateRange(
+      DateTime from, DateTime to) async {
     return InMemoryDb.sales
         .where((s) => s.createdAt.isAfter(from) && s.createdAt.isBefore(to))
         .toList();
@@ -528,7 +536,8 @@ class InMemorySaleRepository implements ISaleRepository {
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�
 /// Financial Transaction Repository
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�
-class InMemoryFinancialTransactionRepository implements IFinancialTransactionRepository {
+class InMemoryFinancialTransactionRepository
+    implements IFinancialTransactionRepository {
   final String? deviceId;
   static final List<Map<String, dynamic>> triggerAuditLogs = [];
 
@@ -580,7 +589,8 @@ class InMemoryFinancialTransactionRepository implements IFinancialTransactionRep
     }
   }
 
-  void _logInMemoryTrigger(String triggerName, String customerId, String txId, double before, double after) {
+  void _logInMemoryTrigger(String triggerName, String customerId, String txId,
+      double before, double after) {
     triggerAuditLogs.add({
       'trigger_name': triggerName,
       'customer_id': customerId,
@@ -594,7 +604,7 @@ class InMemoryFinancialTransactionRepository implements IFinancialTransactionRep
   @override
   Future<int> create(FinancialTransactionEntity entity) async {
     final before = _getCustomerBalance(entity.customerId);
-    
+
     int nextClock = entity.logicalClock;
     if (nextClock == 0) {
       int maxClock = 0;
@@ -624,21 +634,25 @@ class InMemoryFinancialTransactionRepository implements IFinancialTransactionRep
     InMemoryDb.transactions.add(storedTx);
     _syncCustomerBalance(entity.customerId, storedTx, isInsert: true);
     final after = _getCustomerBalance(entity.customerId);
-    _logInMemoryTrigger('trg_ft_insert', entity.customerId, entity.id, before, after);
+    _logInMemoryTrigger(
+        'trg_ft_insert', entity.customerId, entity.id, before, after);
     return 1;
   }
 
   @override
   Future<int> update(FinancialTransactionEntity entity) async {
-    throw UnsupportedError('Kritik Hata: Finansal defter kayıtları değiştirilemez (Ledger Immutability).');
+    throw UnsupportedError(
+        'Kritik Hata: Finansal defter kayıtları değiştirilemez (Ledger Immutability).');
   }
 
   @override
   Future<int> delete(dynamic id) async {
-    throw UnsupportedError('Kritik Hata: Finansal defter kayıtları silinemez (Ledger Immutability).');
+    throw UnsupportedError(
+        'Kritik Hata: Finansal defter kayıtları silinemez (Ledger Immutability).');
   }
 
-  void _syncCustomerBalance(String customerId, FinancialTransactionEntity tx, {required bool isInsert}) {
+  void _syncCustomerBalance(String customerId, FinancialTransactionEntity tx,
+      {required bool isInsert}) {
     double effect = 0.0;
     if (tx.type == 'sale') {
       effect = -tx.debtAmount;
@@ -681,8 +695,11 @@ class InMemoryFinancialTransactionRepository implements IFinancialTransactionRep
   }
 
   @override
-  Future<List<FinancialTransactionEntity>> getByCustomerId(String customerId) async {
-    final list = InMemoryDb.transactions.where((t) => t.customerId == customerId).toList();
+  Future<List<FinancialTransactionEntity>> getByCustomerId(
+      String customerId) async {
+    final list = InMemoryDb.transactions
+        .where((t) => t.customerId == customerId)
+        .toList();
     list.sort((a, b) {
       final cmp = b.logicalClock.compareTo(a.logicalClock);
       if (cmp != 0) return cmp;
@@ -703,7 +720,8 @@ class InMemoryFinancialTransactionRepository implements IFinancialTransactionRep
   }
 
   @override
-  Future<List<FinancialTransactionEntity>> getByDateRange(DateTime from, DateTime to) async {
+  Future<List<FinancialTransactionEntity>> getByDateRange(
+      DateTime from, DateTime to) async {
     final list = InMemoryDb.transactions
         .where((t) => t.date.isAfter(from) && t.date.isBefore(to))
         .toList();
@@ -794,7 +812,10 @@ class InMemoryOrderRepository implements IOrderRepository {
   @override
   Future<List<OrderEntity>> getPending() async {
     return InMemoryDb.orders
-        .where((o) => o.status == 'created' || o.status == 'preparing' || o.status == 'ready')
+        .where((o) =>
+            o.status == 'created' ||
+            o.status == 'preparing' ||
+            o.status == 'ready')
         .toList();
   }
 
@@ -809,7 +830,8 @@ class InMemoryOrderRepository implements IOrderRepository {
         status: status,
         createdAt: o.createdAt,
         expectedDeliveryDate: o.expectedDeliveryDate,
-        actualDeliveryDate: status == 'delivered' ? DateTime.now() : o.actualDeliveryDate,
+        actualDeliveryDate:
+            status == 'delivered' ? DateTime.now() : o.actualDeliveryDate,
         items: o.items,
       );
     }
@@ -819,7 +841,10 @@ class InMemoryOrderRepository implements IOrderRepository {
   Future<List<OrderEntity>> getOverdue() async {
     final now = DateTime.now();
     return InMemoryDb.orders
-        .where((o) => o.expectedDeliveryDate != null && o.expectedDeliveryDate!.isBefore(now) && o.status != 'delivered')
+        .where((o) =>
+            o.expectedDeliveryDate != null &&
+            o.expectedDeliveryDate!.isBefore(now) &&
+            o.status != 'delivered')
         .toList();
   }
 
@@ -831,8 +856,12 @@ class InMemoryOrderRepository implements IOrderRepository {
     int offset = 0,
   }) async {
     var list = InMemoryDb.orders.where((o) {
-      final matchesStatus = status == null || status == 'all' || status.isEmpty || o.status == status;
-      final matchesSearch = searchQuery == null || searchQuery.isEmpty ||
+      final matchesStatus = status == null ||
+          status == 'all' ||
+          status.isEmpty ||
+          o.status == status;
+      final matchesSearch = searchQuery == null ||
+          searchQuery.isEmpty ||
           o.id.toLowerCase().contains(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     }).toList();
@@ -842,9 +871,12 @@ class InMemoryOrderRepository implements IOrderRepository {
 
   @override
   Future<Map<String, int>> getStatusCounts({String? searchQuery}) async {
-    final filtered = InMemoryDb.orders.where((o) =>
-        searchQuery == null || searchQuery.isEmpty ||
-        o.id.toLowerCase().contains(searchQuery.toLowerCase())).toList();
+    final filtered = InMemoryDb.orders
+        .where((o) =>
+            searchQuery == null ||
+            searchQuery.isEmpty ||
+            o.id.toLowerCase().contains(searchQuery.toLowerCase()))
+        .toList();
 
     final counts = <String, int>{
       'all': filtered.length,
@@ -881,20 +913,25 @@ class InMemoryReportRepository implements IReportRepository {
   Future<List<DailyRevenue>> getDailyRevenue(DateRange range) async {
     final Map<String, Map<String, dynamic>> dailyMap = {};
     for (final s in InMemoryDb.sales) {
-      if (s.createdAt.isAfter(range.from) && s.createdAt.isBefore(range.to) && s.status != 'cancelled') {
+      if (s.createdAt.isAfter(range.from) &&
+          s.createdAt.isBefore(range.to) &&
+          s.status != 'cancelled') {
         final dayKey = s.createdAt.toIso8601String().substring(0, 10);
-        final entry = dailyMap.putIfAbsent(dayKey, () => {
-          'total': 0.0,
-          'count': 0,
-          'cash': 0.0,
-          'debt': 0.0,
-        });
+        final entry = dailyMap.putIfAbsent(
+            dayKey,
+            () => {
+                  'total': 0.0,
+                  'count': 0,
+                  'cash': 0.0,
+                  'debt': 0.0,
+                });
         entry['total'] = (entry['total'] as double) + s.totalAmount;
         entry['count'] = (entry['count'] as int) + 1;
         if (s.paymentMethod == 'cash' || s.paymentMethod == 'card') {
           entry['cash'] = (entry['cash'] as double) + s.paidAmount;
         } else {
-          entry['debt'] = (entry['debt'] as double) + (s.totalAmount - s.paidAmount);
+          entry['debt'] =
+              (entry['debt'] as double) + (s.totalAmount - s.paidAmount);
         }
       }
     }
@@ -919,12 +956,20 @@ class InMemoryReportRepository implements IReportRepository {
     double totalRevenue = 0.0;
 
     for (final s in InMemoryDb.sales) {
-      if (s.createdAt.isAfter(range.from) && s.createdAt.isBefore(range.to) && s.status != 'cancelled') {
+      if (s.createdAt.isAfter(range.from) &&
+          s.createdAt.isBefore(range.to) &&
+          s.status != 'cancelled') {
         for (final item in s.items) {
           final prodId = item['product_id'] as String;
           final prod = InMemoryDb.products.firstWhere(
             (p) => p.id == prodId,
-            orElse: () => ProductEntity(id: '', name: 'Di�Ÿer', description: '', price: 0, quantity: 0, category: 'Di�Ÿer'),
+            orElse: () => ProductEntity(
+                id: '',
+                name: 'Di�Ÿer',
+                description: '',
+                price: 0,
+                quantity: 0,
+                category: 'Di�Ÿer'),
           );
           final category = prod.category;
           final subtotal = (item['subtotal'] as num?)?.toDouble() ?? 0.0;
@@ -953,10 +998,13 @@ class InMemoryReportRepository implements IReportRepository {
   }
 
   @override
-  Future<List<ProductPerformance>> getTopProducts(DateRange range, {int limit = 10}) async {
+  Future<List<ProductPerformance>> getTopProducts(DateRange range,
+      {int limit = 10}) async {
     final Map<String, _ProductAccumulator> performanceMap = {};
     for (final s in InMemoryDb.sales) {
-      if (s.createdAt.isAfter(range.from) && s.createdAt.isBefore(range.to) && s.status != 'cancelled') {
+      if (s.createdAt.isAfter(range.from) &&
+          s.createdAt.isBefore(range.to) &&
+          s.status != 'cancelled') {
         for (final item in s.items) {
           final prodId = item['product_id'] as String;
           final qty = item['quantity'] as int? ?? 0;
@@ -965,7 +1013,13 @@ class InMemoryReportRepository implements IReportRepository {
           final accum = performanceMap.putIfAbsent(prodId, () {
             final prod = InMemoryDb.products.firstWhere(
               (p) => p.id == prodId,
-              orElse: () => ProductEntity(id: '', name: 'Di�Ÿer', description: '', price: 0, quantity: 0, category: 'Di�Ÿer'),
+              orElse: () => ProductEntity(
+                  id: '',
+                  name: 'Di�Ÿer',
+                  description: '',
+                  price: 0,
+                  quantity: 0,
+                  category: 'Di�Ÿer'),
             );
             return _ProductAccumulator(prod.name, prod.category);
           });
@@ -984,7 +1038,8 @@ class InMemoryReportRepository implements IReportRepository {
         categoryName: accum.category,
         totalSold: accum.totalSold,
         totalRevenue: accum.totalRevenue,
-        avgPrice: accum.totalSold == 0 ? 0.0 : accum.totalRevenue / accum.totalSold,
+        avgPrice:
+            accum.totalSold == 0 ? 0.0 : accum.totalRevenue / accum.totalSold,
         rank: 0,
       );
     }).toList();
@@ -1058,7 +1113,9 @@ class InMemoryReportRepository implements IReportRepository {
     double totalCollected = 0.0;
 
     for (final s in InMemoryDb.sales) {
-      if (s.createdAt.isAfter(range.from) && s.createdAt.isBefore(range.to) && s.status != 'cancelled') {
+      if (s.createdAt.isAfter(range.from) &&
+          s.createdAt.isBefore(range.to) &&
+          s.status != 'cancelled') {
         totalRevenue += s.totalAmount;
         totalSales++;
         totalCollected += s.paidAmount;
@@ -1066,7 +1123,10 @@ class InMemoryReportRepository implements IReportRepository {
       }
     }
 
-    final newCustomers = InMemoryDb.customers.where((c) => c.createdAt.isAfter(range.from) && c.createdAt.isBefore(range.to)).length;
+    final newCustomers = InMemoryDb.customers
+        .where((c) =>
+            c.createdAt.isAfter(range.from) && c.createdAt.isBefore(range.to))
+        .length;
 
     return ReportSummary(
       totalRevenue: totalRevenue,
@@ -1080,7 +1140,8 @@ class InMemoryReportRepository implements IReportRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getVatBreakdown(DateTime start, DateTime end) async {
+  Future<List<Map<String, dynamic>>> getVatBreakdown(
+      DateTime start, DateTime end) async {
     final Map<double, Map<String, dynamic>> vatGroups = {};
     for (final s in InMemoryDb.sales) {
       if ((s.createdAt.isAtSameMomentAs(start) || s.createdAt.isAfter(start)) &&
@@ -1105,12 +1166,15 @@ class InMemoryReportRepository implements IReportRepository {
           final taxable = subtotal / (1.0 + vatRate / 100.0);
           final vatAmount = subtotal - taxable;
 
-          final group = vatGroups.putIfAbsent(vatRate, () => {
-            'vat_rate': vatRate,
-            'taxable_amount': 0.0,
-            'vat_amount': 0.0,
-          });
-          group['taxable_amount'] = (group['taxable_amount'] as double) + taxable;
+          final group = vatGroups.putIfAbsent(
+              vatRate,
+              () => {
+                    'vat_rate': vatRate,
+                    'taxable_amount': 0.0,
+                    'vat_amount': 0.0,
+                  });
+          group['taxable_amount'] =
+              (group['taxable_amount'] as double) + taxable;
           group['vat_amount'] = (group['vat_amount'] as double) + vatAmount;
         }
       }
@@ -1118,7 +1182,6 @@ class InMemoryReportRepository implements IReportRepository {
     return vatGroups.values.toList();
   }
 }
-
 
 /// �•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•��•�
 /// Dashboard Repository
@@ -1133,7 +1196,10 @@ class InMemoryDashboardRepository implements IDashboardRepository {
     int totalSalesToday = 0;
 
     for (final s in InMemoryDb.sales) {
-      if (s.createdAt.year == now.year && s.createdAt.month == now.month && s.createdAt.day == now.day && s.status != 'cancelled') {
+      if (s.createdAt.year == now.year &&
+          s.createdAt.month == now.month &&
+          s.createdAt.day == now.day &&
+          s.status != 'cancelled') {
         totalSalesToday++;
         todayRevenue += s.totalAmount;
         todayCollected += s.paidAmount;
@@ -1142,7 +1208,10 @@ class InMemoryDashboardRepository implements IDashboardRepository {
     }
 
     final pendingOrdersCount = InMemoryDb.orders
-        .where((o) => o.status == 'created' || o.status == 'preparing' || o.status == 'ready')
+        .where((o) =>
+            o.status == 'created' ||
+            o.status == 'preparing' ||
+            o.status == 'ready')
         .length;
 
     final totalReceivables = InMemoryDb.customers
@@ -1162,8 +1231,9 @@ class InMemoryDashboardRepository implements IDashboardRepository {
   @override
   Future<List<SalesTrendPoint>> getWeeklyTrend() async {
     final now = DateTime.now();
-    final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
-    
+    final sevenDaysAgo = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 6));
+
     final Map<String, double> revenueMap = {};
     final Map<String, int> countMap = {};
 
@@ -1190,7 +1260,8 @@ class InMemoryDashboardRepository implements IDashboardRepository {
   }
 
   @override
-  Future<List<DashboardProductPerformance>> getTopProducts({int limit = 5}) async {
+  Future<List<DashboardProductPerformance>> getTopProducts(
+      {int limit = 5}) async {
     final Map<String, _ProductAccumulator> performanceMap = {};
     for (final s in InMemoryDb.sales) {
       if (s.status != 'cancelled') {
@@ -1202,7 +1273,13 @@ class InMemoryDashboardRepository implements IDashboardRepository {
           final accum = performanceMap.putIfAbsent(prodId, () {
             final prod = InMemoryDb.products.firstWhere(
               (p) => p.id == prodId,
-              orElse: () => ProductEntity(id: '', name: 'Di�Ÿer', description: '', price: 0, quantity: 0, category: 'Di�Ÿer'),
+              orElse: () => ProductEntity(
+                  id: '',
+                  name: 'Di�Ÿer',
+                  description: '',
+                  price: 0,
+                  quantity: 0,
+                  category: 'Di�Ÿer'),
             );
             return _ProductAccumulator(prod.name, prod.category);
           });
@@ -1252,7 +1329,13 @@ class InMemoryDashboardRepository implements IDashboardRepository {
           final prodId = item['product_id'] as String;
           final prod = InMemoryDb.products.firstWhere(
             (p) => p.id == prodId,
-            orElse: () => ProductEntity(id: '', name: 'Di�Ÿer', description: '', price: 0, quantity: 0, category: 'Di�Ÿer'),
+            orElse: () => ProductEntity(
+                id: '',
+                name: 'Di�Ÿer',
+                description: '',
+                price: 0,
+                quantity: 0,
+                category: 'Di�Ÿer'),
           );
           final category = prod.category;
           final subtotal = (item['subtotal'] as num?)?.toDouble() ?? 0.0;
@@ -1283,8 +1366,10 @@ class InMemoryDashboardRepository implements IDashboardRepository {
   }
 
   @override
-  Future<List<ProductEntity>> getLowStockProducts({int threshold = 5, int limit = 5}) async {
-    final list = InMemoryDb.products.where((p) => p.quantity <= threshold).toList();
+  Future<List<ProductEntity>> getLowStockProducts(
+      {int threshold = 5, int limit = 5}) async {
+    final list =
+        InMemoryDb.products.where((p) => p.quantity <= threshold).toList();
     list.sort((a, b) => a.quantity.compareTo(b.quantity));
     return list.take(limit).toList();
   }
@@ -1332,7 +1417,8 @@ class InMemoryUserRepository implements IUserRepository {
   @override
   Future<AuthUser?> findByUsername(String username) async {
     try {
-      return InMemoryDb.users.firstWhere((u) => u.email == username || u.name == username);
+      return InMemoryDb.users
+          .firstWhere((u) => u.email == username || u.name == username);
     } catch (_) {
       return null;
     }
@@ -1419,7 +1505,8 @@ class InMemoryUserRepository implements IUserRepository {
   }
 
   @override
-  Future<AuthUser?> findByBusinessCodeAndUsername(String businessCode, String username) async {
+  Future<AuthUser?> findByBusinessCodeAndUsername(
+      String businessCode, String username) async {
     // InMemory search
     return null;
   }
@@ -1444,11 +1531,14 @@ class InMemoryUserRepository implements IUserRepository {
   }
 
   @override
-  Future<void> incrementFailedPinAttempts(String userId, {int lockoutMinutes = 5, int maxAttempts = 5}) async {
+  Future<void> incrementFailedPinAttempts(String userId,
+      {int lockoutMinutes = 5, int maxAttempts = 5}) async {
     final attempts = (_failedAttempts[userId] ?? 0) + 1;
     _failedAttempts[userId] = attempts;
     if (attempts >= maxAttempts) {
-      _lockedUntil[userId] = DateTime.now().add(Duration(minutes: lockoutMinutes)).toIso8601String();
+      _lockedUntil[userId] = DateTime.now()
+          .add(Duration(minutes: lockoutMinutes))
+          .toIso8601String();
     }
   }
 

@@ -12,9 +12,9 @@ import 'package:serenutos/presentation/pages/onboarding/widgets/step_indicator.d
 
 // İşletme türleri
 const List<_BusinessType> _businessTypes = [
-  _BusinessType(icon: Icons.store_rounded,           label: 'Market'),
-  _BusinessType(icon: Icons.coffee_rounded,          label: 'Kafe'),
-  _BusinessType(icon: Icons.grass_rounded,           label: 'Kuruyemişçi'),
+  _BusinessType(icon: Icons.store_rounded, label: 'Market'),
+  _BusinessType(icon: Icons.coffee_rounded, label: 'Kafe'),
+  _BusinessType(icon: Icons.grass_rounded, label: 'Kuruyemişçi'),
 ];
 
 class _BusinessType {
@@ -48,9 +48,9 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
   late final TextEditingController _taxNoCtrl;
   late final TextEditingController _emailCtrl;
 
-  List<String> _cities     = [];
-  List<String> _districts  = [];
-  bool _citiesLoaded       = false;
+  List<String> _cities = [];
+  List<String> _districts = [];
+  bool _citiesLoaded = false;
   Map<String, List<String>> _cityMap = {};
 
   @override
@@ -58,16 +58,16 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
     super.initState();
     _data = widget.initialData;
     _businessNameCtrl = TextEditingController(text: _data.businessName);
-    _ownerNameCtrl    = TextEditingController(text: _data.ownerName);
-    _phoneCtrl        = TextEditingController(text: _data.phone);
-    _taxNoCtrl        = TextEditingController(text: _data.taxNumber);
-    _emailCtrl        = TextEditingController(text: _data.email);
+    _ownerNameCtrl = TextEditingController(text: _data.ownerName);
+    _phoneCtrl = TextEditingController(text: _data.phone);
+    _taxNoCtrl = TextEditingController(text: _data.taxNumber);
+    _emailCtrl = TextEditingController(text: _data.email);
     _loadCities();
   }
 
   Future<void> _loadCities() async {
     try {
-      final raw  = await rootBundle.loadString('assets/data/cities.json');
+      final raw = await rootBundle.loadString('assets/data/cities.json');
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final countries = json['countries'] as List<dynamic>;
       final tr = countries.firstWhere(
@@ -75,16 +75,17 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
         orElse: () => null,
       );
       if (tr != null) {
-        final cityList = (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
+        final cityList =
+            (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
         final Map<String, List<String>> cityMap = {};
         for (final c in cityList) {
-          final name      = (c as Map<String, dynamic>)['name'] as String;
+          final name = (c as Map<String, dynamic>)['name'] as String;
           final districts = (c['districts'] as List<dynamic>).cast<String>();
-          cityMap[name]   = districts;
+          cityMap[name] = districts;
         }
         setState(() {
-          _cityMap      = cityMap;
-          _cities       = cityMap.keys.toList()..sort();
+          _cityMap = cityMap;
+          _cities = cityMap.keys.toList()..sort();
           _citiesLoaded = true;
           // Eğer önceden seçilmiş şehir varsa ilçeleri yükle
           if (_data.city.isNotEmpty && cityMap.containsKey(_data.city)) {
@@ -110,7 +111,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
   void _onCityChanged(String? city) {
     if (city == null) return;
     setState(() {
-      _data      = _data.copyWith(city: city, district: '');
+      _data = _data.copyWith(city: city, district: '');
       _districts = _cityMap[city] ?? [];
     });
   }
@@ -128,16 +129,16 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
     }
     widget.onComplete(_data.copyWith(
       businessName: _businessNameCtrl.text.trim(),
-      ownerName:    _ownerNameCtrl.text.trim(),
-      phone:        _phoneCtrl.text.trim(),
-      taxNumber:    _taxNoCtrl.text.trim(),
-      email:        _emailCtrl.text.trim(),
+      ownerName: _ownerNameCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      taxNumber: _taxNoCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
     ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final size   = MediaQuery.sizeOf(context);
+    final size = MediaQuery.sizeOf(context);
     final isWide = size.width > 600;
 
     return Scaffold(
@@ -147,10 +148,10 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
           children: [
             // ── Header ───────────────────────────────────────────────────
             _OnboardingHeader(
-              title:       'İşletme Bilgileri',
-              stepLabel:   'Adım 1 / 3',
+              title: 'İşletme Bilgileri',
+              stepLabel: 'Adım 1 / 3',
               currentStep: 0,
-              onBack:      () => context.go('/onboarding'),
+              onBack: () => context.go('/onboarding'),
             ),
 
             // ── Content ──────────────────────────────────────────────────
@@ -170,7 +171,9 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.business_rounded, text: 'İşletme Bilgileri'),
+                            const _SectionTitle(
+                                icon: Icons.business_rounded,
+                                text: 'İşletme Bilgileri'),
                             const SizedBox(height: 16),
                             _Field(
                               controller: _businessNameCtrl,
@@ -178,7 +181,9 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               hint: 'örn. Seren Market',
                               icon: Icons.store_rounded,
                               required: true,
-                              validator: (v) => (v?.trim().isEmpty ?? true) ? 'İşletme adı gerekli' : null,
+                              validator: (v) => (v?.trim().isEmpty ?? true)
+                                  ? 'İşletme adı gerekli'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             _Field(
@@ -187,7 +192,9 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               hint: 'Ad Soyad',
                               icon: Icons.person_rounded,
                               required: true,
-                              validator: (v) => (v?.trim().isEmpty ?? true) ? 'Yetkili adı gerekli' : null,
+                              validator: (v) => (v?.trim().isEmpty ?? true)
+                                  ? 'Yetkili adı gerekli'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             _Field(
@@ -198,8 +205,10 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               required: true,
                               keyboard: TextInputType.phone,
                               validator: (v) {
-                                if (v?.trim().isEmpty ?? true) return 'Telefon gerekli';
-                                if ((v?.trim().length ?? 0) < 10) return 'Geçerli bir numara girin';
+                                if (v?.trim().isEmpty ?? true)
+                                  return 'Telefon gerekli';
+                                if ((v?.trim().length ?? 0) < 10)
+                                  return 'Geçerli bir numara girin';
                                 return null;
                               },
                             ),
@@ -211,7 +220,9 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               icon: Icons.badge_rounded,
                               required: true,
                               keyboard: TextInputType.number,
-                              validator: (v) => (v?.trim().isEmpty ?? true) ? 'Vergi no gerekli (fişe yazılır)' : null,
+                              validator: (v) => (v?.trim().isEmpty ?? true)
+                                  ? 'Vergi no gerekli (fişe yazılır)'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             _Field(
@@ -232,28 +243,41 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.location_on_rounded, text: 'Konum'),
+                            const _SectionTitle(
+                                icon: Icons.location_on_rounded, text: 'Konum'),
                             const SizedBox(height: 16),
                             // İl dropdown
                             _DropdownField<String>(
                               label: 'İl',
                               icon: Icons.map_rounded,
                               value: _data.city.isEmpty ? null : _data.city,
-                              items: _cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              items: _cities
+                                  .map((c) => DropdownMenuItem(
+                                      value: c, child: Text(c)))
+                                  .toList(),
                               onChanged: _onCityChanged,
-                              hint: _citiesLoaded ? 'İl seçin' : 'Yükleniyor...',
+                              hint:
+                                  _citiesLoaded ? 'İl seçin' : 'Yükleniyor...',
                             ),
                             const SizedBox(height: 12),
                             // İlçe dropdown
                             _DropdownField<String>(
                               label: 'İlçe',
                               icon: Icons.location_city_rounded,
-                              value: _data.district.isEmpty ? null : _data.district,
-                              items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                              value: _data.district.isEmpty
+                                  ? null
+                                  : _data.district,
+                              items: _districts
+                                  .map((d) => DropdownMenuItem(
+                                      value: d, child: Text(d)))
+                                  .toList(),
                               onChanged: _districts.isEmpty
                                   ? null
-                                  : (d) => setState(() => _data = _data.copyWith(district: d)),
-                              hint: _data.city.isEmpty ? 'Önce il seçin' : 'İlçe seçin',
+                                  : (d) => setState(() =>
+                                      _data = _data.copyWith(district: d)),
+                              hint: _data.city.isEmpty
+                                  ? 'Önce il seçin'
+                                  : 'İlçe seçin',
                             ),
                           ],
                         ),
@@ -266,19 +290,26 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.payments_rounded, text: 'Para & Fiyatlandırma'),
+                            const _SectionTitle(
+                                icon: Icons.payments_rounded,
+                                text: 'Para & Fiyatlandırma'),
                             const SizedBox(height: 16),
                             _DropdownField<String>(
                               label: 'Para Birimi',
                               icon: Icons.currency_exchange_rounded,
                               value: _data.currency,
                               items: const [
-                                DropdownMenuItem(value: '₺', child: Text('₺ — Türk Lirası')),
-                                DropdownMenuItem(value: '\$', child: Text('\$ — Dolar')),
-                                DropdownMenuItem(value: '€', child: Text('€ — Euro')),
-                                DropdownMenuItem(value: '£', child: Text('£ — Sterlin')),
+                                DropdownMenuItem(
+                                    value: '₺', child: Text('₺ — Türk Lirası')),
+                                DropdownMenuItem(
+                                    value: '\$', child: Text('\$ — Dolar')),
+                                DropdownMenuItem(
+                                    value: '€', child: Text('€ — Euro')),
+                                DropdownMenuItem(
+                                    value: '£', child: Text('£ — Sterlin')),
                               ],
-                              onChanged: (v) => setState(() => _data = _data.copyWith(currency: v)),
+                              onChanged: (v) => setState(
+                                  () => _data = _data.copyWith(currency: v)),
                             ),
                             const SizedBox(height: 12),
                             _SwitchTile(
@@ -286,7 +317,8 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               title: 'Vergi Dahil Fiyat',
                               subtitle: 'Ürün fiyatları KDV dahil gösterilsin',
                               value: _data.taxIncluded,
-                              onChanged: (v) => setState(() => _data = _data.copyWith(taxIncluded: v)),
+                              onChanged: (v) => setState(
+                                  () => _data = _data.copyWith(taxIncluded: v)),
                             ),
                           ],
                         ),
@@ -299,16 +331,21 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const _SectionTitle(icon: Icons.category_rounded, text: 'İşletme Türü'),
+                            const _SectionTitle(
+                                icon: Icons.category_rounded,
+                                text: 'İşletme Türü'),
                             const SizedBox(height: 4),
                             Text('İşletmenizi en iyi tanımlayan türü seçin',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: POSColors.textSecondary)),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: POSColors.textSecondary)),
                             const SizedBox(height: 16),
                             GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 3,
                                 mainAxisSpacing: 10,
                                 crossAxisSpacing: 10,
@@ -316,14 +353,15 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               ),
                               itemCount: _businessTypes.length,
                               itemBuilder: (_, i) {
-                                final bt       = _businessTypes[i];
+                                final bt = _businessTypes[i];
                                 final selected = _data.businessType == bt.label;
                                 return _BusinessTypeCard(
-                                  icon:     bt.icon,
-                                  label:    bt.label,
+                                  icon: bt.icon,
+                                  label: bt.label,
                                   selected: selected,
                                   onTap: () => setState(
-                                    () => _data = _data.copyWith(businessType: bt.label),
+                                    () => _data =
+                                        _data.copyWith(businessType: bt.label),
                                   ),
                                 );
                               },
@@ -379,7 +417,12 @@ class _BusinessTypeCard extends StatelessWidget {
             width: selected ? 2 : 1,
           ),
           boxShadow: selected
-              ? [BoxShadow(color: POSColors.green.withValues(alpha: 0.2), blurRadius: 8, spreadRadius: 1)]
+              ? [
+                  BoxShadow(
+                      color: POSColors.green.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      spreadRadius: 1)
+                ]
               : null,
         ),
         child: Column(
@@ -495,7 +538,8 @@ class _SectionTitle extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 32, height: 32,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: POSColors.greenLight,
             borderRadius: BorderRadius.circular(8),
@@ -505,7 +549,9 @@ class _SectionTitle extends StatelessWidget {
         const SizedBox(width: 10),
         Text(text,
             style: const TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w700, color: POSColors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: POSColors.text,
             )),
       ],
     );
@@ -608,9 +654,12 @@ class _SwitchTile extends StatelessWidget {
             children: [
               Text(title,
                   style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600, color: POSColors.text)),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: POSColors.text)),
               Text(subtitle,
-                  style: const TextStyle(fontSize: 12, color: POSColors.textSecondary)),
+                  style: const TextStyle(
+                      fontSize: 12, color: POSColors.textSecondary)),
             ],
           ),
         ),
@@ -631,7 +680,10 @@ class _BottomButton extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.fromLTRB(
-        20, 12, 20, 12 + MediaQuery.paddingOf(context).bottom,
+        20,
+        12,
+        20,
+        12 + MediaQuery.paddingOf(context).bottom,
       ),
       child: FilledButton(
         onPressed: onTap,
@@ -639,7 +691,8 @@ class _BottomButton extends StatelessWidget {
           backgroundColor: POSColors.green,
           foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
         child: Text(label,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),

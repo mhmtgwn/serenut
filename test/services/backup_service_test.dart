@@ -20,7 +20,8 @@ class MockPathProviderPlatform extends PathProviderPlatform
   Future<String?> getLibraryPath() async => '.';
 
   @override
-  Future<String?> getApplicationDocumentsPath() async => Directory.current.absolute.path;
+  Future<String?> getApplicationDocumentsPath() async =>
+      Directory.current.absolute.path;
 
   @override
   Future<String?> getExternalStoragePath() async => '.';
@@ -29,7 +30,9 @@ class MockPathProviderPlatform extends PathProviderPlatform
   Future<List<String>?> getExternalCachePaths() async => [];
 
   @override
-  Future<List<String>?> getExternalStoragePaths({StorageDirectory? type}) async => [];
+  Future<List<String>?> getExternalStoragePaths(
+          {StorageDirectory? type}) async =>
+      [];
 
   @override
   Future<String?> getDownloadsPath() async => '.';
@@ -75,7 +78,8 @@ void main() {
       DatabaseManager.overrideDatabasePath = null;
     });
 
-    test('backupDatabase clones the database file and saves timestamp', () async {
+    test('backupDatabase clones the database file and saves timestamp',
+        () async {
       final backupPath = await backupService.backupDatabase();
       expect(backupPath, isNotEmpty);
 
@@ -97,7 +101,8 @@ void main() {
       await File(backupPath).delete();
     });
 
-    test('restoreDatabase validates schema and successfully restores the state', () async {
+    test('restoreDatabase validates schema and successfully restores the state',
+        () async {
       // 1. Create a backup first
       final backupPath = await backupService.backupDatabase();
 

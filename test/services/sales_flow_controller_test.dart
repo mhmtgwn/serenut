@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 
@@ -37,7 +37,10 @@ void main() {
       notifier.addToCart(product);
       expect(notifier.state.cartQuantities['test-prod-1'], 1);
       expect(notifier.state.total, 45.0);
-      expect(notifier.state.status, SalesFlowStatus.paymentPending); // auto transitions to paymentPending since cart is not empty
+      expect(
+          notifier.state.status,
+          SalesFlowStatus
+              .paymentPending); // auto transitions to paymentPending since cart is not empty
 
       notifier.addToCart(product);
       expect(notifier.state.cartQuantities['test-prod-1'], 2);
@@ -59,9 +62,15 @@ void main() {
       expect(notifier.state.status, SalesFlowStatus.customerSelected);
 
       // Test payment method changes
-      final product = ProductEntity(id: 'p1', name: 'Bread', description: '', price: 10.0, quantity: 10, category: 'Bakery');
+      final product = ProductEntity(
+          id: 'p1',
+          name: 'Bread',
+          description: '',
+          price: 10.0,
+          quantity: 10,
+          category: 'Bakery');
       notifier.addToCart(product);
-      
+
       notifier.setPaymentMethod('karma');
       expect(notifier.state.paymentMethod, 'karma');
       expect(notifier.state.paidAmount, 5.0); // Split check: total / 2
@@ -72,7 +81,8 @@ void main() {
       expect(() => notifier.setSubmitting(true), throwsA(isA<StateError>()));
     });
 
-    test('Financial Integrity - Idempotency Key Generation and Re-use on Retry', () async {
+    test('Financial Integrity - Idempotency Key Generation and Re-use on Retry',
+        () async {
       final product = ProductEntity(
         id: 'test-prod-1',
         name: 'Organic Milk',
@@ -113,16 +123,22 @@ void main() {
     });
 
     test('FSM transition from failed state using removeProduct', () {
-      final product = ProductEntity(id: 'p1', name: 'Bread', description: '', price: 10.0, quantity: 10, category: 'Bakery');
+      final product = ProductEntity(
+          id: 'p1',
+          name: 'Bread',
+          description: '',
+          price: 10.0,
+          quantity: 10,
+          category: 'Bakery');
       notifier.addToCart(product);
       notifier.addToCart(product);
-      
+
       notifier.setSubmitting(true);
       expect(notifier.state.status, SalesFlowStatus.processing);
-      
+
       notifier.failPayment();
       expect(notifier.state.status, SalesFlowStatus.failed);
-      
+
       notifier.removeFromCart(product);
       expect(notifier.state.status, SalesFlowStatus.productsAdded);
     });

@@ -12,10 +12,12 @@ class _CustomerSelectionSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_CustomerSelectionSheet> createState() => _CustomerSelectionSheetState();
+  ConsumerState<_CustomerSelectionSheet> createState() =>
+      _CustomerSelectionSheetState();
 }
 
-class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet> {
+class _CustomerSelectionSheetState
+    extends ConsumerState<_CustomerSelectionSheet> {
   bool _isAdding = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -81,7 +83,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
           children: [
             const Text(
               'Müşteri Seç',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kText),
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: _kText),
             ),
             IconButton(
               icon: const Icon(Icons.close_rounded),
@@ -90,7 +93,6 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
           ],
         ),
         const SizedBox(height: 8),
-
         Row(
           children: [
             Expanded(
@@ -101,8 +103,10 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                   autofocus: true,
                   decoration: InputDecoration(
                     hintText: 'İsim veya telefon ile ara...',
-                    hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 13),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: _kTextSecondary),
+                    hintStyle:
+                        const TextStyle(color: _kTextSecondary, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        size: 18, color: _kTextSecondary),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: _kBorder),
@@ -128,7 +132,7 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
             ElevatedButton.icon(
               onPressed: () => setState(() {
                 _isAdding = true;
-                _nameController.text = _searchQuery; 
+                _nameController.text = _searchQuery;
               }),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _kGreen,
@@ -149,7 +153,6 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
           ],
         ),
         const SizedBox(height: 12),
-
         Flexible(
           child: customersAsync.when(
             loading: () => const Center(
@@ -160,7 +163,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
             ),
             error: (err, _) => Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('Hata: $err', style: const TextStyle(color: _kRed, fontSize: 12)),
+              child: Text('Hata: $err',
+                  style: const TextStyle(color: _kRed, fontSize: 12)),
             ),
             data: (customersList) {
               final filtered = customersList.where((c) {
@@ -175,11 +179,13 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.people_outline_rounded, size: 48, color: Colors.grey[300]),
+                        Icon(Icons.people_outline_rounded,
+                            size: 48, color: Colors.grey[300]),
                         const SizedBox(height: 12),
                         const Text(
                           'Müşteri bulunamadı.',
-                          style: TextStyle(color: _kTextSecondary, fontSize: 13),
+                          style:
+                              TextStyle(color: _kTextSecondary, fontSize: 13),
                         ),
                         const SizedBox(height: 12),
                         TextButton.icon(
@@ -187,10 +193,12 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                             _isAdding = true;
                             _nameController.text = _searchQuery;
                           }),
-                          icon: const Icon(Icons.person_add_rounded, color: _kGreen),
+                          icon: const Icon(Icons.person_add_rounded,
+                              color: _kGreen),
                           label: Text(
                             '"$_searchQuery" Ekle',
-                            style: const TextStyle(color: _kGreen, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: _kGreen, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -210,7 +218,9 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
 
                   return Container(
                     decoration: BoxDecoration(
-                      color: isSelected ? _kGreenLight.withValues(alpha: 0.5) : Colors.white,
+                      color: isSelected
+                          ? _kGreenLight.withValues(alpha: 0.5)
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSelected ? _kGreen : _kBorder,
@@ -222,14 +232,17 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 2),
                       leading: CircleAvatar(
                         radius: 16,
                         backgroundColor: isSelected
                             ? _kGreen
                             : (isDebt ? _kRedLight : _kGreenLight),
                         child: Text(
-                          cust.name.isNotEmpty ? cust.name[0].toUpperCase() : '?',
+                          cust.name.isNotEmpty
+                              ? cust.name[0].toUpperCase()
+                              : '?',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -264,7 +277,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                           ),
                           if (isSelected) ...[
                             const SizedBox(width: 8),
-                            const Icon(Icons.check_circle_rounded, color: _kGreen, size: 18),
+                            const Icon(Icons.check_circle_rounded,
+                                color: _kGreen, size: 18),
                           ],
                         ],
                       ),
@@ -300,13 +314,13 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
               const Expanded(
                 child: Text(
                   'Yeni Müşteri Ekle',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kText),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800, color: _kText),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-
           TextFormField(
             controller: _nameController,
             autofocus: true,
@@ -314,7 +328,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
             decoration: InputDecoration(
               labelText: 'Müşteri / Firma Adı *',
               hintText: 'Ad Soyad veya Firma Ünvanı',
-              prefixIcon: const Icon(Icons.person_rounded, size: 18, color: _kTextSecondary),
+              prefixIcon: const Icon(Icons.person_rounded,
+                  size: 18, color: _kTextSecondary),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: _kBorder),
@@ -329,21 +344,25 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
               ),
               filled: true,
               fillColor: _kSurface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               isDense: true,
             ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,
           ),
           const SizedBox(height: 10),
-
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))
+            ],
             decoration: InputDecoration(
               labelText: 'Telefon Numarası',
               hintText: 'Örn: 0500 000 0000',
-              prefixIcon: const Icon(Icons.phone_rounded, size: 18, color: _kTextSecondary),
+              prefixIcon: const Icon(Icons.phone_rounded,
+                  size: 18, color: _kTextSecondary),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: _kBorder),
@@ -358,20 +377,24 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
               ),
               filled: true,
               fillColor: _kSurface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               isDense: true,
             ),
           ),
           const SizedBox(height: 10),
-
           TextFormField(
             controller: _balanceController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d\.\,\-]'))],
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d\.\,\-]'))
+            ],
             decoration: InputDecoration(
               labelText: 'Başlangıç Bakiyesi (₺)',
               hintText: 'Negatif: Borçlu, Pozitif: Alacaklı',
-              prefixIcon: const Icon(Icons.account_balance_wallet_rounded, size: 18, color: _kTextSecondary),
+              prefixIcon: const Icon(Icons.account_balance_wallet_rounded,
+                  size: 18, color: _kTextSecondary),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: _kBorder),
@@ -386,7 +409,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
               ),
               filled: true,
               fillColor: _kSurface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               isDense: true,
             ),
             validator: (v) {
@@ -398,12 +422,13 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
             },
           ),
           const SizedBox(height: 16),
-
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _isSaving ? null : () => setState(() => _isAdding = false),
+                  onPressed: _isSaving
+                      ? null
+                      : () => setState(() => _isAdding = false),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -413,7 +438,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                   ),
                   child: const Text(
                     'İptal',
-                    style: TextStyle(color: _kTextSecondary, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: _kTextSecondary, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -434,7 +460,8 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Text(
                           'Kaydet ve Seç',
@@ -459,11 +486,15 @@ class _CustomerSelectionSheetState extends ConsumerState<_CustomerSelectionSheet
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         email: '',
-        balance: double.tryParse(_balanceController.text.trim().replaceAll(',', '.')) ?? 0.0,
+        balance: double.tryParse(
+                _balanceController.text.trim().replaceAll(',', '.')) ??
+            0.0,
         createdAt: DateTime.now(),
       );
 
-      await ref.read(salesCustomersControllerProvider.notifier).addCustomer(newCust);
+      await ref
+          .read(salesCustomersControllerProvider.notifier)
+          .addCustomer(newCust);
       ref.invalidate(dashboardProvider);
       widget.onCustomerChanged(newCust);
 

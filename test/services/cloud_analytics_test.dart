@@ -67,7 +67,8 @@ void main() {
       });
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
-      final repo = CloudAnalyticsRepository(apiClient: apiClient, config: testConfig);
+      final repo =
+          CloudAnalyticsRepository(apiClient: apiClient, config: testConfig);
       final metrics = await repo.getDashboard();
 
       expect(metrics.todayRevenue, 53000.0);
@@ -89,7 +90,8 @@ void main() {
       });
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
-      final repo = CloudAnalyticsRepository(apiClient: apiClient, config: testConfig);
+      final repo =
+          CloudAnalyticsRepository(apiClient: apiClient, config: testConfig);
       final trend = await repo.getSalesTrend(period: 'weekly');
 
       expect(trend.length, 2);
@@ -102,7 +104,12 @@ void main() {
         return http.Response(
           jsonEncode({
             'criticalItems': [
-              {'id': 'p1', 'name': 'Milk 1L', 'category': 'Dairy', 'quantity': 2}
+              {
+                'id': 'p1',
+                'name': 'Milk 1L',
+                'category': 'Dairy',
+                'quantity': 2
+              }
             ],
             'criticalCount': 1
           }),
@@ -112,7 +119,8 @@ void main() {
       });
 
       final apiClient = ApiClient(httpClient: mockClient, config: testConfig);
-      final repo = CloudAnalyticsRepository(apiClient: apiClient, config: testConfig);
+      final repo =
+          CloudAnalyticsRepository(apiClient: apiClient, config: testConfig);
       final stock = await repo.getStockStats();
 
       expect(stock.criticalCount, 1);

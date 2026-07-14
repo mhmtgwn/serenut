@@ -1,4 +1,4 @@
-﻿// lib/domain/services/sync_replay_engine.dart
+// lib/domain/services/sync_replay_engine.dart
 // Incident Replay Engine — Reconstructs and classifies root cause of sync incidents.
 
 import 'dart:convert';
@@ -8,25 +8,32 @@ import 'package:serenutos/domain/services/telemetry_service.dart';
 
 /// Categories of roots causes classified by the heuristic analyzer.
 enum RootCauseCategory {
-  networkTimeout,       // Simulated / real SocketException, timeouts
-  duplicatePush,        // 409 Conflict duplicate uploads
-  databaseLock,         // SQLite lock or contention issues
-  dataCorruption,       // Balance drift alarms
-  licenseFailure,       // Bulut senkronizasyon lisanslama sorunları
-  unhandledException,   // Any other critical/error trace
+  networkTimeout, // Simulated / real SocketException, timeouts
+  duplicatePush, // 409 Conflict duplicate uploads
+  databaseLock, // SQLite lock or contention issues
+  dataCorruption, // Balance drift alarms
+  licenseFailure, // Bulut senkronizasyon lisanslama sorunları
+  unhandledException, // Any other critical/error trace
   unknown,
 }
 
 extension RootCauseCategoryLabel on RootCauseCategory {
   String get label {
     switch (this) {
-      case RootCauseCategory.networkTimeout:     return 'Network Timeout/Connection Drop';
-      case RootCauseCategory.duplicatePush:      return 'Duplicate Push (Idempotency Key Conflict)';
-      case RootCauseCategory.databaseLock:        return 'Database Lock/Contention';
-      case RootCauseCategory.dataCorruption:      return 'Silent Data Corruption';
-      case RootCauseCategory.licenseFailure:      return 'License Failure';
-      case RootCauseCategory.unhandledException:  return 'Unhandled System Exception';
-      case RootCauseCategory.unknown:             return 'Unknown Root Cause';
+      case RootCauseCategory.networkTimeout:
+        return 'Network Timeout/Connection Drop';
+      case RootCauseCategory.duplicatePush:
+        return 'Duplicate Push (Idempotency Key Conflict)';
+      case RootCauseCategory.databaseLock:
+        return 'Database Lock/Contention';
+      case RootCauseCategory.dataCorruption:
+        return 'Silent Data Corruption';
+      case RootCauseCategory.licenseFailure:
+        return 'License Failure';
+      case RootCauseCategory.unhandledException:
+        return 'Unhandled System Exception';
+      case RootCauseCategory.unknown:
+        return 'Unknown Root Cause';
     }
   }
 
@@ -110,7 +117,9 @@ class SyncReplayEngine {
     // 2. Gather State Machine Transitions (correlationId is mapped directly to sessionId)
     final transitions = await _tracer.getSessionTransitions(correlationId);
     for (final row in transitions) {
-      final occurredAt = DateTime.tryParse(row['occurred_at'] as String? ?? '') ?? DateTime.now();
+      final occurredAt =
+          DateTime.tryParse(row['occurred_at'] as String? ?? '') ??
+              DateTime.now();
       final meta = row['metadata'] != null
           ? jsonDecode(row['metadata'] as String) as Map<String, dynamic>
           : <String, dynamic>{};
@@ -119,7 +128,8 @@ class SyncReplayEngine {
         timestamp: occurredAt,
         type: 'transition',
         title: '🔁 State Transition',
-        description: '${row['from_state']} ➔ ${row['to_state']} (${row['trigger_event']})',
+        description:
+            '${row['from_state']} ➔ ${row['to_state']} (${row['trigger_event']})',
         metadata: {
           ...meta,
           if (row['sale_id'] != null) 'sale_id': row['sale_id'],
@@ -133,7 +143,8 @@ class SyncReplayEngine {
 
     // 4. Heuristic Analyzer for root cause classification
     var category = RootCauseCategory.unknown;
-    var diagnosis = 'Trace sequence is healthy or contains insufficient error details.';
+    var diagnosis =
+        'Trace sequence is healthy or contains insufficient error details.';
 
     // Check for specific markers in the unified step list
     final hasDrift = steps.any((s) =>
@@ -165,22 +176,28 @@ class SyncReplayEngine {
 
     if (hasDrift) {
       category = RootCauseCategory.dataCorruption;
-      diagnosis = 'Automatic balance drift check failed due to a discrepancy in customer balance. Invariant corrected.';
+      diagnosis =
+          'Automatic balance drift check failed due to a discrepancy in customer balance. Invariant corrected.';
     } else if (hasNetworkError) {
       category = RootCauseCategory.networkTimeout;
-      diagnosis = 'Connection was lost or timed out mid-flight. POS sync engine remains safe and scheduled for automatic retry.';
+      diagnosis =
+          'Connection was lost or timed out mid-flight. POS sync engine remains safe and scheduled for automatic retry.';
     } else if (hasDuplicate) {
       category = RootCauseCategory.duplicatePush;
-      diagnosis = 'Server returned a 409 Conflict. Handled gracefully by the system idempotency logic. Zero action required.';
+      diagnosis =
+          'Server returned a 409 Conflict. Handled gracefully by the system idempotency logic. Zero action required.';
     } else if (hasDbLock) {
       category = RootCauseCategory.databaseLock;
-      diagnosis = 'Concurrent write or read operations locked the local SQLite database file. Transaction aborted safely.';
+      diagnosis =
+          'Concurrent write or read operations locked the local SQLite database file. Transaction aborted safely.';
     } else if (hasLicenseFail) {
       category = RootCauseCategory.licenseFailure;
-      diagnosis = 'Licensing verification failed. Features such as cloud synchronization are locked.';
+      diagnosis =
+          'Licensing verification failed. Features such as cloud synchronization are locked.';
     } else if (hasCriticalOrError) {
       category = RootCauseCategory.unhandledException;
-      diagnosis = 'An unhandled exception was captured during sync. Please inspect the stack trace details.';
+      diagnosis =
+          'An unhandled exception was captured during sync. Please inspect the stack trace details.';
     }
 
     return ReplayReport(

@@ -49,7 +49,8 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       ref.read(customersControllerProvider.notifier).loadNextPage();
     }
   }
@@ -72,172 +73,196 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       showRefresh: true,
       onRefresh: () => ref.read(customersControllerProvider.notifier).refresh(),
       body: customersAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen)),
+        loading: () => const Center(
+          child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(_kGreen)),
+        ),
+        error: (err, _) => Center(
+          child: Text('Müşteriler yüklenirken hata oluştu: $err'),
+        ),
+        data: (customersList) {
+          if (customersList.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline_rounded,
+                      size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 12),
+                  const Text('Müşteri bulunamadı.',
+                      style: TextStyle(color: _kTextSecondary)),
+                ],
               ),
-              error: (err, _) => Center(
-                child: Text('Müşteriler yüklenirken hata oluştu: $err'),
-              ),
-              data: (customersList) {
-                if (customersList.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey[300]),
-                        const SizedBox(height: 12),
-                        const Text('Müşteri bulunamadı.', style: TextStyle(color: _kTextSecondary)),
-                      ],
-                    ),
-                  );
-                }
+            );
+          }
 
-                return Column(
-                  children: [
-                    _buildSummaryBar(customersList),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: customersList.length + (hasMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == customersList.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+          return Column(
+            children: [
+              _buildSummaryBar(customersList),
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: customersList.length + (hasMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == customersList.length) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(_kGreen),
+                          ),
+                        ),
+                      );
+                    }
+                    final customer = customersList[index];
+                    final isDebt = customer.balance < 0;
+                    final absBalance = customer.balance.abs();
+
+                    return GestureDetector(
+                      onTap: () =>
+                          context.push('/customers/detail/${customer.id}'),
+                      child: Card(
+                        color: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(color: _kBorder),
+                        ),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor:
+                                    isDebt ? _kRedLight : _kGreenLight,
+                                child: Text(
+                                  customer.name.isNotEmpty
+                                      ? customer.name[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    color: isDebt ? _kRed : _kGreenDark,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ),
-                            );
-                          }
-                          final customer = customersList[index];
-                          final isDebt = customer.balance < 0;
-                          final absBalance = customer.balance.abs();
-
-                          return GestureDetector(
-                            onTap: () => context.push('/customers/detail/${customer.id}'),
-                            child: Card(
-                              color: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: const BorderSide(color: _kBorder),
-                              ),
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: isDebt ? _kRedLight : _kGreenLight,
-                                      child: Text(
-                                        customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                                        style: TextStyle(
-                                          color: isDebt ? _kRed : _kGreenDark,
+                                    Text(
+                                      customer.name,
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
+                                          fontSize: 15,
+                                          color: _kText),
                                     ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                    const SizedBox(height: 4),
+                                    if (customer.phone.isNotEmpty)
+                                      Row(
                                         children: [
-                                          Text(
-                                            customer.name,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _kText),
+                                          const Icon(Icons.phone_rounded,
+                                              size: 13, color: _kTextSecondary),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              customer.phone,
+                                              style: const TextStyle(
+                                                  color: _kTextSecondary,
+                                                  fontSize: 12),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          if (customer.phone.isNotEmpty)
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.phone_rounded, size: 13, color: _kTextSecondary),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    customer.phone,
-                                                    style: const TextStyle(color: _kTextSecondary, fontSize: 12),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          if (customer.email.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.email_rounded, size: 13, color: _kTextSecondary),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    customer.email,
-                                                    style: const TextStyle(color: _kTextSecondary, fontSize: 12),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
                                         ],
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: isDebt ? _kRedLight : _kGreenLight,
-                                            borderRadius: BorderRadius.circular(8),
+                                    if (customer.email.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.email_rounded,
+                                              size: 13, color: _kTextSecondary),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              customer.email,
+                                              style: const TextStyle(
+                                                  color: _kTextSecondary,
+                                                  fontSize: 12),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                isDebt ? 'Vadeli Borç' : 'Alacak',
-                                                style: TextStyle(fontSize: 10, color: isDebt ? _kRed : _kGreenDark, fontWeight: FontWeight.bold),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                '₺${absBalance.toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 16,
-                                                  color: isDebt ? _kRed : _kGreenDark,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        const Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 18),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isDebt ? _kRedLight : _kGreenLight,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          isDebt ? 'Vadeli Borç' : 'Alacak',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color:
+                                                  isDebt ? _kRed : _kGreenDark,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '₺${absBalance.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 16,
+                                            color: isDebt ? _kRed : _kGreenDark,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: _kTextSecondary, size: 18),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_customers',
         onPressed: () => context.push('/customers/add'),
         backgroundColor: _kGreen,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add_rounded),
-        label: const Text('Yeni Müşteri', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text('Yeni Müşteri',
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -281,10 +306,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       ),
     );
   }
-
 }
-
-
 
 // ── Özet Chip Widget ─────────────────────────────────────────────────────────
 
@@ -321,9 +343,19 @@ class _SummaryChip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
-                Text(value, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w900)),
-                Text(count, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7))),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: color,
+                        fontWeight: FontWeight.w600)),
+                Text(value,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: color,
+                        fontWeight: FontWeight.w900)),
+                Text(count,
+                    style: TextStyle(
+                        fontSize: 10, color: color.withValues(alpha: 0.7))),
               ],
             ),
           ),

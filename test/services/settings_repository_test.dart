@@ -1,4 +1,4 @@
-﻿// test/services/settings_repository_test.dart
+// test/services/settings_repository_test.dart
 // Phase 2.5 — SQLite Settings Repository Integration Tests
 // Generated: 21 Jun 2026
 
@@ -36,7 +36,8 @@ void main() {
       await databaseManager.close();
     });
 
-    test('getSettings - Should return default settings if table is empty', () async {
+    test('getSettings - Should return default settings if table is empty',
+        () async {
       final settings = await settingsRepo.getSettings();
 
       expect(settings, isNotNull);
@@ -47,7 +48,8 @@ void main() {
       expect(settings.smsEnabled, isFalse);
     });
 
-    test('updateSettings - Should persist changes and load updated settings', () async {
+    test('updateSettings - Should persist changes and load updated settings',
+        () async {
       // 1. Fetch initial settings (which inserts default row)
       final initial = await settingsRepo.getSettings();
       expect(initial.businessName, equals('Serenut POS'));

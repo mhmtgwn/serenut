@@ -12,17 +12,20 @@ class FastCollectionBottomSheet extends ConsumerStatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: const FastCollectionBottomSheet(),
       ),
     );
   }
 
   @override
-  ConsumerState<FastCollectionBottomSheet> createState() => _FastCollectionBottomSheetState();
+  ConsumerState<FastCollectionBottomSheet> createState() =>
+      _FastCollectionBottomSheetState();
 }
 
-class _FastCollectionBottomSheetState extends ConsumerState<FastCollectionBottomSheet> {
+class _FastCollectionBottomSheetState
+    extends ConsumerState<FastCollectionBottomSheet> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
@@ -51,7 +54,10 @@ class _FastCollectionBottomSheetState extends ConsumerState<FastCollectionBottom
             children: [
               const Text(
                 'Hızlı Cari Tahsilat',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A)),
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, size: 20),
@@ -62,27 +68,38 @@ class _FastCollectionBottomSheetState extends ConsumerState<FastCollectionBottom
           const SizedBox(height: 8),
           TextField(
             controller: _searchCtrl,
-            onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+            onChanged: (val) =>
+                setState(() => _searchQuery = val.trim().toLowerCase()),
             decoration: InputDecoration(
               hintText: 'Müşteri ismi veya telefon yazın...',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+              hintStyle:
+                  const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              prefixIcon: const Icon(Icons.search_rounded,
+                  color: Color(0xFF64748B), size: 20),
               filled: true,
               fillColor: const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
             ),
           ),
           const SizedBox(height: 12),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 300),
             child: customersAsync.when(
-              loading: () => const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(strokeWidth: 2))),
-              error: (err, _) => Text('Hata: $err', style: const TextStyle(color: Colors.red)),
+              loading: () => const Center(
+                  child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(strokeWidth: 2))),
+              error: (err, _) =>
+                  Text('Hata: $err', style: const TextStyle(color: Colors.red)),
               data: (list) {
                 final filtered = list.where((c) {
-                  final matchesSearch = c.name.toLowerCase().contains(_searchQuery) ||
-                                       c.phone.toLowerCase().contains(_searchQuery);
+                  final matchesSearch =
+                      c.name.toLowerCase().contains(_searchQuery) ||
+                          c.phone.toLowerCase().contains(_searchQuery);
                   return matchesSearch;
                 }).toList();
 
@@ -90,7 +107,9 @@ class _FastCollectionBottomSheetState extends ConsumerState<FastCollectionBottom
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
-                      child: Text('Uyumlu müşteri bulunamadı.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                      child: Text('Uyumlu müşteri bulunamadı.',
+                          style: TextStyle(
+                              color: Color(0xFF64748B), fontSize: 13)),
                     ),
                   );
                 }
@@ -98,15 +117,23 @@ class _FastCollectionBottomSheetState extends ConsumerState<FastCollectionBottom
                 return ListView.separated(
                   shrinkWrap: true,
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
                   itemBuilder: (context, index) {
                     final customer = filtered[index];
                     final balance = customer.balance;
 
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      title: Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text(customer.phone.isNotEmpty ? customer.phone : 'Telefon yok', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      title: Text(customer.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
+                      subtitle: Text(
+                          customer.phone.isNotEmpty
+                              ? customer.phone
+                              : 'Telefon yok',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF64748B))),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -116,11 +143,14 @@ class _FastCollectionBottomSheetState extends ConsumerState<FastCollectionBottom
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: balance < 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                              color: balance < 0
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFF10B981),
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF64748B)),
+                          const Icon(Icons.chevron_right_rounded,
+                              size: 16, color: Color(0xFF64748B)),
                         ],
                       ),
                       onTap: () {

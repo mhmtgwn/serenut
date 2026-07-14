@@ -8,7 +8,6 @@ import '../../infrastructure/database/database_provider.dart';
 import 'package:flutter/foundation.dart';
 
 class CrashRecoveryManager {
-  
   /// Checks if the application crashed during the last session.
   /// If it finds the lock file, it returns true (crashed). Otherwise creates the lock and returns false.
   Future<bool> checkForCrashOnStartup() async {
@@ -17,7 +16,8 @@ class CrashRecoveryManager {
       final lockFile = File(join(appSupportDir.path, 'app_running.lock'));
 
       if (await lockFile.exists()) {
-        debugPrint('[CrashRecovery] Alert: Interrupted crash detected from last session.');
+        debugPrint(
+            '[CrashRecovery] Alert: Interrupted crash detected from last session.');
         return true;
       }
 
@@ -37,7 +37,8 @@ class CrashRecoveryManager {
       final lockFile = File(join(appSupportDir.path, 'app_running.lock'));
       if (await lockFile.exists()) {
         await lockFile.delete();
-        debugPrint('[CrashRecovery] App shut down cleanly. Session lock released.');
+        debugPrint(
+            '[CrashRecovery] App shut down cleanly. Session lock released.');
       }
     } catch (e) {
       debugPrint('[CrashRecovery] Failed to clear session lock: $e');
@@ -49,7 +50,7 @@ class CrashRecoveryManager {
     int replayed = 0;
     try {
       final db = await DatabaseManager().getDatabase();
-      
+
       // Select interrupted failed pushes
       final List<Map<String, dynamic>> pendingPushes = await db.query(
         'failed_push_log',
@@ -57,7 +58,8 @@ class CrashRecoveryManager {
       );
 
       if (pendingPushes.isNotEmpty) {
-        debugPrint('[CrashRecovery] Found ${pendingPushes.length} interrupted sync entries. Queueing replay...');
+        debugPrint(
+            '[CrashRecovery] Found ${pendingPushes.length} interrupted sync entries. Queueing replay...');
         for (final row in pendingPushes) {
           // Re-trigger sync queues (mocking recovery action log)
           await db.update(

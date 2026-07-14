@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -28,9 +28,11 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     // Initialize scanner service and listen to scans
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(scannerServiceProvider).initialize();
-      _scannerSubscription = ref.read(scannerServiceProvider).scanStream.listen((event) {
+      _scannerSubscription =
+          ref.read(scannerServiceProvider).scanStream.listen((event) {
         setState(() {
-          _scannedBarcodes.insert(0, '${DateFormat('HH:mm:ss').format(DateTime.now())} - ${event.barcode}');
+          _scannedBarcodes.insert(0,
+              '${DateFormat('HH:mm:ss').format(DateTime.now())} - ${event.barcode}');
           if (_scannedBarcodes.length > 5) {
             _scannedBarcodes.removeLast();
           }
@@ -65,7 +67,9 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Yazdırma sıraya eklendi: ${_selectedPaperWidth}mm')),
+          SnackBar(
+              content:
+                  Text('Yazdırma sıraya eklendi: ${_selectedPaperWidth}mm')),
         );
       }
     } catch (e) {
@@ -104,7 +108,8 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.settings_input_hdmi_rounded, color: kGreen, size: 40),
+                  Icon(Icons.settings_input_hdmi_rounded,
+                      color: kGreen, size: 40),
                   SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -112,7 +117,10 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                       children: [
                         Text(
                           'Donanım Teşhis Laboratuvarı',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kTextPrimary),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: kTextPrimary),
                         ),
                         SizedBox(height: 4),
                         Text(
@@ -130,7 +138,11 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
             // ── SECTION 1: PRINTER DIAGNOSTICS ──
             const Text(
               'FİŞ YAZICI DIAGNOSTICS',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.3),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kTextSecondary,
+                  letterSpacing: 0.3),
             ),
             const SizedBox(height: 8),
             Container(
@@ -152,14 +164,18 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                   _buildStatusRow(
                     icon: Icons.lan_rounded,
                     label: 'Yazıcı IP & Port',
-                    value: settings?.printerIp != null && settings!.printerIp!.isNotEmpty
+                    value: settings?.printerIp != null &&
+                            settings!.printerIp!.isNotEmpty
                         ? '${settings.printerIp}:${settings.printerPort ?? 9100}'
                         : 'Belirtilmedi (USB/BT/Gömülü)',
                   ),
                   const Divider(height: 24),
                   const Text(
                     'Test Kağıt Genişliği Seçimi',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: kTextPrimary),
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: kTextPrimary),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -170,11 +186,14 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                           selected: _selectedPaperWidth == 58,
                           selectedColor: const Color(0xFFD1FAE5),
                           labelStyle: TextStyle(
-                            color: _selectedPaperWidth == 58 ? kGreen : kTextSecondary,
+                            color: _selectedPaperWidth == 58
+                                ? kGreen
+                                : kTextSecondary,
                             fontWeight: FontWeight.bold,
                           ),
                           onSelected: (selected) {
-                            if (selected) setState(() => _selectedPaperWidth = 58);
+                            if (selected)
+                              setState(() => _selectedPaperWidth = 58);
                           },
                         ),
                       ),
@@ -185,11 +204,14 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                           selected: _selectedPaperWidth == 80,
                           selectedColor: const Color(0xFFD1FAE5),
                           labelStyle: TextStyle(
-                            color: _selectedPaperWidth == 80 ? kGreen : kTextSecondary,
+                            color: _selectedPaperWidth == 80
+                                ? kGreen
+                                : kTextSecondary,
                             fontWeight: FontWeight.bold,
                           ),
                           onSelected: (selected) {
-                            if (selected) setState(() => _selectedPaperWidth = 80);
+                            if (selected)
+                              setState(() => _selectedPaperWidth = 80);
                           },
                         ),
                       ),
@@ -201,12 +223,14 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                       backgroundColor: kGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     onPressed: _isPrinting ? null : _runPrinterTest,
                     icon: const Icon(Icons.print_rounded),
-                    label: const Text('Deneme Fişi Yazdır (Buzzer & Kesme)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text('Deneme Fişi Yazdır (Buzzer & Kesme)',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -216,7 +240,11 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
             // ── SECTION 2: BARCODE SCANNER ──
             const Text(
               'BARKOD OKUYUCU DIAGNOSTICS',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.3),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kTextSecondary,
+                  letterSpacing: 0.3),
             ),
             const SizedBox(height: 8),
             Container(
@@ -237,7 +265,10 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                   const Divider(height: 24),
                   const Text(
                     'Canlı Barkod Sinyalleri (Okutun)',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: kTextPrimary),
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: kTextPrimary),
                   ),
                   const SizedBox(height: 10),
                   // Dummy hidden focus target to capture USB keyboard scanner inputs
@@ -267,11 +298,13 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.barcode_reader, size: 36, color: Colors.grey[300]),
+                          Icon(Icons.barcode_reader,
+                              size: 36, color: Colors.grey[300]),
                           const SizedBox(height: 8),
                           const Text(
                             'Barkod okutulması bekleniyor...',
-                            style: TextStyle(fontSize: 12, color: kTextSecondary),
+                            style:
+                                TextStyle(fontSize: 12, color: kTextSecondary),
                           ),
                         ],
                       ),
@@ -291,7 +324,8 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                             padding: const EdgeInsets.symmetric(vertical: 4.0),
                             child: Row(
                               children: [
-                                const Icon(Icons.check_circle_rounded, color: kGreen, size: 16),
+                                const Icon(Icons.check_circle_rounded,
+                                    color: kGreen, size: 16),
                                 const SizedBox(width: 8),
                                 Text(
                                   barcode,
@@ -333,7 +367,8 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
         const Spacer(),
         Text(
           value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: kTextPrimary),
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.bold, color: kTextPrimary),
         ),
       ],
     );

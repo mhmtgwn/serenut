@@ -30,10 +30,12 @@ import 'package:serenutos/presentation/pages/sales_history_page.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
-import 'package:serenutos/presentation/pages/license_page.dart' show LicenseManagementPage;
+import 'package:serenutos/presentation/pages/license_page.dart'
+    show LicenseManagementPage;
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_import_wizard_page.dart';
-import 'package:serenutos/domain/models/permission.dart' show UserRole, Permission;
+import 'package:serenutos/domain/models/permission.dart'
+    show UserRole, Permission;
 import 'package:serenutos/presentation/pages/operations_hub_page.dart';
 import 'package:serenutos/presentation/pages/finance_hub_page.dart';
 import 'package:serenutos/presentation/pages/system_hub_page.dart';
@@ -47,11 +49,12 @@ import 'package:serenutos/domain/services/access_manager.dart';
 
 /// Navigation routes
 class AppRoutes {
-  static const login       = '/login';
-  static const loginSub    = '/login/sub';
-  static const onboarding  = '/onboarding'; // Onboarding wizard — tek giriş noktası
-  static const activation  = '/onboarding'; // Eski alias
-  static const paywall     = '/paywall';
+  static const login = '/login';
+  static const loginSub = '/login/sub';
+  static const onboarding =
+      '/onboarding'; // Onboarding wizard — tek giriş noktası
+  static const activation = '/onboarding'; // Eski alias
+  static const paywall = '/paywall';
   static const home = '/';
   static const sales = '/sales';
   static const customers = '/customers';
@@ -73,17 +76,20 @@ class AppRoutes {
   static const admin = '/admin';
   static const finance = '/finance';
   static const printing = '/printing';
-  static const operations  = '/operations';
-  static const system      = '/system';
-  static const printQueue  = '/settings/print-queue';
-  static const smsHistory  = '/settings/sms-history';
-  static const dbHealth    = '/settings/db-health';
-  static const management  = '/management';
+  static const operations = '/operations';
+  static const system = '/system';
+  static const printQueue = '/settings/print-queue';
+  static const smsHistory = '/settings/sms-history';
+  static const dbHealth = '/settings/db-health';
+  static const management = '/management';
 }
 
 String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
   final user = ProviderScope.containerOf(context).read(currentUserProvider);
-  if (user == null || !(user.role == UserRole.admin || user.role == UserRole.owner || user.role == UserRole.sysadmin)) {
+  if (user == null ||
+      !(user.role == UserRole.admin ||
+          user.role == UserRole.owner ||
+          user.role == UserRole.sysadmin)) {
     return AppRoutes.home;
   }
   return null;
@@ -113,41 +119,40 @@ final routerProvider = Provider<GoRouter>((ref) {
         ? AppRoutes.paywall
         : (accessStatus == AccessStatus.restrictedOperation)
             ? '/operational-error'
-            : (isAuthenticated
-                ? AppRoutes.home
-                : AppRoutes.login),
+            : (isAuthenticated ? AppRoutes.home : AppRoutes.login),
     redirect: (context, state) {
       final loggedIn = isAuthenticated;
       final status = accessManager.checkAccess(currentUser: currentUser);
       final onPaywall = state.matchedLocation == AppRoutes.paywall;
       final onRestricted = state.matchedLocation == '/operational-error';
-      
+
       if (loggedIn && status == AccessStatus.paywall) {
         if (!onPaywall) return AppRoutes.paywall;
         return null;
       }
-      
+
       if (loggedIn && status == AccessStatus.restrictedOperation) {
         if (!onRestricted) return '/operational-error';
         return null;
       }
-      
+
       if (onPaywall || onRestricted) {
         return loggedIn ? AppRoutes.home : AppRoutes.login;
       }
-      
-      final onLogin       = state.matchedLocation == AppRoutes.login;
-      final onLoginForm   = state.matchedLocation == '/login/form';
-      final onLoginSub     = state.matchedLocation == AppRoutes.loginSub;
-      final onRegister    = state.matchedLocation.startsWith('/register');
-      final onOnboarding  = state.matchedLocation.startsWith('/onboarding');
-      final onAuthScreen  = onLogin || onLoginForm || onLoginSub || onRegister || onOnboarding;
-      
+
+      final onLogin = state.matchedLocation == AppRoutes.login;
+      final onLoginForm = state.matchedLocation == '/login/form';
+      final onLoginSub = state.matchedLocation == AppRoutes.loginSub;
+      final onRegister = state.matchedLocation.startsWith('/register');
+      final onOnboarding = state.matchedLocation.startsWith('/onboarding');
+      final onAuthScreen =
+          onLogin || onLoginForm || onLoginSub || onRegister || onOnboarding;
+
       if (!loggedIn) {
         if (!onAuthScreen) return AppRoutes.login;
         return null;
       }
-      
+
       if (onAuthScreen) return AppRoutes.home;
       return null;
     },
@@ -216,8 +221,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-
-
       // ── Paywall Screen (no shell) ──────────────────────────────────────
       GoRoute(
         path: AppRoutes.paywall,
@@ -243,7 +246,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.catalogImportWizard,
         name: 'catalogImportWizard',
         builder: (context, state) => const CatalogImportWizardPage(),
-        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsDatabase),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsDatabase),
       ),
 
       // ── Phase 4-6 New Free Routes ─────────────────────────────────────
@@ -251,7 +255,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.license,
         name: 'license',
         builder: (context, state) => const LicenseManagementPage(),
-        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsLicense),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsLicense),
       ),
       GoRoute(
         path: AppRoutes.admin,
@@ -263,19 +268,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.printQueue,
         name: 'printQueue',
         builder: (context, state) => const PrintQueuePage(),
-        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsPrinter),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsPrinter),
       ),
       GoRoute(
         path: AppRoutes.smsHistory,
         name: 'smsHistory',
         builder: (context, state) => const SmsHistoryPage(),
-        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsAudit),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsAudit),
       ),
       GoRoute(
         path: AppRoutes.dbHealth,
         name: 'dbHealth',
         builder: (context, state) => const DbHealthPage(),
-        redirect: (context, state) => _roleOrPermissionRedirect(context, Permission.settingsDatabase),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsDatabase),
       ),
 
       // ── Reports (free route — no navbar tab) ─────────────────────────

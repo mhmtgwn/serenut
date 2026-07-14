@@ -23,7 +23,8 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       FROM order_items 
       WHERE order_id NOT IN (SELECT id FROM orders)
     ''');
-    final orphanedOrderItems = Sqflite.firstIntValue(orphanOrderItemsResult) ?? 0;
+    final orphanedOrderItems =
+        Sqflite.firstIntValue(orphanOrderItemsResult) ?? 0;
 
     // 3. Orphaned Order Payments
     int orphanedOrderPayments = 0;
@@ -33,7 +34,8 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
         FROM order_payments 
         WHERE order_id NOT IN (SELECT id FROM orders)
       ''');
-      orphanedOrderPayments = Sqflite.firstIntValue(orphanOrderPaymentsResult) ?? 0;
+      orphanedOrderPayments =
+          Sqflite.firstIntValue(orphanOrderPaymentsResult) ?? 0;
     } catch (_) {
       // order_payments table does not exist in production POS schema
       orphanedOrderPayments = 0;
@@ -45,7 +47,8 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       FROM financial_transactions 
       WHERE customer_id NOT IN (SELECT id FROM customers)
     ''');
-    final orphanedTransactions = Sqflite.firstIntValue(orphanTransactionsResult) ?? 0;
+    final orphanedTransactions =
+        Sqflite.firstIntValue(orphanTransactionsResult) ?? 0;
 
     // 5. Negative Stock Products
     final negativeStockResult = await _gateway.rawQuery('''
@@ -129,8 +132,6 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
       } catch (_) {
         // order_payments table does not exist in production POS schema
       }
-
-
 
       // 5. Reset negative stock to 0
       await _gateway.execute('''

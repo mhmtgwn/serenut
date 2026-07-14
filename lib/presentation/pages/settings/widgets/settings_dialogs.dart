@@ -12,13 +12,24 @@ extension SettingsPageDialogs on _SettingsPageState {
     String? selectedLogoPath = settings.businessLogo;
 
     // Local dropdown values
-    String? localCity = settings.businessCity.isEmpty ? null : settings.businessCity;
-    String? localDistrict = settings.businessDistrict.isEmpty ? null : settings.businessDistrict;
-    String? localType = settings.businessType.isEmpty ? null : settings.businessType;
+    String? localCity =
+        settings.businessCity.isEmpty ? null : settings.businessCity;
+    String? localDistrict =
+        settings.businessDistrict.isEmpty ? null : settings.businessDistrict;
+    String? localType =
+        settings.businessType.isEmpty ? null : settings.businessType;
 
     const businessTypes = [
-      'Market', 'Kafe', 'Restoran', 'Kuruyemişçi', 'Pastane',
-      'Büfe', 'Kasap', 'Manav', 'Eczane', 'Diğer',
+      'Market',
+      'Kafe',
+      'Restoran',
+      'Kuruyemişçi',
+      'Pastane',
+      'Büfe',
+      'Kasap',
+      'Manav',
+      'Eczane',
+      'Diğer',
     ];
 
     // DÜZELTME: Controller'lar push dönünce dispose ediliyor
@@ -27,7 +38,8 @@ extension SettingsPageDialogs on _SettingsPageState {
         fullscreenDialog: true,
         builder: (context) => StatefulBuilder(
           builder: (context, setModalState) {
-            final List<String> localDistricts = (localCity != null) ? (_cityMap[localCity] ?? []) : [];
+            final List<String> localDistricts =
+                (localCity != null) ? (_cityMap[localCity] ?? []) : [];
 
             return FullScreenSettingsPage(
               title: 'İşletme Bilgileri',
@@ -69,11 +81,14 @@ extension SettingsPageDialogs on _SettingsPageState {
                                 decoration: BoxDecoration(
                                   color: Colors.grey[200],
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: _kBorderColor, width: 2),
+                                  border: Border.all(
+                                      color: _kBorderColor, width: 2),
                                 ),
                                 child: selectedLogoPath != null &&
                                         selectedLogoPath!.isNotEmpty &&
-                                        (kIsWeb || File(selectedLogoPath!).existsSync())
+                                        (kIsWeb ||
+                                            File(selectedLogoPath!)
+                                                .existsSync())
                                     ? ClipOval(
                                         child: kIsWeb
                                             ? Image.network(
@@ -97,7 +112,8 @@ extension SettingsPageDialogs on _SettingsPageState {
                               ),
                               if (selectedLogoPath != null &&
                                   selectedLogoPath!.isNotEmpty &&
-                                  (kIsWeb || File(selectedLogoPath!).existsSync()))
+                                  (kIsWeb ||
+                                      File(selectedLogoPath!).existsSync()))
                                 Positioned(
                                   right: 0,
                                   bottom: 0,
@@ -128,7 +144,9 @@ extension SettingsPageDialogs on _SettingsPageState {
                       const SizedBox(height: 8),
                       Center(
                         child: Text(
-                          selectedLogoPath != null ? 'Logo Seçildi (Değiştirmek için tıklayın)' : 'İşletme Logosu Seçin',
+                          selectedLogoPath != null
+                              ? 'Logo Seçildi (Değiştirmek için tıklayın)'
+                              : 'İşletme Logosu Seçin',
                           style: const TextStyle(
                             fontSize: 12,
                             color: _kTextSecondary,
@@ -170,7 +188,8 @@ extension SettingsPageDialogs on _SettingsPageState {
                         controller: taxIdCtrl,
                         label: 'Vergi Dairesi / No *',
                         icon: Icons.badge_rounded,
-                        validator: (v) => v!.isEmpty ? 'Gerekli alan (fişe yazılır)' : null,
+                        validator: (v) =>
+                            v!.isEmpty ? 'Gerekli alan (fişe yazılır)' : null,
                       ),
                       const SizedBox(height: 12),
                       if (_citiesLoaded)
@@ -178,7 +197,10 @@ extension SettingsPageDialogs on _SettingsPageState {
                           label: 'Şehir *',
                           icon: Icons.location_city_rounded,
                           value: localCity,
-                          items: _cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                          items: _cities
+                              .map((c) =>
+                                  DropdownMenuItem(value: c, child: Text(c)))
+                              .toList(),
                           onChanged: (v) => setModalState(() {
                             localCity = v;
                             localDistrict = null;
@@ -186,14 +208,19 @@ extension SettingsPageDialogs on _SettingsPageState {
                           validator: (v) => v == null ? 'Gerekli alan' : null,
                         )
                       else
-                        const Text('Şehir listesi yükleniyor...', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+                        const Text('Şehir listesi yükleniyor...',
+                            style: TextStyle(
+                                color: _kTextSecondary, fontSize: 13)),
                       const SizedBox(height: 12),
                       if (localDistricts.isNotEmpty) ...[
                         _buildFormDropdown<String>(
                           label: 'İlçe *',
                           icon: Icons.map_outlined,
                           value: localDistrict,
-                          items: localDistricts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                          items: localDistricts
+                              .map((d) =>
+                                  DropdownMenuItem(value: d, child: Text(d)))
+                              .toList(),
                           onChanged: (v) => setModalState(() {
                             localDistrict = v;
                           }),
@@ -205,7 +232,10 @@ extension SettingsPageDialogs on _SettingsPageState {
                         label: 'İşletme Türü',
                         icon: Icons.category_rounded,
                         value: localType,
-                        items: businessTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                        items: businessTypes
+                            .map((t) =>
+                                DropdownMenuItem(value: t, child: Text(t)))
+                            .toList(),
                         onChanged: (v) => setModalState(() {
                           localType = v;
                         }),
@@ -224,10 +254,14 @@ extension SettingsPageDialogs on _SettingsPageState {
                             businessName: nameCtrl.text.trim(),
                             businessPhone: phoneCtrl.text.trim(),
                             businessAddress: addressCtrl.text.trim(),
-                            businessTaxId: taxIdCtrl.text.trim().isEmpty ? null : taxIdCtrl.text.trim(),
+                            businessTaxId: taxIdCtrl.text.trim().isEmpty
+                                ? null
+                                : taxIdCtrl.text.trim(),
                             businessLogo: selectedLogoPath,
                             ownerName: ownerCtrl.text.trim(),
-                            businessEmail: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+                            businessEmail: emailCtrl.text.trim().isEmpty
+                                ? null
+                                : emailCtrl.text.trim(),
                             businessCity: localCity ?? '',
                             businessDistrict: localDistrict ?? '',
                             businessType: localType ?? '',
@@ -251,14 +285,15 @@ extension SettingsPageDialogs on _SettingsPageState {
   void _showCurrencyVatSheet(Settings settings) {
     final formKey = GlobalKey<FormState>();
     final currencyCtrl = TextEditingController(text: settings.currency);
-    
+
     // Parse vatCategories from JSON
     List<Map<String, dynamic>> vatList = [];
     try {
       if (settings.vatCategories.isNotEmpty) {
         final decoded = jsonDecode(settings.vatCategories);
         if (decoded is List) {
-          vatList = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          vatList =
+              decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         }
       }
     } catch (_) {
@@ -281,157 +316,187 @@ extension SettingsPageDialogs on _SettingsPageState {
             builder: (ctx, setModalState) {
               // Get category pool
               final poolCategories = ref.read(categoryPoolProvider);
-            
-            // Build the complete list of display categories by merging pool categories
-            // with the local vatList keys
-            final displayCategories = <String>{
-              ...poolCategories,
-              ...vatList.map((e) => e['name']?.toString() ?? ''),
-            }.where((c) => c.isNotEmpty).toList()..sort();
 
-            return FullScreenSettingsPage(
-              title: 'Para Birimi & KDV',
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFormTextField(
-                      controller: currencyCtrl,
-                      label: 'Para Birimi *',
-                      icon: Icons.monetization_on_rounded,
-                      validator: (v) => v!.isEmpty ? 'Gerekli alan' : null,
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Kategoriye Göre KDV Oranları',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
-                        ),
-                        TextButton.icon(
-                          icon: const Icon(Icons.add_circle_outline_rounded, size: 18, color: _kGreen),
-                          label: const Text('Yeni Kategori Ekle', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13)),
-                          onPressed: () => _showAddVatCategoryDialog(context, displayCategories, (newVat) {
-                            setModalState(() {
-                              vatList.add(newVat);
-                            });
-                          }),
-                        ),
-                      ],
-                    ),
-                    const Divider(color: _kBorderColor),
-                    const SizedBox(height: 8),
-                    if (displayCategories.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Text(
-                            'Kategori bulunamadı.',
-                            style: TextStyle(color: _kTextSecondary, fontSize: 13),
-                            textAlign: TextAlign.center,
+              // Build the complete list of display categories by merging pool categories
+              // with the local vatList keys
+              final displayCategories = <String>{
+                ...poolCategories,
+                ...vatList.map((e) => e['name']?.toString() ?? ''),
+              }.where((c) => c.isNotEmpty).toList()
+                ..sort();
+
+              return FullScreenSettingsPage(
+                title: 'Para Birimi & KDV',
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFormTextField(
+                        controller: currencyCtrl,
+                        label: 'Para Birimi *',
+                        icon: Icons.monetization_on_rounded,
+                        validator: (v) => v!.isEmpty ? 'Gerekli alan' : null,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Kategoriye Göre KDV Oranları',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: _kTextPrimary),
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.add_circle_outline_rounded,
+                                size: 18, color: _kGreen),
+                            label: const Text('Yeni Kategori Ekle',
+                                style: TextStyle(
+                                    color: _kGreen,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13)),
+                            onPressed: () => _showAddVatCategoryDialog(
+                                context, displayCategories, (newVat) {
+                              setModalState(() {
+                                vatList.add(newVat);
+                              });
+                            }),
+                          ),
+                        ],
+                      ),
+                      const Divider(color: _kBorderColor),
+                      const SizedBox(height: 8),
+                      if (displayCategories.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Text(
+                              'Kategori bulunamadı.',
+                              style: TextStyle(
+                                  color: _kTextSecondary, fontSize: 13),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _kBorderColor),
+                          ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: displayCategories.length,
+                            separatorBuilder: (c, i) =>
+                                const Divider(height: 1, color: _kBorderColor),
+                            itemBuilder: (c, idx) {
+                              final catName = displayCategories[idx];
+                              final mapped = vatList.firstWhere(
+                                (e) => e['name']?.toString() == catName,
+                                orElse: () => {},
+                              );
+                              final hasRate = mapped.isNotEmpty;
+                              final rate =
+                                  hasRate ? (mapped['rate'] as int) : 0;
+
+                              return ListTile(
+                                onTap: () {
+                                  _showEditVatDialog(
+                                      context, catName, hasRate ? rate : null,
+                                      (newRate) {
+                                    setModalState(() {
+                                      vatList.removeWhere((e) =>
+                                          e['name']?.toString() == catName);
+                                      vatList.add(
+                                          {'name': catName, 'rate': newRate});
+                                    });
+                                  });
+                                },
+                                leading: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: hasRate
+                                        ? _kGreen.withOpacity(0.12)
+                                        : _kGray.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.percent_rounded,
+                                    color: hasRate ? _kGreen : _kGray,
+                                    size: 18,
+                                  ),
+                                ),
+                                title: Text(
+                                  catName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      color: _kTextPrimary),
+                                ),
+                                subtitle: Text(
+                                  hasRate
+                                      ? 'KDV Oranı: %$rate'
+                                      : 'KDV Oranı: Tanımlanmamı�Ÿ (%0)',
+                                  style: TextStyle(
+                                    color: hasRate ? _kGreen : _kTextSecondary,
+                                    fontSize: 13,
+                                    fontWeight: hasRate
+                                        ? FontWeight.w500
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (hasRate)
+                                      IconButton(
+                                        icon: const Icon(
+                                            Icons.delete_outline_rounded,
+                                            color: _kPink),
+                                        onPressed: () {
+                                          setModalState(() {
+                                            vatList.removeWhere((e) =>
+                                                e['name']?.toString() ==
+                                                catName);
+                                          });
+                                        },
+                                      )
+                                    else
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: _kTextSecondary,
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      )
-                    else
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: _kBorderColor),
-                        ),
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: displayCategories.length,
-                          separatorBuilder: (c, i) => const Divider(height: 1, color: _kBorderColor),
-                          itemBuilder: (c, idx) {
-                            final catName = displayCategories[idx];
-                            final mapped = vatList.firstWhere(
-                              (e) => e['name']?.toString() == catName,
-                              orElse: () => {},
-                            );
-                            final hasRate = mapped.isNotEmpty;
-                            final rate = hasRate ? (mapped['rate'] as int) : 0;
-
-                            return ListTile(
-                              onTap: () {
-                                _showEditVatDialog(context, catName, hasRate ? rate : null, (newRate) {
-                                  setModalState(() {
-                                    vatList.removeWhere((e) => e['name']?.toString() == catName);
-                                    vatList.add({'name': catName, 'rate': newRate});
-                                  });
-                                });
-                              },
-                              leading: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: hasRate ? _kGreen.withOpacity(0.12) : _kGray.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.percent_rounded, 
-                                  color: hasRate ? _kGreen : _kGray, 
-                                  size: 18,
-                                ),
-                              ),
-                              title: Text(
-                                catName,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: _kTextPrimary),
-                              ),
-                              subtitle: Text(
-                                hasRate ? 'KDV Oranı: %$rate' : 'KDV Oranı: Tanımlanmamı�Ÿ (%0)',
-                                style: TextStyle(
-                                  color: hasRate ? _kGreen : _kTextSecondary, 
-                                  fontSize: 13,
-                                  fontWeight: hasRate ? FontWeight.w500 : FontWeight.normal,
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (hasRate)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, color: _kPink),
-                                      onPressed: () {
-                                        setModalState(() {
-                                          vatList.removeWhere((e) => e['name']?.toString() == catName);
-                                        });
-                                      },
-                                    )
-                                  else
-                                    const Icon(
-                                      Icons.chevron_right_rounded, 
-                                      color: _kTextSecondary,
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    const SizedBox(height: 32),
-                    _buildModalSaveButton(onTap: () async {
-                      if (formKey.currentState!.validate()) {
-                        final updated = settings.copyWith(
-                          currency: currencyCtrl.text.trim(),
-                          vatCategories: jsonEncode(vatList),
-                        );
-                        await _updateSettingField(updated);
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    }),
-                  ],
+                      const SizedBox(height: 32),
+                      _buildModalSaveButton(onTap: () async {
+                        if (formKey.currentState!.validate()) {
+                          final updated = settings.copyWith(
+                            currency: currencyCtrl.text.trim(),
+                            vatCategories: jsonEncode(vatList),
+                          );
+                          await _updateSettingField(updated);
+                          if (context.mounted) Navigator.pop(context);
+                        }
+                      }),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showAddVatCategoryDialog(
     BuildContext context,
@@ -446,7 +511,8 @@ extension SettingsPageDialogs on _SettingsPageState {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Yeni Kategori Ekle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('Yeni Kategori Ekle',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         content: Form(
           key: formKey,
           child: Column(
@@ -461,12 +527,15 @@ extension SettingsPageDialogs on _SettingsPageState {
                   labelText: 'Kategori Adı',
                   hintText: 'örn: Gıda, Kozmetik',
                   prefixIcon: const Icon(Icons.category_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Kategori adı gerekli';
+                  if (v == null || v.trim().isEmpty)
+                    return 'Kategori adı gerekli';
                   final name = v.trim().toLowerCase();
-                  if (displayCategories.any((cat) => cat.toLowerCase() == name)) {
+                  if (displayCategories
+                      .any((cat) => cat.toLowerCase() == name)) {
                     return 'Bu kategori zaten mevcut';
                   }
                   return null;
@@ -482,12 +551,14 @@ extension SettingsPageDialogs on _SettingsPageState {
                   labelText: 'KDV Oranı (%)',
                   hintText: 'örn: 1, 8, 18, 20',
                   prefixIcon: const Icon(Icons.percent_rounded, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 validator: (v) {
                   if (v!.trim().isEmpty) return 'KDV oranı gerekli';
                   final rate = int.tryParse(v);
-                  if (rate == null || rate < 0 || rate > 100) return 'Geçersiz oran';
+                  if (rate == null || rate < 0 || rate > 100)
+                    return 'Geçersiz oran';
                   return null;
                 },
               ),
@@ -497,7 +568,8 @@ extension SettingsPageDialogs on _SettingsPageState {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal', style: TextStyle(color: _kTextSecondary)),
+            child:
+                const Text('İptal', style: TextStyle(color: _kTextSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -511,7 +583,8 @@ extension SettingsPageDialogs on _SettingsPageState {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _kGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Ekle', style: TextStyle(color: Colors.white)),
           ),
@@ -530,14 +603,16 @@ extension SettingsPageDialogs on _SettingsPageState {
     int? currentRate,
     ValueChanged<int> onSave,
   ) {
-    final rateCtrl = TextEditingController(text: currentRate != null ? currentRate.toString() : '');
+    final rateCtrl = TextEditingController(
+        text: currentRate != null ? currentRate.toString() : '');
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('$categoryName KDV Oranı', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text('$categoryName KDV Oranı',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         content: Form(
           key: formKey,
           child: TextFormField(
@@ -550,12 +625,14 @@ extension SettingsPageDialogs on _SettingsPageState {
               labelText: 'KDV Oranı (%)',
               hintText: 'örn: 1, 8, 18, 20',
               prefixIcon: const Icon(Icons.percent_rounded, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
             validator: (v) {
               if (v!.trim().isEmpty) return 'KDV oranı gerekli';
               final rate = int.tryParse(v);
-              if (rate == null || rate < 0 || rate > 100) return 'Geçersiz oran';
+              if (rate == null || rate < 0 || rate > 100)
+                return 'Geçersiz oran';
               return null;
             },
           ),
@@ -563,7 +640,8 @@ extension SettingsPageDialogs on _SettingsPageState {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('İptal', style: TextStyle(color: _kTextSecondary)),
+            child:
+                const Text('İptal', style: TextStyle(color: _kTextSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -574,7 +652,8 @@ extension SettingsPageDialogs on _SettingsPageState {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _kGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
           ),
@@ -585,9 +664,6 @@ extension SettingsPageDialogs on _SettingsPageState {
       rateCtrl.dispose();
     });
   }
-
-
-
 
   // �”€�”€ Form Input Widget Yardımcıları �”€�”€
   Widget _buildFormTextField({
@@ -606,7 +682,8 @@ extension SettingsPageDialogs on _SettingsPageState {
       maxLines: maxLines,
       enabled: enabled,
       validator: validator,
-      style: TextStyle(color: enabled ? _kTextPrimary : _kTextSecondary, fontSize: 14),
+      style: TextStyle(
+          color: enabled ? _kTextPrimary : _kTextSecondary, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
@@ -625,7 +702,8 @@ extension SettingsPageDialogs on _SettingsPageState {
         ),
         filled: true,
         fillColor: enabled ? const Color(0xFFF8FAFC) : const Color(0xFFEFEFEF),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
   }
@@ -665,7 +743,8 @@ extension SettingsPageDialogs on _SettingsPageState {
         ),
         filled: true,
         fillColor: const Color(0xFFF8FAFC),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
   }
@@ -701,12 +780,15 @@ extension SettingsPageDialogs on _SettingsPageState {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               title: const Row(
                 children: [
                   Icon(Icons.account_balance_rounded, color: _kPurple),
                   SizedBox(width: 8),
-                  Text('Cari Hesap Bütünlüğü (Replay)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('Cari Hesap Bütünlüğü (Replay)',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ],
               ),
               content: SizedBox(
@@ -721,7 +803,8 @@ extension SettingsPageDialogs on _SettingsPageState {
                           'Bu işlem, sistemdeki tüm satışları, tahsilatları ve cari hareketleri (Ledger) baştan sona tarayarak '
                           'müşteri bakiyelerini yeniden hesaplar. Senkronizasyon veya beklenmedik elektrik kesintileri '
                           'kaynaklı olası bakiye sapmalarını tespit eder ve otomatik olarak onarır.',
-                          style: TextStyle(fontSize: 13, color: _kTextSecondary),
+                          style:
+                              TextStyle(fontSize: 13, color: _kTextSecondary),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -734,16 +817,19 @@ extension SettingsPageDialogs on _SettingsPageState {
 
                             try {
                               // Fetch customers before check to capture their names & old balances
-                              final customerRepo = await ref.read(customerRepositoryProvider.future);
+                              final customerRepo = await ref
+                                  .read(customerRepositoryProvider.future);
                               final allCustomers = await customerRepo.findAll();
                               for (final c in allCustomers) {
                                 customerNames[c.id] = c.name;
                                 oldBalances[c.id] = c.balance;
                               }
 
-                              final dataIntegrity = await ref.read(dataIntegrityServiceProvider.future);
-                              final results = await dataIntegrity.runGlobalDriftCheck();
-                              
+                              final dataIntegrity = await ref
+                                  .read(dataIntegrityServiceProvider.future);
+                              final results =
+                                  await dataIntegrity.runGlobalDriftCheck();
+
                               // Invalidate customers controller so the POS UI updates
                               ref.invalidate(customersControllerProvider);
 
@@ -758,7 +844,9 @@ extension SettingsPageDialogs on _SettingsPageState {
                               });
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Hata oluştu: $e'), backgroundColor: _kPink),
+                                  SnackBar(
+                                      content: Text('Hata oluştu: $e'),
+                                      backgroundColor: _kPink),
                                 );
                               }
                             }
@@ -767,18 +855,22 @@ extension SettingsPageDialogs on _SettingsPageState {
                             backgroundColor: _kPurple,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ] else if (isRunning) ...[
                         const Center(
                           child: Column(
                             children: [
-                              CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_kPurple)),
+                              CircularProgressIndicator(
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(_kPurple)),
                               SizedBox(height: 16),
                               Text(
                                 'İşlem hareketleri taranıyor, bakiyeler yeniden hesaplanıyor...',
-                                style: TextStyle(fontSize: 13, color: _kTextSecondary),
+                                style: TextStyle(
+                                    fontSize: 13, color: _kTextSecondary),
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -789,11 +881,15 @@ extension SettingsPageDialogs on _SettingsPageState {
                           const Center(
                             child: Column(
                               children: [
-                                Icon(Icons.check_circle_rounded, color: _kGreen, size: 48),
+                                Icon(Icons.check_circle_rounded,
+                                    color: _kGreen, size: 48),
                                 SizedBox(height: 12),
                                 Text(
                                   'Harika! Herhangi bir bakiye sapması veya veri tutarsızlığı bulunamadı. Tüm bakiyeleriniz güncel.',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kTextPrimary),
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: _kTextPrimary),
                                   textAlign: TextAlign.center,
                                 ),
                               ],
@@ -801,12 +897,16 @@ extension SettingsPageDialogs on _SettingsPageState {
                           ),
                         ] else ...[
                           const Center(
-                            child: Icon(Icons.info_outline_rounded, color: _kOrange, size: 40),
+                            child: Icon(Icons.info_outline_rounded,
+                                color: _kOrange, size: 40),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Toplam ${driftResults!.length} müşterinin bakiyesinde sapma tespit edildi ve veritabanı otomatik olarak eşitlendi:',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kTextPrimary),
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: _kTextPrimary),
                           ),
                           const SizedBox(height: 8),
                           Container(
@@ -820,7 +920,12 @@ extension SettingsPageDialogs on _SettingsPageState {
                               children: [
                                 for (final entry in driftResults!.entries)
                                   ListTile(
-                                    title: Text(customerNames[entry.key] ?? 'Bilinmeyen Müşteri', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    title: Text(
+                                        customerNames[entry.key] ??
+                                            'Bilinmeyen Müşteri',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold)),
                                     subtitle: Text(
                                       'Eski: ${oldBalances[entry.key]?.toStringAsFixed(2)} ₺ | Yeni: ${entry.value.toStringAsFixed(2)} ₺',
                                       style: const TextStyle(fontSize: 11),
@@ -830,7 +935,12 @@ extension SettingsPageDialogs on _SettingsPageState {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: (entry.value - (oldBalances[entry.key] ?? 0.0)) >= 0 ? _kGreen : _kPink,
+                                        color: (entry.value -
+                                                    (oldBalances[entry.key] ??
+                                                        0.0)) >=
+                                                0
+                                            ? _kGreen
+                                            : _kPink,
                                       ),
                                     ),
                                   ),
@@ -844,7 +954,8 @@ extension SettingsPageDialogs on _SettingsPageState {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _kTextPrimary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           child: const Text('Kapat'),
                         ),
@@ -889,7 +1000,9 @@ class _iOSModalWrapper extends StatelessWidget {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     final statusBarHeight = MediaQuery.of(context).padding.top;
-    final modalHeight = screenHeight - statusBarHeight - 16; // Takes full screen except status bar padding
+    final modalHeight = screenHeight -
+        statusBarHeight -
+        16; // Takes full screen except status bar padding
 
     return Container(
       height: modalHeight,
@@ -920,7 +1033,10 @@ class _iOSModalWrapper extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _kTextPrimary),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: _kTextPrimary),
                 ),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
@@ -930,7 +1046,8 @@ class _iOSModalWrapper extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Color(0xFFE5E5EA),
                     ),
-                    child: const Icon(Icons.close_rounded, size: 16, color: _kTextSecondary),
+                    child: const Icon(Icons.close_rounded,
+                        size: 16, color: _kTextSecondary),
                   ),
                 ),
               ],
@@ -949,4 +1066,3 @@ class _iOSModalWrapper extends StatelessWidget {
     );
   }
 }
-

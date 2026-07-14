@@ -1,4 +1,4 @@
-﻿// lib/domain/services/inventory_service.dart
+// lib/domain/services/inventory_service.dart
 // Phase 2.4 — Envanter Yönetim Servisi
 // Handles stock validation and movement orchestration
 // Generated: 21 Jun 2026
@@ -20,10 +20,10 @@ class SaleItemInput {
   });
 
   Map<String, dynamic> toMap() => {
-    'product_id': productId,
-    'quantity': quantity,
-    'unit_price': unitPrice,
-  };
+        'product_id': productId,
+        'quantity': quantity,
+        'unit_price': unitPrice,
+      };
 }
 
 /// Custom Exceptions for inventory
@@ -72,11 +72,12 @@ class InventoryService {
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       await _productRepository.decreaseStock(item.productId, item.quantity);
-      
+
       // Try to parse product ID as int for DomainEvent compatibility
       int parsedProductId = 0;
       try {
-        parsedProductId = int.parse(item.productId.replaceAll(RegExp(r'[^0-9]'), ''));
+        parsedProductId =
+            int.parse(item.productId.replaceAll(RegExp(r'[^0-9]'), ''));
       } catch (_) {}
 
       _eventPublisher.publish(StockChangedEvent(
@@ -91,10 +92,11 @@ class InventoryService {
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       await _productRepository.increaseStock(item.productId, item.quantity);
-      
+
       int parsedProductId = 0;
       try {
-        parsedProductId = int.parse(item.productId.replaceAll(RegExp(r'[^0-9]'), ''));
+        parsedProductId =
+            int.parse(item.productId.replaceAll(RegExp(r'[^0-9]'), ''));
       } catch (_) {}
 
       _eventPublisher.publish(StockChangedEvent(

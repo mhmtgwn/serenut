@@ -29,7 +29,8 @@ class _KarmaSplitField extends StatelessWidget {
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d,.]'))],
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
+        labelStyle:
+            TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
         prefixIcon: Icon(icon, color: color, size: 18),
         prefixText: '₺',
         prefixStyle: TextStyle(color: color, fontWeight: FontWeight.w800),
@@ -43,7 +44,8 @@ class _KarmaSplitField extends StatelessWidget {
                 child: TextButton(
                   style: TextButton.styleFrom(
                     backgroundColor: color.withValues(alpha: 0.1),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     shape: RoundedRectangleBorder(
@@ -76,7 +78,8 @@ class _KarmaSplitField extends StatelessWidget {
         ),
         filled: true,
         fillColor: color.withValues(alpha: 0.04),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         isDense: true,
       ),
       onChanged: onChanged,
@@ -85,4 +88,3 @@ class _KarmaSplitField extends StatelessWidget {
 }
 
 // ── Ödeme Butonu ─────────────────────────────────────────────────────────────
-

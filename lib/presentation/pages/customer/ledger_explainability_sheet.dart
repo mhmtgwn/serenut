@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/customer/ledger_explainability_sheet.dart
+// lib/presentation/pages/customer/ledger_explainability_sheet.dart
 // Serenut POS — Ledger Bakiye Analiz & Doğrulama Ekranı
 // Backend: DataIntegrityService (explainCustomerBalance + rebuildCustomerBalance + verifyLedgerInvariant) — sıfır değişiklik
 // Created: Phase 4 — 01 Jul 2026
@@ -12,14 +12,14 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kGreen         = Color(0xFF10B981);
-const _kRed           = Color(0xFFEF4444);
-const _kBlue          = Color(0xFF3B82F6);
-const _kAmber         = Color(0xFFF59E0B);
-const _kPurple        = Color(0xFF8B5CF6);
-const _kTextPrimary   = Color(0xFF0F172A);
+const _kGreen = Color(0xFF10B981);
+const _kRed = Color(0xFFEF4444);
+const _kBlue = Color(0xFF3B82F6);
+const _kAmber = Color(0xFFF59E0B);
+const _kPurple = Color(0xFF8B5CF6);
+const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorderColor   = Color(0xFFE2E8F0);
+const _kBorderColor = Color(0xFFE2E8F0);
 
 // ── Ledger Explainability Sheet ────────────────────────────────────────────────
 
@@ -42,10 +42,12 @@ class LedgerExplainabilitySheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<LedgerExplainabilitySheet> createState() => _LedgerExplainabilitySheetState();
+  ConsumerState<LedgerExplainabilitySheet> createState() =>
+      _LedgerExplainabilitySheetState();
 }
 
-class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainabilitySheet> {
+class _LedgerExplainabilitySheetState
+    extends ConsumerState<LedgerExplainabilitySheet> {
   bool _isRebuilding = false;
   bool _isVerifying = true;
   bool? _isInvariantValid;
@@ -104,7 +106,8 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Bakiye ledger hareketlerinden başarıyla yeniden oluşturuldu.'),
+            content: Text(
+                'Bakiye ledger hareketlerinden başarıyla yeniden oluşturuldu.'),
             backgroundColor: _kGreen,
             behavior: SnackBarBehavior.floating,
           ),
@@ -172,7 +175,8 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
                       color: _kPurple.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.history_toggle_off_rounded, color: _kPurple, size: 22),
+                    child: const Icon(Icons.history_toggle_off_rounded,
+                        color: _kPurple, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -200,7 +204,8 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: _kTextSecondary),
+                    icon:
+                        const Icon(Icons.close_rounded, color: _kTextSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -210,7 +215,9 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
 
             Expanded(
               child: _error != null
-                  ? Center(child: Text(_error!, style: const TextStyle(color: _kRed)))
+                  ? Center(
+                      child:
+                          Text(_error!, style: const TextStyle(color: _kRed)))
                   : _isVerifying
                       ? const Center(
                           child: CircularProgressIndicator(
@@ -231,23 +238,29 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
-                                    onPressed: _isRebuilding ? null : _rebuildBalance,
+                                    onPressed:
+                                        _isRebuilding ? null : _rebuildBalance,
                                     icon: _isRebuilding
                                         ? const SizedBox(
                                             width: 16,
                                             height: 16,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                                              valueColor:
+                                                  AlwaysStoppedAnimation(
+                                                      Colors.white),
                                             ),
                                           )
-                                        : const Icon(Icons.restart_alt_rounded, size: 18),
-                                    label: const Text('Bakiyeyi Ledger\'dan Yeniden Hesapla (Replay)'),
+                                        : const Icon(Icons.restart_alt_rounded,
+                                            size: 18),
+                                    label: const Text(
+                                        'Bakiyeyi Ledger\'dan Yeniden Hesapla (Replay)'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _kBlue,
                                       foregroundColor: Colors.white,
                                       elevation: 0,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
@@ -260,7 +273,8 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
                               // Section Header
                               Row(
                                 children: [
-                                  const Icon(Icons.analytics_outlined, color: _kTextSecondary, size: 16),
+                                  const Icon(Icons.analytics_outlined,
+                                      color: _kTextSecondary, size: 16),
                                   const SizedBox(width: 6),
                                   const Text(
                                     'KRONOLOJİK LEDGER GEÇMİŞİ',
@@ -274,7 +288,8 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
                                   const Spacer(),
                                   Text(
                                     '${_explanations?.length ?? 0} İşlem',
-                                    style: const TextStyle(color: _kTextSecondary, fontSize: 10),
+                                    style: const TextStyle(
+                                        color: _kTextSecondary, fontSize: 10),
                                   ),
                                 ],
                               ),
@@ -282,18 +297,24 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
 
                               // Explanation List
                               Expanded(
-                                child: _explanations == null || _explanations!.isEmpty
+                                child: _explanations == null ||
+                                        _explanations!.isEmpty
                                     ? const Center(
                                         child: Text(
                                           'Bu müşteriye ait finansal işlem bulunamadı.',
-                                          style: TextStyle(color: _kTextSecondary, fontSize: 13),
+                                          style: TextStyle(
+                                              color: _kTextSecondary,
+                                              fontSize: 13),
                                         ),
                                       )
                                     : ListView.builder(
                                         itemCount: _explanations!.length,
                                         itemBuilder: (context, index) {
                                           final record = _explanations![index];
-                                          return _buildTimelineItem(record, index == _explanations!.length - 1);
+                                          return _buildTimelineItem(
+                                              record,
+                                              index ==
+                                                  _explanations!.length - 1);
                                         },
                                       ),
                               ),
@@ -311,10 +332,13 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
 
   Widget _buildStatusCard() {
     final isValid = _isInvariantValid ?? true;
-    final cardBg = isValid ? _kGreen.withOpacity(0.04) : _kRed.withOpacity(0.04);
-    final borderCol = isValid ? _kGreen.withOpacity(0.2) : _kRed.withOpacity(0.2);
+    final cardBg =
+        isValid ? _kGreen.withOpacity(0.04) : _kRed.withOpacity(0.04);
+    final borderCol =
+        isValid ? _kGreen.withOpacity(0.2) : _kRed.withOpacity(0.2);
     final iconColor = isValid ? _kGreen : _kRed;
-    final title = isValid ? 'Veri Bütünlüğü Doğrulandı' : 'Bakiye Sapması Tespit Edildi';
+    final title =
+        isValid ? 'Veri Bütünlüğü Doğrulandı' : 'Bakiye Sapması Tespit Edildi';
     final desc = isValid
         ? 'Müşteri net bakiyesi, veritabanı ledger hareket geçmişi ile matematiksel olarak 100% uyuşuyor.'
         : 'Müşterinin güncel bakiye değeri ile ledger hareketlerinin toplamı eşleşmiyor. State Replay yapmanız önerilir.';
@@ -329,7 +353,8 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(isValid ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded, color: iconColor, size: 24),
+          Icon(isValid ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
+              color: iconColor, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -362,7 +387,9 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
   // ── Timeline Item ──────────────────────────────────────────────────────────
 
   Widget _buildTimelineItem(BalanceExplanationRecord record, bool isLast) {
-    final isIncrease = record.type == 'payment' || record.type == 'collection' || record.type == 'cancellation';
+    final isIncrease = record.type == 'payment' ||
+        record.type == 'collection' ||
+        record.type == 'cancellation';
     final color = isIncrease ? _kGreen : _kRed;
     final prefix = isIncrease ? '+' : '-';
     final amountText = '$prefix₺${record.amount.toStringAsFixed(2)}';
@@ -446,11 +473,13 @@ class _LedgerExplainabilitySheetState extends ConsumerState<LedgerExplainability
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.access_time_rounded, color: _kTextSecondary, size: 10),
+                      const Icon(Icons.access_time_rounded,
+                          color: _kTextSecondary, size: 10),
                       const SizedBox(width: 4),
                       Text(
                         DateFormat('dd.MM.yyyy HH:mm').format(record.date),
-                        style: const TextStyle(color: _kTextSecondary, fontSize: 10),
+                        style: const TextStyle(
+                            color: _kTextSecondary, fontSize: 10),
                       ),
                       const Spacer(),
                       Text(

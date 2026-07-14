@@ -19,7 +19,8 @@ class RecoveryCenterPage extends ConsumerStatefulWidget {
   ConsumerState<RecoveryCenterPage> createState() => _RecoveryCenterPageState();
 }
 
-class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with SingleTickerProviderStateMixin {
+class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _deletedItems = [];
   bool _isLoading = false;
@@ -66,7 +67,10 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
     }
   }
 
-  void _runPinGuardedAction(String actionTitle, void Function(String? approvedByUserId, String? approvedByUserName) action) {
+  void _runPinGuardedAction(
+      String actionTitle,
+      void Function(String? approvedByUserId, String? approvedByUserName)
+          action) {
     requirePermissionAccess(
       context,
       permission: Permission.settingsRecovery,
@@ -81,12 +85,13 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
   }
 
   Future<void> _restoreItem(String type, String id, String name) async {
-    _runPinGuardedAction('Kaydı Kurtar: $name', (approvedByUserId, approvedByUserName) async {
+    _runPinGuardedAction('Kaydı Kurtar: $name',
+        (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
         final repo = ref.read(recoveryRepositoryProvider);
         await repo.restore(type, id);
-        
+
         try {
           final auditService = await ref.read(auditServiceProvider.future);
           await auditService.logSystemAction(
@@ -101,12 +106,16 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
         _invalidateControllerForType(type);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$name başarıyla kurtarıldı.'), backgroundColor: const Color(0xFF10B981)),
+          SnackBar(
+              content: Text('$name başarıyla kurtarıldı.'),
+              backgroundColor: const Color(0xFF10B981)),
         );
         _loadDeletedItems();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kurtarma hatası: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(
+              content: Text('Kurtarma hatası: $e'),
+              backgroundColor: Colors.redAccent),
         );
       } finally {
         setState(() => _isLoading = false);
@@ -115,12 +124,13 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
   }
 
   Future<void> _purgeItem(String type, String id, String name) async {
-    _runPinGuardedAction('Kaydı Kalıcı Olarak Sil: $name', (approvedByUserId, approvedByUserName) async {
+    _runPinGuardedAction('Kaydı Kalıcı Olarak Sil: $name',
+        (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {
         final repo = ref.read(recoveryRepositoryProvider);
         await repo.purge(type, id);
-        
+
         try {
           final auditService = await ref.read(auditServiceProvider.future);
           await auditService.logSystemAction(
@@ -135,12 +145,16 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
         _invalidateControllerForType(type);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$name kalıcı olarak silindi (Purged).'), backgroundColor: Colors.orangeAccent),
+          SnackBar(
+              content: Text('$name kalıcı olarak silindi (Purged).'),
+              backgroundColor: Colors.orangeAccent),
         );
         _loadDeletedItems();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Silme hatası: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(
+              content: Text('Silme hatası: $e'),
+              backgroundColor: Colors.redAccent),
         );
       } finally {
         setState(() => _isLoading = false);
@@ -168,12 +182,11 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final hasAccess = currentUser != null && (
-      currentUser.role == UserRole.sysadmin ||
-      currentUser.role == UserRole.owner ||
-      currentUser.role == UserRole.admin ||
-      currentUser.hasPermission(Permission.settingsRecovery.value)
-    );
+    final hasAccess = currentUser != null &&
+        (currentUser.role == UserRole.sysadmin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.hasPermission(Permission.settingsRecovery.value));
 
     if (!hasAccess) {
       return const Scaffold(
@@ -194,7 +207,8 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
       appBar: AppBar(
         title: const Text(
           'Veri Kurtarma Merkezi',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Colors.white),
+          style: TextStyle(
+              fontWeight: FontWeight.w800, fontSize: 18, color: Colors.white),
         ),
         backgroundColor: kCardBg,
         elevation: 0,
@@ -210,12 +224,15 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
           indicatorColor: kAccentColor,
           labelColor: Colors.white,
           unselectedLabelColor: kTextSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: _tabs.map((t) => Tab(text: t['label'])).toList(),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(kAccentColor)))
+          ? const Center(
+              child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(kAccentColor)))
           : _deletedItems.isEmpty
               ? const Center(
                   child: Text(
@@ -233,7 +250,9 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
                     final name = _getItemName(type, item);
                     final subtitle = _getItemSubtitle(type, item);
                     final deletedAtStr = item['deleted_at'] as String? ?? '';
-                    final deletedAt = deletedAtStr.isNotEmpty ? DateTime.tryParse(deletedAtStr) : null;
+                    final deletedAt = deletedAtStr.isNotEmpty
+                        ? DateTime.tryParse(deletedAtStr)
+                        : null;
 
                     return Card(
                       color: kCardBg,
@@ -243,7 +262,8 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
                       ),
                       margin: const EdgeInsets.only(bottom: 12),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -252,24 +272,32 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         name,
-                                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         subtitle,
-                                        style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                                        style: const TextStyle(
+                                            color: kTextSecondary,
+                                            fontSize: 12),
                                       ),
                                     ],
                                   ),
                                 ),
                                 if (deletedAt != null)
                                   Text(
-                                    DateFormat('dd.MM.yy HH:mm').format(deletedAt),
-                                    style: const TextStyle(color: kTextSecondary, fontSize: 11),
+                                    DateFormat('dd.MM.yy HH:mm')
+                                        .format(deletedAt),
+                                    style: const TextStyle(
+                                        color: kTextSecondary, fontSize: 11),
                                   ),
                               ],
                             ),
@@ -281,23 +309,36 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage> with Si
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: kTextSecondary,
                                     side: const BorderSide(color: kBorderColor),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                   ),
-                                  icon: const Icon(Icons.delete_forever_rounded, size: 16, color: Colors.redAccent),
-                                  label: const Text('Kalıcı Sil', style: TextStyle(fontSize: 12, color: Colors.white)),
+                                  icon: const Icon(Icons.delete_forever_rounded,
+                                      size: 16, color: Colors.redAccent),
+                                  label: const Text('Kalıcı Sil',
+                                      style: TextStyle(
+                                          fontSize: 12, color: Colors.white)),
                                   onPressed: () => _purgeItem(type, id, name),
                                 ),
                                 const SizedBox(width: 12),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF10B981), // Emerald 500
+                                    backgroundColor:
+                                        const Color(0xFF10B981), // Emerald 500
                                     foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
                                   ),
-                                  icon: const Icon(Icons.settings_backup_restore_rounded, size: 16),
-                                  label: const Text('Kurtar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  icon: const Icon(
+                                      Icons.settings_backup_restore_rounded,
+                                      size: 16),
+                                  label: const Text('Kurtar',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
                                   onPressed: () => _restoreItem(type, id, name),
                                 ),
                               ],

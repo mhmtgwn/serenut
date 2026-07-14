@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -179,7 +179,8 @@ void main() {
       await db.insert('customers', {
         'id': 'cust-drift',
         'name': 'Drift Customer',
-        'balance': 10.0, // Expected should be 0 because they have no transactions
+        'balance':
+            10.0, // Expected should be 0 because they have no transactions
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       });
@@ -196,11 +197,32 @@ void main() {
       expect(report.customerBalanceDriftsCount, equals(1));
     });
 
-    test('repairDatabaseHealth resolves all structural and balance drift issues', () async {
+    test(
+        'repairDatabaseHealth resolves all structural and balance drift issues',
+        () async {
       // Seed orphans & negatives
-      await db.insert('sale_items', {'id': 'si-1', 'sale_id': 'none', 'product_id': 'p', 'quantity': 1, 'unit_price': 1, 'subtotal': 1});
-      await db.insert('products', {'id': 'p-neg', 'name': 'P', 'price': 1.0, 'quantity': -10, 'category': 'C'});
-      await db.insert('customers', {'id': 'c-1', 'name': 'C', 'balance': -50.0, 'created_at': 'now', 'updated_at': 'now'});
+      await db.insert('sale_items', {
+        'id': 'si-1',
+        'sale_id': 'none',
+        'product_id': 'p',
+        'quantity': 1,
+        'unit_price': 1,
+        'subtotal': 1
+      });
+      await db.insert('products', {
+        'id': 'p-neg',
+        'name': 'P',
+        'price': 1.0,
+        'quantity': -10,
+        'category': 'C'
+      });
+      await db.insert('customers', {
+        'id': 'c-1',
+        'name': 'C',
+        'balance': -50.0,
+        'created_at': 'now',
+        'updated_at': 'now'
+      });
       // Create a sale transaction that matches -30.0 instead of -50.0 bakiye (so 20.0 TL drift)
       await db.insert('financial_transactions', {
         'id': 't-1',
@@ -220,11 +242,13 @@ void main() {
       expect(report.isHealthy, isTrue);
 
       // Verify negative stock was reset to 0
-      final prodResult = await db.query('products', columns: ['quantity'], where: 'id = ?', whereArgs: ['p-neg']);
+      final prodResult = await db.query('products',
+          columns: ['quantity'], where: 'id = ?', whereArgs: ['p-neg']);
       expect(prodResult.first['quantity'] as int, equals(0));
 
       // Verify customer balance drift was corrected to -30.0
-      final custResult = await db.query('customers', columns: ['balance'], where: 'id = ?', whereArgs: ['c-1']);
+      final custResult = await db.query('customers',
+          columns: ['balance'], where: 'id = ?', whereArgs: ['c-1']);
       expect(custResult.first['balance'] as double, equals(-30.0));
 
       // Verify orphaned sale item was deleted
@@ -235,4 +259,5 @@ void main() {
 }
 
 class _DummyCustomerRepo extends Fake implements ICustomerRepository {}
+
 class _DummyTxRepo extends Fake implements IFinancialTransactionRepository {}

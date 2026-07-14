@@ -1,4 +1,4 @@
-﻿// test/services/auth_security_test.dart
+// test/services/auth_security_test.dart
 // Serenut POS — Auth Security Tests
 // Tests PBKDF2 hashing, login security, and legacy migration
 // Created: 24 Jun 2026
@@ -32,12 +32,14 @@ void main() {
 
     test('verifyPassword returns true for correct password', () {
       final hash = PasswordHashService.hashPassword('correctpassword');
-      expect(PasswordHashService.verifyPassword('correctpassword', hash), isTrue);
+      expect(
+          PasswordHashService.verifyPassword('correctpassword', hash), isTrue);
     });
 
     test('verifyPassword returns false for wrong password', () {
       final hash = PasswordHashService.hashPassword('correctpassword');
-      expect(PasswordHashService.verifyPassword('wrongpassword', hash), isFalse);
+      expect(
+          PasswordHashService.verifyPassword('wrongpassword', hash), isFalse);
     });
 
     test('verifyPassword returns false for empty password', () {
@@ -50,13 +52,16 @@ void main() {
     });
 
     test('verifyPassword returns false for malformed hash', () {
-      expect(PasswordHashService.verifyPassword('password', 'notahash'), isFalse);
-      expect(PasswordHashService.verifyPassword('password', 'pbkdf2\$abc\$def'), isFalse);
+      expect(
+          PasswordHashService.verifyPassword('password', 'notahash'), isFalse);
+      expect(PasswordHashService.verifyPassword('password', 'pbkdf2\$abc\$def'),
+          isFalse);
     });
 
     // ── Timing attack prevention ──────────────────────────────────────────────
 
-    test('verifyPassword is constant-time (no early return on wrong length)', () {
+    test('verifyPassword is constant-time (no early return on wrong length)',
+        () {
       // Both calls should complete without crashing even if lengths differ
       final hash = PasswordHashService.hashPassword('test');
       final sw1 = Stopwatch()..start();
@@ -76,7 +81,8 @@ void main() {
 
     test('isLegacyHash detects old format', () {
       expect(PasswordHashService.isLegacyHash('hashed_password_admin'), isTrue);
-      expect(PasswordHashService.isLegacyHash('hashed_password_manager123'), isTrue);
+      expect(PasswordHashService.isLegacyHash('hashed_password_manager123'),
+          isTrue);
     });
 
     test('isLegacyHash returns false for PBKDF2 format', () {
@@ -87,8 +93,10 @@ void main() {
     test('verifyPassword accepts legacy hash for migration', () {
       // Old system stored: 'hashed_password_<plaintext>'
       const legacyHash = 'hashed_password_admin123';
-      expect(PasswordHashService.verifyPassword('admin123', legacyHash), isTrue);
-      expect(PasswordHashService.verifyPassword('wrongpassword', legacyHash), isFalse);
+      expect(
+          PasswordHashService.verifyPassword('admin123', legacyHash), isTrue);
+      expect(PasswordHashService.verifyPassword('wrongpassword', legacyHash),
+          isFalse);
     });
 
     // ── Security properties ───────────────────────────────────────────────────
@@ -99,7 +107,8 @@ void main() {
       // UNLESS it's in legacy format.
       const notAValidHash = 'admin';
       // 'admin' is not a PBKDF2 hash and not a legacy 'hashed_password_*' hash
-      expect(PasswordHashService.verifyPassword('admin', notAValidHash), isFalse);
+      expect(
+          PasswordHashService.verifyPassword('admin', notAValidHash), isFalse);
     });
 
     test('password case sensitivity is enforced', () {
@@ -119,7 +128,8 @@ void main() {
       final longPassword = 'A' * 256; // 256-char password
       final hash = PasswordHashService.hashPassword(longPassword);
       expect(PasswordHashService.verifyPassword(longPassword, hash), isTrue);
-      expect(PasswordHashService.verifyPassword('$longPassword!', hash), isFalse);
+      expect(
+          PasswordHashService.verifyPassword('$longPassword!', hash), isFalse);
     });
   });
 }

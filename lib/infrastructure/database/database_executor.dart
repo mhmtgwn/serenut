@@ -1,12 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 
 /// Abstract database executor for transaction-aware CRUD operations.
-/// 
+///
 /// Repositories use this instead of direct Database access,
 /// enabling transparent transaction switching:
 /// - Normal ops: DbExecutor → Database
 /// - Txn ops: DbExecutor → Transaction
-/// 
+///
 /// Interface matches sqflite.Database for drop-in compatibility.
 abstract class DbExecutor {
   /// Query a table

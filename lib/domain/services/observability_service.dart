@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
@@ -47,11 +47,13 @@ class ObservabilityService {
     try {
       final events = await TelemetryService().getEvents();
       for (final event in events) {
-        if (event.event == 'sync_remote_post_failed' || 
+        if (event.event == 'sync_remote_post_failed' ||
             event.event == 'sync_run_unhandled_exception' ||
             event.event.contains('failed')) {
           syncFailureCount++;
-        } else if (event.event == 'sync_success' || event.event == 'push_success' || event.event.contains('success')) {
+        } else if (event.event == 'sync_success' ||
+            event.event == 'push_success' ||
+            event.event.contains('success')) {
           syncSuccessCount++;
         } else if (event.event == 'sync_security_anomaly_detected') {
           anomalyCount++;
@@ -62,9 +64,8 @@ class ObservabilityService {
     }
 
     final totalSyncAttempts = syncSuccessCount + syncFailureCount;
-    final failureRate = totalSyncAttempts > 0 
-        ? syncFailureCount / totalSyncAttempts 
-        : 0.0;
+    final failureRate =
+        totalSyncAttempts > 0 ? syncFailureCount / totalSyncAttempts : 0.0;
 
     return {
       'drift_rate': driftRate,

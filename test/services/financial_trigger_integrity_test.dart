@@ -49,7 +49,9 @@ void main() {
       ));
     });
 
-    test('Inserting transaction automatically updates customer balance via triggers', () async {
+    test(
+        'Inserting transaction automatically updates customer balance via triggers',
+        () async {
       // 1. Double check balance is 0
       var balance = await customerRepo.getBalance(custId);
       expect(balance, 0.0);
@@ -87,7 +89,8 @@ void main() {
       expect(balance, -40.0);
     });
 
-    test('Updating transaction throws DatabaseException and is blocked', () async {
+    test('Updating transaction throws DatabaseException and is blocked',
+        () async {
       // 1. Insert a sale transaction
       await transactionRepo.create(FinancialTransactionEntity(
         id: 'tx-update-1',
@@ -110,7 +113,8 @@ void main() {
       );
     });
 
-    test('Deleting transaction throws DatabaseException and is blocked', () async {
+    test('Deleting transaction throws DatabaseException and is blocked',
+        () async {
       // 1. Insert collection of 80 TL
       await transactionRepo.create(FinancialTransactionEntity(
         id: 'tx-del-1',

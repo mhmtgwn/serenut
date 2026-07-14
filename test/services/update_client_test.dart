@@ -1,4 +1,4 @@
-﻿// test/services/update_client_test.dart
+// test/services/update_client_test.dart
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +12,8 @@ void main() {
     late UpdateClient updateClient;
 
     setUp(() {
-      apiClient = ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
+      apiClient =
+          ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       updateClient = UpdateClient(apiClient);
     });
 
@@ -20,7 +21,8 @@ void main() {
       apiClient.mockHandler = (request) {
         return const ApiResponse(
           statusCode: 200,
-          body: '{"latestVersion": "1.1.0+10", "minRequiredVersion": "1.0.0+1", "isForceUpdate": true, "downloadUrl": "http://pkg.apk", "sha256": "abc", "releaseNotes": "fixed bugs"}',
+          body:
+              '{"latestVersion": "1.1.0+10", "minRequiredVersion": "1.0.0+1", "isForceUpdate": true, "downloadUrl": "http://pkg.apk", "sha256": "abc", "releaseNotes": "fixed bugs"}',
           headers: {},
         );
       };
@@ -38,17 +40,20 @@ void main() {
       final tempFile = '${tempDir.path}/update.apk';
 
       // Mock download writes the mock payload: 'SERENUT_UPDATE_BINARY_PAYLOAD_MOCK_2026'
-      final downloadedFile = await updateClient.downloadUpdate('http://pkg.apk', tempFile);
+      final downloadedFile =
+          await updateClient.downloadUpdate('http://pkg.apk', tempFile);
       expect(await downloadedFile.exists(), true);
 
       // Compute expected sha256
       final bytes = await downloadedFile.readAsBytes();
       final expectedSha = sha256.convert(bytes).toString();
 
-      final verifySuccess = await updateClient.verifyChecksum(tempFile, expectedSha);
+      final verifySuccess =
+          await updateClient.verifyChecksum(tempFile, expectedSha);
       expect(verifySuccess, true);
 
-      final verifyFailed = await updateClient.verifyChecksum(tempFile, 'wrong_sha_key');
+      final verifyFailed =
+          await updateClient.verifyChecksum(tempFile, 'wrong_sha_key');
       expect(verifyFailed, false);
 
       // Cleanup

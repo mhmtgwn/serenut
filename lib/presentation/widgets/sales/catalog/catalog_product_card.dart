@@ -15,9 +15,8 @@ class _CatalogProductCard extends StatelessWidget {
     final isLowStock = product.quantity > 0 && product.quantity <= 5;
 
     // Stok durumuna göre renkler (mevcut mantık korundu)
-    final Color badgeBgColor = outOfStock
-        ? _kRedLight
-        : (isLowStock ? _kAmberLight : _kGreenLight);
+    final Color badgeBgColor =
+        outOfStock ? _kRedLight : (isLowStock ? _kAmberLight : _kGreenLight);
     final Color badgeTextColor = outOfStock
         ? _kRed
         : (isLowStock ? const Color(0xFF854D0E) : _kGreenDark);
@@ -79,7 +78,8 @@ class _CatalogProductCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       // Stok rozeti
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: badgeBgColor,
                           borderRadius: BorderRadius.circular(6),
@@ -87,7 +87,9 @@ class _CatalogProductCard extends StatelessWidget {
                         child: Text(
                           outOfStock
                               ? 'Tükendi'
-                              : (isLowStock ? '${product.quantity} adet' : '${product.quantity}'),
+                              : (isLowStock
+                                  ? '${product.quantity} adet'
+                                  : '${product.quantity}'),
                           style: TextStyle(
                             fontSize: 9,
                             color: badgeTextColor,

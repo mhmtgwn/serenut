@@ -15,6 +15,7 @@ import 'package:serenutos/providers/settings_provider.dart';
 // ── Status Enums ──────────────────────────────────────────────────────────────
 
 enum PrinterConnectionStatus { connected, disconnected, failing, queueMode }
+
 enum ScannerConnectionStatus { hardware, camera, keyboard, offline }
 
 // ── Device State ──────────────────────────────────────────────────────────────
@@ -34,8 +35,7 @@ class DeviceState {
     required this.lastChecked,
   });
 
-  bool get printerOk =>
-      printerStatus == PrinterConnectionStatus.connected;
+  bool get printerOk => printerStatus == PrinterConnectionStatus.connected;
 
   bool get hasPendingJobs => pendingPrintJobs > 0;
 
@@ -52,11 +52,11 @@ class DeviceState {
     DateTime? lastChecked,
   }) {
     return DeviceState(
-      printerStatus:    printerStatus   ?? this.printerStatus,
-      scannerStatus:    scannerStatus   ?? this.scannerStatus,
+      printerStatus: printerStatus ?? this.printerStatus,
+      scannerStatus: scannerStatus ?? this.scannerStatus,
       pendingPrintJobs: pendingPrintJobs ?? this.pendingPrintJobs,
-      printerError:     printerError,
-      lastChecked:      lastChecked     ?? this.lastChecked,
+      printerError: printerError,
+      lastChecked: lastChecked ?? this.lastChecked,
     );
   }
 }
@@ -116,16 +116,21 @@ class DeviceStatusNotifier extends StateNotifier<DeviceState> {
     final pending = await _printQueue.pendingCount();
 
     state = state.copyWith(
-      printerStatus:    printerStatus,
-      printerError:     printerError,
-      scannerStatus:    scannerStatus,
+      printerStatus: printerStatus,
+      printerError: printerError,
+      scannerStatus: scannerStatus,
       pendingPrintJobs: pending,
-      lastChecked:      DateTime.now(),
+      lastChecked: DateTime.now(),
     );
 
     // Auto-retry pending jobs if printer is connected
-    if (printerStatus == PrinterConnectionStatus.connected && pending > 0 && settings != null) {
-      _ref.read(printerServiceProvider).processPendingQueue(settings).then((_) async {
+    if (printerStatus == PrinterConnectionStatus.connected &&
+        pending > 0 &&
+        settings != null) {
+      _ref
+          .read(printerServiceProvider)
+          .processPendingQueue(settings)
+          .then((_) async {
         final updatedPending = await _printQueue.pendingCount();
         state = state.copyWith(pendingPrintJobs: updatedPending);
       }).catchError((_) {});
@@ -136,7 +141,7 @@ class DeviceStatusNotifier extends StateNotifier<DeviceState> {
     if (settings == null) return PrinterConnectionStatus.disconnected;
 
     final printerName = settings.printerName?.trim();
-    final printerIp   = settings.printerIp?.trim();
+    final printerIp = settings.printerIp?.trim();
 
     // Sunmi check (Android only)
     if (printerName == 'sunmi') {
@@ -205,8 +210,8 @@ final scannerModeLabelProvider = Provider<String>((ref) {
   final status = ref.watch(deviceStatusProvider).scannerStatus;
   return switch (status) {
     ScannerConnectionStatus.hardware => 'Sunmi Tarayici',
-    ScannerConnectionStatus.camera   => 'Kamera Tarayici',
+    ScannerConnectionStatus.camera => 'Kamera Tarayici',
     ScannerConnectionStatus.keyboard => 'USB Tarayici',
-    ScannerConnectionStatus.offline  => 'Tarayici Yok',
+    ScannerConnectionStatus.offline => 'Tarayici Yok',
   };
 });

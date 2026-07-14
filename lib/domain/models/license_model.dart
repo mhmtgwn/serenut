@@ -40,7 +40,8 @@ class CompanyLicense {
     return CompanyLicense(
       companyId: json['companyId'] as String? ?? '',
       tier: tier,
-      activeDeviceIds: List<String>.from(json['activeDeviceIds'] as List? ?? []),
+      activeDeviceIds:
+          List<String>.from(json['activeDeviceIds'] as List? ?? []),
       isActive: json['isActive'] as bool? ?? false,
     );
   }

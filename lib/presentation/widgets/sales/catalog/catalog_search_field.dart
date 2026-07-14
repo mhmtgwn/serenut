@@ -44,7 +44,8 @@ class _SearchField extends StatelessWidget {
         ),
         filled: true,
         fillColor: _kSurface,
-        contentPadding: const EdgeInsets.symmetric(vertical: 13, horizontal: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 13, horizontal: 12),
         isDense: true,
       ),
       onChanged: onChanged,
@@ -54,7 +55,4 @@ class _SearchField extends StatelessWidget {
 
 // ── Barkod Alanı Bileşeni ─────────────────────────────────────────────────────
 
-
-
 // ── Ürün Kartı ────────────────────────────────────────────────────────────────
-

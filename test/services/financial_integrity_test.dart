@@ -41,7 +41,9 @@ void main() {
       expect(logs.first['metadata']['test_key'], 'test_val');
     });
 
-    test('OperationQueueService - queues, increments retry, and removes operations', () async {
+    test(
+        'OperationQueueService - queues, increments retry, and removes operations',
+        () async {
       final key = IdempotencyKeyGenerator.generateKey();
       await operationQueue.queueOperation(
         type: 'create_sale',
@@ -66,7 +68,9 @@ void main() {
       expect(queue, isEmpty);
     });
 
-    test('PaymentReconciliationService - detects matching states and reviews discrepancies', () async {
+    test(
+        'PaymentReconciliationService - detects matching states and reviews discrepancies',
+        () async {
       final key = IdempotencyKeyGenerator.generateKey();
 
       // Case 1: Match
@@ -91,7 +95,8 @@ void main() {
 
       // Verify that mismatch was logged to audit log
       final logs = await auditLogger.getLogs();
-      expect(logs.any((log) => log['action'] == 'reconcile_mismatch_detected'), isTrue);
+      expect(logs.any((log) => log['action'] == 'reconcile_mismatch_detected'),
+          isTrue);
     });
   });
 }

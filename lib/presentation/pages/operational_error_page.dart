@@ -8,7 +8,8 @@ class OperationalErrorPage extends ConsumerStatefulWidget {
   const OperationalErrorPage({super.key});
 
   @override
-  ConsumerState<OperationalErrorPage> createState() => _OperationalErrorPageState();
+  ConsumerState<OperationalErrorPage> createState() =>
+      _OperationalErrorPageState();
 }
 
 class _OperationalErrorPageState extends ConsumerState<OperationalErrorPage> {
@@ -24,11 +25,14 @@ class _OperationalErrorPageState extends ConsumerState<OperationalErrorPage> {
         // But we can explicitly force a refresh just in case
         ref.read(authNotifierProvider.notifier).checkAuth();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Durum güncellendi, yönlendiriliyorsunuz...')),
+          const SnackBar(
+              content: Text('Durum güncellendi, yönlendiriliyorsunuz...')),
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Abonelik durumu henüz aktif değil veya internet bağlantısı yok.')),
+          const SnackBar(
+              content: Text(
+                  'Abonelik durumu henüz aktif değil veya internet bağlantısı yok.')),
         );
       }
     } finally {
@@ -50,7 +54,8 @@ class _OperationalErrorPageState extends ConsumerState<OperationalErrorPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.orange),
+              const Icon(Icons.warning_amber_rounded,
+                  size: 80, color: Colors.orange),
               const SizedBox(height: 24),
               const Text(
                 'Abonelik veya lisans durumunuz nedeniyle bazı servisler kullanılamıyor.',
@@ -74,9 +79,11 @@ class _OperationalErrorPageState extends ConsumerState<OperationalErrorPage> {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Durumu Yenile'),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -88,7 +95,8 @@ class _OperationalErrorPageState extends ConsumerState<OperationalErrorPage> {
                       icon: const Icon(Icons.logout),
                       label: const Text('Çıkış Yap'),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
                       ),
                     ),
                   ],

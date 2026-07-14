@@ -26,25 +26,30 @@ class CloudAdaptiveSaleRepository implements ISaleRepository {
   Future<bool> exists(id) => _localRepo.exists(id);
 
   @override
-  Future<SaleEntity?> findByIdempotencyKey(String key) => _localRepo.findByIdempotencyKey(key);
+  Future<SaleEntity?> findByIdempotencyKey(String key) =>
+      _localRepo.findByIdempotencyKey(key);
 
   @override
   Future<List<SaleEntity>> getTodaySales() => _localRepo.getTodaySales();
 
   @override
-  Future<List<SaleEntity>> getSalesByDateRange(DateTime from, DateTime to) => _localRepo.getSalesByDateRange(from, to);
+  Future<List<SaleEntity>> getSalesByDateRange(DateTime from, DateTime to) =>
+      _localRepo.getSalesByDateRange(from, to);
 
   @override
-  Future<List<SaleEntity>> getByCustomerId(String customerId) => _localRepo.getByCustomerId(customerId);
+  Future<List<SaleEntity>> getByCustomerId(String customerId) =>
+      _localRepo.getByCustomerId(customerId);
 
   @override
-  Future<List<SaleEntity>> getByPaymentMethod(String method) => _localRepo.getByPaymentMethod(method);
+  Future<List<SaleEntity>> getByPaymentMethod(String method) =>
+      _localRepo.getByPaymentMethod(method);
 
   @override
   Future<double> getTodayRevenue() => _localRepo.getTodayRevenue();
 
   @override
-  Future<double> getRevenueByDateRange(DateTime from, DateTime to) => _localRepo.getRevenueByDateRange(from, to);
+  Future<double> getRevenueByDateRange(DateTime from, DateTime to) =>
+      _localRepo.getRevenueByDateRange(from, to);
 
   @override
   Future<int> getTotalItemsSold() => _localRepo.getTotalItemsSold();
@@ -57,7 +62,9 @@ class CloudAdaptiveSaleRepository implements ISaleRepository {
     String? searchQuery,
     int limit = 25,
     int offset = 0,
-  }) => _localRepo.findFiltered(searchQuery: searchQuery, limit: limit, offset: offset);
+  }) =>
+      _localRepo.findFiltered(
+          searchQuery: searchQuery, limit: limit, offset: offset);
 
   // ── Write operations (Offline first: write local, then sync remote in bg) ──
   @override

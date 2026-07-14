@@ -17,19 +17,20 @@ import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
+
 // ── Tema Sabitleri ────────────────────────────────────────────────────────────
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kAmber      = Color(0xFFEAB308);
+const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kAmberDark  = Color(0xFFB45309);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kAmberDark = Color(0xFFB45309);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 // ── Durum Meta ────────────────────────────────────────────────────────────────
 class _StatusMeta {
@@ -37,17 +38,51 @@ class _StatusMeta {
   final Color bg;
   final IconData icon;
   final String label;
-  const _StatusMeta({required this.color, required this.bg, required this.icon, required this.label});
+  const _StatusMeta(
+      {required this.color,
+      required this.bg,
+      required this.icon,
+      required this.label});
 }
 
 _StatusMeta _statusMeta(String status) {
   switch (status.toLowerCase()) {
-    case 'created':    return const _StatusMeta(color: Color(0xFF64748B), bg: Color(0xFFF1F5F9), icon: Icons.fiber_new_rounded,        label: 'Yeni');
-    case 'preparing':  return const _StatusMeta(color: _kAmberDark,             bg: _kAmberLight,      icon: Icons.hourglass_top_rounded,      label: 'Hazırlanıyor');
-    case 'ready':      return const _StatusMeta(color: _kGreen,           bg: _kGreenLight,      icon: Icons.check_circle_outline_rounded, label: 'Hazır');
-    case 'delivered':  return const _StatusMeta(color: _kGreenDark,             bg: _kGreenLight,      icon: Icons.local_shipping_rounded,     label: 'Teslim Edildi');
-    case 'cancelled':  return const _StatusMeta(color: _kRed,                   bg: _kRedLight,        icon: Icons.cancel_outlined,            label: 'İptal');
-    default:           return const _StatusMeta(color: Color(0xFF64748B), bg: Color(0xFFF1F5F9), icon: Icons.help_outline_rounded,       label: 'Bilinmiyor');
+    case 'created':
+      return const _StatusMeta(
+          color: Color(0xFF64748B),
+          bg: Color(0xFFF1F5F9),
+          icon: Icons.fiber_new_rounded,
+          label: 'Yeni');
+    case 'preparing':
+      return const _StatusMeta(
+          color: _kAmberDark,
+          bg: _kAmberLight,
+          icon: Icons.hourglass_top_rounded,
+          label: 'Hazırlanıyor');
+    case 'ready':
+      return const _StatusMeta(
+          color: _kGreen,
+          bg: _kGreenLight,
+          icon: Icons.check_circle_outline_rounded,
+          label: 'Hazır');
+    case 'delivered':
+      return const _StatusMeta(
+          color: _kGreenDark,
+          bg: _kGreenLight,
+          icon: Icons.local_shipping_rounded,
+          label: 'Teslim Edildi');
+    case 'cancelled':
+      return const _StatusMeta(
+          color: _kRed,
+          bg: _kRedLight,
+          icon: Icons.cancel_outlined,
+          label: 'İptal');
+    default:
+      return const _StatusMeta(
+          color: Color(0xFF64748B),
+          bg: Color(0xFFF1F5F9),
+          icon: Icons.help_outline_rounded,
+          label: 'Bilinmiyor');
   }
 }
 
@@ -64,7 +99,14 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
   bool _showFilters = false;
-  Map<String, int> _statusCounts = {'all': 0, 'created': 0, 'preparing': 0, 'ready': 0, 'delivered': 0, 'cancelled': 0};
+  Map<String, int> _statusCounts = {
+    'all': 0,
+    'created': 0,
+    'preparing': 0,
+    'ready': 0,
+    'delivered': 0,
+    'cancelled': 0
+  };
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -80,7 +122,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   Future<void> _refreshCounts() async {
     try {
-      final counts = await ref.read(ordersControllerProvider.notifier).getStatusCounts();
+      final counts =
+          await ref.read(ordersControllerProvider.notifier).getStatusCounts();
       if (mounted) setState(() => _statusCounts = counts);
     } catch (_) {}
   }
@@ -151,12 +194,18 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   String _statusLabel(String status) {
     switch (status.toLowerCase()) {
-      case 'created':    return 'Yeni';
-      case 'preparing':  return 'Hazırlanıyor';
-      case 'ready':      return 'Hazır';
-      case 'delivered':  return 'Teslim Edildi';
-      case 'cancelled':  return 'İptal';
-      default:           return 'Tümü';
+      case 'created':
+        return 'Yeni';
+      case 'preparing':
+        return 'Hazırlanıyor';
+      case 'ready':
+        return 'Hazır';
+      case 'delivered':
+        return 'Teslim Edildi';
+      case 'cancelled':
+        return 'İptal';
+      default:
+        return 'Tümü';
     }
   }
 
@@ -172,7 +221,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: isSelected ? statusColor.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
+        color: isSelected
+            ? statusColor.withValues(alpha: 0.05)
+            : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected ? statusColor : const Color(0xFFE2E8F0),
@@ -217,9 +268,12 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                 const Spacer(),
                 // Item count badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isSelected ? statusColor.withValues(alpha: 0.15) : const Color(0xFFE2E8F0),
+                    color: isSelected
+                        ? statusColor.withValues(alpha: 0.15)
+                        : const Color(0xFFE2E8F0),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -241,8 +295,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ordersAsync   = ref.watch(ordersControllerProvider);
-    final customersVal  = ref.watch(customersControllerProvider);
+    final ordersAsync = ref.watch(ordersControllerProvider);
+    final customersVal = ref.watch(customersControllerProvider);
 
     return ordersAsync.when(
       loading: () => const Scaffold(
@@ -254,7 +308,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         body: SafeArea(
           child: _ErrorView(
             message: err.toString(),
-            onRetry: () => ref.read(ordersControllerProvider.notifier).refresh(),
+            onRetry: () =>
+                ref.read(ordersControllerProvider.notifier).refresh(),
           ),
         ),
       ),
@@ -275,7 +330,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             _refreshCounts();
           },
           showRefresh: true,
-          onRefresh: () => ref.read(ordersControllerProvider.notifier).refresh(),
+          onRefresh: () =>
+              ref.read(ordersControllerProvider.notifier).refresh(),
           filterWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -283,7 +339,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                 onTap: () => setState(() => _showFilters = !_showFilters),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: _kSurface,
                     borderRadius: BorderRadius.circular(12),
@@ -291,7 +348,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.filter_list_rounded, size: 16, color: _kGreenDark),
+                      const Icon(Icons.filter_list_rounded,
+                          size: 16, color: _kGreenDark),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -335,7 +393,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                   ),
                   child: Column(
                     children: [
-                       _buildFilterRow(
+                      _buildFilterRow(
                         context,
                         label: 'Tümü',
                         count: counts['all'] ?? 0,
@@ -345,7 +403,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             _statusFilter = 'all';
                             _showFilters = false;
                           });
-                          ref.read(ordersControllerProvider.notifier).applyFilter('all');
+                          ref
+                              .read(ordersControllerProvider.notifier)
+                              .applyFilter('all');
                           _refreshCounts();
                         },
                         statusColor: const Color(0xFF64748B),
@@ -361,7 +421,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             _statusFilter = 'created';
                             _showFilters = false;
                           });
-                          ref.read(ordersControllerProvider.notifier).applyFilter('created');
+                          ref
+                              .read(ordersControllerProvider.notifier)
+                              .applyFilter('created');
                           _refreshCounts();
                         },
                         statusColor: const Color(0xFF3B82F6),
@@ -377,7 +439,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             _statusFilter = 'preparing';
                             _showFilters = false;
                           });
-                          ref.read(ordersControllerProvider.notifier).applyFilter('preparing');
+                          ref
+                              .read(ordersControllerProvider.notifier)
+                              .applyFilter('preparing');
                           _refreshCounts();
                         },
                         statusColor: const Color(0xFFFF9500),
@@ -393,7 +457,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             _statusFilter = 'ready';
                             _showFilters = false;
                           });
-                          ref.read(ordersControllerProvider.notifier).applyFilter('ready');
+                          ref
+                              .read(ordersControllerProvider.notifier)
+                              .applyFilter('ready');
                           _refreshCounts();
                         },
                         statusColor: const Color(0xFF10B981),
@@ -409,7 +475,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             _statusFilter = 'delivered';
                             _showFilters = false;
                           });
-                          ref.read(ordersControllerProvider.notifier).applyFilter('delivered');
+                          ref
+                              .read(ordersControllerProvider.notifier)
+                              .applyFilter('delivered');
                           _refreshCounts();
                         },
                         statusColor: const Color(0xFF6366F1),
@@ -425,7 +493,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             _statusFilter = 'cancelled';
                             _showFilters = false;
                           });
-                          ref.read(ordersControllerProvider.notifier).applyFilter('cancelled');
+                          ref
+                              .read(ordersControllerProvider.notifier)
+                              .applyFilter('cancelled');
                           _refreshCounts();
                         },
                         statusColor: const Color(0xFFEF4444),
@@ -434,7 +504,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     ],
                   ),
                 ),
-                crossFadeState: _showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                crossFadeState: _showFilters
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 200),
               ),
             ],
@@ -459,7 +531,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                   itemBuilder: (context, index) {
                     if (index == filtered.length) {
                       // Pagination footer
-                      final hasMore = ref.read(ordersControllerProvider.notifier).hasMore;
+                      final hasMore =
+                          ref.read(ordersControllerProvider.notifier).hasMore;
                       if (!hasMore) return const SizedBox.shrink();
                       return const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
@@ -471,7 +544,13 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                       data: (list) {
                         final c = list.firstWhere(
                           (c) => c.id == order.customerId,
-                          orElse: () => CustomerEntity(id: '', name: 'Bilinmeyen', email: '', phone: '', balance: 0, createdAt: DateTime.now()),
+                          orElse: () => CustomerEntity(
+                              id: '',
+                              name: 'Bilinmeyen',
+                              email: '',
+                              phone: '',
+                              balance: 0,
+                              createdAt: DateTime.now()),
                         );
                         return c.name;
                       },
@@ -480,7 +559,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     return _OrderCard(
                       order: order,
                       customerName: customerName,
-                      onDetail: () => context.push('/orders/detail/${order.id}'),
+                      onDetail: () =>
+                          context.push('/orders/detail/${order.id}'),
                     );
                   },
                 ),
@@ -491,7 +571,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             foregroundColor: Colors.white,
             elevation: 3,
             icon: const Icon(Icons.add_shopping_cart_rounded),
-            label: const Text('Yeni Sipariş', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text('Yeni Sipariş',
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         );
       },
@@ -515,11 +596,18 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Siparişi Sil'),
-        content: const Text('Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
+        content: const Text(
+            'Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('İptal')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _kRed, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _kRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
             onPressed: () {
               ref.read(ordersControllerProvider.notifier).deleteOrder(order.id);
               ref.invalidate(dashboardProvider);
@@ -541,13 +629,22 @@ class _FilterChip extends StatelessWidget {
   final String status;
   final String selected;
   final void Function(String) onTap;
-  const _FilterChip({required this.label, required this.count, required this.status, required this.selected, required this.onTap});
+  const _FilterChip(
+      {required this.label,
+      required this.count,
+      required this.status,
+      required this.selected,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final isSelected = selected == status;
     final meta = status == 'all'
-        ? const _StatusMeta(color: _kGreen, bg: _kGreenLight, icon: Icons.list_rounded, label: 'Tümü')
+        ? const _StatusMeta(
+            color: _kGreen,
+            bg: _kGreenLight,
+            icon: Icons.list_rounded,
+            label: 'Tümü')
         : _statusMeta(status);
 
     return GestureDetector(
@@ -575,7 +672,8 @@ class _FilterChip extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.25) : meta.bg,
+                color:
+                    isSelected ? Colors.white.withValues(alpha: 0.25) : meta.bg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -608,11 +706,11 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meta      = _statusMeta(order.status);
-    final dateStr   = DateFormat('dd.MM.yy HH:mm').format(order.createdAt);
+    final meta = _statusMeta(order.status);
+    final dateStr = DateFormat('dd.MM.yy HH:mm').format(order.createdAt);
     final totalAmount = (order.items.fold<double>(0.0, (sum, item) {
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-      final qty   = (item['quantity']   as num?)?.toDouble() ?? 0.0;
+      final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       return sum + price * qty;
     }));
     final itemCount = order.items.length;
@@ -680,7 +778,8 @@ class _OrderCard extends StatelessWidget {
                       const SizedBox(height: 5),
                       Row(
                         children: [
-                          const Icon(Icons.person_outline_rounded, size: 13, color: _kTextSecondary),
+                          const Icon(Icons.person_outline_rounded,
+                              size: 13, color: _kTextSecondary),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -705,7 +804,8 @@ class _OrderCard extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.calendar_month_outlined, size: 13, color: _kTextSecondary),
+                              const Icon(Icons.calendar_month_outlined,
+                                  size: 13, color: _kTextSecondary),
                               const SizedBox(width: 4),
                               Text(
                                 dateStr,
@@ -735,7 +835,8 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: _kGreenLight,
                         borderRadius: BorderRadius.circular(8),
@@ -776,8 +877,11 @@ class _StatusBadge extends StatelessWidget {
     final meta = _statusMeta(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: meta.bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(meta.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: meta.color)),
+      decoration: BoxDecoration(
+          color: meta.bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(meta.label,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: meta.color)),
     );
   }
 }
@@ -787,8 +891,9 @@ class _LoadingView extends StatelessWidget {
   const _LoadingView();
   @override
   Widget build(BuildContext context) => const Center(
-    child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen)),
-  );
+        child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(_kGreen)),
+      );
 }
 
 class _ErrorView extends StatelessWidget {
@@ -798,27 +903,34 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline_rounded, size: 56, color: _kRed),
-          const SizedBox(height: 16),
-          const Text('Siparişler yüklenemedi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text(message, style: const TextStyle(color: _kTextSecondary, fontSize: 12), textAlign: TextAlign.center),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Tekrar Dene'),
-            style: ElevatedButton.styleFrom(backgroundColor: _kGreen, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 56, color: _kRed),
+              const SizedBox(height: 16),
+              const Text('Siparişler yüklenemedi',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(message,
+                  style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Tekrar Dene'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: _kGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12))),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 class _EmptyView extends StatelessWidget {
@@ -829,15 +941,18 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 72, color: Colors.grey[200]),
-        const SizedBox(height: 16),
-        Text(message, style: const TextStyle(color: _kTextSecondary, fontSize: 15, fontWeight: FontWeight.w500)),
-        if (action != null) ...[const SizedBox(height: 16), action!],
-      ],
-    ),
-  );
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 72, color: Colors.grey[200]),
+            const SizedBox(height: 16),
+            Text(message,
+                style: const TextStyle(
+                    color: _kTextSecondary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500)),
+            if (action != null) ...[const SizedBox(height: 16), action!],
+          ],
+        ),
+      );
 }
-

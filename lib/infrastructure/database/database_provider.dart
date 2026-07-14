@@ -71,46 +71,57 @@ class DatabaseManager {
   Future<void> _verifyDatabaseSchemaInvariants(Database db) async {
     final Map<String, List<String>> expectedColumns = {
       'users': [
-        'id', 'name', 'email', 'password_hash', 'role', 'is_active',
-        'username', 'pin_hash', 'business_code', 'device_token_version',
-        'failed_pin_attempts', 'locked_until', 'permissions'
+        'id',
+        'name',
+        'email',
+        'password_hash',
+        'role',
+        'is_active',
+        'username',
+        'pin_hash',
+        'business_code',
+        'device_token_version',
+        'failed_pin_attempts',
+        'locked_until',
+        'permissions'
       ],
       'settings': [
-        'id', 'business_name', 'sound_notification_enabled',
-        'label_printer_ip', 'sms_sim_subscription_id'
+        'id',
+        'business_name',
+        'sound_notification_enabled',
+        'label_printer_ip',
+        'sms_sim_subscription_id'
       ],
-      'business_profile': [
-        'id', 'version'
-      ],
-      'sms_logs': [
-        'id', 'status', 'event_type'
-      ],
-      'print_queue': [
-        'id', 'status'
-      ],
+      'business_profile': ['id', 'version'],
+      'sms_logs': ['id', 'status', 'event_type'],
+      'print_queue': ['id', 'status'],
     };
 
     for (final table in expectedColumns.keys) {
       // 1. Check table existence using sqlite_master
       final tableCheck = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-        [table]
-      );
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          [table]);
       if (tableCheck.isEmpty) {
-        throw StateError('Database invariant violation: Table $table is missing from database schema.');
+        throw StateError(
+            'Database invariant violation: Table $table is missing from database schema.');
       }
 
       // 2. Check column existence using PRAGMA table_info
-      final List<Map<String, dynamic>> columnsInfo = await db.rawQuery('PRAGMA table_info($table)');
-      final existingColumns = columnsInfo.map((c) => c['name'] as String).toList();
+      final List<Map<String, dynamic>> columnsInfo =
+          await db.rawQuery('PRAGMA table_info($table)');
+      final existingColumns =
+          columnsInfo.map((c) => c['name'] as String).toList();
 
       for (final expectedCol in expectedColumns[table]!) {
         if (!existingColumns.contains(expectedCol)) {
-          throw StateError('Database invariant violation: Column $expectedCol is missing from table $table.');
+          throw StateError(
+              'Database invariant violation: Column $expectedCol is missing from table $table.');
         }
       }
     }
-    debugPrint('[DatabaseManager] 🛡️ All schema invariants verified successfully.');
+    debugPrint(
+        '[DatabaseManager] 🛡️ All schema invariants verified successfully.');
   }
 
   /// Check if the database file is a valid SQLite database
@@ -148,42 +159,53 @@ class DatabaseManager {
     if (isDiskDb) {
       final dbFile = File(path);
       if (await dbFile.exists() && !await _isDatabaseFile(path)) {
-        debugPrint('[DatabaseManager] ⚠️ Encrypted or corrupt database file detected.');
-        
+        debugPrint(
+            '[DatabaseManager] ⚠️ Encrypted or corrupt database file detected.');
+
         final dbDir = dirname(path);
         final backupPath = join(dbDir, 'serenut_pos_upgrade_backup.db');
         final backupFile = File(backupPath);
-        
+
         List<Map<String, dynamic>> pendingSales = [];
         List<Map<String, dynamic>> pendingTransactions = [];
-        
+
         if (await backupFile.exists() && await _isDatabaseFile(backupPath)) {
-          debugPrint('[DatabaseManager] 📦 Attempting recovery from plain upgrade backup...');
+          debugPrint(
+              '[DatabaseManager] 📦 Attempting recovery from plain upgrade backup...');
           try {
-            final backupDb = await openDatabase(backupPath, readOnly: true, singleInstance: false);
+            final backupDb = await openDatabase(backupPath,
+                readOnly: true, singleInstance: false);
             try {
-              pendingSales = await backupDb.query('sales', where: 'is_synced = 0');
+              pendingSales =
+                  await backupDb.query('sales', where: 'is_synced = 0');
             } catch (e, st) {
               debugPrint('[DatabaseManager] ❌ Sales recovery query failed: $e');
-              await TelemetryService().logError(e, st, context: 'db_recovery_sales_query');
+              await TelemetryService()
+                  .logError(e, st, context: 'db_recovery_sales_query');
             }
             try {
-              pendingTransactions = await backupDb.query('financial_transactions', where: 'is_synced = 0');
+              pendingTransactions = await backupDb
+                  .query('financial_transactions', where: 'is_synced = 0');
             } catch (e, st) {
-              debugPrint('[DatabaseManager] ❌ Financial transactions recovery query failed: $e');
-              await TelemetryService().logError(e, st, context: 'db_recovery_tx_query');
+              debugPrint(
+                  '[DatabaseManager] ❌ Financial transactions recovery query failed: $e');
+              await TelemetryService()
+                  .logError(e, st, context: 'db_recovery_tx_query');
             }
             await backupDb.close();
-            debugPrint('[DatabaseManager] 📥 Recovered ${pendingSales.length} sales and ${pendingTransactions.length} pending transactions.');
+            debugPrint(
+                '[DatabaseManager] 📥 Recovered ${pendingSales.length} sales and ${pendingTransactions.length} pending transactions.');
           } catch (err, st) {
             debugPrint('[DatabaseManager] ❌ Recovery reading failed: $err');
-            await TelemetryService().logError(err, st, context: 'db_recovery_failed');
+            await TelemetryService()
+                .logError(err, st, context: 'db_recovery_failed');
           }
         }
-        
-        debugPrint('[DatabaseManager] 🗑️ Deleting encrypted/corrupted database file to recreate plain SQLite.');
+
+        debugPrint(
+            '[DatabaseManager] 🗑️ Deleting encrypted/corrupted database file to recreate plain SQLite.');
         await dbFile.delete();
-        
+
         // Recreate clean database and write back the recovered data
         try {
           final cleanDb = await openDatabase(
@@ -192,17 +214,20 @@ class DatabaseManager {
             onCreate: _onCreate,
           );
           if (pendingSales.isNotEmpty || pendingTransactions.isNotEmpty) {
-            debugPrint('[DatabaseManager] 🔄 Replaying recovered pending queue into the new clean database...');
+            debugPrint(
+                '[DatabaseManager] 🔄 Replaying recovered pending queue into the new clean database...');
             await cleanDb.transaction((txn) async {
               for (final sale in pendingSales) {
                 final cleanSale = Map<String, dynamic>.from(sale);
                 cleanSale['is_synced'] = 0;
-                await txn.insert('sales', cleanSale, conflictAlgorithm: ConflictAlgorithm.replace);
+                await txn.insert('sales', cleanSale,
+                    conflictAlgorithm: ConflictAlgorithm.replace);
               }
               for (final tx in pendingTransactions) {
                 final cleanTx = Map<String, dynamic>.from(tx);
                 cleanTx['is_synced'] = 0;
-                await txn.insert('financial_transactions', cleanTx, conflictAlgorithm: ConflictAlgorithm.replace);
+                await txn.insert('financial_transactions', cleanTx,
+                    conflictAlgorithm: ConflictAlgorithm.replace);
               }
             });
             debugPrint('[DatabaseManager] ✅ Replay completed successfully.');
@@ -221,12 +246,15 @@ class DatabaseManager {
       if (await dbFile.exists() && await _isDatabaseFile(path)) {
         int currentVersion = 0;
         try {
-          final tempDb = await openDatabase(path, readOnly: true, singleInstance: false);
+          final tempDb =
+              await openDatabase(path, readOnly: true, singleInstance: false);
           currentVersion = await tempDb.getVersion();
           await tempDb.close();
         } catch (e, st) {
-          debugPrint('[DatabaseManager] ⚠️ Pre-upgrade version check failed: $e');
-          TelemetryService().logError(e, st, context: 'db_pre_upgrade_version_check');
+          debugPrint(
+              '[DatabaseManager] ⚠️ Pre-upgrade version check failed: $e');
+          TelemetryService()
+              .logError(e, st, context: 'db_pre_upgrade_version_check');
         }
 
         if (currentVersion > 0 && currentVersion < _databaseVersion) {
@@ -262,16 +290,19 @@ class DatabaseManager {
       );
       // Ensure default walk-in customer exists to satisfy FOREIGN KEY constraint for anonymous sales
       try {
-        await db.insert('customers', {
-          'id': '',
-          'name': 'Peşin Müşteri',
-          'email': '',
-          'phone': '',
-          'balance': 0.0,
-          'status': 'active',
-          'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert(
+            'customers',
+            {
+              'id': '',
+              'name': 'Peşin Müşteri',
+              'email': '',
+              'phone': '',
+              'balance': 0.0,
+              'status': 'active',
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {
         // Table might not exist yet in certain test configurations (e.g. backup/restore tests)
       }
@@ -313,9 +344,10 @@ class DatabaseManager {
     } catch (e) {
       // Self-healing: if database decryption fails (wrong key / corrupted DB on re-installation),
       // delete the database file and re-open it to start clean.
-      final isDecryptionError = e.toString().contains('file is not a database') || 
-                                e.toString().contains('code 26') || 
-                                e.toString().contains('open_failed');
+      final isDecryptionError =
+          e.toString().contains('file is not a database') ||
+              e.toString().contains('code 26') ||
+              e.toString().contains('open_failed');
       if (isDiskDb && isDecryptionError) {
         try {
           await deleteDatabase(path);
@@ -323,7 +355,7 @@ class DatabaseManager {
           if (await walFile.exists()) await walFile.delete();
           final shmFile = File('$path-shm');
           if (await shmFile.exists()) await shmFile.delete();
-          
+
           return await openDatabase(
             path,
             version: _databaseVersion,
@@ -338,8 +370,10 @@ class DatabaseManager {
             },
           );
         } catch (e, st) {
-          debugPrint('[DatabaseManager] ❌ Self-heal re-open failed after decryption error: $e');
-          TelemetryService().logError(e, st, context: 'db_selfheal_reopen_failed');
+          debugPrint(
+              '[DatabaseManager] ❌ Self-heal re-open failed after decryption error: $e');
+          TelemetryService()
+              .logError(e, st, context: 'db_selfheal_reopen_failed');
         }
       }
 
@@ -365,10 +399,8 @@ class DatabaseManager {
     }
   }
 
-
   /// Open database connection using appropriate factory for tests vs production
   // (Kept for backward compat — delegates to openDatabase)
-
 
   /// Open database connection using appropriate factory for tests vs production
   Future<Database> openDatabaseConnection(
@@ -495,15 +527,18 @@ class DatabaseManager {
       if (await shmFile.exists()) {
         await shmFile.delete();
       }
-      final backupFile = File(join(dirname(path), 'serenut_pos_upgrade_backup.db'));
+      final backupFile =
+          File(join(dirname(path), 'serenut_pos_upgrade_backup.db'));
       if (await backupFile.exists()) {
         await backupFile.delete();
       }
-      final backupWal = File(join(dirname(path), 'serenut_pos_upgrade_backup.db-wal'));
+      final backupWal =
+          File(join(dirname(path), 'serenut_pos_upgrade_backup.db-wal'));
       if (await backupWal.exists()) {
         await backupWal.delete();
       }
-      final backupShm = File(join(dirname(path), 'serenut_pos_upgrade_backup.db-shm'));
+      final backupShm =
+          File(join(dirname(path), 'serenut_pos_upgrade_backup.db-shm'));
       if (await backupShm.exists()) {
         await backupShm.delete();
       }

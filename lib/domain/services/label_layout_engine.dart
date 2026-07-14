@@ -1,4 +1,4 @@
-﻿// lib/domain/services/label_layout_engine.dart
+// lib/domain/services/label_layout_engine.dart
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 
@@ -36,12 +36,13 @@ class LabelLayoutEngine {
     bytes.addAll(alignLeft);
     bytes.addAll(_textToBytes('Miktar: ${_formatQty(model.weight)} kg\n'));
     bytes.addAll(_textToBytes('Fiyat: ₺${model.price.toStringAsFixed(2)}\n'));
-    bytes.addAll(_textToBytes('Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(model.timestamp)}\n'));
-    
+    bytes.addAll(_textToBytes(
+        'Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(model.timestamp)}\n'));
+
     if (model.batchNo != null && model.batchNo!.isNotEmpty) {
       bytes.addAll(_textToBytes('Batch No: ${model.batchNo}\n'));
     }
-    
+
     if (model.barcode != null && model.barcode!.isNotEmpty) {
       bytes.addAll(_textToBytes('Barkod: ${model.barcode}\n'));
     }
@@ -70,20 +71,44 @@ class LabelLayoutEngine {
     for (int i = 0; i < text.length; i++) {
       final char = text[i];
       switch (char) {
-        case 'ğ': bytes.add(0xA7); break;
-        case 'Ğ': bytes.add(0xA6); break;
-        case 'ş': bytes.add(0x9F); break;
-        case 'Ş': bytes.add(0x9E); break;
-        case 'ı': bytes.add(0x8D); break;
-        case 'İ': bytes.add(0x98); break;
-        case 'ç': bytes.add(0x87); break;
-        case 'Ç': bytes.add(0x80); break;
-        case 'ö': bytes.add(0x94); break;
-        case 'Ö': bytes.add(0x99); break;
-        case 'ü': bytes.add(0x81); break;
-        case 'Ü': bytes.add(0x9A); break;
-        case '₺': 
-          bytes.addAll('TL'.codeUnits); 
+        case 'ğ':
+          bytes.add(0xA7);
+          break;
+        case 'Ğ':
+          bytes.add(0xA6);
+          break;
+        case 'ş':
+          bytes.add(0x9F);
+          break;
+        case 'Ş':
+          bytes.add(0x9E);
+          break;
+        case 'ı':
+          bytes.add(0x8D);
+          break;
+        case 'İ':
+          bytes.add(0x98);
+          break;
+        case 'ç':
+          bytes.add(0x87);
+          break;
+        case 'Ç':
+          bytes.add(0x80);
+          break;
+        case 'ö':
+          bytes.add(0x94);
+          break;
+        case 'Ö':
+          bytes.add(0x99);
+          break;
+        case 'ü':
+          bytes.add(0x81);
+          break;
+        case 'Ü':
+          bytes.add(0x9A);
+          break;
+        case '₺':
+          bytes.addAll('TL'.codeUnits);
           break;
         default:
           final code = char.codeUnitAt(0);

@@ -25,8 +25,12 @@ class DbGatewayImpl implements DbGateway {
   final DatabaseManager? _dbManager;
   final Database? _rawDb;
 
-  DbGatewayImpl(DatabaseManager dbManager) : _dbManager = dbManager, _rawDb = null;
-  DbGatewayImpl.raw(Database db) : _rawDb = db, _dbManager = null;
+  DbGatewayImpl(DatabaseManager dbManager)
+      : _dbManager = dbManager,
+        _rawDb = null;
+  DbGatewayImpl.raw(Database db)
+      : _rawDb = db,
+        _dbManager = null;
 
   // A static queue for serializing all write operations and transactions.
   static Future<void> _writeQueue = Future.value();
@@ -45,7 +49,8 @@ class DbGatewayImpl implements DbGateway {
     // Write verification block removed (SQLCipher removed)
 
     int attempts = 0;
-    final bool isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    final bool isTest =
+        !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
     final int maxAttempts = isTest ? 2 : 40;
     while (DatabaseManager.isWriteLocked) {
       if (!isWrite) {
@@ -53,7 +58,8 @@ class DbGatewayImpl implements DbGateway {
       }
       attempts++;
       if (attempts >= maxAttempts) {
-        throw DatabaseLockedException('Database is temporarily locked for backup');
+        throw DatabaseLockedException(
+            'Database is temporarily locked for backup');
       }
       await Future.delayed(const Duration(milliseconds: 50));
     }
@@ -65,15 +71,15 @@ class DbGatewayImpl implements DbGateway {
     if (Zone.current[#sqlite_txn] != null) {
       return await action();
     }
-    
+
     final completer = Completer<T>();
     final previous = _writeQueue;
-    
+
     _writeQueue = () async {
       try {
         await previous;
       } catch (_) {}
-      
+
       try {
         final result = await action();
         completer.complete(result);
@@ -81,7 +87,7 @@ class DbGatewayImpl implements DbGateway {
         completer.completeError(e, stack);
       }
     }();
-    
+
     return completer.future;
   }
 
@@ -238,7 +244,8 @@ class DbGatewayImpl implements DbGateway {
     return await _executeSerialized(() async {
       await _waitForWriteLock(isWrite: true);
 
-      final parentDeferred = Zone.current[#deferred_events] as List<DomainEvent>?;
+      final parentDeferred =
+          Zone.current[#deferred_events] as List<DomainEvent>?;
       final isRootTransaction = parentDeferred == null;
       final List<DomainEvent> deferredEvents = parentDeferred ?? [];
 

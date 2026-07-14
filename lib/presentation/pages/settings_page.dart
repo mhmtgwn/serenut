@@ -37,7 +37,8 @@ import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
-import 'package:serenutos/presentation/pages/license_page.dart' show LicenseManagementPage;
+import 'package:serenutos/presentation/pages/license_page.dart'
+    show LicenseManagementPage;
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 
@@ -49,10 +50,13 @@ part 'settings/widgets/system_config_section.dart';
 // ─── Design Theme Sabitleri ───────────────────────────────────────────────────
 part 'settings/widgets/settings_ui_helpers.dart';
 part 'settings/widgets/settings_dialogs.dart';
-const _kBgColor = Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
+
+const _kBgColor =
+    Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
 const _kCardBg = Colors.white;
 const _kBorderColor = Color(0xFFF0F0F3); // Faint, subtle border
-const _kTextPrimary = Color(0xFF1E293B); // Slate-900: softer and cleaner than raw black
+const _kTextPrimary =
+    Color(0xFF1E293B); // Slate-900: softer and cleaner than raw black
 const _kTextSecondary = Color(0xFF64748B); // Slate-500: elegant subtitle color
 const _kGreen = Color(0xFF10B981); // Emerald Green
 const _kBlue = Color(0xFF3B82F6); // Modern Blue
@@ -80,9 +84,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Map<String, List<String>> _cityMap = {};
   bool _citiesLoaded = false;
 
-  void _runGuardedAction(Permission permission, VoidCallback action, {String title = 'İşlem Doğrulaması', List<UserRole>? allowedRoles}) {
+  void _runGuardedAction(Permission permission, VoidCallback action,
+      {String title = 'İşlem Doğrulaması', List<UserRole>? allowedRoles}) {
     final currentUser = ref.read(currentUserProvider);
-    final isAllowedRole = allowedRoles == null || (currentUser != null && allowedRoles.contains(currentUser.role));
+    final isAllowedRole = allowedRoles == null ||
+        (currentUser != null && allowedRoles.contains(currentUser.role));
 
     if (!isAllowedRole) {
       _showAccessDeniedDialog(title);
@@ -90,11 +96,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     if (_isUnlocked) {
-      final hasAccess = currentUser != null && (
-        currentUser.role == UserRole.sysadmin ||
-        currentUser.role == UserRole.owner ||
-        currentUser.hasPermission(permission.value)
-      );
+      final hasAccess = currentUser != null &&
+          (currentUser.role == UserRole.sysadmin ||
+              currentUser.role == UserRole.owner ||
+              currentUser.hasPermission(permission.value));
       if (hasAccess) {
         action();
       } else {
@@ -136,7 +141,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Kapat', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text('Kapat',
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -166,7 +173,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         orElse: () => null,
       );
       if (tr != null) {
-        final cityList = (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
+        final cityList =
+            (tr as Map<String, dynamic>)['cities'] as List<dynamic>;
         final Map<String, List<String>> map = {};
         for (final c in cityList) {
           final name = (c as Map<String, dynamic>)['name'] as String;
@@ -259,7 +267,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline_rounded, size: 64, color: Colors.redAccent),
+                const Icon(Icons.error_outline_rounded,
+                    size: 64, color: Colors.redAccent),
                 const SizedBox(height: 16),
                 Text(
                   'Ayarlar yüklenemedi: $err',
@@ -284,9 +293,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 16),
 
         // �”€�”€ 2. Kullanıcı Profil Kartı �”€�”€
-        if (currentUser != null && _matchesQuery('Profil', 'Hesap', 'Yetki', currentUser.name))
+        if (currentUser != null &&
+            _matchesQuery('Profil', 'Hesap', 'Yetki', currentUser.name))
           _buildProfileCard(currentUser),
-        
+
         // ”€”€ 3. GruplanmıŸ Menüler ”€”€
         const SizedBox(height: 16),
         ..._buildGroupedSettings(settings, currentUser),
@@ -325,7 +335,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         },
         style: const TextStyle(fontSize: 14, color: _kTextPrimary),
         decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.search_rounded, color: _kTextSecondary, size: 18),
+          prefixIcon: const Icon(Icons.search_rounded,
+              color: _kTextSecondary, size: 18),
           hintText: 'Ayarlarda ara...',
           hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 14),
           border: InputBorder.none,
@@ -336,15 +347,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                   },
-                  child: const Icon(Icons.cancel_rounded, color: _kTextSecondary, size: 18),
+                  child: const Icon(Icons.cancel_rounded,
+                      color: _kTextSecondary, size: 18),
                 )
               : null,
         ),
       ),
     );
   }
-
-
 
   // �”€�”€ Profil Kartı �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
   Widget _buildProfileCard(AuthUser user) {
@@ -388,13 +398,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: Center(
             child: Text(
               initials,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22),
             ),
           ),
         ),
         title: Text(
           user.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
         ),
         subtitle: Row(
           children: [
@@ -407,7 +421,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               child: Text(
                 roleLabel,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _kGreen),
+                style: const TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.bold, color: _kGreen),
               ),
             ),
           ],
@@ -415,7 +430,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         trailing: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Yetkilerim', style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+            Text('Yetkilerim',
+                style: TextStyle(color: _kTextSecondary, fontSize: 13)),
             SizedBox(width: 4),
             Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
           ],
@@ -450,16 +466,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 1: İşletme Ayarları
     final group1 = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsReceipt) && _matchesQuery('işletme', 'bilgiler', settings.businessName)) {
+    if (_hasPermission(currentUser, Permission.settingsReceipt) &&
+        _matchesQuery('işletme', 'bilgiler', settings.businessName)) {
       group1.add(_buildCategoryRow(
         title: 'İşletme Bilgileri',
-        subtitle: settings.businessName.isNotEmpty ? settings.businessName : 'Ayarlanmadı',
+        subtitle: settings.businessName.isNotEmpty
+            ? settings.businessName
+            : 'Ayarlanmadı',
         icon: Icons.storefront_rounded,
         color: _kGreen,
-        onTap: () => _runGuardedAction(Permission.settingsReceipt, () => _showBusinessInfoSheet(settings), title: 'İşletme Bilgileri'),
+        onTap: () => _runGuardedAction(
+            Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
+            title: 'İşletme Bilgileri'),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsDatabase) && (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') || _matchesQuery('müşteri', 'rehber'))) {
+    if (_hasPermission(currentUser, Permission.settingsDatabase) &&
+        (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') ||
+            _matchesQuery('müşteri', 'rehber'))) {
       if (group1.isNotEmpty) group1.add(const _IOSDivider());
       group1.add(_buildCategoryRow(
         title: 'Veri İçeri / Dışarı Aktar',
@@ -483,18 +506,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         subtitle: 'Çalışanlar ve Yetkilendirme',
         icon: Icons.people_alt_rounded,
         color: _kOrange,
-        onTap: () => _runGuardedAction(Permission.settingsUsers, () => _showUserManagementPage(), title: 'Kullanıcı Yönetimi'),
+        onTap: () => _runGuardedAction(
+            Permission.settingsUsers, () => _showUserManagementPage(),
+            title: 'Kullanıcı Yönetimi'),
       ));
     }
     if (_hasPermission(currentUser, Permission.settingsFinance) &&
-        (_matchesQuery('bütünlük', 'audit', 'drift', 'ledger') || _matchesQuery('replay', 'cari', 'bakiye'))) {
+        (_matchesQuery('bütünlük', 'audit', 'drift', 'ledger') ||
+            _matchesQuery('replay', 'cari', 'bakiye'))) {
       if (group1.isNotEmpty) group1.add(const _IOSDivider());
       group1.add(_buildCategoryRow(
         title: 'Cari Hesap Bütünlüğü & Replay',
         subtitle: 'Bakiye Sapmalarını Denetle ve Onar',
         icon: Icons.account_balance_rounded,
         color: _kPurple,
-        onTap: () => _runGuardedAction(Permission.settingsFinance, () => _showLedgerReplayDialog(), title: 'Cari Hesap Bütünlüğü & Replay'),
+        onTap: () => _runGuardedAction(
+            Permission.settingsFinance, () => _showLedgerReplayDialog(),
+            title: 'Cari Hesap Bütünlüğü & Replay'),
       ));
     }
     if (_hasPermission(currentUser, Permission.settingsDatabase) &&
@@ -523,7 +551,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 2: Donanım ve Bağlantılar
     final group2 = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('yazıcı', 'bağlantı', 'ip', settings.printerIp ?? '')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('yazıcı', 'bağlantı', 'ip', settings.printerIp ?? '')) {
       group2.add(_buildCategoryRow(
         title: 'Fiş Yazıcı Ayarları',
         subtitle: settings.printerIp ?? 'Tanımlı Değil',
@@ -532,7 +561,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onTap: () => _showReceiptPrinterSheet(settings),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('etiket yazıcı', 'barkod yazıcı', 'ip')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('etiket yazıcı', 'barkod yazıcı', 'ip')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'Etiket Yazıcı Ayarları',
@@ -542,17 +572,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onTap: () => _showLabelPrinterSheet(settings),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsFinance) && _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
+    if (_hasPermission(currentUser, Permission.settingsFinance) &&
+        _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'SMS Servis Ayarları',
-        subtitle: settings.smsEnabled ? (settings.smsProvider ?? 'Aktif') : 'Pasif',
+        subtitle:
+            settings.smsEnabled ? (settings.smsProvider ?? 'Aktif') : 'Pasif',
         icon: Icons.sms_rounded,
         color: _kOrange,
         onTap: () => _showSmsSettingsSheet(settings),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('test', 'diagnostics', 'donanım', 'yazıcı', 'barkod', 'hardware')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery(
+            'test', 'diagnostics', 'donanım', 'yazıcı', 'barkod', 'hardware')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'Donanım Diagnostics Testleri',
@@ -577,18 +611,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 4: Sistem
     final group4 = <Widget>[];
-    if (currentUser != null && _matchesQuery('hata ayıklama', 'debug', 'sistem')) {
+    if (currentUser != null &&
+        _matchesQuery('hata ayıklama', 'debug', 'sistem')) {
       group4.add(_buildSwitchRow(
         title: 'Hata Ayıklama Modu (Debug)',
         subtitle: 'Sistem loglarını ve detayları aktif eder',
         icon: Icons.bug_report_rounded,
         color: _kGray,
         value: settings.debugMode,
-        onChanged: (val) => _updateSettingField(settings.copyWith(debugMode: val)),
+        onChanged: (val) =>
+            _updateSettingField(settings.copyWith(debugMode: val)),
       ));
     }
 
-    if (currentUser != null && _matchesQuery('ses', 'bildirim', 'sound', 'sesli')) {
+    if (currentUser != null &&
+        _matchesQuery('ses', 'bildirim', 'sound', 'sesli')) {
       if (group4.isNotEmpty) group4.add(const _IOSDivider());
       group4.add(_buildSwitchRow(
         title: 'Satışta Sesli Bildirim',
@@ -597,7 +634,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         color: _kBlue,
         value: settings.soundNotificationEnabled,
         onChanged: (val) async {
-          await ref.read(settingsNotifierProvider.notifier)
+          await ref
+              .read(settingsNotifierProvider.notifier)
               .updateSettings(settings.copyWith(soundNotificationEnabled: val));
         },
       ));
@@ -612,7 +650,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Grup 5: Ürün & Operasyon Merkezi (Phase 4-6)
     final group5 = <Widget>[];
 
-    if (_hasPermission(currentUser, Permission.settingsLicense) && _matchesQuery('lisans', 'license', 'abonelik', 'tier', 'plan', 'cihaz')) {
+    if (_hasPermission(currentUser, Permission.settingsLicense) &&
+        _matchesQuery(
+            'lisans', 'license', 'abonelik', 'tier', 'plan', 'cihaz')) {
       group5.add(_buildCategoryRow(
         title: 'Lisans Yönetimi',
         subtitle: _buildLicenseSubtitleFromRef(),
@@ -626,7 +666,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (_hasPermission(currentUser, Permission.settingsPrinter) && _matchesQuery('yazıcı', 'kuyruk', 'fiş', 'print', 'queue', 'baskı')) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('yazıcı', 'kuyruk', 'fiş', 'print', 'queue', 'baskı')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
         title: 'Yazıcı Kuyruğu',
@@ -641,7 +682,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (_hasPermission(currentUser, Permission.settingsAudit) && _matchesQuery('sms', 'mesaj', 'geçmiş', 'history', 'bildirim')) {
+    if (_hasPermission(currentUser, Permission.settingsAudit) &&
+        _matchesQuery('sms', 'mesaj', 'geçmiş', 'history', 'bildirim')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
         title: 'SMS Geçmişi',
@@ -657,7 +699,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     if (currentUser?.role == UserRole.sysadmin &&
-        _matchesQuery('admin', 'kontrol', 'merkezi', 'observability', 'sistem', 'operasyon')) {
+        _matchesQuery('admin', 'kontrol', 'merkezi', 'observability', 'sistem',
+            'operasyon')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
         title: 'Admin Kontrol Merkezi',
@@ -680,16 +723,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 6: Gelişmiş Yönetim (PIN Korumalı)
     final group6 = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsFinance) && _matchesQuery('finans', 'hub', 'cari', 'raporlar', 'excel', 'kdv')) {
+    if (_hasPermission(currentUser, Permission.settingsFinance) &&
+        _matchesQuery('finans', 'hub', 'cari', 'raporlar', 'excel', 'kdv')) {
       group6.add(_buildCategoryRow(
         title: 'Finans Hub & Raporlar',
         subtitle: 'Ciro raporu, KDV analizleri ve Excel çıktısı',
         icon: Icons.account_balance_wallet_rounded,
         color: _kGreen,
-        onTap: () => _runGuardedAction(Permission.settingsFinance, () => context.push(AppRoutes.finance), title: 'Finans Hub & Raporlar'),
+        onTap: () => _runGuardedAction(
+            Permission.settingsFinance, () => context.push(AppRoutes.finance),
+            title: 'Finans Hub & Raporlar'),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsAudit) && _matchesQuery('denetim', 'merkezi', 'audit', 'fiyat', 'log')) {
+    if (_hasPermission(currentUser, Permission.settingsAudit) &&
+        _matchesQuery('denetim', 'merkezi', 'audit', 'fiyat', 'log')) {
       if (group6.isNotEmpty) group6.add(const _IOSDivider());
       group6.add(_buildCategoryRow(
         title: 'Denetim Merkezi (Audit Center)',
@@ -697,11 +744,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         icon: Icons.assignment_turned_in_rounded,
         color: _kBlue,
         onTap: () => _runGuardedAction(Permission.settingsAudit, () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditCenterPage()));
+          Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const AuditCenterPage()));
         }, title: 'Denetim Merkezi'),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsRecovery) && _matchesQuery('kurtarma', 'recovery', 'çöp', 'silinen')) {
+    if (_hasPermission(currentUser, Permission.settingsRecovery) &&
+        _matchesQuery('kurtarma', 'recovery', 'çöp', 'silinen')) {
       if (group6.isNotEmpty) group6.add(const _IOSDivider());
       group6.add(_buildCategoryRow(
         title: 'Veri Kurtarma Merkezi',
@@ -709,7 +758,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         icon: Icons.restore_from_trash_rounded,
         color: _kPink,
         onTap: () => _runGuardedAction(Permission.settingsRecovery, () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const RecoveryCenterPage()));
+          Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const RecoveryCenterPage()));
         }, title: 'Veri Kurtarma Merkezi'),
       ));
     }
@@ -750,7 +800,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.power_settings_new_rounded, color: _kPink, size: 20),
+                    Icon(Icons.power_settings_new_rounded,
+                        color: _kPink, size: 20),
                     SizedBox(width: 8),
                     Text(
                       'Oturumu Kapat',
@@ -771,11 +822,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const Center(
           child: Text(
             'Serenut POS v1.2.0 �€� Phase 2.5',
-            style: TextStyle(color: _kTextSecondary, fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.3),
+            style: TextStyle(
+                color: _kTextSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3),
           ),
         ),
       ],
     );
   }
-
 }

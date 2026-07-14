@@ -65,7 +65,9 @@ void main() {
       await memoryCustomerRepo.create(customer);
     });
 
-    test('SQLite vs InMemory Dual-Engine Deterministic Replay and Audit Log Match', () async {
+    test(
+        'SQLite vs InMemory Dual-Engine Deterministic Replay and Audit Log Match',
+        () async {
       final random = Random(42);
       final List<Map<String, dynamic>> actions = [];
 
@@ -77,8 +79,10 @@ void main() {
           'id': 'tx-rand-$i',
           'type': isSale ? 'sale' : 'collection',
           'amount': amount,
-          'paidAmount': isSale ? (random.nextBool() ? 0.0 : amount / 2) : amount,
-          'debtAmount': isSale ? (random.nextBool() ? amount : amount / 2) : 0.0,
+          'paidAmount':
+              isSale ? (random.nextBool() ? 0.0 : amount / 2) : amount,
+          'debtAmount':
+              isSale ? (random.nextBool() ? amount : amount / 2) : 0.0,
         });
       }
 
@@ -102,8 +106,10 @@ void main() {
       expect(sqliteBalance, equals(memoryBalance));
 
       // Fetch trigger audit logs from SQLite
-      final sqliteAuditRows = await db.query('trigger_audit_logs', orderBy: 'id ASC');
-      final memoryAuditRows = InMemoryFinancialTransactionRepository.triggerAuditLogs;
+      final sqliteAuditRows =
+          await db.query('trigger_audit_logs', orderBy: 'id ASC');
+      final memoryAuditRows =
+          InMemoryFinancialTransactionRepository.triggerAuditLogs;
 
       // Assert trigger counts match
       expect(sqliteAuditRows.length, equals(memoryAuditRows.length));
@@ -116,7 +122,7 @@ void main() {
         expect(sqlRow['trigger_name'], equals(memRow['trigger_name']));
         expect(sqlRow['customer_id'], equals(memRow['customer_id']));
         expect(sqlRow['transaction_id'], equals(memRow['transaction_id']));
-        
+
         final sqlBefore = sqlRow['before_balance'] as double;
         final memBefore = memRow['before_balance'] as double;
         expect((sqlBefore - memBefore).abs(), lessThan(0.001));
@@ -127,7 +133,9 @@ void main() {
       }
     });
 
-    test('Verifies that update and delete operations are strictly blocked on both engines (Ledger Immutability)', () async {
+    test(
+        'Verifies that update and delete operations are strictly blocked on both engines (Ledger Immutability)',
+        () async {
       final tx = FinancialTransactionEntity(
         id: 'tx-immut-1',
         type: 'sale',
@@ -143,36 +151,43 @@ void main() {
       await memoryTransactionRepo.create(tx);
 
       // 1. Assert SQLite block
-      expect(() => db.update('financial_transactions', {'amount': 200.0}, where: 'id = ?', whereArgs: ['tx-immut-1']), throwsA(isA<DatabaseException>()));
-      expect(() => db.delete('financial_transactions', where: 'id = ?', whereArgs: ['tx-immut-1']), throwsA(isA<DatabaseException>()));
+      expect(
+          () => db.update('financial_transactions', {'amount': 200.0},
+              where: 'id = ?', whereArgs: ['tx-immut-1']),
+          throwsA(isA<DatabaseException>()));
+      expect(
+          () => db.delete('financial_transactions',
+              where: 'id = ?', whereArgs: ['tx-immut-1']),
+          throwsA(isA<DatabaseException>()));
 
       // 2. Assert InMemory block
-      expect(() => memoryTransactionRepo.update(tx), throwsA(isA<UnsupportedError>()));
-      expect(() => memoryTransactionRepo.delete('tx-immut-1'), throwsA(isA<UnsupportedError>()));
+      expect(() => memoryTransactionRepo.update(tx),
+          throwsA(isA<UnsupportedError>()));
+      expect(() => memoryTransactionRepo.delete('tx-immut-1'),
+          throwsA(isA<UnsupportedError>()));
     });
 
     test('DatabaseManager trigger self-healing validation', () async {
       var rows = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'"
-      );
+          "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'");
       expect(rows.length, 1);
 
       await db.execute('DROP TRIGGER IF EXISTS trg_ft_insert');
 
       rows = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'"
-      );
+          "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'");
       expect(rows.isEmpty, isTrue);
 
       await DatabaseTriggers.verifyAndRepairTriggers(db);
 
       rows = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'"
-      );
+          "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_ft_insert'");
       expect(rows.length, 1);
     });
 
-    test('DataIntegrityService explainCustomerBalance calculations are mathematically correct', () async {
+    test(
+        'DataIntegrityService explainCustomerBalance calculations are mathematically correct',
+        () async {
       final gateway = DbGatewayImpl.raw(db);
       final integrityService = DataIntegrityService(
         customerRepository: sqliteCustomerRepo,
@@ -199,13 +214,15 @@ void main() {
         date: DateTime.now().subtract(const Duration(minutes: 5)),
       ));
 
-      final explanations = await integrityService.explainCustomerBalance(custId);
+      final explanations =
+          await integrityService.explainCustomerBalance(custId);
 
       expect(explanations.length, equals(2));
 
       expect(explanations[0].transactionId, equals('expl-tx-1'));
       expect(explanations[0].runningBalance, equals(-100.0));
-      expect(explanations[0].description, contains('150.00 TL değerinde satış yapıldı'));
+      expect(explanations[0].description,
+          contains('150.00 TL değerinde satış yapıldı'));
 
       expect(explanations[1].transactionId, equals('expl-tx-2'));
       expect(explanations[1].runningBalance, equals(-40.0));

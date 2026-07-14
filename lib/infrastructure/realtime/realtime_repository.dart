@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/realtime/realtime_repository.dart
+// lib/infrastructure/realtime/realtime_repository.dart
 // High-level data access repository for realtime events
 
 import 'dart:async';
@@ -20,7 +20,7 @@ class RealtimeRepository {
   /// Automatically registers subscription on connection and returns a filtered event stream.
   Stream<RealtimeEvent> subscribeToTopic(String companyId, String category) {
     final topic = 'tenant/$companyId/$category';
-    
+
     // Register subscription in connection manager
     _connectionManager.subscribe(topic);
 

@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/repositories/cloud_analytics_repository.dart
+// lib/infrastructure/repositories/cloud_analytics_repository.dart
 // Serenut Platform — Cloud BI Analytics Repository (Sprint 7)
 // Client side interface for BI analytics endpoints and CSV exports.
 // Created: 04 Jul 2026
@@ -23,7 +23,8 @@ class CloudAnalyticsRepository {
 
   /// Fetch core dashboard KPI data
   Future<DashboardMetrics> getDashboard() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/dashboard');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/dashboard');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return DashboardMetrics.fromJson(data);
   }
@@ -48,28 +49,32 @@ class CloudAnalyticsRepository {
 
   /// Fetch critical stock details
   Future<StockAnalytics> getStockStats() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/stock');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/stock');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return StockAnalytics.fromJson(data);
   }
 
   /// Fetch financial summaries (debtors, receivables)
   Future<FinanceAnalytics> getFinanceStats() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/finance');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/finance');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return FinanceAnalytics.fromJson(data);
   }
 
   /// Fetch branches comparison revenue
   Future<List<BranchStat>> getBranchStats() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/branches');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/branches');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => BranchStat.fromJson(item)).toList();
   }
 
   /// Fetch staff performance analysis
   Future<List<StaffStat>> getStaffStats() async {
-    final response = await _apiClient.get('${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/staff');
+    final response = await _apiClient.get(
+        '${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/staff');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => StaffStat.fromJson(item)).toList();
   }
@@ -80,11 +85,12 @@ class CloudAnalyticsRepository {
     final response = await _apiClient.get(
       '${_config.releaseEndpoint.replaceAll('releases', 'analytics')}/export?type=$type',
     );
-    
+
     final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/report-$type-${DateTime.now().millisecondsSinceEpoch}.csv');
+    final file = File(
+        '${tempDir.path}/report-$type-${DateTime.now().millisecondsSinceEpoch}.csv');
     await file.writeAsString(response.body);
-    
+
     debugPrint('[AnalyticsExport] Saved CSV to: ${file.path}');
     return file;
   }

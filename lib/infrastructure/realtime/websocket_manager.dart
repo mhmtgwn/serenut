@@ -7,14 +7,14 @@ class WebSocketManager {
   StreamSubscription? _subscription;
   Timer? _reconnectTimer;
   Timer? _pingTimer;
-  
+
   int _reconnectDelaySec = 1;
   int _reconnectAttempts = 0;
   bool _isManuallyClosed = false;
 
   final _messageController = StreamController<String>.broadcast();
   final _stateController = StreamController<bool>.broadcast();
-  
+
   // Offline message queue
   final List<String> _offlineQueue = [];
 
@@ -29,15 +29,15 @@ class WebSocketManager {
     _isManuallyClosed = false;
     _reconnectTimer?.cancel();
     disconnect();
-    
+
     // Append current reconnect attempts to the URL for server metrics upgrade
-    final finalUrl = url.contains('?') 
-        ? '$url&reconnectCount=$_reconnectAttempts' 
+    final finalUrl = url.contains('?')
+        ? '$url&reconnectCount=$_reconnectAttempts'
         : '$url?reconnectCount=$_reconnectAttempts';
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(finalUrl));
-      
+
       // Catch connection handshake errors on the ready future to prevent unhandled exceptions
       _channel!.ready.then((_) {
         _stateController.add(true);

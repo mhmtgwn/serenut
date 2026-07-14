@@ -10,23 +10,23 @@ import 'package:serenutos/domain/events/domain_event.dart';
 typedef EventListener<T extends DomainEvent> = void Function(T event);
 
 /// Central event publisher for domain events
-/// 
+///
 /// Responsibilities:
 /// - Collect events from TransactionEngine
 /// - Publish to listeners (SMS, webhooks, auth changes)
 /// - Fire-and-forget (no blocking)
 /// - Audit trail (all events logged)
-/// 
+///
 /// Usage:
 /// ```dart
 /// final publisher = EventPublisher();
-/// 
+///
 /// // Subscribe to events
 /// publisher.subscribe<SaleCreatedEvent>((event) {
 ///   print('Sale created: ${event.saleId}');
 ///   // Send SMS, update balance, etc.
 /// });
-/// 
+///
 /// // Publish event
 /// publisher.publish(SaleCreatedEvent(saleId: 123, ...));
 /// ```
@@ -37,10 +37,11 @@ class EventPublisher {
 
   // Event listeners by type
   final Map<Type, List<Function>> _listeners = {};
-  
+
   // Event history (audit trail)
   final List<DomainEvent> _eventHistory = [];
-  final StreamController<DomainEvent> _eventStreamController = StreamController.broadcast();
+  final StreamController<DomainEvent> _eventStreamController =
+      StreamController.broadcast();
 
   /// Subscribe to events of a specific type
   void subscribe<T extends DomainEvent>(EventListener<T> listener) {
@@ -69,10 +70,10 @@ class EventPublisher {
     if (_eventHistory.length > 200) {
       _eventHistory.removeAt(0);
     }
-    
+
     // Broadcast to stream
     _eventStreamController.add(event);
-    
+
     // Call listeners (async, no blocking)
     Future.microtask(() {
       final listenersByT = _listeners[T];
@@ -81,7 +82,8 @@ class EventPublisher {
           try {
             (listener)(event);
           } catch (e, stack) {
-            debugPrint('Error in event listener for ${event.runtimeType}: $e\n$stack');
+            debugPrint(
+                'Error in event listener for ${event.runtimeType}: $e\n$stack');
           }
         }
       }
@@ -93,7 +95,8 @@ class EventPublisher {
             try {
               (listener)(event);
             } catch (e, stack) {
-              debugPrint('Error in event listener for ${event.runtimeType}: $e\n$stack');
+              debugPrint(
+                  'Error in event listener for ${event.runtimeType}: $e\n$stack');
             }
           }
         }

@@ -22,7 +22,8 @@ class NotificationTemplate {
     required this.body,
   });
 
-  factory NotificationTemplate.fromJson(Map<String, dynamic> json) => NotificationTemplate(
+  factory NotificationTemplate.fromJson(Map<String, dynamic> json) =>
+      NotificationTemplate(
         id: json['id'] as String? ?? '',
         name: json['name'] as String? ?? '',
         channel: json['channel'] as String? ?? 'sms',

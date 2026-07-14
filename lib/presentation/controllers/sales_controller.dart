@@ -29,7 +29,8 @@ final inventoryServiceProvider = FutureProvider<InventoryService>((ref) async {
 
 final paymentServiceProvider = FutureProvider<PaymentService>((ref) async {
   final customerRepo = await ref.watch(customerRepositoryProvider.future);
-  final transactionRepo = await ref.watch(financialTransactionRepositoryProvider.future);
+  final transactionRepo =
+      await ref.watch(financialTransactionRepositoryProvider.future);
   final eventPublisher = ref.watch(eventPublisherProvider);
   final auditLogService = ref.watch(auditLogServiceProvider);
 
@@ -41,9 +42,11 @@ final paymentServiceProvider = FutureProvider<PaymentService>((ref) async {
   );
 });
 
-final dataIntegrityServiceProvider = FutureProvider<DataIntegrityService>((ref) async {
+final dataIntegrityServiceProvider =
+    FutureProvider<DataIntegrityService>((ref) async {
   final customerRepo = await ref.watch(customerRepositoryProvider.future);
-  final transactionRepo = await ref.watch(financialTransactionRepositoryProvider.future);
+  final transactionRepo =
+      await ref.watch(financialTransactionRepositoryProvider.future);
   final healthRepo = ref.watch(databaseHealthRepositoryProvider);
   return DataIntegrityService(
     customerRepository: customerRepo,
@@ -53,25 +56,24 @@ final dataIntegrityServiceProvider = FutureProvider<DataIntegrityService>((ref) 
 });
 
 final salesServiceProvider = FutureProvider<SalesService>((ref) async {
-  final saleRepo       = await ref.watch(saleRepositoryProvider.future);
+  final saleRepo = await ref.watch(saleRepositoryProvider.future);
   final inventoryService = await ref.watch(inventoryServiceProvider.future);
-  final paymentService   = await ref.watch(paymentServiceProvider.future);
-  final eventPublisher   = ref.watch(eventPublisherProvider);
-  final gateway          = ref.watch(dbGatewayProvider);
-  final securityGate     = ref.watch(securityGateProvider);
-  final dataIntegrity    = await ref.watch(dataIntegrityServiceProvider.future);
+  final paymentService = await ref.watch(paymentServiceProvider.future);
+  final eventPublisher = ref.watch(eventPublisherProvider);
+  final gateway = ref.watch(dbGatewayProvider);
+  final securityGate = ref.watch(securityGateProvider);
+  final dataIntegrity = await ref.watch(dataIntegrityServiceProvider.future);
 
   return SalesService(
-    saleRepository:   saleRepo,
+    saleRepository: saleRepo,
     inventoryService: inventoryService,
-    paymentService:   paymentService,
-    eventPublisher:   eventPublisher,
+    paymentService: paymentService,
+    eventPublisher: eventPublisher,
     transactionRunner: gateway,
-    securityGate:      securityGate,
+    securityGate: securityGate,
     dataIntegrityService: dataIntegrity,
   );
 });
-
 
 class SalesController extends AsyncNotifier<List<SaleEntity>> {
   late ISaleRepository _saleRepository;
@@ -112,7 +114,8 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
               eventType: 'sale_created',
               entityType: 'sale',
               entityId: created!.id,
-              newValue: 'Miktar: ₺${created!.totalAmount.toStringAsFixed(2)}, Yöntem: ${created!.paymentMethod}',
+              newValue:
+                  'Miktar: ₺${created!.totalAmount.toStringAsFixed(2)}, Yöntem: ${created!.paymentMethod}',
             );
           } catch (e) {
             debugPrint('Failed to log sale_created audit event: $e');
@@ -143,7 +146,8 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       await _salesService.cancelSale(saleId);
       try {
         final auditService = await ref.read(auditServiceProvider.future);
-        await auditService.logDelete('sale', saleId, 'Satış İptali: ₺${sale?.totalAmount.toStringAsFixed(2)}');
+        await auditService.logDelete('sale', saleId,
+            'Satış İptali: ₺${sale?.totalAmount.toStringAsFixed(2)}');
       } catch (e) {
         debugPrint('Failed to log sale cancellation audit event: $e');
       }
@@ -203,12 +207,14 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final sale = await _saleRepository.findById(saleId);
-      await _salesService.recordPayment(saleId: saleId, amount: amount, method: method);
-      
+      await _salesService.recordPayment(
+          saleId: saleId, amount: amount, method: method);
+
       try {
         final auditService = await ref.read(auditServiceProvider.future);
         final customerRepo = await ref.read(customerRepositoryProvider.future);
-        final customer = sale != null ? await customerRepo.findById(sale.customerId) : null;
+        final customer =
+            sale != null ? await customerRepo.findById(sale.customerId) : null;
         await auditService.logPayment(
           sale?.customerId ?? '',
           customer?.name ?? 'Bilinmeyen Müşteri',
@@ -243,7 +249,8 @@ final salesControllerProvider =
 });
 
 /// Per-sale detail provider
-final saleDetailProvider = FutureProvider.family<SaleEntity?, String>((ref, saleId) async {
+final saleDetailProvider =
+    FutureProvider.family<SaleEntity?, String>((ref, saleId) async {
   final repo = await ref.watch(saleRepositoryProvider.future);
   return repo.findById(saleId);
 });

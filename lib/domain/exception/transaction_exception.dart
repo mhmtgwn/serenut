@@ -13,7 +13,8 @@ class TransactionException implements Exception {
   });
 
   @override
-  String toString() => 'TransactionException: $message${code != null ? ' ($code)' : ''}';
+  String toString() =>
+      'TransactionException: $message${code != null ? ' ($code)' : ''}';
 }
 
 /// Thrown when transaction rollback is attempted but fails
@@ -23,8 +24,8 @@ class TransactionRollbackException extends TransactionException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: 'ROLLBACK_FAILED',
-  );
+          code: 'ROLLBACK_FAILED',
+        );
 }
 
 /// Thrown when commit fails (data integrity issue)
@@ -34,8 +35,8 @@ class TransactionCommitException extends TransactionException {
     super.originalError,
     super.stackTrace,
   }) : super(
-    code: 'COMMIT_FAILED',
-  );
+          code: 'COMMIT_FAILED',
+        );
 }
 
 /// Thrown when transaction timeout occurs
@@ -46,9 +47,9 @@ class TransactionTimeoutException extends TransactionException {
     required this.timeout,
     super.originalError,
   }) : super(
-    message: 'Transaction timed out after ${timeout.inSeconds}s',
-    code: 'TIMEOUT',
-  );
+          message: 'Transaction timed out after ${timeout.inSeconds}s',
+          code: 'TIMEOUT',
+        );
 }
 
 /// Thrown when operation is attempted outside transaction context
@@ -56,6 +57,6 @@ class NotInTransactionException extends TransactionException {
   NotInTransactionException({
     required super.message,
   }) : super(
-    code: 'NOT_IN_TRANSACTION',
-  );
+          code: 'NOT_IN_TRANSACTION',
+        );
 }

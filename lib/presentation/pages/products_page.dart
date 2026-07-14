@@ -112,7 +112,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     try {
       final repository = await ref.read(productRepositoryProvider.future);
       var matched = await repository.findById(cleanBarcode);
-      
+
       if (matched == null) {
         // Try searching by name/exact matches
         final results = await repository.searchByName(cleanBarcode);
@@ -125,13 +125,16 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         context.push('/products/edit/${matched.id}', extra: matched);
       }
     } catch (e, st) {
-      debugPrint('[ProductsPage] ⚠️ Barcode lookup failed for "$cleanBarcode": $e');
-      TelemetryService().logError(e, st, context: 'products_page_barcode_lookup');
+      debugPrint(
+          '[ProductsPage] ⚠️ Barcode lookup failed for "$cleanBarcode": $e');
+      TelemetryService()
+          .logError(e, st, context: 'products_page_barcode_lookup');
     }
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       ref.read(productsControllerProvider.notifier).loadNextPage();
     }
   }
@@ -168,11 +171,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.filter_list_rounded, size: 18, color: _kGreenDark),
+                  const Icon(Icons.filter_list_rounded,
+                      size: 18, color: _kGreenDark),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      selectedCategory == null ? 'Kategori: Tümü' : 'Kategori: $selectedCategory',
+                      selectedCategory == null
+                          ? 'Kategori: Tümü'
+                          : 'Kategori: $selectedCategory',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -215,7 +221,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         child: Text(
                           'Kategori Seçin',
                           style: TextStyle(
@@ -228,7 +235,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                       if (selectedCategory != null)
                         TextButton(
                           onPressed: () {
-                            ref.read(productCategoryFilterProvider.notifier).state = null;
+                            ref
+                                .read(productCategoryFilterProvider.notifier)
+                                .state = null;
                             setState(() => _showFilters = false);
                           },
                           style: TextButton.styleFrom(
@@ -237,7 +246,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Temizle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          child: const Text('Temizle',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                     ],
                   ),
@@ -246,8 +257,12 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                     children: List.generate(categoriesVal.length + 1, (index) {
                       final isAll = index == 0;
                       final catName = isAll ? 'Tümü' : categoriesVal[index - 1];
-                      final isSelected = isAll ? selectedCategory == null : selectedCategory == catName;
-                      final icon = isAll ? Icons.grid_view_rounded : _getCategoryIcon(catName);
+                      final isSelected = isAll
+                          ? selectedCategory == null
+                          : selectedCategory == catName;
+                      final icon = isAll
+                          ? Icons.grid_view_rounded
+                          : _getCategoryIcon(catName);
 
                       return _buildCategoryListRow(
                         context,
@@ -255,7 +270,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                         icon: icon,
                         isSelected: isSelected,
                         onTap: () {
-                          ref.read(productCategoryFilterProvider.notifier).state = isAll ? null : catName;
+                          ref
+                              .read(productCategoryFilterProvider.notifier)
+                              .state = isAll ? null : catName;
                           setState(() => _showFilters = false);
                         },
                       );
@@ -264,253 +281,287 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 ],
               ),
             ),
-            crossFadeState: _showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            crossFadeState: _showFilters
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 200),
           ),
         ],
       ),
       body: filteredProductsVal.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(_kGreen)),
-                ),
-                error: (err, _) => Center(
-                  child: Text('Ürünler yüklenirken hata oluştu: $err', style: const TextStyle(color: _kRed)),
-                ),
-                data: (products) {
-                  if (products.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
-                          const SizedBox(height: 12),
-                          const Text('Kayıtlı ürün bulunamadı.', style: TextStyle(color: _kTextSecondary)),
+        loading: () => const Center(
+          child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(_kGreen)),
+        ),
+        error: (err, _) => Center(
+          child: Text('Ürünler yüklenirken hata oluştu: $err',
+              style: const TextStyle(color: _kRed)),
+        ),
+        data: (products) {
+          if (products.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inventory_2_outlined,
+                      size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 12),
+                  const Text('Kayıtlı ürün bulunamadı.',
+                      style: TextStyle(color: _kTextSecondary)),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            children: [
+              _buildSummaryBar(products),
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: products.length + (hasMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == products.length) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(_kGreen),
+                          ),
+                        ),
+                      );
+                    }
+                    final product = products[index];
+                    final isLowStock = product.quantity <= 5;
+                    final isOutOfStock = product.quantity <= 0;
+
+                    final stockColor = isOutOfStock
+                        ? _kRed
+                        : (isLowStock ? Colors.orange[700]! : _kGreen);
+                    final stockBg = isOutOfStock
+                        ? _kRedLight
+                        : (isLowStock ? _kAmberLight : _kGreenLight);
+                    final stockText = isOutOfStock
+                        ? 'Tükendi'
+                        : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _kBorder),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
                         ],
                       ),
-                    );
-                  }
-
-                  return Column(
-                    children: [
-                      _buildSummaryBar(products),
-                      Expanded(
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16),
-                          itemCount: products.length + (hasMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == products.length) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation(_kGreen),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => context.push(
+                              '/products/edit/${product.id}',
+                              extra: product),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            child: Row(
+                              children: [
+                                // Sol: Ürün görseli/kategori ikonu çerçevesi (Premium square design)
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: stockBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color:
+                                            stockColor.withValues(alpha: 0.15)),
+                                  ),
+                                  child: Icon(
+                                    _getCategoryIcon(product.category),
+                                    color: stockColor,
+                                    size: 22,
                                   ),
                                 ),
-                              );
-                            }
-                            final product = products[index];
-                            final isLowStock = product.quantity <= 5;
-                            final isOutOfStock = product.quantity <= 0;
+                                const SizedBox(width: 12),
 
-                            final stockColor = isOutOfStock
-                                ? _kRed
-                                : (isLowStock ? Colors.orange[700]! : _kGreen);
-                            final stockBg = isOutOfStock
-                                ? _kRedLight
-                                : (isLowStock ? _kAmberLight : _kGreenLight);
-                            final stockText = isOutOfStock
-                                ? 'Tükendi'
-                                : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _kBorder),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.02),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                                // Orta Kısım: Ürün Adı, Açıklama, Kategori Tagı ve ID
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        product.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: _kText,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        product.description.isEmpty
+                                            ? 'Açıklama girilmemiş'
+                                            : product.description,
+                                        style: const TextStyle(
+                                            color: _kTextSecondary,
+                                            fontSize: 11),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F5F9),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border:
+                                                  Border.all(color: _kBorder),
+                                            ),
+                                            child: Text(
+                                              product.category,
+                                              style: const TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: _kTextSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          const Icon(
+                                              Icons.qr_code_scanner_rounded,
+                                              size: 10,
+                                              color: _kTextSecondary),
+                                          const SizedBox(width: 2),
+                                          Expanded(
+                                            child: Text(
+                                              product.id,
+                                              style: const TextStyle(
+                                                  color: _kTextSecondary,
+                                                  fontSize: 9,
+                                                  fontFamily: 'monospace'),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () => context.push('/products/edit/${product.id}', extra: product),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    child: Row(
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Sağ Kısım: Satış Fiyatı ve Stok Miktarı
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: _kGreenLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '₺${product.price.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 13,
+                                          color: _kGreenDark,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // Sol: Ürün görseli/kategori ikonu çerçevesi (Premium square design)
                                         Container(
-                                          width: 48,
-                                          height: 48,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 4, vertical: 1.5),
                                           decoration: BoxDecoration(
                                             color: stockBg,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: stockColor.withValues(alpha: 0.15)),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
-                                          child: Icon(
-                                            _getCategoryIcon(product.category),
-                                            color: stockColor,
-                                            size: 22,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-
-                                        // Orta Kısım: Ürün Adı, Açıklama, Kategori Tagı ve ID
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                product.name,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                  color: _kText,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                product.description.isEmpty ? 'Açıklama girilmemiş' : product.description,
-                                                style: const TextStyle(color: _kTextSecondary, fontSize: 11),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFF1F5F9),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      border: Border.all(color: _kBorder),
-                                                    ),
-                                                    child: Text(
-                                                      product.category,
-                                                      style: const TextStyle(
-                                                        fontSize: 9,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: _kTextSecondary,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                  const Icon(Icons.qr_code_scanner_rounded, size: 10, color: _kTextSecondary),
-                                                  const SizedBox(width: 2),
-                                                  Expanded(
-                                                    child: Text(
-                                                      product.id,
-                                                      style: const TextStyle(color: _kTextSecondary, fontSize: 9, fontFamily: 'monospace'),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-
-                                        // Sağ Kısım: Satış Fiyatı ve Stok Miktarı
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: _kGreenLight,
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '₺${product.price.toStringAsFixed(2)}',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 13,
-                                                  color: _kGreenDark,
-                                                ),
-                                              ),
+                                          child: Text(
+                                            stockText,
+                                            style: TextStyle(
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.bold,
+                                              color: stockColor,
                                             ),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                                  decoration: BoxDecoration(
-                                                    color: stockBg,
-                                                    borderRadius: BorderRadius.circular(4),
-                                                  ),
-                                                  child: Text(
-                                                    stockText,
-                                                    style: TextStyle(
-                                                      fontSize: 8,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: stockColor,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '${product.quantity} Adet',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isOutOfStock ? _kRed : _kText,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                        const SizedBox(width: 8),
-
-                                        // Silme Aksiyonu (Compact delete button, no redundant chevron)
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded, color: _kRed, size: 18),
-                                          onPressed: () => _confirmDelete(context, product),
-                                          constraints: const BoxConstraints(),
-                                          padding: const EdgeInsets.all(6),
-                                          tooltip: 'Sil',
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${product.quantity} Adet',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color:
+                                                isOutOfStock ? _kRed : _kText,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ),
-                            );
-                          },
+                                const SizedBox(width: 8),
+
+                                // Silme Aksiyonu (Compact delete button, no redundant chevron)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded,
+                                      color: _kRed, size: 18),
+                                  onPressed: () =>
+                                      _confirmDelete(context, product),
+                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(6),
+                                  tooltip: 'Sil',
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ],
-                  );
-                },
+                    );
+                  },
+                ),
               ),
+            ],
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_products',
         onPressed: () => context.push('/products/add'),
         backgroundColor: _kGreen,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_box_rounded),
-        label: const Text('Yeni Ürün', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text('Yeni Ürün',
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   Widget _buildSummaryBar(List<ProductEntity> products) {
-    final totalStockValue = products.fold<double>(0.0, (sum, p) => sum + (p.price * p.quantity));
-    final totalStockQuantity = products.fold<int>(0, (sum, p) => sum + p.quantity);
+    final totalStockValue =
+        products.fold<double>(0.0, (sum, p) => sum + (p.price * p.quantity));
+    final totalStockQuantity =
+        products.fold<int>(0, (sum, p) => sum + p.quantity);
     final criticalStockCount = products.where((p) => p.quantity <= 5).length;
 
     return Container(
@@ -554,9 +605,11 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           context: context,
           builder: (context) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
               title: const Text('Ürünü Sil'),
-              content: Text('"${product.name}" ürününü silmek istediğinize emin misiniz?'),
+              content: Text(
+                  '"${product.name}" ürününü silmek istediğinize emin misiniz?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
@@ -566,14 +619,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kRed,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () {
                     ref.read(productsControllerProvider.notifier).deleteProduct(
-                      product.id,
-                      approvedByUserId: approvedByUserId,
-                      approvedByUserName: approvedByUserName,
-                    );
+                          product.id,
+                          approvedByUserId: approvedByUserId,
+                          approvedByUserName: approvedByUserName,
+                        );
                     Navigator.pop(context);
                   },
                   child: const Text('Sil'),
@@ -720,9 +774,19 @@ class _SummaryChip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
-                Text(value, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w900)),
-                Text(count, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7))),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: color,
+                        fontWeight: FontWeight.w600)),
+                Text(value,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: color,
+                        fontWeight: FontWeight.w900)),
+                Text(count,
+                    style: TextStyle(
+                        fontSize: 10, color: color.withValues(alpha: 0.7))),
               ],
             ),
           ),
@@ -731,4 +795,3 @@ class _SummaryChip extends StatelessWidget {
     );
   }
 }
-

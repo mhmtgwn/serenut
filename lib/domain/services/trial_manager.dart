@@ -6,13 +6,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum EntitlementState {
-  active,
-  graceActive,
-  graceExpired,
-  revoked,
-  unknown
-}
+enum EntitlementState { active, graceActive, graceExpired, revoked, unknown }
 
 class TrialManager {
   static const String _subCacheKey = 'serenut_subscription_cache';
@@ -48,7 +42,8 @@ class TrialManager {
         if (now.difference(firstLaunch).inDays <= 30) {
           return EntitlementState.active;
         } else {
-          return EntitlementState.graceExpired; // Or we could let it be graceActive, but strict is 30 days
+          return EntitlementState
+              .graceExpired; // Or we could let it be graceActive, but strict is 30 days
         }
       }
       return EntitlementState.unknown;
@@ -61,7 +56,7 @@ class TrialManager {
 
     final graceHours = sub['grace_hours_override'] as int? ?? 72;
     DateTime? expirationDate;
-    
+
     if (status == 'trialing') {
       final trialEndsStr = sub['trial_ends_at'] as String?;
       if (trialEndsStr != null) {
@@ -90,7 +85,8 @@ class TrialManager {
   }
 
   bool isTrialActive() {
-    return getEntitlementState() == EntitlementState.active || getEntitlementState() == EntitlementState.graceActive;
+    return getEntitlementState() == EntitlementState.active ||
+        getEntitlementState() == EntitlementState.graceActive;
   }
 
   Future<bool> isTrialActiveAsync() async {
@@ -108,7 +104,7 @@ class TrialManager {
       }
       return 0;
     }
-    
+
     final status = sub['status'] as String?;
     DateTime? expirationDate;
     if (status == 'trialing') {
@@ -124,7 +120,7 @@ class TrialManager {
     }
 
     if (expirationDate == null) return 0;
-    
+
     final remaining = expirationDate.difference(DateTime.now().toUtc()).inDays;
     return remaining > 0 ? remaining : 0;
   }
@@ -136,18 +132,19 @@ class TrialManager {
   Future<DateTime?> getExpiryDate() async {
     final sub = _getCache();
     if (sub == null) return null;
-    
+
     final status = sub['status'] as String?;
     if (status == 'trialing') {
       final trialEndsStr = sub['trial_ends_at'] as String?;
       if (trialEndsStr != null) return DateTime.tryParse(trialEndsStr);
     } else {
       final currentPeriodEndStr = sub['current_period_end'] as String?;
-      if (currentPeriodEndStr != null) return DateTime.tryParse(currentPeriodEndStr);
+      if (currentPeriodEndStr != null)
+        return DateTime.tryParse(currentPeriodEndStr);
     }
     return null;
   }
-  
+
   // No-op for backwards compatibility during transition
   void setDbCallbacks({required dynamic loader, required dynamic saver}) {}
   Future<void> startTrial(DateTime startDate) async {}

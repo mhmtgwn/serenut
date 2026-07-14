@@ -19,7 +19,7 @@ class CentralBackgroundScheduler {
   final List<SchedulerJob> _jobs = [];
   final Map<String, DateTime> _lastRunTimes = {};
   final Map<String, int> _backoffFactors = {};
-  
+
   Timer? _schedulerTimer;
   bool _isPaused = false;
   bool _isNetworkAvailable = true;
@@ -35,7 +35,8 @@ class CentralBackgroundScheduler {
 
   void start() {
     _schedulerTimer?.cancel();
-    _schedulerTimer = Timer.periodic(const Duration(seconds: 10), (_) => tick());
+    _schedulerTimer =
+        Timer.periodic(const Duration(seconds: 10), (_) => tick());
   }
 
   void stop() {
@@ -72,22 +73,25 @@ class CentralBackgroundScheduler {
       ..sort((a, b) => a.priority.index.compareTo(b.priority.index));
 
     for (final job in sortedJobs) {
-      final lastRun = _lastRunTimes[job.name] ?? DateTime.fromMillisecondsSinceEpoch(0);
-      
+      final lastRun =
+          _lastRunTimes[job.name] ?? DateTime.fromMillisecondsSinceEpoch(0);
+
       // Calculate active interval based on battery and exponential backoff
-      final int backoffSeconds = _backoffFactors[job.name]! * 30; // 30s increment per fail
-      final Duration activeInterval = (job.interval * batteryModifier) + Duration(seconds: backoffSeconds);
+      final int backoffSeconds =
+          _backoffFactors[job.name]! * 30; // 30s increment per fail
+      final Duration activeInterval =
+          (job.interval * batteryModifier) + Duration(seconds: backoffSeconds);
 
       if (now.difference(lastRun) >= activeInterval) {
         // Skip remote jobs if network is offline
         if (!_isNetworkAvailable && job.priority != JobPriority.high) {
-          continue; 
+          continue;
         }
 
         try {
           debugPrint('[Scheduler] Executing job: ${job.name}');
           await job.execute();
-          
+
           // Reset backoff factor on success
           _lastRunTimes[job.name] = DateTime.now();
           _backoffFactors[job.name] = 0;

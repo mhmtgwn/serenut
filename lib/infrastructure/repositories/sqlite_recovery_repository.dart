@@ -122,11 +122,12 @@ class SqliteRecoveryRepository implements IRecoveryRepository {
         await db.transaction((txn) async {
           // Delete sale items
           await txn.delete('sale_items', where: 'sale_id = ?', whereArgs: [id]);
-          
+
           try {
             // Delete related financial transactions (requires immutability bypass)
             await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-            await txn.delete('financial_transactions', where: 'reference_id = ?', whereArgs: [id]);
+            await txn.delete('financial_transactions',
+                where: 'reference_id = ?', whereArgs: [id]);
           } finally {
             await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
           }
@@ -138,7 +139,8 @@ class SqliteRecoveryRepository implements IRecoveryRepository {
       case 'order':
         await db.transaction((txn) async {
           // Delete order items
-          await txn.delete('order_items', where: 'order_id = ?', whereArgs: [id]);
+          await txn
+              .delete('order_items', where: 'order_id = ?', whereArgs: [id]);
           // Delete the order itself
           await txn.delete('orders', where: 'id = ?', whereArgs: [id]);
         });

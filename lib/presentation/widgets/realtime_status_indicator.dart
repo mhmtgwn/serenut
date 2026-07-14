@@ -83,7 +83,8 @@ class RealtimeStatusIndicator extends ConsumerWidget {
     final String text;
     final IconData icon;
 
-    if (status == RealtimeStatus.reconnecting || status == RealtimeStatus.connecting) {
+    if (status == RealtimeStatus.reconnecting ||
+        status == RealtimeStatus.connecting) {
       bgColor = const Color(0xFFFEF9C3); // light yellow
       textColor = const Color(0xFF854D0E); // dark yellow
       text = 'Sunucuyla bağlantı kesildi. Yeniden bağlanılıyor...';
@@ -127,7 +128,8 @@ class _BreathingDot extends StatefulWidget {
   State<_BreathingDot> createState() => _BreathingDotState();
 }
 
-class _BreathingDotState extends State<_BreathingDot> with SingleTickerProviderStateMixin {
+class _BreathingDotState extends State<_BreathingDot>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
@@ -158,7 +160,8 @@ class _BreathingDotState extends State<_BreathingDot> with SingleTickerProviderS
             color: const Color(0xFF16A34A),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF16A34A).withOpacity(0.2 + 0.6 * _controller.value),
+                color: const Color(0xFF16A34A)
+                    .withOpacity(0.2 + 0.6 * _controller.value),
                 blurRadius: 4 + 6 * _controller.value,
                 spreadRadius: 1 + 2 * _controller.value,
               ),

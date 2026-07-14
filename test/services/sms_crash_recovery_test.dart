@@ -20,15 +20,17 @@ void main() {
       dbManager = DatabaseManager();
       dbManager.reset();
       repo = SmsLogRepository(dbManager);
-      
+
       // Clean start: clear sms_logs table
       final db = await dbManager.getDatabase();
       await db.delete('sms_logs');
     });
 
-    test('Transitions stuck "sending" SMS to "interrupted" state and does not auto-retry', () async {
+    test(
+        'Transitions stuck "sending" SMS to "interrupted" state and does not auto-retry',
+        () async {
       const logId = 'test_crashed_sms_123';
-      
+
       // 1. Simulate the crash: insert an SMS log in "sending" status
       final entry = SmsLogEntry(
         id: logId,
@@ -67,9 +69,10 @@ void main() {
       expect(unknownLogs.first.status, SmsLogStatus.interrupted);
     });
 
-    test('Allows explicit manual status update of interrupted SMS logs', () async {
+    test('Allows explicit manual status update of interrupted SMS logs',
+        () async {
       const logId = 'test_manual_sms_456';
-      
+
       final entry = SmsLogEntry(
         id: logId,
         phone: '+905551112233',

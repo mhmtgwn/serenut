@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
+import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/i_hash_service.dart';
@@ -40,7 +41,8 @@ class MockUserRepository implements IUserRepository {
   Future<AuthUser?> findByUsername(String username) async => cachedUser;
 
   @override
-  Future<List<AuthUser>> findAll() async => cachedUser != null ? [cachedUser!] : [];
+  Future<List<AuthUser>> findAll() async =>
+      cachedUser != null ? [cachedUser!] : [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -51,7 +53,8 @@ class MockHashService implements IHashService {
   String hashPassword(String password) => 'hashed_$password';
 
   @override
-  bool verifyPassword(String password, String hash) => hash == 'hashed_$password';
+  bool verifyPassword(String password, String hash) =>
+      hash == 'hashed_$password';
 
   @override
   bool isLegacyHash(String hash) => false;
@@ -72,12 +75,15 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final deviceManager = DeviceManager(prefs);
       userRepo = MockUserRepository();
       hashService = MockHashService();
       apiClient = ApiClient();
       authService = AuthService(
         userRepository: userRepo,
         hashService: hashService,
+        deviceManager: deviceManager,
         apiClient: apiClient,
       );
       await authService.initialize();
@@ -101,7 +107,8 @@ void main() {
         if (request.url.path.contains('/auth/me')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"user": {"id": "user_deactivate", "is_active": false, "roles": ["cashier"]}}',
+            body:
+                '{"user": {"id": "user_deactivate", "is_active": false, "roles": ["cashier"]}}',
             headers: {},
           );
         }
@@ -119,7 +126,8 @@ void main() {
       expect(await authService.getCurrentUser(), null);
     });
 
-    test('Updates user role and triggers callback if role changes on backend', () async {
+    test('Updates user role and triggers callback if role changes on backend',
+        () async {
       final user = AuthUser(
         id: 'user_upgrade',
         name: 'kasiyer',
@@ -136,7 +144,8 @@ void main() {
         if (request.url.path.contains('/auth/me')) {
           return const ApiResponse(
             statusCode: 200,
-            body: '{"user": {"id": "user_upgrade", "is_active": true, "roles": ["manager"]}}',
+            body:
+                '{"user": {"id": "user_upgrade", "is_active": true, "roles": ["manager"]}}',
             headers: {},
           );
         }

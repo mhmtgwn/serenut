@@ -42,13 +42,13 @@ class AuditLogEntry {
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'timestamp': timestamp.toIso8601String(),
-    'action': action,
-    'beforeState': beforeState,
-    'afterState': afterState,
-    'metadata': metadata,
-  };
+        'id': id,
+        'timestamp': timestamp.toIso8601String(),
+        'action': action,
+        'beforeState': beforeState,
+        'afterState': afterState,
+        'metadata': metadata,
+      };
 }
 
 // ── Queue Operation Model ──
@@ -68,20 +68,20 @@ class SyncOperation {
   });
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'type': type,
-    'payload': payload,
-    'idempotencyKey': idempotencyKey,
-    'retryCount': retryCount,
-  };
+        'id': id,
+        'type': type,
+        'payload': payload,
+        'idempotencyKey': idempotencyKey,
+        'retryCount': retryCount,
+      };
 
   factory SyncOperation.fromMap(Map<String, dynamic> map) => SyncOperation(
-    id: map['id'] as String,
-    type: map['type'] as String,
-    payload: map['payload'] as Map<String, dynamic>,
-    idempotencyKey: map['idempotencyKey'] as String,
-    retryCount: map['retryCount'] as int? ?? 0,
-  );
+        id: map['id'] as String,
+        type: map['type'] as String,
+        payload: map['payload'] as Map<String, dynamic>,
+        idempotencyKey: map['idempotencyKey'] as String,
+        retryCount: map['retryCount'] as int? ?? 0,
+      );
 }
 
 // ── Audit Logger Service (Sprint 4: writes to SQLite audit_logs) ──
@@ -130,7 +130,9 @@ class AuditLogger {
       return rows.map((r) {
         final detailsRaw = r['details'] as String? ?? '{}';
         Map<String, dynamic> parsed = {};
-        try { parsed = jsonDecode(detailsRaw) as Map<String, dynamic>; } catch (_) {}
+        try {
+          parsed = jsonDecode(detailsRaw) as Map<String, dynamic>;
+        } catch (_) {}
         return {
           'id': r['id'],
           'action': r['action'],
@@ -215,7 +217,12 @@ class OperationQueueService {
 }
 
 // ── Payment Reconciliation Engine ──
-enum ReconciliationStatus { matched, mismatchLocalMissing, mismatchRemoteMissing, needsReview }
+enum ReconciliationStatus {
+  matched,
+  mismatchLocalMissing,
+  mismatchRemoteMissing,
+  needsReview
+}
 
 class PaymentReconciliationService {
   final AuditLogger _logger;

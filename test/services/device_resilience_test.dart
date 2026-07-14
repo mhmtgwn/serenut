@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:serenutos/infrastructure/services/printer_service.dart';
@@ -50,7 +50,9 @@ void main() {
       );
     });
 
-    test('PrinterService should auto-reconnect and succeed if connection fails twice but succeeds on the 3rd attempt', () async {
+    test(
+        'PrinterService should auto-reconnect and succeed if connection fails twice but succeeds on the 3rd attempt',
+        () async {
       int attempts = 0;
       final printerService = PrinterService((ip, port, {timeout}) async {
         attempts++;
@@ -62,12 +64,14 @@ void main() {
 
       // Execute test print
       await printerService.testPrinterConnection(testSettings);
-      
+
       expect(attempts, equals(3));
       expect(mockSocket.isClosed, isTrue);
     });
 
-    test('PrinterService should put print job in failed queue when all retry attempts fail', () async {
+    test(
+        'PrinterService should put print job in failed queue when all retry attempts fail',
+        () async {
       final printerService = PrinterService((ip, port, {timeout}) async {
         throw const SocketException('Printer host is unreachable');
       });
@@ -84,16 +88,20 @@ void main() {
       expect(printerService.queue.first.status, equals('failed'));
     });
 
-    test('ResilientScannerService should reconnect and successfully scan barcode on 3rd attempt after MethodChannel exceptions', () async {
+    test(
+        'ResilientScannerService should reconnect and successfully scan barcode on 3rd attempt after MethodChannel exceptions',
+        () async {
       int scanAttempts = 0;
-      
+
       // Setup mock method channel for scanner
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(const MethodChannel('com.sunmi.scanner'), (MethodCall methodCall) async {
+          .setMockMethodCallHandler(const MethodChannel('com.sunmi.scanner'),
+              (MethodCall methodCall) async {
         if (methodCall.method == 'startScan') {
           scanAttempts++;
           if (scanAttempts < 3) {
-            throw PlatformException(code: 'UNAVAILABLE', message: 'Scanner disconnected');
+            throw PlatformException(
+                code: 'UNAVAILABLE', message: 'Scanner disconnected');
           }
           return '9876543210123';
         }
@@ -104,14 +112,15 @@ void main() {
       scannerService.clearBuffer();
 
       final code = await scannerService.startResilientScan();
-      
+
       expect(code, equals('9876543210123'));
       expect(scanAttempts, equals(3));
       expect(scannerService.buffer.contains('9876543210123'), isTrue);
 
       // Clean mock
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(const MethodChannel('com.sunmi.scanner'), null);
+          .setMockMethodCallHandler(
+              const MethodChannel('com.sunmi.scanner'), null);
     });
   });
 }

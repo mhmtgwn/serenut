@@ -47,7 +47,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this); // Extended to 6 tabs (including Cloud BI)
+    _tabController = TabController(
+        length: 6, vsync: this); // Extended to 6 tabs (including Cloud BI)
     _setupWebSocket();
   }
 
@@ -67,12 +68,15 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
               setState(() {
                 // Instantly update Today Revenue for micro-animation
                 if (_liveMetrics != null) {
-                  final newSaleAmt = (event['data']['total_amount'] as num).toDouble();
+                  final newSaleAmt =
+                      (event['data']['total_amount'] as num).toDouble();
                   _liveMetrics = DashboardMetrics(
                     todayRevenue: _liveMetrics!.todayRevenue + newSaleAmt,
                     todayOrders: _liveMetrics!.todayOrders + 1,
-                    avgBasket: _liveMetrics!.todayOrders + 1 > 0 
-                        ? ((_liveMetrics!.todayRevenue + newSaleAmt) / (_liveMetrics!.todayOrders + 1)).round()
+                    avgBasket: _liveMetrics!.todayOrders + 1 > 0
+                        ? ((_liveMetrics!.todayRevenue + newSaleAmt) /
+                                (_liveMetrics!.todayOrders + 1))
+                            .round()
                         : 0,
                     weeklyRevenue: _liveMetrics!.weeklyRevenue + newSaleAmt,
                     weeklyGrowth: _liveMetrics!.weeklyGrowth,
@@ -120,8 +124,10 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 
       if (type == 'sales') {
         final saleRepo = await ref.read(saleRepositoryProvider.future);
-        final sales = await saleRepo.getSalesByDateRange(_selectedRange.from, _selectedRange.to);
-        filePath = await exportService.exportSalesReportExcel(sales, _selectedRange.label, currency);
+        final sales = await saleRepo.getSalesByDateRange(
+            _selectedRange.from, _selectedRange.to);
+        filePath = await exportService.exportSalesReportExcel(
+            sales, _selectedRange.label, currency);
         subject = '${_selectedRange.label} Satış Raporu';
         await exportService.shareFile(filePath, subject);
       } else if (type == 'stock') {
@@ -133,12 +139,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
       } else if (type == 'end_of_day') {
         final today = DateTime.now();
         final startOfDay = DateTime(today.year, today.month, today.day);
-        final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+        final endOfDay =
+            DateTime(today.year, today.month, today.day, 23, 59, 59);
 
         final saleRepo = await ref.read(saleRepositoryProvider.future);
         final sales = await saleRepo.getSalesByDateRange(startOfDay, endOfDay);
-        
-        final dashboardRepo = await ref.read(dashboardRepositoryProvider.future);
+
+        final dashboardRepo =
+            await ref.read(dashboardRepositoryProvider.future);
         final summary = await dashboardRepo.getTodaySummary();
 
         filePath = await exportService.exportEndOfDayReportExcel(
@@ -154,8 +162,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         await exportService.shareFile(filePath, subject);
       } else if (type == 'vat') {
         final reportRepo = await ref.read(reportRepositoryProvider.future);
-        final rows = await reportRepo.getVatBreakdown(_selectedRange.from, _selectedRange.to);
-
+        final rows = await reportRepo.getVatBreakdown(
+            _selectedRange.from, _selectedRange.to);
 
         filePath = await exportService.exportVatReportExcel(
           startDate: _selectedRange.from,
@@ -169,7 +177,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
         final cloudAnalytics = ref.read(cloudAnalyticsRepositoryProvider);
         final reportType = type.replaceAll('cloud_', '');
         final file = await cloudAnalytics.exportReportCsv(type: reportType);
-        await Share.shareXFiles([XFile(file.path)], subject: 'Cloud BI Raporu - $reportType');
+        await Share.shareXFiles([XFile(file.path)],
+            subject: 'Cloud BI Raporu - $reportType');
       } else {
         return;
       }
@@ -220,12 +229,26 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                 indicatorWeight: 2,
                 isScrollable: true,
                 tabs: [
-                  const Tab(icon: Icon(Icons.trending_up, size: 18), text: 'Satış'),
-                  const Tab(icon: Icon(Icons.inventory_2_outlined, size: 18), text: 'Ürün'),
-                  const Tab(icon: Icon(Icons.account_balance_wallet_outlined, size: 18), text: 'Borç'),
-                  const Tab(icon: Icon(Icons.bar_chart_rounded, size: 18), text: 'Grafikler'),
-                  if (isOnline) const Tab(icon: Icon(Icons.cloud_done_rounded, size: 18), text: 'Cloud BI'),
-                  if (isOnline) const Tab(icon: Icon(Icons.people_alt_outlined, size: 18), text: 'Kasiyer/Şube'),
+                  const Tab(
+                      icon: Icon(Icons.trending_up, size: 18), text: 'Satış'),
+                  const Tab(
+                      icon: Icon(Icons.inventory_2_outlined, size: 18),
+                      text: 'Ürün'),
+                  const Tab(
+                      icon:
+                          Icon(Icons.account_balance_wallet_outlined, size: 18),
+                      text: 'Borç'),
+                  const Tab(
+                      icon: Icon(Icons.bar_chart_rounded, size: 18),
+                      text: 'Grafikler'),
+                  if (isOnline)
+                    const Tab(
+                        icon: Icon(Icons.cloud_done_rounded, size: 18),
+                        text: 'Cloud BI'),
+                  if (isOnline)
+                    const Tab(
+                        icon: Icon(Icons.people_alt_outlined, size: 18),
+                        text: 'Kasiyer/Şube'),
                 ],
               ),
             ],
@@ -263,28 +286,32 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                 const PopupMenuItem<String>(
                   value: 'sales',
                   child: ListTile(
-                    leading: Icon(Icons.trending_up_rounded, color: Color(0xFF16A34A)),
+                    leading: Icon(Icons.trending_up_rounded,
+                        color: Color(0xFF16A34A)),
                     title: Text('Satış Raporu (Excel)'),
                   ),
                 ),
                 const PopupMenuItem<String>(
                   value: 'stock',
                   child: ListTile(
-                    leading: Icon(Icons.inventory_2_outlined, color: Color(0xFF16A34A)),
+                    leading: Icon(Icons.inventory_2_outlined,
+                        color: Color(0xFF16A34A)),
                     title: Text('Stok Raporu (Excel)'),
                   ),
                 ),
                 const PopupMenuItem<String>(
                   value: 'end_of_day',
                   child: ListTile(
-                    leading: Icon(Icons.today_rounded, color: Color(0xFF16A34A)),
+                    leading:
+                        Icon(Icons.today_rounded, color: Color(0xFF16A34A)),
                     title: Text('Gün Sonu Z Raporu (Excel)'),
                   ),
                 ),
                 const PopupMenuItem<String>(
                   value: 'vat',
                   child: ListTile(
-                    leading: Icon(Icons.receipt_long_rounded, color: Color(0xFF16A34A)),
+                    leading: Icon(Icons.receipt_long_rounded,
+                        color: Color(0xFF16A34A)),
                     title: Text('KDV Matrah Raporu (Excel)'),
                   ),
                 ),
@@ -293,21 +320,24 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                   const PopupMenuItem<String>(
                     value: 'cloud_sales',
                     child: ListTile(
-                      leading: Icon(Icons.cloud_download_rounded, color: Colors.blue),
+                      leading: Icon(Icons.cloud_download_rounded,
+                          color: Colors.blue),
                       title: Text('Bulut Satış Geçmişi (CSV)'),
                     ),
                   ),
                   const PopupMenuItem<String>(
                     value: 'cloud_products',
                     child: ListTile(
-                      leading: Icon(Icons.cloud_download_rounded, color: Colors.blue),
+                      leading: Icon(Icons.cloud_download_rounded,
+                          color: Colors.blue),
                       title: Text('Bulut Ürün Analitiği (CSV)'),
                     ),
                   ),
                   const PopupMenuItem<String>(
                     value: 'cloud_debtors',
                     child: ListTile(
-                      leading: Icon(Icons.cloud_download_rounded, color: Colors.blue),
+                      leading: Icon(Icons.cloud_download_rounded,
+                          color: Colors.blue),
                       title: Text('Bulut Cari Veresiye Listesi (CSV)'),
                     ),
                   ),
@@ -323,9 +353,12 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           _ProductsTab(range: _selectedRange),
           const _DebtTab(),
           _AnalyticsTab(range: _selectedRange),
-          if (isOnline) _CloudBiTab(onMetricsLoaded: (metrics) {
-            _liveMetrics ??= metrics;
-          }, liveMetrics: _liveMetrics),
+          if (isOnline)
+            _CloudBiTab(
+                onMetricsLoaded: (metrics) {
+                  _liveMetrics ??= metrics;
+                },
+                liveMetrics: _liveMetrics),
           if (isOnline) const _CloudStaffBranchTab(),
         ],
       ),
@@ -348,13 +381,17 @@ class _CloudBiTab extends ConsumerWidget {
     final cloudAnalytics = ref.watch(cloudAnalyticsRepositoryProvider);
 
     return FutureBuilder<DashboardMetrics>(
-      future: liveMetrics != null ? Future.value(liveMetrics) : cloudAnalytics.getDashboard(),
+      future: liveMetrics != null
+          ? Future.value(liveMetrics)
+          : cloudAnalytics.getDashboard(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && liveMetrics == null) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            liveMetrics == null) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Bulut analitik yüklenemedi: ${snapshot.error}'));
+          return Center(
+              child: Text('Bulut analitik yüklenemedi: ${snapshot.error}'));
         }
 
         final data = snapshot.data!;
@@ -367,7 +404,8 @@ class _CloudBiTab extends ConsumerWidget {
             children: [
               // Real-time badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
@@ -384,7 +422,11 @@ class _CloudBiTab extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text('WebSocket Gerçek Zamanlı Bulut BI Aktif', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const Text('WebSocket Gerçek Zamanlı Bulut BI Aktif',
+                        style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -398,7 +440,8 @@ class _CloudBiTab extends ConsumerWidget {
                       value: '${data.todayRevenue.toStringAsFixed(0)} TL',
                       icon: Icons.monetization_on_rounded,
                       color: Colors.green,
-                      subtitle: '${data.todayOrders} Sipariş | E.Fiş: ${data.avgBasket} TL',
+                      subtitle:
+                          '${data.todayOrders} Sipariş | E.Fiş: ${data.avgBasket} TL',
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -432,7 +475,7 @@ class _CloudBiTab extends ConsumerWidget {
                       value: data.topProduct?.name ?? 'Veri yok',
                       icon: Icons.star_rounded,
                       color: Colors.orange,
-                      subtitle: data.topProduct != null 
+                      subtitle: data.topProduct != null
                           ? '${data.topProduct!.quantity.toStringAsFixed(0)} Adet satıldı'
                           : 'Son 30 günde',
                     ),
@@ -443,13 +486,18 @@ class _CloudBiTab extends ConsumerWidget {
               // Payment breakdown chart
               Card(
                 color: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Ödeme Yöntemi Dağılımı (Son 30 Gün)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                      Text('Ödeme Yöntemi Dağılımı (Son 30 Gün)',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -464,24 +512,36 @@ class _CloudBiTab extends ConsumerWidget {
                                   sections: [
                                     PieChartSectionData(
                                       color: Colors.green,
-                                      value: data.paymentBreakdown.cash.toDouble(),
+                                      value:
+                                          data.paymentBreakdown.cash.toDouble(),
                                       title: '%${data.paymentBreakdown.cash}',
                                       radius: 40,
-                                      titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                      titleStyle: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white),
                                     ),
                                     PieChartSectionData(
                                       color: Colors.blue,
-                                      value: data.paymentBreakdown.card.toDouble(),
+                                      value:
+                                          data.paymentBreakdown.card.toDouble(),
                                       title: '%${data.paymentBreakdown.card}',
                                       radius: 40,
-                                      titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                      titleStyle: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white),
                                     ),
                                     PieChartSectionData(
                                       color: Colors.red,
-                                      value: data.paymentBreakdown.credit.toDouble(),
+                                      value: data.paymentBreakdown.credit
+                                          .toDouble(),
                                       title: '%${data.paymentBreakdown.credit}',
                                       radius: 40,
-                                      titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                      titleStyle: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white),
                                     ),
                                   ],
                                 ),
@@ -492,11 +552,13 @@ class _CloudBiTab extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _ChartLegend(color: Colors.green, label: 'Nakit'),
+                                _ChartLegend(
+                                    color: Colors.green, label: 'Nakit'),
                                 SizedBox(height: 6),
                                 _ChartLegend(color: Colors.blue, label: 'Kart'),
                                 SizedBox(height: 6),
-                                _ChartLegend(color: Colors.red, label: 'Veresiye'),
+                                _ChartLegend(
+                                    color: Colors.red, label: 'Veresiye'),
                               ],
                             ),
                           ),
@@ -549,14 +611,21 @@ class _KpiCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w600)),
+                Text(title,
+                    style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
                 Icon(icon, color: color.withOpacity(0.8), size: 20),
               ],
             ),
             const SizedBox(height: 6),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 9)),
+            Text(subtitle,
+                style: const TextStyle(color: Colors.grey, fontSize: 9)),
           ],
         ),
       ),
@@ -574,9 +643,14 @@ class _ChartLegend extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4))),
+        Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+                color: color, borderRadius: BorderRadius.circular(4))),
         const SizedBox(width: 8),
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -606,13 +680,24 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Satış Trend Analizi', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text('Satış Trend Analizi',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold)),
                 DropdownButton<String>(
                   value: _period,
                   items: const [
-                    DropdownMenuItem(value: 'daily', child: Text('Günlük', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'weekly', child: Text('Haftalık', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'monthly', child: Text('Aylık', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(
+                        value: 'daily',
+                        child: Text('Günlük', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(
+                        value: 'weekly',
+                        child:
+                            Text('Haftalık', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(
+                        value: 'monthly',
+                        child: Text('Aylık', style: TextStyle(fontSize: 12))),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _period = val);
@@ -625,41 +710,58 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
               future: widget.cloudAnalytics.getSalesTrend(period: _period),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+                  return const SizedBox(
+                      height: 150,
+                      child: Center(child: CircularProgressIndicator()));
                 }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const SizedBox(height: 100, child: Center(child: Text('Trend verisi yüklenemedi.')));
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    snapshot.data!.isEmpty) {
+                  return const SizedBox(
+                      height: 100,
+                      child: Center(child: Text('Trend verisi yüklenemedi.')));
                 }
 
                 final trendPoints = snapshot.data!;
-                final maxRevenue = trendPoints.map((p) => p.revenue).reduce(math.max);
+                final maxRevenue =
+                    trendPoints.map((p) => p.revenue).reduce(math.max);
 
                 return SizedBox(
                   height: 160,
                   child: LineChart(
                     LineChartData(
-                      gridData: const FlGridData(show: true, drawVerticalLine: false),
+                      gridData:
+                          const FlGridData(show: true, drawVerticalLine: false),
                       titlesData: FlTitlesData(
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 35,
-                            getTitlesWidget: (val, meta) => Text('${(val/1000).toStringAsFixed(0)}K', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                            getTitlesWidget: (val, meta) => Text(
+                                '${(val / 1000).toStringAsFixed(0)}K',
+                                style: const TextStyle(
+                                    fontSize: 9, color: Colors.grey)),
                           ),
                         ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
                             getTitlesWidget: (val, meta) {
-                              if (val.toInt() >= 0 && val.toInt() < trendPoints.length) {
+                              if (val.toInt() >= 0 &&
+                                  val.toInt() < trendPoints.length) {
                                 final point = trendPoints[val.toInt()];
                                 final date = DateTime.tryParse(point.time);
                                 if (date != null) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 4),
-                                    child: Text(DateFormat('dd.MM').format(date), style: const TextStyle(fontSize: 8, color: Colors.grey)),
+                                    child: Text(
+                                        DateFormat('dd.MM').format(date),
+                                        style: const TextStyle(
+                                            fontSize: 8, color: Colors.grey)),
                                   );
                                 }
                               }
@@ -675,7 +777,8 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
                         LineChartBarData(
                           spots: List.generate(
                             trendPoints.length,
-                            (index) => FlSpot(index.toDouble(), trendPoints[index].revenue),
+                            (index) => FlSpot(
+                                index.toDouble(), trendPoints[index].revenue),
                           ),
                           isCurved: true,
                           color: Colors.green,
@@ -718,7 +821,11 @@ class _CloudStockAlertWidget extends StatelessWidget {
               children: [
                 const Icon(Icons.warning_amber_rounded, color: Colors.orange),
                 const SizedBox(width: 8),
-                Text('Kritik Stok Uyarısı (Bulut)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                Text('Kritik Stok Uyarısı (Bulut)',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 12),
@@ -728,8 +835,11 @@ class _CloudStockAlertWidget extends StatelessWidget {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.criticalItems.isEmpty) {
-                  return const Text('Kritik stokta ürün bulunmuyor.', style: TextStyle(fontSize: 12, color: Colors.grey));
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    snapshot.data!.criticalItems.isEmpty) {
+                  return const Text('Kritik stokta ürün bulunmuyor.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey));
                 }
 
                 final items = snapshot.data!.criticalItems;
@@ -742,18 +852,26 @@ class _CloudStockAlertWidget extends StatelessWidget {
                     final item = items[index];
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      subtitle: Text(item.category ?? 'Genel', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      title: Text(item.name,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: Text(item.category ?? 'Genel',
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey)),
                       trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: item.quantity <= 3 ? Colors.red.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                          color: item.quantity <= 3
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.orange.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           '${item.quantity} Adet',
                           style: TextStyle(
-                            color: item.quantity <= 3 ? Colors.red : Colors.orange,
+                            color:
+                                item.quantity <= 3 ? Colors.red : Colors.orange,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -785,13 +903,18 @@ class _CloudStaffBranchTab extends ConsumerWidget {
           // Branch performance
           Card(
             color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Mağaza / Şube Karşılaştırması', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text('Mağaza / Şube Karşılaştırması',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   FutureBuilder<List<BranchStat>>(
                     future: cloudAnalytics.getBranchStats(),
@@ -799,7 +922,9 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                      if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data!.isEmpty) {
                         return const Text('Şube karşılaştırma verisi yok.');
                       }
 
@@ -815,19 +940,31 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                             child: Column(
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('${index + 1}. ${branch.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    Text('${branch.revenue.toStringAsFixed(0)} TL', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                    Text('${index + 1}. ${branch.name}',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    Text(
+                                        '${branch.revenue.toStringAsFixed(0)} TL',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green)),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
                                   child: LinearProgressIndicator(
-                                    value: branch.revenue / (branches.first.revenue > 0 ? branches.first.revenue : 1),
-                                    backgroundColor: Colors.grey.withOpacity(0.2),
-                                    valueColor: const AlwaysStoppedAnimation(Colors.green),
+                                    value: branch.revenue /
+                                        (branches.first.revenue > 0
+                                            ? branches.first.revenue
+                                            : 1),
+                                    backgroundColor:
+                                        Colors.grey.withOpacity(0.2),
+                                    valueColor: const AlwaysStoppedAnimation(
+                                        Colors.green),
                                     minHeight: 8,
                                   ),
                                 ),
@@ -846,13 +983,18 @@ class _CloudStaffBranchTab extends ConsumerWidget {
           // Staff performance
           Card(
             color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Kasiyer / Personel Analizi', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text('Kasiyer / Personel Analizi',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   FutureBuilder<List<StaffStat>>(
                     future: cloudAnalytics.getStaffStats(),
@@ -860,7 +1002,9 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
-                      if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                      if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data!.isEmpty) {
                         return const Text('Personel analiz verisi yok.');
                       }
 
@@ -873,18 +1017,49 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                         },
                         children: [
                           TableRow(
-                            decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1)),
+                            decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1)),
                             children: const [
-                              Padding(padding: EdgeInsets.all(8.0), child: Text('Personel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8.0), child: Text('Sipariş', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8.0), child: Text('Ciro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                              Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Text('Personel',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12))),
+                              Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Text('Sipariş',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12))),
+                              Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Text('Ciro',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12))),
                             ],
                           ),
                           ...staffList.map((staff) => TableRow(
                                 children: [
-                                  Padding(padding: const EdgeInsets.all(8.0), child: Text(staff.name, style: const TextStyle(fontSize: 12))),
-                                  Padding(padding: const EdgeInsets.all(8.0), child: Text('${staff.salesCount}', style: const TextStyle(fontSize: 12))),
-                                  Padding(padding: const EdgeInsets.all(8.0), child: Text('${staff.revenue.toStringAsFixed(0)} TL', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green))),
+                                  Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text(staff.name,
+                                          style:
+                                              const TextStyle(fontSize: 12))),
+                                  Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text('${staff.salesCount}',
+                                          style:
+                                              const TextStyle(fontSize: 12))),
+                                  Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Text(
+                                          '${staff.revenue.toStringAsFixed(0)} TL',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green))),
                                 ],
                               )),
                         ],
@@ -936,19 +1111,25 @@ class _DateRangePicker extends StatelessWidget {
                       onTap: () => onSelected(range),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isSelected ? POSColors.green : Colors.grey[100],
+                          color:
+                              isSelected ? POSColors.green : Colors.grey[100],
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? POSColors.green : Colors.grey[300]!,
+                            color: isSelected
+                                ? POSColors.green
+                                : Colors.grey[300]!,
                           ),
                         ),
                         child: Text(
                           range.label,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                             color: isSelected ? Colors.white : Colors.grey[700],
                           ),
                         ),
@@ -1005,8 +1186,6 @@ class _DateRangePicker extends StatelessWidget {
 // Tab 1 — Satış Özeti
 // ════════════════════════════════════════════════════════════
 
-
-
 // ════════════════════════════════════════════════════════════
 // Tab 2 — Ürün Analizi
 // ════════════════════════════════════════════════════════════
@@ -1053,8 +1232,13 @@ class _ProductsTab extends ConsumerWidget {
   }
 
   Widget _buildProductList(List<ProductPerformance> products) {
-    final maxRevenue = products.fold<double>(0, (m, p) => p.totalRevenue > m ? p.totalRevenue : m);
-    final rankColors = [Colors.amber[700]!, Colors.grey[500]!, Colors.brown[400]!];
+    final maxRevenue = products.fold<double>(
+        0, (m, p) => p.totalRevenue > m ? p.totalRevenue : m);
+    final rankColors = [
+      Colors.amber[700]!,
+      Colors.grey[500]!,
+      Colors.brown[400]!
+    ];
 
     return Card(
       elevation: 1,
@@ -1063,7 +1247,8 @@ class _ProductsTab extends ConsumerWidget {
         children: products.asMap().entries.map((entry) {
           final i = entry.key;
           final product = entry.value;
-          final barFrac = maxRevenue == 0 ? 0.0 : product.totalRevenue / maxRevenue;
+          final barFrac =
+              maxRevenue == 0 ? 0.0 : product.totalRevenue / maxRevenue;
           final rankColor = i < 3 ? rankColors[i] : Colors.grey[400]!;
 
           return Padding(
@@ -1075,7 +1260,8 @@ class _ProductsTab extends ConsumerWidget {
                   children: [
                     // Rank badge
                     Container(
-                      width: 28, height: 28,
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
                         color: rankColor.withAlpha(30),
                         shape: BoxShape.circle,
@@ -1098,9 +1284,11 @@ class _ProductsTab extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(product.productName,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 14)),
                           Text(product.categoryName,
-                              style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[500])),
                         ],
                       ),
                     ),
@@ -1117,7 +1305,8 @@ class _ProductsTab extends ConsumerWidget {
                         ),
                         Text(
                           '${product.totalSold} adet',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),
                       ],
                     ),
@@ -1214,28 +1403,32 @@ class _DebtTab extends ConsumerWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _AgingBucket(
+            Expanded(
+                child: _AgingBucket(
               label: '0–30 gün',
               amount: s.total0to30,
               color: Colors.green[600]!,
               icon: Icons.check_circle_outline,
             )),
             const SizedBox(width: 8),
-            Expanded(child: _AgingBucket(
+            Expanded(
+                child: _AgingBucket(
               label: '31–60 gün',
               amount: s.total31to60,
               color: Colors.orange[600]!,
               icon: Icons.schedule,
             )),
             const SizedBox(width: 8),
-            Expanded(child: _AgingBucket(
+            Expanded(
+                child: _AgingBucket(
               label: '61–90 gün',
               amount: s.total61to90,
               color: Colors.deepOrange[600]!,
               icon: Icons.warning_amber_outlined,
             )),
             const SizedBox(width: 8),
-            Expanded(child: _AgingBucket(
+            Expanded(
+                child: _AgingBucket(
               label: '90+ gün',
               amount: s.totalOver90,
               color: Colors.red[700]!,
@@ -1261,7 +1454,8 @@ class _DebtTab extends ConsumerWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: s.totalOver90 > 0 ? Colors.red[700] : Colors.orange[700],
+                  color:
+                      s.totalOver90 > 0 ? Colors.red[700] : Colors.orange[700],
                 ),
               ),
             ],
@@ -1289,8 +1483,10 @@ class _DebtTab extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Expanded(child: Text('Müşteri',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                const Expanded(
+                    child: Text('Müşteri',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 12))),
                 _tableHeader('0-30', Colors.green[700]!),
                 _tableHeader('31-60', Colors.orange[700]!),
                 _tableHeader('61-90', Colors.deepOrange[700]!),
@@ -1312,7 +1508,8 @@ class _DebtTab extends ConsumerWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: color),
+        style:
+            TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: color),
       ),
     );
   }
@@ -1332,7 +1529,8 @@ class _DebtTab extends ConsumerWidget {
         children: [
           Expanded(
             child: Text(row.customerName,
-                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
                 overflow: TextOverflow.ellipsis),
           ),
           _amountCell(row.current, Colors.green[700]!),
@@ -1362,18 +1560,20 @@ class _DebtTab extends ConsumerWidget {
 
   Widget _shimmerBuckets() {
     return Row(
-      children: List.generate(4, (_) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Container(
-            height: 72,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-      )),
+      children: List.generate(
+          4,
+          (_) => Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Container(
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              )),
     );
   }
 }
@@ -1387,7 +1587,8 @@ class _SectionHeader extends StatelessWidget {
   final String? subtitle;
   final IconData icon;
 
-  const _SectionHeader({required this.title, this.subtitle, required this.icon});
+  const _SectionHeader(
+      {required this.title, this.subtitle, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -1496,7 +1697,8 @@ class _AgingBucket extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             _fmt(amount),
-            style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: color, fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(label,
@@ -1593,7 +1795,8 @@ class _AnalyticsTab extends ConsumerWidget {
             Card(
               color: Colors.white,
               elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 24, 16),
                 child: SizedBox(
@@ -1603,7 +1806,10 @@ class _AnalyticsTab extends ConsumerWidget {
                       if (data.isEmpty) return _emptyState('Trend verisi yok');
                       return _buildLineChart(data);
                     },
-                    loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(POSColors.green))),
+                    loading: () => const Center(
+                        child: CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation(POSColors.green))),
                     error: (e, _) => _errorCard('Grafik yüklenemedi: $e'),
                   ),
                 ),
@@ -1627,17 +1833,20 @@ class _AnalyticsTab extends ConsumerWidget {
                       Card(
                         color: Colors.white,
                         elevation: 1,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: SizedBox(
                             height: 180,
                             child: summaryVal.when(
                               data: (s) {
-                                if (s.totalRevenue == 0) return _emptyState('Veri yok');
+                                if (s.totalRevenue == 0)
+                                  return _emptyState('Veri yok');
                                 return _buildProfitabilityPie(s);
                               },
-                              loading: () => const Center(child: CircularProgressIndicator()),
+                              loading: () => const Center(
+                                  child: CircularProgressIndicator()),
                               error: (e, _) => _errorCard('Hata'),
                             ),
                           ),
@@ -1660,17 +1869,20 @@ class _AnalyticsTab extends ConsumerWidget {
                       Card(
                         color: Colors.white,
                         elevation: 1,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: SizedBox(
                             height: 180,
                             child: summaryVal.when(
                               data: (s) {
-                                if (s.totalRevenue == 0) return _emptyState('Veri yok');
+                                if (s.totalRevenue == 0)
+                                  return _emptyState('Veri yok');
                                 return _buildCollectionsPie(s);
                               },
-                              loading: () => const Center(child: CircularProgressIndicator()),
+                              loading: () => const Center(
+                                  child: CircularProgressIndicator()),
                               error: (e, _) => _errorCard('Hata'),
                             ),
                           ),
@@ -1693,7 +1905,8 @@ class _AnalyticsTab extends ConsumerWidget {
             Card(
               color: Colors.white,
               elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 24, 16),
                 child: SizedBox(
@@ -1703,7 +1916,8 @@ class _AnalyticsTab extends ConsumerWidget {
                       if (data.isEmpty) return _emptyState('Veri yok');
                       return _buildBarChart(data);
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
                     error: (e, _) => _errorCard('Hata'),
                   ),
                 ),
@@ -1734,8 +1948,10 @@ class _AnalyticsTab extends ConsumerWidget {
         ),
         titlesData: FlTitlesData(
           show: true,
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -1748,7 +1964,8 @@ class _AnalyticsTab extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 4.0),
                     child: Text(
                       DateFormat('dd.MM').format(data[index].date),
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+                      style: const TextStyle(
+                          color: Color(0xFF64748B), fontSize: 9),
                     ),
                   );
                 }
@@ -1812,14 +2029,16 @@ class _AnalyticsTab extends ConsumerWidget {
             value: profit,
             title: '%30\nKâr',
             radius: 45,
-            titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+            titleStyle: const TextStyle(
+                fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           PieChartSectionData(
             color: const Color(0xFFFF2D55),
             value: cost,
             title: '%70\nMaliyet',
             radius: 40,
-            titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+            titleStyle: const TextStyle(
+                fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
           ),
         ],
       ),
@@ -1837,14 +2056,16 @@ class _AnalyticsTab extends ConsumerWidget {
             value: s.totalCollected,
             title: 'Nakit\n%${s.collectionRate.toStringAsFixed(0)}',
             radius: 45,
-            titleStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+            titleStyle: const TextStyle(
+                fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           PieChartSectionData(
             color: POSColors.amber,
             value: s.totalDebt,
             title: 'Vadeli\n%${(100 - s.collectionRate).toStringAsFixed(0)}',
             radius: 40,
-            titleStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+            titleStyle: const TextStyle(
+                fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
           ),
         ],
       ),
@@ -1871,8 +2092,10 @@ class _AnalyticsTab extends ConsumerWidget {
         gridData: const FlGridData(show: false),
         titlesData: FlTitlesData(
           show: true,
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -1885,7 +2108,8 @@ class _AnalyticsTab extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 4.0),
                     child: Text(
                       DateFormat('dd.MM').format(data[index].date),
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+                      style: const TextStyle(
+                          color: Color(0xFF64748B), fontSize: 9),
                     ),
                   );
                 }

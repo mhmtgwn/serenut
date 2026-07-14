@@ -12,17 +12,17 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 
-const _kGreen      = Color(0xFF16A34A);
-const _kGreenDark  = Color(0xFF15803D);
+const _kGreen = Color(0xFF16A34A);
+const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kBlue       = Color(0xFF2563EB);
-const _kBlueLight  = Color(0xFFDBEAFE);
-const _kRed        = Color(0xFFDC2626);
-const _kRedLight   = Color(0xFFFEE2E2);
-const _kSurface    = Color(0xFFF8FAFC);
-const _kText       = Color(0xFF0F172A);
+const _kBlue = Color(0xFF2563EB);
+const _kBlueLight = Color(0xFFDBEAFE);
+const _kRed = Color(0xFFDC2626);
+const _kRedLight = Color(0xFFFEE2E2);
+const _kSurface = Color(0xFFF8FAFC);
+const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
-const _kBorder     = Color(0xFFE2E8F0);
+const _kBorder = Color(0xFFE2E8F0);
 
 class CollectionPage extends ConsumerStatefulWidget {
   final String customerId;
@@ -36,9 +36,9 @@ class CollectionPage extends ConsumerStatefulWidget {
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  final _noteController   = TextEditingController();
-  String _selectedMethod  = 'cash'; // 'cash' | 'card'
-  bool _isSaving          = false;
+  final _noteController = TextEditingController();
+  String _selectedMethod = 'cash'; // 'cash' | 'card'
+  bool _isSaving = false;
 
   bool _printReceipt = true;
   bool _isPrintReceiptInitialized = false;
@@ -46,7 +46,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   CustomerEntity? _customer;
 
   double get _enteredAmount =>
-      double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ?? 0.0;
+      double.tryParse(_amountController.text.trim().replaceAll(',', '.')) ??
+      0.0;
 
   double get _balanceAfter {
     if (_customer == null) return 0;
@@ -84,7 +85,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         body: Center(child: Text('Hata: $err')),
       ),
       data: (customers) {
-        _customer = customers.where((c) => c.id == widget.customerId).firstOrNull;
+        _customer =
+            customers.where((c) => c.id == widget.customerId).firstOrNull;
         if (_customer == null) {
           return Scaffold(
             appBar: AppBar(
@@ -230,7 +232,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.payments_rounded, size: 16, color: _kGreenDark),
+                      Icon(Icons.payments_rounded,
+                          size: 16, color: _kGreenDark),
                       SizedBox(width: 8),
                       Text('Tahsil Edilen Tutar',
                           style: TextStyle(
@@ -242,7 +245,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
                     ],
@@ -269,8 +273,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                            color: _kGreen.withValues(alpha: 0.3)),
+                        borderSide:
+                            BorderSide(color: _kGreen.withValues(alpha: 0.3)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -320,7 +324,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             // ── Bakiye Önizleme ────────────────────────────────────────────
             if (_enteredAmount > 0) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: _balanceAfter >= 0 ? _kGreenLight : _kRedLight,
                   borderRadius: BorderRadius.circular(10),
@@ -378,7 +383,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.credit_card_rounded, size: 16, color: _kTextSecondary),
+                      Icon(Icons.credit_card_rounded,
+                          size: 16, color: _kTextSecondary),
                       SizedBox(width: 8),
                       Text('Tahsilat Yöntemi',
                           style: TextStyle(
@@ -427,7 +433,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.notes_rounded, size: 16, color: _kTextSecondary),
+                      Icon(Icons.notes_rounded,
+                          size: 16, color: _kTextSecondary),
                       SizedBox(width: 8),
                       Text('Açıklama (Opsiyonel)',
                           style: TextStyle(
@@ -450,7 +457,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                           borderSide: const BorderSide(color: _kBorder)),
                       focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: _kGreen, width: 2)),
+                          borderSide:
+                              const BorderSide(color: _kGreen, width: 2)),
                       filled: true,
                       fillColor: _kSurface,
                       contentPadding: const EdgeInsets.all(12),
@@ -475,7 +483,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   Row(
                     children: [
                       Icon(
-                        _printReceipt ? Icons.print_rounded : Icons.print_disabled_rounded,
+                        _printReceipt
+                            ? Icons.print_rounded
+                            : Icons.print_disabled_rounded,
                         size: 16,
                         color: _printReceipt ? _kGreenDark : _kTextSecondary,
                       ),
@@ -502,61 +512,76 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                       final settingsAsync = ref.watch(settingsNotifierProvider);
                       final settings = settingsAsync.value;
                       if (settings == null) return const SizedBox.shrink();
-                      
-                      final hasIp = settings.printerIp != null && settings.printerIp!.isNotEmpty;
-                      final hasName = settings.printerName != null && settings.printerName!.isNotEmpty;
-                      
+
+                      final hasIp = settings.printerIp != null &&
+                          settings.printerIp!.isNotEmpty;
+                      final hasName = settings.printerName != null &&
+                          settings.printerName!.isNotEmpty;
+
                       if (!hasIp && !hasName) {
                         return GestureDetector(
                           onTap: () {
                             context.push('/settings');
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
                               color: _kRedLight,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: _kRed.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color: _kRed.withValues(alpha: 0.3)),
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.warning_amber_rounded, size: 16, color: _kRed),
+                                Icon(Icons.warning_amber_rounded,
+                                    size: 16, color: _kRed),
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Aktif yazıcı bulunamadı! Ayarlamak için dokunun.',
-                                    style: TextStyle(color: _kRed, fontSize: 11, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                        color: _kRed,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600),
                                   ),
                                 ),
-                                Icon(Icons.chevron_right_rounded, size: 16, color: _kRed),
+                                Icon(Icons.chevron_right_rounded,
+                                    size: 16, color: _kRed),
                               ],
                             ),
                           ),
                         );
                       }
-                      
+
                       String printerInfo = '';
                       if (hasIp) {
                         printerInfo = 'Ağ Yazıcısı: ${settings.printerIp}';
                       } else if (hasName) {
                         printerInfo = 'Yazıcı: ${settings.printerName}';
                       }
-                      
+
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
                           color: _kGreenLight.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _kGreen.withValues(alpha: 0.2)),
+                          border:
+                              Border.all(color: _kGreen.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.check_circle_outline_rounded, size: 16, color: _kGreenDark),
+                            const Icon(Icons.check_circle_outline_rounded,
+                                size: 16, color: _kGreenDark),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 printerInfo,
-                                style: const TextStyle(color: _kGreenDark, fontSize: 11, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    color: _kGreenDark,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
                           ],
@@ -606,7 +631,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     setState(() => _isSaving = true);
 
     try {
-      await ref.read(collectionCustomersControllerProvider.notifier).recordCollection(
+      await ref
+          .read(collectionCustomersControllerProvider.notifier)
+          .recordCollection(
             customerId: widget.customerId,
             amount: _enteredAmount,
             method: _selectedMethod,
@@ -617,11 +644,11 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
       // Get the settings and the updated customer (which now has updated balance)
       final settings = ref.read(settingsNotifierProvider).value;
-      final updatedCustomers = ref.read(collectionCustomersControllerProvider).value;
-      final updatedCustomer = updatedCustomers
-          ?.where((c) => c.id == widget.customerId)
-          .firstOrNull;
-      
+      final updatedCustomers =
+          ref.read(collectionCustomersControllerProvider).value;
+      final updatedCustomer =
+          updatedCustomers?.where((c) => c.id == widget.customerId).firstOrNull;
+
       final currentCustomer = _customer;
       final customerToPrint = updatedCustomer ??
           (currentCustomer != null

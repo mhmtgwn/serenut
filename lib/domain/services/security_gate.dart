@@ -31,21 +31,24 @@ class SecurityGate {
 
     final status = _licenseService.checkLicenseStatus();
     if (status != 'valid') {
-      throw LicenseException('Ticari lisans doğrulaması başarısız oldu (Durum: $status).');
+      throw LicenseException(
+          'Ticari lisans doğrulaması başarısız oldu (Durum: $status).');
     }
   }
 
   /// Validates if device registration limits are exceeded for a license
   void validateDeviceLimit(String deviceId, int activeCount, int maxLimit) {
     if (activeCount > maxLimit) {
-      throw LicenseException('Lisans sınırları aşıldı. Cihaz: $deviceId (Aktif: $activeCount, Limit: $maxLimit).');
+      throw LicenseException(
+          'Lisans sınırları aşıldı. Cihaz: $deviceId (Aktif: $activeCount, Limit: $maxLimit).');
     }
   }
 
   /// Verifies force update requirements
   void checkForceUpdate(int currentVersionCode, int minRequiredVersionCode) {
     if (currentVersionCode < minRequiredVersionCode) {
-      throw UpdateRequiredException('Uygulama sürümü çok eski. Lütfen devam etmek için güncelleyin.');
+      throw UpdateRequiredException(
+          'Uygulama sürümü çok eski. Lütfen devam etmek için güncelleyin.');
     }
   }
 
