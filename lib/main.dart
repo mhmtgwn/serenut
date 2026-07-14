@@ -26,6 +26,7 @@ import 'package:serenutos/infrastructure/services/password_hash_service.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/domain/services/error_boundary.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
 
@@ -65,10 +66,13 @@ void main() async {
         licenseService.startHeartbeat(apiClient);
       }
 
+      final deviceManager = DeviceManager(prefs);
+
       final authService = AuthService(
         userRepository: userRepository,
         hashService: hashService,
         apiClient: apiClient,
+        deviceManager: deviceManager,
       );
       // Global event publisher will be eagerly initialized in MyApp build
 

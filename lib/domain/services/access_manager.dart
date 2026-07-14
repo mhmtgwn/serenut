@@ -1,4 +1,6 @@
 // lib/domain/services/access_manager.dart
+import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/license_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';

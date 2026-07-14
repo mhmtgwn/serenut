@@ -455,6 +455,7 @@ class DatabaseMigrations {
             'migrated_at': DateTime.now().toIso8601String(),
             'status': 'success'
           });
+        }
         if (oldVersion < 28) {
           try {
             await txn.execute('ALTER TABLE sales ADD COLUMN entitlement_snapshot TEXT');

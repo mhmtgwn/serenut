@@ -136,4 +136,9 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
     await _authService.setCurrentUser(user);
     state = AppState.success(user);
   }
+
+  /// Re-check and refresh current auth state (e.g. after license refresh)
+  Future<void> checkAuth() async {
+    await _initializeUser();
+  }
 }
