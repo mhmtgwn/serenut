@@ -2,9 +2,9 @@ name: Serenut OS Continuous Integration & Staging Deployment
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, staging ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, staging ]
 
 jobs:
   backend-ci:
