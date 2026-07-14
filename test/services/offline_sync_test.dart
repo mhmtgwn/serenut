@@ -247,7 +247,7 @@ void main() {
             headers: {},
           );
         }
-        throw ApiException('Conflict', statusCode: 409, responseBody: '{"error":"duplicate"}');
+        throw const ApiException('Conflict', statusCode: 409, responseBody: '{"error":"duplicate"}');
       };
 
       final idempotentSync = OfflineSyncService(

@@ -5,7 +5,6 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
 class DbHealthPage extends ConsumerStatefulWidget {

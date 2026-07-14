@@ -9,8 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:serenutos/domain/services/license_service.dart';
-import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/config/theme.dart';
 

@@ -305,10 +305,10 @@ class _SystemSummaryCard extends StatelessWidget {
     final items = [
       _SummaryItem(icon: Icons.store_rounded,    label: 'İşletme', value: state.business.businessName.isNotEmpty ? state.business.businessName : '—'),
       _SummaryItem(icon: Icons.category_rounded, label: 'Tür', value: state.business.businessType.isNotEmpty ? state.business.businessType : '—'),
-      _SummaryItem(icon: Icons.storage_rounded,  label: 'Veritabanı', value: 'Hazır', isGood: true),
-      _SummaryItem(icon: Icons.backup_rounded,   label: 'Yedekleme', value: 'Hazır', isGood: true),
+      const _SummaryItem(icon: Icons.storage_rounded,  label: 'Veritabanı', value: 'Hazır', isGood: true),
+      const _SummaryItem(icon: Icons.backup_rounded,   label: 'Yedekleme', value: 'Hazır', isGood: true),
       _SummaryItem(icon: Icons.manage_accounts_rounded, label: 'Admin', value: state.admin.adminFullName.isNotEmpty ? state.admin.adminFullName : '—', isGood: true),
-      _SummaryItem(icon: Icons.devices_rounded,  label: 'Cihaz', value: 'Aktif', isGood: true),
+      const _SummaryItem(icon: Icons.devices_rounded,  label: 'Cihaz', value: 'Aktif', isGood: true),
       _SummaryItem(icon: Icons.info_outline_rounded, label: 'Sürüm', value: appVersion),
     ];
 

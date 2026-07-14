@@ -10,8 +10,6 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
-import 'package:serenutos/config/router.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 
 part 'catalog/catalog_search_field.dart';

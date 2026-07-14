@@ -19,7 +19,6 @@ import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/domain/services/dashboard_service.dart';
 import 'package:serenutos/presentation/pages/global_search_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
-import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/widgets/home/system_trust_panel.dart';

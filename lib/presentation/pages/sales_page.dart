@@ -6,7 +6,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
@@ -452,15 +451,15 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                           color: Colors.white,
                           border: Border(top: BorderSide(color: _kBorder, width: 1)),
                         ),
-                        child: SafeArea(
+                        child: const SafeArea(
                           child: TabBar(
                             indicatorColor: _kGreen,
                             indicatorWeight: 3,
                             labelColor: _kGreen,
                             unselectedLabelColor: _kTextSecondary,
-                            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
-                            tabs: const [
+                            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+                            tabs: [
                               Tab(
                                 icon: Icon(Icons.grid_view_rounded, size: 20),
                                 text: 'Katalog',

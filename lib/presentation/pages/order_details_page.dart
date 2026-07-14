@@ -15,7 +15,6 @@ import 'package:serenutos/config/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart' show paymentServiceProvider;
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 
 

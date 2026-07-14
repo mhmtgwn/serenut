@@ -1,4 +1,4 @@
-﻿// test/services/order_printing_productization_test.dart
+// test/services/order_printing_productization_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,7 +8,6 @@ import 'package:serenutos/domain/services/label_layout_engine.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
-import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_order_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';

@@ -2,7 +2,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -14,7 +13,7 @@ void main() {
 
   group('PersistentPrintQueue SQLite Tests', () {
     late PersistentPrintQueue queue;
-    final String testKey = 'test_queue';
+    const String testKey = 'test_queue';
 
     setUp(() async {
       queue = PersistentPrintQueue(testKey: testKey);

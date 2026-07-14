@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/domain/models/analytics_models.dart';
 import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/providers/settings_provider.dart';

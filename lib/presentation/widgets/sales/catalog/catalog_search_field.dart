@@ -11,8 +11,6 @@ class _SearchField extends StatelessWidget {
     required this.controller,
     required this.hintText,
     required this.prefixIcon,
-    this.onChanged,
-    this.onClear,
   });
 
   @override

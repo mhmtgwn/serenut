@@ -62,16 +62,16 @@ void main() {
           final body = (request as http.Request).body;
           expect(body.contains('Offline Market'), true);
           expect(body.contains('Owner Name'), true);
-          return ApiResponse(statusCode: 200, body: '{"success": true}', headers: const {});
+          return const ApiResponse(statusCode: 200, body: '{"success": true}', headers: {});
         }
         // Return dummy response for bootstrap modules
         if (request.url.path.contains('/sync/bootstrap/company') ||
             request.url.path.contains('/sync/bootstrap/settings') ||
             request.url.path.contains('/sync/bootstrap/printer-config') ||
             request.url.path.contains('/sync/bootstrap/license-config')) {
-          return ApiResponse(statusCode: 200, body: '{"data": {}}', headers: const {});
+          return const ApiResponse(statusCode: 200, body: '{"data": {}}', headers: {});
         }
-        return ApiResponse(statusCode: 200, body: '{"data": []}', headers: const {});
+        return const ApiResponse(statusCode: 200, body: '{"data": []}', headers: {});
       };
 
       final syncService = BootstrapSyncService(prefs, apiClient);
@@ -124,19 +124,19 @@ void main() {
           patchReceived = true;
           final body = (request as http.Request).body;
           expect(body.contains('"expected_version":5'), true);
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"id": 1, "name": "Updated Market name", "owner_name": "Owner Name", "version": 6}',
-            headers: const {},
+            headers: {},
           );
         }
         if (request.url.path.contains('/sync/bootstrap/company') ||
             request.url.path.contains('/sync/bootstrap/settings') ||
             request.url.path.contains('/sync/bootstrap/printer-config') ||
             request.url.path.contains('/sync/bootstrap/license-config')) {
-          return ApiResponse(statusCode: 200, body: '{"data": {}}', headers: const {});
+          return const ApiResponse(statusCode: 200, body: '{"data": {}}', headers: {});
         }
-        return ApiResponse(statusCode: 200, body: '{"data": []}', headers: const {});
+        return const ApiResponse(statusCode: 200, body: '{"data": []}', headers: {});
       };
 
       final syncService = BootstrapSyncService(prefs, apiClient);
@@ -187,19 +187,19 @@ void main() {
 
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/api/v1/company') && request.method == 'PATCH') {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 409,
             body: '{"error": {"code": "CONFLICT", "message": "Version mismatch"}}',
-            headers: const {},
+            headers: {},
           );
         }
         if (request.url.path.contains('/sync/bootstrap/company') ||
             request.url.path.contains('/sync/bootstrap/settings') ||
             request.url.path.contains('/sync/bootstrap/printer-config') ||
             request.url.path.contains('/sync/bootstrap/license-config')) {
-          return ApiResponse(statusCode: 200, body: '{"data": {}}', headers: const {});
+          return const ApiResponse(statusCode: 200, body: '{"data": {}}', headers: {});
         }
-        return ApiResponse(statusCode: 200, body: '{"data": []}', headers: const {});
+        return const ApiResponse(statusCode: 200, body: '{"data": []}', headers: {});
       };
 
       final syncService = BootstrapSyncService(prefs, apiClient);

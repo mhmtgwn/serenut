@@ -5,7 +5,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:serenutos/config/router.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/business_profile.dart';
 import 'package:serenutos/domain/models/settings.dart';

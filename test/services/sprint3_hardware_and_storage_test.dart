@@ -1,12 +1,9 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
-import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 
 void main() {

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/repositories/sms_log_repository.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -28,7 +27,7 @@ void main() {
     });
 
     test('Transitions stuck "sending" SMS to "interrupted" state and does not auto-retry', () async {
-      final logId = 'test_crashed_sms_123';
+      const logId = 'test_crashed_sms_123';
       
       // 1. Simulate the crash: insert an SMS log in "sending" status
       final entry = SmsLogEntry(
@@ -69,7 +68,7 @@ void main() {
     });
 
     test('Allows explicit manual status update of interrupted SMS logs', () async {
-      final logId = 'test_manual_sms_456';
+      const logId = 'test_manual_sms_456';
       
       final entry = SmsLogEntry(
         id: logId,

@@ -166,7 +166,7 @@ class ApiClient {
           if (onSessionExpired != null) {
             onSessionExpired!();
           }
-          throw ApiException('Session expired', statusCode: 401);
+          throw const ApiException('Session expired', statusCode: 401);
         }
       }
 

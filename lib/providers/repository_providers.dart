@@ -4,7 +4,6 @@
 // Generated: 21 Jun 2026
 // Strategy: Mock implementation (Phase 1) → Real SQLite (Phase 6+)
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/database_provider.dart';

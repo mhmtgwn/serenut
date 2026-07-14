@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/customers_page.dart
+// lib/presentation/pages/customers_page.dart
 // Serenut POS — Müşteriler Sayfası
 // Yeşil + Sarı + Premium POS Teması
 // Generated: 21 Jun 2026 (v2)
@@ -8,8 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
-import 'package:serenutos/config/router.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────

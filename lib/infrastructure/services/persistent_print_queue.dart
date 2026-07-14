@@ -3,7 +3,6 @@
 // Survives app kill, power loss, and device restarts
 // Created: 12 Jul 2026 (Migrated to SQLite)
 
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 import 'package:sqflite/sqflite.dart';

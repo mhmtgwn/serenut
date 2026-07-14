@@ -1,4 +1,4 @@
-﻿// test/services/integrity_check_service_test.dart
+// test/services/integrity_check_service_test.dart
 // KRITIK E DOGRULAMA: attemptDatabaseRepair() en guncel gecerli backup'i secmeli.
 //
 // Test senaryolari:
@@ -15,8 +15,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
-import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:serenutos/infrastructure/services/integrity_check_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Test: Test amacli IntegrityCheckService alt sinifi
@@ -63,7 +61,7 @@ class _TestableIntegrityCheckService {
     if (sourceFile == null) return {'success': false, 'source': null};
 
     final dbFile = File(dbPath);
-    final tempPath = '.repair_bak';
+    const tempPath = '.repair_bak';
     final tempFile = File(tempPath);
     if (await tempFile.exists()) await tempFile.delete();
     if (await dbFile.exists()) await dbFile.copy(tempPath);

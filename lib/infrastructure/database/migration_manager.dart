@@ -1,4 +1,4 @@
-﻿// lib/infrastructure/database/migration_manager.dart
+// lib/infrastructure/database/migration_manager.dart
 // Serenut Platform — Database Migration and Rollback Manager
 // Executes database schema upgrades, automatic backups, WAL checkpoints, and transaction-safe rollbacks.
 // Created: 04 Jul 2026
@@ -115,10 +115,8 @@ class MigrationManager {
         });
 
         // 5. Restore DB from physical backup file
-        if (backupPath != null) {
-          await _performPhysicalRollback(backupPath);
-        }
-
+        await _performPhysicalRollback(backupPath);
+      
         rethrow;
       }
     }

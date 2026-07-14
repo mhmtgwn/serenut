@@ -49,7 +49,7 @@ class SqliteProductRepository implements IProductRepository {
       if (orderBy != null) {
         String rewrittenOrder = orderBy.replaceAll('category', 'p.category');
         // DÜZELTME: SQL injection koruması — sadece izin verilen sütunlar kabul edilir
-        const _allowedOrderCols = {
+        const allowedOrderCols = {
           'p.category', 'p.name', 'p.quantity', 'p.price',
           'p.category ASC', 'p.category DESC',
           'p.name ASC', 'p.name DESC',
@@ -57,7 +57,7 @@ class SqliteProductRepository implements IProductRepository {
           'p.price ASC', 'p.price DESC',
           'quantity ASC', 'quantity DESC',
         };
-        if (!_allowedOrderCols.contains(rewrittenOrder)) {
+        if (!allowedOrderCols.contains(rewrittenOrder)) {
           rewrittenOrder = 'p.name ASC'; // güvenli varsayılan
         }
         sql += ' ORDER BY $rewrittenOrder';

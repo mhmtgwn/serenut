@@ -14,8 +14,6 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/config/utils.dart';
-import 'package:serenutos/presentation/widgets/auth/pin_gate_dialog.dart';
-import 'package:serenutos/config/router.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';

@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:serenutos/domain/repositories/recovery_repository.dart';
 import 'package:serenutos/providers/recovery_provider.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
@@ -11,7 +10,6 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
 class RecoveryCenterPage extends ConsumerStatefulWidget {

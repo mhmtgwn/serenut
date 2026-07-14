@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:url_launcher/url_launcher.dart';
 

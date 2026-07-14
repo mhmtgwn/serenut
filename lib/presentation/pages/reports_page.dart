@@ -5,16 +5,12 @@
 
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/domain/services/report_service.dart';
-import 'package:serenutos/presentation/widgets/revenue_bar_chart.dart';
-import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -328,9 +324,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
           const _DebtTab(),
           _AnalyticsTab(range: _selectedRange),
           if (isOnline) _CloudBiTab(onMetricsLoaded: (metrics) {
-            if (_liveMetrics == null) {
-              _liveMetrics = metrics;
-            }
+            _liveMetrics ??= metrics;
           }, liveMetrics: _liveMetrics),
           if (isOnline) const _CloudStaffBranchTab(),
         ],
@@ -494,14 +488,14 @@ class _CloudBiTab extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          Expanded(
+                          const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _ChartLegend(color: Colors.green, label: 'Nakit'),
-                                const SizedBox(height: 6),
+                                SizedBox(height: 6),
                                 _ChartLegend(color: Colors.blue, label: 'Kart'),
-                                const SizedBox(height: 6),
+                                SizedBox(height: 6),
                                 _ChartLegend(color: Colors.red, label: 'Veresiye'),
                               ],
                             ),
@@ -644,10 +638,10 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
                   height: 160,
                   child: LineChart(
                     LineChartData(
-                      gridData: FlGridData(show: true, drawVerticalLine: false),
+                      gridData: const FlGridData(show: true, drawVerticalLine: false),
                       titlesData: FlTitlesData(
-                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -687,7 +681,7 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
                           color: Colors.green,
                           barWidth: 3,
                           isStrokeCapRound: true,
-                          dotData: FlDotData(show: false),
+                          dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
                             color: Colors.green.withOpacity(0.1),
@@ -1427,7 +1421,6 @@ class _MetricCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.bg,
-    this.subtitle,
   });
 
   @override

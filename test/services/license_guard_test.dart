@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/services/license_guard.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
-import 'package:serenutos/domain/models/license_model.dart';
 import 'package:serenutos/domain/services/license_client.dart';
 
 class FakeLicenseClient implements LicenseClient {
@@ -18,7 +17,7 @@ class FakeLicenseClient implements LicenseClient {
   @override
   Future<bool> validate(String licenseId) async {
     if (shouldThrowSocket) {
-      throw SocketException('Network unreachable');
+      throw const SocketException('Network unreachable');
     }
     return validationResult;
   }

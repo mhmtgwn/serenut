@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 
 class FastCollectionBottomSheet extends ConsumerStatefulWidget {
-  const FastCollectionBottomSheet({Key? key}) : super(key: key);
+  const FastCollectionBottomSheet({super.key});
 
   static void show(BuildContext context) {
     showModalBottomSheet(

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/settings.dart';
-import 'package:serenutos/domain/services/i_printer_service.dart';
 import 'package:serenutos/infrastructure/services/printer_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 

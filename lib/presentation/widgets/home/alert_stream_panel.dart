@@ -29,7 +29,7 @@ final recentAlertsProvider = FutureProvider.autoDispose<List<String>>((ref) asyn
 });
 
 class AlertStreamPanel extends ConsumerWidget {
-  const AlertStreamPanel({Key? key}) : super(key: key);
+  const AlertStreamPanel({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

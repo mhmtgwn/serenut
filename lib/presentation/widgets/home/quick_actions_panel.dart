@@ -15,8 +15,8 @@ class QuickActionBtn extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +52,7 @@ class QuickActionBtn extends StatelessWidget {
 }
 
 class QuickActionsPanel extends ConsumerWidget {
-  const QuickActionsPanel({Key? key}) : super(key: key);
+  const QuickActionsPanel({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -88,12 +88,13 @@ class QuickActionsPanel extends ConsumerWidget {
               final width = constraints.maxWidth;
               // Responsive grid calculation
               int crossAxisCount = 3;
-              if (width > 600) crossAxisCount = 6;
-              else if (width > 400) crossAxisCount = 4;
+              if (width > 600) {
+                crossAxisCount = 6;
+              } else if (width > 400) crossAxisCount = 4;
 
               final itemWidth = (width - ((crossAxisCount - 1) * 12)) / crossAxisCount;
-              final spacing = 12.0;
-              final childHeight = 90.0;
+              const spacing = 12.0;
+              const childHeight = 90.0;
               final aspectRatio = itemWidth / childHeight;
 
               return GridView.count(

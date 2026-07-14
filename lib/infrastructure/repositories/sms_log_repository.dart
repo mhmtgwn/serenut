@@ -227,7 +227,7 @@ class SmsLogRepository {
       await database.update(
         'sms_logs',
         {'status': SmsLogStatus.interrupted.value},
-        where: "status = ?",
+        where: 'status = ?',
         whereArgs: ['sending'],
       );
     } catch (e) {

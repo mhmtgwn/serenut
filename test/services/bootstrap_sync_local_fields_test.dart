@@ -58,23 +58,23 @@ void main() {
       apiClient.mockHandler = (request) {
         final path = request.url.path;
         if (path.contains('/sync/bootstrap/users')) {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"data": [{"id": "user-123", "name": "New Name", "email": "new@email.com", "password_hash": "new_pw_hash", "role": "manager", "is_active": true}]}',
-            headers: const {},
+            headers: {},
           );
         }
         if (path.contains('/sync/bootstrap/company') ||
             path.contains('/sync/bootstrap/settings') ||
             path.contains('/sync/bootstrap/printer-config') ||
             path.contains('/sync/bootstrap/license-config')) {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"data": {}}',
-            headers: const {},
+            headers: {},
           );
         }
-        return ApiResponse(statusCode: 200, body: '{"data": []}', headers: const {});
+        return const ApiResponse(statusCode: 200, body: '{"data": []}', headers: {});
       };
 
       final prefs = await SharedPreferences.getInstance();

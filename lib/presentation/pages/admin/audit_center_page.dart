@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
 class AuditCenterPage extends ConsumerStatefulWidget {

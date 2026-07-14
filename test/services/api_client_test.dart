@@ -1,5 +1,4 @@
-﻿// test/services/api_client_test.dart
-import 'dart:convert';
+// test/services/api_client_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';

@@ -118,7 +118,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
             debugPrint('Failed to log sale_created audit event: $e');
           }
         }
-      } catch (e, st) {
+      } catch (e) {
         // print('🔴 EXCEPTION inside SalesService.createSale: $e\n$st');
         rethrow;
       }

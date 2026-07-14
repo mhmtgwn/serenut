@@ -1,10 +1,9 @@
-﻿// lib/infrastructure/repositories/notification_repository.dart
+// lib/infrastructure/repositories/notification_repository.dart
 // Serenut Platform — Notification & Messaging Repository (Sprint 9)
 // Client side interface for templates, balances, campaign orchestration and delivery reports queue.
 // Created: 04 Jul 2026
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 

@@ -57,7 +57,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'beta',
-          sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
+          sentryDsn: String.fromEnvironment('SENTRY_DSN'),
         );
       case AppEnvironment.prod:
         return const EnvironmentConfig(
@@ -68,7 +68,7 @@ class EnvironmentConfig {
           updateEndpoint: '/updates',
           releaseEndpoint: '/releases',
           releaseChannel: 'stable',
-          sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
+          sentryDsn: String.fromEnvironment('SENTRY_DSN'),
         );
     }
   }

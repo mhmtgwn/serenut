@@ -6,8 +6,6 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
-import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
-import 'package:serenutos/domain/services/license_manager.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
@@ -100,7 +98,7 @@ class _TrustMetric extends StatelessWidget {
 // ── System Trust Panel ────────────────────────────────────────────────────────
 
 class SystemTrustPanel extends ConsumerWidget {
-  const SystemTrustPanel({Key? key}) : super(key: key);
+  const SystemTrustPanel({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

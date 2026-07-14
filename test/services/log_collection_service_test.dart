@@ -7,7 +7,6 @@ import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:pointycastle/export.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 void main() {
@@ -42,9 +41,9 @@ void main() {
         if (request is http.Request) {
           uploadedBase64 = jsonDecode(request.body)['encrypted_data'];
         }
-        return ApiResponse(statusCode: 200, body: '{"success":true}', headers: const {});
+        return const ApiResponse(statusCode: 200, body: '{"success":true}', headers: {});
       }
-      return ApiResponse(statusCode: 404, body: '{}', headers: const {});
+      return const ApiResponse(statusCode: 404, body: '{}', headers: {});
     };
 
     logCollectionService = LogCollectionService(mockApiClient);

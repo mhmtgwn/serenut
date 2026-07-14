@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/admin/mobile_admin_dashboard.dart
+// lib/presentation/pages/admin/mobile_admin_dashboard.dart
 // Serenut POS — Mobile Admin Dashboard Console (Sprint 10)
 // Responsive store management panel with KPI metrics, terminal statuses, license tokens and support chats.
 // Created: 04 Jul 2026
@@ -31,7 +31,7 @@ class MobileAdminDashboard extends ConsumerStatefulWidget {
 
 class _MobileAdminDashboardState extends ConsumerState<MobileAdminDashboard> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   void initState() {
@@ -120,7 +120,7 @@ class _MobileAdminDashboardState extends ConsumerState<MobileAdminDashboard> wit
               children: [
                 _buildKpiCard(
                   'Aylık Ciro',
-                  '${NumberFormat.currency(locale: 'tr_TR', symbol: 'TL').format(data.monthlyRevenue)}',
+                  NumberFormat.currency(locale: 'tr_TR', symbol: 'TL').format(data.monthlyRevenue),
                   Icons.trending_up_rounded,
                   _kGreen,
                 ),

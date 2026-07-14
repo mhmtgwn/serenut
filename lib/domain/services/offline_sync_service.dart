@@ -598,14 +598,12 @@ class OfflineSyncService {
       'status':          sale.status,
       'createdAt':       sale.createdAt.toIso8601String(),
       'items':           sale.items.map((item) {
-        if (item is Map<String, dynamic>) {
-          return {
-            'productId': item['product_id'],
-            'qty': item['quantity'] ?? item['qty'],
-            'unitPrice': item['unit_price'] ?? item['unitPrice'],
-          };
-        }
-        return item;
+        return {
+          'productId': item['product_id'],
+          'qty': item['quantity'] ?? item['qty'],
+          'unitPrice': item['unit_price'] ?? item['unitPrice'],
+        };
+              return item;
       }).toList(),
     };
   }

@@ -15,7 +15,6 @@ import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.d
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SmsSettingsSheet extends ConsumerStatefulWidget {
   final Settings settings;

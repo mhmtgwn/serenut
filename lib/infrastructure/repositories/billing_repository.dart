@@ -1,10 +1,9 @@
-﻿// lib/infrastructure/repositories/billing_repository.dart
+// lib/infrastructure/repositories/billing_repository.dart
 // Serenut Platform — Billing & Subscription Repository (Sprint 8)
 // Client side interface for plan management, mockup paywall checkout and invoices list.
 // Created: 04 Jul 2026
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 

@@ -1,4 +1,4 @@
-﻿// lib/presentation/pages/onboarding/steps/step2_admin_account.dart
+// lib/presentation/pages/onboarding/steps/step2_admin_account.dart
 // Adım 2 — Admin Hesabı
 // Ad Soyad, Kullanıcı Adı, PIN (4 veya 6 hane), PIN tekrar, opsiyonel şifre
 // Parmak izi: "Yakında" info kartı (çalışmayan toggle değil)
@@ -105,7 +105,7 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.manage_accounts_rounded, text: 'Kimlik Bilgileri'),
+                            const _SectionTitle(icon: Icons.manage_accounts_rounded, text: 'Kimlik Bilgileri'),
                             const SizedBox(height: 16),
                             _Field(
                               controller: _fullNameCtrl,
@@ -138,7 +138,7 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.pin_rounded, text: 'Giriş PIN\'i'),
+                            const _SectionTitle(icon: Icons.pin_rounded, text: 'Giriş PIN\'i'),
                             const SizedBox(height: 8),
                             Text(
                               'Hızlı giriş için 4 veya 6 haneli PIN belirleyin',
@@ -232,7 +232,7 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.security_rounded, text: 'Ek Güvenlik (İsteğe Bağlı)'),
+                            const _SectionTitle(icon: Icons.security_rounded, text: 'Ek Güvenlik (İsteğe Bağlı)'),
                             const SizedBox(height: 12),
                             _SwitchTile(
                               icon: Icons.password_rounded,
@@ -276,7 +276,7 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                       const SizedBox(height: 16),
 
                       // Parmak izi: Yakında kartı
-                      _ComingSoonCard(
+                      const _ComingSoonCard(
                         icon:    Icons.fingerprint_rounded,
                         title:   'Parmak İzi ile Giriş',
                         message: 'Bu özellik yakında kullanılabilir olacak. Etkinleştirildiğinde PIN yerine parmak izi ile hızlıca giriş yapabileceksiniz.',

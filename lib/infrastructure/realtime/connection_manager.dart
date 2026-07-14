@@ -3,7 +3,6 @@
 
 import 'dart:async';
 import 'package:serenutos/domain/realtime/realtime_status.dart';
-import 'package:serenutos/domain/realtime/realtime_event.dart';
 import 'package:serenutos/domain/realtime/realtime_message.dart';
 import 'package:serenutos/domain/realtime/event_parser.dart';
 import 'package:serenutos/domain/realtime/event_dispatcher.dart';
@@ -68,7 +67,9 @@ class ConnectionManager {
     _explicitClose = false;
     if (_status == RealtimeStatus.connected || 
         _status == RealtimeStatus.connecting || 
-        _status == RealtimeStatus.reconnecting) return;
+        _status == RealtimeStatus.reconnecting) {
+      return;
+    }
 
     if (_reconnectTimer != null) {
       _reconnectTimer!.cancel();

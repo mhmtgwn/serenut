@@ -1,8 +1,6 @@
 // lib/infrastructure/services/client_health_service.dart
 // Serenut OS — Consolidated Client Health Diagnostics Service (Sprint 11)
 
-import 'dart:convert';
-import 'package:sqflite/sqflite.dart';
 import '../../infrastructure/database/database_provider.dart';
 import '../../infrastructure/network/api_client.dart';
 import '../../domain/services/license_service.dart';

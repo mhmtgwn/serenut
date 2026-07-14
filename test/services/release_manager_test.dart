@@ -298,9 +298,9 @@ void main() {
 
   group('DownloadProgress', () {
     test('percentage is correctly clamped to 0.0-1.0', () {
-      final p1 = DownloadProgress(bytesDownloaded: 0, totalBytes: 1000, percentage: 0.0);
-      final p2 = DownloadProgress(bytesDownloaded: 500, totalBytes: 1000, percentage: 0.5);
-      final p3 = DownloadProgress(bytesDownloaded: 1000, totalBytes: 1000, percentage: 1.0);
+      const p1 = DownloadProgress(bytesDownloaded: 0, totalBytes: 1000, percentage: 0.0);
+      const p2 = DownloadProgress(bytesDownloaded: 500, totalBytes: 1000, percentage: 0.5);
+      const p3 = DownloadProgress(bytesDownloaded: 1000, totalBytes: 1000, percentage: 1.0);
 
       expect(p1.percentage, 0.0);
       expect(p2.percentage, 0.5);

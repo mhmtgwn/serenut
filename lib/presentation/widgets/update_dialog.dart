@@ -96,7 +96,7 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
     if (!specResult.isAllPass) {
       setState(() {
         _state = _DialogState.error;
-        _errorMessage = 'Sistem gereksinimleri karşılanamadı:\n' + specResult.issues.join('\n');
+        _errorMessage = 'Sistem gereksinimleri karşılanamadı:\n${specResult.issues.join('\n')}';
       });
       return;
     }
@@ -277,11 +277,11 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.red.withOpacity(0.3)),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
+                    Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
                       child: Text(
                         'Bu güncelleme zorunludur. Güncellemeden uygulamaya devam edilemez.',
                         style: TextStyle(color: Colors.red, fontSize: 12),
@@ -351,13 +351,13 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
         );
 
       case _DialogState.done:
-        return Column(
+        return const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 16),
-            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 56),
-            const SizedBox(height: 8),
-            const Text('Güncelleme hazır! Kurulum başlatılıyor...', textAlign: TextAlign.center),
+            SizedBox(height: 16),
+            Icon(Icons.check_circle_rounded, color: Colors.green, size: 56),
+            SizedBox(height: 8),
+            Text('Güncelleme hazır! Kurulum başlatılıyor...', textAlign: TextAlign.center),
           ],
         );
 
@@ -367,11 +367,11 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog> with SingleTickerP
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.error_outline, color: Colors.red),
-                const SizedBox(width: 8),
-                const Text('Güncelleme başarısız', style: TextStyle(fontWeight: FontWeight.bold)),
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Güncelleme başarısız', style: TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 8),

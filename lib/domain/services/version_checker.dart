@@ -1,5 +1,4 @@
 // lib/domain/services/version_checker.dart
-import 'dart:convert';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 
 class VersionCheckResult {

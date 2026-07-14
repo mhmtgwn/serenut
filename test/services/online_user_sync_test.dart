@@ -7,7 +7,6 @@ import 'package:serenutos/domain/services/auth_service.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/i_hash_service.dart';
-import 'package:path/path.dart';
 
 class MockUserRepository implements IUserRepository {
   AuthUser? cachedUser;
@@ -100,13 +99,13 @@ void main() {
       // Mock deactivated response for /auth/me
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/auth/me')) {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"user": {"id": "user_deactivate", "is_active": false, "roles": ["cashier"]}}',
-            headers: const {},
+            headers: {},
           );
         }
-        return ApiResponse(statusCode: 400, body: '{}', headers: const {});
+        return const ApiResponse(statusCode: 400, body: '{}', headers: {});
       };
 
       bool sessionExpiredTriggered = false;
@@ -135,13 +134,13 @@ void main() {
       // Mock updated manager response for /auth/me
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/auth/me')) {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"user": {"id": "user_upgrade", "is_active": true, "roles": ["manager"]}}',
-            headers: const {},
+            headers: {},
           );
         }
-        return ApiResponse(statusCode: 400, body: '{}', headers: const {});
+        return const ApiResponse(statusCode: 400, body: '{}', headers: {});
       };
 
       AuthUser? updatedUserCallbackPayload;

@@ -16,7 +16,6 @@ import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -35,9 +34,6 @@ import 'package:serenutos/infrastructure/services/password_hash_service.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
-import 'package:serenutos/providers/sms_provider.dart';
-import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
-import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
@@ -78,7 +74,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _searchQuery = '';
   String? _adminPinCode;
   bool _isUnlocked = false;
-  bool _soundNotificationEnabled = false;
+  final bool _soundNotificationEnabled = false;
 
   List<String> _cities = [];
   Map<String, List<String>> _cityMap = {};

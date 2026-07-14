@@ -91,10 +91,10 @@ void main() {
 
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/auth/login')) {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
-            headers: const {},
+            headers: {},
           );
         }
         return ApiResponse(
@@ -120,10 +120,10 @@ void main() {
     test('Clears JWT token on logout', () async {
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/auth/login')) {
-          return ApiResponse(
+          return const ApiResponse(
             statusCode: 200,
             body: '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
-            headers: const {},
+            headers: {},
           );
         }
         return ApiResponse(
@@ -174,10 +174,10 @@ void main() {
 
     test('Maps unexpected/unknown user role to cashier (fail-secure)', () async {
       apiClient.mockHandler = (request) {
-        return ApiResponse(
+        return const ApiResponse(
           statusCode: 200,
           body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid", "name": "Test User", "email": "test@serenut.com", "role": "unknown_role_typo"}}',
-          headers: const {},
+          headers: {},
         );
       };
 
@@ -188,10 +188,10 @@ void main() {
     test('Maps owner or sysadmin roles to their respective roles', () async {
       // 1. Test owner role
       apiClient.mockHandler = (request) {
-        return ApiResponse(
+        return const ApiResponse(
           statusCode: 200,
           body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid1", "name": "Owner User", "email": "owner@serenut.com", "role": "owner"}}',
-          headers: const {},
+          headers: {},
         );
       };
 
@@ -200,10 +200,10 @@ void main() {
 
       // 2. Test sysadmin role
       apiClient.mockHandler = (request) {
-        return ApiResponse(
+        return const ApiResponse(
           statusCode: 200,
           body: '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid2", "name": "Sysadmin User", "email": "sysadmin@serenut.com", "role": "sysadmin"}}',
-          headers: const {},
+          headers: {},
         );
       };
 

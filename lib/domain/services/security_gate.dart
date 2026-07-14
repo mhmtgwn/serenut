@@ -1,8 +1,6 @@
 // lib/domain/services/security_gate.dart
 import 'package:serenutos/domain/services/license_service.dart';
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 
 class LicenseException implements Exception {
   final String message;

@@ -4,7 +4,6 @@ import 'package:serenutos/infrastructure/services/printer_service.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class MockSocket implements Socket {

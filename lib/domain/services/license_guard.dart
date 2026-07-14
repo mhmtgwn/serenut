@@ -7,7 +7,6 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
-import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/license_client.dart';
 
 class LicenseException implements Exception {

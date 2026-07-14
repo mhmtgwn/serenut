@@ -170,7 +170,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.business_rounded, text: 'İşletme Bilgileri'),
+                            const _SectionTitle(icon: Icons.business_rounded, text: 'İşletme Bilgileri'),
                             const SizedBox(height: 16),
                             _Field(
                               controller: _businessNameCtrl,
@@ -232,7 +232,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.location_on_rounded, text: 'Konum'),
+                            const _SectionTitle(icon: Icons.location_on_rounded, text: 'Konum'),
                             const SizedBox(height: 16),
                             // İl dropdown
                             _DropdownField<String>(
@@ -266,7 +266,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.payments_rounded, text: 'Para & Fiyatlandırma'),
+                            const _SectionTitle(icon: Icons.payments_rounded, text: 'Para & Fiyatlandırma'),
                             const SizedBox(height: 16),
                             _DropdownField<String>(
                               label: 'Para Birimi',
@@ -299,7 +299,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SectionTitle(icon: Icons.category_rounded, text: 'İşletme Türü'),
+                            const _SectionTitle(icon: Icons.category_rounded, text: 'İşletme Türü'),
                             const SizedBox(height: 4),
                             Text('İşletmenizi en iyi tanımlayan türü seçin',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

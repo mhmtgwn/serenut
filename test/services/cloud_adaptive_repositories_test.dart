@@ -1,9 +1,7 @@
-﻿// test/services/cloud_adaptive_repositories_test.dart
+// test/services/cloud_adaptive_repositories_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/cloud_adaptive_product_repository.dart';
-import 'package:serenutos/infrastructure/repositories/cloud_adaptive_customer_repository.dart';
-import 'package:serenutos/infrastructure/repositories/cloud_adaptive_sale_repository.dart';
 import 'package:serenutos/infrastructure/datasources/remote_data_sources.dart';
 
 class MockLocalProductRepository implements IProductRepository {

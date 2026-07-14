@@ -3,7 +3,6 @@
 // Implements Manifest checking, SHA256 integrity validation, and mock download/migration routines.
 // Created: 04 Jul 2026
 
-import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';

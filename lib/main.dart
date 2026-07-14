@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:serenutos/config/environment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +22,6 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
-import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/domain/services/error_boundary.dart';
@@ -82,7 +80,7 @@ void main() async {
         final users = await authService.getUsers();
         if (users.isEmpty) {
           // Clear admin PIN from SQLite settings (single source of truth)
-          final db = await dbManager!.getDatabase();
+          final db = await dbManager.getDatabase();
           await db.update('settings', {'admin_pin_code': null, 'updated_at': DateTime.now().toIso8601String()});
         }
       } catch (e) {
