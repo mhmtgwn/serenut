@@ -84,7 +84,7 @@ import healthRouter from './modules/health/health.controller';
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
 import { startBillingScheduler, stopBillingScheduler } from './workers/billing.scheduler';
 
-const app = express();
+export const app = express();
 
 // Initialize Sentry before anything else
 if (process.env.SENTRY_DSN) {
