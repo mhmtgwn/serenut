@@ -52,7 +52,7 @@ async function run() {
     console.log('🌱 Starting STOCK-01 to STOCK-05 tests on port 9999...');
 
     const loginRes = await AuthService.login('testuser@stock.com', 'password123');
-    const token = loginRes.token;
+    const token = loginRes.access_token;
 
     const headers = {
       'Content-Type': 'application/json',

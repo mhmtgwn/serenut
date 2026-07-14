@@ -23,9 +23,12 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     }
 
     const decoded = AuthService.verifyAccessToken(token);
+    console.log('authenticateUser verifyAccessToken DONE');
 
     // Dynamic database check for active status and token version
+    console.log('authenticateUser pgPool.query...');
     const resUser = await pgPool.query('SELECT is_active, token_version FROM users WHERE id = $1', [decoded.id]);
+    console.log('authenticateUser pgPool.query DONE');
     if (resUser.rows.length === 0 || !resUser.rows[0].is_active) {
       incrementJwtFailures();
       return res.status(403).json({ error: 'user_suspended', message: 'Hesabınız askıya alınmıştır.' });
@@ -44,6 +47,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
       next();
     });
   } catch (err) {
+    console.error('authenticateUser Error:', err);
     incrementJwtFailures();
     return res.status(401).json({ error: 'unauthorized', message: 'Geçersiz veya süresi dolmuş token.' });
   }
@@ -77,7 +81,7 @@ export function requirePermission(permissionCode: string) {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    const hasPermission = req.user.permissions.includes(permissionCode) || req.user.roles.includes('sysadmin');
+    const hasPermission = req.user.permissions.includes(permissionCode);
     if (!hasPermission) {
       return res.status(403).json({
         error: 'forbidden',
@@ -94,7 +98,7 @@ export function requireRole(roleName: string) {
       return res.status(401).json({ error: 'unauthorized' });
     }
 
-    const hasRole = req.user.roles.includes(roleName) || req.user.roles.includes('sysadmin');
+    const hasRole = req.user.roles.includes(roleName);
     if (!hasRole) {
       return res.status(403).json({
         error: 'forbidden',

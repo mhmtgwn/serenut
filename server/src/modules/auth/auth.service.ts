@@ -41,6 +41,8 @@ export interface UserPayload {
   roles: string[];
   permissions: string[];
   token_version?: number;
+  entitlement_state?: string;
+  entitlement_valid_until?: number;
 }
 
 export class AuthService {
@@ -180,6 +182,24 @@ export class AuthService {
         permissions = permRes.rows.map((row: any) => row.code);
       }
 
+      // Fetch current subscription status to embed entitlement in snapshot
+      const subRes = await client.query(
+        `SELECT s.status, s.trial_started_at, s.trial_ends_at, s.current_period_start, s.current_period_end, s.grace_hours_override, p.offline_grace_hours 
+         FROM subscriptions s
+         LEFT JOIN plans p ON s.plan_id = p.id
+         WHERE s.company_id = $1 LIMIT 1`,
+        [userRow.company_id]
+      );
+      const sub = subRes.rows[0] || {};
+      
+      let entitlementValidUntil: number | undefined;
+      const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
+      const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+      
+      if (baseExpiration) {
+        entitlementValidUntil = baseExpiration.getTime() + graceHours * 3600 * 1000;
+      }
+
       const payload: UserPayload = {
         jti: crypto.randomUUID(),
         id: userRow.id,
@@ -189,6 +209,8 @@ export class AuthService {
         roles,
         permissions,
         token_version: userRow.token_version,
+        entitlement_state: sub.status || 'inactive',
+        entitlement_valid_until: entitlementValidUntil,
       };
 
       // 6. Issue token pair
@@ -211,21 +233,19 @@ export class AuthService {
 
       await client.query('COMMIT');
 
-      // Fetch current trial timestamps from DB (trial start is now triggered by POS activation, not login)
-      const trialRes = await pgPool.query(
-        `SELECT trial_started_at, trial_ends_at FROM subscriptions WHERE company_id = $1 LIMIT 1`,
-        [userRow.company_id]
-      );
-      const trialStartedAt = trialRes.rows[0]?.trial_started_at ?? null;
-      const trialEndsAt   = trialRes.rows[0]?.trial_ends_at   ?? null;
-
       return {
         access_token: accessToken,
         refresh_token: refreshToken,
         expires_in: 3600,
         trial_started: false,
-        trial_started_at: trialStartedAt,
-        trial_ends_at: trialEndsAt,
+        subscription: {
+          status: sub.status || 'inactive',
+          trial_started_at: sub.trial_started_at ?? null,
+          trial_ends_at: sub.trial_ends_at ?? null,
+          current_period_start: sub.current_period_start ?? null,
+          current_period_end: sub.current_period_end ?? null,
+          grace_hours_override: sub.grace_hours_override ?? null
+        },
         user: payload,
       };
     } catch (err) {
@@ -306,6 +326,21 @@ export class AuthService {
                 permissions = permRes.rows.map((row: any) => row.code);
               }
 
+              const subRes = await client.query(
+                `SELECT s.status, s.trial_started_at, s.trial_ends_at, s.current_period_start, s.current_period_end, s.grace_hours_override, p.offline_grace_hours 
+                 FROM subscriptions s
+                 LEFT JOIN plans p ON s.plan_id = p.id
+                 WHERE s.company_id = $1 LIMIT 1`,
+                [userRow.company_id]
+              );
+              const sub = subRes.rows[0] || {};
+              let entitlementValidUntil: number | undefined;
+              const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
+              const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+              if (baseExpiration) {
+                entitlementValidUntil = baseExpiration.getTime() + graceHours * 3600 * 1000;
+              }
+
               const payload: UserPayload = {
                 jti: crypto.randomUUID(),
                 id: userRow.id,
@@ -315,6 +350,8 @@ export class AuthService {
                 roles,
                 permissions,
                 token_version: userRow.token_version,
+                entitlement_state: sub.status || 'inactive',
+                entitlement_valid_until: entitlementValidUntil,
               };
 
               const accessToken = jwt.sign(payload, JWT_SECRET!, {
@@ -328,6 +365,14 @@ export class AuthService {
                 access_token: accessToken,
                 refresh_token: activeSessRes.rows[0].refresh_token,
                 expires_in: 3600,
+                subscription: {
+                  status: sub.status || 'inactive',
+                  trial_started_at: sub.trial_started_at ?? null,
+                  trial_ends_at: sub.trial_ends_at ?? null,
+                  current_period_start: sub.current_period_start ?? null,
+                  current_period_end: sub.current_period_end ?? null,
+                  grace_hours_override: sub.grace_hours_override ?? null
+                },
               };
             }
           }
@@ -372,6 +417,21 @@ export class AuthService {
         permissions = permRes.rows.map((row: any) => row.code);
       }
 
+      const subRes = await client.query(
+        `SELECT s.status, s.trial_started_at, s.trial_ends_at, s.current_period_start, s.current_period_end, s.grace_hours_override, p.offline_grace_hours 
+         FROM subscriptions s
+         LEFT JOIN plans p ON s.plan_id = p.id
+         WHERE s.company_id = $1 LIMIT 1`,
+        [userRow.company_id]
+      );
+      const sub = subRes.rows[0] || {};
+      let entitlementValidUntil: number | undefined;
+      const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
+      const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+      if (baseExpiration) {
+        entitlementValidUntil = baseExpiration.getTime() + graceHours * 3600 * 1000;
+      }
+
       const payload: UserPayload = {
         jti: crypto.randomUUID(),
         id: userRow.id,
@@ -381,6 +441,8 @@ export class AuthService {
         roles,
         permissions,
         token_version: userRow.token_version,
+        entitlement_state: sub.status || 'inactive',
+        entitlement_valid_until: entitlementValidUntil,
       };
 
       const newAccessToken = jwt.sign(payload, JWT_SECRET!, {
@@ -410,6 +472,14 @@ export class AuthService {
         access_token: newAccessToken,
         refresh_token: newRefreshToken,
         expires_in: 3600,
+        subscription: {
+          status: sub.status || 'inactive',
+          trial_started_at: sub.trial_started_at ?? null,
+          trial_ends_at: sub.trial_ends_at ?? null,
+          current_period_start: sub.current_period_start ?? null,
+          current_period_end: sub.current_period_end ?? null,
+          grace_hours_override: sub.grace_hours_override ?? null
+        },
       };
     } catch (err) {
       await client.query('ROLLBACK');
@@ -448,9 +518,12 @@ export class AuthService {
 
   public static async isTokenBlacklisted(token: string): Promise<boolean> {
     try {
+      console.log('isTokenBlacklisted START', { isOpen: redisClient?.isOpen, isReady: redisClient?.isReady });
       const decoded = jwt.decode(token) as any;
-      if (decoded && decoded.jti && redisClient && redisClient.isOpen) {
+      if (decoded && decoded.jti && redisClient && redisClient.isReady) {
+        console.log('isTokenBlacklisted redisClient.get...');
         const isBlacklisted = await redisClient.get(`bl:${decoded.jti}`);
+        console.log('isTokenBlacklisted redisClient.get DONE');
         return isBlacklisted === '1';
       }
     } catch (_) {}
@@ -466,6 +539,7 @@ export class AuthService {
         audience: JWT_AUDIENCE,
       }) as UserPayload;
     } catch (err) {
+      console.error('verifyAccessToken Error:', err);
       throw new Error('invalid_access_token');
     }
   }
@@ -745,9 +819,25 @@ export class AuthService {
 
       await client.query('COMMIT');
 
+      // Fetch current subscription status
+      const subRes = await pgPool.query(
+        `SELECT status, trial_started_at, trial_ends_at, current_period_start, current_period_end, grace_hours_override 
+         FROM subscriptions WHERE company_id = $1 LIMIT 1`,
+        [companyId]
+      );
+      const sub = subRes.rows[0] || {};
+
       return {
         access_token: accessToken,
         refresh_token: refreshToken,
+        subscription: {
+          status: sub.status || 'inactive',
+          trial_started_at: sub.trial_started_at ?? null,
+          trial_ends_at: sub.trial_ends_at ?? null,
+          current_period_start: sub.current_period_start ?? null,
+          current_period_end: sub.current_period_end ?? null,
+          grace_hours_override: sub.grace_hours_override ?? null
+        },
         user: {
           id: profile.id,
           name: profile.name,

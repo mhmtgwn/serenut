@@ -4,6 +4,7 @@ import { pgPool } from '../../config/database';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { syncLimiter } from '../../middleware/rate-limit.middleware';
 import { authenticateUser } from '../../middleware/auth.middleware';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 router.use(syncLimiter);
@@ -20,11 +21,90 @@ router.post('/push', async (req: Request, res: Response) => {
 
   let syncedCount = 0;
   const errors: any[] = [];
+  const processed: string[] = [];
+  console.log('[DEBUG] Trying to connect to pgPool...');
   const client = await pgPool.connect();
+  console.log('[DEBUG] Connected to pgPool.');
 
   try {
+    // Determine Grace Expiry Status
+    const subRes = await client.query(`
+      SELECT s.status, s.trial_ends_at, s.current_period_end, s.grace_hours_override, p.offline_grace_hours
+      FROM subscriptions s
+      JOIN plans p ON s.plan_id = p.id
+      WHERE s.company_id = $1 LIMIT 1
+    `, [user.company_id]);
+
+    let isGraceExpired = false;
+    let expirationTimeUtc = new Date(0);
+
+    if (subRes.rows.length > 0) {
+      const sub = subRes.rows[0];
+      if (sub.status === 'canceled' || sub.status === 'revoked') {
+        return res.status(402).json({ error: 'COMPANY402', message: 'Aboneliğiniz iptal edilmiştir.' });
+      }
+      
+      const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
+      const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+      
+      if (baseExpiration) {
+        expirationTimeUtc = new Date(baseExpiration.getTime() + graceHours * 3600 * 1000);
+        if (new Date() > expirationTimeUtc) {
+          isGraceExpired = true;
+        }
+      }
+    } else {
+         console.log('[DEBUG] No subscription found.');
+    }
+
+    console.log(`[DEBUG] Processing ${items.length} items...`);
     for (const item of items) {
+      console.log(`[DEBUG] Processing item ${item.id}`);
       const { id, entity_type, entity_id, payload } = item;
+      
+      // Prevent clock manipulation attacks: if grace expired, only allow valid historical sales
+      if (isGraceExpired) {
+        const itemTime = payload.created_at || payload.date;
+        if (!itemTime || new Date(itemTime) > expirationTimeUtc) {
+          errors.push({ id, error: 'grace_expired', message: 'Geçersiz işlem tarihi: Abonelik süresi dışında işlem yapılamaz.' });
+          continue;
+        }
+
+        // Validate entitlement snapshot to prevent clock spoofing
+        const snapshot = payload.entitlement_snapshot;
+        if (!snapshot) {
+          errors.push({ id, error: 'missing_entitlement_snapshot', message: 'Geçmiş işlem doğrulaması için güvenlik anahtarı eksik (clock_spoofing_prevented).' });
+          continue;
+        }
+
+        try {
+          // Verify JWT without checking expiration (since it was offline)
+          const decoded = jwt.verify(snapshot, process.env.JWT_SECRET as string, { ignoreExpiration: true }) as any;
+          
+          if (!decoded.entitlement_valid_until) {
+             errors.push({ id, error: 'invalid_entitlement_snapshot', message: 'Eski güvenlik anahtarı sürümü desteklenmiyor.' });
+             continue;
+          }
+
+          // The item must have been created AFTER the snapshot was issued
+          const iatDate = new Date(decoded.iat * 1000);
+          const maxSkewMs = 60 * 60 * 1000; // 1 hour skew tolerance
+          if (new Date(itemTime).getTime() < iatDate.getTime() - maxSkewMs) {
+             errors.push({ id, error: 'clock_spoofed', message: 'Cihaz saati manipülasyonu tespit edildi (clock_spoofed geçmişe dönük).' });
+             continue;
+          }
+
+          // The item must have been created BEFORE the entitlement expired (with 1 hour skew tolerance)
+          const validUntilMs = decoded.entitlement_valid_until;
+          if (new Date(itemTime).getTime() > validUntilMs + maxSkewMs) {
+             errors.push({ id, error: 'clock_spoofed', message: 'İşlem tarihi, cihazın yetki süresinin (grace period) dışında (clock_spoofed geleceğe dönük).' });
+             continue;
+          }
+        } catch (err) {
+          errors.push({ id, error: 'invalid_entitlement_snapshot', message: 'Geçersiz güvenlik anahtarı.' });
+          continue;
+        }
+      }
       if (!entity_type || !entity_id || !payload) {
         errors.push({ id, error: 'missing_fields' });
         continue;
@@ -182,6 +262,7 @@ router.post('/push', async (req: Request, res: Response) => {
 
         await client.query('COMMIT');
         syncedCount++;
+        processed.push(id);
 
         // Realtime Event Broadcasting
         try {
@@ -226,14 +307,17 @@ router.post('/push', async (req: Request, res: Response) => {
           // Silence ws errors so they do not block standard sync flow
         }
       } catch (err: any) {
+        console.log('[DEBUG] Error checking subscription:', err);
         await client.query('ROLLBACK');
         console.error(`Error syncing item ${id}:`, err);
         errors.push({ id, error: err.message || 'database_error' });
       }
     }
 
+    console.log('[DEBUG] Finished processing. Sending response...');
     return res.json({
       synced_count: syncedCount,
+      processed,
       errors
     });
   } finally {
@@ -247,6 +331,36 @@ router.get('/pull', async (req: Request, res: Response) => {
   const lastTime = lastTimestampStr ? new Date(parseInt(lastTimestampStr, 10)) : new Date(0);
 
   try {
+    const client = await pgPool.connect();
+    try {
+      const subRes = await client.query(`
+        SELECT s.status, s.trial_ends_at, s.current_period_end, s.grace_hours_override, p.offline_grace_hours
+        FROM subscriptions s
+        JOIN plans p ON s.plan_id = p.id
+        WHERE s.company_id = $1 LIMIT 1
+      `, [user.company_id]);
+
+      if (subRes.rows.length > 0) {
+        console.log('[DEBUG] Subscription found.');
+        const sub = subRes.rows[0];
+        if (sub.status === 'canceled' || sub.status === 'revoked') {
+          return res.status(402).json({ error: 'COMPANY402', message: 'Aboneliğiniz iptal edilmiştir.' });
+        }
+        
+        const graceHours = sub.grace_hours_override ?? sub.offline_grace_hours ?? 72;
+        const baseExpiration = sub.status === 'trialing' ? sub.trial_ends_at : sub.current_period_end;
+        
+        if (baseExpiration) {
+          const expirationTimeUtc = new Date(baseExpiration.getTime() + graceHours * 3600 * 1000);
+          if (new Date() > expirationTimeUtc) {
+            return res.status(402).json({ error: 'grace_expired', message: 'Abonelik süresi dolduğu için veri senkronizasyonu durduruldu.' });
+          }
+        }
+      }
+    } finally {
+      client.release();
+    }
+
     // Gather modified products since last timestamp
     const prodRes = await pgPool.query(
       'SELECT * FROM products WHERE company_id = $1 AND updated_at > $2',
@@ -410,7 +524,7 @@ router.get('/bootstrap/:module', async (req: Request, res: Response) => {
 
     return res.json({ module, data });
   } catch (err: any) {
-    console.error(`Bootstrap sync error on ${module}:`, err);
+    console.error(`[SYNC] Bulk push failed: ${err.message}`);
     return res.status(500).json({ error: 'server_error', message: `Bootstrap veri yükleme hatası: ${module}` });
   }
 });

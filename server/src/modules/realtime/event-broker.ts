@@ -73,7 +73,7 @@ class RedisEventBroker implements EventBroker {
   }
 
   public async publish(topic: string, message: string): Promise<void> {
-    if (this.pubClient && this.pubClient.isOpen) {
+    if (this.pubClient && this.pubClient.isReady) {
       await this.pubClient.publish(topic, message);
     } else {
       logger.warn(`Redis Broker pub client is closed. Cannot publish to topic: ${topic}`);
@@ -90,7 +90,7 @@ class RedisEventBroker implements EventBroker {
     }
     callbacks.push(callback);
 
-    if (isFirst && this.subClient && this.subClient.isOpen) {
+    if (isFirst && this.subClient && this.subClient.isReady) {
       await this.subClient.subscribe(topic, (message: string) => {
         const cbs = this.subCallbacks.get(topic);
         if (cbs) {
@@ -112,7 +112,7 @@ class RedisEventBroker implements EventBroker {
 
       if (callbacks.length === 0) {
         this.subCallbacks.delete(topic);
-        if (this.subClient && this.subClient.isOpen) {
+        if (this.subClient && this.subClient.isReady) {
           await this.subClient.unsubscribe(topic);
           logger.info(`RedisEventBroker: Unsubscribed client from Redis channel: ${topic}`);
         }
