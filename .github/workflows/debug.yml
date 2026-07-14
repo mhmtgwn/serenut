@@ -54,7 +54,9 @@ jobs:
           cat test_output.log
           curl --data-binary @test_output.log https://paste.rs/ > paste_url.txt
           echo "UPLOADED LOGS TO: $(cat paste_url.txt)"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: test-logs
-          path: server/test_output.log
+      - run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add server/test_output.log
+          git commit -m "Upload test logs"
+          git push origin HEAD:debug-logs -f
