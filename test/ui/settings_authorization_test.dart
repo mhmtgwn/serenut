@@ -58,6 +58,13 @@ void main() {
     );
   });
 
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(
+      'flutter/assets',
+      null,
+    );
+  });
+
   group('SettingsPage Granular RBAC Authorization Tests', () {
     testWidgets(
         'Sysadmin sees all sections including platform-level Admin Kontrol Merkezi',

@@ -23,8 +23,10 @@ void main() {
       final path = join(databasePath, 'serenut_pos_stress.db');
       await deleteDatabase(path);
 
-      // Create a specific database for stress testing
+      // Set override path to prevent using the same database connection as other tests
+      DatabaseManager.overrideDatabasePath = path;
       databaseManager = DatabaseManager();
+      databaseManager.reset();
       db = await databaseManager.getDatabase();
 
       // Insert a mock customer to satisfy the sales foreign key constraint
@@ -48,6 +50,8 @@ void main() {
 
     tearDownAll(() async {
       await databaseManager.close();
+      DatabaseManager.overrideDatabasePath = null;
+      databaseManager.reset();
       final databasePath = await getDatabasesPath();
       final path = join(databasePath, 'serenut_pos_stress.db');
       await deleteDatabase(path);
