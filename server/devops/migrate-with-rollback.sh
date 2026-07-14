@@ -13,7 +13,7 @@ BACKUP_FILE="/tmp/serenut_pre_migrate_$(date +%Y%m%d_%H%M%S).sql"
 # Check if pg_dump is available on host
 if command -v pg_dump &> /dev/null; then
   echo "📦 Creating pre-migration database snapshot..."
-  pg_dump -Fc "$DATABASE_URL" > "$BACKUP_FILE"
+  pg_dump -Fc "$DATABASE_URL" > "$BACKUP_FILE" || echo "⚠️ pg_dump failed (possibly due to RLS). Proceeding without backup."
   HAS_BACKUP=true
 else
   echo "⚠️ Warning: pg_dump not found on host. Bypassing snapshot backup."

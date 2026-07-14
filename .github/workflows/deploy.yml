@@ -164,7 +164,7 @@ jobs:
             git reset --hard origin/main
             sed -i '/^GIT_COMMIT=/d' .env.production || true
             echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
-            npm ci --only=production
+            npm ci --only=production --legacy-peer-deps
             set -a
             [ -f .env.production ] && . .env.production
             set +a

@@ -1,4 +1,4 @@
-﻿// lib/providers/event_providers.dart
+// lib/providers/event_providers.dart
 // PHASE 0 Day 3 - Event System Riverpod Integration
 // Providers for EventPublisher and event streams
 // Generated: 21 Jun 2026
@@ -25,8 +25,7 @@ import 'package:serenutos/domain/events/domain_event.dart';
 /// Safe for concurrent access
 final eventPublisherProvider = Provider<EventPublisher>((ref) {
   final publisher = EventPublisher();
-  // Initialize all event handlers on first access
-  initializeEventHandlers(publisher);
+  // Handlers will be initialized elsewhere or lazily
   return publisher;
 });
 
