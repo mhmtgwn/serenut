@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,9 +17,35 @@ import 'package:serenutos/domain/services/i_printer_service.dart';
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
+
+    // Mock binary messenger for assets/data/cities.json to prevent async leaks in tests
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(
+      'flutter/assets',
+      (ByteData? message) async {
+        if (message == null) return null;
+        final Uint8List list = message.buffer.asUint8List(message.offsetInBytes, message.lengthInBytes);
+        final String key = utf8.decode(list);
+        if (key == 'assets/data/cities.json') {
+          final jsonStr = jsonEncode({
+            'countries': [
+              {
+                'code': 'TR',
+                'cities': [
+                  {
+                    'name': 'Istanbul',
+                    'districts': ['Kadikoy', 'Besiktas']
+                  }
+                ]
+              }
+            ]
+          });
+          return ByteData.sublistView(utf8.encode(jsonStr));
+        }
+        return null;
+      },
+    );
+
     try {
-      // Pre-load cities.json into the rootBundle cache to prevent async Future leaks
-      // where SettingsPage's initState loads it and completes after the test is closed.
       await rootBundle.loadString('assets/data/cities.json');
     } catch (_) {}
 
