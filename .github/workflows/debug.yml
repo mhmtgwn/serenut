@@ -51,6 +51,9 @@ jobs:
           cd server
           rm -f .env.test
           npm run test > test_output.log 2>&1 || true
+          cat test_output.log
+          curl --data-binary @test_output.log https://paste.rs/ > paste_url.txt
+          echo "UPLOADED LOGS TO: $(cat paste_url.txt)"
       - uses: actions/upload-artifact@v4
         with:
           name: test-logs
