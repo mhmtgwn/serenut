@@ -207,32 +207,51 @@ class BootstrapSyncService {
 
         // Sync with settings table for settings screen
         try {
-          await txn.execute('''
-            UPDATE settings SET
-              business_name = ?,
-              business_phone = ?,
-              business_address = ?,
-              business_tax_id = ?,
-              owner_name = ?,
-              business_email = ?,
-              business_city = ?,
-              business_district = ?,
-              business_type = ?,
-              currency = ?
-          ''', [
-            map['name'] ?? '',
-            map['phone'] ?? '',
-            '${map['district'] ?? ''}, ${map['city'] ?? ''}',
-            map['tax_number'] ?? '',
-            map['owner_name'] ?? '',
-            map['email'] ?? '',
-            map['city'] ?? '',
-            map['district'] ?? '',
-            map['type'] ?? '',
-            map['currency'] ?? '₺'
-          ]);
-          debugPrint(
-              '[Bootstrap] ✅ settings.business_name güncellendi: ${map['name']}');
+          final settingsRows = await txn.query('settings', limit: 1);
+          if (settingsRows.isEmpty) {
+            await txn.insert('settings', {
+              'business_name': map['name'] ?? '',
+              'business_phone': map['phone'] ?? '',
+              'business_address': '${map['district'] ?? ''}, ${map['city'] ?? ''}',
+              'business_tax_id': map['tax_number'] ?? '',
+              'owner_name': map['owner_name'] ?? '',
+              'business_email': map['email'] ?? '',
+              'business_city': map['city'] ?? '',
+              'business_district': map['district'] ?? '',
+              'business_type': map['type'] ?? '',
+              'currency': map['currency'] ?? '₺',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+            debugPrint(
+                '[Bootstrap] ✅ settings table initialized with company details: ${map['name']}');
+          } else {
+            await txn.execute('''
+              UPDATE settings SET
+                business_name = ?,
+                business_phone = ?,
+                business_address = ?,
+                business_tax_id = ?,
+                owner_name = ?,
+                business_email = ?,
+                business_city = ?,
+                business_district = ?,
+                business_type = ?,
+                currency = ?
+            ''', [
+              map['name'] ?? '',
+              map['phone'] ?? '',
+              '${map['district'] ?? ''}, ${map['city'] ?? ''}',
+              map['tax_number'] ?? '',
+              map['owner_name'] ?? '',
+              map['email'] ?? '',
+              map['city'] ?? '',
+              map['district'] ?? '',
+              map['type'] ?? '',
+              map['currency'] ?? '₺'
+            ]);
+            debugPrint(
+                '[Bootstrap] ✅ settings table updated with company details: ${map['name']}');
+          }
         } catch (e) {
           // Non-fatal: settings table sync after company bootstrap failed.
           // Business profile data is still saved to business_profile table above.
