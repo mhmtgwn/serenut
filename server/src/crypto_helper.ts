@@ -71,8 +71,9 @@ function loadPrivateKey(): crypto.KeyObject {
       });
     } else {
       // Load from PEM format
+      const formattedKey = envKey.replace(/\\n/g, '\n');
       return crypto.createPrivateKey({
-        key: envKey,
+        key: formattedKey,
         format: 'pem'
       });
     }
