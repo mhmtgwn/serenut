@@ -180,7 +180,7 @@ jobs:
             cd server
             sed -i '/^GIT_COMMIT=/d' .env.production || true
             echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
-            npm ci --only=production --legacy-peer-deps
+            npm install --legacy-peer-deps
             set -a
             [ -f .env.production ] && . .env.production
             set +a
@@ -189,6 +189,7 @@ jobs:
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             sleep 25
+            docker logs serenut-backend > /var/www/serenut/server/public/website/docker_debug.txt 2>&1 || true
             # Setup Nginx reverse proxy
             apt-get install -y nginx || true
             cp devops/nginx.conf /etc/nginx/sites-available/serenut
