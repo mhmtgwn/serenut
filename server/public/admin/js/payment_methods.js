@@ -2,7 +2,7 @@
    SERENUT OS V2 - PAYMENT METHODS ADMIN MODULE
    ========================================================================== */
 
-import { apiFetch } from '/admin/js/api-client.js';
+import { apiFetch } from '/shared/js/api-client.js';
 import { showToast } from '/shared/js/ui.js';
 
 let providers = [];

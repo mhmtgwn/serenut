@@ -1,62 +1,14 @@
-name: Debug CI
-on:
-  push:
-    branches: [ staging ]
-
+name: Debug
+on: push
 jobs:
-  debug-ci:
+  debug:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgrespassword
-          POSTGRES_DB: postgres
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: appleboy/ssh-action@master
         with:
-          node-version: '22'
-      - run: |
-          cd server
-          npm install --legacy-peer-deps
-          npm run build
-      - env:
-          PGPASSWORD: postgrespassword
-        run: psql -h localhost -p 5433 -U postgres -d postgres -c "CREATE DATABASE testdb;"
-      - env:
-          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/testdb
-        run: |
-          cd server
-          npm run migrate
-      - env:
-          NODE_ENV: test
-          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/postgres
-          TEST_DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/testdb
-          JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
-          INVOICES_DIR: ./invoices
-        run: |
-          cd server
-          rm -f .env.test
-          npm run test > test_output.log 2>&1 || true
-          cat test_output.log
-          curl --data-binary @test_output.log https://paste.rs/ > paste_url.txt
-          echo "UPLOADED LOGS TO: $(cat paste_url.txt)"
-      - run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add server/test_output.log
-          git commit -m "Upload test logs"
-          git push origin HEAD:debug-logs -f
+          host: "185.255.93.94"
+          username: "root"
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 2222
+          script: |
+            docker logs serenut-backend

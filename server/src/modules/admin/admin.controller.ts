@@ -996,54 +996,6 @@ router.post('/releases/distribute', async (req: AuthenticatedRequest, res: Respo
   }
 });
 
-// ── 15. BANK WIRE / TRANSFER MANUAL INVOICE APPROVER (Sprint 13) ──────────────
-router.post('/invoices/:id/approve', async (req: AuthenticatedRequest, res: Response) => {
-  const invRes = await runBypassingRLS('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
-  if (invRes.rows.length === 0) {
-    return res.status(404).json({ error: 'invoice_not_found' });
-  }
-  const invoice = invRes.rows[0];
-
-  // 1. Mark Invoice as Paid & Activate Subscription in a transaction
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await CommercialLifecycleService.finalizeInvoicePayment(client, req.params.id, 'bank_transfer', req.user!.id);
-    await client.query('COMMIT');
-  } catch (err: any) {
-    await client.query('ROLLBACK');
-    if (err.message === 'invoice_not_found') {
-      return res.status(404).json({ error: 'invoice_not_found' });
-    }
-    throw err;
-  } finally {
-    client.release();
-  }
-
-  // Refresh invoice for audit log
-  const updatedInvRes = await runBypassingRLS('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
-  const updatedInvoice = updatedInvRes.rows[0];
-
-  // 2. Write Admin Audit Log
-  await writeAdminAudit(req.user!.id, 'APPROVED_BANK_WIRE_PAYMENT', 'invoices', req.params.id, invoice, updatedInvoice, req.ip);
-
-  // 3. Send Notification (SMS/Mail Queue)
-  const notifId = `notif-${Date.now()}`;
-  await runBypassingRLS(`
-    INSERT INTO notification_queue (id, company_id, channel, recipient, body, status)
-    VALUES ($1, $2, 'sms', '05440000000', 'Sayın Müşterimiz, Havale/EFT ödemeniz onaylanmış ve lisansınız aktif edilmiştir.', 'queued')
-  `, [notifId, invoice.company_id]);
-
-  // 4. Resolve Bank Transfer Notification status
-  await runBypassingRLS(`
-    UPDATE bank_transfer_notifications
-    SET status = 'approved', updated_at = NOW()
-    WHERE invoice_id = $1
-  `, [req.params.id]);
-
-  return res.json({ success: true });
-});
-
 // ── 16. GELİR ZEKASI (Commercial Intelligence) ──────────────────────────────
 router.get('/billing/intel', async (req: AuthenticatedRequest, res: Response) => {
   try {

@@ -24,6 +24,13 @@ async function runAudit() {
       VALUES ($1, 'Audit Company', $2, $2)
     `, [companyId, Date.now().toString().slice(0,10)]);
 
+    // Ensure serenut_cloud exists for general sysadmin logs
+    await client.query(`
+      INSERT INTO companies (id, name, tax_number, tax_office, status)
+      VALUES ('serenut_cloud', 'Serenut Cloud Admin', '0000000000', 'Admin Office', 'active')
+      ON CONFLICT (id) DO NOTHING
+    `);
+
     // SysAdmin
     const sysadminId = `audit-sysadmin-${Date.now()}`;
     await client.query(`
@@ -123,9 +130,13 @@ async function runAudit() {
 
     // Approving as sysadmin
     const apprRes = await request(app)
-      .post(`/api/v1/admin/invoices/${invoiceId}/approve`)
+      .put(`/api/v1/billing/admin/invoices/${invoiceId}/approve-payment`)
       .set('Authorization', `Bearer ${sysadminToken}`);
+    console.log('Approve response:', apprRes.status, apprRes.body);
     assert.strictEqual(apprRes.status, 200, 'Approval should succeed');
+
+    const checkInv = await client.query('SELECT * FROM invoices WHERE id = $1', [invoiceId]);
+    console.log('Invoice in DB after approve:', checkInv.rows[0]);
 
     const postSub = await client.query('SELECT * FROM subscriptions WHERE company_id = $1', [companyId]);
     assert.strictEqual(postSub.rows.length, 1, 'Subscription created after approval');
@@ -164,6 +175,40 @@ async function runAudit() {
     const entRes = await client.query('SELECT * FROM license_entitlements WHERE company_id = $1', [companyId]);
     // There was 1 entitlement from test 6, this test should only add 1 more or update it.
     console.log('✅ TEST 7 PASS');
+
+    // TEST 8: HTTP double approval and concurrency
+    console.log('[TEST 8] Verifying HTTP Double Approval and Concurrency...');
+    const invId3 = `inv-http-conc-${Date.now()}`;
+    await client.query(`
+      INSERT INTO invoices (id, company_id, invoice_number, amount, status, due_at, billing_details)
+      VALUES ($1, $2, $1, 300, 'pending', NOW(), '{"planId":"plan-pro","billingPeriod":"monthly"}')
+    `, [invId3, companyId]);
+
+    // Send 5 concurrent HTTP approval requests
+    const httpPromises = [];
+    for (let i = 0; i < 5; i++) {
+      httpPromises.push(
+        request(app)
+          .put(`/api/v1/billing/admin/invoices/${invId3}/approve-payment`)
+          .set('Authorization', `Bearer ${sysadminToken}`)
+      );
+    }
+    const httpResults = await Promise.all(httpPromises);
+
+    const successfulRequests = httpResults.filter(r => r.status === 200);
+    const failedRequests = httpResults.filter(r => r.status === 400 && r.body.error === 'already_paid');
+
+    assert.strictEqual(successfulRequests.length, 1, 'Exactly one concurrent request must succeed');
+    assert.strictEqual(failedRequests.length, 4, 'Other 4 concurrent requests must return already_paid error');
+
+    // Perform an explicit sequential duplicate approval test
+    const seqApprRes = await request(app)
+      .put(`/api/v1/billing/admin/invoices/${invId3}/approve-payment`)
+      .set('Authorization', `Bearer ${sysadminToken}`);
+    assert.strictEqual(seqApprRes.status, 400, 'Sequential double approval must fail');
+    assert.strictEqual(seqApprRes.body.error, 'already_paid', 'Must return already_paid error code');
+
+    console.log('✅ TEST 8 PASS');
 
     console.log('--- ALL FORENSIC AUDIT TESTS PASSED ---');
     process.exit(0);

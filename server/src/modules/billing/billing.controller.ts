@@ -42,6 +42,30 @@ async function runBypassingRLS(sql: string, params: any[] = []) {
   }
 }
 
+// Helper to write admin audit log
+async function writeAdminAudit(userId: string, action: string, entity: string, entityId: string, oldValue: any = null, newValue: any = null, ipAddress: string = 'admin_panel') {
+  const auditId = `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  try {
+    await runBypassingRLS(
+      `INSERT INTO audit_logs (id, company_id, user_id, action, entity, entity_id, old_value, new_value, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        auditId,
+        'serenut_cloud', // Admin platform indicator
+        userId,
+        action,
+        entity,
+        entityId,
+        oldValue ? JSON.stringify(oldValue) : null,
+        newValue ? JSON.stringify(newValue) : null,
+        ipAddress
+      ]
+    );
+  } catch (err: any) {
+    logger.error('Failed to write admin audit log:', err);
+  }
+}
+
 async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
   const client = await pgPool.connect();
   try {
@@ -1281,6 +1305,47 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
       grantType: 'bank_transfer',
       adminUserId,
     });
+
+    // 6. Write Admin Audit Log (Inside Transaction, non-blocking)
+    try {
+      const auditId = `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const invoiceAfter = { ...invoice, status: 'paid', paid_at: new Date() };
+      await client.query(
+        `INSERT INTO audit_logs (id, company_id, user_id, action, entity, entity_id, old_value, new_value, ip_address)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          auditId,
+          invoice.company_id,
+          adminUserId,
+          'APPROVED_BANK_WIRE_PAYMENT',
+          'invoices',
+          id,
+          JSON.stringify(invoice),
+          JSON.stringify(invoiceAfter),
+          req.ip || 'admin_panel'
+        ]
+      );
+    } catch (auditErr) {
+      logger.error('Failed to write admin audit log inside transaction:', auditErr);
+    }
+
+    // 7. Send Notification (Inside Transaction, non-blocking, dynamic phone lookup)
+    try {
+      const companyRes = await client.query('SELECT phone FROM companies WHERE id = $1', [invoice.company_id]);
+      const recipientPhone = companyRes.rows[0]?.phone;
+
+      if (recipientPhone && recipientPhone.trim() !== '') {
+        const notifId = `notif-${Date.now()}`;
+        await client.query(`
+          INSERT INTO notification_queue (id, company_id, channel, recipient, body, status)
+          VALUES ($1, $2, 'sms', $3, 'Sayın Müşterimiz, Havale/EFT ödemeniz onaylanmış ve lisansınız aktif edilmiştir.', 'queued')
+        `, [notifId, invoice.company_id, recipientPhone]);
+      } else {
+        logger.warn(`No phone number found for company ${invoice.company_id}. Skipping SMS notification.`);
+      }
+    } catch (smsErr) {
+      logger.error('Failed to queue SMS notification inside transaction:', smsErr);
+    }
 
     await client.query('COMMIT');
 
