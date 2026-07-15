@@ -17,8 +17,8 @@ html {
 
 body {
   font-family: var(--font-family);
-  background-color: var(--neutral-950);
-  color: var(--neutral-100);
+  background-color: var(--neutral-50);
+  color: var(--neutral-900);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -33,13 +33,13 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--neutral-900);
+  background: var(--neutral-100);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--neutral-700);
+  background: var(--neutral-300);
   border-radius: var(--radius-full);
-  border: 2px solid var(--neutral-900);
+  border: 2px solid var(--neutral-100);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -48,7 +48,7 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-  color: var(--neutral-50);
+  color: var(--neutral-950);
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -60,18 +60,18 @@ h3 { font-size: 1.5rem; }
 h4 { font-size: 1.25rem; }
 
 p {
-  color: var(--neutral-300);
+  color: var(--neutral-600);
 }
 
 a {
-  color: var(--primary-400);
+  color: var(--primary-600);
   text-decoration: none;
   transition: color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
 }
 
 a:hover {
-  color: var(--primary-300);
+  color: var(--primary-700);
 }
 
 /* Accessibility Focus States */

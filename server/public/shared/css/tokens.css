@@ -17,8 +17,8 @@
   --neutral-100: hsl(210, 40%, 96%);
   --neutral-50:  hsl(210, 40%, 98%);
 
-  /* Primary Brand Accent (Neon Teal/Emerald) */
-  --primary-hue: 162;
+  /* Primary Brand Accent (Emerald Green) */
+  --primary-hue: 145;
   --primary-50:  hsl(var(--primary-hue), 85%, 97%);
   --primary-100: hsl(var(--primary-hue), 79%, 92%);
   --primary-200: hsl(var(--primary-hue), 75%, 80%);
@@ -61,10 +61,10 @@
   --danger-glow: rgba(239, 68, 68, 0.15);
 
   /* Ambient Glassmorphism Tokens */
-  --glass-bg: rgba(15, 23, 42, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
   --glass-border-hover: rgba(16, 185, 129, 0.25);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
 
   /* Fonts */
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
