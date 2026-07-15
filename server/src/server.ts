@@ -267,7 +267,18 @@ app.get('/marketing*', (req, res) => {
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
 app.use('/admin', express.static(path.join(process.cwd(), 'public/admin')));
 app.use('/portal', express.static(path.join(process.cwd(), 'public/portal')));
+
+// ── CLEAN URLs (no .html extension) ──────────────────────────────────────────
+const websiteDir = path.join(process.cwd(), 'public/website');
+const websitePages = ['platform', 'plans', 'downloads', 'contact', 'privacy', 'kvkk', 'terms', '404'];
+websitePages.forEach(page => {
+  app.get(`/${page}`, (req, res) => {
+    res.sendFile(path.join(websiteDir, `${page}.html`));
+  });
+});
+
 app.use('/', express.static(path.join(process.cwd(), 'public/website')));
+
 
 // ── ROUTERS — Auth & License (özel rate limitler) ────────────────────────────
 app.use('/api/v1/auth', authLimiter, authRouter);
