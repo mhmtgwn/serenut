@@ -3,10 +3,10 @@
    Tasarım: Sidebar koyu + İçerik beyaz (Stripe/Linear stili)
    ========================================================================== */
 
-@import "/shared/css/tokens.css";
-@import "/shared/css/base.css";
-@import "/shared/css/components.css";
-@import "/shared/css/utilities.css";
+@import "../../shared/css/tokens.css";
+@import "../../shared/css/base.css";
+@import "../../shared/css/components.css";
+@import "../../shared/css/utilities.css";
 
 /* ── PORTAL RENK OVERRİDES ──────────────────────────────────────────────────
    Shared CSS token'larına light-theme değerleri bindirmek için.
