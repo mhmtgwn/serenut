@@ -16,6 +16,16 @@ body {
   color: var(--color-text);
 }
 
+.container {
+  width: 100%;
+  max-width: var(--container-max-w);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+  box-sizing: border-box;
+}
+
 /* Website-specific overrides for shared light-theme form elements */
 body input[type="text"],
 body input[type="email"],
