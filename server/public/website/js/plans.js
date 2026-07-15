@@ -117,7 +117,7 @@ function renderPlans() {
     card.className = `card plan-card ${isPro ? 'border-teal' : ''}`;
     
     // Custom highlights
-    const proBadge = isPro ? '<div class="badge badge-trial mb-4 w-full">En Popüler Seçenek</div>' : '';
+    const proBadge = isPro ? '<div class="badge badge-trial mb-4" style="display:inline-flex; width:auto; font-size:0.75rem; font-weight:700; align-self:flex-start;">En Popüler Seçenek</div>' : '';
     
     card.innerHTML = `
       ${proBadge}

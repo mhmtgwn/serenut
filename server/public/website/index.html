@@ -584,7 +584,9 @@
             }
           } catch(_) {}
 
+          const proBadge = isPro ? '<div class="badge badge-trial mb-3" style="display:inline-flex; width:auto; font-size:0.72rem; font-weight:700; align-self:flex-start;">En Popüler</div>' : '';
           card.innerHTML = `
+            ${proBadge}
             <h3 class="font-semibold">${p.name}</h3>
             <p class="text-sm mt-1" style="color: var(--color-text-secondary); min-height:38px;">${p.description || 'Temel platform yetenekleri.'}</p>
             <div class="plan-price-block" style="font-size: 2rem; margin-block: var(--space-2);">

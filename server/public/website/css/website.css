@@ -943,24 +943,12 @@ body::after {
 }
 
 .plan-card.border-teal {
-  border: 2px solid var(--color-primary);
+  border: 1px solid rgba(5, 150, 105, 0.25);
+  background: linear-gradient(180deg, var(--color-surface) 0%, rgba(5, 150, 105, 0.02) 100%);
   position: relative;
-  box-shadow: var(--shadow-card), var(--shadow-primary-soft);
-}
-
-.plan-card.border-teal::before {
-  content: "EN POPÜLER";
-  position: absolute;
-  top: -13px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 4px 16px;
-  border-radius: var(--radius-full);
-  letter-spacing: 0.08em;
+  box-shadow: 
+    0 10px 30px -10px rgba(5, 150, 105, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.01);
 }
 
 .plan-card:hover {
