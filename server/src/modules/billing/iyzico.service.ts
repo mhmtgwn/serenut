@@ -23,10 +23,26 @@ export let IYZICO_API_KEY = process.env.IYZICO_API_KEY || '';
 export let IYZICO_SECRET = process.env.IYZICO_SECRET_KEY || '';
 export let IYZICO_BASE_URL = process.env.IYZICO_BASE_URL || 'https://sandbox-api.iyzipay.com';
 
+import { decryptSecret } from '../../crypto_helper';
+
 export async function loadIyzicoConfig(pool: any) {
   try {
-    const res = await pool.query("SELECT key, value FROM system_settings WHERE key IN ('iyzico_api_key', 'iyzico_secret_key', 'iyzico_base_url')");
-    res.rows.forEach((r: any) => {
+    // 1. Fetch from payment_providers
+    const res = await pool.query("SELECT config, secrets FROM payment_providers WHERE id = 'iyzico'");
+    if (res.rows.length > 0) {
+      const row = res.rows[0];
+      const config = typeof row.config === 'string' ? JSON.parse(row.config) : row.config || {};
+      const secrets = typeof row.secrets === 'string' ? JSON.parse(row.secrets) : row.secrets || {};
+
+      if (config.iyzico_base_url) IYZICO_BASE_URL = config.iyzico_base_url;
+      if (secrets.iyzico_api_key) IYZICO_API_KEY = decryptSecret(secrets.iyzico_api_key);
+      if (secrets.iyzico_secret_key) IYZICO_SECRET = decryptSecret(secrets.iyzico_secret_key);
+      return;
+    }
+
+    // 2. Fallback to system_settings for backward compatibility
+    const sysRes = await pool.query("SELECT key, value FROM system_settings WHERE key IN ('iyzico_api_key', 'iyzico_secret_key', 'iyzico_base_url')");
+    sysRes.rows.forEach((r: any) => {
       if (r.key === 'iyzico_api_key' && r.value) IYZICO_API_KEY = r.value;
       if (r.key === 'iyzico_secret_key' && r.value) IYZICO_SECRET = r.value;
       if (r.key === 'iyzico_base_url' && r.value) IYZICO_BASE_URL = r.value;
@@ -302,5 +318,31 @@ export class IyzicoService {
    */
   static isConfigured(): boolean {
     return Boolean(IYZICO_API_KEY && IYZICO_SECRET);
+  }
+
+  /**
+   * Test the connection to Iyzico by making a lightweight API call (Installment check).
+   */
+  static async testConnection(): Promise<{ success: boolean; message?: string }> {
+    try {
+      if (!this.isConfigured()) return { success: false, message: 'API anahtarları eksik.' };
+
+      // We use the installment check endpoint as a ping
+      const response = await iyzicoPost<any>('/payment/iyzipos/installment', {
+        locale: 'tr',
+        conversationId: 'test-connection',
+        binNumber: '411111',
+        price: '1.0'
+      });
+
+      if (response.status === 'success' || response.errorCode === '10051') {
+        // 10051 could be a bin not found error, but it proves auth was successful
+        return { success: true };
+      }
+
+      return { success: false, message: response.errorMessage || 'Bilinmeyen hata' };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
   }
 }

@@ -321,7 +321,8 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     }
 
     // Map user plan selection to database IDs (target plan for subscription)
-    let mappedPlanId = 'plan-free';
+    let mappedPlanId = plan_id || 'plan-free';
+    // Support legacy frontend keys just in case
     if (plan_id === 'starter') mappedPlanId = 'plan-basic';
     else if (plan_id === 'growth') mappedPlanId = 'plan-pro';
     else if (plan_id === 'pro') mappedPlanId = 'plan-enterprise';

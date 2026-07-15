@@ -59,6 +59,7 @@
         <div class="sidebar-item" data-tab="subscriptions">💳 Abonelikler</div>
         <div class="sidebar-item" data-tab="transfers">💸 Havale Onayları</div>
         <div class="sidebar-item" data-tab="payments">🧾 Ödemeler</div>
+        <div class="sidebar-item" data-tab="payment-methods">⚙️ Ödeme Yöntemleri</div>
         <div class="sidebar-item" data-tab="plans">📋 Planlar</div>
         <div class="sidebar-item" data-tab="licenses">🔑 Lisanslar</div>
         <div class="sidebar-item" data-tab="devices">💻 Cihazlar</div>
@@ -320,6 +321,19 @@
                   <!-- Loaded via payments.js -->
                 </tbody>
               </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab: Payment Methods (Added dynamically via js/payment_methods.js) -->
+        <section class="tab-panel" id="tab-payment-methods">
+          <div class="card">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-bold">Ödeme Sağlayıcılar & Bankalar</h3>
+              <button class="btn btn-primary btn-sm" onclick="alert('Bankalar Banka Yönetimi sekmesindedir.')">Yenile</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4" id="payment-methods-grid">
+              <!-- Providers loaded dynamically -->
             </div>
           </div>
         </section>

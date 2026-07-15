@@ -105,8 +105,14 @@ function showPortalApp() {
     document.getElementById('sidebar-company-name').innerText = profile.company_name || 'Şirketiniz';
   }
 
-  // Switch to default overview
-  switchTab('dashboard');
+  // Check if we have a pending checkout from plans page
+  const planId = sessionStorage.getItem('selected_plan_id');
+  if (planId) {
+    switchTab('subscription');
+  } else {
+    // Switch to default overview
+    switchTab('dashboard');
+  }
 }
 
 /**
@@ -293,8 +299,8 @@ async function handleRegister() {
     setAuthToken(data.access_token);
     setUserProfile(data.user);
     
-    // Clear dynamic select store selection
-    sessionStorage.removeItem('selected_plan_id');
+    // We do NOT clear selected_plan_id here anymore. 
+    // It will be cleared after successful checkout in the billing module.
 
     showPortalApp();
   } catch (err) {

@@ -89,3 +89,63 @@ export function signPayload(payload: string): string {
   signer.end();
   return signer.sign(privateKey, 'base64');
 }
+
+// ── SYMMETRIC ENCRYPTION (AES-256-GCM) ─────────────────────────────────────────
+
+// We derive a static 32-byte AES key from the RSA Private Key or an environment variable.
+let aesKey: Buffer;
+try {
+  // Try to use a dedicated APP_SECRET if available
+  if (process.env.APP_SECRET) {
+    aesKey = crypto.createHash('sha256').update(process.env.APP_SECRET).digest();
+  } else if (process.env.RSA_PRIVATE_KEY) {
+    // Fallback: derive AES key from the RSA private key string
+    aesKey = crypto.createHash('sha256').update(process.env.RSA_PRIVATE_KEY).digest();
+  } else {
+    // DO NOT USE A HARDCODED FALLBACK KEY IN PRODUCTION.
+    throw new Error('CRITICAL: No secure encryption key provided in environment. Refusing to start.');
+  }
+} catch (e) {
+  // Instead of silently falling back to a random byte which would cause data loss on restarts,
+  // we must halt the system if we cannot securely derive the key.
+  console.error('[FATAL] Failed to initialize AES encryption key.', e);
+  process.exit(1);
+}
+
+export function encryptSecret(text: string): string {
+  if (!text) return text;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, iv);
+  
+  let encrypted = cipher.update(text, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  const authTag = cipher.getAuthTag().toString('base64');
+  
+  // Format: iv:authTag:encrypted
+  return `${iv.toString('base64')}:${authTag}:${encrypted}`;
+}
+
+export function decryptSecret(encryptedData: string): string {
+  if (!encryptedData) return encryptedData;
+  if (!encryptedData.includes(':')) return encryptedData; // Not encrypted or old format
+  
+  try {
+    const parts = encryptedData.split(':');
+    if (parts.length !== 3) return encryptedData;
+    
+    const iv = Buffer.from(parts[0], 'base64');
+    const authTag = Buffer.from(parts[1], 'base64');
+    const encrypted = parts[2];
+    
+    const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
+    decipher.setAuthTag(authTag);
+    
+    let decrypted = decipher.update(encrypted, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (err) {
+    console.error('Failed to decrypt secret:', err);
+    return ''; // Return empty string on failure to prevent leaking malformed data
+  }
+}

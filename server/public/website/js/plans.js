@@ -161,7 +161,8 @@ function renderPlans() {
 
 // Attach to window scope for HTML onclick access
 window.selectPlan = function(planId) {
-  // Store selected plan ID in session or storage, then redirect to registration
+  // Store selected plan ID and billing period in session or storage, then redirect to registration
   sessionStorage.setItem('selected_plan_id', planId);
+  sessionStorage.setItem('selected_billing_period', billingCycle);
   window.location.href = `/portal/#register`;
 };

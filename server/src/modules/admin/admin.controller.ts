@@ -8,8 +8,10 @@ import { getNotificationQueue } from '../../workers/notification.worker';
 import { getBillingQueue } from '../../workers/billing.scheduler';
 import { enqueueNotification } from '../../workers/notification.worker';
 import { getActiveWebSocketCount } from '../analytics/analytics.ws';
-import { loadIyzicoConfig } from '../billing/iyzico.service';
+import { loadIyzicoConfig, IyzicoService } from '../billing/iyzico.service';
 import { logger } from '../../config/logger';
+import { CommercialLifecycleService } from '../billing/commercial_lifecycle.service';
+import { encryptSecret } from '../../crypto_helper';
 
 const router = Router();
 
@@ -996,64 +998,50 @@ router.post('/releases/distribute', async (req: AuthenticatedRequest, res: Respo
 
 // ── 15. BANK WIRE / TRANSFER MANUAL INVOICE APPROVER (Sprint 13) ──────────────
 router.post('/invoices/:id/approve', async (req: AuthenticatedRequest, res: Response) => {
+  const invRes = await runBypassingRLS('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
+  if (invRes.rows.length === 0) {
+    return res.status(404).json({ error: 'invoice_not_found' });
+  }
+  const invoice = invRes.rows[0];
+
+  // 1. Mark Invoice as Paid & Activate Subscription in a transaction
+  const client = await pgPool.connect();
   try {
-    const invRes = await runBypassingRLS('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
-    if (invRes.rows.length === 0) {
+    await client.query('BEGIN');
+    await CommercialLifecycleService.finalizeInvoicePayment(client, req.params.id, 'bank_transfer', req.user!.id);
+    await client.query('COMMIT');
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    if (err.message === 'invoice_not_found') {
       return res.status(404).json({ error: 'invoice_not_found' });
     }
-    const invoice = invRes.rows[0];
-    
-    if (invoice.status === 'paid') {
-      return res.status(400).json({ error: 'invoice_already_paid' });
-    }
-
-    // 1. Mark Invoice as Paid
-    await runBypassingRLS(`
-      UPDATE invoices 
-      SET status = 'paid', paid_at = NOW() 
-      WHERE id = $1
-    `, [req.params.id]);
-
-    // 2. Reactivate Subscription & matching licenses limits
-    if (invoice.subscription_id) {
-      const periodEnd = new Date();
-      periodEnd.setDate(periodEnd.getDate() + 30); // Extend 30 days
-
-      await runBypassingRLS(`
-        UPDATE subscriptions 
-        SET status = 'active', current_period_start = NOW(), current_period_end = $2
-        WHERE id = $1
-      `, [invoice.subscription_id, periodEnd]);
-
-      const subRes = await runBypassingRLS('SELECT plan_id FROM subscriptions WHERE id = $1', [invoice.subscription_id]);
-      if (subRes.rows.length > 0) {
-        const planId = subRes.rows[0].plan_id;
-        const allowedDevices = planId === 'plan-free' ? 1 : (planId === 'plan-basic' ? 1 : (planId === 'plan-pro' ? 3 : 99));
-        const tier = planId === 'plan-free' ? 'trial' : (planId === 'plan-enterprise' ? 'enterprise' : 'pro');
-
-        await runBypassingRLS(`
-          UPDATE licenses 
-          SET allowed_devices_count = $1, tier = $2, status = 'active', expires_at = $3
-          WHERE company_id = $4
-        `, [allowedDevices, tier, periodEnd, invoice.company_id]);
-      }
-    }
-
-    // 3. Write Admin Audit Log
-    await writeAdminAudit(req.user!.id, 'APPROVED_BANK_WIRE_PAYMENT', 'invoices', req.params.id, invoice, { ...invoice, status: 'paid' }, req.ip);
-
-    // 4. Send Notification (SMS/Mail Queue)
-    const notifId = `notif-${Date.now()}`;
-    await runBypassingRLS(`
-      INSERT INTO notification_queue (id, company_id, channel, recipient, body, status)
-      VALUES ($1, $2, 'sms', '05440000000', 'Sayın Müşterimiz, Havale/EFT ödemeniz onaylanmış ve lisansınız aktif edilmiştir.', 'queued')
-    `, [notifId, invoice.company_id]);
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Invoice manual approval failed:', err);
-    return res.status(500).json({ error: 'server_error' });
+    throw err;
+  } finally {
+    client.release();
   }
+
+  // Refresh invoice for audit log
+  const updatedInvRes = await runBypassingRLS('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
+  const updatedInvoice = updatedInvRes.rows[0];
+
+  // 2. Write Admin Audit Log
+  await writeAdminAudit(req.user!.id, 'APPROVED_BANK_WIRE_PAYMENT', 'invoices', req.params.id, invoice, updatedInvoice, req.ip);
+
+  // 3. Send Notification (SMS/Mail Queue)
+  const notifId = `notif-${Date.now()}`;
+  await runBypassingRLS(`
+    INSERT INTO notification_queue (id, company_id, channel, recipient, body, status)
+    VALUES ($1, $2, 'sms', '05440000000', 'Sayın Müşterimiz, Havale/EFT ödemeniz onaylanmış ve lisansınız aktif edilmiştir.', 'queued')
+  `, [notifId, invoice.company_id]);
+
+  // 4. Resolve Bank Transfer Notification status
+  await runBypassingRLS(`
+    UPDATE bank_transfer_notifications
+    SET status = 'approved', updated_at = NOW()
+    WHERE invoice_id = $1
+  `, [req.params.id]);
+
+  return res.json({ success: true });
 });
 
 // ── 16. GELİR ZEKASI (Commercial Intelligence) ──────────────────────────────
@@ -2364,6 +2352,115 @@ router.put('/settings', async (req: AuthenticatedRequest, res: Response) => {
     return res.json({ success: true, message: 'Sistem ayarları başarıyla güncellendi.' });
   } catch (err) {
     console.error('Failed to save system settings:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// ── 30. PAYMENT PROVIDERS MANAGEMENT ──────────────────────────────────────────
+
+router.get('/payment-methods', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await runBypassingRLS('SELECT * FROM payment_providers ORDER BY id ASC');
+    // Mask secrets
+    const masked = result.rows.map(row => {
+      const secrets = typeof row.secrets === 'string' ? JSON.parse(row.secrets) : (row.secrets || {});
+      const maskedSecrets: Record<string, string> = {};
+      for (const key of Object.keys(secrets)) {
+        maskedSecrets[key] = '********';
+      }
+      return { ...row, secrets: maskedSecrets };
+    });
+    return res.json(masked);
+  } catch (err: any) {
+    if (err.code === '42P01') return res.json([]);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.put('/payment-methods/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const { is_enabled, config, secrets } = req.body;
+  try {
+    const currentRes = await runBypassingRLS('SELECT * FROM payment_providers WHERE id = $1', [req.params.id]);
+    if (currentRes.rows.length === 0) return res.status(404).json({ error: 'not_found' });
+    
+    const current = currentRes.rows[0];
+    const currentSecrets = typeof current.secrets === 'string' ? JSON.parse(current.secrets) : (current.secrets || {});
+
+    // Encrypt new secrets
+    const newSecrets = { ...currentSecrets };
+    if (secrets) {
+      for (const [k, v] of Object.entries(secrets)) {
+        if (v && v !== '********') { // Only update if value changed and not masked
+          newSecrets[k] = encryptSecret(v as string);
+        }
+      }
+    }
+
+    // First, save the new config/secrets, but forcefully keep is_enabled = false if they requested it to be true
+    // so we can test it safely.
+    const requestedEnabled = is_enabled === true;
+    let finalEnabled = current.is_enabled;
+    if (!requestedEnabled) finalEnabled = false; // They want to disable it, allowed.
+
+    await runBypassingRLS(`
+      UPDATE payment_providers 
+      SET config = $1, secrets = $2, is_configured = true, updated_at = NOW()
+      WHERE id = $3
+    `, [JSON.stringify(config || {}), JSON.stringify(newSecrets), req.params.id]);
+
+    if (requestedEnabled && req.params.id === 'iyzico') {
+      // Force reload config into memory to test
+      await loadIyzicoConfig(pgPool);
+      const testResult = await IyzicoService.testConnection();
+      
+      await runBypassingRLS(`
+        UPDATE payment_providers SET last_test_at = NOW(), last_error = $1 WHERE id = $2
+      `, [testResult.success ? null : testResult.message, req.params.id]);
+
+      if (testResult.success) {
+        finalEnabled = true;
+      } else {
+        return res.status(400).json({ 
+          error: 'verification_failed', 
+          message: 'Sağlayıcı test edilemedi. Bilgiler kaydedildi ancak aktif edilemedi: ' + testResult.message 
+        });
+      }
+    } else if (requestedEnabled && req.params.id !== 'iyzico') {
+      finalEnabled = true;
+    }
+
+    const result = await runBypassingRLS(`
+      UPDATE payment_providers SET is_enabled = $1 WHERE id = $2 RETURNING *
+    `, [finalEnabled, req.params.id]);
+
+    await writeAdminAudit(req.user!.id, 'UPDATE_PAYMENT_PROVIDER', 'payment_providers', req.params.id, null, { is_enabled: finalEnabled }, req.ip);
+
+    return res.json(result.rows[0]);
+  } catch (err) {
+    logger.error('Failed to update payment provider:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.post('/payment-methods/:id/test', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.params.id === 'iyzico') {
+      await loadIyzicoConfig(pgPool);
+      const testResult = await IyzicoService.testConnection();
+      await runBypassingRLS(`
+        UPDATE payment_providers SET last_test_at = NOW(), last_error = $1 WHERE id = $2
+      `, [testResult.success ? null : testResult.message, req.params.id]);
+      
+      if (!testResult.success) {
+        // If test fails, forcibly disable it
+        await runBypassingRLS('UPDATE payment_providers SET is_enabled = false WHERE id = $1', [req.params.id]);
+      }
+      return res.json(testResult);
+    } else {
+      await runBypassingRLS('UPDATE payment_providers SET last_test_at = NOW(), last_error = null WHERE id = $1', [req.params.id]);
+      return res.json({ success: true, message: 'Test applied manually.' });
+    }
+  } catch (err) {
     return res.status(500).json({ error: 'server_error' });
   }
 });

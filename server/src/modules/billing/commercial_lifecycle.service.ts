@@ -22,6 +22,8 @@ export interface ActivationParams {
   adminUserId?: string;
   /** If provided, extend from this date instead of NOW() */
   periodStart?: Date;
+  /** 'monthly' or 'yearly' */
+  billingPeriod?: string;
 }
 
 export class CommercialLifecycleService {
@@ -47,7 +49,11 @@ export class CommercialLifecycleService {
 
     const now = params.periodStart ?? new Date();
     const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    if (params.billingPeriod === 'yearly') {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
 
     // 2. Upsert subscription (ON CONFLICT on company_id)
     const subId = `sub-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
@@ -184,5 +190,66 @@ export class CommercialLifecycleService {
     logger.info(`[CommercialLifecycle] Company ${companyId} activated plan ${planId} via ${grantType}. Entitlement: ${entId}`);
 
     return { subscriptionId: resolvedSubId, entitlementId: entId };
+  }
+  static async finalizeInvoicePayment(
+    client: PoolClient,
+    invoiceId: string,
+    grantType: 'card' | 'bank_transfer' | 'admin_grant',
+    adminUserId?: string
+  ): Promise<void> {
+    // 1. Lock invoice
+    const invRes = await client.query('SELECT * FROM invoices WHERE id = $1 FOR UPDATE', [invoiceId]);
+    if (invRes.rows.length === 0) {
+      throw new Error('invoice_not_found');
+    }
+    const invoice = invRes.rows[0];
+
+    // Idempotency check
+    if (invoice.status === 'paid') {
+      logger.info(`[CommercialLifecycle] Invoice ${invoiceId} is already paid. Skipping finalization.`);
+      return;
+    }
+
+    // 2. Mark invoice as paid
+    await client.query(`
+      UPDATE invoices 
+      SET status = 'paid', paid_at = NOW() 
+      WHERE id = $1
+    `, [invoiceId]);
+
+    // 3. Resolve planId and billing_period from billing_details
+    let planId = 'plan-free';
+    let billingPeriod = 'monthly';
+    if (invoice.billing_details) {
+      const details = typeof invoice.billing_details === 'string' ? JSON.parse(invoice.billing_details) : invoice.billing_details;
+      planId = details.planId || planId;
+      billingPeriod = details.billingPeriod || billingPeriod;
+    } else if (invoice.subscription_id) {
+      const subRes = await client.query('SELECT plan_id FROM subscriptions WHERE id = $1', [invoice.subscription_id]);
+      if (subRes.rows.length > 0) planId = subRes.rows[0].plan_id;
+    }
+
+    const now = new Date();
+    if (billingPeriod === 'yearly') {
+      // It sets periodEnd = NOW + 1 month by default in activatePaidSubscription.
+      // Wait, activatePaidSubscription currently hardcodes periodEnd to +1 month:
+      // periodEnd.setMonth(periodEnd.getMonth() + 1);
+      // Let's pass billingPeriod to activatePaidSubscription if we modify it, but let's just do it directly.
+    }
+
+    // Call activatePaidSubscription
+    const { subscriptionId } = await this.activatePaidSubscription(client, {
+      companyId: invoice.company_id,
+      planId,
+      paymentId: invoice.id,
+      grantType,
+      adminUserId,
+      billingPeriod
+    });
+
+    // 4. Update invoice subscription_id if it was null
+    if (!invoice.subscription_id) {
+      await client.query('UPDATE invoices SET subscription_id = $1 WHERE id = $2', [subscriptionId, invoiceId]);
+    }
   }
 }

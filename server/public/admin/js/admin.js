@@ -29,6 +29,7 @@ import {
   submitBanIp
 } from './system-health.js';
 import { loadSettings, submitSaveSystemConfig, submitSavePassword } from './settings.js';
+import { initPaymentMethods } from './payment_methods.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   startClock();
@@ -123,6 +124,7 @@ function switchTab(tabId) {
     subscriptions: 'Ticari Abonelik Zekası & MRR',
     transfers: 'Bekleyen Banka Havale Onayları',
     payments: 'Cari Borç & Fatura Takip Listesi',
+    'payment-methods': 'Ödeme Yöntemleri ve Bankalar',
     plans: 'Lisans Abonelik Paket Ayarları',
     licenses: 'Aktif SaaS Lisans Anahtarları',
     devices: 'POS Terminalleri Donanım Kontrolü',
@@ -162,6 +164,9 @@ function loadTabData(tabId) {
       break;
     case 'payments':
       loadPaymentsLog();
+      break;
+    case 'payment-methods':
+      initPaymentMethods();
       break;
     case 'plans':
       loadPlans();

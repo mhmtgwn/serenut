@@ -134,6 +134,77 @@ export async function loadPlansList() {
  * Opens bank transfer modal and loads available accounts targets
  */
 export async function initiatePlanPurchase(planId) {
+  try {
+    const methods = await apiFetch('/billing/payment-methods');
+    if (!methods || methods.length === 0) {
+      showToast('Aktif ödeme yöntemi bulunmamaktadır.', 'error');
+      return;
+    }
+
+    if (methods.length === 1 && methods[0].id === 'bank_transfer') {
+      // Only bank transfer available, skip selection modal
+      openBankTransferModal(planId);
+      return;
+    }
+
+    // Show selection modal
+    const modal = document.getElementById('modal-payment-method');
+    const container = document.getElementById('payment-methods-container');
+    
+    // Bind close
+    document.getElementById('btn-payment-method-cancel').onclick = () => {
+      modal.classList.remove('active');
+    };
+
+    container.innerHTML = '';
+    methods.forEach(m => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-secondary w-full';
+      btn.style.padding = '15px';
+      btn.style.textAlign = 'left';
+      btn.innerText = m.display_name;
+      btn.onclick = () => {
+        modal.classList.remove('active');
+        if (m.id === 'bank_transfer') {
+          openBankTransferModal(planId);
+        } else if (m.id === 'iyzico') {
+          initiateIyzicoCheckout(planId);
+        }
+      };
+      container.appendChild(btn);
+    });
+
+    modal.classList.add('active');
+
+  } catch (err) {
+    console.error('Failed to fetch payment methods', err);
+    showToast('Ödeme yöntemleri yüklenemedi.', 'error');
+  }
+}
+
+async function initiateIyzicoCheckout(planId) {
+  const billingPeriod = sessionStorage.getItem('selected_billing_period') || 'monthly';
+  try {
+    // 1. Backend'den Iyzico HTML checkout formu iste (bunu da ekleyeceğiz veya frontend'de iyzico'ya yonlendiricez)
+    const res = await apiFetch('/billing/checkout', {
+      method: 'POST',
+      body: { plan_id: planId, billing_period: billingPeriod, payment_method: 'iyzico' }
+    });
+    
+    if (res.checkoutContent) {
+      // Create a temporary div to render Iyzico script
+      const div = document.createElement('div');
+      div.innerHTML = res.checkoutContent + '<div id="iyzipay-checkout-form" class="responsive"></div>';
+      document.body.appendChild(div);
+    } else {
+      showToast('Iyzico başlatılamadı.', 'error');
+    }
+  } catch (err) {
+    showToast('Ödeme sistemi hatası', 'error');
+  }
+}
+
+async function openBankTransferModal(planId) {
   const modal = document.getElementById('modal-bank-transfer');
   if (!modal) return;
 
@@ -214,9 +285,10 @@ export async function submitBankTransferNotification() {
 
   try {
     // Step 1: Create request bank transfer invoice
+    const billingPeriod = sessionStorage.getItem('selected_billing_period') || 'monthly';
     const reqData = await apiFetch('/billing/request-bank-transfer', {
       method: 'POST',
-      body: { plan_id: planId, bank_account_id: bankAccountId }
+      body: { plan_id: planId, bank_account_id: bankAccountId, billing_period: billingPeriod }
     });
 
     // Step 2: Notify bank transfer reference to review
@@ -232,6 +304,10 @@ export async function submitBankTransferNotification() {
 
     // Close checkout modal
     document.getElementById('modal-bank-transfer').classList.remove('active');
+
+    // Clear session variables after successful request
+    sessionStorage.removeItem('selected_plan_id');
+    sessionStorage.removeItem('selected_billing_period');
 
     // Show approval result modal
     document.getElementById('success-reference-code').innerText = reqData.reference_code;
