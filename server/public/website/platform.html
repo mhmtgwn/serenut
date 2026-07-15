@@ -51,94 +51,110 @@
   <main>
     <section class="section-padding">
       <div class="container">
-        <div class="grid grid-cols-responsive gap-8">
+        <div class="bento-grid">
 
-          <!-- 1. POS -->
-          <article class="card border-teal reveal">
-            <div class="trust-icon mb-2">
-              <i data-lucide="receipt" style="width:24px;height:24px;"></i>
+          <!-- POS (span-2) -->
+          <article class="bento-card span-2 reveal">
+            <div>
+              <div class="bento-icon">
+                <i data-lucide="receipt" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Hızlı POS Satış Yönetimi</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Yoğun saatlerde kasadaki donmalar ve yavaş faturalandırma kuyruklara neden olur.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> SQLite üzerinde çalışan, dokunmatik ekran uyumlu, anlık barkod tarama destekleyen hızlı satış arayüzü.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">1. Hızlı POS Satış Yönetimi</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Yoğun saatlerde kasadaki donmalar ve yavaş faturalandırma kuyruklara neden olur.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> SQLite üzerinde çalışan, dokunmatik ekran uyumlu, anlık barkod tarama destekleyen hızlı satış arayüzü.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Sıfır işlem bekleme süresiyle müşterileri hızlıca uğurlayın, satış kaybını önleyin.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">Sıfır işlem bekleme süresiyle müşterileri hızlıca uğurlayın, satış kaybını önleyin.</p>
           </article>
 
-          <!-- 2. STOCK -->
-          <article class="card border-purple reveal">
-            <div class="trust-icon text-info mb-2">
-              <i data-lucide="package" style="width:24px;height:24px;"></i>
+          <!-- STOCK (span-1) -->
+          <article class="bento-card reveal">
+            <div>
+              <div class="bento-icon blue">
+                <i data-lucide="package" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Akıllı Envanter</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Eksilen ürünlerin fark edilmemesi nedeniyle sipariş kayıpları yaşanır.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Kritik stok eşikleri tanımlama, otomatik sayım ve şubeler arası anlık stok takibi.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">2. Akıllı Stok & Envanter</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Eksilen ürünlerin fark edilmemesi nedeniyle sipariş kayıpları yaşanır.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Kritik stok eşikleri tanımlama, otomatik sayım mutabakatı ve şubeler arası anlık stok transfer takibi.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Rafların boş kalmasını engelleyin, siparişleri her zaman vaktinde teslim edin.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Rafların boş kalmasını engelleyin, siparişleri her zaman vaktinde teslim edin.</p>
           </article>
 
-          <!-- 3. ORDERS -->
-          <article class="card border-amber reveal">
-            <div class="trust-icon text-amber mb-2">
-              <i data-lucide="clipboard-list" style="width:24px;height:24px;"></i>
+          <!-- ORDERS (span-1) -->
+          <article class="bento-card reveal">
+            <div>
+              <div class="bento-icon amber">
+                <i data-lucide="clipboard-list" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Adisyon Akışı</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Mutfak ile kasa arasındaki iletişim kopukluğu hatalı siparişlere yol açar.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Mutfak ekranı (KDS) entegrasyonu, masa adisyon taşıma/bölme ve kurye takibi.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">3. Adisyon & Sipariş Akışı</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Mutfak ile kasa arasındaki iletişim kopukluğu hatalı siparişlere yol açar.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Mutfak ekranı (KDS) entegrasyonu, masa adisyon taşıma/bölme ve kurye takip otomasyonu.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Hatalı sipariş iadelerini sıfıra indirin, mutfak verimliliğini %40 artırın.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-accent);">Hatalı sipariş iadelerini sıfıra indirin, mutfak verimliliğini %40 artırın.</p>
           </article>
 
-          <!-- 4. CUSTOMERS -->
-          <article class="card border-red reveal">
-            <div class="trust-icon text-danger mb-2">
-              <i data-lucide="users" style="width:24px;height:24px;"></i>
+          <!-- CUSTOMERS (span-2) -->
+          <article class="bento-card span-2 reveal">
+            <div>
+              <div class="bento-icon red">
+                <i data-lucide="users" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Müşteri İlişkileri & Sadakat</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Tek seferlik gelen müşterileri sadık ziyaretçilere dönüştürme yöntemi eksiktir.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Müşteri kartı profilleri, anlık puan kazanım/harcama motoru ve özel indirim kampanyaları.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">4. Müşteri İlişkileri & Sadakat</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Tek seferlik gelen müşterileri sadık ziyaretçilere dönüştürme yöntemi eksiktir.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Müşteri kartı profilleri, anlık puan kazanım/harcama motoru ve özel indirim kampanyaları.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Sadakat kampanyalarıyla müşteri geri dönüş oranlarını %25 oranında yükseltin.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-error);">Sadakat kampanyalarıyla müşteri geri dönüş oranlarını %25 oranında yükseltin.</p>
           </article>
 
-          <!-- 5. FINANCE -->
-          <article class="card border-teal reveal">
-            <div class="trust-icon mb-2">
-              <i data-lucide="wallet" style="width:24px;height:24px;"></i>
+          <!-- FINANCE (span-1) -->
+          <article class="bento-card reveal">
+            <div>
+              <div class="bento-icon">
+                <i data-lucide="wallet" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Nakit Akışı</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Gün sonu kasa sayımlarındaki açıklar takibi zorlaştırır.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Kasiyer bazlı oturum açma, nakit/kart ayrımı ve otomatik Z Raporu bildirimleri.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">5. Nakit Akışı & Kasa Mutabakatı</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Gün sonu kasa sayımlarındaki kuruşluk açıklar ve kayıp takibi zorlaştırır.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Kasiyer bazlı oturum açma, nakit/kredi kartı ayrımı ve otomatik gün sonu (Z Raporu) e-posta bildirimleri.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Gelir kaçaklarını önleyin, kasa mutabakatlarını saniyeler içinde hatasız tamamlayın.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">Gelir kaçaklarını önleyin, kasa mutabakatlarını saniyeler içinde hatasız tamamlayın.</p>
           </article>
 
-          <!-- 6. REPORTING -->
-          <article class="card border-purple reveal">
-            <div class="trust-icon text-info mb-2">
-              <i data-lucide="bar-chart-3" style="width:24px;height:24px;"></i>
+          <!-- REPORTING (span-2) -->
+          <article class="bento-card span-2 reveal">
+            <div>
+              <div class="bento-icon blue">
+                <i data-lucide="bar-chart-3" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Raporlama & Kar/Zarar Zekası</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Kar marjlarını görebilmek için Excel tablolarıyla saatlerce uğraşmak gerekir.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> En çok satan ürün grupları, saatlik ciro yoğunluk grafikleri ve anlık kar/zarar maliyet analizleri.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">6. Raporlama & Kar/Zarar Zekası</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Kar marjlarını görebilmek için Excel tablolarıyla saatlerce uğraşmak gerekir.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> En çok satan ürün grupları, saatlik ciro yoğunluk grafikleri ve anlık kar/zarar maliyet analizleri.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Doğru verilere dayanarak büyüme kararları alın, maliyetleri kontrol altında tutun.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Doğru verilere dayanarak büyüme kararları alın, maliyetleri kontrol altında tutun.</p>
           </article>
 
-          <!-- 7. OFFLINE -->
-          <article class="card border-amber reveal">
-            <div class="trust-icon text-amber mb-2">
-              <i data-lucide="wifi-off" style="width:24px;height:24px;"></i>
+          <!-- OFFLINE (span-2) -->
+          <article class="bento-card span-2 reveal">
+            <div>
+              <div class="bento-icon amber">
+                <i data-lucide="wifi-off" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>İnternetsiz (Offline) Çalışma</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> İnternet altyapı arızalarında kasaların kilitlenmesi ticari faaliyeti durdurur.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Cihazda yerel SQLite veritabanı kullanımı sayesinde ağ bağlantısı kopsa dahi tam sürat satış imkanı.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">7. İnternetsiz (Offline) Çalışma</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> İnternet altyapı arızalarında kasaların kilitlenmesi ticari faaliyeti durdurur.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Cihazda yerel SQLite veritabanı kullanımı sayesinde ağ bağlantısı kopsa dahi tam sürat satış imkanı.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Altyapı çökmelerinden etkilenmeden satış yapmaya devam edin, ciro kaybı yaşamayın.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-accent);">Altyapı çökmelerinden etkilenmeden satış yapmaya devam edin, ciro kaybı yaşamayın.</p>
           </article>
 
-          <!-- 8. CLOUD SYNC -->
-          <article class="card border-red reveal">
-            <div class="trust-icon text-danger mb-2">
-              <i data-lucide="refresh-cw" style="width:24px;height:24px;"></i>
+          <!-- CLOUD SYNC (span-1) -->
+          <article class="bento-card reveal">
+            <div>
+              <div class="bento-icon red">
+                <i data-lucide="refresh-cw" style="width:24px;height:24px;"></i>
+              </div>
+              <h3>Delta Bulut Eşitlemesi</h3>
+              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Çevrimdışı verilerin elle yüklenmesi çakışmalara neden olur.</p>
+              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Bağlantı kurulduğu an yerel işlemlerin otomatik buluta aktarılmasını sağlayan Delta Sync.</p>
             </div>
-            <h3 class="font-bold mt-2 mb-2">8. Delta Bulut Eşitlemesi</h3>
-            <p class="text-sm" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Çevrimdışı verilerin elle yüklenmesi zahmetlidir ve veri çakışmalarına neden olur.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Bağlantı kurulduğu an kuyruktaki yerel işlemlerin otomatik olarak buluta aktarılmasını sağlayan Delta Sync motoru.</p>
-            <p class="text-sm mt-2" style="color:var(--color-text);"><strong>Kullanıcı Faydası:</strong> Yedekleme derdini unutun; tüm terminallerinizdeki veriler otomatik olarak senkronize kalsın.</p>
+            <p class="text-sm mt-4 font-bold" style="color:var(--color-error);">Yedekleme derdini unutun; verileriniz otomatik olarak senkronize kalsın.</p>
           </article>
 
         </div>

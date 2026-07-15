@@ -76,34 +76,94 @@ body .form-label {
 /* Website card overrides - Highly Premium Modern Cards */
 body .card, body .glass-panel {
   background: var(--color-surface);
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  outline: 1px solid rgba(255, 255, 255, 0.7);
-  outline-offset: -2px;
-  border-radius: var(--radius-md);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  border-radius: var(--radius-lg);
   padding: var(--space-8);
   box-shadow: 
-    0 1px 3px 0 rgba(0, 0, 0, 0.05),
-    0 10px 15px -3px rgba(0, 0, 0, 0.02),
-    0 4px 6px -4px rgba(0, 0, 0, 0.02);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    0 1px 3px rgba(0, 0, 0, 0.01),
+    0 10px 20px -5px rgba(0, 0, 0, 0.01);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
 }
 
 body .card:hover, body .glass-panel:hover {
-  transform: translateY(-5px);
-  border-color: rgba(5, 150, 105, 0.25);
+  transform: translateY(-4px);
+  border-color: rgba(5, 150, 105, 0.15);
   box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.04),
-    0 10px 10px -5px rgba(0, 0, 0, 0.02),
+    0 30px 60px -15px rgba(0, 0, 0, 0.06),
     0 0 0 1px rgba(5, 150, 105, 0.05);
 }
 
-/* Premium Top Border accents instead of thick left borders */
-body .card.border-teal { border-top: 4px solid var(--color-primary); border-left: none; }
-body .card.border-purple { border-top: 4px solid var(--color-secondary); border-left: none; }
-body .card.border-amber { border-top: 4px solid var(--color-accent); border-left: none; }
-body .card.border-red { border-top: 4px solid var(--color-error); border-left: none; }
+/* Bento Grid Layout */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+.bento-card {
+  background: var(--color-surface);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.01),
+    0 10px 20px -5px rgba(0, 0, 0, 0.01);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bento-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(5, 150, 105, 0.15);
+  box-shadow: 
+    0 30px 60px -15px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(5, 150, 105, 0.05);
+}
+
+.bento-card.span-2 {
+  grid-column: span 2;
+}
+
+.bento-card.span-3 {
+  grid-column: span 3;
+}
+
+.bento-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--color-primary-border);
+}
+
+.bento-icon.blue {
+  background: var(--color-secondary-light);
+  color: var(--color-secondary);
+  border-color: rgba(30, 64, 175, 0.15);
+}
+
+.bento-icon.amber {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  border-color: rgba(217, 119, 6, 0.15);
+}
+
+.bento-icon.red {
+  background: #fef2f2;
+  color: var(--color-error);
+  border-color: rgba(220, 38, 38, 0.15);
+}
 
 /* Website badge overrides */
 body .badge-trial, body .badge-info, body .badge-pro {
