@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Serenut OS Paketleri & Fiyatlandırma</title>
   <meta name="description" content="İşletmenizin büyüklüğüne en uygun Serenut POS planını seçin. Aylık veya indirimli yıllık faturalama seçenekleri." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="css/website.css" />
 </head>
 <body>
+
+  <div class="mobile-overlay" id="mobile-overlay"></div>
 
   <!-- HEADER -->
   <header class="nav-landing nav-scrolled" id="main-header">
@@ -21,16 +24,16 @@
         <span>Serenut OS</span>
       </a>
       <nav class="nav-links" id="nav-links">
-        <a href="platform.html" class="nav-link">Platform</a>
-        <a href="plans.html" class="nav-link active">Planlar</a>
+        <a href="platform.html" class="nav-link">Özellikler</a>
+        <a href="plans.html" class="nav-link active">Fiyatlandırma</a>
         <a href="downloads.html" class="nav-link">İndir</a>
         <a href="contact.html" class="nav-link">İletişim</a>
       </nav>
       <div class="nav-auth" id="nav-auth">
         <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
+        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
         <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <i data-lucide="menu" style="width:22px;height:22px;"></i>
         </button>
       </div>
     </div>
@@ -66,16 +69,18 @@
     </div>
 
     <!-- FAQ Context footer -->
-    <section class="mt-12 p-8 glass-panel text-center" style="max-width: 800px; margin-inline: auto;">
-      <h3 class="font-semibold mb-2">Sıkça Sorulan Sorular</h3>
-      <div class="text-left mt-4 grid grid-cols-2 gap-6">
-        <div>
-          <h4 class="font-medium text-light">Abonelik iptali nasıl yapılır?</h4>
-          <p class="text-muted text-sm mt-1">İstediğiniz zaman Müşteri Portalından tek tıkla iptal edebilirsiniz. Herhangi bir taahhüt bulunmaz.</p>
-        </div>
-        <div>
-          <h4 class="font-medium text-light">Donanım kısıtlaması var mı?</h4>
-          <p class="text-muted text-sm mt-1">Hayır, Serenut OS tüm standart dokunmatik bilgisayarlar, barkod okuyucular ve termal yazıcılarla uyumludur.</p>
+    <section class="mt-12 reveal" style="max-width: 800px; margin-inline: auto;">
+      <div class="card" style="padding: var(--space-8);">
+        <h3 class="font-semibold mb-4" style="color: var(--color-text); text-align:center;">Sıkça Sorulan Sorular</h3>
+        <div class="mt-4" style="display:grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+          <div>
+            <h4 class="font-medium" style="color: var(--color-text);">Abonelik iptali nasıl yapılır?</h4>
+            <p class="text-sm mt-1" style="color: var(--color-text-secondary);">İstediğiniz zaman Müşteri Portalından tek tıkla iptal edebilirsiniz. Herhangi bir taahhüt bulunmaz.</p>
+          </div>
+          <div>
+            <h4 class="font-medium" style="color: var(--color-text);">Donanım kısıtlaması var mı?</h4>
+            <p class="text-sm mt-1" style="color: var(--color-text-secondary);">Hayır, Serenut OS tüm standart dokunmatik bilgisayarlar, barkod okuyucular ve termal yazıcılarla uyumludur.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -93,7 +98,7 @@
             </svg>
             <span>Serenut OS</span>
           </a>
-          <p class="text-muted text-sm mt-2">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
         </div>
         <div class="footer-links-col">
           <h4>Platform</h4>

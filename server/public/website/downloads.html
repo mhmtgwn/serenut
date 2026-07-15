@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Yükleme & İndirme Merkezi — Serenut OS</title>
   <meta name="description" content="Android APK ve Windows Desktop terminal uygulamalarımızın en son stabil sürümlerini indirin." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="css/website.css" />
 </head>
 <body>
+
+  <div class="mobile-overlay" id="mobile-overlay"></div>
 
   <!-- HEADER -->
   <header class="nav-landing nav-scrolled" id="main-header">
@@ -21,16 +24,16 @@
         <span>Serenut OS</span>
       </a>
       <nav class="nav-links" id="nav-links">
-        <a href="platform.html" class="nav-link">Platform</a>
-        <a href="plans.html" class="nav-link">Planlar</a>
+        <a href="platform.html" class="nav-link">Özellikler</a>
+        <a href="plans.html" class="nav-link">Fiyatlandırma</a>
         <a href="downloads.html" class="nav-link active">İndir</a>
         <a href="contact.html" class="nav-link">İletişim</a>
       </nav>
       <div class="nav-auth" id="nav-auth">
         <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
+        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
         <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <i data-lucide="menu" style="width:22px;height:22px;"></i>
         </button>
       </div>
     </div>
@@ -54,25 +57,25 @@
     </div>
 
     <!-- Requirements checklist -->
-    <section class="mt-12 grid grid-cols-2 gap-6">
-      <div class="card">
-        <h4 class="font-bold text-light mb-3" style="display:flex; align-items:center; gap: 8px;">
-          <svg class="icon text-primary" viewBox="0 0 24 24" width="20" height="20" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+    <section class="mt-12" style="display:grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-6);">
+      <div class="card reveal">
+        <h4 class="font-bold mb-3" style="display:flex; align-items:center; gap: 8px; color: var(--color-text);">
+          <i data-lucide="monitor" style="width:20px;height:20px;color:var(--color-primary);"></i>
           Windows Sistem Gereksinimleri
         </h4>
-        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--neutral-300);">
+        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--color-text-secondary);">
           <li>• Windows 10 veya Windows 11 (64-bit)</li>
           <li>• Minimum 4 GB RAM bellek (8 GB önerilir)</li>
           <li>• 1.6 GHz çift çekirdekli veya daha hızlı işlemci</li>
           <li>• ESC/POS uyumlu 58mm / 80mm Termal fiş yazıcısı sürücüsü</li>
         </ul>
       </div>
-      <div class="card">
-        <h4 class="font-bold text-light mb-3" style="display:flex; align-items:center; gap: 8px;">
-          <svg class="icon text-info" viewBox="0 0 24 24" width="20" height="20" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+      <div class="card reveal">
+        <h4 class="font-bold mb-3" style="display:flex; align-items:center; gap: 8px; color: var(--color-text);">
+          <i data-lucide="smartphone" style="width:20px;height:20px;color:var(--color-secondary);"></i>
           Android El Terminali Gereksinimleri
         </h4>
-        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--neutral-300);">
+        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--color-text-secondary);">
           <li>• Android 7.0 (Nougat) veya üzeri işletim sistemi</li>
           <li>• Minimum 2 GB RAM (Dahili termal yazıcılı Sunmi, Urovo el terminalleri desteklenir)</li>
           <li>• Bluetooth 4.0 / USB bağlantı destekli taşınabilir yazıcılar</li>
@@ -93,7 +96,7 @@
             </svg>
             <span>Serenut OS</span>
           </a>
-          <p class="text-muted text-sm mt-2">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
         </div>
         <div class="footer-links-col">
           <h4>Platform</h4>

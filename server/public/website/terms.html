@@ -4,12 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kullanım Şartları — Serenut OS</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="css/website.css" />
 </head>
 <body>
 
-  <!-- HEADER -->
+  <div class="mobile-overlay" id="mobile-overlay"></div>
+
   <header class="nav-landing nav-scrolled" id="main-header">
     <div class="nav-container">
       <a href="index.html" class="brand">
@@ -20,36 +22,36 @@
         <span>Serenut OS</span>
       </a>
       <nav class="nav-links" id="nav-links">
-        <a href="platform.html" class="nav-link">Platform</a>
-        <a href="plans.html" class="nav-link">Planlar</a>
+        <a href="platform.html" class="nav-link">Özellikler</a>
+        <a href="plans.html" class="nav-link">Fiyatlandırma</a>
         <a href="downloads.html" class="nav-link">İndir</a>
         <a href="contact.html" class="nav-link">İletişim</a>
       </nav>
       <div class="nav-auth" id="nav-auth">
         <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
+        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
         <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <i data-lucide="menu" style="width:22px;height:22px;"></i>
         </button>
       </div>
     </div>
   </header>
 
   <main class="container mb-12" style="margin-top: calc(var(--header-h) + var(--space-8)); max-width: 800px;">
-    <div class="card p-8">
-      <h1 class="font-bold text-light mb-4" style="font-size:2rem;">Kullanım Şartları</h1>
-      <p class="text-sm text-muted mb-4">Serenut OS Hizmet Koşulları Sözleşmesi</p>
-      
-      <div style="display:flex; flex-direction:column; gap: var(--space-4); color: var(--neutral-300); font-size:0.92rem;">
+    <div class="card" style="padding: var(--space-8);">
+      <h1 class="font-bold mb-4" style="font-size:2rem; color: var(--color-text);">Kullanım Şartları</h1>
+      <p class="text-sm mb-4" style="color: var(--color-text-muted);">Serenut OS Hizmet Koşulları Sözleşmesi</p>
+
+      <div style="display:flex; flex-direction:column; gap: var(--space-4); color: var(--color-text-secondary); font-size:0.92rem;">
         <p>Serenut OS bulut POS otomasyon hizmetlerini kullanmaya başlayarak bu sözleşmede yer alan tüm kullanım koşullarını kabul etmiş bulunuyorsunuz.</p>
-        
-        <h3 class="font-semibold text-light mt-4">1. Hizmetin Tanımı</h3>
+
+        <h3 class="font-semibold mt-4" style="color: var(--color-text);">1. Hizmetin Tanımı</h3>
         <p>Serenut OS, işletmeler için tasarlanmış hibrit (çevrimdışı ve çevrimiçi çalışabilen) bir POS ve mağaza yönetim yazılımıdır. Sunulan yazılımların mülkiyet ve fikri hakları tamamen Serenut OS'a aittir.</p>
 
-        <h3 class="font-semibold text-light mt-4">2. Kullanıcı Yükümlülükleri</h3>
+        <h3 class="font-semibold mt-4" style="color: var(--color-text);">2. Kullanıcı Yükümlülükleri</h3>
         <p>Kullanıcılar, satın aldıkları lisans sınırları dışına çıkmamakla ve hesap giriş şifrelerini güvenli tutmakla yükümlüdür. Donanım anahtarlarını değiştirmeye veya lisans sistemini manipüle etmeye yönelik girişimler üyeliğin askıya alınmasıyla sonuçlanır.</p>
-        
-        <h3 class="font-semibold text-light mt-4">3. Ödemeler ve Yenilemeler</h3>
+
+        <h3 class="font-semibold mt-4" style="color: var(--color-text);">3. Ödemeler ve Yenilemeler</h3>
         <p>Abonelikler seçilen periyotlarda (aylık veya yıllık) otomatik olarak yenilenir. Banka havalesiyle yapılan bildirimler yönetici onayından geçtikten sonra lisansları aktifleştirir.</p>
       </div>
     </div>
@@ -58,6 +60,41 @@
   <!-- FOOTER -->
   <footer class="footer">
     <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="brand">
+            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
+              <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
+            </svg>
+            <span>Serenut OS</span>
+          </a>
+          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+        </div>
+        <div class="footer-links-col">
+          <h4>Platform</h4>
+          <ul>
+            <li><a href="platform.html">Özellikler</a></li>
+            <li><a href="plans.html">Fiyatlandırma</a></li>
+            <li><a href="downloads.html">İndir</a></li>
+          </ul>
+        </div>
+        <div class="footer-links-col">
+          <h4>Destek</h4>
+          <ul>
+            <li><a href="contact.html">İletişim</a></li>
+            <li><a href="/portal/">Müşteri Portalı</a></li>
+          </ul>
+        </div>
+        <div class="footer-links-col">
+          <h4>Yasal</h4>
+          <ul>
+            <li><a href="privacy.html">Gizlilik Politikası</a></li>
+            <li><a href="kvkk.html">KVKK Bilgilendirme</a></li>
+            <li><a href="terms.html">Kullanım Şartları</a></li>
+          </ul>
+        </div>
+      </div>
       <div class="footer-bottom">
         <p>&copy; 2026 Serenut OS. Tüm Hakları Saklıdır.</p>
       </div>

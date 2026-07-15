@@ -27,9 +27,9 @@ async function initDownloadsPage() {
     if (history.length === 0) {
       container.innerHTML = `
         <div class="empty-state" style="grid-column: 1 / -1;">
-          <div class="empty-state-icon">📂</div>
-          <div class="empty-state-title">Sürüm Bulunamadı</div>
-          <div class="empty-state-desc">Sistemde yayınlanmış güncel bir yazılım paketi bulunmamaktadır.</div>
+          <div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--color-text-muted);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></div>
+          <div class="empty-state-title" style="color:var(--color-text);">Sürüm Bulunamadı</div>
+          <div class="empty-state-desc" style="color:var(--color-text-secondary);">Sistemde yayınlanmış güncel bir yazılım paketi bulunmamaktadır.</div>
         </div>
       `;
       return;
@@ -45,7 +45,7 @@ async function initDownloadsPage() {
       
       const isAndroid = String(rel.platform).toLowerCase() === 'android';
       const badgeClass = isAndroid ? 'badge-trial' : 'badge-active';
-      const badgeLabel = isAndroid ? '📱 Android APK' : '💻 Windows Desktop';
+      const badgeLabel = isAndroid ? 'Android APK' : 'Windows Desktop';
 
       card.innerHTML = `
         <div class="flex justify-between items-center flex-wrap gap-2">

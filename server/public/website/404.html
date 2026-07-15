@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sayfa Bulunamadı — Serenut OS</title>
   <meta name="description" content="Aradığınız sayfa silinmiş veya taşınmış olabilir. Serenut OS ana sayfasına veya planlar sayfasına geri dönün." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="css/website.css" />
 </head>
 <body>
+
+  <div class="mobile-overlay" id="mobile-overlay"></div>
 
   <!-- HEADER -->
   <header class="nav-landing nav-scrolled" id="main-header">
@@ -21,16 +24,16 @@
         <span>Serenut OS</span>
       </a>
       <nav class="nav-links" id="nav-links">
-        <a href="platform.html" class="nav-link">Platform</a>
-        <a href="plans.html" class="nav-link">Planlar</a>
+        <a href="platform.html" class="nav-link">Özellikler</a>
+        <a href="plans.html" class="nav-link">Fiyatlandırma</a>
         <a href="downloads.html" class="nav-link">İndir</a>
         <a href="contact.html" class="nav-link">İletişim</a>
       </nav>
       <div class="nav-auth" id="nav-auth">
         <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
+        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
         <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <i data-lucide="menu" style="width:22px;height:22px;"></i>
         </button>
       </div>
     </div>
@@ -39,18 +42,21 @@
   <!-- 404 CONTENT -->
   <main style="padding: 180px 0 100px 0; min-height: 60vh; display: flex; align-items: center; justify-content: center;">
     <div class="container text-center" style="max-width: 600px; margin: 0 auto; padding: 0 var(--space-4);">
-      <div style="font-size: clamp(6rem, 10vw, 10rem); font-weight: 900; color: var(--primary-500); line-height: 1; letter-spacing: -0.05em; margin-bottom: 24px;">
+      <div style="font-size: clamp(6rem, 10vw, 10rem); font-weight: 900; font-family: var(--font-heading); background: linear-gradient(135deg, var(--color-primary), #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; letter-spacing: -0.05em; margin-bottom: 24px;">
         404
       </div>
-      <h1 style="font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; color: var(--neutral-100);">
+      <h1 style="font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; color: var(--color-text);">
         Aradığınız Sayfa Bulunamadı
       </h1>
-      <p style="color: var(--neutral-400); font-size: 1.1rem; margin-bottom: 32px; line-height: 1.6;">
+      <p style="color: var(--color-text-secondary); font-size: 1.05rem; margin-bottom: 32px; line-height: 1.6;">
         Talep ettiğiniz sayfa kaldırılmış, adı değiştirilmiş veya geçici olarak kullanım dışı bırakılmış olabilir.
       </p>
-      <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-        <a href="index.html" class="btn btn-primary">Ana Sayfaya Dön</a>
-        <a href="plans.html" class="btn btn-secondary">Planları İncele</a>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <a href="index.html" class="btn btn-primary" style="background:var(--color-primary);color:var(--color-text-inverse)!important;">
+          <i data-lucide="home" style="width:16px;height:16px;"></i>
+          Ana Sayfaya Dön
+        </a>
+        <a href="plans.html" class="btn btn-secondary" style="background:transparent;border:1px solid var(--color-border);color:var(--color-text-secondary)!important;">Planları İncele</a>
       </div>
     </div>
   </main>
@@ -67,7 +73,7 @@
             </svg>
             <span>Serenut OS</span>
           </a>
-          <p class="text-muted text-sm mt-2">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
         </div>
         <div class="footer-links-col">
           <h4>Platform</h4>

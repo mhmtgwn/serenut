@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>İletişim — Serenut OS</title>
   <meta name="description" content="Serenut OS ekibine ulaşın. Teknik destek ve satış sorularınız için iletişim formumuzu doldurun." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="css/website.css" />
 </head>
 <body>
+
+  <div class="mobile-overlay" id="mobile-overlay"></div>
 
   <!-- HEADER -->
   <header class="nav-landing nav-scrolled" id="main-header">
@@ -21,16 +24,16 @@
         <span>Serenut OS</span>
       </a>
       <nav class="nav-links" id="nav-links">
-        <a href="platform.html" class="nav-link">Platform</a>
-        <a href="plans.html" class="nav-link">Planlar</a>
+        <a href="platform.html" class="nav-link">Özellikler</a>
+        <a href="plans.html" class="nav-link">Fiyatlandırma</a>
         <a href="downloads.html" class="nav-link">İndir</a>
         <a href="contact.html" class="nav-link active">İletişim</a>
       </nav>
       <div class="nav-auth" id="nav-auth">
         <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Başla</a>
+        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
         <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <svg class="icon" viewBox="0 0 24 24" width="24" height="24" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <i data-lucide="menu" style="width:22px;height:22px;"></i>
         </button>
       </div>
     </div>
@@ -49,55 +52,61 @@
 
   <main class="container mb-12">
     <div class="plans-grid">
-      
+
       <!-- Contact Info Card -->
-      <div class="card" style="display:flex; flex-direction:column; gap: var(--space-4);">
-        <h3 class="font-bold text-light">Destek & Satış Kanalları</h3>
-        <p class="text-muted text-sm">Hafta içi ve cumartesi günleri 09:00 - 18:00 saatleri arasında destek ekibimize direkt olarak ulaşabilirsiniz.</p>
-        
-        <div style="display:flex; flex-direction:column; gap: var(--space-4); margin-top: var(--space-4);">
-          <div>
-            <h4 class="font-medium text-light" style="display:flex; align-items:center; gap: 8px;">
-              <svg class="icon text-primary" viewBox="0 0 24 24" width="18" height="18" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-              Telefon
-            </h4>
-            <p class="text-muted text-sm" style="padding-left: 26px;">+90 (212) 555 0199</p>
+      <div class="card reveal" style="display:flex; flex-direction:column; gap: var(--space-5);">
+        <h3 class="font-bold" style="color: var(--color-text);">Destek & Satış Kanalları</h3>
+        <p class="text-sm" style="color: var(--color-text-secondary);">Hafta içi ve cumartesi günleri 09:00 - 18:00 saatleri arasında destek ekibimize direkt olarak ulaşabilirsiniz.</p>
+
+        <div style="display:flex; flex-direction:column; gap: var(--space-5); margin-top: var(--space-3);">
+          <div style="display:flex; align-items:flex-start; gap: 12px;">
+            <div class="trust-icon" style="width:40px; height:40px; min-width:40px;">
+              <i data-lucide="phone" style="width:18px;height:18px;"></i>
+            </div>
+            <div>
+              <h4 class="font-medium" style="color: var(--color-text);">Telefon</h4>
+              <p class="text-sm" style="color: var(--color-text-secondary);">+90 (212) 555 0199</p>
+            </div>
           </div>
-          <div>
-            <h4 class="font-medium text-light" style="display:flex; align-items:center; gap: 8px;">
-              <svg class="icon text-info" viewBox="0 0 24 24" width="18" height="18" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              E-posta
-            </h4>
-            <p class="text-muted text-sm" style="padding-left: 26px;">destek@serenut.com.tr</p>
+          <div style="display:flex; align-items:flex-start; gap: 12px;">
+            <div class="trust-icon text-info" style="width:40px; height:40px; min-width:40px;">
+              <i data-lucide="mail" style="width:18px;height:18px;"></i>
+            </div>
+            <div>
+              <h4 class="font-medium" style="color: var(--color-text);">E-posta</h4>
+              <p class="text-sm" style="color: var(--color-text-secondary);">destek@serenut.com.tr</p>
+            </div>
           </div>
-          <div>
-            <h4 class="font-medium text-light" style="display:flex; align-items:center; gap: 8px;">
-              <svg class="icon text-amber" viewBox="0 0 24 24" width="18" height="18" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              Merkez Ofis
-            </h4>
-            <p class="text-muted text-sm" style="padding-left: 26px;">Maslak Mahallesi, Sanayi Caddesi No:41 Şişli / İstanbul</p>
+          <div style="display:flex; align-items:flex-start; gap: 12px;">
+            <div class="trust-icon text-amber" style="width:40px; height:40px; min-width:40px;">
+              <i data-lucide="map-pin" style="width:18px;height:18px;"></i>
+            </div>
+            <div>
+              <h4 class="font-medium" style="color: var(--color-text);">Merkez Ofis</h4>
+              <p class="text-sm" style="color: var(--color-text-secondary);">Maslak Mahallesi, Sanayi Caddesi No:41 Şişli / İstanbul</p>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Contact Form Card -->
-      <div class="card">
-        <h3 class="font-bold text-light mb-4">Mesaj Gönderin</h3>
+      <div class="card reveal">
+        <h3 class="font-bold mb-4" style="color: var(--color-text);">Mesaj Gönderin</h3>
         <form id="contact-form">
           <div class="form-group">
-            <label class="form-label">Adınız Soyadınız <span class="required">*</span></label>
+            <label class="form-label">Adınız Soyadınız <span class="required" style="color:var(--color-error);">*</span></label>
             <input type="text" id="contact-name" required placeholder="Ahmet Yılmaz" />
           </div>
           <div class="form-group">
-            <label class="form-label">İletişim E-postanız <span class="required">*</span></label>
+            <label class="form-label">İletişim E-postanız <span class="required" style="color:var(--color-error);">*</span></label>
             <input type="email" id="contact-email" required placeholder="orn@firma.com" />
           </div>
           <div class="form-group">
-            <label class="form-label">Mesajınız <span class="required">*</span></label>
+            <label class="form-label">Mesajınız <span class="required" style="color:var(--color-error);">*</span></label>
             <textarea id="contact-message" required rows="4" placeholder="Sorunuzu veya talebinizi detaylıca buraya yazın..."></textarea>
           </div>
           <div id="contact-status-msg" style="margin-top: 10px; font-size: 0.9rem;"></div>
-          <button type="submit" class="btn btn-primary w-full mt-4">Gönder</button>
+          <button type="submit" class="btn btn-primary w-full mt-4" style="background:var(--color-primary);color:var(--color-text-inverse)!important;">Gönder</button>
         </form>
       </div>
 
@@ -116,7 +125,7 @@
             </svg>
             <span>Serenut OS</span>
           </a>
-          <p class="text-muted text-sm mt-2">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
         </div>
         <div class="footer-links-col">
           <h4>Platform</h4>
