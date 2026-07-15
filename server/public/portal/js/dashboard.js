@@ -27,7 +27,7 @@ export async function loadDashboard() {
       if (licenses.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="text-center text-muted">Şirketinize tanımlı aktif lisans kaydı bulunamadı.</td>
+            <td colspan="6" class="text-center text-muted">Şirketinize tanımlı aktif lisans kaydı bulunamadı.</td>
           </tr>
         `;
         return;
@@ -43,8 +43,19 @@ export async function loadDashboard() {
           <td>${lic.allowed_devices_count || lic.device_limit || 1} Cihaz</td>
           <td>${formatDate(lic.expires_at)}</td>
           <td><span class="badge ${badgeClass}">${translateStatus(lic.status)}</span></td>
+          <td><button class="btn btn-secondary btn-sm btn-copy-license" data-key="${lic.license_key || ''}">Kopyala</button></td>
         `;
         tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('.btn-copy-license').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const key = btn.getAttribute('data-key');
+          if (!key) return;
+          await navigator.clipboard?.writeText(key);
+          btn.innerText = 'Kopyalandı';
+          setTimeout(() => { btn.innerText = 'Kopyala'; }, 1500);
+        });
       });
     }
 

@@ -62,7 +62,12 @@
         </div>
         <div class="form-group">
           <label class="form-label">Hesap Şifresi <span class="required">*</span></label>
-          <input type="password" id="reg-password" placeholder="En az 6 karakter" />
+          <input type="password" id="reg-password" placeholder="En az 8 karakter" />
+        </div>
+        <div id="selected-plan-summary" class="card border-teal text-sm" style="display:none; padding: var(--space-3); background: rgba(5, 150, 105, 0.06);">
+          <div class="font-bold text-primary mb-1">Seçilen başlangıç paketi</div>
+          <div id="selected-plan-summary-text" class="text-muted">Paket bilgisi yükleniyor...</div>
+          <div class="text-xs text-muted mt-2">Kayıt sonrası 30 günlük deneme lisansınız oluşur. Ödeme talebini portal içinden havale/EFT ile başlatabilirsiniz.</div>
         </div>
         <div class="text-red text-sm" id="register-error" style="min-height: 20px;"></div>
         <button class="btn btn-primary w-full" id="btn-register">Kayıt Ol</button>
@@ -160,16 +165,26 @@
               Serenut OS'e Hoş Geldiniz!
             </h3>
             <p class="text-sm">Hesabınız başarıyla oluşturuldu. Satış yapmaya başlamak için aşağıdaki adımları izleyin:</p>
-            <div class="grid grid-cols-2 gap-4 mt-2">
+            <div class="grid grid-cols-4 gap-4 mt-2">
               <div class="card" style="padding: var(--space-3); border: 1px dashed var(--color-border);">
-                <div class="font-semibold mb-1 text-sm">1. Mağazanızı Ekleyin</div>
-                <p class="text-xs text-muted mb-3">Sistemde işlem yapabilmek için önce bir şube kaydı oluşturmalısınız.</p>
+                <div class="font-semibold mb-1 text-sm">1. Şubenizi Ekleyin</div>
+                <p class="text-xs text-muted mb-3">İlk kasa/cihaz aktivasyonu için en az bir şube oluşturun.</p>
                 <button class="btn btn-secondary btn-sm" onclick="switchTab('stores')">Şube Ekle</button>
               </div>
               <div class="card" style="padding: var(--space-3); border: 1px dashed var(--color-border);">
-                <div class="font-semibold mb-1 text-sm">2. POS Uygulamasını Kurun</div>
-                <p class="text-xs text-muted mb-3">Bilgisayarınıza veya tabletinize POS uygulamasını indirin ve lisans anahtarınızla giriş yapın.</p>
-                <button class="btn btn-primary btn-sm" onclick="window.open('/downloads', '_blank')">Uygulamayı İndir</button>
+                <div class="font-semibold mb-1 text-sm">2. Lisansı Kopyalayın</div>
+                <p class="text-xs text-muted mb-3">POS uygulamasında kullanacağınız deneme lisans anahtarınızı alın.</p>
+                <button class="btn btn-secondary btn-sm" onclick="switchTab('licenses')">Lisansı Gör</button>
+              </div>
+              <div class="card" style="padding: var(--space-3); border: 1px dashed var(--color-border);">
+                <div class="font-semibold mb-1 text-sm">3. Uygulamayı İndirin</div>
+                <p class="text-xs text-muted mb-3">Windows veya Android POS paketini portal üzerinden güvenli indirin.</p>
+                <button class="btn btn-primary btn-sm" onclick="switchTab('downloads')">İndir</button>
+              </div>
+              <div class="card" style="padding: var(--space-3); border: 1px dashed var(--color-border);">
+                <div class="font-semibold mb-1 text-sm">4. Cihazı Aktive Edin</div>
+                <p class="text-xs text-muted mb-3">İlk cihaz aktivasyonunda deneme kullanım süreciniz başlar.</p>
+                <button class="btn btn-secondary btn-sm" onclick="switchTab('devices')">Cihazları İzle</button>
               </div>
             </div>
           </div>
@@ -203,6 +218,7 @@
                     <th>Cihaz Limiti</th>
                     <th>Geçerlilik Tarihi</th>
                     <th>Durum</th>
+                    <th>İşlem</th>
                   </tr>
                 </thead>
                 <tbody id="dashboard-licenses-body">
@@ -272,6 +288,7 @@
                     <th>Cihaz Limiti</th>
                     <th>Geçerlilik Tarihi</th>
                     <th>Durum</th>
+                    <th>İşlem</th>
                   </tr>
                 </thead>
                 <tbody id="licenses-table-body">
@@ -346,7 +363,8 @@
         <!-- Tab: Downloads -->
         <section class="tab-panel" id="tab-downloads">
           <div class="card">
-            <h3 class="font-bold mb-4">Terminal Yazılım İndirme Merkezi</h3>
+            <h3 class="font-bold mb-2">Terminal Yazılım İndirme Merkezi</h3>
+            <p class="text-sm text-muted mb-4">İndirme için aktif deneme veya ücretli lisans gerekir. Kayıttan sonra oluşan lisans anahtarınızla POS uygulamasını aktive edebilirsiniz.</p>
             <div class="grid grid-cols-3 gap-4" id="portal-downloads-grid">
               <!-- Rendered via downloads.js -->
             </div>
@@ -618,11 +636,11 @@
   <div class="modal-overlay" id="modal-payment-method">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Ödeme Yöntemi Seçin</h3>
+        <h3>Ödeme Yöntemi</h3>
         <button class="modal-close" id="btn-payment-method-cancel">&times;</button>
       </div>
       <div class="modal-body" id="payment-methods-container" style="display: flex; flex-direction: column; gap: 10px;">
-        <!-- Loaded dynamically -->
+        Havale/EFT ödeme yöntemi ile devam edilecek. Kredi kartı tahsilatı satış başlangıcından sonra açılacaktır.
       </div>
     </div>
   </div>
@@ -631,11 +649,15 @@
   <div class="modal-overlay" id="modal-bank-transfer">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Banka Havalesi / EFT Bildirim Paneli</h3>
+        <h3>Banka Havalesi / EFT ile Lisans Ödemesi</h3>
         <button class="modal-close" id="btn-transfer-cancel">&times;</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="transfer-plan-id" />
+        <div class="alert alert-info text-sm" style="margin-bottom: var(--space-4);">
+          <strong>Nasıl çalışır?</strong><br>
+          1) Talep oluşturun, 2) aşağıdaki IBAN'a referans koduyla ödeme gönderin, 3) yönetici onayı sonrası abonelik/lisans durumunuz güncellenir.
+        </div>
         
         <div class="form-group">
           <label class="form-label">Ödemeyi Göndereceğiniz Alıcı Banka</label>
@@ -680,7 +702,7 @@
         <button class="modal-close" id="btn-success-close">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="text-sm">Ödeme bildiriminiz başarıyla sisteme iletildi. Kontroller tamamlandıktan sonra aboneliğiniz sistem tarafından otomatik olarak güncellenecektir.</p>
+        <p class="text-sm">Ödeme bildiriminiz alındı. Havale/EFT tutarı banka hesabında doğrulandıktan sonra abonelik ve lisans durumunuz yönetici onayıyla güncellenecektir.</p>
         
         <div class="p-4 glass-panel mt-3 text-center" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
           <div class="text-muted text-xs uppercase">Havale Ödeme Referans Kodu</div>

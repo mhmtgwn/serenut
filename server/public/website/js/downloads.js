@@ -81,7 +81,8 @@ async function initDownloadsPage() {
 window.handleDownloadRequest = async function(releaseId) {
   const token = getAuthToken();
   if (!token) {
-    alert('Yazılım paketi indirmek için müşteri hesabınıza giriş yapmış olmanız ve aktif bir lisansınızın bulunması gerekmektedir. Giriş sayfasına yönlendiriliyorsunuz.');
+    sessionStorage.setItem('pending_download_release_id', releaseId);
+    alert('Yazılımı indirmek için müşteri portalına giriş yapmanız gerekir. Girişten sonra İndirmeler ekranında seçtiğiniz paket hazır gösterilecektir.');
     window.location.href = '/portal/';
   } else {
     const btn = document.querySelector(`button[onclick*="${releaseId}"]`);
