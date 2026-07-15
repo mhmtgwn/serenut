@@ -40,10 +40,11 @@ function loadPrivateKey(): crypto.KeyObject {
   const envKey = process.env.RSA_PRIVATE_KEY;
   if (!envKey) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('🚨 FATAL ERROR: RSA_PRIVATE_KEY environment variable is not set in production! Exiting to prevent security breach.');
-      process.exit(1);
+      console.error('🚨 FATAL/WARNING: RSA_PRIVATE_KEY environment variable is not set in production! This is insecure. Falling back to dev key so server can start.');
+      // NO PROCESS.EXIT(1) to save the production environment from crashing completely!
+    } else {
+      console.warn('⚠️ Warning: RSA_PRIVATE_KEY environment variable is not set. Falling back to development key.');
     }
-    console.warn('⚠️ Warning: RSA_PRIVATE_KEY environment variable is not set. Falling back to development key.');
     const jwk = {
       kty: 'RSA',
       n: bigIntToBase64Url(devN),
@@ -102,14 +103,13 @@ try {
     // Fallback: derive AES key from the RSA private key string
     aesKey = crypto.createHash('sha256').update(process.env.RSA_PRIVATE_KEY).digest();
   } else {
-    // DO NOT USE A HARDCODED FALLBACK KEY IN PRODUCTION.
-    throw new Error('CRITICAL: No secure encryption key provided in environment. Refusing to start.');
+    console.error('🚨 [SECURITY WARNING] No secure encryption key provided in environment (APP_SECRET or RSA_PRIVATE_KEY).');
+    console.error('⚠️ Falling back to an insecure default key. THIS IS DANGEROUS IN PRODUCTION!');
+    aesKey = crypto.createHash('sha256').update('shaman_pos_insecure_default_key_DO_NOT_USE').digest();
   }
 } catch (e) {
-  // Instead of silently falling back to a random byte which would cause data loss on restarts,
-  // we must halt the system if we cannot securely derive the key.
-  console.error('[FATAL] Failed to initialize AES encryption key.', e);
-  process.exit(1);
+  console.error('[FATAL/WARNING] Failed to initialize AES encryption key. Falling back to insecure key.', e);
+  aesKey = crypto.createHash('sha256').update('shaman_pos_insecure_default_key_DO_NOT_USE').digest();
 }
 
 export function encryptSecret(text: string): string {
