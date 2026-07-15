@@ -217,13 +217,23 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
   if (!plan_id || !bank_account_id) {
     return res.status(400).json({ error: 'missing_fields', message: 'Plan ve banka hesabı seçimi zorunludur.' });
   }
+  const client = await pgPool.connect();
   try {
-    const planRes = await runBypassingRLS('SELECT * FROM plans WHERE id = $1', [plan_id]);
-    if (planRes.rows.length === 0) return res.status(404).json({ error: 'plan_not_found' });
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+    const planRes = await client.query('SELECT * FROM plans WHERE id = $1', [plan_id]);
+    if (planRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'plan_not_found' });
+    }
     const plan = planRes.rows[0];
 
-    const bankRes = await runBypassingRLS('SELECT * FROM payment_bank_accounts WHERE id = $1 AND is_active = TRUE', [bank_account_id]);
-    if (bankRes.rows.length === 0) return res.status(404).json({ error: 'bank_account_not_found' });
+    const bankRes = await client.query('SELECT * FROM payment_bank_accounts WHERE id = $1 AND is_active = TRUE', [bank_account_id]);
+    if (bankRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'bank_account_not_found' });
+    }
     const bank = bankRes.rows[0];
 
     const now = new Date();
@@ -244,7 +254,7 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     // Create pending invoice
     const invoiceId = `inv-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const invoiceNum = `INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    await runBypassingRLS(
+    await client.query(
       `INSERT INTO invoices (id, company_id, amount, status, due_at, invoice_number, billing_details)
        VALUES ($1,$2,$3,'pending',$4,$5,$6)`,
       [invoiceId, user.company_id, price, periodEnd, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: billing_period || 'monthly' })]
@@ -257,11 +267,13 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
 
     // Create bank transfer notification
     const notifId = `btn-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    await runBypassingRLS(
+    await client.query(
       `INSERT INTO bank_transfer_notifications (id, invoice_id, company_id, bank_account_id, reference_code, status)
        VALUES ($1,$2,$3,$4,$5,'pending_review')`,
       [notifId, invoiceId, user.company_id, bank_account_id, referenceCode]
     );
+
+    await client.query('COMMIT');
 
     return res.status(201).json({
       reference_code: referenceCode,
@@ -278,8 +290,11 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
       message: `Lütfen havale açıklama alanına referans kodunuzu yazın: ${referenceCode}`,
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error creating bank transfer request:', err);
     return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
   }
 });
 

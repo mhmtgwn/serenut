@@ -40,8 +40,8 @@ function loadPrivateKey(): crypto.KeyObject {
   const envKey = process.env.RSA_PRIVATE_KEY;
   if (!envKey) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('🚨 FATAL/WARNING: RSA_PRIVATE_KEY environment variable is not set in production! This is insecure. Falling back to dev key so server can start.');
-      // NO PROCESS.EXIT(1) to save the production environment from crashing completely!
+      console.error('🚨 FATAL ERROR: RSA_PRIVATE_KEY environment variable is not set in production! Server startup aborted.');
+      process.exit(1);
     } else {
       console.warn('⚠️ Warning: RSA_PRIVATE_KEY environment variable is not set. Falling back to development key.');
     }

@@ -56,12 +56,16 @@ async function initDownloadsPage() {
         <p class="text-muted text-sm" style="flex:1;">
           ${rel.release_notes ? rel.release_notes.replace(/\n/g, '<br>') : 'Hata gidermeleri ve performans optimizasyonları içerir.'}
         </p>
-        <button class="btn btn-primary w-full mt-2" onclick="handleDownloadRequest('${rel.id}')">
-          İndir ve Yükle
-        </button>
+        ${rel.is_available 
+          ? `<button class="btn btn-primary w-full mt-2" onclick="handleDownloadRequest('${rel.id}')">İndir ve Yükle</button>` 
+          : `<button class="btn btn-secondary w-full mt-2" disabled style="opacity: 0.6; cursor: not-allowed;">Çok Yakında</button>`}
       `;
       container.appendChild(card);
     });
+
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
 
   } catch (err) {
     console.error('Failed to load releases history:', err);

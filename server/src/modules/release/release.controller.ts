@@ -108,12 +108,25 @@ function isDeviceInRollout(deviceId: string, rolloutPercentage: number): boolean
 router.get('/history', async (req: Request, res: Response) => {
   try {
     const list = await pgPool.query(`
-      SELECT version_code, platform, release_notes, created_at
+      SELECT id, version_code, platform, release_notes, created_at, file_path
       FROM app_versions
       WHERE status = 'active' AND channel = 'stable'
       ORDER BY created_at DESC
     `);
-    return res.json(list.rows);
+    
+    const mapped = list.rows.map(row => {
+      const isAvailable = row.file_path ? fs.existsSync(row.file_path) : false;
+      return {
+        id: row.id,
+        version_code: row.version_code,
+        platform: row.platform,
+        release_notes: row.release_notes,
+        created_at: row.created_at,
+        is_available: isAvailable
+      };
+    });
+
+    return res.json(mapped);
   } catch (err) {
     console.error('Release history error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Sürüm geçmişi alınamadı.' });
