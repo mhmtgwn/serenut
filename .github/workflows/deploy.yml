@@ -188,6 +188,7 @@ jobs:
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
             sleep 25
             docker logs serenut-backend > /var/www/serenut/server/public/shared/docker_debug.txt 2>&1 || true
             chmod 644 /var/www/serenut/server/public/shared/docker_debug.txt || true
