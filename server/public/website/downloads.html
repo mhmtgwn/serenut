@@ -40,46 +40,52 @@
   </header>
 
   <!-- INTRO HEADER -->
-  <header class="hero" style="padding-top: calc(var(--header-h) + var(--space-8)); padding-bottom: var(--space-4); text-align: center;">
+  <header class="subpage-header">
     <div class="container">
-      <div class="section-title">
-        <div class="badge badge-active mb-2" style="display:inline-flex; width:auto; align-self:center;">Sürüm Dağıtımı</div>
-        <h1 class="font-bold">Serenut OS İndirme Merkezi</h1>
-        <p>Windows bilgisayarlar ve Android el terminalleri için optimize edilmiş stabil terminal yazılımlarımız.</p>
-      </div>
+      <div class="badge badge-active mb-2" style="display:inline-flex; width:auto;">Sürüm Dağıtımı</div>
+      <h1>Serenut OS İndirme Merkezi</h1>
+      <p>Windows bilgisayarlar ve Android el terminalleri için optimize edilmiş stabil terminal yazılımlarımız.</p>
     </div>
   </header>
 
-  <main class="container mb-12">
-    <!-- Dynamic releases rendering grid -->
-    <div class="plans-grid" id="releases-history-container">
-      <!-- Will be populated dynamically via downloads.js -->
-    </div>
+  <main>
+    <section class="section-padding">
+      <div class="container">
+        <!-- Dynamic releases rendering grid -->
+        <div class="plans-grid" id="releases-history-container">
+          <!-- Will be populated dynamically via downloads.js -->
+        </div>
+      </div>
+    </section>
 
     <!-- Requirements checklist -->
-    <section class="mt-12" style="display:grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-6);">
-      <div class="card reveal">
-        <h4 class="font-bold mb-3" style="display:flex; align-items:center; gap: 8px; color: var(--color-text);">
-          <i data-lucide="monitor" style="width:20px;height:20px;color:var(--color-primary);"></i>
-          Windows Sistem Gereksinimleri
-        </h4>
-        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--color-text-secondary);">
-          <li>• Windows 10 veya Windows 11 (64-bit)</li>
-          <li>• Minimum 4 GB RAM bellek (8 GB önerilir)</li>
-          <li>• 1.6 GHz çift çekirdekli veya daha hızlı işlemci</li>
-          <li>• ESC/POS uyumlu 58mm / 80mm Termal fiş yazıcısı sürücüsü</li>
-        </ul>
-      </div>
-      <div class="card reveal">
-        <h4 class="font-bold mb-3" style="display:flex; align-items:center; gap: 8px; color: var(--color-text);">
-          <i data-lucide="smartphone" style="width:20px;height:20px;color:var(--color-secondary);"></i>
-          Android El Terminali Gereksinimleri
-        </h4>
-        <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.88rem; color: var(--color-text-secondary);">
-          <li>• Android 7.0 (Nougat) veya üzeri işletim sistemi</li>
-          <li>• Minimum 2 GB RAM (Dahili termal yazıcılı Sunmi, Urovo el terminalleri desteklenir)</li>
-          <li>• Bluetooth 4.0 / USB bağlantı destekli taşınabilir yazıcılar</li>
-        </ul>
+    <section class="section-padding section-alt reveal">
+      <div class="container">
+        <div class="plans-grid">
+          <div class="card reveal" style="height:auto;">
+            <h4 class="font-bold mb-4" style="display:flex; align-items:center; gap: 8px; color: var(--color-text); font-size: 1.1rem; letter-spacing: -0.01em;">
+              <i data-lucide="monitor" style="width:20px;height:20px;color:var(--color-primary);"></i>
+              Windows Sistem Gereksinimleri
+            </h4>
+            <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.92rem; color: var(--color-text-secondary); list-style:none; padding:0;">
+              <li>• Windows 10 veya Windows 11 (64-bit)</li>
+              <li>• Minimum 4 GB RAM bellek (8 GB önerilir)</li>
+              <li>• 1.6 GHz çift çekirdekli veya daha hızlı işlemci</li>
+              <li>• ESC/POS uyumlu 58mm / 80mm Termal fiş yazıcısı sürücüsü</li>
+            </ul>
+          </div>
+          <div class="card reveal" style="height:auto;">
+            <h4 class="font-bold mb-4" style="display:flex; align-items:center; gap: 8px; color: var(--color-text); font-size: 1.1rem; letter-spacing: -0.01em;">
+              <i data-lucide="smartphone" style="width:20px;height:20px;color:var(--color-secondary);"></i>
+              Android El Terminali Gereksinimleri
+            </h4>
+            <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.92rem; color: var(--color-text-secondary); list-style:none; padding:0;">
+              <li>• Android 7.0 (Nougat) veya üzeri işletim sistemi</li>
+              <li>• Minimum 2 GB RAM (Dahili termal yazıcılı Sunmi, Urovo el terminalleri desteklenir)</li>
+              <li>• Bluetooth 4.0 / USB bağlantı destekli taşınabilir yazıcılar</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </section>
   </main>

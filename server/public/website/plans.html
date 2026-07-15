@@ -40,46 +40,50 @@
   </header>
 
   <!-- PAGE HEADER -->
-  <header class="hero" style="padding-top: calc(var(--header-h) + var(--space-8)); padding-bottom: var(--space-4); text-align: center;">
+  <header class="subpage-header">
     <div class="container">
-      <div class="section-title">
-        <div class="badge badge-trial mb-2" style="display:inline-flex; width:auto; align-self:center;">Esnek Fiyatlandırma</div>
-        <h1 class="font-bold">Büyümeyi Destekleyen Planlar</h1>
-        <p>İhtiyaç duyduğunuz POS lisansı ve şube adetlerine göre ölçeklenebilen, gizli maliyet barındırmayan şeffaf paketler.</p>
-      </div>
+      <div class="badge badge-trial mb-2" style="display:inline-flex; width:auto;">Esnek Fiyatlandırma</div>
+      <h1>Büyümeyi Destekleyen Planlar</h1>
+      <p>İhtiyaç duyduğunuz POS lisansı ve şube adetlerine göre ölçeklenebilen, gizli maliyet barındırmayan şeffaf paketler.</p>
     </div>
   </header>
 
-  <main class="container mb-12">
-    <!-- Billing Period Toggle -->
-    <div class="billing-toggle-wrap">
-      <span class="billing-label active" id="lbl-monthly">Aylık Ödeme</span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="billing-toggle" />
-        <span class="toggle-track">
-          <span class="toggle-thumb"></span>
-        </span>
-      </label>
-      <span class="billing-label" id="lbl-yearly">Yıllık Ödeme <span class="discount-tag">%15 İndirim</span></span>
-    </div>
+  <main>
+    <section class="section-padding">
+      <div class="container">
+        <!-- Billing Period Toggle -->
+        <div class="billing-toggle-wrap">
+          <span class="billing-label active" id="lbl-monthly">Aylık Ödeme</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="billing-toggle" />
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+          </label>
+          <span class="billing-label" id="lbl-yearly">Yıllık Ödeme <span class="discount-tag">%15 İndirim</span></span>
+        </div>
 
-    <!-- Dynamic Plans Container -->
-    <div class="plans-grid" id="plans-container">
-      <!-- Will be populated dynamically via plans.js -->
-    </div>
+        <!-- Dynamic Plans Container -->
+        <div class="plans-grid" id="plans-container">
+          <!-- Will be populated dynamically via plans.js -->
+        </div>
+      </div>
+    </section>
 
     <!-- FAQ Context footer -->
-    <section class="mt-12 reveal" style="max-width: 800px; margin-inline: auto;">
-      <div class="card" style="padding: var(--space-8);">
-        <h3 class="font-semibold mb-4" style="color: var(--color-text); text-align:center;">Sıkça Sorulan Sorular</h3>
-        <div class="mt-4" style="display:grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
-          <div>
-            <h4 class="font-medium" style="color: var(--color-text);">Abonelik iptali nasıl yapılır?</h4>
-            <p class="text-sm mt-1" style="color: var(--color-text-secondary);">İstediğiniz zaman Müşteri Portalından tek tıkla iptal edebilirsiniz. Herhangi bir taahhüt bulunmaz.</p>
-          </div>
-          <div>
-            <h4 class="font-medium" style="color: var(--color-text);">Donanım kısıtlaması var mı?</h4>
-            <p class="text-sm mt-1" style="color: var(--color-text-secondary);">Hayır, Serenut OS tüm standart dokunmatik bilgisayarlar, barkod okuyucular ve termal yazıcılarla uyumludur.</p>
+    <section class="section-padding section-alt reveal">
+      <div class="container">
+        <div style="max-width: 800px; margin: 0 auto;">
+          <h3 class="font-semibold mb-8" style="color: var(--color-text); text-align:center; font-size: 1.6rem; letter-spacing: -0.02em;">Sıkça Sorulan Sorular</h3>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: var(--space-8);">
+            <div>
+              <h4 class="font-bold" style="color: var(--color-text); font-size: 1.05rem; margin-bottom: 6px;">Abonelik iptali nasıl yapılır?</h4>
+              <p class="text-sm" style="color: var(--color-text-secondary); line-height: 1.55;">İstediğiniz zaman Müşteri Portalından tek tıkla iptal edebilirsiniz. Herhangi bir taahhüt bulunmaz.</p>
+            </div>
+            <div>
+              <h4 class="font-bold" style="color: var(--color-text); font-size: 1.05rem; margin-bottom: 6px;">Donanım kısıtlaması var mı?</h4>
+              <p class="text-sm" style="color: var(--color-text-secondary); line-height: 1.55;">Hayır, Serenut OS tüm standart dokunmatik bilgisayarlar, barkod okuyucular ve termal yazıcılarla uyumludur.</p>
+            </div>
           </div>
         </div>
       </div>
