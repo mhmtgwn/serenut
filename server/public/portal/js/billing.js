@@ -136,45 +136,14 @@ export async function loadPlansList() {
 export async function initiatePlanPurchase(planId) {
   try {
     const methods = await apiFetch('/billing/payment-methods');
-    if (!methods || methods.length === 0) {
-      showToast('Aktif ödeme yöntemi bulunmamaktadır.', 'error');
+    const bankTransfer = methods.find(m => m.id === 'bank_transfer');
+    if (!bankTransfer) {
+      showToast('Havale/EFT ödeme yöntemi aktif değil. Lütfen destek ile iletişime geçin.', 'error');
       return;
     }
 
-    if (methods.length === 1 && methods[0].id === 'bank_transfer') {
-      // Only bank transfer available, skip selection modal
-      openBankTransferModal(planId);
-      return;
-    }
-
-    // Show selection modal
-    const modal = document.getElementById('modal-payment-method');
-    const container = document.getElementById('payment-methods-container');
-    
-    // Bind close
-    document.getElementById('btn-payment-method-cancel').onclick = () => {
-      modal.classList.remove('active');
-    };
-
-    container.innerHTML = '';
-    methods.forEach(m => {
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-secondary w-full';
-      btn.style.padding = '15px';
-      btn.style.textAlign = 'left';
-      btn.innerText = m.display_name;
-      btn.onclick = () => {
-        modal.classList.remove('active');
-        if (m.id === 'bank_transfer') {
-          openBankTransferModal(planId);
-        } else if (m.id === 'iyzico') {
-          initiateIyzicoCheckout(planId);
-        }
-      };
-      container.appendChild(btn);
-    });
-
-    modal.classList.add('active');
+    // MVP ödeme akışı yalnızca havale/EFT ile ilerler. Kredi kartı/Iyzico satış sonrası faza bırakıldı.
+    openBankTransferModal(planId);
 
   } catch (err) {
     console.error('Failed to fetch payment methods', err);
@@ -182,6 +151,7 @@ export async function initiatePlanPurchase(planId) {
   }
 }
 
+/* Kredi kartı/Iyzico satış başlangıcından sonraki faza bırakıldı.
 async function initiateIyzicoCheckout(planId) {
   const billingPeriod = sessionStorage.getItem('selected_billing_period') || 'monthly';
   try {
@@ -203,6 +173,7 @@ async function initiateIyzicoCheckout(planId) {
     showToast('Ödeme sistemi hatası', 'error');
   }
 }
+*/
 
 async function openBankTransferModal(planId) {
   const modal = document.getElementById('modal-bank-transfer');

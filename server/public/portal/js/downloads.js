@@ -4,6 +4,7 @@
 
 import { apiFetch, getAuthToken } from '/shared/js/api-client.js';
 import { formatDate } from '/shared/js/formatters.js';
+import { showToast } from '/shared/js/ui.js';
 
 export async function loadDownloads() {
   const container = document.getElementById('portal-downloads-grid');
@@ -22,7 +23,8 @@ export async function loadDownloads() {
 
     history.forEach(rel => {
       const card = document.createElement('div');
-      card.className = 'card';
+      const pendingReleaseId = sessionStorage.getItem('pending_download_release_id');
+      card.className = `card ${pendingReleaseId === rel.id ? 'border-teal' : ''}`;
       card.style.display = 'flex';
       card.style.flexDirection = 'column';
       card.style.gap = 'var(--space-3)';
@@ -40,6 +42,7 @@ export async function loadDownloads() {
         <p class="text-muted text-xs" style="flex:1;">
           ${rel.release_notes ? rel.release_notes.replace(/\n/g, '<br>') : 'Kararlılık iyileştirmeleri ve hata düzeltmeleri.'}
         </p>
+        ${pendingReleaseId === rel.id ? '<div class="badge badge-trial">Son seçtiğiniz indirme</div>' : ''}
         <button class="btn btn-primary btn-sm btn-download-release w-full mt-2" data-id="${rel.id}">
           Güvenli İndir
         </button>
@@ -105,6 +108,7 @@ async function downloadRelease(releaseId) {
     a.click();
     window.URL.revokeObjectURL(url);
     a.remove();
+    sessionStorage.removeItem('pending_download_release_id');
     showToast('İndirme tamamlandı.', 'success');
   } catch (err) {
     console.error('Download failed:', err);

@@ -303,64 +303,12 @@
     </div>
   </div>
 
-  <script src="js/website.js?v=3.0.1"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const plan = urlParams.get('plan');
-      if (plan) {
-        const select = document.getElementById('planId');
-        if (select) {
-          select.value = plan;
-        }
-      }
-    });
-
-    document.getElementById('signup-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const btn = document.getElementById('btn-submit');
-      const err = document.getElementById('error-msg');
-      err.innerText = '';
-      
-      const payload = {
-        company_name: document.getElementById('companyName').value,
-        name: document.getElementById('fullName').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        tax_number: document.getElementById('taxNumber').value,
-        plan_id: document.getElementById('planId').value,
-        password: document.getElementById('password').value
-      };
-      
-      btn.innerText = 'Kayıt Yapılıyor...';
-      btn.disabled = true;
-      
-      try {
-        const res = await fetch('/api/v1/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        
-        const data = await res.json();
-        
-        if (res.ok) {
-          sessionStorage.setItem('portal_token', data.access_token);
-          window.location.href = '/portal/';
-        } else {
-          err.innerText = data.message || 'Kayıt başarısız.';
-        }
-      } catch (error) {
-        err.innerText = 'Bağlantı hatası oluştu.';
-      } finally {
-        btn.innerText = '14 Gün Ücretsiz Dene';
-        btn.disabled = false;
-        if (typeof lucide !== 'undefined' && lucide.createIcons) {
-          lucide.createIcons();
-        }
-      }
-    });
+    // Tek kayıt kapısı müşteri portalıdır; eski signup sayfası akış karmaşası yaratmaması için yönlendirilir.
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get('plan');
+    if (plan) sessionStorage.setItem('selected_plan_id', plan);
+    window.location.replace('/portal/#register');
   </script>
 </body>
 </html>

@@ -2,9 +2,8 @@
    SERENUT OS V2 - PORTAL ENGINE AND NAVIGATION BOOTSTRAPPER
    ========================================================================== */
 
-import { setAuthToken, clearAuthToken, getAuthToken } from '/shared/js/api-client.js';
+import { setAuthToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile, getUserProfile } from '/shared/js/auth.js';
-import { showToast } from '/shared/js/ui.js';
 
 // Sub-module Imports
 import { loadDashboard } from './dashboard.js';
@@ -40,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.location.hash === '#register' || window.location.hash.startsWith('#register')) {
     switchAuthTab('register');
   }
+  renderSelectedPlanSummary();
 
   // Sidebar item tab navigations
   document.querySelectorAll('.sidebar-item').forEach(item => {
@@ -106,8 +106,11 @@ function showPortalApp() {
   }
 
   // Check if we have a pending checkout from plans page
+  const pendingDownload = sessionStorage.getItem('pending_download_release_id');
   const planId = sessionStorage.getItem('selected_plan_id');
-  if (planId) {
+  if (pendingDownload) {
+    switchTab('downloads');
+  } else if (planId) {
     switchTab('subscription');
   } else {
     // Switch to default overview
@@ -163,6 +166,8 @@ function switchTab(tabId) {
   loadTabData(tabId);
 }
 
+window.switchTab = switchTab;
+
 function loadTabData(tabId) {
   switch (tabId) {
     case 'dashboard':
@@ -200,6 +205,33 @@ function loadTabData(tabId) {
  * Switches between login and signup auth cards
  * @param {'login'|'register'} mode 
  */
+async function renderSelectedPlanSummary() {
+  const wrap = document.getElementById('selected-plan-summary');
+  const text = document.getElementById('selected-plan-summary-text');
+  if (!wrap || !text) return;
+
+  const planId = sessionStorage.getItem('selected_plan_id');
+  if (!planId) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  const billingPeriod = sessionStorage.getItem('selected_billing_period') || 'monthly';
+  const periodLabel = billingPeriod === 'yearly' ? 'Yıllık ödeme' : 'Aylık ödeme';
+  text.innerText = `${planId} • ${periodLabel}`;
+
+  try {
+    const plans = await apiFetch('/billing/plans');
+    const plan = plans.find(p => p.id === planId);
+    if (plan) {
+      text.innerText = `${plan.name} • ${periodLabel}`;
+    }
+  } catch (_) {
+    // Summary is non-blocking; keep the technical plan id if plans cannot be loaded.
+  }
+}
+
 function switchAuthTab(mode) {
   const loginForm = document.getElementById('form-login');
   const regForm = document.getElementById('form-register');
@@ -272,8 +304,8 @@ async function handleRegister() {
     return;
   }
 
-  if (password.length < 6) {
-    errorEl.innerText = 'Şifreniz en az 6 karakter olmalıdır.';
+  if (password.length < 8) {
+    errorEl.innerText = 'Şifreniz en az 8 karakter olmalıdır.';
     return;
   }
 
@@ -377,23 +409,29 @@ function setupModals() {
   });
 
   // Bank wire notifications cancel
-  document.getElementById('btn-transfer-cancel')?.addEventListener('click', () => {
+  const closeTransferModal = () => {
     document.getElementById('modal-bank-transfer').classList.remove('active');
-  });
+  };
+  document.getElementById('btn-transfer-cancel')?.addEventListener('click', closeTransferModal);
+  document.getElementById('btn-transfer-cancel-close')?.addEventListener('click', closeTransferModal);
   document.getElementById('btn-transfer-submit')?.addEventListener('click', submitBankTransferNotification);
 
   // Success payment reference card close
-  document.getElementById('btn-success-close')?.addEventListener('click', () => {
+  const closeTransferSuccessModal = () => {
     document.getElementById('modal-transfer-success').classList.remove('active');
-  });
+  };
+  document.getElementById('btn-success-close')?.addEventListener('click', closeTransferSuccessModal);
+  document.getElementById('btn-success-close-btn')?.addEventListener('click', closeTransferSuccessModal);
 
   // Subscription cancel modals
   document.getElementById('btn-sub-cancel')?.addEventListener('click', () => {
     document.getElementById('modal-sub-cancel').classList.add('active');
   });
-  document.getElementById('btn-cancel-modal-close')?.addEventListener('click', () => {
+  const closeCancelModal = () => {
     document.getElementById('modal-sub-cancel').classList.remove('active');
-  });
+  };
+  document.getElementById('btn-cancel-modal-close')?.addEventListener('click', closeCancelModal);
+  document.getElementById('btn-cancel-modal-close-btn')?.addEventListener('click', closeCancelModal);
   document.getElementById('btn-cancel-modal-submit')?.addEventListener('click', async () => {
     const reason = document.getElementById('cancel-reason').value;
     const note = document.getElementById('cancel-note').value.trim();

@@ -20,7 +20,7 @@ try {
 
 // Environment Validation
 const isProduction = process.env.NODE_ENV === 'production';
-const requiredEnv = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'];
+const requiredEnv = ['DATABASE_URL', 'JWT_SECRET'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 
 if (missingEnv.length > 0) {
@@ -31,7 +31,7 @@ if (missingEnv.length > 0) {
 }
 
 // Operational warning for optional API keys
-const optionalEnv = ['SMS_API_KEY', 'SMTP_API_KEY', 'RSA_PRIVATE_KEY', 'APP_SECRET'];
+const optionalEnv = ['REDIS_URL', 'SMS_API_KEY', 'SMTP_API_KEY', 'RSA_PRIVATE_KEY', 'APP_SECRET'];
 optionalEnv.forEach(key => {
   if (!process.env[key]) {
     console.warn(`⚠️ Warning: Optional operational key ${key} is not set. Related features may fallback to insecure defaults or fail.`);

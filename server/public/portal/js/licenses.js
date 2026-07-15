@@ -12,7 +12,7 @@ export async function loadLicenses() {
   const tbody = document.getElementById('licenses-table-body');
   if (!tbody) return;
 
-  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Lisanslar yükleniyor...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Lisanslar yükleniyor...</td></tr>';
 
   try {
     const data = await apiFetch('/portal/dashboard');
@@ -21,7 +21,7 @@ export async function loadLicenses() {
     tbody.innerHTML = '';
 
     if (licenses.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Aktif lisansınız bulunmamaktadır.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Aktif lisansınız bulunmamaktadır.</td></tr>';
       return;
     }
 
@@ -36,12 +36,23 @@ export async function loadLicenses() {
         <td>${deviceCount} Cihaz</td>
         <td>${formatDate(lic.expires_at)}</td>
         <td><span class="badge ${badgeClass}">${translateStatus(lic.status)}</span></td>
+        <td><button class="btn btn-secondary btn-sm btn-copy-license" data-key="${lic.license_key || ''}">Kopyala</button></td>
       `;
       tbody.appendChild(tr);
     });
 
+    tbody.querySelectorAll('.btn-copy-license').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const key = btn.getAttribute('data-key');
+        if (!key) return;
+        await navigator.clipboard?.writeText(key);
+        btn.innerText = 'Kopyalandı';
+        setTimeout(() => { btn.innerText = 'Kopyala'; }, 1500);
+      });
+    });
+
   } catch (err) {
     console.error('Failed to load licenses:', err);
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Lisanslar yüklenemedi.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Lisanslar yüklenemedi.</td></tr>';
   }
 }

@@ -36,15 +36,14 @@ const devDp = devD % (devP - 1n);
 const devDq = devD % (devQ - 1n);
 const devQi = modInverse(devQ, devP);
 
-function loadPrivateKey(): crypto.KeyObject {
+function loadPrivateKey(): crypto.KeyObject | null {
   const envKey = process.env.RSA_PRIVATE_KEY;
   if (!envKey) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('🚨 FATAL ERROR: RSA_PRIVATE_KEY environment variable is not set in production! Server startup aborted.');
-      process.exit(1);
-    } else {
-      console.warn('⚠️ Warning: RSA_PRIVATE_KEY environment variable is not set. Falling back to development key.');
+      console.error('🚨 RSA_PRIVATE_KEY environment variable is not set. RSA signing features are disabled, but HTTP service startup will continue.');
+      return null;
     }
+    console.warn('⚠️ Warning: RSA_PRIVATE_KEY environment variable is not set. Falling back to development key.');
     const jwk = {
       kty: 'RSA',
       n: bigIntToBase64Url(devN),
@@ -78,14 +77,17 @@ function loadPrivateKey(): crypto.KeyObject {
       });
     }
   } catch (err: any) {
-    console.error('❌ Failed to load RSA_PRIVATE_KEY from environment variables:', err);
-    throw new Error('Invalid RSA_PRIVATE_KEY format: ' + err.message);
+    console.error('❌ Failed to load RSA_PRIVATE_KEY from environment variables. RSA signing features are disabled until the key is fixed:', err);
+    return null;
   }
 }
 
 export const privateKey = loadPrivateKey();
 
 export function signPayload(payload: string): string {
+  if (!privateKey) {
+    throw new Error('RSA_PRIVATE_KEY is not configured; cannot sign payload.');
+  }
   const signer = crypto.createSign('RSA-SHA256');
   signer.update(payload);
   signer.end();
