@@ -380,9 +380,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        onTap: () => _showProfileDetails(user),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          onTap: () => _showProfileDetails(user),
         leading: Container(
           width: 52,
           height: 52,
@@ -435,6 +439,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
           ],
         ),
+      ),
       ),
     );
   }
