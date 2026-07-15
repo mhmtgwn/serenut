@@ -107,6 +107,7 @@ jobs:
 
       - name: Create keystore properties
         run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/serenut-release.jks
           echo "storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> android/key.properties
           echo "keyAlias=serenut" >> android/key.properties
