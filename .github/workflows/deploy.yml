@@ -189,7 +189,7 @@ jobs:
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             sleep 25
-            docker logs serenut-backend > /var/www/serenut/server/public/website/docker_debug.txt 2>&1 || true
+            docker logs serenut-backend > /var/www/serenut/server/public/shared/docker_debug.txt 2>&1 || true
             # Setup Nginx reverse proxy
             apt-get install -y nginx || true
             cp devops/nginx.conf /etc/nginx/sites-available/serenut
