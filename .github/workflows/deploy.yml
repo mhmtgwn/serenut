@@ -70,6 +70,7 @@ jobs:
           DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/postgres
           TEST_DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/testdb
           JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
+          APP_SECRET: testing-app-secret-key-that-is-at-least-32-bytes-long
           INVOICES_DIR: ./invoices
         run: |
           cd server
