@@ -152,6 +152,28 @@
         
         <!-- Tab: Dashboard -->
         <section class="tab-panel active" id="tab-dashboard">
+          
+          <!-- Onboarding / Getting Started Banner -->
+          <div class="card border-teal mb-4" style="background: rgba(5, 150, 105, 0.03); display: flex; flex-direction: column; gap: var(--space-2);">
+            <h3 class="font-bold text-primary" style="display: flex; align-items: center; gap: 8px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Serenut OS'e Hoş Geldiniz!
+            </h3>
+            <p class="text-sm">Hesabınız başarıyla oluşturuldu. Satış yapmaya başlamak için aşağıdaki adımları izleyin:</p>
+            <div class="grid grid-cols-2 gap-4 mt-2">
+              <div class="card" style="padding: var(--space-3); border: 1px dashed var(--color-border);">
+                <div class="font-semibold mb-1 text-sm">1. Mağazanızı Ekleyin</div>
+                <p class="text-xs text-muted mb-3">Sistemde işlem yapabilmek için önce bir şube kaydı oluşturmalısınız.</p>
+                <button class="btn btn-secondary btn-sm" onclick="switchTab('stores')">Şube Ekle</button>
+              </div>
+              <div class="card" style="padding: var(--space-3); border: 1px dashed var(--color-border);">
+                <div class="font-semibold mb-1 text-sm">2. POS Uygulamasını Kurun</div>
+                <p class="text-xs text-muted mb-3">Bilgisayarınıza veya tabletinize POS uygulamasını indirin ve lisans anahtarınızla giriş yapın.</p>
+                <button class="btn btn-primary btn-sm" onclick="window.open('/downloads', '_blank')">Uygulamayı İndir</button>
+              </div>
+            </div>
+          </div>
+
           <div class="grid grid-cols-4 gap-4">
             <div class="card border-teal text-center">
               <h4 class="text-muted text-xs font-semibold uppercase">Şube Adeti</h4>
