@@ -1,6 +1,6 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { loadModule } from './module-runtime.js?v=20260716-admin2';
+import { loadModule } from './module-runtime.js?v=20260716-payments1';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');

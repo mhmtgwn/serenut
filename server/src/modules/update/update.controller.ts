@@ -5,6 +5,16 @@ import path from 'path';
 
 const router = Router();
 
+function compareVersions(a: string, b: string): number {
+  const parts = (value: string) => value.replace(/\+.*/, '').split('.').map(x => Number.parseInt(x, 10) || 0);
+  const left = parts(a); const right = parts(b);
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const diff = (left[i] || 0) - (right[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return (Number.parseInt(a.split('+')[1] || '0', 10) || 0) - (Number.parseInt(b.split('+')[1] || '0', 10) || 0);
+}
+
 router.get('/download/:platform/latest', async (req: Request, res: Response) => {
   const { platform } = req.params;
   
@@ -93,7 +103,7 @@ router.get('/check', async (req: Request, res: Response) => {
     const query = `
       SELECT version_code, platform, download_url, sha256_hash, is_mandatory, release_notes
       FROM app_versions
-      WHERE platform = $1
+      WHERE platform = $1 AND status = 'active' AND channel = 'stable'
       ORDER BY created_at DESC
       LIMIT 1
     `;
@@ -113,7 +123,7 @@ router.get('/check', async (req: Request, res: Response) => {
     const latest = result.rows[0];
 
     // Simple comparison logic: if latest version code is different, suggest update
-    const hasUpdate = latest.version_code !== current_version;
+    const hasUpdate = compareVersions(current_version, latest.version_code) < 0;
 
     return res.json({
       latestVersion: latest.version_code,

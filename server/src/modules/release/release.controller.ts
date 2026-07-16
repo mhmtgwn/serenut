@@ -14,11 +14,10 @@ const ALLOWED_EXTENSIONS = ['.apk', '.aab', '.exe', '.msix'];
 const MAX_FILE_SIZE_MB = 150;
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const { platform, channel } = (req as any).body;
-    const uploadDir = path.join(RELEASES_BASE_DIR, platform || 'android', channel || 'stable');
-    fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
+  destination: (_req, _file, cb) => {
+    const incomingDir = path.join(RELEASES_BASE_DIR, '_incoming');
+    fs.mkdirSync(incomingDir, { recursive: true });
+    cb(null, incomingDir);
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
@@ -102,6 +101,18 @@ function isDeviceInRollout(deviceId: string, rolloutPercentage: number): boolean
   const hash = crypto.createHash('md5').update(deviceId).digest('hex');
   const bucket = parseInt(hash.substring(0, 4), 16) % 100;
   return bucket < rolloutPercentage;
+}
+
+function compareVersions(a: string, b: string): number {
+  const parts = (value: string) => value.replace(/\+.*/, '').split('.').map(x => Number.parseInt(x, 10) || 0);
+  const left = parts(a); const right = parts(b);
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const diff = (left[i] || 0) - (right[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  const buildA = Number.parseInt(a.split('+')[1] || '0', 10) || 0;
+  const buildB = Number.parseInt(b.split('+')[1] || '0', 10) || 0;
+  return buildA - buildB;
 }
 
 // ── 0. PUBLIC RELEASE HISTORY (Called by website release notes) ──────────────
@@ -214,20 +225,20 @@ router.get('/check', async (req: Request, res: Response) => {
       });
     }
 
-    const hasUpdate = eligibleRelease.version_code !== current_version;
+    const hasUpdate = compareVersions(current_version, eligibleRelease.version_code) < 0;
 
     // Determine force update — if device version is below min_required
     let isForceUpdate = false;
     if (eligibleRelease.is_mandatory && hasUpdate) {
       isForceUpdate = true;
     }
-    if (eligibleRelease.min_required_version && current_version < eligibleRelease.min_required_version) {
+    if (eligibleRelease.min_required_version && compareVersions(current_version, eligibleRelease.min_required_version) < 0) {
       isForceUpdate = true;
     }
 
-    // Build secure download URL (token-protected endpoint)
+    // Public installer URLs are intentional; licensing happens inside the app.
     const downloadUrl = hasUpdate
-      ? `/api/v1/releases/download/${eligibleRelease.id}`
+      ? (eligibleRelease.download_url || `/api/v1/updates/download/${platform}/latest`)
       : null;
 
     return res.json({
@@ -413,8 +424,17 @@ router.post(
       fs.unlinkSync(file.path);
       return res.status(400).json({ error: 'missing_fields', message: 'version_code ve platform zorunludur.' });
     }
+    if (!['android', 'windows'].includes(platform) || !['stable', 'beta'].includes(channel || 'stable')) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: 'invalid_release_target', message: 'Platform veya yayın kanalı geçersiz.' });
+    }
 
     try {
+      const targetDir = path.join(RELEASES_BASE_DIR, platform, channel || 'stable');
+      fs.mkdirSync(targetDir, { recursive: true });
+      const targetPath = path.join(targetDir, path.basename(file.path));
+      fs.renameSync(file.path, targetPath);
+      file.path = targetPath;
       // Server-side SHA-256 computation
       const serverSha256 = await computeFileSha256(file.path);
 
@@ -444,7 +464,7 @@ router.post(
         version_code,
         platform,
         channel || 'stable',
-        `/api/v1/releases/download/${releaseId}`,
+        `/api/v1/updates/download/${platform}/latest`,
         file.path,
         serverSha256,
         signature,

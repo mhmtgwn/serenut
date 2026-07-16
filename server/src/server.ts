@@ -620,57 +620,6 @@ async function bootstrap() {
     // Caching warmup
     await warmupCache();
 
-    // Auto-seed/sanitize Windows and Android release metadata on startup
-    try {
-      await pgPool.query(`
-        UPDATE app_versions 
-        SET status = 'inactive' 
-        WHERE (platform = 'windows' AND id <> 'win-v1-stable')
-           OR (platform = 'android' AND id <> 'android-v1-stable');
-      `);
-
-      await pgPool.query(`
-        INSERT INTO app_versions (
-          id, version_code, platform, download_url, sha256_hash, 
-          file_path, status, channel, is_mandatory, rollout_percentage, 
-          file_size_bytes, release_notes, created_at
-        ) VALUES (
-          'win-v1-stable', '1.0.0', 'windows', '/api/v1/updates/download/windows/latest', 
-          '94DACCA2B0C5605F960C6DE74D8B23A8B44D59AEAB79DC9A3C91EA3A19859B9D', 
-          'public/website/downloads/SerenutOSSetup.exe', 
-          'active', 'stable', true, 100, 14009885, 'RC1 Release Build — Inno Setup Installer', NOW()
-        ) ON CONFLICT (id) DO UPDATE SET 
-          file_path = EXCLUDED.file_path, 
-          version_code = EXCLUDED.version_code,
-          sha256_hash = EXCLUDED.sha256_hash,
-          file_size_bytes = EXCLUDED.file_size_bytes,
-          status = 'active',
-          created_at = NOW();
-      `);
-
-      await pgPool.query(`
-        INSERT INTO app_versions (
-          id, version_code, platform, download_url, sha256_hash, 
-          file_path, status, channel, is_mandatory, rollout_percentage, 
-          file_size_bytes, release_notes, created_at
-        ) VALUES (
-          'android-v1-stable', '1.0.0', 'android', '/api/v1/updates/download/android/latest', 
-          '36DA4BD533E1973B9A3A1ECFC1A59EE8F1D9B54F629857ADE78FBAC99D172C9B', 
-          'public/website/downloads/serenut.apk', 
-          'active', 'stable', true, 100, 142629988, 'RC1 Release Build — Android Application Package', NOW()
-        ) ON CONFLICT (id) DO UPDATE SET 
-          file_path = EXCLUDED.file_path, 
-          version_code = EXCLUDED.version_code,
-          sha256_hash = EXCLUDED.sha256_hash,
-          file_size_bytes = EXCLUDED.file_size_bytes,
-          status = 'active',
-          created_at = NOW();
-      `);
-      logger.info('✅ Production Windows and Android release metadata auto-seeded successfully.');
-    } catch (seedErr: any) {
-      logger.error(`Failed to auto-seed release metadata on startup: ${seedErr.message}`);
-    }
-
     server.listen(port, () => {
       logger.info(`✅ Serenut Cloud API running on port ${port} [${process.env.NODE_ENV || 'development'}]`);
       logger.info(`📚 API Docs: http://localhost:${port}/api-docs`);

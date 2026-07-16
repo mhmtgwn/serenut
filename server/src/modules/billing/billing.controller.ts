@@ -125,8 +125,10 @@ router.get('/plans', async (req, res: Response) => {
  */
 router.get('/bank-accounts', authenticateUser, async (req, res: Response) => {
   try {
+    const includeInactive = req.query.all === 'true' && (req as AuthenticatedRequest).user?.roles?.includes('sysadmin');
     const result = await runBypassingRLS(
-      'SELECT id, bank_name, account_holder, iban, currency, branch_name, instructions FROM payment_bank_accounts WHERE is_active = TRUE ORDER BY display_order ASC'
+      `SELECT id, bank_name, account_holder, iban, currency, branch_name, instructions, is_active, display_order
+       FROM payment_bank_accounts ${includeInactive ? '' : 'WHERE is_active = TRUE'} ORDER BY display_order ASC`
     );
     return res.json(result.rows);
   } catch (err) {
@@ -134,6 +136,15 @@ router.get('/bank-accounts', authenticateUser, async (req, res: Response) => {
     return res.status(500).json({ error: 'server_error' });
   }
 });
+
+async function isIyzicoEnabled(): Promise<boolean> {
+  try {
+    const result = await runBypassingRLS("SELECT is_enabled FROM payment_providers WHERE id = 'iyzico' LIMIT 1");
+    return result.rows[0]?.is_enabled === true;
+  } catch (_) {
+    return process.env.IYZICO_ENABLED === 'true';
+  }
+}
 
 // ── DYNAMIC PAYMENT METHODS ───────────────────────────────────────────────────
 
@@ -509,7 +520,7 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
     return res.status(400).json({ error: 'missing_plan_id' });
   }
 
-  if (process.env.IYZICO_ENABLED !== 'true') {
+  if (!(await isIyzicoEnabled())) {
     return res.status(501).json({
       error: 'not_implemented',
       message: 'Kredi kartı tahsilat altyapısı şu anda aktif değildir. Lütfen banka havalesi ile ödeme yapınız.'
@@ -618,7 +629,7 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
  *     summary: Iyzico Checkout Webhook Callback
  */
 router.post('/iyzico/callback', async (req: Request, res: Response) => {
-  if (process.env.IYZICO_ENABLED !== 'true') {
+  if (!(await isIyzicoEnabled())) {
     return res.status(410).send('Kart ödeme kanalı kapalıdır.');
   }
   const { token } = req.body;
