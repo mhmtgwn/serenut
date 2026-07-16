@@ -11,6 +11,7 @@ import { emailVerificationEmail } from '../notifications/email.templates';
 import crypto from 'crypto';
 
 const router = Router();
+const emailVerificationRequired = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
 
 /**
  * @swagger
@@ -340,9 +341,10 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     const userId = `usr-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const passwordHash = await AuthService.hashPassword(password);
     await client.query(
-      `INSERT INTO users (id, company_id, name, email, password_hash, is_active)
-       VALUES ($1, $2, $3, $4, $5, false)`,
-      [userId, companyId, name, normalizedEmail, passwordHash]
+      `INSERT INTO users (id, company_id, name, email, password_hash, is_active, email_verified_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId, companyId, name, normalizedEmail, passwordHash,
+        !emailVerificationRequired, emailVerificationRequired ? null : new Date()]
     );
     registeredUserId = userId;
     registeredCompanyId = companyId;
@@ -423,17 +425,19 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
         licenseKey
       ]);
 
-      verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
-      await client.query(
-        `INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at)
-         VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')`,
-        [`evt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, userId, verificationHash]
-      );
+      if (emailVerificationRequired) {
+        verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+        await client.query(
+          `INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at)
+           VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')`,
+          [`evt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, userId, verificationHash]
+        );
+      }
 
     await client.query('COMMIT');
 
-    try {
+    if (emailVerificationRequired) try {
     const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
     const message = emailVerificationEmail({
       userName: name,
@@ -459,8 +463,10 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
 
     return res.status(201).json({
       user_id: registeredUserId,
-      email_verification_required: true,
-      message: 'Hesabınız oluşturuldu. Giriş yapabilmek için e-posta adresinizi doğrulayın.'
+      email_verification_required: emailVerificationRequired,
+      message: emailVerificationRequired
+        ? 'Hesabınız oluşturuldu. Giriş yapabilmek için e-posta adresinizi doğrulayın.'
+        : 'Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.'
     });
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});

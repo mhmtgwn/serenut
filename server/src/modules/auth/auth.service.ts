@@ -101,10 +101,18 @@ export class AuthService {
       const now = new Date();
 
       if (!user.is_active) {
-        if (!user.email_verified_at) {
+        if (!user.email_verified_at && process.env.REQUIRE_EMAIL_VERIFICATION === 'false') {
+          await client.query(
+            `UPDATE users SET is_active = true, email_verified_at = NOW() WHERE id = $1`,
+            [user.id]
+          );
+          user.is_active = true;
+          user.email_verified_at = now;
+        } else if (!user.email_verified_at) {
           throw new Error('email_not_verified');
+        } else {
+          throw new Error('user_suspended');
         }
-        throw new Error('user_suspended');
       }
 
       if (user.locked_until && new Date(user.locked_until) > now) {
