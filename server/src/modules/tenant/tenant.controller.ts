@@ -35,7 +35,7 @@ router.get('/company', async (req: AuthenticatedRequest, res: Response) => {
     const compRes = await pgPool.query(
       `SELECT id, name, tax_number, tax_office, phone, email, address, status,
               owner_name, type, city, district, currency, logo_url,
-              created_at, updated_at
+              version, created_at, updated_at
        FROM companies WHERE id = $1`,
       [user.company_id]
     );

@@ -102,7 +102,7 @@ router.get('/plans', async (req, res: Response) => {
   }
 
   try {
-    const result = await runBypassingRLS('SELECT * FROM plans ORDER BY price ASC');
+    const result = await runBypassingRLS('SELECT * FROM plans WHERE is_active = true ORDER BY price ASC');
     const plans = result.rows;
     if (redisClient && redisClient.isOpen) {
       await redisClient.setEx(cacheKey, 300, JSON.stringify(plans));

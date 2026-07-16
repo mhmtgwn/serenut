@@ -540,7 +540,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
 async function warmupCache() {
   try {
     if (redisClient && redisClient.isOpen) {
-      const plansRes = await pgPool.query('SELECT * FROM plans');
+      const plansRes = await pgPool.query('SELECT * FROM plans WHERE is_active = true ORDER BY price ASC');
       if (plansRes.rows.length > 0) {
         await redisClient.setEx('plans:list', 300, JSON.stringify(plansRes.rows));
         logger.info('🔥 Cache warmed up: plans:list key populated.');

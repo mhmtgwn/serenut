@@ -787,8 +787,14 @@ router.get('/analytics', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const totalCustomers = await runBypassingRLS('SELECT COUNT(*) FROM companies');
-    const activeLicenses = await runBypassingRLS("SELECT COUNT(*) FROM licenses WHERE status = 'active'");
-    const trialUsers = await runBypassingRLS("SELECT COUNT(*) FROM subscriptions WHERE status = 'trial'");
+    const activeLicenses = await runBypassingRLS("SELECT COUNT(*) FROM license_entitlements WHERE status = 'active'");
+    const trialUsers = await runBypassingRLS("SELECT COUNT(*) FROM subscriptions WHERE status = 'trialing'");
+    const noLicense = await runBypassingRLS(`
+      SELECT COUNT(*) FROM companies c WHERE NOT EXISTS (
+        SELECT 1 FROM license_entitlements le WHERE le.company_id = c.id AND le.status IN ('trial','active')
+      )
+    `);
+    const pendingTransfers = await runBypassingRLS("SELECT COUNT(*) FROM bank_transfer_notifications WHERE status = 'pending_review'");
     
     const expiringLicenses = await runBypassingRLS(`
       SELECT COUNT(*) FROM licenses 
@@ -812,7 +818,7 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
       GROUP BY status
     `);
 
-    const subReport: Record<string, number> = { active: 0, suspended: 0, trial: 0, cancelled: 0 };
+    const subReport: Record<string, number> = { active: 0, suspended: 0, trialing: 0, cancelled: 0, expired: 0 };
     for (const row of subStats.rows) {
       if (row.status in subReport) {
         subReport[row.status] = parseInt(row.count, 10);
@@ -826,7 +832,9 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
         trialUsers: parseInt(trialUsers.rows[0].count, 10),
         expiringLicenses: parseInt(expiringLicenses.rows[0].count, 10),
         todaySignups: parseInt(todaySignups.rows[0].count, 10),
-        monthlyRevenue: parseFloat(monthlySales.rows[0].total)
+        monthlyRevenue: parseFloat(monthlySales.rows[0].total),
+        noLicense: parseInt(noLicense.rows[0].count, 10),
+        pendingTransfers: parseInt(pendingTransfers.rows[0].count, 10)
       },
       subscriptions: subReport
     });

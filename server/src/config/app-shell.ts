@@ -69,6 +69,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     moduleTab: 'support'
   },
   {
+    id: 'platform-overview',
+    label: 'Ticari Genel Bakış',
+    section: 'platform',
+    href: '/app/#platform-overview',
+    description: 'Kayıt, deneme, abonelik, lisans ve havale özeti.',
+    module: 'admin',
+    moduleTab: 'commercial',
+    roles: ['sysadmin']
+  },
+  {
     id: 'platform-companies',
     label: 'Platform Şirketleri',
     section: 'platform',
@@ -96,6 +106,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     description: 'Şirket lisanslarını üretin, yenileyin ve askıya alın.',
     module: 'admin',
     moduleTab: 'licenses',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-releases',
+    label: 'Uygulama Sürümleri',
+    section: 'platform',
+    href: '/app/#platform-releases',
+    description: 'Android ve Windows sürümlerini yayınlayın, kademeli dağıtın veya geri çekin.',
+    module: 'admin',
+    moduleTab: 'releases',
     roles: ['sysadmin']
   },
   {
@@ -129,7 +149,7 @@ export function filterNavByEntitlements(roles: string[] = [], permissions: strin
 }
 
 export function resolveLandingRoute(roles: string[] = [], permissions: string[] = []) {
-  if (roles.includes('sysadmin')) return '/app/#platform-companies';
+  if (roles.includes('sysadmin')) return '/app/#platform-overview';
   if (permissions.includes('billing:view')) return '/app/#billing-center';
   if (permissions.includes('devices:view')) return '/app/#company-dashboard';
   return '/app/#home';
