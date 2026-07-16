@@ -1,6 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
   const currentPath = window.location.pathname.replace(/\.html$/, '') || '/';
-  const headerMarkup = `<div class="container header-row"><a class="brand" href="/">Serenut</a><nav class="desktop-nav"><a href="/platform" ${currentPath==='/platform'?'aria-current="page"':''}>Ürün</a><a href="/plans" ${currentPath==='/plans'?'aria-current="page"':''}>Planlar</a><a href="/downloads" ${currentPath==='/downloads'?'aria-current="page"':''}>İndir</a><a href="/contact" ${currentPath==='/contact'?'aria-current="page"':''}>İletişim</a></nav><div class="header-actions"><a class="btn btn-secondary btn-sm" href="/app/">Giriş Yap</a><a class="btn btn-primary btn-sm" href="/app/#register">30 Gün Ücretsiz</a><button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menüyü aç">Menü</button></div></div><div class="mobile-panel app-hidden" id="mobile-panel"><a href="/">Ana Sayfa</a><a href="/platform">Ürün</a><a href="/plans">Planlar</a><a href="/downloads">İndir</a><a href="/contact">İletişim</a><a href="/app/">Giriş Yap</a><a href="/app/#register">30 Gün Ücretsiz</a></div>`;
+  const icon = (path) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"></path></svg>`;
+  const icons = { product:icon('M4 6h16M4 12h16M4 18h10'), plans:icon('M4 4h16v16H4zM8 9h8M8 13h5'), download:icon('M12 3v12m0 0 5-5m-5 5-5-5M5 21h14'), contact:icon('M4 5h16v14H4zM4 7l8 6 8-6') };
+  const escapeHtml = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let profile = null;
+  try { profile = JSON.parse(sessionStorage.getItem('app_profile') || sessionStorage.getItem('portal_profile') || 'null'); } catch (_) {}
+  const accountWidget = profile
+    ? `<a class="account-widget is-authenticated" href="/app/"><span class="account-avatar">${escapeHtml((profile.name||profile.email||'S').slice(0,1).toUpperCase())}</span><span><strong>${escapeHtml(profile.name||'Hesabım')}</strong><small>Panele git</small></span></a>`
+    : `<div class="account-widget"><span class="account-avatar">S</span><span class="account-links"><a href="/app/">Giriş yap</a><a href="/app/#register">Kayıt ol</a></span></div>`;
+  const headerMarkup = `<div class="container header-row"><a class="brand" href="/">Serenut</a><nav class="desktop-nav"><a href="/platform" ${currentPath==='/platform'?'aria-current="page"':''}>${icons.product}<span>Ürün</span></a><a href="/plans" ${currentPath==='/plans'?'aria-current="page"':''}>${icons.plans}<span>Planlar</span></a><a href="/downloads" ${currentPath==='/downloads'?'aria-current="page"':''}>${icons.download}<span>İndir</span></a><a href="/contact" ${currentPath==='/contact'?'aria-current="page"':''}>${icons.contact}<span>İletişim</span></a></nav><div class="header-actions">${accountWidget}</div></div>`;
   let siteHeader = document.getElementById('site-header');
   if (!siteHeader) { siteHeader = document.createElement('header'); siteHeader.id='site-header'; siteHeader.className='site-header'; document.body.prepend(siteHeader); }
   siteHeader.innerHTML = headerMarkup;

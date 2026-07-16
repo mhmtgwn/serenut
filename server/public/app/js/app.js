@@ -13,6 +13,23 @@ const embedContent = document.getElementById('embed-content');
 
 let navigationItems = [];
 
+const navIconPaths = {
+  'workspace-home': 'M4 11l8-7 8 7v9H4z M9 20v-6h6v6',
+  'company-dashboard': 'M4 20V8l8-4 8 4v12 M8 12h2m4 0h2M8 16h2m4 0h2',
+  'sales-operations': 'M4 6h16v12H4z M8 10h8m-8 4h5',
+  'team-management': 'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2 M9.5 10a3 3 0 100-6 3 3 0 000 6z M17 11a3 3 0 000-6',
+  'billing-center': 'M4 6h16v12H4z M4 10h16 M8 15h3',
+  'support-center': 'M4 5h16v12H8l-4 3z M8 9h8m-8 4h5',
+  'platform-overview': 'M4 19V9m5 10V5m5 14v-7m5 7V3',
+  'platform-companies': 'M3 20h18M5 20V8l7-4 7 4v12M9 11h2m2 0h2M9 15h2m2 0h2',
+  'platform-billing': 'M12 3v18m5-14H9.5a3.5 3.5 0 000 7H14a3 3 0 010 6H6',
+  'platform-licenses': 'M5 4h14v16H5z M9 8h6m-6 4h6m-6 4h3',
+  'platform-releases': 'M12 3v12m0 0 5-5m-5 5-5-5M5 21h14',
+  'platform-health': 'M3 12h4l2-6 4 12 2-6h6',
+  'account-settings': 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2 3.46-.08-.02a1.7 1.7 0 00-1.8.22l-.45.26a1.7 1.7 0 00-.8 1.63V22h-4v-.09a1.7 1.7 0 00-.8-1.63l-.45-.26a1.7 1.7 0 00-1.8-.22l-.08.02-2-3.46.06-.06A1.7 1.7 0 005 15v-.52a1.7 1.7 0 00-1.14-1.6L3.8 12.85v-4l.08-.02A1.7 1.7 0 005 7.23v-.52a1.7 1.7 0 00-.34-1.88l-.06-.06 2-3.46.08.02a1.7 1.7 0 001.8-.22l.45-.26A1.7 1.7 0 009.73-.58V-.67h4v.09a1.7 1.7 0 00.8 1.63l.45.26a1.7 1.7 0 001.8.22l.08-.02 2 3.46-.06.06a1.7 1.7 0 00-.34 1.88v.52a1.7 1.7 0 001.14 1.6l.08.02v4l-.08.02A1.7 1.7 0 0019.4 15z'
+};
+const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
+
 document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
 
@@ -284,7 +301,7 @@ function renderNav(items) {
     sectionItems.forEach((item) => {
       nav.insertAdjacentHTML('beforeend', `
         <a class="nav-link" href="${item.href}" data-module-id="${item.id}">
-          <span>${item.label}</span>
+          ${navIcon(item.id)}<span>${item.label}</span>
           <span class="nav-link-desc">${item.description}</span>
         </a>
       `);
@@ -303,7 +320,7 @@ function renderModuleCards(items) {
   const grid = document.getElementById('module-grid');
   grid.innerHTML = items.map((item) => `
     <article class="module-card">
-      <h3>${item.label}</h3>
+      <div class="module-card-icon">${navIcon(item.id)}</div><h3>${item.label}</h3>
       <p>${item.description}</p>
       <button class="btn btn-primary btn-sm" data-module-id="${item.id}">Modülü Aç</button>
     </article>
