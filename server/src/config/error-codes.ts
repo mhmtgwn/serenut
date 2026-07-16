@@ -27,7 +27,7 @@ export const ErrorCodes = {
   AUTH004: {
     code: 'AUTH004',
     http: 429,
-    message: 'Çok fazla hatalı giriş denemesi. 15 dakika bekleyin.',
+    message: 'Çok fazla hatalı giriş denemesi. 5 dakika sonra tekrar deneyin.',
     internal: 'Too many login attempts — account temporarily locked.',
   },
   AUTH005: {

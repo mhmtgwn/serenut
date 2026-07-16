@@ -41,10 +41,13 @@ export function createRedisLimiter(options: LimiterOptions) {
       }
 
       if (current > options.max) {
+        const retryAfterSeconds = Math.max(1, await redisClient.ttl(key));
+        res.setHeader('Retry-After', String(retryAfterSeconds));
         logger.warn(`Rate limit exceeded: ${ip} → ${req.originalUrl} (${current}/${options.max})`);
         return res.status(429).json({
           error: options.error,
-          message: options.message
+          message: options.message,
+          retry_after_seconds: retryAfterSeconds
         });
       }
 
@@ -72,10 +75,10 @@ export const generalApiLimiter = createRedisLimiter({
 
 // ── KİMLİK DOĞRULAMA LİMİTER ─────────────────────────────────────────────────
 export const authLimiter = createRedisLimiter({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 10 : 200, // Üretimde daha sıkı, testte esnek
+  windowMs: 5 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 30 : 200,
   error: 'too_many_auth_attempts',
-  message: 'Çok fazla giriş denemesi yapıldı. 15 dakika bekleyin.'
+  message: 'Çok fazla giriş denemesi yapıldı. En fazla 5 dakika sonra tekrar deneyin.'
 });
 
 // ── LİSANS AKTİVASYON LİMİTER ────────────────────────────────────────────────

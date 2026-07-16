@@ -26,8 +26,8 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCK_TIME_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS || 8);
+const LOCK_TIME_MS = Number(process.env.LOGIN_LOCK_MINUTES || 5) * 60 * 1000;
 
 // SHA-256 hex hash is always exactly 64 chars — used to detect legacy hashes
 const SHA256_HEX_LENGTH = 64;
