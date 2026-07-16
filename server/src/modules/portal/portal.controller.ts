@@ -148,7 +148,15 @@ router.get('/users', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const list = await runWithTenantContext(
       user.company_id,
-      'SELECT id, name, email, is_active, created_at FROM users WHERE company_id = $1 ORDER BY name ASC',
+      `SELECT u.id, u.name, u.email, u.is_active, u.created_at,
+              COALESCE(ARRAY_AGG(r.name) FILTER (WHERE r.id IS NOT NULL), '{}') AS roles,
+              MIN(r.id) AS role_id, MIN(r.name) AS role_name
+       FROM users u
+       LEFT JOIN user_roles ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       WHERE u.company_id = $1
+       GROUP BY u.id
+       ORDER BY u.name ASC`,
       [user.company_id]
     );
     return res.json(list.rows);
@@ -176,6 +184,16 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: 'forbidden', message: 'Sysadmin yetkisi atanamaz.' });
   }
 
+  const assignableRole = await runWithTenantContext(
+    user.company_id,
+    `SELECT id FROM roles WHERE id = $1 AND name <> 'sysadmin'
+     AND (company_id IS NULL OR company_id = $2)`,
+    [role_id, user.company_id]
+  );
+  if (assignableRole.rows.length === 0) {
+    return res.status(400).json({ error: 'invalid_role', message: 'Bu rol firmaya atanamaz.' });
+  }
+
   if (password.length < 8) {
     return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
   }
@@ -183,6 +201,21 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
   const id = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   try {
+    const limitResult = await runWithTenantContext(
+      user.company_id,
+      `SELECT p.user_limit, COUNT(u.id)::int AS current_users
+       FROM subscriptions s
+       JOIN plans p ON p.id = s.plan_id
+       LEFT JOIN users u ON u.company_id = s.company_id AND u.is_active = true
+       WHERE s.company_id = $1
+       GROUP BY p.user_limit
+       ORDER BY MAX(s.created_at) DESC LIMIT 1`,
+      [user.company_id]
+    );
+    if (limitResult.rows[0] && limitResult.rows[0].current_users >= limitResult.rows[0].user_limit) {
+      return res.status(409).json({ error: 'user_limit_reached', message: 'Planınızdaki kullanıcı sınırına ulaştınız.' });
+    }
+
     const passwordHash = await AuthService.hashPassword(password);
 
     await runWithTenantContext(
@@ -219,10 +252,25 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
 
   const { name, email, is_active, new_password, role_id } = req.body;
   const targetId = req.params.id;
+  if (targetId === user.id && is_active === false) {
+    return res.status(400).json({ error: 'cannot_deactivate_self', message: 'Kendi hesabınızı devre dışı bırakamazsınız.' });
+  }
 
   // Prevent assigning 'sysadmin' role unless the requester is also a sysadmin
   if (role_id === 'sysadmin' && !user.roles?.includes('sysadmin')) {
     return res.status(403).json({ error: 'forbidden', message: 'Sysadmin yetkisi atanamaz.' });
+  }
+
+  if (role_id !== undefined) {
+    const assignableRole = await runWithTenantContext(
+      user.company_id,
+      `SELECT id FROM roles WHERE id = $1 AND name <> 'sysadmin'
+       AND (company_id IS NULL OR company_id = $2)`,
+      [role_id, user.company_id]
+    );
+    if (assignableRole.rows.length === 0) {
+      return res.status(400).json({ error: 'invalid_role', message: 'Bu rol firmaya atanamaz.' });
+    }
   }
 
   // Verify user belongs to this company
@@ -331,13 +379,71 @@ router.delete('/users/:id', async (req: AuthenticatedRequest, res: Response) => 
 
 // GET /portal/roles — List assignable roles (exclude sysadmin)
 router.get('/roles', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
   try {
-    const result = await pgPool.query(
-      "SELECT id, name, description FROM roles WHERE name NOT IN ('sysadmin') ORDER BY name ASC"
+    const result = await runWithTenantContext(
+      user.company_id,
+      `SELECT r.id, r.name, r.description, r.company_id,
+              COALESCE(ARRAY_AGG(p.code) FILTER (WHERE p.code IS NOT NULL), '{}') AS permissions
+       FROM roles r
+       LEFT JOIN role_permissions rp ON rp.role_id = r.id
+       LEFT JOIN permissions p ON p.id = rp.permission_id
+       WHERE r.name <> 'sysadmin' AND (r.company_id IS NULL OR r.company_id = $1)
+       GROUP BY r.id ORDER BY r.company_id NULLS FIRST, r.name ASC`,
+      [user.company_id]
     );
     return res.json(result.rows);
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.get('/permissions', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await pgPool.query('SELECT id, code, description FROM permissions ORDER BY code');
+    return res.json(result.rows);
+  } catch (_) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.post('/roles', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (!user.roles?.includes('owner') && !user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const name = String(req.body.name || '').trim();
+  const description = String(req.body.description || '').trim();
+  const permissionCodes = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.map(String))] : [];
+  if (!name || permissionCodes.length === 0) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Rol adı ve en az bir yetki zorunludur.' });
+  }
+  const client = await pgPool.connect();
+  const roleId = `role-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await client.query(
+      'INSERT INTO roles (id, company_id, name, description) VALUES ($1, $2, $3, $4)',
+      [roleId, user.company_id, name, description || null]
+    );
+    const inserted = await client.query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT $1, id FROM permissions WHERE code = ANY($2::varchar[])
+       RETURNING permission_id`,
+      [roleId, permissionCodes]
+    );
+    if (inserted.rowCount !== permissionCodes.length) throw new Error('invalid_permission');
+    await client.query('COMMIT');
+    await writeTenantAudit(user.company_id, user.id, 'CREATE_ROLE', 'roles', roleId, null, { name, permissions: permissionCodes });
+    return res.status(201).json({ id: roleId, name, permissions: permissionCodes });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') return res.status(409).json({ error: 'role_exists', message: 'Bu isimde bir rol zaten var.' });
+    if (err.message === 'invalid_permission') return res.status(400).json({ error: 'invalid_permission' });
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
   }
 });
 

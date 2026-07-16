@@ -618,6 +618,9 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
  *     summary: Iyzico Checkout Webhook Callback
  */
 router.post('/iyzico/callback', async (req: Request, res: Response) => {
+  if (process.env.IYZICO_ENABLED !== 'true') {
+    return res.status(410).send('Kart ödeme kanalı kapalıdır.');
+  }
   const { token } = req.body;
   if (!token) {
     return res.status(400).send('Token missing');

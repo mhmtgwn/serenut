@@ -50,6 +50,7 @@ console.log('✅ DATABASE ISOLATION VERIFIED: Running against safe test environm
 // ---------------------------------------------------------
 
 const testFiles = [
+  'ac_saas_foundation.test.ts',
   'ac_trial.test.ts',
   'ac_license.test.ts',
   'ac_billing.test.ts',

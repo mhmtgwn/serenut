@@ -5,6 +5,10 @@ import { authLimiter, passwordResetLimiter, signupLimiter } from '../../middlewa
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
+import { pgPool } from '../../config/database';
+import { enqueueNotification } from '../../workers/notification.worker';
+import { emailVerificationEmail } from '../notifications/email.templates';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -60,6 +64,12 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     }
     if (err.message === 'user_suspended') {
       return res.status(403).json(createError('AUTH003'));
+    }
+    if (err.message === 'email_not_verified') {
+      return res.status(403).json({
+        error: { code: 'EMAIL_NOT_VERIFIED', message: 'Giriş yapmadan önce e-posta adresinizi doğrulayın.' },
+        can_resend: true
+      });
     }
     if (err.message === 'account_locked') {
       return res.status(429).json(createError('AUTH004'));
@@ -255,13 +265,23 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
 // ── SELF-SERVICE REGISTRATION ────────────────────────────────────────────────
 // Creates a new company tenant + owner/admin user in a single atomic transaction.
 router.post('/register', signupLimiter, async (req: Request, res: Response) => {
-  const { company_name, name, email, password, phone, tax_number, plan_id } = req.body;
+  const { company_name, name, email, password, phone, tax_number, tax_office, city, district, address,
+    accept_terms, accept_privacy, accept_kvkk, accept_marketing } = req.body;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedTaxNumber = String(tax_number || '').replace(/\D/g, '');
 
-  if (!company_name || !name || !email || !password) {
+  if (!company_name || !name || !normalizedEmail || !password || !normalizedTaxNumber) {
     return res.status(400).json({
       error: 'missing_fields',
-      message: 'Firma adı, ad soyad, e-posta ve şifre zorunludur.'
+      message: 'Firma adı, ad soyad, e-posta, şifre ve TC/VKN zorunludur.'
     });
+  }
+
+  if (![10, 11].includes(normalizedTaxNumber.length)) {
+    return res.status(400).json({ error: 'invalid_tax_number', message: 'TC 11, VKN 10 haneli olmalıdır.' });
+  }
+  if (!accept_terms || !accept_privacy || !accept_kvkk) {
+    return res.status(400).json({ error: 'legal_consent_required', message: 'Üyelik, gizlilik ve KVKK onayları zorunludur.' });
   }
 
   if (password.length < 8) {
@@ -275,6 +295,9 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   const { pgPool } = require('../../config/database');
 
   const client = await pgPool.connect();
+  let verificationToken = '';
+  let registeredUserId = '';
+  let registeredCompanyId = '';
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
@@ -282,7 +305,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     // Check if email already exists (global uniqueness for the owner account)
     const emailCheck = await client.query(
       'SELECT id FROM users WHERE email = $1',
-      [email]
+      [normalizedEmail]
     );
     if (emailCheck.rows.length > 0) {
       await client.query('ROLLBACK');
@@ -292,12 +315,25 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       });
     }
 
+    const taxCheck = await client.query(
+      `SELECT id FROM companies WHERE REGEXP_REPLACE(tax_number, '\\D', '', 'g') = $1 LIMIT 1`,
+      [normalizedTaxNumber]
+    );
+    if (taxCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        error: 'tax_number_taken',
+        message: 'Bu TC/VKN ile kayıtlı bir firma var. Firma sahibinden kullanıcı hesabı isteyin.'
+      });
+    }
+
     // Create company
     const companyId = `comp-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     await client.query(
-      `INSERT INTO companies (id, name, tax_number, phone, email, status)
-       VALUES ($1, $2, $3, $4, $5, 'trial')`,
-      [companyId, company_name, tax_number || `TEMP-${Date.now()}`, phone || null, email]
+      `INSERT INTO companies (id, name, owner_name, tax_number, tax_office, phone, email, city, district, address, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'trial')`,
+      [companyId, company_name, name, normalizedTaxNumber, tax_office || null, phone || null, normalizedEmail,
+        city || null, district || null, address || null]
     );
 
     // Create owner user
@@ -305,9 +341,25 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     const passwordHash = await AuthService.hashPassword(password);
     await client.query(
       `INSERT INTO users (id, company_id, name, email, password_hash, is_active)
-       VALUES ($1, $2, $3, $4, $5, true)`,
-      [userId, companyId, name, email, passwordHash]
+       VALUES ($1, $2, $3, $4, $5, false)`,
+      [userId, companyId, name, normalizedEmail, passwordHash]
     );
+    registeredUserId = userId;
+    registeredCompanyId = companyId;
+
+    const consentVersion = process.env.LEGAL_DOCUMENT_VERSION || '2026-07';
+    const consentRows = [
+      ['terms', true], ['privacy', true], ['kvkk', true], ['marketing', Boolean(accept_marketing)]
+    ];
+    for (const [consentType, accepted] of consentRows) {
+      await client.query(
+        `INSERT INTO user_legal_consents
+          (id, user_id, consent_type, document_version, accepted, ip_address, user_agent)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [`consent-${userId}-${consentType}`, userId, consentType, consentVersion, accepted,
+          req.ip || null, req.headers['user-agent'] || null]
+      );
+    }
 
     // Assign 'owner' role if it exists
     const ownerRoleRes = await client.query(
@@ -320,15 +372,9 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       );
     }
 
-    // Map user plan selection to database IDs (target plan for subscription)
-    let mappedPlanId = plan_id || 'plan-free';
-    // Support legacy frontend keys just in case
-    if (plan_id === 'starter') mappedPlanId = 'plan-basic';
-    else if (plan_id === 'growth') mappedPlanId = 'plan-pro';
-    else if (plan_id === 'pro') mappedPlanId = 'plan-enterprise';
-
-    // All trial registrations start on plan-free limits to prevent unpaid premium entitlement bypass
-    const trialPlanId = 'plan-free';
+    // Registration never selects a paid plan. Every company starts with the
+    // Starter trial contract; the clock begins on first device activation.
+    const trialPlanId = 'plan-basic';
     const trialDeviceLimit = 1;
     const trialStoreLimit = 1;
 
@@ -342,7 +388,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
             trial_started_at, trial_ends_at, payment_retry_count)
          VALUES ($1, $2, $3, 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
                  NULL, NULL, 0)`,
-        [subId, companyId, mappedPlanId]
+        [subId, companyId, trialPlanId]
       );
 
       // Generate a canonical license key and trial entitlement during registration!
@@ -377,21 +423,155 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
         licenseKey
       ]);
 
+      verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+      await client.query(
+        `INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')`,
+        [`evt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, userId, verificationHash]
+      );
+
     await client.query('COMMIT');
 
-    // Auto-login: issue token pair
-    const ipAddress = req.ip || req.socket.remoteAddress || undefined;
-    const userAgent = req.headers['user-agent'] || undefined;
-    const loginResult = await AuthService.login(email, password, ipAddress, userAgent);
+    try {
+    const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
+    const message = emailVerificationEmail({
+      userName: name,
+      verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${verificationToken}`
+    });
+    const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    await pgPool.query(
+      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
+       VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
+      [notificationId, registeredCompanyId, normalizedEmail, message.subject, message.html]
+    );
+    await enqueueNotification({
+      notification_id: notificationId,
+      company_id: registeredCompanyId,
+      channel: 'email',
+      recipient: normalizedEmail,
+      title: message.subject,
+      body: message.html
+    });
+    } catch (notificationError) {
+      logger.error('Verification email could not be queued after registration', notificationError);
+    }
 
     return res.status(201).json({
-      ...loginResult,
-      message: 'Hesabınız oluşturuldu. 30 günlük ücretsiz deneme başladı!'
+      user_id: registeredUserId,
+      email_verification_required: true,
+      message: 'Hesabınız oluşturuldu. Giriş yapabilmek için e-posta adresinizi doğrulayın.'
     });
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Register error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Kayıt işlemi sırasında bir hata oluştu.' });
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/verify-email', async (req: Request, res: Response) => {
+  const token = String(req.query.token || '');
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return res.status(400).send('Geçersiz doğrulama bağlantısı.');
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const result = await client.query(
+      `SELECT id, user_id FROM email_verification_tokens
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+       FOR UPDATE`,
+      [tokenHash]
+    );
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).send('Doğrulama bağlantısının süresi dolmuş veya bağlantı daha önce kullanılmış.');
+    }
+    await client.query(
+      `UPDATE users SET email_verified_at = NOW(), is_active = true WHERE id = $1`,
+      [result.rows[0].user_id]
+    );
+    await client.query(
+      `UPDATE email_verification_tokens SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [result.rows[0].user_id]
+    );
+    await client.query('COMMIT');
+    return res.redirect(302, '/app/#login?verified=1');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Email verification failed', err);
+    return res.status(500).send('E-posta doğrulanamadı. Lütfen yeniden deneyin.');
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/resend-verification', signupLimiter, async (req: Request, res: Response) => {
+  const normalizedEmail = String(req.body.email || '').trim().toLowerCase();
+  const genericResponse = {
+    message: 'Doğrulanmamış bir hesap varsa yeni bağlantı gönderildi.'
+  };
+  if (!normalizedEmail) return res.status(200).json(genericResponse);
+
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const userResult = await client.query(
+      `SELECT id, company_id, name FROM users
+       WHERE LOWER(email) = $1 AND email_verified_at IS NULL AND is_active = false
+       LIMIT 1`,
+      [normalizedEmail]
+    );
+    if (userResult.rows.length === 0) {
+      await client.query('COMMIT');
+      return res.status(200).json(genericResponse);
+    }
+    const user = userResult.rows[0];
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    await client.query(
+      `UPDATE email_verification_tokens SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [user.id]
+    );
+    await client.query(
+      `INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')`,
+      [`evt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, user.id, tokenHash]
+    );
+    await client.query('COMMIT');
+
+    const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
+    const emailMessage = emailVerificationEmail({
+      userName: user.name,
+      verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${rawToken}`
+    });
+    const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    await pgPool.query(
+      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
+       VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
+      [notificationId, user.company_id, normalizedEmail, emailMessage.subject, emailMessage.html]
+    );
+    await enqueueNotification({
+      notification_id: notificationId,
+      company_id: user.company_id,
+      channel: 'email',
+      recipient: normalizedEmail,
+      title: emailMessage.subject,
+      body: emailMessage.html
+    });
+    return res.status(200).json(genericResponse);
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Resend verification failed', err);
+    return res.status(500).json({ error: 'server_error' });
   } finally {
     client.release();
   }

@@ -88,7 +88,7 @@ export class AuthService {
 
       // 1. Fetch user status (lock check)
       const userRes = await client.query(
-        `SELECT id, company_id, password_hash, failed_login_attempts, locked_until, is_active
+        `SELECT id, company_id, password_hash, failed_login_attempts, locked_until, is_active, email_verified_at
          FROM users WHERE email = $1`,
         [email]
       );
@@ -101,6 +101,9 @@ export class AuthService {
       const now = new Date();
 
       if (!user.is_active) {
+        if (!user.email_verified_at) {
+          throw new Error('email_not_verified');
+        }
         throw new Error('user_suspended');
       }
 
@@ -175,9 +178,9 @@ export class AuthService {
           `SELECT DISTINCT p.code
            FROM permissions p
            JOIN role_permissions rp ON p.id = rp.permission_id
-           JOIN roles r ON rp.role_id = r.id
-           WHERE r.name = ANY($1)`,
-          [roles]
+           JOIN user_roles ur ON ur.role_id = rp.role_id
+           WHERE ur.user_id = $1`,
+          [userRow.id]
         );
         permissions = permRes.rows.map((row: any) => row.code);
       }
@@ -319,9 +322,9 @@ export class AuthService {
                   `SELECT DISTINCT p.code
                    FROM permissions p
                    JOIN role_permissions rp ON p.id = rp.permission_id
-                   JOIN roles r ON rp.role_id = r.id
-                   WHERE r.name = ANY($1)`,
-                  [roles]
+                   JOIN user_roles ur ON ur.role_id = rp.role_id
+                   WHERE ur.user_id = $1`,
+                  [session.user_id]
                 );
                 permissions = permRes.rows.map((row: any) => row.code);
               }
@@ -410,9 +413,9 @@ export class AuthService {
           `SELECT DISTINCT p.code
            FROM permissions p
            JOIN role_permissions rp ON p.id = rp.permission_id
-           JOIN roles r ON rp.role_id = r.id
-           WHERE r.name = ANY($1)`,
-          [roles]
+           JOIN user_roles ur ON ur.role_id = rp.role_id
+           WHERE ur.user_id = $1`,
+          [userRow.id]
         );
         permissions = permRes.rows.map((row: any) => row.code);
       }

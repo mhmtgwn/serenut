@@ -198,6 +198,118 @@ router.post('/sync-local', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+router.get('/sms-gateway', async (req: AuthenticatedRequest, res: Response) => {
+  const result = await runWithTenantContext(
+    req.user!.company_id,
+    `SELECT g.device_activation_id, g.selected_at, g.last_poll_at,
+            d.device_name, d.platform, d.status,
+            CASE WHEN g.last_poll_at > NOW() - INTERVAL '5 minutes' THEN true ELSE false END AS is_online
+     FROM company_sms_gateways g
+     JOIN device_activations d ON d.id = g.device_activation_id
+     WHERE g.company_id = $1`,
+    [req.user!.company_id]
+  );
+  return res.json(result.rows[0] || null);
+});
+
+router.put('/sms-gateway', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  if (!user.roles?.includes('owner') && !user.roles?.includes('sysadmin')) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const deviceId = String(req.body.device_id || '');
+  const device = await runWithTenantContext(
+    user.company_id,
+    `SELECT id FROM device_activations
+     WHERE id = $1 AND company_id = $2 AND status = 'active' AND LOWER(COALESCE(platform, '')) = 'android'`,
+    [deviceId, user.company_id]
+  );
+  if (device.rows.length === 0) {
+    return res.status(400).json({ error: 'invalid_android_device', message: 'Aktif bir Android cihaz seçin.' });
+  }
+  await runWithTenantContext(
+    user.company_id,
+    `INSERT INTO company_sms_gateways (company_id, device_activation_id, selected_by)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (company_id) DO UPDATE SET
+       device_activation_id = EXCLUDED.device_activation_id,
+       selected_by = EXCLUDED.selected_by,
+       selected_at = NOW(), last_poll_at = NULL`,
+    [user.company_id, deviceId, user.id]
+  );
+  return res.json({ success: true, device_id: deviceId });
+});
+
+router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const deviceId = String(req.body.device_id || '');
+  const limit = Math.min(Math.max(Number(req.body.limit || 20), 1), 50);
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    const gateway = await client.query(
+      `UPDATE company_sms_gateways SET last_poll_at = NOW()
+       WHERE company_id = $1 AND device_activation_id = $2 RETURNING device_activation_id`,
+      [user.company_id, deviceId]
+    );
+    if (gateway.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'not_primary_sms_gateway' });
+    }
+    await client.query(
+      `UPDATE notification_queue SET status = 'failed', error_message = 'sms_gateway_timeout', gateway_updated_at = NOW()
+       WHERE company_id = $1 AND channel = 'sms' AND status IN ('queued','pending','retrying')
+         AND created_at < NOW() - INTERVAL '24 hours'`,
+      [user.company_id]
+    );
+    const jobs = await client.query(
+      `WITH selected AS (
+         SELECT id FROM notification_queue
+         WHERE company_id = $1 AND channel = 'sms' AND status IN ('queued','pending','retrying')
+           AND COALESCE(scheduled_at, created_at) <= NOW()
+           AND created_at >= NOW() - INTERVAL '24 hours'
+         ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT $3
+       )
+       UPDATE notification_queue q
+       SET status = 'delivered_to_device', gateway_device_id = $2,
+           gateway_claimed_at = NOW(), gateway_updated_at = NOW()
+       FROM selected WHERE q.id = selected.id
+       RETURNING q.id, q.recipient, q.body, q.client_message_id, q.created_at`,
+      [user.company_id, deviceId, limit]
+    );
+    await client.query('COMMIT');
+    return res.json({ messages: jobs.rows });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('SMS gateway poll failed', err);
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/sms-gateway/messages/:id/result', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const deviceId = String(req.body.device_id || '');
+  const status = String(req.body.status || '');
+  if (!['sending', 'sent', 'failed'].includes(status)) {
+    return res.status(400).json({ error: 'invalid_status' });
+  }
+  const result = await runWithTenantContext(
+    user.company_id,
+    `UPDATE notification_queue q SET status = $1, error_message = $2,
+       delivered_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE delivered_at END,
+       gateway_updated_at = NOW()
+     WHERE q.id = $3 AND q.company_id = $4 AND q.channel = 'sms' AND q.gateway_device_id = $5
+       AND EXISTS (SELECT 1 FROM company_sms_gateways g WHERE g.company_id = $4 AND g.device_activation_id = $5)
+     RETURNING q.id, q.status`,
+    [status, req.body.error_message || null, req.params.id, user.company_id, deviceId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'message_not_found' });
+  return res.json(result.rows[0]);
+});
+
 
 /**
  * @openapi

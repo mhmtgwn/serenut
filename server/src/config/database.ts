@@ -151,7 +151,10 @@ const redisUrl = process.env.REDIS_URL;
 let redisClient: any = null;
 
 if (redisUrl) {
-  redisClient = createClient({ url: redisUrl });
+  redisClient = createClient({
+    url: redisUrl,
+    socket: nodeEnv === 'test' ? { reconnectStrategy: false } : undefined
+  });
   redisClient.on('error', (err: any) => console.error('🔴 Redis Client Error:', err));
   redisClient.connect()
     .then(() => console.log('🔴 Connected to Redis successfully!'))

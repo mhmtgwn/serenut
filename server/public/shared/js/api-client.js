@@ -42,6 +42,28 @@ export function setRefreshToken(token) {
   if (token) sessionStorage.setItem('app_refresh_token', token);
 }
 
+let refreshPromise = null;
+
+async function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise;
+  const refreshToken = sessionStorage.getItem('app_refresh_token');
+  if (!refreshToken) return false;
+  refreshPromise = fetch(`${BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken })
+  }).then(async (response) => {
+    if (!response.ok) return false;
+    const data = await response.json();
+    setAuthToken(data.access_token);
+    setRefreshToken(data.refresh_token || refreshToken);
+    return true;
+  }).catch(() => false).finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
 export function setAuthToken(token) {
   sessionStorage.setItem(getTokenKey(), token);
   if (isUnifiedApp()) {
@@ -86,7 +108,7 @@ export function clearAuthToken() {
  * @param {object} options 
  * @returns {Promise<any>}
  */
-export async function apiFetch(endpoint, options = {}) {
+export async function apiFetch(endpoint, options = {}, retry = true) {
   const token = getAuthToken();
   
   const headers = {
@@ -114,6 +136,13 @@ export async function apiFetch(endpoint, options = {}) {
 
   // Handle unauthorized redirects
   if (response.status === 401) {
+    if (retry && await refreshAccessToken()) {
+      const retryOptions = { ...options };
+      if (typeof retryOptions.body === 'string' && headers['Content-Type'] === 'application/json') {
+        try { retryOptions.body = JSON.parse(retryOptions.body); } catch (_) {}
+      }
+      return apiFetch(endpoint, retryOptions, false);
+    }
     clearAuthToken();
     throw new Error('Unauthorized');
   }

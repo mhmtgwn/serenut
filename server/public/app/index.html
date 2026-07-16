@@ -79,8 +79,30 @@
         <input type="tel" id="register-phone" placeholder="0505 000 00 00">
       </div>
       <div class="form-group">
+        <label class="form-label">TC veya VKN</label>
+        <input type="text" id="register-tax-number" inputmode="numeric" maxlength="11" placeholder="10 veya 11 hane" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vergi Dairesi</label>
+        <input type="text" id="register-tax-office" placeholder="İsteğe bağlı">
+      </div>
+      <div class="form-group form-row-two">
+        <div><label class="form-label">İl</label><input type="text" id="register-city" placeholder="İstanbul"></div>
+        <div><label class="form-label">İlçe</label><input type="text" id="register-district" placeholder="Kadıköy"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Firma Adresi</label>
+        <textarea id="register-address" rows="2" placeholder="İsteğe bağlı"></textarea>
+      </div>
+      <div class="form-group">
         <label class="form-label">Şifre</label>
         <input type="password" id="register-password" placeholder="En az 8 karakter">
+      </div>
+      <div class="legal-consents">
+        <label><input type="checkbox" id="accept-terms" required> <a href="/terms.html" target="_blank">Üyelik koşullarını</a> kabul ediyorum.</label>
+        <label><input type="checkbox" id="accept-privacy" required> <a href="/privacy.html" target="_blank">Gizlilik politikasını</a> kabul ediyorum.</label>
+        <label><input type="checkbox" id="accept-kvkk" required> <a href="/kvkk.html" target="_blank">KVKK aydınlatma metnini</a> okudum.</label>
+        <label><input type="checkbox" id="accept-marketing"> Kampanya ve ürün duyuruları almak istiyorum.</label>
       </div>
       <div class="auth-status text-sm text-red" id="register-status"></div>
       <button class="btn btn-primary w-full" id="btn-register">Hesap Oluştur</button>

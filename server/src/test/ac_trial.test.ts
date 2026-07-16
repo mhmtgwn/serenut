@@ -94,13 +94,27 @@ async function run() {
     }
 
     const postSub = await pgPool.query(
-      `SELECT status, trial_started_at FROM subscriptions WHERE company_id = 'trial-comp'`
+      `SELECT status, trial_started_at, trial_ends_at, current_period_end
+       FROM subscriptions WHERE company_id = 'trial-comp'`
     );
     if (postSub.rows[0].trial_started_at === null) {
       throw new Error('Trial started date is still null after device activation!');
     }
     if (postSub.rows[0].status !== 'trialing') {
       throw new Error(`Expected subscription status to be 'trialing', got: ${postSub.rows[0].status}`);
+    }
+    const postEntitlement = await pgPool.query(
+      `SELECT valid_until FROM license_entitlements WHERE id = 'ent-trial'`
+    );
+    const trialEndsAt = new Date(postSub.rows[0].trial_ends_at).getTime();
+    const entitlementEndsAt = new Date(postEntitlement.rows[0].valid_until).getTime();
+    const currentPeriodEndsAt = new Date(postSub.rows[0].current_period_end).getTime();
+    if (Math.abs(trialEndsAt - entitlementEndsAt) > 1000 || Math.abs(trialEndsAt - currentPeriodEndsAt) > 1000) {
+      throw new Error('Subscription and entitlement trial dates are not aligned!');
+    }
+    const trialDurationDays = (trialEndsAt - new Date(postSub.rows[0].trial_started_at).getTime()) / 86_400_000;
+    if (trialDurationDays < 29.99 || trialDurationDays > 30.01) {
+      throw new Error(`Expected a 30-day trial, got ${trialDurationDays} days`);
     }
 
     console.log('  ✔️ Trial successfully started on POS device activation at:', postSub.rows[0].trial_started_at);

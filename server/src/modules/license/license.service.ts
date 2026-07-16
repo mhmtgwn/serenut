@@ -183,9 +183,24 @@ export class LicenseService {
             const trialStart = new Date();
             const trialEnd = new Date(trialStart.getTime() + 30 * 24 * 60 * 60 * 1000);
             await trialClient.query(
-              `UPDATE subscriptions SET trial_started_at = $1, trial_ends_at = $2, status = 'trialing' WHERE id = $3`,
+              `UPDATE subscriptions
+               SET trial_started_at = $1,
+                   trial_ends_at = $2,
+                   current_period_start = $1,
+                   current_period_end = $2,
+                   status = 'trialing'
+               WHERE id = $3`,
               [trialStart, trialEnd, subCheck.rows[0].id]
             );
+            await trialClient.query(
+              `UPDATE license_entitlements
+               SET valid_from = $1, valid_until = $2, updated_at = NOW()
+               WHERE id = $3 AND status = 'trial'`,
+              [trialStart, trialEnd, entitlement.id]
+            );
+            // The response below is built from the row fetched before this update.
+            // Keep it aligned so the client receives the actual 30-day trial end.
+            entitlement.valid_until = trialEnd;
           }
           await trialClient.query('COMMIT');
         } catch (trialErr) {

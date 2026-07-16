@@ -11,6 +11,8 @@ import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { SupportService } from './support.service';
 import { createError } from '../../config/error-codes';
+import { pgPool } from '../../config/database';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -20,14 +22,18 @@ router.post('/public-contact', async (req, res) => {
   if (!name || !email || !subject || !message) {
     return res.status(400).json({ error: 'missing_fields', message: 'Lütfen tüm zorunlu alanları doldurun.' });
   }
-  console.log(`✉️ İletişim Formu Mesajı Alındı:
-    Ad: ${name}
-    E-posta: ${email}
-    Telefon: ${phone || 'Belirtilmedi'}
-    Konu: ${subject}
-    Mesaj: ${message}
-  `);
-  return res.status(200).json({ success: true, message: 'Mesajınız başarıyla iletildi.' });
+  try {
+    const id = `contact-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    await pgPool.query(
+      `INSERT INTO public_contact_messages (id, name, email, phone, subject, message)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, String(name).trim(), String(email).trim().toLowerCase(), phone ? String(phone).trim() : null, String(subject).trim(), String(message).trim()]
+    );
+    return res.status(201).json({ success: true, message: 'Mesajınız alındı. Destek ekibimiz sizinle iletişime geçecek.' });
+  } catch (err) {
+    console.error('Public contact persistence error:', err);
+    return res.status(500).json({ error: 'server_error', message: 'Mesajınız kaydedilemedi.' });
+  }
 });
 
 // All support routes require authentication

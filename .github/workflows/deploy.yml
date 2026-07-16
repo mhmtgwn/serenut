@@ -1,16 +1,18 @@
-name: Serenut OS Continuous Integration & Staging Deployment
+name: Serenut CI and Deployment
 
 on:
   push:
-    branches: [ main, master, develop, staging ]
+    branches: [main, staging]
   pull_request:
-    branches: [ main, master, develop, staging ]
+    branches: [main, staging]
+
+concurrency:
+  group: serenut-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   backend-ci:
-    name: Backend CI & Database Rollback Validation
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:16
@@ -18,216 +20,131 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgrespassword
           POSTGRES_DB: postgres
-        ports:
-          - 5433:5432
+        ports: ["5433:5432"]
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
       redis:
         image: redis:7
-        ports:
-          - 6379:6379
-
+        ports: ["6379:6379"]
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: 'server/package-lock.json'
-
-      - name: Install Server Dependencies
-        run: |
-          cd server
-          npm install --legacy-peer-deps
-
-      - name: Compile TypeScript Server
-        run: |
-          cd server
-          npm run build
-
-      - name: Create Test Database
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --legacy-peer-deps
+        working-directory: server
+      - run: npm run build
+        working-directory: server
+      - name: Create isolated acceptance database
         env:
           PGPASSWORD: postgrespassword
-        run: psql -h localhost -p 5433 -U postgres -d postgres -c "CREATE DATABASE testdb;"
-
-      - name: Validate Database Schema Migrations (Up)
-        env:
-          DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/testdb
-        run: |
-          cd server
-          npm run migrate
-
-      - name: Run All Verification Tests
+        run: psql -h localhost -p 5433 -U postgres -d postgres -c "CREATE DATABASE serenut_test;"
+      - name: Run migrations and tests
+        working-directory: server
         env:
           NODE_ENV: test
           DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/postgres
-          TEST_DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/testdb
+          TEST_DATABASE_URL: postgres://postgres:postgrespassword@localhost:5433/serenut_test
           JWT_SECRET: testing-jwt-secret-key-that-is-at-least-32-chars-long
           APP_SECRET: testing-app-secret-key-that-is-at-least-32-bytes-long
           INVOICES_DIR: ./invoices
         run: |
-          cd server
           rm -f .env.test
-          npm run test || echo "Tests failed, bypassing for hotfix deploy"
+          DATABASE_URL="$TEST_DATABASE_URL" npm run migrate
+          npm run test
 
-  frontend-ci:
-    name: Frontend CI & Build Compilation
+  flutter-ci:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Java SDK
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
+          distribution: zulu
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
-
-      - name: Install Flutter Dependencies
-        run: flutter pub get
-
-      - name: Run Static Code Analysis (Errors only)
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-      - name: Run Widget & Logic Tests
-        run: flutter test --fail-fast
-
-      - name: Create keystore properties
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test --fail-fast
+      - name: Configure Android signing
+        if: github.event_name == 'push'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          echo "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" | base64 --decode > android/app/serenut-release.jks
-          echo "storePassword=serenut123" > android/key.properties
-          echo "keyPassword=serenut123" >> android/key.properties
-          echo "keyAlias=serenut" >> android/key.properties
-          echo "storeFile=serenut-release.jks" >> android/key.properties
-
-      - name: Build Android APK
-        run: flutter build apk --release
-
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v4
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/serenut-release.jks
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=serenut-release.jks\n' \
+            "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" > android/key.properties
+      - run: flutter build apk --release
+        if: github.event_name == 'push'
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
         with:
           name: serenut-pos-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
   windows-ci:
-    name: Windows Installer Build
     runs-on: windows-latest
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
           cache: true
-
-      - name: Install Flutter Dependencies
-        run: flutter pub get
-
-      - name: Build Windows Executable
-        run: flutter build windows --release
-
-      - name: Compile Inno Setup Installer
-        run: iscc windows\installer\serenut_installer.iss
-
-      - name: Upload Windows Build
-        uses: actions/upload-artifact@v4
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - run: iscc windows\installer\serenut_installer.iss
+      - uses: actions/upload-artifact@v4
         with:
           name: serenut-pos-windows-build
           path: build/windows/x64/runner/Release/
 
   deploy-production:
-    name: Continuous Production Deployment (VPS)
-    needs: [backend-ci]
+    needs: [backend-ci, flutter-ci, windows-ci]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
-
+    environment: production
     steps:
-      - name: Deploy to Production VPS via SSH
-        uses: appleboy/ssh-action@master
+      - name: Deploy production
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          host: "185.255.93.94"
-          username: "root"
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: 2222
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
           script: |
-            mkdir -p /var/www/serenut
             cd /var/www/serenut
-            if [ ! -d .git ]; then
-              git init
-              git remote add origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
-            else
-              git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
-            fi
-            git fetch --all
+            git fetch origin main
             git reset --hard origin/main
             cd server
-            sed -i '/^GIT_COMMIT=/d' .env.production || true
-            echo "GIT_COMMIT=${{ github.sha }}" >> .env.production
-            npm install --legacy-peer-deps
-            set -a
-            [ -f .env.production ] && . .env.production
-            set +a
-            bash devops/migrate-with-rollback.sh || echo "Migration warning, continuing..."
-            chmod -R 755 /var/www/serenut/server/public || true
-            docker rm -f serenut-redis serenut-db serenut-backend || true
+            bash devops/migrate-with-rollback.sh
             docker compose -f docker-compose.prod.yml --env-file .env.production build
-            docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans
-            docker compose -f docker-compose.prod.yml --env-file .env.production up -d
-            docker image prune -a -f
-            sleep 25
-            docker logs serenut-backend > /var/www/serenut/server/public/shared/docker_debug.txt 2>&1 || true
-            chmod 644 /var/www/serenut/server/public/shared/docker_debug.txt || true
-            curl -d @/var/www/serenut/server/public/shared/docker_debug.txt -X POST "https://webhook.site/2ec19433-d086-48ac-ac67-6774e494d36e" || true
-            nginx -t > /var/www/serenut/server/public/shared/nginx_debug.txt 2>&1 || true
-            curl -d @/var/www/serenut/server/public/shared/nginx_debug.txt -X POST "https://webhook.site/2ec19433-d086-48ac-ac67-6774e494d36e" || true
-            # Setup Nginx reverse proxy
-            apt-get install -y nginx || true
-            cp devops/nginx.conf /etc/nginx/sites-available/serenut
-            ln -sf /etc/nginx/sites-available/serenut /etc/nginx/sites-enabled/serenut
-            rm -f /etc/nginx/sites-enabled/default
-            nginx -t && systemctl reload nginx || systemctl restart nginx
-            docker compose -f docker-compose.prod.yml exec -T backend node public/website/downloads/seed_production.js || echo "Seed skipped"
-            echo "Deployment completed successfully."
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml ps
+            curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:3000/health
 
   deploy-staging:
-    name: Continuous Staging Deployment (VPS)
+    needs: [backend-ci, flutter-ci, windows-ci]
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
-
+    environment: staging
     steps:
-      - name: Deploy to Staging VPS via SSH
-        uses: appleboy/ssh-action@master
+      - name: Deploy staging
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          host: "185.255.93.94"
-          username: "root"
-          password: ${{ secrets.VPS_SSH_PASSWORD }}
-          port: 2222
-          script: |
-            mkdir -p /var/www/serenut-staging
-            cd /var/www/serenut-staging
-            if [ ! -d .git ]; then
-              git init
-              git remote add origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
-            else
-              git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/mhmtgwn/serenut.git
-            fi
-            git fetch --all
-            git reset --hard origin/staging
-            sudo bash server/scripts/deploy_staging.sh
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
+          script: sudo bash /var/www/serenut-staging/server/scripts/deploy_staging.sh

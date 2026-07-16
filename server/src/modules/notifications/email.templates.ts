@@ -37,6 +37,19 @@ interface EmailVars {
   cancelLink?: string;
   retryCount?: number;
   supportEmail?: string;
+  verificationLink?: string;
+}
+
+export function emailVerificationEmail(vars: EmailVars): { subject: string; html: string } {
+  const subject = 'Serenut hesabınızı doğrulayın';
+  const html = wrapEmail(subject, `
+    <h1>E-posta adresinizi doğrulayın</h1>
+    <p>Merhaba ${vars.userName || ''}, Serenut firma hesabınızı açmak için aşağıdaki bağlantıyı kullanın.</p>
+    <a href="${vars.verificationLink}" class="btn">Hesabımı Doğrula</a>
+    <div class="warning-box"><p>Bu bağlantı 30 dakika ve yalnızca bir kez geçerlidir.</p></div>
+    <p>Bu kaydı siz oluşturmadıysanız e-postayı yok sayabilirsiniz.</p>
+  `);
+  return { subject, html };
 }
 
 // ── ORTAK HTML ÇERÇEVE ────────────────────────────────────────────────────────

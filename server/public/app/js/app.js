@@ -15,7 +15,6 @@ let navigationItems = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
-  handleInitialIntent();
 
   if (isAuthenticated()) {
     bootShell();
@@ -23,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   showAuth();
+  handleInitialIntent();
 });
 
 function bindEvents() {
@@ -49,7 +49,7 @@ function handleInitialIntent() {
     return;
   }
 
-  if (window.location.hash === '#register') {
+  if (window.location.hash.startsWith('#register')) {
     openLayer('register');
   }
 }
@@ -94,7 +94,20 @@ async function handleLogin() {
       })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data?.error?.message || data?.message || 'Giriş başarısız.');
+    if (!res.ok) {
+      if (data?.error?.code === 'EMAIL_NOT_VERIFIED') {
+        const email = document.getElementById('login-email').value.trim();
+        statusEl.innerText = `${data.error.message} `;
+        const resend = document.createElement('button');
+        resend.type = 'button';
+        resend.className = 'ghost-link';
+        resend.innerText = 'Bağlantıyı yeniden gönder';
+        resend.addEventListener('click', () => resendVerification(email, resend));
+        statusEl.appendChild(resend);
+        return;
+      }
+      throw new Error(data?.error?.message || data?.message || 'Giriş başarısız.');
+    }
     setAuthToken(data.access_token);
     setRefreshToken(data.refresh_token);
     setUserProfile(data.user);
@@ -117,17 +130,40 @@ async function handleRegister() {
         name: document.getElementById('register-name').value.trim(),
         email: document.getElementById('register-email').value.trim(),
         phone: document.getElementById('register-phone').value.trim(),
+        tax_number: document.getElementById('register-tax-number').value.trim(),
+        tax_office: document.getElementById('register-tax-office').value.trim(),
+        city: document.getElementById('register-city').value.trim(),
+        district: document.getElementById('register-district').value.trim(),
+        address: document.getElementById('register-address').value.trim(),
+        accept_terms: document.getElementById('accept-terms').checked,
+        accept_privacy: document.getElementById('accept-privacy').checked,
+        accept_kvkk: document.getElementById('accept-kvkk').checked,
+        accept_marketing: document.getElementById('accept-marketing').checked,
         password: document.getElementById('register-password').value
       })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || 'Kayıt oluşturulamadı.');
-    setAuthToken(data.access_token);
-    setRefreshToken(data.refresh_token);
-    setUserProfile(data.user);
-    await bootShell();
+    statusEl.className = 'auth-status text-sm text-green';
+    statusEl.innerText = data.message;
+    document.getElementById('btn-register').disabled = true;
   } catch (error) {
     statusEl.innerText = error.message;
+  }
+}
+
+async function resendVerification(email, button) {
+  button.disabled = true;
+  try {
+    const res = await fetch('/api/v1/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    button.innerText = res.ok ? data.message : 'Gönderilemedi';
+  } catch (_) {
+    button.innerText = 'Gönderilemedi';
   }
 }
 

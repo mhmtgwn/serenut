@@ -12,6 +12,7 @@
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { pgPool, redisClient } from '../config/database';
 import { logger } from '../config/logger';
+import nodemailer from 'nodemailer';
 
 // ── REDIS BAĞLANTI AYARLARI ──────────────────────────────────────────────────
 // BullMQ kendi ioredis bağlantısını yönetir.
@@ -130,13 +131,38 @@ async function dispatchSms(to: string, body: string): Promise<boolean> {
 }
 
 async function dispatchEmail(to: string, subject: string, body: string): Promise<boolean> {
-  const isMock = !process.env.SMTP_API_KEY || process.env.SMTP_API_KEY.startsWith('YOUR_') || process.env.SMTP_API_KEY === 'mock';
+  const hasSmtp = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+  const hasPostmark = Boolean(process.env.SMTP_API_KEY && !process.env.SMTP_API_KEY.startsWith('YOUR_') && process.env.SMTP_API_KEY !== 'mock');
+  const isMock = !hasSmtp && !hasPostmark;
   if (isMock) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('SMTP/Postmark API Key is not configured in production! Mock Email is disabled.');
     }
     logger.info(`[EMAIL][MOCK] Sending to ${to}: "${subject}"`);
     await new Promise((resolve) => setTimeout(resolve, 100));
+    return true;
+  }
+
+  if (hasSmtp) {
+    logger.info(`[EMAIL] Sending to ${to} via SMTP...`);
+    const port = Number(process.env.SMTP_PORT || 587);
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: process.env.SMTP_SECURE === 'true' || port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+      pool: true,
+      maxConnections: 3,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000
+    });
+    await transporter.sendMail({
+      from: `"${process.env.SMTP_FROM_NAME || 'Serenut'}" <${process.env.SMTP_FROM_EMAIL || 'noreply@serenut.com'}>`,
+      to,
+      subject,
+      html: body
+    });
     return true;
   }
 

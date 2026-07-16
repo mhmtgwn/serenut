@@ -554,10 +554,18 @@ async function warmupCache() {
 // ── LOCAL/DEV SYSADMIN SEED ────────────────────────────────────────────────
 async function ensureDefaultSysadmin() {
   try {
+    // This helper is intentionally not called during bootstrap. It is retained
+    // temporarily for controlled migrations and refuses to run without explicit
+    // one-time credentials supplied by the operator.
+    const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
+    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+    if (!bootstrapEmail || !bootstrapPassword) {
+      throw new Error('Explicit bootstrap administrator credentials are required');
+    }
     const companyId = 'serenut_cloud';
     const roleId = 'sysadmin';
     const userId = 'user-sysadmin';
-    const email = 'sysadmin@serenut.com';
+    const email = bootstrapEmail.trim().toLowerCase();
 
     await pgPool.query(`
       INSERT INTO companies (id, name, tax_number, phone, email, status)
@@ -577,7 +585,7 @@ async function ensureDefaultSysadmin() {
     );
 
     if (userRes.rows.length === 0) {
-      const hash = await AuthService.hashPassword('adminpass');
+      const hash = await AuthService.hashPassword(bootstrapPassword);
       await pgPool.query(`
         INSERT INTO users (id, company_id, name, email, password_hash, is_active)
         VALUES ($1, $2, 'System Admin', $3, $4, true)
@@ -592,7 +600,7 @@ async function ensureDefaultSysadmin() {
       ON CONFLICT DO NOTHING
     `, [email, roleId]);
 
-    logger.info('✅ Default sysadmin account verified: sysadmin@serenut.com');
+    logger.info('✅ Explicit bootstrap administrator verified');
   } catch (err: any) {
     logger.error(`Failed to ensure default sysadmin account: ${err.message}`);
   }
@@ -602,7 +610,6 @@ async function ensureDefaultSysadmin() {
 async function bootstrap() {
   try {
     await runMigrations(pgPool);
-    await ensureDefaultSysadmin();
     initAnalyticsWebSocket(server);
     initRealtimeWebSocket(server);
 
