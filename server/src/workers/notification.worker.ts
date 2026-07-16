@@ -152,6 +152,7 @@ async function dispatchEmail(to: string, subject: string, body: string): Promise
       host: process.env.SMTP_HOST,
       port,
       secure: process.env.SMTP_SECURE === 'true' || port === 465,
+      ignoreTLS: process.env.SMTP_IGNORE_TLS === 'true',
       ...(smtpUser && smtpPassword ? { auth: { user: smtpUser, pass: smtpPassword } } : {}),
       pool: true,
       maxConnections: 3,
