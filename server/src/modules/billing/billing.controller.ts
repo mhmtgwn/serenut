@@ -454,7 +454,7 @@ router.get('/subscription', authenticateUser, async (req: AuthenticatedRequest, 
       FROM subscriptions s
       JOIN plans p ON s.plan_id = p.id
       WHERE s.company_id = $1
-      ORDER BY s.created_at DESC
+      ORDER BY s.current_period_start DESC
       LIMIT 1
     `, [companyId]);
 

@@ -276,8 +276,19 @@ function renderShell(bootstrap) {
     ['platform-support','Destek','Firmalardan gelen talepleri yönetin.'],
     ['platform-health','Sistem','Servis sağlığını ve sistem olaylarını izleyin.']
   ].map(([id,label,description])=>({id,label,description,section:'platform',href:`/app/#${id}`,module:'admin'}));
-  navigationItems = isSysadmin ? adminNavigation : (bootstrap.navigation || []);
+  const customerDefinitions = {
+    'company-dashboard':['Genel Bakış','Firma, lisans ve kullanım özeti.','overview'],
+    'sales-operations':['Cihazlar ve SMS','Bağlı cihazlar ve SMS ana cihazı.','operations'],
+    'team-management':['Ekip','Alt kullanıcılar ve görev rolleri.','operations'],
+    'billing-center':['Abonelik ve Ödemeler','Plan, lisans ve ödeme geçmişi.','commerce'],
+    'support-center':['Destek','Destek talepleri ve yanıt geçmişi.','commerce'],
+    'account-settings':['Firma Ayarları','Firma, profil ve oturum ayarları.','account']
+  };
+  const allowedCustomerIds = new Set((bootstrap.navigation || []).map(item=>item.id));
+  const customerNavigation = Object.entries(customerDefinitions).filter(([id])=>allowedCustomerIds.has(id)).map(([id,[label,description,section]])=>({id,label,description,section,href:`/app/#${id}`,module:'customer'}));
+  navigationItems = isSysadmin ? adminNavigation : customerNavigation;
   document.body.classList.toggle('sysadmin-shell', isSysadmin);
+  document.body.classList.toggle('customer-shell', !isSysadmin);
 
   document.querySelector('.sidebar-brand').innerText = isSysadmin ? 'Serenut Yönetim' : 'Serenut OS';
   document.getElementById('tenant-name').innerText = isSysadmin ? 'Sistem sahibi paneli' : (bootstrap.company?.name || 'Firma');
@@ -362,7 +373,7 @@ function resolveInitialModule(bootstrap) {
   }
 
   const landing = navigationItems.find((item) => item.href === bootstrap.landing_route);
-  return landing?.id || 'home';
+  return landing?.id || navigationItems[0]?.id || 'home';
 }
 
 async function selectModule(moduleId) {

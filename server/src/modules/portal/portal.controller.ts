@@ -60,7 +60,7 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const stores = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM stores WHERE company_id = $1', [user.company_id]);
     const devices = await runWithTenantContext(user.company_id, "SELECT COUNT(*) FROM device_activations WHERE company_id = $1 AND status = 'active'", [user.company_id]);
-    const licenses = await runWithTenantContext(user.company_id, 'SELECT id, plan_id as tier, status, valid_until as expires_at, license_key FROM license_entitlements WHERE company_id = $1 ORDER BY valid_until DESC', [user.company_id]);
+    const licenses = await runWithTenantContext(user.company_id, 'SELECT id, plan_id as tier, status, valid_until as expires_at, license_key, device_limit as allowed_devices_count FROM license_entitlements WHERE company_id = $1 ORDER BY valid_until DESC', [user.company_id]);
     const invoices = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM invoices WHERE status = \'unpaid\' AND company_id = $1', [user.company_id]);
     const recentSales = await runWithTenantContext(user.company_id, 'SELECT SUM(total_amount) FROM sales WHERE created_at >= NOW() - INTERVAL \'30 days\' AND company_id = $1', [user.company_id]);
 
@@ -72,10 +72,7 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
         unpaidInvoices: parseInt(invoices.rows[0].count, 10),
         monthlyRevenue: parseFloat(recentSales.rows[0].sum || '0.00'),
       },
-      licenses: licenses.rows.map((l: any) => ({
-        ...l,
-        allowed_devices_count: l.tier.includes('pro') ? 5 : 2,
-      }))
+      licenses: licenses.rows
     });
   } catch (err) {
     console.error('Portal dashboard error:', err);
@@ -209,7 +206,7 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
        LEFT JOIN users u ON u.company_id = s.company_id AND u.is_active = true
        WHERE s.company_id = $1
        GROUP BY p.user_limit
-       ORDER BY MAX(s.created_at) DESC LIMIT 1`,
+       ORDER BY MAX(s.current_period_start) DESC LIMIT 1`,
       [user.company_id]
     );
     if (limitResult.rows[0] && limitResult.rows[0].current_users >= limitResult.rows[0].user_limit) {
@@ -400,7 +397,7 @@ router.get('/roles', async (req: AuthenticatedRequest, res: Response) => {
 
 router.get('/permissions', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    const result = await pgPool.query('SELECT id, code, description FROM permissions ORDER BY code');
+    const result = await pgPool.query("SELECT id, code, description FROM permissions WHERE code NOT LIKE 'platform:%' ORDER BY code");
     return res.json(result.rows);
   } catch (_) {
     return res.status(500).json({ error: 'server_error' });
