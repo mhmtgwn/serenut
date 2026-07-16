@@ -31,6 +31,7 @@ const navIconPaths = {
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (new URLSearchParams(window.location.search).get('embed') === '1') document.body.classList.add('embed-mode');
   bindEvents();
 
   if (isAuthenticated()) {
@@ -128,6 +129,10 @@ async function handleLogin() {
     setAuthToken(data.access_token);
     setRefreshToken(data.refresh_token);
     setUserProfile(data.user);
+    if (document.body.classList.contains('embed-mode')) {
+      window.parent.postMessage({ type: 'serenut-authenticated' }, window.location.origin);
+      return;
+    }
     await bootShell();
   } catch (error) {
     statusEl.innerText = error.message;
