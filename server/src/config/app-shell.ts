@@ -70,7 +70,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-overview',
-    label: 'Ticari Genel Bakış',
+    label: 'Genel Bakış',
     section: 'platform',
     href: '/app/#platform-overview',
     description: 'Kayıt, deneme, abonelik, lisans ve havale özeti.',
@@ -80,7 +80,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-companies',
-    label: 'Platform Şirketleri',
+    label: 'Firmalar',
     section: 'platform',
     href: '/app/#platform-companies',
     description: 'Tenant ve müşteri organizasyonlarını yönetin.',
@@ -90,7 +90,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-billing',
-    label: 'Ödeme Operasyonları',
+    label: 'Ödemeler ve Planlar',
     section: 'platform',
     href: '/app/#platform-billing',
     description: 'Havale onayları, ödeme yöntemleri ve planlar.',
@@ -100,7 +100,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-licenses',
-    label: 'Lisans Yönetimi',
+    label: 'Lisanslar',
     section: 'platform',
     href: '/app/#platform-licenses',
     description: 'Şirket lisanslarını üretin, yenileyin ve askıya alın.',
@@ -110,7 +110,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-releases',
-    label: 'Uygulama Sürümleri',
+    label: 'Güncellemeler',
     section: 'platform',
     href: '/app/#platform-releases',
     description: 'Android ve Windows sürümlerini yayınlayın, kademeli dağıtın veya geri çekin.',
@@ -120,12 +120,22 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-health',
-    label: 'Sistem Sağlığı',
+    label: 'Sistem',
     section: 'platform',
     href: '/app/#platform-health',
     description: 'Telemetri, güvenlik ve olay yönetimi.',
     module: 'admin',
     moduleTab: 'health',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-support',
+    label: 'Destek',
+    section: 'platform',
+    href: '/app/#platform-support',
+    description: 'Firmalardan gelen destek taleplerini görüntüleyin.',
+    module: 'admin',
+    moduleTab: 'support',
     roles: ['sysadmin']
   },
   {
@@ -141,6 +151,9 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
 ];
 
 export function filterNavByEntitlements(roles: string[] = [], permissions: string[] = []) {
+  if (roles.includes('sysadmin')) {
+    return APP_NAV_ITEMS.filter((item) => item.roles?.includes('sysadmin'));
+  }
   return APP_NAV_ITEMS.filter((item) => {
     const rolePass = !item.roles || item.roles.some((role) => roles.includes(role));
     const permissionPass = !item.permissions || item.permissions.some((permission) => permissions.includes(permission));

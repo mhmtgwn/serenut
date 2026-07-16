@@ -1,6 +1,6 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { loadModule } from './module-runtime.js';
+import { loadModule } from './module-runtime.js?v=20260716-admin1';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -26,6 +26,7 @@ const navIconPaths = {
   'platform-licenses': 'M5 4h14v16H5z M9 8h6m-6 4h6m-6 4h3',
   'platform-releases': 'M12 3v12m0 0 5-5m-5 5-5-5M5 21h14',
   'platform-health': 'M3 12h4l2-6 4 12 2-6h6',
+  'platform-support': 'M4 5h16v12H8l-4 3z M8 9h8m-8 4h5',
   'account-settings': 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2 3.46-.08-.02a1.7 1.7 0 00-1.8.22l-.45.26a1.7 1.7 0 00-.8 1.63V22h-4v-.09a1.7 1.7 0 00-.8-1.63l-.45-.26a1.7 1.7 0 00-1.8-.22l-.08.02-2-3.46.06-.06A1.7 1.7 0 005 15v-.52a1.7 1.7 0 00-1.14-1.6L3.8 12.85v-4l.08-.02A1.7 1.7 0 005 7.23v-.52a1.7 1.7 0 00-.34-1.88l-.06-.06 2-3.46.08.02a1.7 1.7 0 001.8-.22l.45-.26A1.7 1.7 0 009.73-.58V-.67h4v.09a1.7 1.7 0 00.8 1.63l.45.26a1.7 1.7 0 001.8.22l.08-.02 2 3.46-.06.06a1.7 1.7 0 00-.34 1.88v.52a1.7 1.7 0 001.14 1.6l.08.02v4l-.08.02A1.7 1.7 0 0019.4 15z'
 };
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
@@ -261,12 +262,27 @@ async function bootShell() {
 }
 
 function renderShell(bootstrap) {
-  navigationItems = bootstrap.navigation || [];
+  const isSysadmin = (bootstrap.user?.roles || []).includes('sysadmin');
+  const adminLabels = {
+    'platform-overview': 'Genel Bakış', 'platform-companies': 'Firmalar',
+    'platform-billing': 'Ödemeler ve Planlar', 'platform-licenses': 'Lisanslar',
+    'platform-releases': 'Güncellemeler', 'platform-support': 'Destek', 'platform-health': 'Sistem'
+  };
+  navigationItems = isSysadmin
+    ? (bootstrap.navigation || []).filter(item => item.id.startsWith('platform-')).map(item => ({ ...item, label: adminLabels[item.id] || item.label }))
+    : (bootstrap.navigation || []);
+  if (isSysadmin && !navigationItems.some(item => item.id === 'platform-support')) {
+    navigationItems.splice(Math.max(0, navigationItems.length - 1), 0, { id:'platform-support', label:'Destek', section:'platform', href:'/app/#platform-support', description:'Firmalardan gelen destek taleplerini görüntüleyin.', module:'admin' });
+  }
+  document.body.classList.toggle('sysadmin-shell', isSysadmin);
 
-  document.getElementById('tenant-name').innerText = bootstrap.company?.name || 'Tenant';
+  document.querySelector('.sidebar-brand').innerText = isSysadmin ? 'Serenut Yönetim' : 'Serenut OS';
+  document.getElementById('tenant-name').innerText = isSysadmin ? 'Sistem sahibi paneli' : (bootstrap.company?.name || 'Firma');
   document.getElementById('user-name').innerText = bootstrap.user?.name || 'Kullanıcı';
   document.getElementById('user-roles').innerText = (bootstrap.user?.roles || []).join(', ') || 'rol yok';
-  document.getElementById('shell-subtitle').innerText = `Aktif şirket: ${bootstrap.company?.name || 'Tanımsız'} • Başlangıç rotası: ${bootstrap.landing_route}`;
+  document.getElementById('shell-subtitle').innerText = isSysadmin
+    ? 'Firmaları, ödemeleri, lisansları ve uygulama yayınlarını yönetin.'
+    : `Aktif firma: ${bootstrap.company?.name || 'Tanımsız'}`;
   document.getElementById('workspace-note').innerText = bootstrap.workspaces?.platform
     ? 'Bu kullanıcı hem platform hem firma modüllerine erişebilir.'
     : 'Bu kullanıcı firma modülleri ile sınırlandırılmıştır.';
@@ -292,7 +308,7 @@ function renderNav(items) {
     overview: 'Genel',
     operations: 'Operasyon',
     commerce: 'Ticari',
-    platform: 'Platform',
+    platform: 'Yönetim',
     account: 'Hesap'
   };
   const sections = ['overview', 'operations', 'commerce', 'platform', 'account'];
