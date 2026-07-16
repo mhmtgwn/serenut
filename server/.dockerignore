@@ -1,0 +1,8 @@
+node_modules
+dist
+logs
+uploads
+data
+*.tgz
+Dockerfile*
+npm-debug.log

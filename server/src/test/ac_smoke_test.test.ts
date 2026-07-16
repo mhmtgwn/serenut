@@ -49,21 +49,21 @@ async function runSmokeTests() {
     addCheck('3. Login hash validation check', false, err.message);
   }
 
-  // Test 4: Portal asset path validation
+  // Test 4: Unified app asset path validation
   try {
-    const portalIndex = path.join(__dirname, '../../public/portal/index.html');
-    addCheck('4. Customer Portal static index check', fs.existsSync(portalIndex));
+    const appIndex = path.join(__dirname, '../../public/app/index.html');
+    addCheck('4. Unified app static index check', fs.existsSync(appIndex));
   } catch (err: any) {
-    addCheck('4. Customer Portal static index check', false, err.message);
+    addCheck('4. Unified app static index check', false, err.message);
   }
 
-  // Test 5: Download center route check
+  // Test 5: Unified app auth shell check
   try {
-    const portalHtml = fs.readFileSync(path.join(__dirname, '../../public/portal/index.html'), 'utf8');
-    const hasDownloadBtn = portalHtml.includes('Uygulama İndirme');
-    addCheck('5. Download center button wiring', hasDownloadBtn);
+    const appHtml = fs.readFileSync(path.join(__dirname, '../../public/app/index.html'), 'utf8');
+    const hasLoginBtn = appHtml.includes('Giriş Yap');
+    addCheck('5. Unified app auth shell check', hasLoginBtn);
   } catch (err: any) {
-    addCheck('5. Download center button wiring', false, err.message);
+    addCheck('5. Unified app auth shell check', false, err.message);
   }
 
   // Test 6: Windows Installer config script exists

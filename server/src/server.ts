@@ -20,7 +20,7 @@ try {
 
 // Environment Validation
 const isProduction = process.env.NODE_ENV === 'production';
-const requiredEnv = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'];
+const requiredEnv = ['DATABASE_URL', 'JWT_SECRET'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 
 if (missingEnv.length > 0) {
@@ -31,7 +31,7 @@ if (missingEnv.length > 0) {
 }
 
 // Operational warning for optional API keys
-const optionalEnv = ['SMS_API_KEY', 'SMTP_API_KEY', 'RSA_PRIVATE_KEY', 'APP_SECRET'];
+const optionalEnv = ['REDIS_URL', 'SMS_API_KEY', 'SMTP_API_KEY', 'RSA_PRIVATE_KEY', 'APP_SECRET'];
 optionalEnv.forEach(key => {
   if (!process.env[key]) {
     console.warn(`⚠️ Warning: Optional operational key ${key} is not set. Related features may fallback to insecure defaults or fail.`);
@@ -65,6 +65,7 @@ import userRouter from './modules/user/user.controller';
 import tenantRouter from './modules/tenant/tenant.controller';
 import adminRouter from './modules/admin/admin.controller';
 import portalRouter from './modules/portal/portal.controller';
+import appRouter from './modules/app/app.controller';
 import releaseRouter from './modules/release/release.controller';
 import { initAnalyticsWebSocket, getActiveWebSocketCount } from './modules/analytics/analytics.ws';
 import { initRealtimeWebSocket, getAuthErrorsCount, getReconnectCount, getHeartbeatTimeoutsCount, getTenantRejectionsCount } from './modules/realtime/realtime.ws';
@@ -83,6 +84,7 @@ import healthRouter from './modules/health/health.controller';
 // BullMQ Workers
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
 import { startBillingScheduler, stopBillingScheduler } from './workers/billing.scheduler';
+import { AuthService } from './modules/auth/auth.service';
 
 export const app = express();
 
@@ -255,10 +257,21 @@ app.get(['/marketing/features', '/marketing/features.html', '/marketing/platform
   res.redirect(301, '/platform.html');
 });
 app.get(['/login', '/login.html'], (req, res) => {
-  res.redirect(301, '/portal/');
+  res.redirect(301, '/app/');
 });
 app.get(['/marketing/login', '/marketing/login.html'], (req, res) => {
-  res.redirect(301, '/portal/');
+  res.redirect(301, '/app/');
+});
+app.get(['/signup', '/signup.html', '/register', '/register.html'], (req, res) => {
+  res.redirect(301, '/app/#register');
+});
+app.get('/reset-password', (req, res) => {
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
+  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+  res.redirect(302, `/app/${qs}`);
+});
+app.get(['/marketing/signup', '/marketing/signup.html', '/marketing/register', '/marketing/register.html'], (req, res) => {
+  res.redirect(301, '/app/#register');
 });
 app.get('/marketing*', (req, res) => {
   res.redirect(301, '/');
@@ -266,8 +279,10 @@ app.get('/marketing*', (req, res) => {
 
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
-app.use('/admin', express.static(path.join(process.cwd(), 'public/admin')));
-app.use('/portal', express.static(path.join(process.cwd(), 'public/portal')));
+app.use('/app', express.static(path.join(process.cwd(), 'public/app')));
+app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
+  res.redirect(301, '/app/');
+});
 
 // ── CLEAN URLs (no .html extension) ──────────────────────────────────────────
 const websiteDir = path.join(process.cwd(), 'public/website');
@@ -300,6 +315,7 @@ app.use('/api/v1/remote-config', remoteConfigRouter);
 app.use('/api/v1/logs', logsRouter);
 app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/app', appRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/portal', portalRouter);
 app.use('/api/v1/support', supportRouter);
@@ -535,10 +551,58 @@ async function warmupCache() {
   }
 }
 
+// ── LOCAL/DEV SYSADMIN SEED ────────────────────────────────────────────────
+async function ensureDefaultSysadmin() {
+  try {
+    const companyId = 'serenut_cloud';
+    const roleId = 'sysadmin';
+    const userId = 'user-sysadmin';
+    const email = 'sysadmin@serenut.com';
+
+    await pgPool.query(`
+      INSERT INTO companies (id, name, tax_number, phone, email, status)
+      VALUES ($1, 'Serenut Cloud', '0000000000', NULL, $2, 'active')
+      ON CONFLICT (id) DO NOTHING
+    `, [companyId, email]);
+
+    await pgPool.query(`
+      INSERT INTO roles (id, name, description)
+      VALUES ($1, 'sysadmin', 'System Administrator')
+      ON CONFLICT (id) DO NOTHING
+    `, [roleId]);
+
+    const userRes = await pgPool.query(
+      `SELECT id FROM users WHERE email = $1 LIMIT 1`,
+      [email]
+    );
+
+    if (userRes.rows.length === 0) {
+      const hash = await AuthService.hashPassword('adminpass');
+      await pgPool.query(`
+        INSERT INTO users (id, company_id, name, email, password_hash, is_active)
+        VALUES ($1, $2, 'System Admin', $3, $4, true)
+      `, [userId, companyId, email, hash]);
+    }
+
+    await pgPool.query(`
+      INSERT INTO user_roles (user_id, role_id)
+      SELECT u.id, $2
+      FROM users u
+      WHERE u.email = $1
+      ON CONFLICT DO NOTHING
+    `, [email, roleId]);
+
+    logger.info('✅ Default sysadmin account verified: sysadmin@serenut.com');
+  } catch (err: any) {
+    logger.error(`Failed to ensure default sysadmin account: ${err.message}`);
+  }
+}
+
 // ── BOOTSTRAP ─────────────────────────────────────────────────────────────────
 async function bootstrap() {
   try {
     await runMigrations(pgPool);
+    await ensureDefaultSysadmin();
     initAnalyticsWebSocket(server);
     initRealtimeWebSocket(server);
 

@@ -586,6 +586,15 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
 
     const iyzicoRes = await IyzicoService.createCheckoutSession(reqData as any);
     if (iyzicoRes.status === 'success') {
+      // Bind the provider token to this exact invoice. The callback must never
+      // resolve an arbitrary "latest pending" invoice.
+      await runBypassingRLS(
+        `UPDATE invoices
+         SET billing_details = COALESCE(billing_details, '{}'::jsonb) || $1::jsonb,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [JSON.stringify({ iyzicoToken: iyzicoRes.token }), invoiceId]
+      );
       return res.json({ 
         success: true, 
         checkoutFormContent: iyzicoRes.checkoutFormContent, 
@@ -625,9 +634,16 @@ router.post('/iyzico/callback', async (req: Request, res: Response) => {
     // In production, we MUST verify HMAC or retrieve result.
     // We will do the DB update here:
     
-    const tokenInfoRes = await runBypassingRLS("SELECT * FROM invoices WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1");
+    const tokenInfoRes = await runBypassingRLS(
+      `SELECT * FROM invoices
+       WHERE status = 'pending'
+         AND billing_details->>'iyzicoToken' = $1
+       LIMIT 1`,
+      [token]
+    );
     if (tokenInfoRes.rows.length === 0) {
-      return res.redirect('/portal/#payment-failed');
+      logger.warn(`Iyzico callback rejected: no pending invoice for token ${String(token).slice(0, 8)}…`);
+      return res.redirect('/app/#billing-center?payment=invalid');
     }
     
     const invoice = tokenInfoRes.rows[0];
@@ -664,12 +680,12 @@ router.post('/iyzico/callback', async (req: Request, res: Response) => {
       `, [planId, devLimit, nextPeriodEnd, subId]);
     }
 
-    // Redirect user back to portal success page
-    res.redirect('/portal/#payment-success');
+    // Redirect user back to unified app shell
+    res.redirect('/app/');
 
   } catch (error) {
     logger.error('Iyzico callback error:', error);
-    res.redirect('/portal/#payment-failed');
+    res.redirect('/app/');
   }
 });
 
@@ -1294,11 +1310,15 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
     }
 
     // 2. Fetch plan from subscription
-    const subRes = await client.query(
-      'SELECT plan_id FROM subscriptions WHERE id = $1',
-      [invoice.subscription_id]
-    );
-    const planId = subRes.rows[0]?.plan_id ?? 'plan-basic';
+    const requestedPlanId = invoice.billing_details?.planId;
+    const subRes = invoice.subscription_id
+      ? await client.query('SELECT plan_id FROM subscriptions WHERE id = $1', [invoice.subscription_id])
+      : { rows: [] };
+    const planId = requestedPlanId ?? subRes.rows[0]?.plan_id;
+    if (!planId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'plan_not_resolved', message: 'Faturaya bağlı plan bulunamadı.' });
+    }
 
     // 3. Mark invoice as paid
     await client.query(

@@ -3,7 +3,7 @@
 User-agent: *
 Allow: /
 Disallow: /admin/
-Disallow: /portal/
+Disallow:
 Disallow: /api/v1/
 
 Sitemap: https://serenut.com/sitemap.xml

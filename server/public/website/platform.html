@@ -1,212 +1,108 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Serenut Platform Özellikleri — POS, Stok ve Şube Çözümleri</title>
-  <meta name="description" content="Serenut OS'un POS satış, stok kontrolü, adisyon takibi, müşteri sadakati ve offline delta eşitleme mimarisini keşfedin." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
-  <script src="/shared/js/lucide.min.js?v=3.0.1"></script>
-  <link rel="stylesheet" href="css/website.css?v=3.0.1" />
+  <title>Serenut OS | Ürün Mimarisi</title>
+  <meta name="description" content="Serenut OS ürün mimarisi: public website, tek girişli app shell, firma modülleri ve platform modülleri.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/website.css">
 </head>
 <body>
-
-  <div class="mobile-overlay" id="mobile-overlay"></div>
-
-  <!-- HEADER -->
-  <header class="nav-landing nav-scrolled" id="main-header">
-    <div class="nav-container">
-      <a href="/" class="brand">
-        <svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-        </svg>
-        <span>Serenut OS</span>
-      </a>
-      <nav class="nav-links" id="nav-links">
-        <a href="/platform" class="nav-link active">Özellikler</a>
-        <a href="/plans" class="nav-link">Fiyatlandırma</a>
-        <a href="/downloads" class="nav-link">İndir</a>
-        <a href="/contact" class="nav-link">İletişim</a>
+  <header class="site-header" id="site-header">
+    <div class="container header-row">
+      <a href="/" class="brand">Serenut OS</a>
+      <nav class="desktop-nav" id="desktop-nav">
+        <a href="/">Ana Sayfa</a>
+        <a href="/platform">Mimari</a>
+        <a href="/plans">Planlar</a>
+        <a href="/contact">İletişim</a>
       </nav>
-      <div class="nav-auth" id="nav-auth">
-        <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
-        <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <i data-lucide="menu" style="width:22px;height:22px;"></i>
-        </button>
+      <div class="header-actions">
+        <a href="/app/" class="btn btn-secondary btn-sm">Giriş Yap</a>
+        <a href="/app/#register" class="btn btn-primary btn-sm">Kayıt Ol</a>
+        <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menüyü aç">Menü</button>
       </div>
     </div>
-  </header>
-
-  <!-- INTRO PAGE HEADER -->
-  <header class="subpage-header">
-    <div class="container">
-      <div class="badge badge-trial mb-2" style="display:inline-flex; width:auto;">Teknoloji Gücü</div>
-      <h1>Serenut OS Platform Yetenekleri</h1>
-      <p>Klasik sistemlerin hantallığını unutturan modern, hızlı ve kesintisiz entegrasyon çözümleri.</p>
+    <div class="mobile-panel app-hidden" id="mobile-panel">
+      <a href="/">Ana Sayfa</a>
+      <a href="/platform">Mimari</a>
+      <a href="/plans">Planlar</a>
+      <a href="/contact">İletişim</a>
+      <a href="/app/">Giriş Yap</a>
+      <a href="/app/#register">Kayıt Ol</a>
     </div>
   </header>
 
   <main>
-    <section class="section-padding">
+    <section class="page-hero">
       <div class="container">
-        <div class="bento-grid">
+        <div class="eyebrow">Ürün Mimarisi</div>
+        <h1 class="page-title">Website tanıtır, `/app` karar verir, modüller aynı kabukta açılır.</h1>
+        <p class="page-copy">Serenut OS; public pazarlama yüzeyi, tek girişli uygulama kabuğu, firma modülleri ve platform modülleri olarak ayrışır. Kullanıcıya ise tek ürün gibi görünür.</p>
+      </div>
+    </section>
 
-          <!-- POS (span-2) -->
-          <article class="bento-card span-2 reveal">
-            <div>
-              <div class="bento-icon">
-                <i data-lucide="receipt" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Hızlı POS Satış Yönetimi</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Yoğun saatlerde kasadaki donmalar ve yavaş faturalandırma kuyruklara neden olur.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> SQLite üzerinde çalışan, dokunmatik ekran uyumlu, anlık barkod tarama destekleyen hızlı satış arayüzü.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">Sıfır işlem bekleme süresiyle müşterileri hızlıca uğurlayın, satış kaybını önleyin.</p>
+    <section class="section">
+      <div class="container">
+        <div class="flow-grid">
+          <article class="flow-step">
+            <strong>Public Website</strong>
+            <p>Ürünü, mimariyi, planları ve başlangıç akışını anlatır. Yetkili alan değildir.</p>
           </article>
-
-          <!-- STOCK (span-1) -->
-          <article class="bento-card reveal">
-            <div>
-              <div class="bento-icon blue">
-                <i data-lucide="package" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Akıllı Envanter</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Eksilen ürünlerin fark edilmemesi nedeniyle sipariş kayıpları yaşanır.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Kritik stok eşikleri tanımlama, otomatik sayım ve şubeler arası anlık stok takibi.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Rafların boş kalmasını engelleyin, siparişleri her zaman vaktinde teslim edin.</p>
+          <article class="flow-step">
+            <strong>App Shell</strong>
+            <p>Login, register, reset ve bootstrap işlemlerini tek giriş yüzeyinde toplar.</p>
           </article>
-
-          <!-- ORDERS (span-1) -->
-          <article class="bento-card reveal">
-            <div>
-              <div class="bento-icon amber">
-                <i data-lucide="clipboard-list" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Adisyon Akışı</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Mutfak ile kasa arasındaki iletişim kopukluğu hatalı siparişlere yol açar.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Mutfak ekranı (KDS) entegrasyonu, masa adisyon taşıma/bölme ve kurye takibi.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-accent);">Hatalı sipariş iadelerini sıfıra indirin, mutfak verimliliğini %40 artırın.</p>
+          <article class="flow-step">
+            <strong>Company Modules</strong>
+            <p>Dashboard, kullanıcılar, şubeler, cihazlar, lisanslar, abonelik, destek ve ayarlar.</p>
           </article>
-
-          <!-- CUSTOMERS (span-2) -->
-          <article class="bento-card span-2 reveal">
-            <div>
-              <div class="bento-icon red">
-                <i data-lucide="users" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Müşteri İlişkileri & Sadakat</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Tek seferlik gelen müşterileri sadık ziyaretçilere dönüştürme yöntemi eksiktir.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Müşteri kartı profilleri, anlık puan kazanım/harcama motoru ve özel indirim kampanyaları.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-error);">Sadakat kampanyalarıyla müşteri geri dönüş oranlarını %25 oranında yükseltin.</p>
+          <article class="flow-step">
+            <strong>Platform Modules</strong>
+            <p>Şirketler, transferler, planlar, lisanslar, releases, audit ve sistem sağlığı.</p>
           </article>
+        </div>
+      </div>
+    </section>
 
-          <!-- FINANCE (span-1) -->
-          <article class="bento-card reveal">
-            <div>
-              <div class="bento-icon">
-                <i data-lucide="wallet" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Nakit Akışı</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Gün sonu kasa sayımlarındaki açıklar takibi zorlaştırır.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Kasiyer bazlı oturum açma, nakit/kart ayrımı ve otomatik Z Raporu bildirimleri.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">Gelir kaçaklarını önleyin, kasa mutabakatlarını saniyeler içinde hatasız tamamlayın.</p>
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow">Yetki Akışı</div>
+          <h2>Rol ve permission birleşimi menüyü üretir.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Sysadmin</h3>
+            <p>Platform şirketleri, ödeme operasyonları, planlar, cihazlar, releases ve sağlık ekranlarını görür.</p>
           </article>
-
-          <!-- REPORTING (span-2) -->
-          <article class="bento-card span-2 reveal">
-            <div>
-              <div class="bento-icon blue">
-                <i data-lucide="bar-chart-3" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Raporlama & Kar/Zarar Zekası</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Kar marjlarını görebilmek için Excel tablolarıyla saatlerce uğraşmak gerekir.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> En çok satan ürün grupları, saatlik ciro yoğunluk grafikleri ve anlık kar/zarar maliyet analizleri.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Doğru verilere dayanarak büyüme kararları alın, maliyetleri kontrol altında tutun.</p>
+          <article class="feature-card">
+            <h3>Owner / Manager</h3>
+            <p>Firma dashboard, kullanıcılar, cihazlar, şubeler, ayarlar ve ticari modülleri yönetir.</p>
           </article>
-
-          <!-- OFFLINE (span-2) -->
-          <article class="bento-card span-2 reveal">
-            <div>
-              <div class="bento-icon amber">
-                <i data-lucide="wifi-off" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>İnternetsiz (Offline) Çalışma</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> İnternet altyapı arızalarında kasaların kilitlenmesi ticari faaliyeti durdurur.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Cihazda yerel SQLite veritabanı kullanımı sayesinde ağ bağlantısı kopsa dahi tam sürat satış imkanı.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-accent);">Altyapı çökmelerinden etkilenmeden satış yapmaya devam edin, ciro kaybı yaşamayın.</p>
+          <article class="feature-card">
+            <h3>Operasyon Rolleri</h3>
+            <p>Sadece izin verilmiş iş akışlarını görür. Gereksiz admin yüzeyi ve kırık geçişler gösterilmez.</p>
           </article>
+        </div>
+      </div>
+    </section>
 
-          <!-- CLOUD SYNC (span-1) -->
-          <article class="bento-card reveal">
-            <div>
-              <div class="bento-icon red">
-                <i data-lucide="refresh-cw" style="width:24px;height:24px;"></i>
-              </div>
-              <h3>Delta Bulut Eşitlemesi</h3>
-              <p class="text-sm mt-3" style="color:var(--color-text-secondary);"><strong>Problem:</strong> Çevrimdışı verilerin elle yüklenmesi çakışmalara neden olur.</p>
-              <p class="text-sm mt-2" style="color:var(--color-text-secondary);"><strong>Serenut Çözümü:</strong> Bağlantı kurulduğu an yerel işlemlerin otomatik buluta aktarılmasını sağlayan Delta Sync.</p>
-            </div>
-            <p class="text-sm mt-4 font-bold" style="color:var(--color-error);">Yedekleme derdini unutun; verileriniz otomatik olarak senkronize kalsın.</p>
-          </article>
-
+    <section class="section">
+      <div class="container cta-box">
+        <div>
+          <div class="eyebrow">Başlangıç</div>
+          <h2>Public yüzeyden uygulamaya tek kapı ile geçin.</h2>
+        </div>
+        <div class="cta-actions">
+          <a href="/app/" class="btn btn-primary">Uygulamaya Gir</a>
+          <a href="/app/#register" class="btn btn-secondary">Hesap Oluştur</a>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="/" class="brand">
-            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-              <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-            </svg>
-            <span>Serenut OS</span>
-          </a>
-          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
-        </div>
-        <div class="footer-links-col">
-          <h4>Platform</h4>
-          <ul>
-            <li><a href="/platform">Özellikler</a></li>
-            <li><a href="/plans">Fiyatlandırma</a></li>
-            <li><a href="/downloads">İndir</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Destek</h4>
-          <ul>
-            <li><a href="/contact">İletişim</a></li>
-            <li><a href="/portal/">Müşteri Portalı</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Yasal</h4>
-          <ul>
-            <li><a href="/privacy">Gizlilik Politikası</a></li>
-            <li><a href="/kvkk">KVKK Bilgilendirme</a></li>
-            <li><a href="/terms">Kullanım Şartları</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 Serenut OS. Tüm Hakları Saklıdır.</p>
-      </div>
-    </div>
-  </footer>
-
-  <script src="js/website.js?v=3.0.1"></script>
+  <script src="js/website.js"></script>
 </body>
 </html>
-

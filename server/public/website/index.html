@@ -1,613 +1,187 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Serenut OS — İşletmenizi Tek Bir Sistemden Yönetin</title>
-  <meta name="description" content="Satış, stok, müşteri, sipariş, finans ve raporlama süreçlerini tek platformda yöneten modern işletme yönetim sistemi. İnternet kopsa bile satış devam eder." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
-  <script src="/shared/js/lucide.min.js?v=3.0.1"></script>
-  <link rel="stylesheet" href="css/website.css?v=3.0.1" />
+  <title>Serenut OS | Tek Girişli İşletme Sistemi</title>
+  <meta name="description" content="Serenut OS, işletme yönetimi ve platform operasyonlarını tek girişli, rol bazlı, modern bir sistemde birleştirir.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/website.css">
 </head>
 <body>
-
-  <!-- MOBILE OVERLAY -->
-  <div class="mobile-overlay" id="mobile-overlay"></div>
-
-  <!-- 1. HEADER -->
-  <header class="nav-landing" id="main-header">
-    <div class="nav-container">
-      <a href="/" class="brand">
-        <svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-        </svg>
-        <span>Serenut OS</span>
-      </a>
-      <nav class="nav-links" id="nav-links">
-        <a href="/platform" class="nav-link">Özellikler</a>
-        <a href="/plans" class="nav-link">Fiyatlandırma</a>
-        <a href="/downloads" class="nav-link">İndir</a>
-        <a href="/contact" class="nav-link">İletişim</a>
+  <header class="site-header" id="site-header">
+    <div class="container header-row">
+      <a href="/" class="brand">Serenut OS</a>
+      <nav class="desktop-nav" id="desktop-nav">
+        <a href="#features">Özellikler</a>
+        <a href="/plans">Fiyatlandırma</a>
+        <a href="/downloads">İndir</a>
+        <a href="/contact">İletişim</a>
       </nav>
-      <div class="nav-auth" id="nav-auth">
-        <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
-        <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <i data-lucide="menu" style="width:22px;height:22px;"></i>
-        </button>
+      <div class="header-actions">
+        <a href="/app/" class="btn btn-secondary btn-sm">Giriş Yap</a>
+        <a href="/app/#register" class="btn btn-primary btn-sm">Kayıt Ol</a>
+        <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menüyü aç">Menü</button>
       </div>
+    </div>
+    <div class="mobile-panel app-hidden" id="mobile-panel">
+      <a href="#features">Özellikler</a>
+      <a href="/plans">Fiyatlandırma</a>
+      <a href="/downloads">İndir</a>
+      <a href="/contact">İletişim</a>
+      <a href="/app/">Giriş Yap</a>
+      <a href="/app/#register">Kayıt Ol</a>
     </div>
   </header>
 
-  <!-- 2. HERO -->
-  <section class="hero">
-    <div class="container">
-      <div class="hero-grid">
-        <div class="hero-content">
-          <div class="hero-tag">
-            <i data-lucide="zap" style="width:14px;height:14px;"></i>
-            <span>Kesintisiz Satış Platformu</span>
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">Satıştan yönetime tek sistem</div>
+          <h1>İşletmenizi yönetin, satışınızı hızlandırın.</h1>
+          <p>
+            Serenut OS; satış, şube, cihaz, ekip, abonelik ve destek süreçlerini tek çalışma alanında birleştirir.
+            Planınızı seçin, hesabınızı açın ve işletmenizi dakikalar içinde çalıştırmaya başlayın.
+          </p>
+          <div class="hero-actions">
+            <a href="/plans" class="btn btn-primary">Planları İncele</a>
+            <a href="/app/#register" class="btn btn-secondary">Ücretsiz Başla</a>
           </div>
-          <h1>İşletmenizi Tek Bir Sistemden <span>Yönetin</span></h1>
-          <p>Satış, stok, müşteri, sipariş, finans ve raporlama süreçlerini tek platformda yöneten modern işletme yönetim sistemi. İnternet kopsa bile satış devam eder.</p>
-          <div class="hero-ctas">
-            <a href="/portal/#register" class="btn btn-primary">
-              <i data-lucide="arrow-right" style="width:18px;height:18px;"></i>
-              Serenut'u Keşfet
-            </a>
-            <a href="/platform" class="btn btn-secondary">Özellikleri İncele</a>
+          <div class="hero-notes">
+            <span>30 gün deneme</span>
+            <span>Rol bazlı yetki</span>
+            <span>Bulut + çevrimdışı çalışma</span>
           </div>
         </div>
-        <div class="hero-visual">
-          <div class="browser-chrome">
-            <span class="chrome-dot red"></span>
-            <span class="chrome-dot yellow"></span>
-            <span class="chrome-dot green"></span>
-            <span class="chrome-address">serenut.com/pos-dashboard</span>
-          </div>
-          <!-- Premium POS Dashboard Showcase -->
-          <svg viewBox="0 0 500 320" style="background:#0f172a; display:block; width:100%; height:auto;">
-            <rect width="500" height="28" fill="#0f172a"/>
-            <text x="250" y="17" fill="#64748b" font-family="Inter" font-size="10" text-anchor="middle">Serenut POS — Satış Paneli</text>
 
-            <!-- Sidebar -->
-            <rect x="8" y="36" width="100" height="276" rx="6" fill="#1e293b"/>
-            <rect x="16" y="48" width="84" height="28" rx="4" fill="rgba(5, 150, 105, 0.15)"/>
-            <text x="30" y="66" fill="#10b981" font-family="Inter" font-size="10" font-weight="600">Satış</text>
-            <rect x="16" y="84" width="84" height="24" rx="4" fill="rgba(255,255,255,0.03)"/>
-            <text x="30" y="100" fill="#64748b" font-family="Inter" font-size="10">Stok</text>
-            <rect x="16" y="114" width="84" height="24" rx="4" fill="rgba(255,255,255,0.03)"/>
-            <text x="30" y="130" fill="#64748b" font-family="Inter" font-size="10">Müşteriler</text>
-            <rect x="16" y="144" width="84" height="24" rx="4" fill="rgba(255,255,255,0.03)"/>
-            <text x="30" y="160" fill="#64748b" font-family="Inter" font-size="10">Raporlar</text>
-
-            <!-- Product Grid -->
-            <rect x="116" y="36" width="240" height="276" rx="6" fill="#1e293b"/>
-            <text x="132" y="58" fill="#94a3b8" font-family="Inter" font-size="11" font-weight="600">Ürünler</text>
-
-            <rect x="130" y="70" width="100" height="70" rx="6" fill="#0f172a"/>
-            <text x="180" y="105" fill="#e2e8f0" font-family="Inter" font-size="10" text-anchor="middle">Filtre Kahve</text>
-            <text x="180" y="125" fill="#10b981" font-family="Outfit" font-size="12" text-anchor="middle" font-weight="700">65 ₺</text>
-
-            <rect x="240" y="70" width="100" height="70" rx="6" fill="#0f172a"/>
-            <text x="290" y="105" fill="#e2e8f0" font-family="Inter" font-size="10" text-anchor="middle">Latte</text>
-            <text x="290" y="125" fill="#10b981" font-family="Outfit" font-size="12" text-anchor="middle" font-weight="700">75 ₺</text>
-
-            <rect x="130" y="150" width="100" height="70" rx="6" fill="#0f172a"/>
-            <text x="180" y="185" fill="#e2e8f0" font-family="Inter" font-size="10" text-anchor="middle">Türk Kahvesi</text>
-            <text x="180" y="205" fill="#10b981" font-family="Outfit" font-size="12" text-anchor="middle" font-weight="700">55 ₺</text>
-
-            <rect x="240" y="150" width="100" height="70" rx="6" fill="#0f172a"/>
-            <text x="290" y="185" fill="#e2e8f0" font-family="Inter" font-size="10" text-anchor="middle">Cheesecake</text>
-            <text x="290" y="205" fill="#10b981" font-family="Outfit" font-size="12" text-anchor="middle" font-weight="700">120 ₺</text>
-
-            <!-- Checkout Sidebar -->
-            <rect x="364" y="36" width="128" height="276" rx="6" fill="rgba(5, 150, 105, 0.05)" stroke="rgba(5,150,105,0.15)" stroke-width="1"/>
-            <text x="380" y="58" fill="#10b981" font-family="Outfit" font-size="11" font-weight="700">Adisyon</text>
-
-            <rect x="376" y="70" width="104" height="22" rx="3" fill="#1e293b"/>
-            <text x="382" y="85" fill="#cbd5e1" font-family="Inter" font-size="9">1x Filtre Kahve</text>
-
-            <rect x="376" y="98" width="104" height="22" rx="3" fill="#1e293b"/>
-            <text x="382" y="113" fill="#cbd5e1" font-family="Inter" font-size="9">2x Latte</text>
-
-            <rect x="376" y="126" width="104" height="22" rx="3" fill="#1e293b"/>
-            <text x="382" y="141" fill="#cbd5e1" font-family="Inter" font-size="9">1x Cheesecake</text>
-
-            <line x1="376" y1="250" x2="480" y2="250" stroke="#334155" stroke-width="1"/>
-            <text x="376" y="270" fill="#94a3b8" font-family="Inter" font-size="10">Toplam</text>
-            <text x="480" y="270" fill="#10b981" font-family="Outfit" font-size="16" font-weight="800" text-anchor="end">335 ₺</text>
-
-            <rect x="376" y="282" width="104" height="24" rx="6" fill="#059669"/>
-            <text x="428" y="298" fill="#ffffff" font-family="Outfit" font-size="11" font-weight="800" text-anchor="middle">ÖDEME AL</text>
-          </svg>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 3. TRUST / HEDEF KİTLE -->
-  <section class="section-padding section-alt reveal">
-    <div class="container">
-      <div class="section-title">
-        <h2>Kimin İçin Tasarladık?</h2>
-        <p>Geleneksel, hantal ve sürekli kesilen POS sistemlerinden bıkan işletmeler için kurumsal güçte modern bir altyapı.</p>
-      </div>
-      <div class="trust-grid">
-        <div class="trust-card">
-          <div class="trust-card-header">
-            <div class="trust-icon">
-              <i data-lucide="utensils" style="width:24px;height:24px;"></i>
+        <div class="hero-panel">
+          <div class="hero-panel-top">
+            <div class="dot-row">
+              <span></span><span></span><span></span>
             </div>
-            <h3>Restoran & Kafeler</h3>
+            <div class="panel-url">serenut.com/app</div>
           </div>
-          <p>Hızlı sipariş alma, masa adisyon takibi ve entegre ödeme çözümleri ile işletme hızınızı ikiye katlayın.</p>
-        </div>
-        <div class="trust-card">
-          <div class="trust-card-header">
-            <div class="trust-icon text-info">
-              <i data-lucide="shopping-bag" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Perakende & Market</h3>
-          </div>
-          <p>Barkod okuma hızında satış, anlık varyasyonlu stok kontrolü ve kasiyer hesap mutabakatlarını tek noktadan yapın.</p>
-        </div>
-        <div class="trust-card">
-          <div class="trust-card-header">
-            <div class="trust-icon text-amber">
-              <i data-lucide="building-2" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Çok Şubeli Zincirler</h3>
-          </div>
-          <p>Merkez portalından tek tuşla tüm şubelere fiyat gönderin, anlık ciro ve karlılık raporlarını izleyin.</p>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- 4. ÖZELLİKLER BÖLÜMÜ -->
-  <section class="features-section reveal">
-    <div class="container">
-      <div class="section-title">
-        <h2>Güçlü Platform Yetenekleri</h2>
-        <p>İşletmenizin tüm ihtiyaçlarını karşılayan kapsamlı modüller ve entegrasyon çözümleri.</p>
-      </div>
-      <div class="bento-grid">
-
-        <!-- POS (span-2) -->
-        <article class="bento-card span-2 reveal">
-          <div>
-            <div class="bento-icon">
-              <i data-lucide="receipt" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Satış Yönetimi</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Dokunmatik ekran uyumlu, barkod tarama destekli hızlı satış arayüzü. Sıfır işlem bekleme süresiyle müşterileri hızlıca uğurlayın.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">Hızlı ve stabil kasa operasyonları.</p>
-        </article>
-
-        <!-- STOCK (span-1) -->
-        <article class="bento-card reveal">
-          <div>
-            <div class="bento-icon blue">
-              <i data-lucide="package" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Stok Takibi</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Kritik stok eşikleri tanımlama, otomatik sayım ve şubeler arası anlık stok takibi.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Eksiksiz envanter yönetimi.</p>
-        </article>
-
-        <!-- ORDERS (span-1) -->
-        <article class="bento-card reveal">
-          <div>
-            <div class="bento-icon amber">
-              <i data-lucide="clipboard-list" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Sipariş Yönetimi</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Mutfak ekranı entegrasyonu, masa adisyon taşıma/bölme ve kurye takibi.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-accent);">Koordineli mutfak ve servis.</p>
-        </article>
-
-        <!-- CUSTOMERS (span-2) -->
-        <article class="bento-card span-2 reveal">
-          <div>
-            <div class="bento-icon red">
-              <i data-lucide="users" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Müşteri İlişkileri & Sadakat</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Müşteri kartı profilleri, anlık puan kazanım/harcama motoru ve özel indirim kampanyalarıyla geri dönüş oranlarını artırın.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-error);">Sadık müşteri tabanı oluşturun.</p>
-        </article>
-
-        <!-- FINANCE (span-1) -->
-        <article class="bento-card reveal">
-          <div>
-            <div class="bento-icon">
-              <i data-lucide="wallet" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Finans Yönetimi</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Kasiyer bazlı oturum açma, nakit/kredi kartı ayrımı ve otomatik gün sonu raporlama.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">Gelir kaçaklarına son verin.</p>
-        </article>
-
-        <!-- REPORTING (span-2) -->
-        <article class="bento-card span-2 reveal">
-          <div>
-            <div class="bento-icon blue">
-              <i data-lucide="bar-chart-3" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Raporlama</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">En çok satan ürün grupları ciro yoğunluk grafikleri ve anlık kar/zarar maliyet analizleri ile kar marjlarınızı kontrol altında tutun.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Veriye dayalı ciro kararları.</p>
-        </article>
-
-        <!-- OFFLINE (span-2) -->
-        <article class="bento-card span-2 reveal">
-          <div>
-            <div class="bento-icon amber">
-              <i data-lucide="wifi-off" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Offline Çalışma</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Cihazda yerel SQLite veritabanı kullanımı sayesinde internet bağlantısı kopsa dahi tam sürat satış imkanı.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-accent);">Altyapı kesintilerinden etkilenmeyin.</p>
-        </article>
-
-        <!-- CLOUD SYNC (span-1) -->
-        <article class="bento-card reveal">
-          <div>
-            <div class="bento-icon red">
-              <i data-lucide="refresh-cw" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Bulut Eşitlemesi</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Bağlantı kurulduğu an kuyruktaki yerel işlemlerin otomatik olarak buluta aktarılmasını sağlayan Delta Sync.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-error);">Güvenli otomatik yedekleme.</p>
-        </article>
-
-        <!-- DEVICES (span-1) -->
-        <article class="bento-card reveal">
-          <div>
-            <div class="bento-icon blue">
-              <i data-lucide="printer" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Cihaz Entegrasyonları</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">ESC/POS termal yazıcılar, barkod okuyucular ve el terminalleri ile tak-çalıştır entegrasyon.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-secondary);">Geniş donanım desteği.</p>
-        </article>
-
-        <!-- UPDATE (span-2) -->
-        <article class="bento-card span-2 reveal">
-          <div>
-            <div class="bento-icon">
-              <i data-lucide="shield-check" style="width:24px;height:24px;"></i>
-            </div>
-            <h3>Lisans & Güvenlik</h3>
-            <p class="text-sm mt-3" style="color:var(--color-text-secondary);">Donanım UUID eşleştirmeli lisanslama ve otomatik stabil güncelleme dağıtımı ile sisteminizi her an güncel tutun.</p>
-          </div>
-          <p class="text-sm mt-4 font-bold" style="color:var(--color-primary);">%100 veri güvenliği ve süreklilik.</p>
-        </article>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- 5. WORKFLOW -->
-  <section class="section-padding section-alt reveal">
-    <div class="container">
-      <div class="section-title">
-        <h2>Uçtan Uca Operasyon Yönetimi</h2>
-        <p>İşletmenizin tüm iş akışlarını kusursuz bir zincir halinde yönetin.</p>
-      </div>
-      <div class="workflow-flow">
-        <div class="workflow-step">
-          <div class="workflow-num">1</div>
-          <h4>Satış</h4>
-          <p>Hızlı faturalandırma</p>
-        </div>
-        <div class="workflow-step">
-          <div class="workflow-num">2</div>
-          <h4>Stok</h4>
-          <p>Kritik seviye uyarısı</p>
-        </div>
-        <div class="workflow-step">
-          <div class="workflow-num">3</div>
-          <h4>Sipariş</h4>
-          <p>Adisyon akış kontrolü</p>
-        </div>
-        <div class="workflow-step">
-          <div class="workflow-num">4</div>
-          <h4>Müşteri</h4>
-          <p>Puan ve sadakat kartı</p>
-        </div>
-        <div class="workflow-step">
-          <div class="workflow-num">5</div>
-          <h4>Finans</h4>
-          <p>Kasa mutabakatı</p>
-        </div>
-        <div class="workflow-step">
-          <div class="workflow-num">6</div>
-          <h4>Rapor</h4>
-          <p>Kar/Zarar analizi</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 6. OFFLINE + CLOUD -->
-  <section class="section-padding reveal">
-    <div class="container">
-      <div class="offline-sync-box">
-        <div class="hero-content">
-          <div class="badge badge-trial">Offline-First Mimari</div>
-          <h2 class="font-bold">İnternet Kopsa da Satışlar Asla Durmaz</h2>
-          <p>Serenut OS'un hibrit eşitleme teknolojisi sayesinde yerel cihazınızda SQLite veri motoru ile kesintisiz satış yapın. Ağ bağlantısı geri geldiği an verileriniz otomatik olarak buluta yedeklenir.</p>
-          <div class="sync-features">
-            <div class="sync-item">
-              <div class="sync-item-icon">
-                <i data-lucide="check" style="width:14px;height:14px;"></i>
+          <div class="workspace-preview">
+            <aside class="preview-sidebar">
+              <div class="preview-brand">Serenut OS</div>
+              <div class="preview-nav active">Çalışma Alanı</div>
+              <div class="preview-nav">Kullanıcılar ve Roller</div>
+              <div class="preview-nav">Abonelik ve Faturalama</div>
+              <div class="preview-nav">Platform Şirketleri</div>
+              <div class="preview-nav">Sistem Sağlığı</div>
+            </aside>
+            <div class="preview-content">
+              <div class="preview-card">
+                <div class="preview-title">Rol Özeti</div>
+                <div class="chip-row">
+                  <span class="chip">sysadmin</span>
+                  <span class="chip">owner</span>
+                </div>
               </div>
-              <div class="sync-item-text">
-                <h4>Kesintisiz Yerel Çalışma</h4>
-                <p>Veritabanı tamamen yerelde SQLite üzerinde hızlıca işlenir.</p>
+              <div class="preview-card">
+                <div class="preview-title">Şirket Bağlamı</div>
+                <p>Aktif tenant ve yetkilere göre aynı kabuk içinde doğru modül açılır.</p>
               </div>
-            </div>
-            <div class="sync-item">
-              <div class="sync-item-icon">
-                <i data-lucide="check" style="width:14px;height:14px;"></i>
-              </div>
-              <div class="sync-item-text">
-                <h4>Bulut Eşitlemesi (Delta Sync)</h4>
-                <p>Milisaniyeler içerisinde veritabanı değişiklikleri bulut PostgreSQL sunucusuna eşitlenir.</p>
+              <div class="preview-card wide">
+                <div class="preview-title">Embed Modül</div>
+                <div class="preview-window"></div>
               </div>
             </div>
           </div>
         </div>
-        <div style="display:flex; justify-content:center;">
-          <svg viewBox="0 0 300 240" style="width:100%; max-width:300px; height:auto;">
-            <rect x="20" y="140" width="80" height="55" rx="8" fill="#f1f5f9" stroke="#059669" stroke-width="2"/>
-            <text x="60" y="172" fill="#059669" font-family="Outfit" font-size="11" text-anchor="middle" font-weight="700">POS Cihazı</text>
-            <text x="60" y="218" fill="#64748b" font-family="Inter" font-size="9" text-anchor="middle">Yerel SQLite</text>
+      </div>
+    </section>
 
-            <rect x="200" y="25" width="80" height="55" rx="8" fill="#eff6ff" stroke="#1e40af" stroke-width="2"/>
-            <text x="240" y="57" fill="#1e40af" font-family="Outfit" font-size="11" text-anchor="middle" font-weight="700">Bulut VPS</text>
-            <text x="240" y="103" fill="#64748b" font-family="Inter" font-size="9" text-anchor="middle">PostgreSQL</text>
-
-            <path d="M108,148 Q160,108 192,72" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
-            <polygon points="192,67 194,77 187,75" fill="#94a3b8"/>
-            <text x="155" y="125" fill="#64748b" font-family="Inter" font-size="9" transform="rotate(-30, 155, 125)">Delta Sync</text>
-          </svg>
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow">Özellikler</div>
+          <h2>İşletmenin günlük operasyonu tek yerde</h2>
+          <p>Kasa ve cihaz operasyonlarından ekip yönetimi, abonelik ve desteğe kadar ihtiyaç duyduğunuz araçlar.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Tek Auth Akışı</h3>
+            <p>Login, register ve reset tek giriş yüzeyinde toplanır. Ayrı panel girişleri kullanıcıyı dağıtmaz.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Rol Bazlı Navigasyon</h3>
+            <p>Menü kullanıcı rolü ve permission birleşimine göre oluşur. Herkese aynı dağınık panel gösterilmez.</p>
+          </article>
+          <article class="feature-card">
+            <h3>Birleşik Tasarım Dili</h3>
+            <p>Firma modülleri ve platform modülleri aynı kabuk, aynı spacing, aynı tipografi ile çalışır.</p>
+          </article>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 7. MULTI STORE / MULTI DEVICE -->
-  <section class="section-padding section-alt reveal">
-    <div class="container">
-      <div class="section-title">
-        <h2>Çoklu Şube & Terminal Yönetimi</h2>
-        <p>Büyüyen işletmenizin sınırlarını kaldırın. Tek bir abonelikle şubelerinizi ve kasalarınızı anlık olarak yönetin.</p>
-      </div>
-      <div class="trust-grid">
-        <div class="trust-card">
-          <div class="trust-icon">
-            <i data-lucide="git-merge" style="width:24px;height:24px;"></i>
+    <section class="section section-alt" id="architecture">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow">Mimari</div>
+          <h2>Olması gereken profesyonel akış</h2>
+        </div>
+        <div class="flow-grid">
+          <div class="flow-step">
+            <strong>1. Website</strong>
+            <p>Kullanıcı yalnızca ürün, yapı ve başlangıç akışını görür.</p>
           </div>
-          <h3>Merkezi Ürün & Fiyat</h3>
-          <p>Merkez portalından yapacağınız tek bir fiyat değişikliği saniyeler içinde tüm şubelerinizdeki terminallere yansır.</p>
-        </div>
-        <div class="trust-card">
-          <div class="trust-icon text-info">
-            <i data-lucide="monitor" style="width:24px;height:24px;"></i>
+          <div class="flow-step">
+            <strong>2. /app</strong>
+            <p>Tek giriş ekranı auth işlemlerini yönetir.</p>
           </div>
-          <h3>Kasa Limitleri Kontrolü</h3>
-          <p>Paketinize tanımlı cihaz limitleri çerçevesinde dilediğiniz kadar kasayı saniyeler içinde yetkilendirip aktifleştirin.</p>
-        </div>
-        <div class="trust-card">
-          <div class="trust-icon text-amber">
-            <i data-lucide="lock" style="width:24px;height:24px;"></i>
+          <div class="flow-step">
+            <strong>3. Bootstrap</strong>
+            <p>Rol, company ve permission bilgisi ile menü üretilir.</p>
           </div>
-          <h3>Donanım Lisans Kilidi</h3>
-          <p>Güvenlik amacıyla terminaller donanım imzası (UUID) ile eşleştirilir; yetkisiz erişimler engellenir.</p>
+          <div class="flow-step">
+            <strong>4. Workspace</strong>
+            <p>Firma veya platform modülü aynı uygulama içinde açılır.</p>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 8. PRODUCT PREVIEW -->
-  <section class="section-padding reveal">
-    <div class="container text-center">
-      <div class="section-title">
-        <h2>Modern Arayüz Detayları</h2>
-        <p>Kullanıcı dostu, göz yormayan, dokunmatik ekran uyumlu arayüz tasarımlarımızı inceleyin.</p>
-      </div>
-      <div style="max-width:800px; margin:0 auto; border-radius: var(--radius-lg); overflow:hidden; border: 1px solid var(--color-border); box-shadow: var(--shadow-elevated);">
-        <svg viewBox="0 0 800 450" style="background:#0f172a; display:block; width:100%; height:auto;">
-          <!-- Top bar -->
-          <rect width="800" height="40" fill="#1e293b"/>
-          <text x="20" y="25" fill="#cbd5e1" font-family="Outfit" font-size="14" font-weight="700">Serenut POS v1.0</text>
-          <rect x="700" y="8" width="80" height="24" rx="12" fill="#059669"/>
-          <text x="740" y="24" fill="#ffffff" font-family="Inter" font-size="11" font-weight="700" text-anchor="middle">ONLINE</text>
-
-          <!-- Categories Sidebar -->
-          <rect x="15" y="55" width="140" height="380" rx="6" fill="#1e293b"/>
-          <rect x="25" y="70" width="120" height="30" rx="4" fill="rgba(5, 150, 105, 0.15)"/>
-          <text x="35" y="90" fill="#10b981" font-family="Inter" font-size="12" font-weight="700">Popüler Ürünler</text>
-          <rect x="25" y="110" width="120" height="30" rx="4" fill="rgba(255,255,255,0.03)"/>
-          <text x="35" y="130" fill="#94a3b8" font-family="Inter" font-size="12">Sıcak İçecekler</text>
-          <rect x="25" y="150" width="120" height="30" rx="4" fill="rgba(255,255,255,0.03)"/>
-          <text x="35" y="170" fill="#94a3b8" font-family="Inter" font-size="12">Yemekler</text>
-          <rect x="25" y="190" width="120" height="30" rx="4" fill="rgba(255,255,255,0.03)"/>
-          <text x="35" y="210" fill="#94a3b8" font-family="Inter" font-size="12">Tatlılar</text>
-
-          <!-- Products Grid -->
-          <rect x="170" y="55" width="410" height="380" rx="6" fill="#1e293b"/>
-          <rect x="185" y="70" width="115" height="100" rx="6" fill="#0f172a"/>
-          <text x="242.5" y="120" fill="#cbd5e1" font-family="Inter" font-size="12" text-anchor="middle">Filtre Kahve</text>
-          <text x="242.5" y="145" fill="#10b981" font-family="Outfit" font-size="13" text-anchor="middle" font-weight="700">65 ₺</text>
-          <rect x="315" y="70" width="115" height="100" rx="6" fill="#0f172a"/>
-          <text x="372.5" y="120" fill="#cbd5e1" font-family="Inter" font-size="12" text-anchor="middle">Latte</text>
-          <text x="372.5" y="145" fill="#10b981" font-family="Outfit" font-size="13" text-anchor="middle" font-weight="700">75 ₺</text>
-          <rect x="445" y="70" width="115" height="100" rx="6" fill="#0f172a"/>
-          <text x="502.5" y="120" fill="#cbd5e1" font-family="Inter" font-size="12" text-anchor="middle">Türk Kahvesi</text>
-          <text x="502.5" y="145" fill="#10b981" font-family="Outfit" font-size="13" text-anchor="middle" font-weight="700">55 ₺</text>
-
-          <!-- Checkout sidebar -->
-          <rect x="595" y="55" width="190" height="380" rx="6" fill="#1e293b"/>
-          <text x="610" y="80" fill="#cbd5e1" font-family="Outfit" font-size="14" font-weight="700">Adisyon Detayı</text>
-          <rect x="610" y="100" width="160" height="35" rx="4" fill="#0f172a"/>
-          <text x="620" y="122" fill="#cbd5e1" font-family="Inter" font-size="11">1x Filtre Kahve</text>
-          <text x="760" y="122" fill="#cbd5e1" font-family="Inter" font-size="11" text-anchor="end">65 ₺</text>
-          <rect x="610" y="140" width="160" height="35" rx="4" fill="#0f172a"/>
-          <text x="620" y="162" fill="#cbd5e1" font-family="Inter" font-size="11">2x Latte</text>
-          <text x="760" y="162" fill="#cbd5e1" font-family="Inter" font-size="11" text-anchor="end">150 ₺</text>
-
-          <line x1="610" y1="330" x2="770" y2="330" stroke="#475569" stroke-width="1"/>
-          <text x="610" y="360" fill="#cbd5e1" font-family="Inter" font-size="13">Toplam Tutar</text>
-          <text x="770" y="360" fill="#10b981" font-family="Outfit" font-size="18" font-weight="700" text-anchor="end">215 ₺</text>
-          <rect x="610" y="380" width="160" height="40" rx="8" fill="#059669"/>
-          <text x="690" y="405" fill="#ffffff" font-family="Outfit" font-size="14" font-weight="800" text-anchor="middle">ÖDEME AL</text>
-        </svg>
-      </div>
-    </div>
-  </section>
-
-  <!-- 9. PLANS PREVIEW -->
-  <section class="section-padding section-alt reveal">
-    <div class="container">
-      <div class="section-title">
-        <h2>Hazır Fiyat Seçenekleri</h2>
-        <p>Büyüyen işletmenizin ihtiyaçlarına göre uyarlanmış esnek plan seçenekleri.</p>
-      </div>
-
-      <div class="plans-grid" id="homepage-plans-preview">
-        <!-- Dynamic loading of pricing tiers via JS -->
-      </div>
-
-      <div class="text-center mt-6">
-        <a href="/plans" class="btn btn-outline">Tüm Plan Detaylarını Gör</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- 10. FINAL CTA -->
-  <section class="final-cta reveal">
-    <div class="container">
-      <div class="cta-box">
-        <h2>Hemen Bugün Başlayın</h2>
-        <p>14 gün boyunca kredi kartı bilgisi girmeden tüm platform özelliklerini ücretsiz deneyin. Kolay kurulum ile dakikalar içinde aktif edin.</p>
-        <a href="/portal/#register" class="btn btn-primary btn-lg">
-          <i data-lucide="arrow-right" style="width:18px;height:18px;"></i>
-          Ücretsiz Başlat
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- 11. FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="/" class="brand">
-            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-              <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-            </svg>
-            <span>Serenut OS</span>
-          </a>
-          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
+    <section class="section" id="roles">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow">Roller</div>
+          <h2>Her role aynı kapı, farklı çalışma alanı</h2>
         </div>
-        <div class="footer-links-col">
-          <h4>Platform</h4>
-          <ul>
-            <li><a href="/platform">Özellikler</a></li>
-            <li><a href="/plans">Fiyatlandırma</a></li>
-            <li><a href="/downloads">İndir</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Destek</h4>
-          <ul>
-            <li><a href="/contact">İletişim</a></li>
-            <li><a href="/portal/">Müşteri Portalı</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Yasal</h4>
-          <ul>
-            <li><a href="/privacy">Gizlilik Politikası</a></li>
-            <li><a href="/kvkk">KVKK Bilgilendirme</a></li>
-            <li><a href="/terms">Kullanım Şartları</a></li>
-          </ul>
+        <div class="role-grid">
+          <article class="role-card">
+            <h3>Sysadmin</h3>
+            <p>Platform şirketleri, ödeme operasyonları ve sistem sağlığı modüllerine erişir.</p>
+          </article>
+          <article class="role-card">
+            <h3>Owner / Manager</h3>
+            <p>Kullanıcılar, ayarlar, cihazlar ve şirket operasyonlarını yönetir.</p>
+          </article>
+          <article class="role-card">
+            <h3>Operasyon Rolleri</h3>
+            <p>Kendilerine açılan izinli modüller üzerinden sınırlı ve net bir arayüz kullanır.</p>
+          </article>
         </div>
       </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 Serenut OS. Tüm Hakları Saklıdır.</p>
+    </section>
+
+    <section class="section cta-section" id="cta">
+      <div class="container cta-box">
+        <div>
+          <div class="eyebrow">Başlangıç</div>
+          <h2>Eski dağınık panel yapısı yerine yeni tek giriş akışını kullanın.</h2>
+        </div>
+        <div class="cta-actions">
+          <a href="/app/" class="btn btn-primary">Giriş Yap</a>
+          <a href="/app/#register" class="btn btn-secondary">Kayıt Oluştur</a>
+        </div>
       </div>
-    </div>
-  </footer>
+    </section>
+  </main>
 
-  <script src="js/website.js?v=3.0.1"></script>
-  <!-- Inline simple preview loader for plans section -->
-  <script type="module">
-    import { apiFetch } from '/shared/js/api-client.js';
-    import { formatCurrency } from '/shared/js/formatters.js';
-
-    document.addEventListener('DOMContentLoaded', async () => {
-      const plansPreview = document.getElementById('homepage-plans-preview');
-      if (!plansPreview) return;
-
-      try {
-        const plans = await apiFetch('/billing/plans');
-        plansPreview.innerHTML = '';
-
-        // Show up to 3 plans
-        plans.slice(0, 3).forEach(p => {
-          const isPro = p.id.includes('pro');
-          const card = document.createElement('div');
-          card.className = `plan-card ${isPro ? 'border-teal' : ''}`;
-
-          let devicesText = '1 Cihaz';
-          try {
-            const feats = typeof p.features === 'string' ? JSON.parse(p.features) : p.features;
-            if (feats && feats.devices !== undefined) {
-              devicesText = feats.devices > 90 ? 'Sınırsız Kasa' : `${feats.devices} Kasa Limiti`;
-            }
-          } catch(_) {}
-
-          const proBadge = isPro ? '<div class="badge badge-trial mb-3" style="display:inline-flex; width:auto; font-size:0.72rem; font-weight:700; align-self:flex-start;">En Popüler</div>' : '';
-          card.innerHTML = `
-            ${proBadge}
-            <h3 class="font-semibold">${p.name}</h3>
-            <p class="text-sm mt-1" style="color: var(--color-text-secondary); min-height:38px;">${p.description || 'Temel platform yetenekleri.'}</p>
-            <div class="plan-price-block" style="font-size: 2rem; margin-block: var(--space-2);">
-              ${formatCurrency(p.price, p.currency)}
-              <span style="font-size:0.8rem;">/ ay</span>
-            </div>
-            <p class="font-medium text-sm" style="color: var(--color-text-secondary); display:flex; align-items:center; gap:6px;">
-              <svg style="display:inline-block; vertical-align:middle; color: var(--color-primary);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              ${devicesText}
-            </p>
-            <button class="btn ${isPro ? 'btn-primary' : 'btn-secondary'} w-full mt-4" onclick="location.href='/portal/#register'" style="${isPro ? 'background:var(--color-primary);color:var(--color-text-inverse)!important;' : 'background:transparent;border:1px solid var(--color-border);color:var(--color-text-secondary)!important;'}">
-              Seç
-            </button>
-          `;
-          plansPreview.appendChild(card);
-        });
-      } catch (err) {
-        plansPreview.innerHTML = '<p style="grid-column: 1 / -1; text-align:center; color: var(--color-text-muted);">Plan verileri yüklenemedi.</p>';
-      }
-    });
-  </script>
+  <script src="js/website.js"></script>
 </body>
 </html>
-

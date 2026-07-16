@@ -1,165 +1,81 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>İletişim — Serenut OS</title>
-  <meta name="description" content="Serenut OS ekibine ulaşın. Teknik destek ve satış sorularınız için iletişim formumuzu doldurun." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
-  <script src="/shared/js/lucide.min.js?v=3.0.1"></script>
-  <link rel="stylesheet" href="css/website.css?v=3.0.1" />
+  <title>Serenut OS | İletişim</title>
+  <meta name="description" content="Serenut OS satış ve ürün mimarisi için iletişim sayfası.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/website.css">
 </head>
 <body>
-
-  <div class="mobile-overlay" id="mobile-overlay"></div>
-
-  <!-- HEADER -->
-  <header class="nav-landing nav-scrolled" id="main-header">
-    <div class="nav-container">
-      <a href="/" class="brand">
-        <svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-        </svg>
-        <span>Serenut OS</span>
-      </a>
-      <nav class="nav-links" id="nav-links">
-        <a href="/platform" class="nav-link">Özellikler</a>
-        <a href="/plans" class="nav-link">Fiyatlandırma</a>
-        <a href="/downloads" class="nav-link">İndir</a>
-        <a href="/contact" class="nav-link active">İletişim</a>
+  <header class="site-header" id="site-header">
+    <div class="container header-row">
+      <a href="/" class="brand">Serenut OS</a>
+      <nav class="desktop-nav" id="desktop-nav">
+        <a href="/">Ana Sayfa</a>
+        <a href="/platform">Mimari</a>
+        <a href="/plans">Planlar</a>
+        <a href="/contact">İletişim</a>
       </nav>
-      <div class="nav-auth" id="nav-auth">
-        <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
-        <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <i data-lucide="menu" style="width:22px;height:22px;"></i>
-        </button>
+      <div class="header-actions">
+        <a href="/app/" class="btn btn-secondary btn-sm">Giriş Yap</a>
+        <a href="/app/#register" class="btn btn-primary btn-sm">Kayıt Ol</a>
+        <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menüyü aç">Menü</button>
       </div>
     </div>
-  </header>
-
-  <!-- INTRO HEADER -->
-  <header class="subpage-header">
-    <div class="container">
-      <div class="badge badge-trial mb-2" style="display:inline-flex; width:auto;">Bize Ulaşın</div>
-      <h1>Müşteri Hizmetleri & Satış</h1>
-      <p>Aklınıza takılan tüm sorular veya kurumsal iş birlikleri için yanınızdayız.</p>
+    <div class="mobile-panel app-hidden" id="mobile-panel">
+      <a href="/">Ana Sayfa</a>
+      <a href="/platform">Mimari</a>
+      <a href="/plans">Planlar</a>
+      <a href="/contact">İletişim</a>
+      <a href="/app/">Giriş Yap</a>
+      <a href="/app/#register">Kayıt Ol</a>
     </div>
   </header>
 
   <main>
-    <section class="section-padding">
+    <section class="page-hero">
       <div class="container">
-        <div class="plans-grid">
-
-      <!-- Contact Info Card -->
-      <div class="card reveal" style="display:flex; flex-direction:column; gap: var(--space-5);">
-        <h3 class="font-bold" style="color: var(--color-text);">Destek & Satış Kanalları</h3>
-        <p class="text-sm" style="color: var(--color-text-secondary);">Hafta içi ve cumartesi günleri 09:00 - 18:00 saatleri arasında destek ekibimize direkt olarak ulaşabilirsiniz.</p>
-
-        <div style="display:flex; flex-direction:column; gap: var(--space-5); margin-top: var(--space-3);">
-          <div style="display:flex; align-items:flex-start; gap: 12px;">
-            <div class="trust-icon" style="width:40px; height:40px; min-width:40px;">
-              <i data-lucide="phone" style="width:18px;height:18px;"></i>
-            </div>
-            <div>
-              <h4 class="font-medium" style="color: var(--color-text);">Telefon</h4>
-              <p class="text-sm" style="color: var(--color-text-secondary);">+90 (212) 555 0199</p>
-            </div>
-          </div>
-          <div style="display:flex; align-items:flex-start; gap: 12px;">
-            <div class="trust-icon text-info" style="width:40px; height:40px; min-width:40px;">
-              <i data-lucide="mail" style="width:18px;height:18px;"></i>
-            </div>
-            <div>
-              <h4 class="font-medium" style="color: var(--color-text);">E-posta</h4>
-              <p class="text-sm" style="color: var(--color-text-secondary);">destek@serenut.com.tr</p>
-            </div>
-          </div>
-          <div style="display:flex; align-items:flex-start; gap: 12px;">
-            <div class="trust-icon text-amber" style="width:40px; height:40px; min-width:40px;">
-              <i data-lucide="map-pin" style="width:18px;height:18px;"></i>
-            </div>
-            <div>
-              <h4 class="font-medium" style="color: var(--color-text);">Merkez Ofis</h4>
-              <p class="text-sm" style="color: var(--color-text-secondary);">Maslak Mahallesi, Sanayi Caddesi No:41 Şişli / İstanbul</p>
-            </div>
-          </div>
-        </div>
+        <div class="eyebrow">İletişim</div>
+        <h1 class="page-title">Satış, mimari ve kurulum akışı için bize yazın.</h1>
+        <p class="page-copy">Bu yüzey destek paneli değildir. Public ürün ve başlangıç iletişim alanıdır. Kullanıcı destek talepleri uygulama içindeki destek modülünden yönetilir.</p>
       </div>
+    </section>
 
-      <!-- Contact Form Card -->
-      <div class="card reveal">
-        <h3 class="font-bold mb-4" style="color: var(--color-text);">Mesaj Gönderin</h3>
-        <form id="contact-form">
-          <div class="form-group">
-            <label class="form-label">Adınız Soyadınız <span class="required" style="color:var(--color-error);">*</span></label>
-            <input type="text" id="contact-name" required placeholder="Ahmet Yılmaz" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">İletişim E-postanız <span class="required" style="color:var(--color-error);">*</span></label>
-            <input type="email" id="contact-email" required placeholder="orn@firma.com" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Mesajınız <span class="required" style="color:var(--color-error);">*</span></label>
-            <textarea id="contact-message" required rows="4" placeholder="Sorunuzu veya talebinizi detaylıca buraya yazın..."></textarea>
-          </div>
-          <div id="contact-status-msg" style="margin-top: 10px; font-size: 0.9rem;"></div>
-          <button type="submit" class="btn btn-primary w-full mt-4" style="background:var(--color-primary);color:var(--color-text-inverse)!important;">Gönder</button>
+    <section class="section">
+      <div class="container contact-grid">
+        <article class="feature-card">
+          <div class="eyebrow">Doğrudan iletişim</div>
+          <h3>Satış ve kurulum ekibi</h3>
+          <p>Ürün seçimi, kurulum ve geçiş planı için formu doldurun. Mevcut müşteriler destek taleplerini uygulamadaki Destek Merkezi üzerinden açabilir.</p>
+        </article>
+        <form class="feature-card contact-form" id="contact-form">
+          <label>Ad Soyad<input id="contact-name" required autocomplete="name"></label>
+          <label>E-posta<input id="contact-email" type="email" required autocomplete="email"></label>
+          <label>Telefon<input id="contact-phone" type="tel" autocomplete="tel"></label>
+          <label>Konu<select id="contact-subject" required><option value="Satış görüşmesi">Satış görüşmesi</option><option value="Kurulum ve geçiş">Kurulum ve geçiş</option><option value="İş ortaklığı">İş ortaklığı</option></select></label>
+          <label class="full">Mesaj<textarea id="contact-message" rows="5" required></textarea></label>
+          <div class="form-status full" id="contact-status" role="status" aria-live="polite"></div>
+          <button class="btn btn-primary full" type="submit">Mesajı Gönder</button>
         </form>
       </div>
-
+    </section>
+    <section class="section section-alt">
+      <div class="container cta-box">
+        <div>
+          <div class="eyebrow">Başlangıç</div>
+          <h2>İletişim yerine doğrudan uygulama akışına da geçebilirsiniz.</h2>
+        </div>
+        <div class="cta-actions">
+          <a href="/app/" class="btn btn-primary">Giriş Yap</a>
+          <a href="/app/#register" class="btn btn-secondary">Hesap Oluştur</a>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="/" class="brand">
-            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-              <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-            </svg>
-            <span>Serenut OS</span>
-          </a>
-          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
-        </div>
-        <div class="footer-links-col">
-          <h4>Platform</h4>
-          <ul>
-            <li><a href="/platform">Özellikler</a></li>
-            <li><a href="/plans">Fiyatlandırma</a></li>
-            <li><a href="/downloads">İndir</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Destek</h4>
-          <ul>
-            <li><a href="/contact">İletişim</a></li>
-            <li><a href="/portal/">Müşteri Portalı</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Yasal</h4>
-          <ul>
-            <li><a href="/privacy">Gizlilik Politikası</a></li>
-            <li><a href="/kvkk">KVKK Bilgilendirme</a></li>
-            <li><a href="/terms">Kullanım Şartları</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 Serenut OS. Tüm Hakları Saklıdır.</p>
-      </div>
-    </div>
-  </footer>
-
-  <script src="js/website.js?v=3.0.1"></script>
+  <script src="js/website.js"></script>
 </body>
 </html>
 

@@ -1,141 +1,81 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yükleme & İndirme Merkezi — Serenut OS</title>
-  <meta name="description" content="Android APK ve Windows Desktop terminal uygulamalarımızın en son stabil sürümlerini indirin." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet">
-  <script src="/shared/js/lucide.min.js?v=3.0.1"></script>
-  <link rel="stylesheet" href="css/website.css?v=3.0.1" />
+  <title>Serenut OS | İndirmeler</title>
+  <meta name="description" content="Serenut OS uygulama indirmeleri ve kurulum akışı.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/website.css">
 </head>
 <body>
-
-  <div class="mobile-overlay" id="mobile-overlay"></div>
-
-  <!-- HEADER -->
-  <header class="nav-landing nav-scrolled" id="main-header">
-    <div class="nav-container">
-      <a href="/" class="brand">
-        <svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-          <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-        </svg>
-        <span>Serenut OS</span>
-      </a>
-      <nav class="nav-links" id="nav-links">
-        <a href="/platform" class="nav-link">Özellikler</a>
-        <a href="/plans" class="nav-link">Fiyatlandırma</a>
-        <a href="/downloads" class="nav-link active">İndir</a>
-        <a href="/contact" class="nav-link">İletişim</a>
+  <header class="site-header" id="site-header">
+    <div class="container header-row">
+      <a href="/" class="brand">Serenut OS</a>
+      <nav class="desktop-nav" id="desktop-nav">
+        <a href="/">Ana Sayfa</a>
+        <a href="/platform">Mimari</a>
+        <a href="/plans">Planlar</a>
+        <a href="/contact">İletişim</a>
       </nav>
-      <div class="nav-auth" id="nav-auth">
-        <a href="/portal/" class="btn btn-secondary btn-sm">Giriş Yap</a>
-        <a href="/portal/#register" class="btn btn-primary btn-sm">Ücretsiz Başla</a>
-        <button class="menu-toggle" id="nav-toggle" aria-label="Menüyü Aç/Kapat">
-          <i data-lucide="menu" style="width:22px;height:22px;"></i>
-        </button>
+      <div class="header-actions">
+        <a href="/app/" class="btn btn-secondary btn-sm">Giriş Yap</a>
+        <a href="/app/#register" class="btn btn-primary btn-sm">Kayıt Ol</a>
+        <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Menüyü aç">Menü</button>
       </div>
     </div>
-  </header>
-
-  <!-- INTRO HEADER -->
-  <header class="subpage-header">
-    <div class="container">
-      <div class="badge badge-active mb-2" style="display:inline-flex; width:auto;">Sürüm Dağıtımı</div>
-      <h1>Serenut OS İndirme Merkezi</h1>
-      <p>Windows bilgisayarlar ve Android el terminalleri için optimize edilmiş stabil terminal yazılımlarımız.</p>
+    <div class="mobile-panel app-hidden" id="mobile-panel">
+      <a href="/">Ana Sayfa</a>
+      <a href="/platform">Mimari</a>
+      <a href="/plans">Planlar</a>
+      <a href="/contact">İletişim</a>
+      <a href="/app/">Giriş Yap</a>
+      <a href="/app/#register">Kayıt Ol</a>
     </div>
   </header>
 
   <main>
-    <section class="section-padding">
+    <section class="page-hero">
       <div class="container">
-        <!-- Dynamic releases rendering grid -->
-        <div class="plans-grid" id="releases-history-container">
-          <!-- Will be populated dynamically via downloads.js -->
-        </div>
+        <div class="eyebrow">İndirmeler</div>
+        <h1 class="page-title">Kurulum dosyaları public yüzeyde, aktivasyon akışı uygulama içinde.</h1>
+        <p class="page-copy">İndirme paketleri burada bulunabilir. Ancak lisans, cihaz ve kullanıcı ilişkilendirmesi uygulama içindeki firma modüllerinden yönetilir.</p>
       </div>
     </section>
 
-    <!-- Requirements checklist -->
-    <section class="section-padding section-alt reveal">
-      <div class="container">
-        <div class="plans-grid">
-          <div class="card reveal" style="height:auto;">
-            <h4 class="font-bold mb-4" style="display:flex; align-items:center; gap: 8px; color: var(--color-text); font-size: 1.1rem; letter-spacing: -0.01em;">
-              <i data-lucide="monitor" style="width:20px;height:20px;color:var(--color-primary);"></i>
-              Windows Sistem Gereksinimleri
-            </h4>
-            <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.92rem; color: var(--color-text-secondary); list-style:none; padding:0;">
-              <li>• Windows 10 veya Windows 11 (64-bit)</li>
-              <li>• Minimum 4 GB RAM bellek (8 GB önerilir)</li>
-              <li>• 1.6 GHz çift çekirdekli veya daha hızlı işlemci</li>
-              <li>• ESC/POS uyumlu 58mm / 80mm Termal fiş yazıcısı sürücüsü</li>
-            </ul>
-          </div>
-          <div class="card reveal" style="height:auto;">
-            <h4 class="font-bold mb-4" style="display:flex; align-items:center; gap: 8px; color: var(--color-text); font-size: 1.1rem; letter-spacing: -0.01em;">
-              <i data-lucide="smartphone" style="width:20px;height:20px;color:var(--color-secondary);"></i>
-              Android El Terminali Gereksinimleri
-            </h4>
-            <ul style="display:flex; flex-direction:column; gap: var(--space-2); font-size:0.92rem; color: var(--color-text-secondary); list-style:none; padding:0;">
-              <li>• Android 7.0 (Nougat) veya üzeri işletim sistemi</li>
-              <li>• Minimum 2 GB RAM (Dahili termal yazıcılı Sunmi, Urovo el terminalleri desteklenir)</li>
-              <li>• Bluetooth 4.0 / USB bağlantı destekli taşınabilir yazıcılar</li>
-            </ul>
-          </div>
+    <section class="section">
+      <div class="container feature-grid" id="downloads-container">
+        <article class="feature-card">
+          <h3>Windows Kurulumu</h3>
+          <p>Masaüstü kurulum paketleri dağıtım için kullanılabilir. Yetkili kullanıcı akışı uygulama içinden devam eder.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Android APK</h3>
+          <p>Mobil veya kiosk tarzı cihazlarda kullanılacak uygulama paketleri public indirme yüzeyinden sunulur.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Aktivasyon</h3>
+          <p>Kurulum sonrası lisans, cihaz ve tenant bağlantısı uygulama içindeki cihaz/lisans modülünden yapılır.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container cta-box">
+        <div>
+          <div class="eyebrow">Geçiş</div>
+          <h2>Kurulumdan sonra doğrudan uygulama akışına geçin.</h2>
+        </div>
+        <div class="cta-actions">
+          <a href="/app/" class="btn btn-primary">Uygulamaya Gir</a>
+          <a href="/app/#register" class="btn btn-secondary">Hesap Oluştur</a>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="/" class="brand">
-            <svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M2 22C2 22 8 18 12 12C16 6 22 2 22 2C22 2 18 8 12 12C6 16 2 22 2 22Z"/>
-              <path d="M12 12C12 12 14 18 17 21C20 24 22 22 22 22C22 22 24 20 21 17C18 14 12 12 12 12Z"/>
-            </svg>
-            <span>Serenut OS</span>
-          </a>
-          <p class="text-sm" style="color: var(--color-text-muted);">Kesintisiz yerel POS otomasyonu ve bulut yönetim platformu.</p>
-        </div>
-        <div class="footer-links-col">
-          <h4>Platform</h4>
-          <ul>
-            <li><a href="/platform">Özellikler</a></li>
-            <li><a href="/plans">Fiyatlandırma</a></li>
-            <li><a href="/downloads">İndir</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Destek</h4>
-          <ul>
-            <li><a href="/contact">İletişim</a></li>
-            <li><a href="/portal/">Müşteri Portalı</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Yasal</h4>
-          <ul>
-            <li><a href="/privacy">Gizlilik Politikası</a></li>
-            <li><a href="/kvkk">KVKK Bilgilendirme</a></li>
-            <li><a href="/terms">Kullanım Şartları</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 Serenut OS. Tüm Hakları Saklıdır.</p>
-      </div>
-    </div>
-  </footer>
-
-  <script type="module" src="js/downloads.js?v=3.0.1"></script>
-  <script src="js/website.js?v=3.0.1"></script>
+  <script src="js/website.js"></script>
+  <script src="js/downloads.js"></script>
 </body>
 </html>
 

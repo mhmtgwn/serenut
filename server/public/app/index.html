@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serenut OS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/css/tokens.css">
+  <link rel="stylesheet" href="/shared/css/base.css">
+  <link rel="stylesheet" href="/shared/css/components.css">
+  <link rel="stylesheet" href="/shared/css/utilities.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="auth-view" class="auth-layout">
+    <section class="auth-hero">
+      <div class="auth-hero-inner">
+        <a href="/" class="hero-brand">Serenut OS</a>
+        <h1 class="hero-title">Tek giriş, tek kabuk, rol bazlı sistem yönetimi.</h1>
+        <p class="hero-copy">Website ayrı kalır. Girişten sonra kullanıcı rolüne göre aynı uygulama içinde doğru modül açılır.</p>
+        <div class="hero-points">
+          <div class="hero-point">Tek auth akışı</div>
+          <div class="hero-point">Rol ve permission odaklı menü</div>
+          <div class="hero-point">Firma ve platform modülleri aynı tasarım dili</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="auth-card-wrap">
+      <div class="auth-card card">
+        <div class="auth-card-head">
+          <div>
+            <div class="auth-eyebrow">Giriş</div>
+            <h2 class="auth-heading">Hesabınıza giriş yapın</h2>
+          </div>
+          <button class="ghost-link" id="open-register" type="button">Kayıt Ol</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">E-posta</label>
+          <input type="email" id="login-email" placeholder="sysadmin@serenut.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Şifre</label>
+          <input type="password" id="login-password" placeholder="••••••••">
+        </div>
+        <div class="auth-row">
+          <button class="ghost-link" id="open-reset" type="button">Şifremi unuttum</button>
+        </div>
+        <div class="auth-status text-sm text-red" id="login-status"></div>
+        <button class="btn btn-primary w-full" id="btn-login">Giriş Yap</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-layer app-hidden" id="register-layer">
+    <div class="modal-panel card">
+      <div class="modal-head">
+        <div>
+          <div class="auth-eyebrow">Kayıt</div>
+          <h2 class="auth-heading">Firma hesabı oluştur</h2>
+        </div>
+        <button class="modal-close" id="close-register" type="button">×</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Firma Ünvanı</label>
+        <input type="text" id="register-company" placeholder="Serenut Gıda A.Ş.">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Yetkili Ad Soyad</label>
+        <input type="text" id="register-name" placeholder="Ahmet Yılmaz">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-posta</label>
+        <input type="email" id="register-email" placeholder="iletisim@firma.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefon</label>
+        <input type="tel" id="register-phone" placeholder="0505 000 00 00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Şifre</label>
+        <input type="password" id="register-password" placeholder="En az 8 karakter">
+      </div>
+      <div class="auth-status text-sm text-red" id="register-status"></div>
+      <button class="btn btn-primary w-full" id="btn-register">Hesap Oluştur</button>
+    </div>
+  </div>
+
+  <div class="modal-layer app-hidden" id="reset-layer">
+    <div class="modal-panel card">
+      <div class="modal-head">
+        <div>
+          <div class="auth-eyebrow">Şifre</div>
+          <h2 class="auth-heading">Şifre sıfırlama</h2>
+        </div>
+        <button class="modal-close" id="close-reset" type="button">×</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-posta</label>
+        <input type="email" id="reset-email" placeholder="orn@firma.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Yeni Şifre</label>
+        <input type="password" id="reset-password" placeholder="En az 8 karakter">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Yeni Şifre Tekrarı</label>
+        <input type="password" id="reset-password-confirm" placeholder="Şifre tekrar">
+      </div>
+      <div class="auth-status text-sm" id="reset-status"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary w-full" id="btn-request-reset">Link Gönder</button>
+        <button class="btn btn-primary w-full" id="btn-apply-reset">Şifreyi Güncelle</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="shell-view" class="shell-layout app-hidden">
+    <aside class="shell-sidebar">
+      <div class="sidebar-top">
+        <a href="/" class="sidebar-brand">Serenut OS</a>
+        <div class="sidebar-tenant" id="tenant-name">Tenant</div>
+      </div>
+      <nav id="app-nav" class="sidebar-nav"></nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user-name" id="user-name">Kullanıcı</div>
+        <div class="sidebar-user-role" id="user-roles">roller</div>
+        <button class="btn btn-secondary w-full" id="btn-logout">Çıkış Yap</button>
+      </div>
+    </aside>
+
+    <main class="shell-main">
+      <header class="shell-header">
+        <button class="menu-toggle app-menu-toggle" id="sidebar-toggle" type="button" aria-label="Uygulama menüsünü aç">Menü</button>
+        <div>
+          <div class="auth-eyebrow">Workspace</div>
+          <h1 class="shell-title">Çalışma Alanı</h1>
+          <p class="shell-copy" id="shell-subtitle">Rolünüze göre modüller hazırlanıyor.</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-home">Ana Görünüm</button>
+      </header>
+
+      <section class="overview-grid" id="overview-grid">
+        <article class="card">
+          <h2 class="panel-title">Rol Özeti</h2>
+          <div class="chip-row" id="role-chips"></div>
+          <p class="panel-copy" id="workspace-note"></p>
+        </article>
+        <article class="card">
+          <h2 class="panel-title">Şirket Bağlamı</h2>
+          <div class="company-meta" id="company-meta"></div>
+        </article>
+      </section>
+
+      <section class="card module-panel" id="module-panel">
+        <div class="module-panel-head">
+          <div>
+            <h2 class="panel-title">Modüller</h2>
+            <p class="panel-copy">Yetkinize göre açılan modüller.</p>
+          </div>
+        </div>
+        <div class="module-grid" id="module-grid"></div>
+      </section>
+
+      <section class="card embed-panel app-hidden" id="embed-panel">
+        <div class="module-panel-head">
+          <div>
+            <h2 class="panel-title" id="embed-title">Modül</h2>
+            <p class="panel-copy" id="embed-description"></p>
+          </div>
+        </div>
+        <div class="embed-content" id="embed-content"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

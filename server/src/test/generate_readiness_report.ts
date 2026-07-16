@@ -58,12 +58,13 @@ async function generateReport() {
   // 4. Check static sites files
   try {
     const websiteIndex = path.join(__dirname, '../../public/website/index.html');
-    const portalIndex = path.join(__dirname, '../../public/portal/index.html');
-    const adminIndex = path.join(__dirname, '../../public/admin/index.html');
+    const appIndex = path.join(__dirname, '../../public/app/index.html');
     
     if (fs.existsSync(websiteIndex)) status['Website'] = 'PASS';
-    if (fs.existsSync(portalIndex)) status['Portal'] = 'PASS';
-    if (fs.existsSync(adminIndex)) status['Admin'] = 'PASS';
+    if (fs.existsSync(appIndex)) {
+      status['Portal'] = 'PASS';
+      status['Admin'] = 'PASS';
+    }
   } catch (_) {}
 
   // 5. Check API controller routing

@@ -123,12 +123,9 @@ async function verifyProductionDomains() {
   
   // Checking live domains and SRE metrics endpoints
   await checkDomain('https://serenut.com');
-  await checkDomain('https://portal.serenut.com');
-  await checkDomain('https://admin.serenut.com');
-  await checkDomain('https://api.serenut.com/health');
-  await checkDomain('https://api.serenut.com/live');
-  await checkDomain('https://api.serenut.com/ready');
-  await checkDomain('https://api.serenut.com/metrics');
+  await checkDomain('https://serenut.com/app/');
+  await checkDomain('https://serenut.com/api/v1/health');
+  await checkDomain('https://serenut.com/health');
 }
 
 async function runAuditor() {

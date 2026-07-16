@@ -617,7 +617,7 @@ export class AuthService {
         channel: 'email',
         recipient: email,
         title: 'Serenut OS — Şifre Sıfırlama Talebi',
-        body: `Merhaba ${userName},\n\nŞifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanabilirsiniz. Bu bağlantı 1 saat boyunca geçerlidir:\n\nhttps://portal.serenut.com/reset-password?token=${resetToken}\n\nEğer bu talebi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız.`
+        body: `Merhaba ${userName},\n\nŞifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanabilirsiniz. Bu bağlantı 1 saat boyunca geçerlidir:\n\n${process.env.PORTAL_URL || 'https://serenut.com/portal'}/?token=${resetToken}\n\nEğer bu talebi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız.`
       });
       
       logger.info(`Password reset token generated and queued for ${email}`);

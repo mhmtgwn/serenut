@@ -4,26 +4,49 @@
 
 const BASE_URL = '/api/v1';
 
+function isUnifiedApp() {
+  return window.location.pathname.includes('/app');
+}
+
+function isAdminApp() {
+  return window.location.pathname.includes('/admin');
+}
+
+function getTokenKey() {
+  if (isUnifiedApp()) {
+    return 'app_token';
+  }
+  return isAdminApp() ? 'admin_token' : 'portal_token';
+}
+
+function getProfileKey() {
+  if (isUnifiedApp()) {
+    return 'app_profile';
+  }
+  return isAdminApp() ? 'admin_profile' : 'portal_profile';
+}
+
 /**
  * Resolves the authentication token based on current app context (portal vs admin)
  * @returns {string}
  */
 export function getAuthToken() {
-  if (window.location.pathname.includes('/admin')) {
-    return sessionStorage.getItem('admin_token') || '';
-  }
-  return sessionStorage.getItem('portal_token') || '';
+  return sessionStorage.getItem(getTokenKey()) || sessionStorage.getItem('app_token') || '';
 }
 
 /**
  * Saves the authentication token for the current app context
  * @param {string} token 
  */
+export function setRefreshToken(token) {
+  if (token) sessionStorage.setItem('app_refresh_token', token);
+}
+
 export function setAuthToken(token) {
-  if (window.location.pathname.includes('/admin')) {
-    sessionStorage.setItem('admin_token', token);
-  } else {
+  sessionStorage.setItem(getTokenKey(), token);
+  if (isUnifiedApp()) {
     sessionStorage.setItem('portal_token', token);
+    sessionStorage.setItem('admin_token', token);
   }
 }
 
@@ -31,13 +54,30 @@ export function setAuthToken(token) {
  * Clears the authentication token and triggers a page refresh/redirect
  */
 export function clearAuthToken() {
-  if (window.location.pathname.includes('/admin')) {
-    sessionStorage.removeItem('admin_token');
-    window.location.href = '/admin/';
-  } else {
-    sessionStorage.removeItem('portal_token');
-    window.location.href = '/portal/';
+  [
+    getTokenKey(),
+    getProfileKey(),
+    'app_token',
+    'app_profile',
+    'portal_token',
+    'portal_profile',
+    'admin_token',
+    'admin_profile',
+    'app_refresh_token'
+  ].forEach((key) => sessionStorage.removeItem(key));
+
+  if (!isAdminApp() && !isUnifiedApp()) {
+    sessionStorage.removeItem('selected_plan_id');
+    sessionStorage.removeItem('selected_billing_period');
+    sessionStorage.removeItem('pending_download_release_id');
   }
+
+  if (isUnifiedApp()) {
+    window.location.href = '/app/';
+    return;
+  }
+
+  window.location.href = isAdminApp() ? '/admin/' : '/portal/';
 }
 
 /**
@@ -85,7 +125,11 @@ export async function apiFetch(endpoint, options = {}) {
     } catch (_) {
       // Response is not JSON
     }
-    const error = new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+    if (response.status === 403 && ['user_suspended', 'forbidden'].includes(errorData?.error)) {
+      clearAuthToken();
+    }
+
+    const error = new Error(errorData?.message || errorData?.error?.message || `HTTP error! status: ${response.status}`);
     error.status = response.status;
     error.data = errorData;
     throw error;

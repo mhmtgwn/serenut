@@ -186,7 +186,6 @@ jobs:
             set +a
             bash devops/migrate-with-rollback.sh || echo "Migration warning, continuing..."
             chmod -R 755 /var/www/serenut/server/public || true
-            cd server
             docker rm -f serenut-redis serenut-db serenut-backend || true
             docker compose -f docker-compose.prod.yml --env-file .env.production build
             docker compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans
