@@ -63,7 +63,11 @@ function bindEvents() {
   document.getElementById('btn-apply-reset')?.addEventListener('click', applyReset);
   document.getElementById('btn-logout')?.addEventListener('click', () => {
     clearAuthToken();
-    showAuth();
+    if (document.body.classList.contains('embed-mode')) {
+      showAuth();
+      return;
+    }
+    window.location.replace('/?auth=login');
   });
   document.getElementById('btn-home')?.addEventListener('click', () => selectModule('home'));
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
