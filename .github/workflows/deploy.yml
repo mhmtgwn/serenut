@@ -72,22 +72,26 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test --fail-fast
       - name: Configure Android signing
+        id: android-signing
         if: github.event_name == 'push'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Android signing secrets are not configured; release artifact build is skipped."
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/serenut-release.jks
           printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=serenut-release.jks\n' \
             "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" > android/key.properties
       - run: flutter build apk --release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.android-signing.outputs.configured == 'true'
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.android-signing.outputs.configured == 'true'
         with:
           name: serenut-pos-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
