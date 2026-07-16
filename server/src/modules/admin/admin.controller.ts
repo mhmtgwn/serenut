@@ -164,6 +164,24 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
   }
 });
 
+router.get('/subscriptions', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await runBypassingRLS(`
+      SELECT s.id, s.company_id, c.name AS company_name, c.email AS company_email,
+             p.name AS plan_name, p.price, p.currency, s.status,
+             s.current_period_start, s.current_period_end, s.cancel_at_period_end,
+             s.current_period_start AS created_at
+      FROM subscriptions s
+      JOIN companies c ON c.id = s.company_id
+      JOIN plans p ON p.id = s.plan_id
+      ORDER BY s.current_period_start DESC NULLS LAST
+    `);
+    return res.json(result.rows);
+  } catch (err) {
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
   const { name, tax_number, tax_office, phone, email, address } = req.body;
   if (!name || !tax_number) {

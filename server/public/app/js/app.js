@@ -1,6 +1,6 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { loadModule } from './module-runtime.js?v=20260716-admin1';
+import { loadModule } from './module-runtime.js?v=20260716-admin2';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -23,6 +23,8 @@ const navIconPaths = {
   'platform-overview': 'M4 19V9m5 10V5m5 14v-7m5 7V3',
   'platform-companies': 'M3 20h18M5 20V8l7-4 7 4v12M9 11h2m2 0h2M9 15h2m2 0h2',
   'platform-billing': 'M12 3v18m5-14H9.5a3.5 3.5 0 000 7H14a3 3 0 010 6H6',
+  'platform-subscriptions': 'M4 7h16v13H4z M8 3h8v4 M8 12h8m-8 4h5',
+  'platform-plans': 'M4 5h16v14H4z M8 9h8m-8 4h8',
   'platform-licenses': 'M5 4h14v16H5z M9 8h6m-6 4h6m-6 4h3',
   'platform-releases': 'M12 3v12m0 0 5-5m-5 5-5-5M5 21h14',
   'platform-health': 'M3 12h4l2-6 4 12 2-6h6',
@@ -263,17 +265,18 @@ async function bootShell() {
 
 function renderShell(bootstrap) {
   const isSysadmin = (bootstrap.user?.roles || []).includes('sysadmin');
-  const adminLabels = {
-    'platform-overview': 'Genel Bakış', 'platform-companies': 'Firmalar',
-    'platform-billing': 'Ödemeler ve Planlar', 'platform-licenses': 'Lisanslar',
-    'platform-releases': 'Güncellemeler', 'platform-support': 'Destek', 'platform-health': 'Sistem'
-  };
-  navigationItems = isSysadmin
-    ? (bootstrap.navigation || []).filter(item => item.id.startsWith('platform-')).map(item => ({ ...item, label: adminLabels[item.id] || item.label }))
-    : (bootstrap.navigation || []);
-  if (isSysadmin && !navigationItems.some(item => item.id === 'platform-support')) {
-    navigationItems.splice(Math.max(0, navigationItems.length - 1), 0, { id:'platform-support', label:'Destek', section:'platform', href:'/app/#platform-support', description:'Firmalardan gelen destek taleplerini görüntüleyin.', module:'admin' });
-  }
+  const adminNavigation = [
+    ['platform-overview','Genel Bakış','Günlük ticari durum ve bekleyen işler.'],
+    ['platform-companies','Firmalar','Firma hesaplarını ve ayrıntılarını yönetin.'],
+    ['platform-subscriptions','Abonelikler','Deneme, aktif ve sona eren abonelikleri izleyin.'],
+    ['platform-billing','Ödemeler','Havale ve EFT bildirimlerini onaylayın.'],
+    ['platform-plans','Planlar','Satış planlarını ve fiyatlarını düzenleyin.'],
+    ['platform-licenses','Lisanslar ve Cihazlar','Lisans süreleri ile bağlı cihazları yönetin.'],
+    ['platform-releases','Güncellemeler','Windows ve Android sürümlerini yayınlayın.'],
+    ['platform-support','Destek','Firmalardan gelen talepleri yönetin.'],
+    ['platform-health','Sistem','Servis sağlığını ve sistem olaylarını izleyin.']
+  ].map(([id,label,description])=>({id,label,description,section:'platform',href:`/app/#${id}`,module:'admin'}));
+  navigationItems = isSysadmin ? adminNavigation : (bootstrap.navigation || []);
   document.body.classList.toggle('sysadmin-shell', isSysadmin);
 
   document.querySelector('.sidebar-brand').innerText = isSysadmin ? 'Serenut Yönetim' : 'Serenut OS';
@@ -372,6 +375,7 @@ async function selectModule(moduleId) {
   });
 
   if (!item || activeId === 'home' || item.module === 'home') {
+    document.querySelector('.shell-title').innerText = 'Çalışma Alanı';
     overviewGrid.classList.remove('app-hidden');
     modulePanel.classList.remove('app-hidden');
     embedPanel.classList.add('app-hidden');
@@ -379,6 +383,7 @@ async function selectModule(moduleId) {
     return;
   }
 
+  document.querySelector('.shell-title').innerText = item.label;
   document.getElementById('embed-title').innerText = item.label;
   document.getElementById('embed-description').innerText = item.description;
   await loadModule(item);
