@@ -22,6 +22,7 @@ services:
     volumes:
       - ./public:/app/public
       - ./logs:/app/logs
+      - ./releases:/var/www/serenut-api/releases
     ports:
       # Yalnızca localhost'a bağla — Nginx dışarıya açar
       - "127.0.0.1:3000:3000"
