@@ -33,6 +33,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      postfix:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
@@ -120,6 +122,21 @@ services:
         limits:
           cpus: '0.50'
           memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  postfix:
+    image: boky/postfix:latest
+    container_name: serenut-postfix
+    restart: unless-stopped
+    environment:
+      ALLOWED_SENDER_DOMAINS: serenut.com
+      HOSTNAME: serenut.com
+    networks:
+      - serenut-external
     logging:
       driver: "json-file"
       options:
