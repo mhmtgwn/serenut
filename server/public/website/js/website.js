@@ -28,6 +28,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('auth-window-open');
     authWindow.querySelector('.auth-window-close')?.focus();
   };
+  const requestedAuth = new URLSearchParams(window.location.search).get('auth');
+  if (requestedAuth === 'login' || requestedAuth === 'register') {
+    openAuthWindow(requestedAuth);
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="/app"]');
+    if (!link || profile) return;
+    event.preventDefault();
+    openAuthWindow(link.getAttribute('href').includes('#register') ? 'register' : 'login');
+  });
   const closeAuthWindow = () => {
     authWindow.classList.add('app-hidden');
     document.body.classList.remove('auth-window-open');

@@ -1,6 +1,6 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { loadModule } from './module-runtime.js?v=20260716-payments1';
+import { loadModule } from './module-runtime.js?v=20260716-payments2';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -34,7 +34,8 @@ const navIconPaths = {
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (new URLSearchParams(window.location.search).get('embed') === '1') document.body.classList.add('embed-mode');
+  const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
+  if (isEmbed) document.body.classList.add('embed-mode');
   bindEvents();
 
   if (isAuthenticated()) {
@@ -42,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  if (!isEmbed) {
+    const intent = window.location.hash.startsWith('#register') ? 'register' : 'login';
+    window.location.replace(`/?auth=${intent}`);
+    return;
+  }
   showAuth();
   handleInitialIntent();
 });

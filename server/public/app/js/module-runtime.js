@@ -18,15 +18,20 @@ function notice(message) { window.alert(message); }
 
 async function beginCheckout(planId) {
   const billingPeriod = document.getElementById('billing-period')?.value || 'monthly';
-  const accounts = await apiFetch('/billing/bank-accounts');
+  const [accounts, plans] = await Promise.all([apiFetch('/billing/bank-accounts'), apiFetch('/billing/plans')]);
   if (!accounts.length) throw new Error('Aktif banka hesabı bulunamadı. Lütfen destek ekibiyle iletişime geçin.');
-  set(`<button class="btn btn-secondary" id="back-to-billing">← Aboneliklere dön</button><h3>Havale / EFT ile ödeme</h3><p>Plan aktivasyonu, havaleniz Serenut yöneticisi tarafından doğrulandıktan sonra yapılır.</p><form class="payment-form" id="bank-transfer-form"><select id="bank-account">${accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.bank_name)} — ${esc(a.iban)}</option>`).join('')}</select><button class="btn btn-primary" type="submit">Ödeme Talebi Oluştur</button></form><div id="payment-result"></div>`);
+  const plan = plans.find(p=>String(p.id)===String(planId)) || {};
+  const multiplier = billingPeriod === 'yearly' ? 12 * .85 : 1;
+  const amount = Number(plan.price || 0) * multiplier;
+  const accountCards = accounts.map((a,index)=>`<label class="bank-choice"><input type="radio" name="bank-account" value="${esc(a.id)}" ${index===0?'checked':''}><span><b>${esc(a.bank_name)}</b><small>Alıcı: ${esc(a.account_holder||'Serenut')}</small><code>${esc(a.iban)}</code>${a.branch_name?`<small>Şube: ${esc(a.branch_name)}</small>`:''}</span></label>`).join('');
+  set(`<button class="btn btn-secondary back-button" id="back-to-billing">← Planlara dön</button><div class="payment-layout"><section class="payment-summary"><span>SEÇİLEN PLAN</span><h3>${esc(plan.name||'Abonelik')}</h3><strong>${esc(money(amount,plan.currency||'TRY'))}</strong><p>${billingPeriod==='yearly'?'Yıllık ödeme, %15 indirimli':'Aylık ödeme'}</p></section><section class="transfer-panel"><div class="section-heading"><div><h3>Havale / EFT bilgileri</h3><p>Aşağıdaki hesaba ödeme yapın. Talep oluşturunca açıklamaya yazacağınız referans kodu üretilir.</p></div></div><form id="bank-transfer-form"><div class="bank-choice-grid">${accountCards}</div><div class="transfer-steps"><b>Nasıl ödeyeceksiniz?</b><ol><li>Banka hesabını seçin.</li><li>Ödeme talebini oluşturun.</li><li>Üretilen referansı havale açıklamasına yazın.</li><li>Onaydan sonra aboneliğiniz etkinleşir.</li></ol></div><button class="btn btn-primary" type="submit">Referans Kodu Oluştur</button></form></section></div><div id="payment-result"></div>`);
     document.getElementById('back-to-billing').onclick = () => loaders['billing-center']();
     document.getElementById('bank-transfer-form').onsubmit = async event => {
       event.preventDefault(); const button=event.submitter; button.disabled=true;
       try {
-        const result=await apiFetch('/billing/request-bank-transfer',{method:'POST',body:{plan_id:planId,bank_account_id:document.getElementById('bank-account').value,billing_period:billingPeriod}});
-        document.getElementById('payment-result').innerHTML=`<div class="payment-result"><strong>Referans: ${esc(result.reference_code)}</strong><p>${esc(result.bank.bank_name)} — ${esc(result.bank.iban)}</p><p>${esc(result.message)}</p><p>Tutar: ${esc(money(result.amount,result.currency||'TRY'))}</p></div>`;
+        const selected=document.querySelector('input[name="bank-account"]:checked');
+        const result=await apiFetch('/billing/request-bank-transfer',{method:'POST',body:{plan_id:planId,bank_account_id:selected.value,billing_period:billingPeriod}});
+        document.getElementById('payment-result').innerHTML=`<div class="payment-result transfer-result"><span>ÖDEME AÇIKLAMASI</span><strong>${esc(result.reference_code)}</strong><p><b>${esc(result.bank.bank_name)}</b><br>${esc(result.bank.iban)}</p><p>Havale açıklamasına yalnızca bu referans kodunu yazın.</p><p class="result-amount">${esc(money(result.amount,result.currency||'TRY'))}</p></div>`;
       } catch(e) { notice(e.message); } finally { button.disabled=false; }
     };
 }
