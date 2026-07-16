@@ -14,6 +14,7 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:serenutos/infrastructure/services/sms_gateway_service.dart';
 
 /// Builds SmsConfig from the current app Settings.
 SmsConfig? _buildSmsConfig(Settings? settings) {
@@ -99,6 +100,17 @@ final smsServiceProvider = Provider<SmsService>((ref) {
 final smsPendingCountProvider = FutureProvider<int>((ref) async {
   final service = ref.watch(smsServiceProvider);
   return service.getPendingCount();
+});
+
+final smsGatewayServiceProvider = Provider<SmsGatewayService>((ref) {
+  final service = SmsGatewayService(
+    ref.watch(apiClientProvider),
+    ref.watch(smsServiceProvider),
+    ref.watch(deviceManagerProvider),
+  );
+  service.start();
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 /// Provider for SmsLogRepository

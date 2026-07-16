@@ -312,6 +312,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     // Eagerly initialize SMS notification handler to subscribe to domain events on startup
     ref.watch(smsNotificationHandlerProvider);
+    ref.watch(smsGatewayServiceProvider);
 
     return MaterialApp.router(
       title: 'Serenut POS',

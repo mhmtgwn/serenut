@@ -202,7 +202,7 @@ router.get('/sms-gateway', async (req: AuthenticatedRequest, res: Response) => {
   const result = await runWithTenantContext(
     req.user!.company_id,
     `SELECT g.device_activation_id, g.selected_at, g.last_poll_at,
-            d.device_name, d.platform, d.status,
+            d.device_name, d.device_hash, d.platform, d.status,
             CASE WHEN g.last_poll_at > NOW() - INTERVAL '5 minutes' THEN true ELSE false END AS is_online
      FROM company_sms_gateways g
      JOIN device_activations d ON d.id = g.device_activation_id
@@ -249,8 +249,10 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
     await client.query('BEGIN');
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
     const gateway = await client.query(
-      `UPDATE company_sms_gateways SET last_poll_at = NOW()
-       WHERE company_id = $1 AND device_activation_id = $2 RETURNING device_activation_id`,
+      `UPDATE company_sms_gateways g SET last_poll_at = NOW()
+       FROM device_activations d
+       WHERE g.company_id = $1 AND g.device_activation_id = d.id AND d.device_hash = $2
+       RETURNING g.device_activation_id`,
       [user.company_id, deviceId]
     );
     if (gateway.rows.length === 0) {
@@ -263,6 +265,7 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
          AND created_at < NOW() - INTERVAL '24 hours'`,
       [user.company_id]
     );
+    const gatewayActivationId = gateway.rows[0].device_activation_id;
     const jobs = await client.query(
       `WITH selected AS (
          SELECT id FROM notification_queue
@@ -276,7 +279,7 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
            gateway_claimed_at = NOW(), gateway_updated_at = NOW()
        FROM selected WHERE q.id = selected.id
        RETURNING q.id, q.recipient, q.body, q.client_message_id, q.created_at`,
-      [user.company_id, deviceId, limit]
+      [user.company_id, gatewayActivationId, limit]
     );
     await client.query('COMMIT');
     return res.json({ messages: jobs.rows });
@@ -301,8 +304,12 @@ router.post('/sms-gateway/messages/:id/result', async (req: AuthenticatedRequest
     `UPDATE notification_queue q SET status = $1, error_message = $2,
        delivered_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE delivered_at END,
        gateway_updated_at = NOW()
-     WHERE q.id = $3 AND q.company_id = $4 AND q.channel = 'sms' AND q.gateway_device_id = $5
-       AND EXISTS (SELECT 1 FROM company_sms_gateways g WHERE g.company_id = $4 AND g.device_activation_id = $5)
+     WHERE q.id = $3 AND q.company_id = $4 AND q.channel = 'sms'
+       AND EXISTS (
+         SELECT 1 FROM company_sms_gateways g
+         JOIN device_activations d ON d.id = g.device_activation_id
+         WHERE g.company_id = $4 AND d.device_hash = $5 AND q.gateway_device_id = g.device_activation_id
+       )
      RETURNING q.id, q.status`,
     [status, req.body.error_message || null, req.params.id, user.company_id, deviceId]
   );

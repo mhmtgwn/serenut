@@ -140,6 +140,21 @@ class SmsService {
     return success;
   }
 
+  /// Sends a message claimed from the Serenut cloud queue through this
+  /// device's local SIM. Cloud status is reported by the gateway worker, so
+  /// the normal sync-local callback is intentionally suppressed.
+  Future<bool> sendGatewaySms(String phone, String message) async {
+    final config = _config;
+    if (config == null || config.provider != SmsProvider.sim) return false;
+    final item = SmsQueueItem(
+      id: const Uuid().v4(),
+      phone: _normalizePhone(phone),
+      message: message,
+      createdAt: DateTime.now(),
+    );
+    return _dispatch(item, config, reportDispatch: false);
+  }
+
   /// Queue an SMS without sending (for offline scenarios).
   Future<void> queueSms(String phone, String message) async {
     final item = SmsQueueItem(
@@ -236,14 +251,17 @@ class SmsService {
 
   // ── Private — Provider Dispatch ────────────────────────────────────────────
 
-  Future<bool> _dispatch(SmsQueueItem item, SmsConfig config) async {
+  Future<bool> _dispatch(SmsQueueItem item, SmsConfig config,
+      {bool reportDispatch = true}) async {
     if (config.provider == SmsProvider.sim &&
         config.monthlyLimit != null &&
         config.sentThisMonth >= config.monthlyLimit!) {
       await _logDelivery(item, success: false);
-      unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed',
-              'Aylık SMS limiti aşıldı.', item.id) ??
-          Future.value());
+      if (reportDispatch) {
+        unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed',
+                'Aylık SMS limiti aşıldı.', item.id) ??
+            Future.value());
+      }
       return false;
     }
 
@@ -264,9 +282,11 @@ class SmsService {
         }
         if (success) {
           await _logDelivery(item, success: true);
-          unawaited(onSmsDispatched?.call(
-                  item.phone, item.message, 'sent', null, item.id) ??
-              Future.value());
+          if (reportDispatch) {
+            unawaited(onSmsDispatched?.call(
+                    item.phone, item.message, 'sent', null, item.id) ??
+                Future.value());
+          }
           return true;
         }
       } catch (_) {
@@ -278,9 +298,11 @@ class SmsService {
       }
     }
     await _logDelivery(item, success: false);
-    unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed',
-            'Operatör/Sağlayıcı hatası veya sinyal yok.', item.id) ??
-        Future.value());
+    if (reportDispatch) {
+      unawaited(onSmsDispatched?.call(item.phone, item.message, 'failed',
+              'Operatör/Sağlayıcı hatası veya sinyal yok.', item.id) ??
+          Future.value());
+    }
     return false;
   }
 
