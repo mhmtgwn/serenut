@@ -1,4 +1,4 @@
--- PostgreSQL schema v3 migrations for Serenut OS SaaS backend
+-- PostgreSQL schema v3 migrations for Serenut POS SaaS backend
 -- Release Management Platform: multi-channel distribution, targeting, rollout, tracking
 
 -- 1. Extend app_versions with release management fields

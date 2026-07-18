@@ -1,4 +1,4 @@
--- PostgreSQL schema v8 migrations for Serenut OS SaaS backend
+-- PostgreSQL schema v8 migrations for Serenut POS SaaS backend
 -- Sprint 3: Admin Operations & System Hardening
 
 -- 1. System Incidents Table

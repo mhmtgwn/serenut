@@ -1,4 +1,4 @@
--- PostgreSQL schema v7 migrations for Serenut OS SaaS backend
+-- PostgreSQL schema v7 migrations for Serenut POS SaaS backend
 -- Production Hardening: Audit logging and notification queue scheduled delivery
 
 -- 1. Create Audit Logs Table (For tracking critical tenant operations)
