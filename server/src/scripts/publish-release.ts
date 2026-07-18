@@ -14,7 +14,7 @@ async function sha256(filePath: string): Promise<string> {
 }
 
 async function main() {
-  const [platform, versionCode, incomingPath] = process.argv.slice(2);
+  const [platform, versionCode, incomingPath, mandatoryArg] = process.argv.slice(2);
   if (!['android', 'windows'].includes(platform) || !versionCode || !incomingPath) {
     throw new Error('Usage: publish-release <android|windows> <version> <file>');
   }
@@ -40,6 +40,7 @@ async function main() {
   const size = fs.statSync(finalPath).size;
   const id = `rel-${platform}-${versionCode.replace(/[^a-zA-Z0-9]/g, '-')}`;
   const notes = `Serenut OS ${versionCode}: WebSocket bağlantı kararlılığı, tekil yeniden bağlanma yönetimi ve güvenli müşteri deneyimi telemetry kayıtları.`;
+  const isMandatory = mandatoryArg === 'true';
 
   const client = await pgPool.connect();
   try {
@@ -52,7 +53,7 @@ async function main() {
         is_mandatory, min_required_version, release_notes, status,
         rollout_percentage, created_at, updated_at
       ) VALUES ($1, $2, $3, 'stable', $4, $5, $6, $7, $7, $8,
-                false, NULL, $9, 'active', 100, NOW(), NOW())
+                $10, NULL, $9, 'active', 100, NOW(), NOW())
       ON CONFLICT (version_code, platform, channel) DO UPDATE SET
         download_url = EXCLUDED.download_url,
         file_path = EXCLUDED.file_path,
@@ -61,11 +62,12 @@ async function main() {
         digital_signature = EXCLUDED.digital_signature,
         file_size_bytes = EXCLUDED.file_size_bytes,
         release_notes = EXCLUDED.release_notes,
+        is_mandatory = EXCLUDED.is_mandatory,
         status = 'active', rollout_percentage = 100, updated_at = NOW()
     `, [
       id, versionCode, platform,
       `/api/v1/updates/download/${platform}/latest`, finalPath,
-      hash, signature, size, notes
+      hash, signature, size, notes, isMandatory
     ]);
     await client.query('COMMIT');
     console.log(JSON.stringify({ platform, versionCode, finalPath, sha256: hash, size }));

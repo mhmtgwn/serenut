@@ -56,10 +56,16 @@ class UpdateInfo {
         downloadUrl: json['downloadUrl'] as String?,
         sha256Hash: json['sha256Hash'] as String?,
         signature: json['signature'] as String?,
-        fileSizeBytes: json['fileSizeBytes'] as int?,
+        fileSizeBytes: _parseOptionalInt(json['fileSizeBytes']),
         releaseNotes: json['releaseNotes'] as String?,
         channel: json['channel'] as String? ?? 'stable',
       );
+}
+
+int? _parseOptionalInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
 }
 
 /// Download progress event emitted to UI.

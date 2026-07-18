@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:serenutos/config/environment.dart';
 import 'package:flutter/foundation.dart';
@@ -29,6 +30,8 @@ import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
+import 'package:serenutos/presentation/widgets/update_dialog.dart';
+import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 
 void main() async {
   final envConfig = EnvironmentConfig.current;
@@ -121,7 +124,7 @@ class MyApp extends ConsumerStatefulWidget {
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends ConsumerState<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   bool _checkingIntegrity = true;
   String? _integrityError;
   bool _checkingVersion = true;
@@ -132,11 +135,30 @@ class _MyAppState extends ConsumerState<MyApp> {
   String? _sha256Hash;
   String? _signature;
   int? _fileSizeBytes;
+  Timer? _updateCheckTimer;
+  bool _updateCheckRunning = false;
+  bool _updateDialogVisible = false;
+  String? _lastPromptedVersion;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _runIntegrityDiagnostics();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _updateCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_checkForLiveUpdate());
+    }
   }
 
   Future<void> _runIntegrityDiagnostics() async {
@@ -177,6 +199,10 @@ class _MyAppState extends ConsumerState<MyApp> {
       _checkingIntegrity = false;
     });
     _checkVersion();
+    _updateCheckTimer = Timer.periodic(
+      const Duration(minutes: 15),
+      (_) => unawaited(_checkForLiveUpdate()),
+    );
     _triggerAutoBackup();
   }
 
@@ -189,9 +215,9 @@ class _MyAppState extends ConsumerState<MyApp> {
   Future<void> _checkVersion() async {
     final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
     final required = await checker.checkForceUpdateRequired();
-    if (required) {
-      final info = await checker.getVersionInfo();
-      if (info != null) {
+    final info = await checker.getVersionInfo();
+    if (info != null) {
+      if (required) {
         _latestVersion = info.latestVersion;
         _releaseNotes = info.releaseNotes;
         _downloadUrl = info.downloadUrl;
@@ -206,6 +232,77 @@ class _MyAppState extends ConsumerState<MyApp> {
         _checkingVersion = false;
       });
     }
+    if (!required && info != null) {
+      await _offerOptionalUpdate(info);
+    }
+  }
+
+  Future<void> _checkForLiveUpdate() async {
+    if (_updateCheckRunning || _checkingVersion || _forceUpdateRequired) return;
+    _updateCheckRunning = true;
+    try {
+      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
+      final info = await checker.getVersionInfo();
+      if (info == null ||
+          !VersionChecker.isVersionOlder(
+              VersionChecker.currentVersion, info.latestVersion)) {
+        return;
+      }
+      if (info.isForceUpdate) {
+        if (!mounted) return;
+        setState(() {
+          _latestVersion = info.latestVersion;
+          _releaseNotes = info.releaseNotes;
+          _downloadUrl = info.downloadUrl;
+          _sha256Hash = info.sha256Hash;
+          _signature = info.signature;
+          _fileSizeBytes = info.fileSizeBytes;
+          _forceUpdateRequired = true;
+        });
+        return;
+      }
+      await _offerOptionalUpdate(info);
+    } finally {
+      _updateCheckRunning = false;
+    }
+  }
+
+  Future<void> _offerOptionalUpdate(VersionCheckResult info) async {
+    if (!VersionChecker.isVersionOlder(
+            VersionChecker.currentVersion, info.latestVersion) ||
+        _updateDialogVisible ||
+        _lastPromptedVersion == info.latestVersion) {
+      return;
+    }
+    _lastPromptedVersion = info.latestVersion;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final context = rootNavigatorKey.currentContext;
+      if (!mounted || context == null || _updateDialogVisible) return;
+      _updateDialogVisible = true;
+      try {
+        await showUpdateDialog(
+          context: context,
+          updateInfo: UpdateInfo(
+            hasUpdate: true,
+            isForceUpdate: false,
+            latestVersion: info.latestVersion,
+            minRequiredVersion: info.minRequiredVersion,
+            downloadUrl: info.downloadUrl,
+            sha256Hash: info.sha256Hash,
+            signature: info.signature,
+            fileSizeBytes: info.fileSizeBytes,
+            releaseNotes: info.releaseNotes,
+            channel: 'stable',
+          ),
+          releaseManager: ref.read(releaseManagerServiceProvider),
+          platform: Platform.isAndroid ? 'android' : 'windows',
+          jwtToken: ref.read(authServiceProvider).getJwtToken(),
+          deviceId: null,
+        );
+      } finally {
+        _updateDialogVisible = false;
+      }
+    });
   }
 
   @override

@@ -160,8 +160,8 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
             docker compose -f docker-compose.prod.yml --env-file .env.production ps
             curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
-            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js android 1.0.3 /var/www/serenut-api/releases/_incoming/android/app-release.apk
-            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js windows 1.0.3 /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js android 1.0.4 /var/www/serenut-api/releases/_incoming/android/app-release.apk true
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js windows 1.0.4 /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe true
             curl --fail https://api.serenut.com/api/v1/updates/latest-metadata
 
   deploy-staging:

@@ -47,6 +47,8 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/paywall_page.dart';
 import 'package:serenutos/domain/services/access_manager.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Navigation routes
 class AppRoutes {
   static const login = '/login';
@@ -115,6 +117,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final accessStatus = accessManager.checkAccess(currentUser: currentUser);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: (accessStatus == AccessStatus.paywall)
         ? AppRoutes.paywall
         : (accessStatus == AccessStatus.restrictedOperation)

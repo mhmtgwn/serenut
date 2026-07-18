@@ -31,7 +31,8 @@ class VersionCheckResult {
     if (url.isNotEmpty && !url.startsWith('http')) {
       final base = EnvironmentConfig.current.apiBaseUrl;
       final uri = Uri.parse(base);
-      final hostUrl = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+      final hostUrl =
+          '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
       url = '$hostUrl$url';
     }
     return VersionCheckResult(
@@ -50,9 +51,16 @@ class VersionCheckResult {
           (json['release_notes'] ?? json['releaseNotes']) as String? ?? '',
       sha256Hash: (json['sha256_hash'] ?? json['sha256Hash']) as String?,
       signature: json['signature'] as String?,
-      fileSizeBytes: (json['file_size_bytes'] ?? json['fileSizeBytes']) as int?,
+      fileSizeBytes:
+          _parseOptionalInt(json['file_size_bytes'] ?? json['fileSizeBytes']),
     );
   }
+}
+
+int? _parseOptionalInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
 }
 
 class VersionChecker {
@@ -62,7 +70,7 @@ class VersionChecker {
     ApiClient? apiClient,
   }) : _apiClient = apiClient ?? ApiClient();
 
-  static const String currentVersion = '1.0.1+2'; // Current app version
+  static const String currentVersion = '1.0.4+5';
   static const int currentSchemaVersion = 1;
 
   String get _platform => Platform.isAndroid ? 'android' : 'windows';
