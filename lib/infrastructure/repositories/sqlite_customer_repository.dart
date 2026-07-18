@@ -93,19 +93,15 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   String _normalizeTurkish(String text) {
     return text
+        .replaceAll('İ', 'i')
+        .replaceAll('I', 'i')
         .toLowerCase()
         .replaceAll('ı', 'i')
-        .replaceAll('İ', 'i')
         .replaceAll('ş', 's')
-        .replaceAll('Ş', 's')
         .replaceAll('ç', 'c')
-        .replaceAll('Ç', 'c')
         .replaceAll('ğ', 'g')
-        .replaceAll('Ğ', 'g')
         .replaceAll('ü', 'u')
-        .replaceAll('Ü', 'u')
-        .replaceAll('ö', 'o')
-        .replaceAll('Ö', 'o');
+        .replaceAll('ö', 'o');
   }
 
   @override
@@ -113,12 +109,16 @@ class SqliteCustomerRepository implements ICustomerRepository {
     if (query.trim().isEmpty) return [];
     final normalizedQuery = query.trim().normalizeTurkish;
     final term = '%$normalizedQuery%';
-    final rows = await _executor.query(
+    var rows = await _executor.query(
       'customers',
-      where: "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ?)",
+      where:
+          "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ?)",
       whereArgs: [term, term, term],
       orderBy: 'normalized_name ASC',
     );
+    if (rows.isEmpty) {
+      rows = await _legacyNormalizedSearch(normalizedQuery);
+    }
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
   }
 
@@ -151,18 +151,57 @@ class SqliteCustomerRepository implements ICustomerRepository {
     } else if (cleanPhone.startsWith('0')) {
       cleanPhone = cleanPhone.substring(1);
     }
-    
+
     final phoneTerm = cleanPhone.isNotEmpty ? '%$cleanPhone%' : termContains;
 
-    final rows = await _executor.query(
+    var rows = await _executor.query(
       'customers',
-      where: "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ? OR normalized_email LIKE ?)",
-      whereArgs: [termPrefix, termContains, phoneTerm, termPrefix, termContains],
+      where:
+          "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ? OR normalized_email LIKE ?)",
+      whereArgs: [
+        termPrefix,
+        termContains,
+        phoneTerm,
+        termPrefix,
+        termContains
+      ],
       orderBy: 'normalized_name ASC',
       limit: limit,
       offset: offset,
     );
+    if (rows.isEmpty) {
+      final matches = await _legacyNormalizedSearch(
+        normalizedQuery,
+        normalizedPhone: cleanPhone,
+      );
+      final start = (offset ?? 0).clamp(0, matches.length);
+      final end = limit == null
+          ? matches.length
+          : (start + limit).clamp(start, matches.length);
+      rows = matches.sublist(start, end);
+    }
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> _legacyNormalizedSearch(
+    String query, {
+    String? normalizedPhone,
+  }) async {
+    final candidates = await _executor.query(
+      'customers',
+      where: "is_active = 1 AND id != ''",
+      orderBy: 'name ASC',
+    );
+    return candidates.where((row) {
+      final name = _normalizeTurkish(row['name']?.toString() ?? '');
+      final email = _normalizeTurkish(row['email']?.toString() ?? '');
+      final phone =
+          row['phone']?.toString().replaceAll(RegExp(r'\D'), '') ?? '';
+      return name.contains(query) ||
+          email.contains(query) ||
+          (normalizedPhone?.isNotEmpty == true &&
+              phone.contains(normalizedPhone!));
+    }).toList();
   }
 
   @override
