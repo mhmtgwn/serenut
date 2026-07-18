@@ -140,8 +140,8 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production build
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/run-migrations.js
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
-            docker compose -f docker-compose.prod.yml ps
-            curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:3000/health
+            docker compose -f docker-compose.prod.yml --env-file .env.production ps
+            curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
 
   deploy-staging:
     needs: [backend-ci, flutter-ci, windows-ci]
