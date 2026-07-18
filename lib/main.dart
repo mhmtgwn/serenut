@@ -76,6 +76,7 @@ void main() async {
         hashService: hashService,
         apiClient: apiClient,
         deviceManager: deviceManager,
+        licenseService: licenseService,
       );
       // Global event publisher will be eagerly initialized in MyApp build
 

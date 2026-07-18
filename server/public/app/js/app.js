@@ -12,6 +12,11 @@ const modulePanel = document.getElementById('module-panel');
 const embedContent = document.getElementById('embed-content');
 
 let navigationItems = [];
+let selectedModuleId = 'home';
+let realtimeSocket = null;
+let realtimeReconnectTimer = null;
+let realtimeRefreshTimer = null;
+let realtimeCompanyId = '';
 
 const navIconPaths = {
   'workspace-home': 'M4 11l8-7 8 7v9H4z M9 20v-6h6v6',
@@ -288,12 +293,14 @@ async function bootShell() {
     setUserProfile(me);
     renderShell(bootstrap);
     showShell();
+    startRealtime();
   } catch (_) {
     showAuth();
   }
 }
 
 function renderShell(bootstrap) {
+  realtimeCompanyId = bootstrap.company?.id || bootstrap.user?.company_id || '';
   const isSysadmin = (bootstrap.user?.roles || []).includes('sysadmin');
   const adminNavigation = [
     ['platform-overview','Genel Bakış','Günlük ticari durum ve bekleyen işler.'],
@@ -408,6 +415,7 @@ function resolveInitialModule(bootstrap) {
 
 async function selectModule(moduleId) {
   const activeId = moduleId || 'home';
+  selectedModuleId = activeId;
   document.body.classList.remove('sidebar-open');
   const item = navigationItems.find((entry) => entry.id === activeId);
 
@@ -433,4 +441,43 @@ async function selectModule(moduleId) {
   modulePanel.classList.add('app-hidden');
   embedPanel.classList.remove('app-hidden');
   window.location.hash = item.id;
+}
+
+function startRealtime() {
+  if (realtimeSocket?.readyState === WebSocket.OPEN || !isAuthenticated()) return;
+  clearTimeout(realtimeReconnectTimer);
+  const token = sessionStorage.getItem('app_token');
+  if (!token) return;
+
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${scheme}://${window.location.host}/api/v1/realtime/live?token=${encodeURIComponent(token)}&reconnectCount=0`;
+  try {
+    realtimeSocket = new WebSocket(url);
+    realtimeSocket.onopen = () => {
+      if (!realtimeCompanyId) return;
+      ['orders', 'inventory', 'customers', 'payments', 'license', 'notifications', 'settings']
+        .forEach((topic) => realtimeSocket.send(JSON.stringify({ action: 'subscribe', topic: `tenant/${realtimeCompanyId}/${topic}` })));
+    };
+    realtimeSocket.onmessage = (event) => {
+      let message;
+      try { message = JSON.parse(event.data); } catch (_) { return; }
+      if (!message?.type) return;
+      scheduleModuleRefresh(message.type);
+    };
+    realtimeSocket.onclose = () => {
+      realtimeSocket = null;
+      if (isAuthenticated()) realtimeReconnectTimer = setTimeout(startRealtime, 5000);
+    };
+    realtimeSocket.onerror = () => realtimeSocket?.close();
+  } catch (_) {
+    realtimeReconnectTimer = setTimeout(startRealtime, 5000);
+  }
+}
+
+function scheduleModuleRefresh(eventType) {
+  clearTimeout(realtimeRefreshTimer);
+  realtimeRefreshTimer = setTimeout(() => {
+    document.dispatchEvent(new CustomEvent('serenut:realtime', { detail: { eventType } }));
+    if (selectedModuleId !== 'home') selectModule(selectedModuleId);
+  }, 400);
 }

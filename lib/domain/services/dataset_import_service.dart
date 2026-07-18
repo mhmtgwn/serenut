@@ -61,6 +61,47 @@ class DatasetImportService {
     return int.tryParse(val.toString()) ?? 0;
   }
 
+  /// Resolves familiar Turkish/English catalogue headers. Files without a
+  /// header row keep the original column order for backwards compatibility.
+  static Map<String, int> _resolveColumns(List<dynamic> headerRow) {
+    final columns = <String, int>{
+      'barcode': 0,
+      'name': 1,
+      'category': 2,
+      'brand': 3,
+      'price': 4,
+      'vat': 5,
+      'remoteUrl': 6,
+      'quantity': 7,
+    };
+    final aliases = <String, List<String>>{
+      'barcode': ['barkod', 'barkod no', 'barcode', 'ean', 'sku'],
+      'name': ['urun adi', 'ürün adı', 'urun', 'ürün', 'product name', 'name'],
+      'category': ['kategori', 'category'],
+      'brand': ['marka', 'brand'],
+      'price': ['fiyat', 'satis fiyati', 'satış fiyatı', 'price'],
+      'vat': ['kdv', 'vat'],
+      'remoteUrl': ['resim url', 'gorsel url', 'görsel url', 'image url'],
+      'quantity': ['stok', 'miktar', 'adet', 'quantity', 'stock'],
+    };
+    for (var index = 0; index < headerRow.length; index++) {
+      final header = _staticParseString(headerRow[index])
+          .toLowerCase()
+          .replaceAll(RegExp(r'[_\-]+'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      for (final entry in aliases.entries) {
+        if (entry.value.contains(header)) {
+          columns[entry.key] = index;
+        }
+      }
+    }
+    return columns;
+  }
+
+  static dynamic _cellAt(List<dynamic> row, int? index) =>
+      index != null && index >= 0 && index < row.length ? row[index] : null;
+
   /// CPU-heavy ZIP decoding and Excel parsing executed in a background Isolate.
   static ParsedCatalogData _parseZipInIsolate(Uint8List zipBytes) {
     // 1. Pre-decompression limit checks via ZipDirectory (Zip Bomb Mitigation)
@@ -182,25 +223,33 @@ class DatasetImportService {
     // 5. Parse sheet rows into transfer maps
     final rows = sheet.rows;
     final totalRows = rows.length;
+    final columns = _resolveColumns(rows.first);
     final List<Map<String, dynamic>> parsedProducts = [];
 
     for (int i = 1; i < totalRows; i++) {
       final row = rows[i];
       if (row.isEmpty) continue;
 
-      final barcode = row.isNotEmpty ? _staticParseString(row[0]) : '';
-      final name = row.length > 1 ? _staticParseString(row[1]) : '';
+      final barcode = _staticParseString(_cellAt(row, columns['barcode']));
+      final name = _staticParseString(_cellAt(row, columns['name']));
 
       if (barcode.isEmpty || name.isEmpty) {
         continue;
       }
 
-      final category = row.length > 2 ? _staticParseString(row[2]) : 'Diğer';
-      final brand = row.length > 3 ? _staticParseString(row[3]) : 'Bilinmiyor';
-      final price = row.length > 4 ? _staticParseDouble(row[4]) : 0.0;
-      final vat = row.length > 5 ? _staticParseInt(row[5]) : 18;
-      final remoteUrl = row.length > 6 ? _staticParseString(row[6]) : '';
-      final quantity = row.length > 7 ? _staticParseInt(row[7]) : 0;
+      final category =
+          _staticParseString(_cellAt(row, columns['category'])).isEmpty
+              ? 'Diğer'
+              : _staticParseString(_cellAt(row, columns['category']));
+      final brand = _staticParseString(_cellAt(row, columns['brand'])).isEmpty
+          ? 'Bilinmiyor'
+          : _staticParseString(_cellAt(row, columns['brand']));
+      final price = _staticParseDouble(_cellAt(row, columns['price']));
+      final vat = _staticParseInt(_cellAt(row, columns['vat'])) == 0
+          ? 18
+          : _staticParseInt(_cellAt(row, columns['vat']));
+      final remoteUrl = _staticParseString(_cellAt(row, columns['remoteUrl']));
+      final quantity = _staticParseInt(_cellAt(row, columns['quantity']));
 
       parsedProducts.add({
         'barcode': barcode,
@@ -348,25 +397,33 @@ class DatasetImportService {
     await Future.delayed(const Duration(milliseconds: 50));
     final rows = sheet.rows;
     final totalRows = rows.length;
+    final columns = _resolveColumns(rows.first);
     final List<Map<String, dynamic>> parsedProducts = [];
 
     for (int i = 1; i < totalRows; i++) {
       final row = rows[i];
       if (row.isEmpty) continue;
 
-      final barcode = row.isNotEmpty ? _staticParseString(row[0]) : '';
-      final name = row.length > 1 ? _staticParseString(row[1]) : '';
+      final barcode = _staticParseString(_cellAt(row, columns['barcode']));
+      final name = _staticParseString(_cellAt(row, columns['name']));
 
       if (barcode.isEmpty || name.isEmpty) {
         continue;
       }
 
-      final category = row.length > 2 ? _staticParseString(row[2]) : 'Diğer';
-      final brand = row.length > 3 ? _staticParseString(row[3]) : 'Bilinmiyor';
-      final price = row.length > 4 ? _staticParseDouble(row[4]) : 0.0;
-      final vat = row.length > 5 ? _staticParseInt(row[5]) : 18;
-      final remoteUrl = row.length > 6 ? _staticParseString(row[6]) : '';
-      final quantity = row.length > 7 ? _staticParseInt(row[7]) : 0;
+      final category =
+          _staticParseString(_cellAt(row, columns['category'])).isEmpty
+              ? 'Diğer'
+              : _staticParseString(_cellAt(row, columns['category']));
+      final brand = _staticParseString(_cellAt(row, columns['brand'])).isEmpty
+          ? 'Bilinmiyor'
+          : _staticParseString(_cellAt(row, columns['brand']));
+      final price = _staticParseDouble(_cellAt(row, columns['price']));
+      final vat = _staticParseInt(_cellAt(row, columns['vat'])) == 0
+          ? 18
+          : _staticParseInt(_cellAt(row, columns['vat']));
+      final remoteUrl = _staticParseString(_cellAt(row, columns['remoteUrl']));
+      final quantity = _staticParseInt(_cellAt(row, columns['quantity']));
 
       parsedProducts.add({
         'barcode': barcode,

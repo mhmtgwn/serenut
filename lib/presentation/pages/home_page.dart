@@ -21,9 +21,7 @@ import 'package:serenutos/presentation/pages/global_search_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/presentation/widgets/home/system_trust_panel.dart';
 import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
-import 'package:serenutos/presentation/widgets/home/alert_stream_panel.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kBgColor = Color(0xFFF8FAFC);
@@ -38,8 +36,6 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardProvider);
     final ordersAsync = ref.watch(ordersControllerProvider);
-    final syncState = ref.watch(syncProvider);
-    final debtAgingVal = ref.watch(debtAgingProvider);
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -56,15 +52,6 @@ class HomePage extends ConsumerWidget {
           ),
           data: (data) {
             final orders = ordersAsync.value ?? [];
-            final pendingCount =
-                orders.where((o) => o.status == 'created').length;
-            final preparingCount =
-                orders.where((o) => o.status == 'preparing').length;
-
-            final debtAging = debtAgingVal.value ?? [];
-            final overdueCount =
-                debtAging.where((row) => row.hasOverdue).length;
-
             return RefreshIndicator(
               color: const Color(0xFF10B981),
               onRefresh: () async {
@@ -94,23 +81,16 @@ class HomePage extends ConsumerWidget {
 
                         const SizedBox(height: 8),
 
-                        // 2. SYSTEM TRUST PANEL (Phase B)
-                        const SystemTrustPanel(),
-                        const SizedBox(height: 16),
-
-                        // 3. OPERATION QUICK ACTIONS (Phase B)
+                        // Hızlı işlemler operasyon ekranının odağıdır. Teknik
+                        // sistem sağlığı ve ayrıntılı olaylar web panelindedir.
                         const QuickActionsPanel(),
                         const SizedBox(height: 20),
 
-                        // 4. Finansal Özet Kartları (KPI)
+                        // Finansal Özet Kartları (KPI)
                         _buildFinancialSummary(data.summary),
                         const SizedBox(height: 24),
 
-                        // 5. ALERT STREAM (Phase B)
-                        const AlertStreamPanel(),
-                        const SizedBox(height: 24),
-
-                        // 6. Satış Grafiği
+                        // Satış Grafiği
                         _buildSalesTrendSection(data.weeklyTrend),
                         const SizedBox(height: 24),
 
@@ -245,9 +225,6 @@ class HomePage extends ConsumerWidget {
   // ── Financial Summary KPI Cards ────────────────────────────────────────────
   Widget _buildFinancialSummary(DashboardSummary summary) {
     final format = NumberFormat('#,##0.00', 'tr_TR');
-    final profit =
-        summary.todayRevenue * 0.30; // Estimated 30% gross profit margin
-
     final items = [
       _KpiData(
         title: 'Bugünkü Ciro',

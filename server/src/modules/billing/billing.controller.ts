@@ -22,6 +22,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { CommercialLifecycleService } from './commercial_lifecycle.service';
+import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 
 const router = Router();
 
@@ -1349,11 +1350,19 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
     `, [adminUserId, id]);
 
     // 5. Atomic subscription + entitlement upsert
-    await CommercialLifecycleService.activatePaidSubscription(client, {
+    const billingDetails = typeof invoice.billing_details === 'string'
+      ? JSON.parse(invoice.billing_details)
+      : (invoice.billing_details || {});
+    const billingPeriod = billingDetails.billingPeriod === 'yearly'
+      ? 'yearly'
+      : 'monthly';
+
+    const activation = await CommercialLifecycleService.activatePaidSubscription(client, {
       companyId: invoice.company_id,
       planId,
       grantType: 'bank_transfer',
       adminUserId,
+      billingPeriod,
     });
 
     // 6. Write Admin Audit Log (Inside Transaction, non-blocking)
@@ -1398,6 +1407,16 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
     }
 
     await client.query('COMMIT');
+
+    // Notify open POS and portal sessions immediately. Offline clients refresh
+    // their entitlement on their next connection/heartbeat.
+    await RealtimeBroadcastService.publishEvent(invoice.company_id, 'LicenseUpdated', {
+      subscriptionId: activation.subscriptionId,
+      entitlementId: activation.entitlementId,
+      invoiceId: id,
+      status: 'active',
+      billingPeriod,
+    });
 
     logger.info(`Invoice ${id} bank wire approved by admin ${req.user?.email}`);
     return res.json({ success: true, message: 'Ödeme başarıyla onaylandı ve abonelik aktif edildi.' });

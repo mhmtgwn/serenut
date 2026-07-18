@@ -151,7 +151,10 @@ class AuthService {
           // PHASE 3: Device Lifecycle - Auto Activate
           try {
             if (!kIsWeb) {
-              final deviceId = _deviceManager.getDeviceId();
+              // The signed license token, its heartbeat and device activation
+              // must all refer to the same durable device identity.
+              final deviceId = _licenseService?.getDeviceUuid() ??
+                  _deviceManager.getDeviceId();
               final deviceName = 'POS Cihazı - $deviceId';
               final activation =
                   await _apiClient!.post('/licenses/auto-activate', {

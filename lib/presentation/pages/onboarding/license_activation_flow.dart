@@ -61,7 +61,7 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
         '/api/v1/licenses/activate',
         body: {
           'license_key': rawKey,
-          'device_id': deviceId,
+          'device_hash': deviceId,
           'device_name': deviceName,
           'fingerprint': fingerprint.toJson(),
         },
