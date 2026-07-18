@@ -107,18 +107,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
   @override
   Future<List<CustomerEntity>> search(String query) async {
     if (query.trim().isEmpty) return [];
-    final normalizedQuery = query.trim().normalizeTurkish;
-    final term = '%$normalizedQuery%';
-    var rows = await _executor.query(
-      'customers',
-      where:
-          "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ?)",
-      whereArgs: [term, term, term],
-      orderBy: 'normalized_name ASC',
-    );
-    if (rows.isEmpty) {
-      rows = await _legacyNormalizedSearch(normalizedQuery);
-    }
+    final normalizedQuery = _normalizeTurkish(query.trim());
+    final rows = await _legacyNormalizedSearch(normalizedQuery);
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
   }
 
@@ -139,9 +129,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
       return rows.map((row) => CustomerEntity.fromMap(row)).toList();
     }
 
-    final normalizedQuery = searchQuery.trim().normalizeTurkish;
-    final termPrefix = '$normalizedQuery%';
-    final termContains = '%$normalizedQuery%';
+    final normalizedQuery = _normalizeTurkish(searchQuery.trim());
 
     // Normalize phone input: strip non-digits, country code, and leading zeros
     final phoneDigits = normalizedQuery.replaceAll(RegExp(r'\D'), '');
@@ -152,34 +140,15 @@ class SqliteCustomerRepository implements ICustomerRepository {
       cleanPhone = cleanPhone.substring(1);
     }
 
-    final phoneTerm = cleanPhone.isNotEmpty ? '%$cleanPhone%' : termContains;
-
-    var rows = await _executor.query(
-      'customers',
-      where:
-          "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ? OR normalized_email LIKE ?)",
-      whereArgs: [
-        termPrefix,
-        termContains,
-        phoneTerm,
-        termPrefix,
-        termContains
-      ],
-      orderBy: 'normalized_name ASC',
-      limit: limit,
-      offset: offset,
+    final matches = await _legacyNormalizedSearch(
+      normalizedQuery,
+      normalizedPhone: cleanPhone,
     );
-    if (rows.isEmpty) {
-      final matches = await _legacyNormalizedSearch(
-        normalizedQuery,
-        normalizedPhone: cleanPhone,
-      );
-      final start = (offset ?? 0).clamp(0, matches.length);
-      final end = limit == null
-          ? matches.length
-          : (start + limit).clamp(start, matches.length);
-      rows = matches.sublist(start, end);
-    }
+    final start = (offset ?? 0).clamp(0, matches.length);
+    final end = limit == null
+        ? matches.length
+        : (start + limit).clamp(start, matches.length);
+    final rows = matches.sublist(start, end);
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
   }
 
@@ -192,7 +161,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
       where: "is_active = 1 AND id != ''",
       orderBy: 'name ASC',
     );
-    return candidates.where((row) {
+    final matches = candidates.where((row) {
       final name = _normalizeTurkish(row['name']?.toString() ?? '');
       final email = _normalizeTurkish(row['email']?.toString() ?? '');
       final phone =
@@ -202,6 +171,23 @@ class SqliteCustomerRepository implements ICustomerRepository {
           (normalizedPhone?.isNotEmpty == true &&
               phone.contains(normalizedPhone!));
     }).toList();
+    matches.sort((a, b) {
+      int rank(Map<String, dynamic> row) {
+        final name = _normalizeTurkish(row['name']?.toString() ?? '');
+        final email = _normalizeTurkish(row['email']?.toString() ?? '');
+        if (name.startsWith(query)) return 0;
+        if (name.contains(query)) return 1;
+        if (email.startsWith(query)) return 2;
+        if (email.contains(query)) return 3;
+        return 4;
+      }
+
+      final rankComparison = rank(a).compareTo(rank(b));
+      if (rankComparison != 0) return rankComparison;
+      return _normalizeTurkish(a['name']?.toString() ?? '')
+          .compareTo(_normalizeTurkish(b['name']?.toString() ?? ''));
+    });
+    return matches;
   }
 
   @override

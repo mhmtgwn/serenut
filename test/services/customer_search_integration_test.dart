@@ -53,6 +53,7 @@ void main() {
           'balance': 0.0,
           'is_active': 1,
           'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
         });
       }
 
@@ -89,6 +90,7 @@ void main() {
           'balance': 0.0,
           'is_active': 1,
           'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
         });
       }
 
