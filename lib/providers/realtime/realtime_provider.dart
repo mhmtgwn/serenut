@@ -12,6 +12,7 @@ import 'package:serenutos/infrastructure/realtime/realtime_repository.dart';
 import 'package:serenutos/providers/realtime/connection_state_notifier.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/config/environment.dart';
+import 'package:serenutos/providers/service_providers.dart';
 
 final eventDispatcherProvider = Provider<EventDispatcher>((ref) {
   final dispatcher = EventDispatcher();
@@ -39,6 +40,7 @@ final connectionManagerProvider = Provider<ConnectionManager>((ref) {
   final eventDispatcher = ref.watch(eventDispatcherProvider);
   final authService = ref.watch(authServiceProvider);
   final notifier = ref.read(connectionStateProvider.notifier);
+  final telemetryUpload = ref.watch(telemetryUploadServiceProvider);
 
   final conn = ConnectionManager(
     wsManager: wsManager,
@@ -49,6 +51,7 @@ final connectionManagerProvider = Provider<ConnectionManager>((ref) {
     onStatusChanged: (status) {
       notifier.updateStatus(status);
     },
+    telemetryUpload: telemetryUpload,
   );
 
   ref.onDispose(() => conn.dispose());

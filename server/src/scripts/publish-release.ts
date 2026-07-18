@@ -39,7 +39,7 @@ async function main() {
   const signature = signer.sign(privateKey, 'base64');
   const size = fs.statSync(finalPath).size;
   const id = `rel-${platform}-${versionCode.replace(/[^a-zA-Z0-9]/g, '-')}`;
-  const notes = 'Serenut OS 1.0.2: hesaplama, sipariş düzenleme/iptal, senkronizasyon, hesap ve lisans akışı iyileştirmeleri.';
+  const notes = `Serenut OS ${versionCode}: WebSocket bağlantı kararlılığı, tekil yeniden bağlanma yönetimi ve güvenli müşteri deneyimi telemetry kayıtları.`;
 
   const client = await pgPool.connect();
   try {

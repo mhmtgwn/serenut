@@ -6,6 +6,7 @@
 import '../../infrastructure/database/database_provider.dart';
 import '../../infrastructure/network/api_client.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
 class TelemetryUploadService {
   final ApiClient _apiClient;
@@ -14,14 +15,15 @@ class TelemetryUploadService {
 
   /// Buffer metric record into local SQLite database
   Future<void> recordMetric(String name, double value,
-      {String? metadata}) async {
+      {Object? metadata}) async {
     try {
       final db = await DatabaseManager().getDatabase();
       await db.insert('client_telemetry_logs', {
         'metric_name': name,
         'metric_value': value,
         'timestamp': DateTime.now().toIso8601String(),
-        'metadata': metadata ?? '',
+        'metadata':
+            metadata is String ? metadata : jsonEncode(metadata ?? const {}),
       });
       debugPrint('[TelemetryUpload] Recorded local metric: $name = $value');
     } catch (e) {

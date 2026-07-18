@@ -12,6 +12,77 @@ const router = Router();
 
 router.use(authenticateUser);
 
+router.post('/upload', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const metrics = Array.isArray(req.body?.metrics) ? req.body.metrics.slice(0, 100) : [];
+  if (metrics.length === 0) return res.status(400).json({ error: 'empty_metrics' });
+
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    for (const metric of metrics) {
+      const name = String(metric.metric_name || '').slice(0, 120);
+      if (!/^[a-z0-9_.-]+$/i.test(name)) continue;
+      const value = Number(metric.metric_value);
+      const occurredAt = new Date(metric.timestamp);
+      if (!Number.isFinite(value) || Number.isNaN(occurredAt.getTime())) continue;
+
+      let metadata: Record<string, unknown> = {};
+      try {
+        const parsed = typeof metric.metadata === 'string'
+          ? JSON.parse(metric.metadata || '{}')
+          : metric.metadata;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) metadata = parsed;
+      } catch (_) {}
+
+      // Never persist credentials accidentally supplied by a client.
+      for (const key of ['token', 'access_token', 'refresh_token', 'password', 'authorization']) {
+        delete metadata[key];
+      }
+
+      await client.query(`
+        INSERT INTO client_telemetry_events
+          (company_id, user_id, metric_name, metric_value, occurred_at, metadata, ip_address, user_agent)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [
+        user.company_id, user.id, name, value, occurredAt.toISOString(),
+        JSON.stringify(metadata), req.ip || null,
+        String(req.headers['user-agent'] || 'unknown').slice(0, 500)
+      ]);
+    }
+    await client.query('COMMIT');
+    return res.json({ success: true, accepted: metrics.length });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error('Client telemetry upload failed:', err);
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/client-events', requirePermission('telemetry.view'), async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+  const isSysadmin = user.roles.includes('sysadmin');
+  try {
+    const result = isSysadmin
+      ? await runBypassingRLS(`
+          SELECT id, company_id, user_id, metric_name, metric_value, occurred_at, metadata, received_at
+          FROM client_telemetry_events ORDER BY occurred_at DESC LIMIT $1
+        `, [limit])
+      : await runWithTenantContext(user.company_id, `
+          SELECT id, company_id, user_id, metric_name, metric_value, occurred_at, metadata, received_at
+          FROM client_telemetry_events WHERE company_id = $1 ORDER BY occurred_at DESC LIMIT $2
+        `, [user.company_id, limit]);
+    return res.json(result.rows);
+  } catch (err) {
+    logger.error('Client telemetry query failed:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 async function runBypassingRLS(sql: string, params: any[] = []) {
   const client = await pgPool.connect();
   try {

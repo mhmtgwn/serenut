@@ -13,6 +13,8 @@ import 'package:serenutos/domain/realtime/event_dispatcher.dart';
 class MockWebSocketManager implements WebSocketManager {
   final _msgController = StreamController<String>.broadcast();
   final _stateController = StreamController<bool>.broadcast();
+  final _eventController =
+      StreamController<WebSocketConnectionEvent>.broadcast();
   bool _isConnected = false;
   String? connectedUrl;
 
@@ -21,6 +23,10 @@ class MockWebSocketManager implements WebSocketManager {
 
   @override
   Stream<bool> get connectionState => _stateController.stream;
+
+  @override
+  Stream<WebSocketConnectionEvent> get connectionEvents =>
+      _eventController.stream;
 
   @override
   bool get isConnected => _isConnected;
@@ -47,6 +53,7 @@ class MockWebSocketManager implements WebSocketManager {
   void dispose() {
     _msgController.close();
     _stateController.close();
+    _eventController.close();
   }
 
   @override
@@ -160,7 +167,7 @@ void main() {
       wsManager.disconnect();
 
       // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 150ms for it to run.
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 220));
 
       expect(authService.refreshCalled, true);
       expect(authService.sessionExpiredTriggered, false);
@@ -171,7 +178,7 @@ void main() {
       authService.refreshCalled = false;
 
       // Reconnect is scheduled (attempt 2: delay = 150ms). Wait 200ms for it to run.
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 350));
       expect(authService.refreshCalled, true);
       expect(wsManager.isConnected, true);
       expect(connectionManager.status, RealtimeStatus.connected);
@@ -191,7 +198,7 @@ void main() {
       wsManager.disconnect();
 
       // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 150ms for it to run.
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 220));
 
       expect(authService.refreshCalled, true);
       expect(authService.sessionExpiredTriggered, true);
