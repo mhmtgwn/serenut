@@ -21,8 +21,9 @@ class SystemSpecCheckResult {
     required this.issues,
   });
 
-  bool get isAllPass =>
-      hasRequiredSpace && hasRequiredRam && hasAdminPrivileges;
+  // Serenut OS is installed per-user (`PrivilegesRequired=lowest` on Windows),
+  // so an elevated process is not an installation requirement.
+  bool get isAllPass => hasRequiredSpace && hasRequiredRam;
 }
 
 class RollbackManager {
@@ -30,22 +31,12 @@ class RollbackManager {
   Future<SystemSpecCheckResult> verifyInstallationSpecs() async {
     bool hasSpace = true;
     bool hasRam = true;
-    bool hasAdmin = true;
+    const bool hasAdmin = true;
     double freeGb = 1.0; // Fallback default
     final issues = <String>[];
 
-    // 1. Check Admin privileges
-    if (Platform.isWindows) {
-      try {
-        final res = await Process.run('net', ['session']);
-        if (res.exitCode != 0) {
-          hasAdmin = false;
-          issues.add('Kurulum için yönetici (Admin) yetkileri gereklidir.');
-        }
-      } catch (_) {
-        hasAdmin = false;
-      }
-    }
+    // The Windows installer targets {userappdata}; elevation is neither needed
+    // nor desirable. Keep this compatibility field true for existing callers.
 
     // 2. Check Disk Space (Requesting min 300MB)
     try {
