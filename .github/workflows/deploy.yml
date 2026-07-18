@@ -94,7 +94,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
         with:
-          name: serenut-pos-android-apk
+          name: serenut-os-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
   windows-ci:
@@ -111,8 +111,8 @@ jobs:
       - run: iscc windows\installer\serenut_installer.iss
       - uses: actions/upload-artifact@v4
         with:
-          name: serenut-pos-windows-build
-          path: build/windows/x64/runner/Release/
+          name: serenut-os-windows-installer
+          path: build/windows/installer/SerenutOSSetup.exe
 
   deploy-production:
     needs: [backend-ci, flutter-ci, windows-ci]
@@ -120,6 +120,24 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: serenut-os-android-apk
+          path: release-artifacts/android
+      - uses: actions/download-artifact@v4
+        with:
+          name: serenut-os-windows-installer
+          path: release-artifacts/windows
+      - name: Upload release files to production
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: release-artifacts/*
+          target: /var/www/serenut/server/releases/_incoming
+          strip_components: 1
       - name: Deploy production
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -142,6 +160,9 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
             docker compose -f docker-compose.prod.yml --env-file .env.production ps
             curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js android 1.0.2 /var/www/serenut-api/releases/_incoming/android/app-release.apk
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js windows 1.0.2 /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe
+            curl --fail https://api.serenut.com/api/v1/updates/latest-metadata
 
   deploy-staging:
     needs: [backend-ci, flutter-ci, windows-ci]
