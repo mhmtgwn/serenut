@@ -37,7 +37,12 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                               icon: const Icon(Icons.clear_rounded, size: 18),
                               onPressed: () {
                                 updateState(() => _customerQuery = '');
-                                ref.read(ordersCustomerSearchQueryProvider.notifier).state = '';
+                                ref
+                                    .read(ordersCustomerSearchQueryProvider
+                                        .notifier)
+                                    .state = '';
+                                ref.invalidate(
+                                    ordersCustomersControllerProvider);
                               },
                             )
                           : null,
@@ -48,9 +53,14 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                     ),
                     onChanged: (val) {
                       updateState(() => _customerQuery = val);
-                      if (_customerSearchDebounce?.isActive ?? false) _customerSearchDebounce!.cancel();
-                      _customerSearchDebounce = Timer(const Duration(milliseconds: 300), () {
-                        ref.read(ordersCustomerSearchQueryProvider.notifier).state = val;
+                      if (_customerSearchDebounce?.isActive ?? false)
+                        _customerSearchDebounce!.cancel();
+                      _customerSearchDebounce =
+                          Timer(const Duration(milliseconds: 300), () {
+                        ref
+                            .read(ordersCustomerSearchQueryProvider.notifier)
+                            .state = val;
+                        ref.invalidate(ordersCustomersControllerProvider);
                       });
                     },
                   );
@@ -120,7 +130,12 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                     : ListView.builder(
                         controller: _customerScrollController,
                         itemCount: filtered.length +
-                            (ref.read(ordersCustomersControllerProvider.notifier).isLoadingMore ? 1 : 0),
+                            (ref
+                                    .read(ordersCustomersControllerProvider
+                                        .notifier)
+                                    .isLoadingMore
+                                ? 1
+                                : 0),
                         itemBuilder: (context, idx) {
                           if (idx == filtered.length) {
                             return const Padding(

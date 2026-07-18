@@ -135,10 +135,10 @@ void main() {
       expect(find.text('Müşerref Aksoy'), findsOneWidget);
       expect(find.text('Mehmet Yılmaz'), findsNothing);
 
-      // Clear search query
-      await tester.enterText(searchFieldFinder, '');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      // Clear with the actual UI action. The field is rebuilt after each
+      // provider result, so enterText('') may target an already-empty visual
+      // field and does not model what a user does here.
+      await tester.tap(find.byIcon(Icons.clear_rounded));
       await tester.pumpAndSettle();
 
       // Reset to original paginated list
