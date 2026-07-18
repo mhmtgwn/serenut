@@ -1,5 +1,5 @@
 // lib/presentation/controllers/sales_flow_controller.dart
-// Serenut POS — Sales Flow FSM Controller
+// Serenut OS — Sales Flow FSM Controller
 // Revized: 22 Jun 2026
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

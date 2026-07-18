@@ -1,5 +1,5 @@
 // lib/domain/notifications/sms_notification_handler.dart
-// Serenut POS — SMS Notification Handler (Event Subscriber)
+// Serenut OS — SMS Notification Handler (Event Subscriber)
 //
 // Responsibilities:
 //   - Subscribe to domain events (SaleCreatedEvent, CollectionRecordedEvent)

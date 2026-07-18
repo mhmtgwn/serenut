@@ -1,5 +1,5 @@
 // lib/domain/services/sms_service.dart
-// Serenut POS — SMS Notification Service
+// Serenut OS — SMS Notification Service
 // Supports: Netgsm (TR), Twilio (global)
 // Features: Queue, retry, offline buffering, delivery status logging
 // Created: 24 Jun 2026
@@ -240,8 +240,8 @@ class SmsService {
             .replaceAll('{tutar}', '$currency${totalAmount.toStringAsFixed(2)}')
             .replaceAll('{odenen}', '$currency${paidAmount.toStringAsFixed(2)}')
             .replaceAll('{bakiye}', debtStr)
-            .replaceAll('{firma}', businessName ?? 'Serenut POS')
-        : '${businessName ?? 'Serenut POS'}: Sayın $customerName, '
+            .replaceAll('{firma}', businessName ?? 'Serenut OS')
+        : '${businessName ?? 'Serenut OS'}: Sayın $customerName, '
             '$currency${totalAmount.toStringAsFixed(2)} tutarındaki alışverişiniz için teşekkürler.$debtStr';
 
     await queueSms(phone, message);

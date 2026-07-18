@@ -1,5 +1,5 @@
 // lib/presentation/pages/home_page.dart
-// Serenut POS — Ana Sayfa / Dashboard (Restructured & Redesigned)
+// Serenut OS — Ana Sayfa / Dashboard (Restructured & Redesigned)
 // Generated: 25 Jun 2026
 
 import 'package:flutter/material.dart';

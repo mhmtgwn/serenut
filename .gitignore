@@ -46,10 +46,12 @@ app.*.map.json
 
 # Shaman Security & Secrets
 serenut_key
-serenut_key.pub
+*.pem
+*.key
 .env
-*.env
-*.env.test
+.env.*
+!.env.example
+!.env.staging.example
 telemetry_logs.jsonl
 *.zip
 

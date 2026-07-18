@@ -17,21 +17,54 @@ function set(html) { document.getElementById('embed-content').innerHTML = html; 
 function notice(message) { window.alert(message); }
 
 async function beginCheckout(planId) {
-  const billingPeriod = document.getElementById('billing-period')?.value || 'monthly';
-  const [accounts, plans] = await Promise.all([apiFetch('/billing/bank-accounts'), apiFetch('/billing/plans')]);
-  if (!accounts.length) throw new Error('Aktif banka hesabı bulunamadı. Lütfen destek ekibiyle iletişime geçin.');
+  const billingPeriod = document.querySelector('input[name="billing-period"]:checked')?.value || 'monthly';
+  const [accounts, plans, paymentMethods] = await Promise.all([apiFetch('/billing/bank-accounts'), apiFetch('/billing/plans'), apiFetch('/billing/payment-methods')]);
   const plan = plans.find(p=>String(p.id)===String(planId)) || {};
   const multiplier = billingPeriod === 'yearly' ? 12 * .85 : 1;
   const amount = Number(plan.price || 0) * multiplier;
   const accountCards = accounts.map((a,index)=>`<label class="bank-choice"><input type="radio" name="bank-account" value="${esc(a.id)}" ${index===0?'checked':''}><span><b>${esc(a.bank_name)}</b><small>Alıcı: ${esc(a.account_holder||'Serenut')}</small><code>${esc(a.iban)}</code>${a.branch_name?`<small>Şube: ${esc(a.branch_name)}</small>`:''}</span></label>`).join('');
-  set(`<button class="btn btn-secondary back-button" id="back-to-billing">← Planlara dön</button><div class="payment-layout"><section class="payment-summary"><span>SEÇİLEN PLAN</span><h3>${esc(plan.name||'Abonelik')}</h3><strong>${esc(money(amount,plan.currency||'TRY'))}</strong><p>${billingPeriod==='yearly'?'Yıllık ödeme, %15 indirimli':'Aylık ödeme'}</p></section><section class="transfer-panel"><div class="section-heading"><div><h3>Havale / EFT bilgileri</h3><p>Aşağıdaki hesaba ödeme yapın. Talep oluşturunca açıklamaya yazacağınız referans kodu üretilir.</p></div></div><form id="bank-transfer-form"><div class="bank-choice-grid">${accountCards}</div><div class="transfer-steps"><b>Nasıl ödeyeceksiniz?</b><ol><li>Banka hesabını seçin.</li><li>Ödeme talebini oluşturun.</li><li>Üretilen referansı havale açıklamasına yazın.</li><li>Onaydan sonra aboneliğiniz etkinleşir.</li></ol></div><button class="btn btn-primary" type="submit">Referans Kodu Oluştur</button></form></section></div><div id="payment-result"></div>`);
+  const cardEnabled = paymentMethods.some(method=>method.id==='iyzico' && method.is_enabled);
+  const cardAction = cardEnabled ? '<button class="btn btn-primary" id="start-card-checkout" type="button">Kredi / Banka Kartıyla Öde</button>' : '';
+  const transferContent = accounts.length ? `<form id="bank-transfer-form"><div class="bank-choice-grid">${accountCards}</div><div class="transfer-steps"><b>Nasıl ödeyeceksiniz?</b><ol><li>Banka hesabını seçin.</li><li>Ödeme talebini oluşturun.</li><li>Üretilen referansı havale açıklamasına yazın.</li><li>Ödemeyi yaptığınızı bildirin.</li><li>Onaydan sonra aboneliğiniz etkinleşir.</li></ol></div><button class="btn btn-secondary" type="submit">Havale Referansı Oluştur</button></form>` : '<div class="state-panel">Aktif havale hesabı bulunamadı.</div>';
+  set(`<button class="btn btn-secondary back-button" id="back-to-billing">← Planlara dön</button><div class="payment-layout"><section class="payment-summary"><span>SEÇİLEN PLAN</span><h3>${esc(plan.name||'Abonelik')}</h3><strong>${esc(money(amount,plan.currency||'TRY'))}</strong><p>${billingPeriod==='yearly'?'Yıllık ödeme, %15 indirimli':'Aylık ödeme'}</p>${cardAction}</section><section class="transfer-panel"><div class="section-heading"><div><h3>Havale / EFT</h3><p>Aşağıdaki hesaba ödeme yapın. Talep oluşturunca açıklamaya yazacağınız referans kodu üretilir.</p></div></div>${transferContent}</section></div><div id="payment-result"></div>`);
     document.getElementById('back-to-billing').onclick = () => loaders['billing-center']();
-    document.getElementById('bank-transfer-form').onsubmit = async event => {
+    const cardButton = document.getElementById('start-card-checkout');
+    if (cardButton) cardButton.onclick = async () => {
+      cardButton.disabled = true;
+      try {
+        const checkout = await apiFetch('/billing/subscribe',{method:'POST',body:{plan_id:planId,billing_period:billingPeriod}});
+        if (!checkout.checkoutFormContent) throw new Error('Kart ödeme formu oluşturulamadı.');
+        const frame = document.createElement('iframe');
+        frame.className = 'checkout-frame';
+        frame.title = 'Güvenli kart ödeme formu';
+        frame.srcdoc = checkout.checkoutFormContent;
+        document.getElementById('payment-result').replaceChildren(frame);
+      } catch (cardError) {
+        notice(cardError.message);
+        cardButton.disabled = false;
+      }
+    };
+    const transferForm = document.getElementById('bank-transfer-form');
+    if (transferForm) transferForm.onsubmit = async event => {
       event.preventDefault(); const button=event.submitter; button.disabled=true;
       try {
         const selected=document.querySelector('input[name="bank-account"]:checked');
         const result=await apiFetch('/billing/request-bank-transfer',{method:'POST',body:{plan_id:planId,bank_account_id:selected.value,billing_period:billingPeriod}});
-        document.getElementById('payment-result').innerHTML=`<div class="payment-result transfer-result"><span>ÖDEME AÇIKLAMASI</span><strong>${esc(result.reference_code)}</strong><p><b>${esc(result.bank.bank_name)}</b><br>${esc(result.bank.iban)}</p><p>Havale açıklamasına yalnızca bu referans kodunu yazın.</p><p class="result-amount">${esc(money(result.amount,result.currency||'TRY'))}</p></div>`;
+        document.getElementById('payment-result').innerHTML=`<div class="payment-result transfer-result"><span>ÖDEME AÇIKLAMASI</span><strong>${esc(result.reference_code)}</strong><p><b>${esc(result.bank.bank_name)}</b><br>${esc(result.bank.iban)}</p><p>Havale açıklamasına yalnızca bu referans kodunu yazın.</p><p class="result-amount">${esc(money(result.amount,result.currency||'TRY'))}</p><form id="transfer-notification-form" class="payment-form"><h3>Ödemeyi yaptıysanız bildirin</h3><label>Gönderen adı<input id="transfer-sender-name" required placeholder="Hesap sahibinin adı"></label><label>Gönderen banka<input id="transfer-sender-bank" placeholder="Banka adı"></label><label>Transfer tarihi<input id="transfer-date" type="date" required></label><label>Açıklama<textarea id="transfer-description" rows="2" placeholder="İsteğe bağlı not"></textarea></label><button class="btn btn-primary" type="submit">Ödemeyi Yaptım</button></form><div id="transfer-notification-status"></div></div>`;
+        document.getElementById('transfer-date').value = new Date().toISOString().slice(0,10);
+        document.getElementById('transfer-notification-form').onsubmit = async notifyEvent => {
+          notifyEvent.preventDefault();
+          const notifyButton = notifyEvent.submitter;
+          notifyButton.disabled = true;
+          try {
+            const notification = await apiFetch('/billing/notify-transfer',{method:'POST',body:{invoice_id:result.invoice_id,sender_name:document.getElementById('transfer-sender-name').value.trim(),sender_bank:document.getElementById('transfer-sender-bank').value.trim(),transfer_date:document.getElementById('transfer-date').value,transfer_description:document.getElementById('transfer-description').value.trim()}});
+            document.getElementById('transfer-notification-status').innerHTML=`<div class="state-panel"><strong>Bildiriminiz alındı</strong><p>${esc(notification.message)}</p></div>`;
+            notifyEvent.currentTarget.remove();
+          } catch (notifyError) {
+            notice(notifyError.message);
+            notifyButton.disabled = false;
+          }
+        };
       } catch(e) { notice(e.message); } finally { button.disabled=false; }
     };
 }
@@ -65,7 +98,7 @@ const loaders = {
   },
   'billing-center': async () => {
     const [sub,invoices,plans] = await Promise.all([apiFetch('/billing/subscription'),apiFetch('/portal/invoices'),apiFetch('/billing/plans')]);
-    set(`<div class="metrics-grid">${metric('Mevcut Plan',sub.plan_name||'Plan yok')}${metric('Abonelik',tr(sub.status))}${metric('Geçerlilik',date(sub.current_period_end))}</div><div class="toolbar"><div><h3 class="content-title">Planlar</h3><p>Deneme süreniz bitince istediğiniz planı seçebilirsiniz.</p></div><select id="billing-period"><option value="monthly">Aylık ödeme</option><option value="yearly">Yıllık — %15 indirim</option></select></div><div class="plan-grid customer-plan-grid">${plans.map(p=>`<article class="module-card"><h3>${esc(p.name)}</h3><strong>${money(p.price,p.currency||'TRY')} / ay</strong><p>${esc(p.description||'')}</p><button class="btn btn-primary buy-plan" data-plan="${esc(p.id)}">Havale / EFT ile Al</button></article>`).join('')}</div><div class="section-heading spaced"><div><h3>Ödeme Geçmişi</h3><p>Oluşturduğunuz ödeme talepleri ve faturalar.</p></div></div>${table([{label:'Fatura',key:'invoice_number'},{label:'Tutar',render:r=>esc(money(r.amount,r.currency||'TRY'))},{label:'Tarih',render:r=>esc(date(r.created_at||r.due_at))},{label:'Durum',render:r=>badge(tr(r.status))}],invoices)}`);
+    set(`<div class="metrics-grid">${metric('Mevcut Plan',sub.plan_name||'Plan yok')}${metric('Abonelik',tr(sub.status))}${metric('Geçerlilik',date(sub.current_period_end))}</div><div class="toolbar billing-toolbar"><div><h3 class="content-title">Planlar</h3><p>Deneme süreniz bitince istediğiniz planı seçebilirsiniz.</p></div><div class="billing-toggle" role="radiogroup" aria-label="Ödeme dönemi"><input id="billing-monthly" type="radio" name="billing-period" value="monthly" checked><label for="billing-monthly">Aylık</label><input id="billing-yearly" type="radio" name="billing-period" value="yearly"><label for="billing-yearly">Yıllık</label><span aria-hidden="true"></span></div></div><div class="plan-grid customer-plan-grid">${plans.map(p=>`<article class="module-card"><h3>${esc(p.name)}</h3><strong>${money(p.price,p.currency||'TRY')} / ay</strong><p>${esc(p.description||'')}</p><button class="btn btn-primary buy-plan" data-plan="${esc(p.id)}">Havale / EFT ile Al</button></article>`).join('')}</div><div class="section-heading spaced"><div><h3>Ödeme Geçmişi</h3><p>Oluşturduğunuz ödeme talepleri ve faturalar.</p></div></div>${table([{label:'Fatura',key:'invoice_number'},{label:'Tutar',render:r=>esc(money(r.amount,r.currency||'TRY'))},{label:'Tarih',render:r=>esc(date(r.created_at||r.due_at))},{label:'Durum',render:r=>badge(tr(r.status))}],invoices)}`);
     document.querySelectorAll('.buy-plan').forEach(button => button.onclick = async () => { button.disabled=true; try { await beginCheckout(button.dataset.plan); } catch(error) { notice(error.message); button.disabled=false; } });
   },
   'support-center': async () => {

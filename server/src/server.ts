@@ -198,7 +198,7 @@ const swaggerOptions = {
     info: {
       title: 'Serenut Cloud SaaS Platform API',
       version: '1.0.0',
-      description: 'Enterprise API documentation for Serenut POS SaaS cloud orchestrator.',
+      description: 'Enterprise API documentation for Serenut OS SaaS cloud orchestrator.',
     },
     components: {
       securitySchemes: {

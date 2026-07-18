@@ -1,5 +1,5 @@
 // lib/presentation/widgets/export_bottom_sheet.dart
-// Serenut POS — Cari Hesap Dışa Aktarma Bottom Sheet
+// Serenut OS — Cari Hesap Dışa Aktarma Bottom Sheet
 // Backend: DocumentExportService — sıfır değişiklik
 // Created: Phase 4 — 01 Jul 2026
 

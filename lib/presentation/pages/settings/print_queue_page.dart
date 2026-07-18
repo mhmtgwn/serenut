@@ -1,5 +1,5 @@
 // lib/presentation/pages/settings/print_queue_page.dart
-// Serenut POS — Yazıcı Kuyruğu İzleme Ekranı
+// Serenut OS — Yazıcı Kuyruğu İzleme Ekranı
 // Backend: PersistentPrintQueue — crash-safe, retry logic bağlı
 // Created: Phase 4 — 01 Jul 2026
 

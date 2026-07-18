@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "Running Serenut POS Quality Gate Checklist" -ForegroundColor Cyan
+Write-Host "Running Serenut OS Quality Gate Checklist" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 # 1. Run Flutter Analyze (Assertive Fail: Fail on both errors and warnings)

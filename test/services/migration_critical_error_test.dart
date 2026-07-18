@@ -52,7 +52,7 @@ void main() {
       await db.insert('users', {
         'id': 'user_1',
         'name': 'Kasiyer 1',
-        'email': 'k1@shaman.com',
+        'email': 'k1@serenut.com',
         'password_hash': 'pw',
         'role': 'cashier',
         'is_active': 1,
@@ -63,7 +63,7 @@ void main() {
       await db.insert('users', {
         'id': 'user_2',
         'name': 'Kasiyer 2',
-        'email': 'k2@shaman.com',
+        'email': 'k2@serenut.com',
         'password_hash': 'pw',
         'role': 'cashier',
         'is_active': 1,

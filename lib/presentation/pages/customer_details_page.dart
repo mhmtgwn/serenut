@@ -1,5 +1,5 @@
 // lib/presentation/pages/customer_details_page.dart
-// Serenut POS — Müşteri Detay Sayfası (Bankacılık Stili)
+// Serenut OS — Müşteri Detay Sayfası (Bankacılık Stili)
 // UX Redesign v3: Hero gradient card, bank-statement transaction list,
 // full-screen collection push (no dialog). Uses existing providers — zero backend changes.
 

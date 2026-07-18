@@ -1,11 +1,11 @@
 ; C:\Users\notop\AndroidStudioProjects\shaman_new\windows\installer\serenut_installer.iss
-; Inno Setup Compiler Script for Serenut OS POS Client (Release Candidate 1)
+; Inno Setup Compiler Script for Serenut OS Client
 ; Blueprint: Pilot Launch Sprint (Clean Windows Installer Configuration)
 
 [Setup]
 AppId={{5E22B005-9B28-4DE3-BB10-388C838F5F2B}
 AppName=Serenut OS
-AppVersion=1.0.0
+AppVersion=1.0.2
 AppPublisher=Serenut OS Software Technologies A.Ş.
 AppPublisherURL=https://serenut.com/
 AppSupportURL=https://serenut.com/faq.html

@@ -1,5 +1,5 @@
 // lib/presentation/pages/product_form_page.dart
-// Serenut POS — Ürün Ekleme / Düzenleme (Tam Ekran, Çok Bölümlü Form)
+// Serenut OS — Ürün Ekleme / Düzenleme (Tam Ekran, Çok Bölümlü Form)
 // UX Redesign v3: Full-screen form, Shopify admin style, no dialogs
 
 import 'dart:convert';

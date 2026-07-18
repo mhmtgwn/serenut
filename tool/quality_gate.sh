@@ -2,7 +2,7 @@
 set -e
 
 echo "=========================================="
-echo "Running Serenut POS Quality Gate Checklist"
+echo "Running Serenut OS Quality Gate Checklist"
 echo "=========================================="
 
 # 1. Run Flutter Analyze (Assertive Fail: Fail on both errors and warnings)

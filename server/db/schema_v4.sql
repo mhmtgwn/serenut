@@ -1,4 +1,4 @@
--- PostgreSQL schema v4 migrations for Serenut POS SaaS backend
+-- PostgreSQL schema v4 migrations for Serenut OS SaaS backend
 -- Analytics Platform: query performance indexes for BI reports
 
 -- 1. Index for sales dashboard / trend analysis queries

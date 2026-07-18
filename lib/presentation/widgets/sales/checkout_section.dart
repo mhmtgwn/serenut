@@ -1,8 +1,9 @@
 // lib/presentation/widgets/sales/checkout_section.dart
-// Serenut POS — Ödeme & Checkout Paneli
+// Serenut OS — Ödeme & Checkout Paneli
 // UX Redesign v3: KARMA split payment, 64px buttons, inline print status
 // Preserved: all FSM calls, controller calls, provider reads
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

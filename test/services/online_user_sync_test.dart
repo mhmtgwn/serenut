@@ -94,7 +94,7 @@ void main() {
       final user = AuthUser(
         id: 'user_deactivate',
         name: 'kasiyer',
-        email: 'kasiyer@shaman.com',
+        email: 'kasiyer@serenut.com',
         role: UserRole.cashier,
         permissions: [],
         createdAt: DateTime.now(),
@@ -131,7 +131,7 @@ void main() {
       final user = AuthUser(
         id: 'user_upgrade',
         name: 'kasiyer',
-        email: 'kasiyer@shaman.com',
+        email: 'kasiyer@serenut.com',
         role: UserRole.cashier,
         permissions: [],
         createdAt: DateTime.now(),

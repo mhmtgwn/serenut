@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/config/utils.dart';
 
 class DatabaseMigrations {
   /// Handle database upgrades
@@ -516,6 +517,58 @@ class DatabaseMigrations {
           await txn.insert('app_migration_history', {
             'version': 28,
             'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 29) {
+          try {
+            final customers = await txn.query('customers');
+            for (final cust in customers) {
+              final id = cust['id'] as String;
+              final name = cust['name'] as String? ?? '';
+              final email = cust['email'] as String? ?? '';
+              await txn.update(
+                'customers',
+                {
+                  'normalized_name': name.normalizeTurkish,
+                  'normalized_email': email.toLowerCase(),
+                },
+                where: 'id = ?',
+                whereArgs: [id],
+              );
+            }
+          } catch (e) {
+            handleMigrationError(e, 29);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 29,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 30) {
+          try {
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_customers_normalized_name ON customers(normalized_name COLLATE NOCASE)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_customers_normalized_email ON customers(normalized_email COLLATE NOCASE)');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone COLLATE NOCASE)');
+            
+            // Database-level partial unique indexes to prevent duplicate ledger transactions
+            await txn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ft_unique_cancellation ON financial_transactions(reference_id) WHERE type = 'cancellation'");
+            await txn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ft_unique_sale ON financial_transactions(reference_id) WHERE type = 'sale'");
+
+            // Run ANALYZE to update query planner stats for the new indexes
+            await txn.execute('ANALYZE');
+          } catch (e) {
+            handleMigrationError(e, 30);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 30,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
             'status': 'success'
           });
         }

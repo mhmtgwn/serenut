@@ -125,9 +125,9 @@ class BackupService implements IBackupService {
     }
     await Share.shareXFiles(
       [XFile(backupPath)],
-      subject: 'Serenut POS Veritabanı Yedeği',
+      subject: 'Serenut OS Veritabanı Yedeği',
       text:
-          'Serenut POS veritabanı yedeğidir. Dosya adı: ${basename(backupPath)}',
+          'Serenut OS veritabanı yedeğidir. Dosya adı: ${basename(backupPath)}',
     );
   }
 
@@ -179,7 +179,7 @@ class BackupService implements IBackupService {
           !tableNames.contains('sales') ||
           !tableNames.contains('products')) {
         throw Exception(
-            'Geçersiz yedek dosyası. Gerekli Serenut POS tabloları bulunamadı.');
+            'Geçersiz yedek dosyası. Gerekli Serenut OS tabloları bulunamadı.');
       }
     } catch (e) {
       throw Exception('Yedek dosyası doğrulanamadı: $e');

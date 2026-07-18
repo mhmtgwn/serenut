@@ -1,5 +1,5 @@
 // test/device/printer_stress_test.dart
-// Serenut POS — Printer Stress & Resilience Tests
+// Serenut OS — Printer Stress & Resilience Tests
 // Tests: 100-receipt loop, mid-print disconnect, network outage recovery,
 //        failover chain, persistent queue, stuck job reset
 // Created: 24 Jun 2026

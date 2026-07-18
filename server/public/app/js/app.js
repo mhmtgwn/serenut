@@ -1,6 +1,6 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { loadModule } from './module-runtime.js?v=20260716-payments2';
+import { loadModule } from './module-runtime.js?v=20260718-commerce2';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -91,6 +91,12 @@ function openLayer(type) {
     registerLayer?.classList.remove('app-hidden');
     return;
   }
+  const hasResetToken = Boolean(new URLSearchParams(window.location.search).get('token'));
+  document.getElementById('reset-email')?.closest('.form-group')?.classList.toggle('app-hidden', hasResetToken);
+  document.getElementById('btn-request-reset')?.classList.toggle('app-hidden', hasResetToken);
+  document.getElementById('reset-password')?.closest('.form-group')?.classList.toggle('app-hidden', !hasResetToken);
+  document.getElementById('reset-password-confirm')?.closest('.form-group')?.classList.toggle('app-hidden', !hasResetToken);
+  document.getElementById('btn-apply-reset')?.classList.toggle('app-hidden', !hasResetToken);
   resetLayer?.classList.remove('app-hidden');
 }
 
@@ -181,7 +187,12 @@ async function handleRegister() {
     if (!res.ok) throw new Error(data?.message || 'Kayıt oluşturulamadı.');
     statusEl.className = 'auth-status text-sm text-green';
     statusEl.innerText = data.message;
-    document.getElementById('btn-register').disabled = true;
+    const registerButton = document.getElementById('btn-register');
+    const loginButton = registerButton.cloneNode(true);
+    loginButton.disabled = false;
+    loginButton.innerText = 'Giriş Ekranına Dön';
+    loginButton.addEventListener('click', closeLayers);
+    registerButton.replaceWith(loginButton);
   } catch (error) {
     statusEl.innerText = error.message;
   }
@@ -242,6 +253,11 @@ async function applyReset() {
     statusEl.innerText = 'Şifreler eşleşmiyor.';
     return;
   }
+  if (newPassword.length < 8) {
+    statusEl.classList.add('text-red');
+    statusEl.innerText = 'Yeni şifre en az 8 karakter olmalıdır.';
+    return;
+  }
 
   try {
     const res = await fetch('/api/v1/auth/reset-password', {
@@ -254,7 +270,11 @@ async function applyReset() {
     history.replaceState({}, '', '/app/');
     statusEl.classList.add('text-green');
     statusEl.innerText = data.message;
-    closeLayers();
+    const applyButton = document.getElementById('btn-apply-reset');
+    const loginButton = applyButton.cloneNode(true);
+    loginButton.innerText = 'Giriş Ekranına Dön';
+    loginButton.addEventListener('click', closeLayers);
+    applyButton.replaceWith(loginButton);
   } catch (error) {
     statusEl.classList.add('text-red');
     statusEl.innerText = error.message;

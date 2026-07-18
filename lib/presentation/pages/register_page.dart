@@ -12,19 +12,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/business_profile.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_business_profile_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/database_provider.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
-import 'package:serenutos/domain/models/permission.dart';
-import 'package:serenutos/domain/services/auth_service.dart';
-import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,11 +39,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   // ── Sayfa 0: Hesap ──
   final _emailCtrl = TextEditingController();
-  final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _password2Ctrl = TextEditingController();
   bool _obscurePass = true;
   bool _obscurePass2 = true;
+  bool _acceptTerms = false;
+  bool _acceptPrivacy = false;
+  bool _acceptKvkk = false;
+  bool _acceptMarketing = false;
 
   // ── Sayfa 1: İşletme (fiş bilgileri) ──
   final _bizNameCtrl = TextEditingController();
@@ -92,7 +89,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   void dispose() {
     _emailCtrl.dispose();
-    _usernameCtrl.dispose();
     _passwordCtrl.dispose();
     _password2Ctrl.dispose();
     _bizNameCtrl.dispose();
@@ -150,6 +146,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       setState(() => _error = 'Lütfen şehir seçin.');
       return;
     }
+    if (!_acceptTerms || !_acceptPrivacy || !_acceptKvkk) {
+      setState(() => _error =
+          'Üyelik koşulları, gizlilik politikası ve KVKK metnini onaylamalısınız.');
+      return;
+    }
 
     setState(() {
       _saving = true;
@@ -158,21 +159,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     try {
       final gateway = ref.read(dbGatewayProvider);
-      final authService = ref.read(authServiceProvider);
       final prefs = ref.read(sharedPreferencesProvider);
 
-      // 1. Admin kullanıcı oluştur
-      final adminUser = AuthUser(
-        id: const Uuid().v4(),
-        name: _ownerNameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
-        role: UserRole.admin,
-        permissions: AuthService.getPermissionsForRole(UserRole.admin),
-        createdAt: DateTime.now(),
-      );
-      await authService.createUser(adminUser, _passwordCtrl.text);
-      await prefs.setString('admin_username', _usernameCtrl.text.trim());
-      await prefs.setString('admin_full_name', _ownerNameCtrl.text.trim());
+      // Backend is the source of truth. Never create a local-only account or
+      // trial when registration fails, otherwise web, license and POS accounts
+      // diverge permanently.
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.post('/auth/register', {
+        'company_name': _bizNameCtrl.text.trim(),
+        'name': _ownerNameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim().toLowerCase(),
+        'password': _passwordCtrl.text,
+        'phone': _phoneCtrl.text.trim(),
+        'tax_number': _taxNoCtrl.text.trim(),
+        'city': _selectedCity,
+        'district': _selectedDistrict,
+        'accept_terms': _acceptTerms,
+        'accept_privacy': _acceptPrivacy,
+        'accept_kvkk': _acceptKvkk,
+        'accept_marketing': _acceptMarketing,
+      });
+      final registration = response.json as Map<String, dynamic>;
 
       // 2. İşletme profilini kaydet
       final profileRepo = SqliteBusinessProfileRepository(gateway);
@@ -207,30 +214,30 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         createdAt: DateTime.now(),
       ));
 
-      // 4. Backend'e kayıt (opsiyonel — network yoksa silent fail)
-      try {
-        final apiClient = ref.read(apiClientProvider);
-        await apiClient.post('/auth/register', {
-          'company_name': _bizNameCtrl.text.trim(),
-          'name': _ownerNameCtrl.text.trim(),
-          'username': _usernameCtrl.text.trim(),
-          'email': _emailCtrl.text.trim(),
-          'password': _passwordCtrl.text,
-          'phone': _phoneCtrl.text.trim(),
-        });
-      } catch (_) {
-        // Network yoksa local'e devam
-      }
+      await prefs.setString('admin_username', _emailCtrl.text.trim());
+      await prefs.setString('admin_full_name', _ownerNameCtrl.text.trim());
 
-      // 5. Onboarding tamamlandı + 30 gün deneme
-      await prefs.setBool('serenut_onboarding_completed_v2', true);
-      final trialManager = ref.read(trialManagerProvider);
-      await trialManager.startTrial(DateTime.now());
-
-      // Establish Auth State locally so the router doesn't redirect back to login
-      await authService.setCurrentUser(adminUser);
-
-      if (mounted) context.go(AppRoutes.home);
+      if (!mounted) return;
+      final verificationRequired =
+          registration['email_verification_required'] as bool? ?? false;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(verificationRequired
+              ? 'E-postanızı doğrulayın'
+              : 'Hesabınız oluşturuldu'),
+          content: Text(registration['message'] as String? ??
+              'Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Giriş Ekranına Geç'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) context.go('/login/form');
     } catch (e) {
       setState(() {
         _saving = false;
@@ -359,19 +366,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ),
               const SizedBox(height: 14),
               _LightFormField(
-                controller: _usernameCtrl,
-                label: 'Kullanıcı Adı *',
-                hint: 'kullanici_adi',
-                icon: Icons.person_outline_rounded,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty)
-                    return 'Kullanıcı adı zorunludur';
-                  if (v.trim().length < 3) return 'En az 3 karakter olmalı';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 14),
-              _LightFormField(
                 controller: _passwordCtrl,
                 label: 'Şifre *',
                 hint: '••••••••',
@@ -389,7 +383,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Şifre zorunludur';
-                  if (v.length < 6) return 'En az 6 karakter olmalı';
+                  if (v.length < 8) return 'En az 8 karakter olmalı';
                   return null;
                 },
               ),
@@ -508,6 +502,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 keyboard: TextInputType.number,
                 validator: (v) {
                   if (v?.trim().isEmpty ?? true) return 'Vergi no zorunludur';
+                  final digits = v!.replaceAll(RegExp(r'\D'), '');
+                  if (digits.length != 10 && digits.length != 11) {
+                    return 'TC 11, VKN 10 haneli olmalıdır';
+                  }
                   return null;
                 },
               ),
@@ -656,6 +654,48 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          _SectionCard(
+            title: 'Yasal Onaylar',
+            icon: Icons.verified_user_outlined,
+            subtitle: 'Hesabınızı oluşturmak için zorunlu onaylar',
+            children: [
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _acceptTerms,
+                onChanged: (value) =>
+                    setState(() => _acceptTerms = value ?? false),
+                title: const Text('Üyelik koşullarını kabul ediyorum. *'),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _acceptPrivacy,
+                onChanged: (value) =>
+                    setState(() => _acceptPrivacy = value ?? false),
+                title: const Text('Gizlilik politikasını kabul ediyorum. *'),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _acceptKvkk,
+                onChanged: (value) =>
+                    setState(() => _acceptKvkk = value ?? false),
+                title: const Text('KVKK aydınlatma metnini okudum. *'),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _acceptMarketing,
+                onChanged: (value) =>
+                    setState(() => _acceptMarketing = value ?? false),
+                title:
+                    const Text('Kampanya ve ürün duyuruları almak istiyorum.'),
+                controlAffinity: ListTileControlAffinity.leading,
               ),
             ],
           ),

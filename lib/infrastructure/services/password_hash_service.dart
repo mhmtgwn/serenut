@@ -1,5 +1,5 @@
 // lib/infrastructure/services/password_hash_service.dart
-// Serenut POS — Password Security Layer
+// Serenut OS — Password Security Layer
 // PBKDF2-HMAC-SHA256 with salt — production-grade implementation
 // Created: 24 Jun 2026
 

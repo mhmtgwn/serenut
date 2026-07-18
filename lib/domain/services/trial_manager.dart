@@ -3,10 +3,16 @@
 // Relies solely on backend-authoritative subscription state.
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum EntitlementState { active, graceActive, graceExpired, revoked, unknown }
+enum EntitlementState {
+  active,
+  graceActive,
+  graceExpired,
+  revoked,
+  unknown,
+  bootstrapPending
+}
 
 class TrialManager {
   static const String _subCacheKey = 'serenut_subscription_cache';
@@ -33,20 +39,7 @@ class TrialManager {
   EntitlementState getEntitlementState() {
     final sub = _getCache();
     if (sub == null) {
-      // PHASE 1: Legacy Migration & Backward Compatibility
-      // Fallback for existing devices that haven't synced yet
-      final firstLaunchMs = _prefs.getInt('nutopiano_first_launch_timestamp');
-      if (firstLaunchMs != null) {
-        final firstLaunch = DateTime.fromMillisecondsSinceEpoch(firstLaunchMs);
-        final now = DateTime.now();
-        if (now.difference(firstLaunch).inDays <= 30) {
-          return EntitlementState.active;
-        } else {
-          return EntitlementState
-              .graceExpired; // Or we could let it be graceActive, but strict is 30 days
-        }
-      }
-      return EntitlementState.unknown;
+      return EntitlementState.bootstrapPending;
     }
 
     final status = sub['status'] as String?;
@@ -85,8 +78,9 @@ class TrialManager {
   }
 
   bool isTrialActive() {
-    return getEntitlementState() == EntitlementState.active ||
-        getEntitlementState() == EntitlementState.graceActive;
+    final state = getEntitlementState();
+    return state == EntitlementState.active ||
+        state == EntitlementState.graceActive;
   }
 
   Future<bool> isTrialActiveAsync() async {
@@ -96,12 +90,6 @@ class TrialManager {
   int getRemainingDays() {
     final sub = _getCache();
     if (sub == null) {
-      final firstLaunchMs = _prefs.getInt('nutopiano_first_launch_timestamp');
-      if (firstLaunchMs != null) {
-        final firstLaunch = DateTime.fromMillisecondsSinceEpoch(firstLaunchMs);
-        final elapsed = DateTime.now().difference(firstLaunch).inDays;
-        return (30 - elapsed).clamp(0, 30);
-      }
       return 0;
     }
 

@@ -76,7 +76,7 @@ void main() {
 
       // Verify text label is sent in bytes
       final writtenText = String.fromCharCodes(mockSocket.writtenBytes);
-      expect(writtenText, contains('SERENUT POS'));
+      expect(writtenText, contains('SERENUT OS'));
       expect(
           _containsBytes(mockSocket.writtenBytes, [89, 97, 122, 141, 99, 141]),
           isTrue); // 'Yazıcı'

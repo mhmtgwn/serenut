@@ -67,21 +67,25 @@ void main() {
       prefs = await SharedPreferences.getInstance();
     });
 
-    test('New installation gets 30 days trial', () async {
-      await prefs.setInt('nutopiano_first_launch_timestamp', DateTime.now().millisecondsSinceEpoch);
+    test('New installation waits for backend entitlement bootstrap', () async {
       final manager = TrialManager(prefs);
-      manager.initTrialIfNeeded();
 
-      expect(manager.isTrialActive(), isTrue);
-      expect(manager.getRemainingDays(), equals(30));
+      expect(manager.getEntitlementState(), EntitlementState.bootstrapPending);
+      expect(manager.isTrialActive(), isFalse);
+      expect(manager.getRemainingDays(), equals(0));
     });
 
     test('Trial expires after 30 days', () async {
       final manager = TrialManager(prefs);
-      // Mock setting start date to 31 days ago
-      final pastDate = DateTime.now().subtract(const Duration(days: 31));
-      await prefs.setInt(
-          'nutopiano_first_launch_timestamp', pastDate.millisecondsSinceEpoch);
+      final pastDate =
+          DateTime.now().toUtc().subtract(const Duration(days: 31));
+      await manager.cacheSubscription({
+        'status': 'trialing',
+        'trial_started_at':
+            pastDate.subtract(const Duration(days: 30)).toIso8601String(),
+        'trial_ends_at': pastDate.toIso8601String(),
+        'grace_hours_override': 72,
+      });
 
       expect(manager.isTrialActive(), isFalse);
       expect(manager.getRemainingDays(), equals(0));
@@ -131,7 +135,8 @@ void main() {
     test('Allows access when trial is active', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('nutopiano_first_launch_timestamp', DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt('nutopiano_first_launch_timestamp',
+          DateTime.now().millisecondsSinceEpoch);
       final device = DeviceManager(prefs);
       final trial = TrialManager(prefs);
       final licenseService = LicenseService(prefs);

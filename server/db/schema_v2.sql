@@ -1,4 +1,4 @@
--- PostgreSQL schema v2 migrations for Serenut POS SaaS backend
+-- PostgreSQL schema v2 migrations for Serenut OS SaaS backend
 -- Adds support tickets and SMS logs tables under PostgreSQL RLS isolation
 -- Recreates RLS policies to support admin bypass via app.bypass_rls = 'true'
 

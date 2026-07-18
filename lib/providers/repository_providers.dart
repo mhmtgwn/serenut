@@ -17,6 +17,7 @@ import 'package:serenutos/infrastructure/datasources/remote_data_sources.dart';
 import 'package:serenutos/infrastructure/repositories/cloud_adaptive_product_repository.dart';
 import 'package:serenutos/infrastructure/repositories/cloud_adaptive_customer_repository.dart';
 import 'package:serenutos/infrastructure/repositories/cloud_adaptive_sale_repository.dart';
+import 'package:serenutos/domain/services/customer_search_service.dart';
 
 // ── Late Sprint Imports (Sprint 7, 8, 9, 10) ──
 import 'package:serenutos/infrastructure/repositories/cloud_analytics_repository.dart';
@@ -63,6 +64,12 @@ final customerRepositoryProvider =
   final localRepo = SqliteCustomerRepository(ref.watch(dbGatewayProvider));
   final remoteDS = ref.watch(customerRemoteDataSourceProvider);
   return CloudAdaptiveCustomerRepository(localRepo, remoteDS);
+});
+
+final customerSearchServiceProvider =
+    FutureProvider<CustomerSearchService>((ref) async {
+  final repo = await ref.watch(customerRepositoryProvider.future);
+  return CustomerSearchService(repo);
 });
 
 final saleRepositoryProvider = FutureProvider<ISaleRepository>((ref) async {

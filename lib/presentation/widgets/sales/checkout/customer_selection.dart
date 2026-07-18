@@ -21,6 +21,8 @@ class _CustomerSelectionSheetState
   bool _isAdding = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  final ScrollController _scrollController = ScrollController();
 
   // Add Customer Form Key & Controllers
   final _formKey = GlobalKey<FormState>();
@@ -31,11 +33,26 @@ class _CustomerSelectionSheetState
   bool _isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(salesCustomersControllerProvider.notifier).loadNextPage();
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _balanceController.dispose();
+    _scrollController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -124,7 +141,13 @@ class _CustomerSelectionSheetState
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     isDense: true,
                   ),
-                  onChanged: (val) => setState(() => _searchQuery = val),
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val);
+                    if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
+                    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                      ref.read(salesCustomerSearchQueryProvider.notifier).state = val;
+                    });
+                  },
                 ),
               ),
             ),
@@ -167,10 +190,7 @@ class _CustomerSelectionSheetState
                   style: const TextStyle(color: _kRed, fontSize: 12)),
             ),
             data: (customersList) {
-              final filtered = customersList.where((c) {
-                final q = _searchQuery.toLowerCase();
-                return c.name.toLowerCase().contains(q) || c.phone.contains(q);
-              }).toList();
+              final filtered = customersList;
 
               if (filtered.isEmpty) {
                 return Center(
@@ -208,10 +228,23 @@ class _CustomerSelectionSheetState
               }
 
               return ListView.separated(
+                controller: _scrollController,
                 shrinkWrap: true,
-                itemCount: filtered.length,
+                itemCount: filtered.length +
+                    (ref.read(salesCustomersControllerProvider.notifier).isLoadingMore ? 1 : 0),
                 separatorBuilder: (context, index) => const SizedBox(height: 6),
                 itemBuilder: (context, idx) {
+                  if (idx == filtered.length) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(_kGreen),
+                        ),
+                      ),
+                    );
+                  }
                   final cust = filtered[idx];
                   final isDebt = cust.balance < 0;
                   final isSelected = widget.initialSelected?.id == cust.id;

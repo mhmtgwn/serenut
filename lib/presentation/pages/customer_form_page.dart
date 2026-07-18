@@ -1,5 +1,5 @@
 // lib/presentation/pages/customer_form_page.dart
-// Serenut POS — Müşteri Ekleme / Düzenleme (Tam Ekran Form)
+// Serenut OS — Müşteri Ekleme / Düzenleme (Tam Ekran Form)
 // UX Redesign v3: Full-screen, no dialog, mobile banking form style
 
 import 'package:flutter/material.dart';

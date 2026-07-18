@@ -129,6 +129,9 @@ class _MyAppState extends ConsumerState<MyApp> {
   String _latestVersion = '';
   String _releaseNotes = '';
   String _downloadUrl = '';
+  String? _sha256Hash;
+  String? _signature;
+  int? _fileSizeBytes;
 
   @override
   void initState() {
@@ -192,6 +195,9 @@ class _MyAppState extends ConsumerState<MyApp> {
         _latestVersion = info.latestVersion;
         _releaseNotes = info.releaseNotes;
         _downloadUrl = info.downloadUrl;
+        _sha256Hash = info.sha256Hash;
+        _signature = info.signature;
+        _fileSizeBytes = info.fileSizeBytes;
       }
     }
     if (mounted) {
@@ -206,7 +212,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   Widget build(BuildContext context) {
     if (_checkingIntegrity) {
       return MaterialApp(
-        title: 'Serenut POS',
+        title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: const Scaffold(
@@ -226,7 +232,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     if (_integrityError != null) {
       return MaterialApp(
-        title: 'Serenut POS',
+        title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: Scaffold(
@@ -273,7 +279,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     if (_checkingVersion) {
       return MaterialApp(
-        title: 'Serenut POS',
+        title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: const Scaffold(
@@ -286,7 +292,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     if (_forceUpdateRequired) {
       return MaterialApp(
-        title: 'Serenut POS',
+        title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: ForceUpdatePage(
@@ -297,6 +303,9 @@ class _MyAppState extends ConsumerState<MyApp> {
           downloadUrl: _downloadUrl.isNotEmpty
               ? _downloadUrl
               : 'https://serenut.com/api/v1/updates/download/android/latest',
+          sha256Hash: _sha256Hash,
+          signature: _signature,
+          fileSizeBytes: _fileSizeBytes,
         ),
       );
     }
@@ -315,7 +324,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     ref.watch(smsGatewayServiceProvider);
 
     return MaterialApp.router(
-      title: 'Serenut POS',
+      title: 'Serenut OS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: router,

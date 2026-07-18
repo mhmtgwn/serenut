@@ -225,12 +225,29 @@ class SqliteOrderRepository implements IOrderRepository {
     if (status == 'delivered') {
       updateMap['actual_delivery_date'] = DateTime.now().toIso8601String();
     }
-    await _executor.update(
+    final count = await _executor.update(
       'orders',
       updateMap,
-      where: 'id = ?',
-      whereArgs: [orderId],
+      where: 'id = ? AND status != ?',
+      whereArgs: [orderId, status],
     );
+    
+    if (count == 0) {
+      final existing = await _executor.query(
+        'orders',
+        columns: ['status'],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        throw Exception('Sipariş bulunamadı.');
+      }
+      if (existing.first['status'] == status) {
+        return; // Idempotent success (already in target status)
+      }
+      throw Exception('Geçersiz sipariş durumu geçişi.');
+    }
   }
 
   @override

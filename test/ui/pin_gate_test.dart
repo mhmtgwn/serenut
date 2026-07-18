@@ -84,7 +84,7 @@ void main() {
     final mockUser = AuthUser(
       id: 'admin_1',
       name: 'Test Admin',
-      email: 'admin@shaman.com',
+      email: 'admin@serenut.com',
       role: UserRole.admin,
       permissions: [],
       createdAt: DateTime.now(),

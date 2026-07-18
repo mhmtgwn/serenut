@@ -1,5 +1,5 @@
 // lib/presentation/pages/sales_page.dart
-// Serenut POS — Satış Sayfası / POS Sepet Ekranı
+// Serenut OS — Satış Sayfası / POS Sepet Ekranı
 // Yeşil + Sarı + Premium POS Teması
 // Revized: 22 Jun 2026 (Modularized)
 

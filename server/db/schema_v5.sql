@@ -1,4 +1,4 @@
--- PostgreSQL schema v5 migrations for Serenut POS SaaS backend
+-- PostgreSQL schema v5 migrations for Serenut OS SaaS backend
 -- Billing Platform: subscription properties, invoice details and plans seeding
 
 -- 1. Extend subscriptions with recurring billing control columns

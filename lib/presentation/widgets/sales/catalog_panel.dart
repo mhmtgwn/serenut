@@ -1,5 +1,5 @@
 // lib/presentation/widgets/sales/catalog_panel.dart
-// Serenut POS — Ürün Kataloğu Paneli
+// Serenut OS — Ürün Kataloğu Paneli
 // Design Evolution v2: Büyük dokunmatik hedefler, geliştirilmiş kart hiyerarşisi
 // Revized: 22 Jun 2026
 

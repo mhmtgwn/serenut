@@ -18,6 +18,28 @@ class ItemLine {
 }
 
 class MathEngine {
+  static double calculateMappedItemsTotal(List<Map<String, dynamic>> items) {
+    return roundTL(items.fold<double>(0.0, (sum, item) {
+      final quantity = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+      final price =
+          ((item['unit_price'] ?? item['unitPrice'] ?? item['price']) as num?)
+                  ?.toDouble() ??
+              0.0;
+      return sum + (quantity * price);
+    }));
+  }
+
+  static double calculateCartTotal(Map<dynamic, double> cart) {
+    return roundTL(cart.entries.fold<double>(
+      0.0,
+      (sum, entry) =>
+          sum + (((entry.key.price as num).toDouble()) * entry.value),
+    ));
+  }
+
+  static double calculateSplitTotal(double cash, double card, double debt) =>
+      roundTL(cash + card + debt);
+
   /// Toplam hesapla (items)
   static double calculateTotal(List<ItemLine> items) {
     return items.fold(0.0, (sum, item) => sum + item.subtotal);

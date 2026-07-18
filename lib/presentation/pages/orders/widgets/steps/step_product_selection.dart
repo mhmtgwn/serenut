@@ -463,4 +463,61 @@ extension OrderCreationProductStep on OrderCreationDialogState {
       ),
     );
   }
+
+  void _showCategoryBottomSheet(BuildContext context, List<String> categoriesList) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Text(
+                  'Kategori Seçin',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('Tümü'),
+                leading: Icon(
+                  Icons.category_rounded,
+                  color: _selectedCategory == 'Tümü' ? _kGreen : Colors.grey,
+                ),
+                onTap: () {
+                  updateState(() {
+                    _selectedCategory = 'Tümü';
+                  });
+                  Navigator.of(context).pop();
+                },
+              ),
+              ...categoriesList.map((category) {
+                final isSelected = _selectedCategory == category;
+                return ListTile(
+                  title: Text(category),
+                  leading: Icon(
+                    Icons.label_outline_rounded,
+                    color: isSelected ? _kGreen : Colors.grey,
+                  ),
+                  onTap: () {
+                    updateState(() {
+                      _selectedCategory = category;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

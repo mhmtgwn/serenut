@@ -23,7 +23,7 @@ class FileSaverImpl implements FileSaver {
     if (context.mounted) {
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Serenut POS Ürün Kataloğu Dışa Aktar',
+        subject: 'Serenut OS Ürün Kataloğu Dışa Aktar',
       );
     }
   }

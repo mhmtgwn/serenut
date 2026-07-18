@@ -1,5 +1,5 @@
 // test/services/sales_service_license_gate_test.dart
-// Serenut POS — Sales Service License Gate Tests
+// Serenut OS — Sales Service License Gate Tests
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

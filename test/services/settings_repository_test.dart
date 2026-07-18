@@ -41,7 +41,7 @@ void main() {
       final settings = await settingsRepo.getSettings();
 
       expect(settings, isNotNull);
-      expect(settings.businessName, equals('Serenut POS'));
+      expect(settings.businessName, equals('Serenut OS'));
       expect(settings.printerPort, equals(9100));
       expect(settings.paperWidth, equals(80));
       expect(settings.printReceipt, isTrue);
@@ -52,7 +52,7 @@ void main() {
         () async {
       // 1. Fetch initial settings (which inserts default row)
       final initial = await settingsRepo.getSettings();
-      expect(initial.businessName, equals('Serenut POS'));
+      expect(initial.businessName, equals('Serenut OS'));
 
       // 2. Modify properties
       final modified = initial.copyWith(

@@ -69,7 +69,7 @@ async function main() {
         file_path, status, channel, is_mandatory, rollout_percentage, 
         file_size_bytes, release_notes, created_at
       ) VALUES (
-        'win-v1-stable', '1.0.0', 'windows', '/api/v1/updates/download/windows/latest', 
+        'win-v1-stable', '1.0.1', 'windows', '/api/v1/updates/download/windows/latest', 
         $1, 'public/website/downloads/SerenutOSSetup.exe', 
         'active', 'stable', true, 100, $2, 'RC1 Release Build — Inno Setup Installer', NOW()
       ) ON CONFLICT (id) DO UPDATE SET 
@@ -88,7 +88,7 @@ async function main() {
         file_path, status, channel, is_mandatory, rollout_percentage, 
         file_size_bytes, release_notes, created_at
       ) VALUES (
-        'android-v1-stable', '1.0.0', 'android', '/api/v1/updates/download/android/latest', 
+        'android-v1-stable', '1.0.1', 'android', '/api/v1/updates/download/android/latest', 
         $1, 'public/website/downloads/serenut.apk', 
         'active', 'stable', true, 100, $2, 'RC1 Release Build — Android Application Package', NOW()
       ) ON CONFLICT (id) DO UPDATE SET 

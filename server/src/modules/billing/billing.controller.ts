@@ -280,7 +280,7 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     const notifId = `btn-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     await client.query(
       `INSERT INTO bank_transfer_notifications (id, invoice_id, company_id, bank_account_id, reference_code, status)
-       VALUES ($1,$2,$3,$4,$5,'pending_review')`,
+       VALUES ($1,$2,$3,$4,$5,'pending')`,
       [notifId, invoiceId, user.company_id, bank_account_id, referenceCode]
     );
 
@@ -326,8 +326,9 @@ router.post('/notify-transfer', authenticateUser, async (req: AuthenticatedReque
   try {
     const result = await runBypassingRLS(
       `UPDATE bank_transfer_notifications
-       SET sender_name=$1, sender_bank=$2, transfer_date=$3, transfer_description=$4, updated_at=NOW()
-       WHERE invoice_id=$5 AND company_id=$6 AND status='pending_review'
+       SET sender_name=$1, sender_bank=$2, transfer_date=$3, transfer_description=$4,
+           status='pending_review', updated_at=NOW()
+       WHERE invoice_id=$5 AND company_id=$6 AND status='pending'
        RETURNING reference_code`,
       [sender_name || null, sender_bank || null, transfer_date || null, transfer_description || null, invoice_id, user.company_id]
     );
@@ -891,7 +892,7 @@ router.post('/mock-checkout-callback', async (req, res: Response) => {
       companyName: company.name,
       taxOffice: company.tax_office || 'Belirtilmedi',
       taxNumber: company.tax_number,
-      address: company.address || 'Serenut POS Tenant Address',
+      address: company.address || 'Serenut OS Tenant Address',
       senderName: senderName || null,
       senderBank: senderBank || null,
       paymentMethod: payMethod
@@ -909,7 +910,7 @@ router.post('/mock-checkout-callback', async (req, res: Response) => {
       currency: plan.currency,
       items: [
         {
-          description: `Serenut POS Bulut SaaS ${plan.name} Aboneliği`,
+          description: `Serenut OS Bulut SaaS ${plan.name} Aboneliği`,
           quantity: 1,
           unitPrice: parseFloat(plan.price),
           taxRate: 20 // Standard %20 VAT

@@ -1,5 +1,5 @@
 // lib/presentation/pages/customer/ledger_explainability_sheet.dart
-// Serenut POS — Ledger Bakiye Analiz & Doğrulama Ekranı
+// Serenut OS — Ledger Bakiye Analiz & Doğrulama Ekranı
 // Backend: DataIntegrityService (explainCustomerBalance + rebuildCustomerBalance + verifyLedgerInvariant) — sıfır değişiklik
 // Created: Phase 4 — 01 Jul 2026
 

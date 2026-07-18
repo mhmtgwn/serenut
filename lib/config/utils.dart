@@ -29,3 +29,22 @@ extension IdShortener on String {
     return length > 8 ? substring(0, 8).toUpperCase() : toUpperCase();
   }
 }
+
+extension TurkishNormalization on String {
+  String get normalizeTurkish {
+    return toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'i')
+        .replaceAll('ş', 's')
+        .replaceAll('Ş', 's')
+        .replaceAll('ç', 'c')
+        .replaceAll('Ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('Ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('Ü', 'u')
+        .replaceAll('ö', 'o')
+        .replaceAll('Ö', 'o')
+        .trim();
+  }
+}

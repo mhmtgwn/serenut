@@ -101,7 +101,7 @@ async function main() {
       currency: 'TRY',
       items: [
         {
-          description: 'Serenut POS Pro Subscription',
+          description: 'Serenut OS Pro Subscription',
           quantity: 1,
           unitPrice: 950.00,
           taxRate: 20

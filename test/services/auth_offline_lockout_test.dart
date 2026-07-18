@@ -102,7 +102,7 @@ void main() {
       user = AuthUser(
         id: 'user_123',
         name: 'kasiyer',
-        email: 'kasiyer@shaman.com',
+        email: 'kasiyer@serenut.com',
         role: UserRole.cashier,
         permissions: [],
         createdAt: DateTime.now(),

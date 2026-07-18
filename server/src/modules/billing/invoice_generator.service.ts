@@ -161,7 +161,7 @@ export class InvoiceGeneratorService {
       doc.fillColor('#64748B')
          .fontSize(8)
          .text('Bu fatura elektronik imza kanununa göre dijital olarak üretilmiştir. e-Fatura / e-Arşiv e-posta adresinize iletilmiştir.', 50, 720, { align: 'center' })
-         .text('Serenut POS platformunu tercih ettiğiniz için teşekkür ederiz.', 50, 735, { align: 'center' });
+         .text('Serenut OS platformunu tercih ettiğiniz için teşekkür ederiz.', 50, 735, { align: 'center' });
 
       doc.end();
 

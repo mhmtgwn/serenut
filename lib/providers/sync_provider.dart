@@ -1,5 +1,5 @@
 // lib/providers/sync_provider.dart
-// Serenut POS — Offline Sync Riverpod Provider + AppLifecycle Trigger
+// Serenut OS — Offline Sync Riverpod Provider + AppLifecycle Trigger
 // Created: 24 Jun 2026
 
 import 'package:flutter/widgets.dart';

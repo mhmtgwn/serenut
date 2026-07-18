@@ -2,31 +2,62 @@
 // Serenut OS — Critical/Mandatory Force Update Screen
 // Blueprint: Ecosystem UX & AC 8.3 (Zorunlu Güncelleme)
 
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/widgets/update_dialog.dart';
+import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 
-class ForceUpdatePage extends StatelessWidget {
+class ForceUpdatePage extends ConsumerWidget {
   final String latestVersion;
   final String releaseNotes;
   final String downloadUrl;
+  final String? sha256Hash;
+  final String? signature;
+  final int? fileSizeBytes;
 
   const ForceUpdatePage({
     super.key,
     required this.latestVersion,
     required this.releaseNotes,
     required this.downloadUrl,
+    this.sha256Hash,
+    this.signature,
+    this.fileSizeBytes,
   });
 
-  Future<void> _launchUpdateUrl() async {
+  Future<void> _startInAppUpdate(BuildContext context, WidgetRef ref) async {
     if (downloadUrl.isEmpty) return;
-    final uri = Uri.tryParse(downloadUrl);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    final releaseManager = ref.read(releaseManagerServiceProvider);
+    final platform = Platform.isAndroid ? 'android' : 'windows';
+    final jwtToken = ref.read(apiClientProvider).jwtToken;
+    final deviceId = ref.read(deviceManagerProvider).getDeviceId();
+
+    final updateInfo = UpdateInfo(
+      hasUpdate: true,
+      isForceUpdate: true,
+      latestVersion: latestVersion,
+      downloadUrl: downloadUrl,
+      sha256Hash: sha256Hash,
+      signature: signature,
+      fileSizeBytes: fileSizeBytes,
+      releaseNotes: releaseNotes,
+      channel: 'stable',
+    );
+
+    await showUpdateDialog(
+      context: context,
+      updateInfo: updateInfo,
+      releaseManager: releaseManager,
+      platform: platform,
+      jwtToken: jwtToken,
+      deviceId: deviceId,
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     const primaryColor = Color(0xFF10B981); // Emerald Green
     const backgroundColor = Color(0xFF0F172A); // Slate 900
     const cardBgColor = Color(0xFF1E293B); // Slate 800
@@ -110,8 +141,9 @@ class ForceUpdatePage extends StatelessWidget {
                     ],
                     const SizedBox(height: 32),
                     ElevatedButton.icon(
-                      onPressed:
-                          downloadUrl.isNotEmpty ? _launchUpdateUrl : null,
+                      onPressed: downloadUrl.isNotEmpty
+                          ? () => _startInAppUpdate(context, ref)
+                          : null,
                       icon: const Icon(Icons.download_rounded),
                       label: const Text(
                         'Şimdi Güncelle',

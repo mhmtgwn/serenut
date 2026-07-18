@@ -34,7 +34,7 @@ class MockWinspoolWrapper implements WinspoolWrapper {
     startDocPrinterCalled = true;
     expect(hPrinter, 42);
     expect(level, 1);
-    expect(pDocInfo.ref.pDocName.toDartString(), 'Serenut POS Raw Receipt');
+    expect(pDocInfo.ref.pDocName.toDartString(), 'Serenut OS Raw Receipt');
     expect(pDocInfo.ref.pDataType.toDartString(), 'RAW');
     return 1; // doc ID
   }

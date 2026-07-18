@@ -43,6 +43,7 @@ class ApiClient {
   // Callbacks for dynamic token refresh and session expiration
   Future<bool> Function()? onTokenExpired;
   void Function()? onSessionExpired;
+  void Function(String dateHeader)? onDateHeaderReceived;
   Future<bool>? _refreshFuture;
 
   // Custom mock handler function for testing/development
@@ -133,6 +134,11 @@ class ApiClient {
         headers: response.headers,
       );
 
+      final dateHeader = response.headers['date'] ?? response.headers['Date'];
+      if (dateHeader != null && onDateHeaderReceived != null && apiResponse.isSuccess) {
+        onDateHeaderReceived!(dateHeader);
+      }
+
       // Handle transparent JWT token refresh on 401s
       if (response.statusCode == 401 &&
           !path.startsWith('/auth/') &&
@@ -159,7 +165,12 @@ class ApiClient {
             headers: retryResponse.headers,
           );
 
-          if (!retryApiResponse.isSuccess) {
+          if (retryApiResponse.isSuccess) {
+            final dateHeader = retryResponse.headers['date'] ?? retryResponse.headers['Date'];
+            if (dateHeader != null && onDateHeaderReceived != null) {
+              onDateHeaderReceived!(dateHeader);
+            }
+          } else {
             throw ApiException(
               'HTTP Request failed with status code ${retryResponse.statusCode}',
               statusCode: retryResponse.statusCode,

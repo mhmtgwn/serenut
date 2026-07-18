@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// ════════════════════════════════════════════════════════════
-/// POSColors — Serenut POS Merkezi Renk Paleti
+/// POSColors — Serenut OS Merkezi Renk Paleti
 /// Tüm sayfalar bu sınıftan beslenmeli
 /// Yeşil / Sarı / Beyaz / Siyah / Slate sistemi
 /// ════════════════════════════════════════════════════════════

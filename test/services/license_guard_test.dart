@@ -1,5 +1,5 @@
 // test/services/license_guard_test.dart
-// Serenut POS — License Guard Unit & Integration Tests
+// Serenut OS — License Guard Unit & Integration Tests
 // Verifies 72-hour offline grace, clock integrity checks, and DEVICE503 handling.
 
 import 'dart:io';
@@ -66,14 +66,13 @@ void main() {
     });
 
     test('Bypasses validation if trial is active', () async {
-      // Set trial active (first launch timestamp within 30 days)
-      await prefs.setInt('nutopiano_first_launch_timestamp',
-          DateTime.now().millisecondsSinceEpoch);
-      await prefs.setString('serenut_trial_checksum',
-          'invalid_but_ignored_due_to_initialization');
-
-      // Initialize trial manager checksum correctly
-      await trialManager.initTrialIfNeeded();
+      final now = DateTime.now().toUtc();
+      await trialManager.cacheSubscription({
+        'status': 'trialing',
+        'trial_started_at': now.toIso8601String(),
+        'trial_ends_at': now.add(const Duration(days: 30)).toIso8601String(),
+        'grace_hours_override': 72,
+      });
 
       expect(trialManager.isTrialActive(), isTrue);
 

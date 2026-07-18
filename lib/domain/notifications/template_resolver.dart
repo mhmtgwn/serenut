@@ -1,5 +1,5 @@
 // lib/domain/notifications/template_resolver.dart
-// Serenut POS — SMS Template Resolver
+// Serenut OS — SMS Template Resolver
 // Reads active template from Settings.smsTemplate JSON,
 // resolves {variable} tokens, returns final message string.
 // Created: 01 Jul 2026

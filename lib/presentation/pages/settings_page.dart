@@ -825,7 +825,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 16),
         const Center(
           child: Text(
-            'Serenut POS v1.2.0 �€� Phase 2.5',
+            'Serenut OS v1.2.0 �€� Phase 2.5',
             style: TextStyle(
                 color: _kTextSecondary,
                 fontSize: 11,

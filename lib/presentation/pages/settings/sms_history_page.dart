@@ -1,5 +1,5 @@
 // lib/presentation/pages/settings/sms_history_page.dart
-// Serenut POS — Cloud Notification & Campaign Hub (Sprint 9)
+// Serenut OS — Cloud Notification & Campaign Hub (Sprint 9)
 // Integrated real-time credit checking, campaign wizard and central queue delivery tracking.
 
 import 'package:flutter/material.dart';

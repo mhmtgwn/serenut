@@ -1,6 +1,7 @@
 // lib/domain/services/license_service.dart
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -97,6 +98,8 @@ class LicenseService {
   String? _cachedLastSystemTime;
   String? _cachedMaxTimestampSeen;
   bool _isTampered = false;
+  final Stopwatch _stopwatch = Stopwatch()..start();
+  final DateTime _startTime = DateTime.now();
 
   LicenseService(this._prefs);
 
@@ -304,6 +307,19 @@ class LicenseService {
     }
   }
 
+  /// Records the authoritative server time from HTTP response header
+  void updateTrustedServerTime(String httpDateHeader) {
+    try {
+      final parsedDate = HttpDate.parse(httpDateHeader);
+      updateMaxTimestampSeen(parsedDate);
+    } catch (_) {
+      try {
+        final parsedDate = DateTime.parse(httpDateHeader);
+        updateMaxTimestampSeen(parsedDate);
+      } catch (_) {}
+    }
+  }
+
   Future<DateTime?> getMaxOperationalTimestamp() async {
     try {
       final db = await _getDb();
@@ -442,6 +458,16 @@ class LicenseService {
   /// Strong clock integrity check
   bool checkClockIntegrity() {
     if (_isTampered) return false;
+
+    // 0. Monotonic clock drift check
+    final elapsed = _stopwatch.elapsed;
+    final expectedTime = _startTime.add(elapsed);
+    final actualTime = DateTime.now();
+    final driftSeconds = actualTime.difference(expectedTime).inSeconds.abs();
+    if (driftSeconds > 15) {
+      _isTampered = true;
+      return false;
+    }
 
     final now = DateTime.now().toUtc();
 

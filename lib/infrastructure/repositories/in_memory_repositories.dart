@@ -371,8 +371,12 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   Future<double> getTotalDebt(String customerId) async {
     double debt = 0;
     for (final tx in InMemoryDb.transactions) {
-      if (tx.customerId == customerId && tx.debtAmount > 0) {
-        debt += tx.debtAmount;
+      if (tx.customerId == customerId) {
+        if (tx.type == 'sale') {
+          debt += tx.amount;
+        } else if (tx.type == 'cancellation') {
+          debt -= tx.amount;
+        }
       }
     }
     return debt;
@@ -383,7 +387,15 @@ class InMemoryCustomerRepository implements ICustomerRepository {
     double paid = 0;
     for (final tx in InMemoryDb.transactions) {
       if (tx.customerId == customerId) {
-        paid += tx.paidAmount;
+        if (tx.type == 'sale') {
+          paid += tx.paidAmount;
+        } else if (tx.type == 'payment' ||
+            tx.type == 'collection' ||
+            tx.type == 'refund') {
+          paid += tx.amount;
+        } else if (tx.type == 'cancellation') {
+          paid -= tx.paidAmount;
+        }
       }
     }
     return paid;

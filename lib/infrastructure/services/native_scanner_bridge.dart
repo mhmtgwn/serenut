@@ -1,5 +1,5 @@
 // lib/infrastructure/services/native_scanner_bridge.dart
-// Serenut POS — Native Scanner Bridge (MethodChannel + EventChannel)
+// Serenut OS — Native Scanner Bridge (MethodChannel + EventChannel)
 // Supports: Sunmi hardware scanner continuous mode
 // Updated: 24 Jun 2026
 

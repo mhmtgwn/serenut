@@ -1,4 +1,4 @@
--- PostgreSQL schema v1.0 for Serenut POS SaaS backend
+-- PostgreSQL schema v1.0 for Serenut OS SaaS backend
 
 -- 1. SaaS & Tenants
 CREATE TABLE IF NOT EXISTS companies (

@@ -237,15 +237,21 @@ router.get('/check', async (req: Request, res: Response) => {
     }
 
     // Public installer URLs are intentional; licensing happens inside the app.
-    const downloadUrl = hasUpdate
-      ? (eligibleRelease.download_url || `/api/v1/updates/download/${platform}/latest`)
-      : null;
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    let absoluteDownloadUrl = null;
+    if (hasUpdate) {
+      const rawUrl = eligibleRelease.download_url || `/api/v1/updates/download/${platform}/latest`;
+      absoluteDownloadUrl = rawUrl.startsWith('http')
+        ? rawUrl
+        : `${protocol}://${host}${rawUrl}`;
+    }
 
     return res.json({
       latestVersion: eligibleRelease.version_code,
       minRequiredVersion: eligibleRelease.min_required_version || current_version,
       isForceUpdate,
-      downloadUrl,
+      downloadUrl: absoluteDownloadUrl,
       sha256Hash: hasUpdate ? eligibleRelease.sha256_hash : null,
       signature: hasUpdate ? eligibleRelease.signature : null,
       fileSizeBytes: hasUpdate ? eligibleRelease.file_size_bytes : null,

@@ -1,5 +1,5 @@
 // lib/providers/device_status_provider.dart
-// Serenut POS — Device Status Provider (Printer + Scanner heartbeat)
+// Serenut OS — Device Status Provider (Printer + Scanner heartbeat)
 // Polls device health every 30s; shows banner on failure
 // Created: 24 Jun 2026
 

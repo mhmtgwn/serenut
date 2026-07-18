@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
@@ -16,7 +16,7 @@ class SqliteSettingsRepository implements ISettingsRepository {
     final rows = await _executor.query('settings', limit: 1);
     if (rows.isEmpty) {
       final defaultSettings = Settings(
-        businessName: 'Serenut POS',
+        businessName: 'Serenut OS',
         businessPhone: '+90-555-xxx-xxxx',
         businessAddress: 'Istanbul, Turkiye',
         currency: '₺',

@@ -1,5 +1,5 @@
 // lib/domain/models/sms_log_entry.dart
-// Serenut POS — SMS Log Entry (Domain Model)
+// Serenut OS — SMS Log Entry (Domain Model)
 // Maps to sms_logs SQLite table
 // Created: 01 Jul 2026
 

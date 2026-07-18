@@ -1,7 +1,7 @@
 {
   "name": "serenut-pos-backend",
   "version": "1.0.0",
-  "description": "SaaS Backend for Serenut POS",
+  "description": "SaaS Backend for Serenut OS",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",

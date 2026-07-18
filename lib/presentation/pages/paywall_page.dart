@@ -187,8 +187,8 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
 
                     // Web site actions
                     ElevatedButton.icon(
-                      onPressed: () =>
-                          _launchWebUrl('https://serenut.com/portal/'),
+                      onPressed: () => _launchWebUrl(
+                          'https://serenut.com/app/#billing-center'),
                       icon: const Icon(Icons.shopping_bag_rounded),
                       label: const Text('Lisans Satın Al / Yenile (Web)'),
                       style: ElevatedButton.styleFrom(
@@ -208,7 +208,7 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _launchWebUrl(
-                                'https://serenut.com/portal/#register'),
+                                'https://serenut.com/?auth=register'),
                             icon:
                                 const Icon(Icons.person_add_rounded, size: 18),
                             label: const Text('Kayıt Ol'),
@@ -224,7 +224,7 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _launchWebUrl(
-                                'https://serenut.com/portal/#reset'),
+                                'https://serenut.com/?auth=login'),
                             icon:
                                 const Icon(Icons.lock_reset_rounded, size: 18),
                             label: const Text('Şifremi Unuttum'),

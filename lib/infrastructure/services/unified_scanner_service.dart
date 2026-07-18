@@ -1,5 +1,5 @@
 // lib/infrastructure/services/unified_scanner_service.dart
-// Serenut POS — Unified Barcode Scanner Service
+// Serenut OS — Unified Barcode Scanner Service
 // Supports: Sunmi hardware, camera (Android/iOS), USB keyboard (Windows)
 // Features: debounce, anti-spam, offline buffer, platform detection
 

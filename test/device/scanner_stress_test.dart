@@ -1,5 +1,5 @@
 // test/device/scanner_stress_test.dart
-// Serenut POS — Scanner Stress & Deduplication Tests
+// Serenut OS — Scanner Stress & Deduplication Tests
 // Tests: spam scan prevention, debounce, offline buffer, USB keyboard mode
 // Created: 24 Jun 2026
 

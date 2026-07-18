@@ -6,6 +6,11 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/providers/event_providers.dart';
 import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/domain/services/math_engine.dart';
+import 'package:serenutos/domain/services/inventory_service.dart';
+import 'package:serenutos/providers/database_provider.dart';
 
 // ─── Pagination constants ─────────────────────────────────────────────────────
 const _kPageSize = 25;
@@ -108,15 +113,16 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> addOrder(OrderEntity order) async {
     await future;
-    await _repository.create(order);
+    final inventory = await ref.read(inventoryServiceProvider.future);
+    final gateway = ref.read(dbGatewayProvider);
+    await gateway.transaction(() async {
+      await inventory.verifyStockAvailability(_inventoryItems(order.items));
+      await _repository.create(order);
+      await inventory.decreaseStock(_inventoryItems(order.items));
+    });
 
     // Calculate total amount from items
-    double total = 0.0;
-    for (final item in order.items) {
-      final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = (item['price'] as num?)?.toDouble() ?? 0.0;
-      total += qty * price;
-    }
+    final total = MathEngine.calculateMappedItemsTotal(order.items);
 
     // Publish OrderCreatedEvent
     try {
@@ -151,7 +157,18 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> updateOrder(OrderEntity order) async {
     await future;
-    await _repository.update(order);
+    final previous = await _repository.findById(order.id);
+    if (previous == null) {
+      throw StateError('Düzenlenecek sipariş bulunamadı: ${order.id}');
+    }
+    final inventory = await ref.read(inventoryServiceProvider.future);
+    final gateway = ref.read(dbGatewayProvider);
+    await gateway.transaction(() async {
+      await inventory.increaseStock(_inventoryItems(previous.items));
+      await inventory.verifyStockAvailability(_inventoryItems(order.items));
+      await _repository.update(order);
+      await inventory.decreaseStock(_inventoryItems(order.items));
+    });
 
     // Log to Audit Trail
     try {
@@ -169,6 +186,27 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     } catch (_) {}
 
     await refresh();
+  }
+
+  List<SaleItemInput> _inventoryItems(List<Map<String, dynamic>> items) {
+    return items
+        .map((item) {
+          final productId =
+              (item['product_id'] ?? item['productId']).toString();
+          final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
+          final price = ((item['unit_price'] ??
+                      item['unitPrice'] ??
+                      item['price']) as num?)
+                  ?.toDouble() ??
+              0.0;
+          return SaleItemInput(
+            productId: productId,
+            quantity: quantity,
+            unitPrice: price,
+          );
+        })
+        .where((item) => item.productId.isNotEmpty && item.quantity > 0)
+        .toList();
   }
 
   Future<void> deleteOrder(String id,
@@ -194,40 +232,57 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
   Future<void> updateStatus(String id, String status) async {
     await future;
-    await _repository.updateStatus(id, status);
 
     try {
       final order = await _repository.findById(id);
       if (order != null) {
         final publisher = ref.read(eventPublisherProvider);
-        if (status == 'delivered') {
-          publisher.publish(OrderDeliveredEvent(
-            orderId: 0,
-            customerId: 0,
-            orderIdStr: order.id,
-            customerIdStr: order.customerId,
-          ));
-        } else if (status == 'preparing') {
-          publisher.publish(OrderPreparingEvent(
-            orderId: 0,
-            customerId: 0,
-            orderIdStr: order.id,
-            customerIdStr: order.customerId,
-          ));
-        } else if (status == 'ready') {
-          publisher.publish(OrderReadyEvent(
-            orderId: 0,
-            customerId: 0,
-            orderIdStr: order.id,
-            customerIdStr: order.customerId,
-          ));
-        } else if (status == 'cancelled') {
+
+        if (status == 'cancelled') {
+          final cancellationService =
+              await ref.read(orderCancellationServiceProvider.future);
+
+          await cancellationService.cancel(
+            id: order.id,
+            isOrder: true,
+          );
+
           publisher.publish(OrderCancelledEvent(
             orderId: 0,
             customerId: 0,
             orderIdStr: order.id,
             customerIdStr: order.customerId,
           ));
+
+          // Invalidate balance/transaction providers to refresh UI state immediately
+          ref.invalidate(customersControllerProvider);
+          ref.invalidate(customerTransactionsProvider(order.customerId));
+          ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+        } else {
+          await _repository.updateStatus(id, status);
+
+          if (status == 'delivered') {
+            publisher.publish(OrderDeliveredEvent(
+              orderId: 0,
+              customerId: 0,
+              orderIdStr: order.id,
+              customerIdStr: order.customerId,
+            ));
+          } else if (status == 'preparing') {
+            publisher.publish(OrderPreparingEvent(
+              orderId: 0,
+              customerId: 0,
+              orderIdStr: order.id,
+              customerIdStr: order.customerId,
+            ));
+          } else if (status == 'ready') {
+            publisher.publish(OrderReadyEvent(
+              orderId: 0,
+              customerId: 0,
+              orderIdStr: order.id,
+              customerIdStr: order.customerId,
+            ));
+          }
         }
 
         // Log status update to audit trail

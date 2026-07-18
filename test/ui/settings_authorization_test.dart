@@ -79,7 +79,7 @@ void main() {
       final mockUser = AuthUser(
         id: 'usr-sysadmin',
         name: 'Sys Admin',
-        email: 'sys@shaman.com',
+        email: 'sys@serenut.com',
         role: UserRole.sysadmin,
         permissions:
             Permission.forRole(UserRole.sysadmin).map((p) => p.value).toList(),
@@ -125,7 +125,7 @@ void main() {
       final mockUser = AuthUser(
         id: 'usr-owner',
         name: 'Owner User',
-        email: 'owner@shaman.com',
+        email: 'owner@serenut.com',
         role: UserRole.owner,
         permissions:
             Permission.forRole(UserRole.owner).map((p) => p.value).toList(),
@@ -171,7 +171,7 @@ void main() {
       final mockUser = AuthUser(
         id: 'usr-admin',
         name: 'Admin User',
-        email: 'admin@shaman.com',
+        email: 'admin@serenut.com',
         role: UserRole.admin,
         permissions:
             Permission.forRole(UserRole.admin).map((p) => p.value).toList(),
@@ -213,7 +213,7 @@ void main() {
       final mockUser = AuthUser(
         id: 'usr-admin-restricted',
         name: 'Restricted Admin',
-        email: 'radmin@shaman.com',
+        email: 'radmin@serenut.com',
         role: UserRole.admin,
         permissions: [
           'settings:view',
@@ -262,7 +262,7 @@ void main() {
       final cashierUser = AuthUser(
         id: 'usr-cashier',
         name: 'Test Cashier',
-        email: 'cashier@shaman.com',
+        email: 'cashier@serenut.com',
         role: UserRole.cashier,
         permissions: ['settings:view', 'settings:printer'],
         createdAt: DateTime.now(),
@@ -310,7 +310,7 @@ void main() {
       final staffUser = AuthUser(
         id: 'usr-staff',
         name: 'Test Staff',
-        email: 'staff@shaman.com',
+        email: 'staff@serenut.com',
         role: UserRole.staff,
         permissions: ['settings:view'], // no settings:printer
         createdAt: DateTime.now(),
@@ -355,7 +355,7 @@ void main() {
       final mockUser = AuthUser(
         id: 'usr-1',
         name: 'Restricted Staff',
-        email: 'staff@shaman.com',
+        email: 'staff@serenut.com',
         role: UserRole.staff,
         permissions: [], // empty permissions
         createdAt: DateTime.now(),
@@ -397,7 +397,7 @@ void main() {
       final mockUser = AuthUser(
         id: 'usr-staff',
         name: 'Restricted Staff',
-        email: 'staff@shaman.com',
+        email: 'staff@serenut.com',
         role: UserRole.staff,
         permissions: ['settings:view'], // has view, but not settings:database
         createdAt: DateTime.now(),

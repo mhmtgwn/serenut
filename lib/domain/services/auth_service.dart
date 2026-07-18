@@ -11,7 +11,8 @@ import 'package:serenutos/domain/services/i_hash_service.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:serenutos/domain/services/license_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, listEquals;
 
 class AuthException implements Exception {
   final String message;
@@ -28,6 +29,7 @@ class AuthService {
   final IHashService _hashService;
   final ApiClient? _apiClient;
   final DeviceManager _deviceManager;
+  final LicenseService? _licenseService;
   late SharedPreferences _prefs;
   AuthUser? _currentUser;
 
@@ -35,10 +37,12 @@ class AuthService {
     required IUserRepository userRepository,
     required IHashService hashService,
     required DeviceManager deviceManager,
+    LicenseService? licenseService,
     ApiClient? apiClient,
   })  : _userRepository = userRepository,
         _hashService = hashService,
         _deviceManager = deviceManager,
+        _licenseService = licenseService,
         _apiClient = apiClient;
 
   /// Initialize service (call once on app startup)
@@ -149,10 +153,12 @@ class AuthService {
             if (!kIsWeb) {
               final deviceId = _deviceManager.getDeviceId();
               final deviceName = 'POS Cihazı - $deviceId';
-              await _apiClient!.post('/licenses/auto-activate', {
+              final activation =
+                  await _apiClient!.post('/licenses/auto-activate', {
                 'device_hash': deviceId,
                 'device_name': deviceName,
               });
+              await _cacheLicenseActivation(activation.json);
             }
           } catch (e) {
             debugPrint(
@@ -242,6 +248,33 @@ class AuthService {
     }
 
     throw AuthException('Kullanıcı adı veya şifre hatalı.');
+  }
+
+  Future<void> _cacheLicenseActivation(dynamic responseJson) async {
+    final licenseService = _licenseService;
+    if (licenseService == null || responseJson is! Map<String, dynamic>) return;
+    final licenseInfo = responseJson['license_info'] as Map<String, dynamic>?;
+    final signature = responseJson['signature'] as String?;
+    if (licenseInfo == null || signature == null || signature.isEmpty) return;
+
+    final tokenMap = <String, dynamic>{
+      'merchant_id': licenseInfo['merchant_id'],
+      'device_id': licenseInfo['device_id'],
+      'device_token_version': licenseInfo['device_token_version'] ?? 1,
+      'expiry_date': licenseInfo['expiry_date'],
+      'tier': licenseInfo['tier'],
+      'features': licenseInfo['features'] ?? const <String>[],
+      'token_version': licenseInfo['token_version'] ?? 1,
+      'signature': signature,
+    };
+    final token = base64.encode(utf8.encode(jsonEncode(tokenMap)));
+    final saved = await licenseService.saveLicenseToken(token);
+    if (saved && _apiClient != null) {
+      // Fetch and persist the canonical key, then validate the signed token via
+      // heartbeat so offline startup has a complete license cache.
+      await licenseService.syncLicenseFromServer(_apiClient!);
+      licenseService.startHeartbeat(_apiClient!);
+    }
   }
 
   /// Login sub-user (cashier, manager, staff) using business_code, username, and PIN.
@@ -370,8 +403,6 @@ class AuthService {
         if (pinHash != null) {
           final isValid = _hashService.verifyPassword(pin, pinHash);
           if (isValid) {
-            final lastVerifiedStr =
-                _prefs.getString('serenut_last_authz_verified_at_${user.id}');
             // Lease check removed from here to allow offline POS sales.
             await _userRepository.resetPinAttempts(user.id);
             await _onLoginSuccess(user);
@@ -546,13 +577,12 @@ class AuthService {
         _apiClient == null ||
         _apiClient!.jwtToken == null) return;
     try {
-      final response = await _apiClient!.get('/auth/me');
+      final response = await _apiClient!.get('/users/me');
       if (response.statusCode == 200) {
         await _prefs.setString(
             'serenut_last_authz_verified_at_${_currentUser!.id}',
             DateTime.now().toUtc().toIso8601String());
-        final data = response.json;
-        final userMap = data['user'] as Map<String, dynamic>;
+        final userMap = response.json as Map<String, dynamic>;
 
         final isActive = userMap['is_active'] as bool? ?? true;
         if (!isActive) {
@@ -569,11 +599,14 @@ class AuthService {
           orElse: () => UserRole.cashier,
         );
 
-        if (role != _currentUser!.role) {
-          final updatedUser = _currentUser!.copyWith(
-            role: role,
-            permissions: getPermissionsForRole(role),
-          );
+        final serverPermissions = (userMap['permissions'] as List<dynamic>?)
+                ?.map((permission) => permission.toString())
+                .toList() ??
+            getPermissionsForRole(role);
+        if (role != _currentUser!.role ||
+            !listEquals(serverPermissions, _currentUser!.permissions)) {
+          final updatedUser = _currentUser!
+              .copyWith(role: role, permissions: serverPermissions);
           _currentUser = updatedUser;
           await _prefs.setString(_userStorageKey, updatedUser.toJson());
           await _userRepository.updateUserFields(updatedUser);
@@ -655,6 +688,10 @@ class AuthService {
         if (subscription != null) {
           final trialManager = TrialManager(_prefs);
           await trialManager.cacheSubscription(subscription);
+        }
+
+        if (_licenseService != null) {
+          await _licenseService!.syncLicenseFromServer(_apiClient!);
         }
 
         return true;
@@ -805,8 +842,17 @@ class AuthService {
     required String currentPassword,
     required String newPassword,
   }) async {
-    if (newPassword.isEmpty || newPassword.length < 6) {
-      throw AuthException('Yeni şifre en az 6 karakter olmalıdır.');
+    if (newPassword.isEmpty || newPassword.length < 8) {
+      throw AuthException('Yeni şifre en az 8 karakter olmalıdır.');
+    }
+
+    if (_currentUser?.id == userId &&
+        _apiClient != null &&
+        _apiClient!.jwtToken != null) {
+      await _apiClient!.post('/auth/change-password', {
+        'old_password': currentPassword,
+        'new_password': newPassword,
+      });
     }
     final hash = await _userRepository.getPasswordHash(userId);
     if (hash == null) throw AuthException('Kullanıcı bulunamadı.');

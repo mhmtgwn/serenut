@@ -1,5 +1,5 @@
 // lib/infrastructure/services/persistent_print_queue.dart
-// Serenut POS — Crash-safe Persistent Print Queue (SQLite-backed)
+// Serenut OS — Crash-safe Persistent Print Queue (SQLite-backed)
 // Survives app kill, power loss, and device restarts
 // Created: 12 Jul 2026 (Migrated to SQLite)
 

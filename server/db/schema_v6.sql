@@ -1,4 +1,4 @@
--- PostgreSQL schema v6 migrations for Serenut POS SaaS backend
+-- PostgreSQL schema v6 migrations for Serenut OS SaaS backend
 -- Notification Platform: templates, central message queue and credits tracking
 
 -- 1. Notification Templates Table

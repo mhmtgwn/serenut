@@ -1,5 +1,5 @@
 // lib/presentation/pages/license_page.dart
-// Serenut POS — Lisans Yönetim Ekranı
+// Serenut OS — Lisans Yönetim Ekranı
 // NOTE: Named LicenseManagementPage to avoid conflict with Flutter Material's LicensePage
 // Created: Phase 6 — 01 Jul 2026
 

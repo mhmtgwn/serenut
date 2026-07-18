@@ -28,10 +28,12 @@ final authServiceProvider = Provider<AuthService>((ref) {
   final hashService = ref.watch(hashServiceProvider);
   final apiClient = ref.watch(apiClientProvider);
   final deviceManager = ref.watch(deviceManagerProvider);
+  final licenseService = ref.watch(licenseServiceProvider);
   return AuthService(
     userRepository: userRepo,
     hashService: hashService,
     deviceManager: deviceManager,
+    licenseService: licenseService,
     apiClient: apiClient,
   );
 });

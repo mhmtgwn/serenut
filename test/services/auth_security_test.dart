@@ -1,5 +1,5 @@
 // test/services/auth_security_test.dart
-// Serenut POS — Auth Security Tests
+// Serenut OS — Auth Security Tests
 // Tests PBKDF2 hashing, login security, and legacy migration
 // Created: 24 Jun 2026
 

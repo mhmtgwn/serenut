@@ -16,16 +16,18 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
+    final searchService = await ref.watch(customerSearchServiceProvider.future);
 
     final searchQuery = ref.watch(customerSearchQueryProvider);
 
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
-        return _repository.findFiltered(
-          searchQuery: query,
-          offset: offset,
+        final result = await searchService.searchCustomers(
+          query: query ?? '',
+          page: offset ~/ limit,
           limit: limit,
         );
+        return result.items;
       },
       pageSize: 50,
     );
@@ -191,16 +193,18 @@ class SalesCustomersController extends CustomersController {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
+    final searchService = await ref.watch(customerSearchServiceProvider.future);
 
     final searchQuery = ref.watch(salesCustomerSearchQueryProvider);
 
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
-        return _repository.findFiltered(
-          searchQuery: query,
-          offset: offset,
+        final result = await searchService.searchCustomers(
+          query: query ?? '',
+          page: offset ~/ limit,
           limit: limit,
         );
+        return result.items;
       },
       pageSize: 50,
     );
@@ -220,16 +224,18 @@ class OrdersCustomersController extends CustomersController {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
+    final searchService = await ref.watch(customerSearchServiceProvider.future);
 
     final searchQuery = ref.watch(ordersCustomerSearchQueryProvider);
 
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
-        return _repository.findFiltered(
-          searchQuery: query,
-          offset: offset,
+        final result = await searchService.searchCustomers(
+          query: query ?? '',
+          page: offset ~/ limit,
           limit: limit,
         );
+        return result.items;
       },
       pageSize: 50,
     );
@@ -249,16 +255,18 @@ class CollectionCustomersController extends CustomersController {
   @override
   FutureOr<List<CustomerEntity>> build() async {
     _repository = await ref.watch(customerRepositoryProvider.future);
+    final searchService = await ref.watch(customerSearchServiceProvider.future);
 
     final searchQuery = ref.watch(collectionCustomerSearchQueryProvider);
 
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
-        return _repository.findFiltered(
-          searchQuery: query,
-          offset: offset,
+        final result = await searchService.searchCustomers(
+          query: query ?? '',
+          page: offset ~/ limit,
           limit: limit,
         );
+        return result.items;
       },
       pageSize: 50,
     );

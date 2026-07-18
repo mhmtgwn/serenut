@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/config/utils.dart';
 
 class SqliteCustomerRepository implements ICustomerRepository {
   final DbGateway _gateway;
@@ -33,6 +34,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
   Future<int> create(CustomerEntity entity) async {
     return await _executor.insert('customers', {
       ...entity.toMap(),
+      'normalized_name': entity.name.normalizeTurkish,
+      'normalized_email': entity.email.toLowerCase(),
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     });
@@ -44,6 +47,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
       'customers',
       {
         ...entity.toMap(),
+        'normalized_name': entity.name.normalizeTurkish,
+        'normalized_email': entity.email.toLowerCase(),
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -86,12 +91,33 @@ class SqliteCustomerRepository implements ICustomerRepository {
     return result.isNotEmpty;
   }
 
+  String _normalizeTurkish(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll('ı', 'i')
+        .replaceAll('İ', 'i')
+        .replaceAll('ş', 's')
+        .replaceAll('Ş', 's')
+        .replaceAll('ç', 'c')
+        .replaceAll('Ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('Ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('Ü', 'u')
+        .replaceAll('ö', 'o')
+        .replaceAll('Ö', 'o');
+  }
+
   @override
   Future<List<CustomerEntity>> search(String query) async {
+    if (query.trim().isEmpty) return [];
+    final normalizedQuery = query.trim().normalizeTurkish;
+    final term = '%$normalizedQuery%';
     final rows = await _executor.query(
       'customers',
-      where: "(name LIKE ? OR email LIKE ?) AND is_active = 1 AND id != ''",
-      whereArgs: ['%$query%', '%$query%'],
+      where: "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ?)",
+      whereArgs: [term, term, term],
+      orderBy: 'normalized_name ASC',
     );
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
   }
@@ -102,22 +128,37 @@ class SqliteCustomerRepository implements ICustomerRepository {
     int? limit,
     int? offset,
   }) async {
-    String? whereClause;
-    List<dynamic>? whereArgs;
-
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      whereClause =
-          "(name LIKE ? OR phone LIKE ? OR email LIKE ?) AND is_active = 1 AND id != ''";
-      whereArgs = ['%$searchQuery%', '%$searchQuery%', '%$searchQuery%'];
-    } else {
-      whereClause = "is_active = 1 AND id != ''";
+    if (searchQuery == null || searchQuery.trim().isEmpty) {
+      final rows = await _executor.query(
+        'customers',
+        where: "is_active = 1 AND id != ''",
+        orderBy: 'normalized_name ASC',
+        limit: limit,
+        offset: offset,
+      );
+      return rows.map((row) => CustomerEntity.fromMap(row)).toList();
     }
+
+    final normalizedQuery = searchQuery.trim().normalizeTurkish;
+    final termPrefix = '$normalizedQuery%';
+    final termContains = '%$normalizedQuery%';
+
+    // Normalize phone input: strip non-digits, country code, and leading zeros
+    final phoneDigits = normalizedQuery.replaceAll(RegExp(r'\D'), '');
+    String cleanPhone = phoneDigits;
+    if (cleanPhone.startsWith('90')) {
+      cleanPhone = cleanPhone.substring(2);
+    } else if (cleanPhone.startsWith('0')) {
+      cleanPhone = cleanPhone.substring(1);
+    }
+    
+    final phoneTerm = cleanPhone.isNotEmpty ? '%$cleanPhone%' : termContains;
 
     final rows = await _executor.query(
       'customers',
-      where: whereClause,
-      whereArgs: whereArgs,
-      orderBy: 'name ASC',
+      where: "is_active = 1 AND id != '' AND (normalized_name LIKE ? OR normalized_name LIKE ? OR phone LIKE ? OR normalized_email LIKE ? OR normalized_email LIKE ?)",
+      whereArgs: [termPrefix, termContains, phoneTerm, termPrefix, termContains],
+      orderBy: 'normalized_name ASC',
       limit: limit,
       offset: offset,
     );
@@ -167,22 +208,29 @@ class SqliteCustomerRepository implements ICustomerRepository {
   @override
   Future<double> getTotalDebt(String customerId) async {
     final result = await _executor.rawQuery(
-      'SELECT SUM(debt_amount) as total FROM financial_transactions '
-      'WHERE customer_id = ? AND debt_amount > 0',
+      "SELECT COALESCE(SUM(CASE WHEN type = 'sale' THEN amount WHEN type = 'cancellation' THEN -amount ELSE 0 END), 0.0) as total "
+      "FROM financial_transactions WHERE customer_id = ?",
       [customerId],
     );
-    if (result.isEmpty) return 0;
-    return result.first['total'] as double? ?? 0;
+    if (result.isEmpty) return 0.0;
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   @override
   Future<double> getTotalPaid(String customerId) async {
     final result = await _executor.rawQuery(
-      'SELECT SUM(paid_amount) as total FROM financial_transactions '
-      'WHERE customer_id = ?',
+      "SELECT COALESCE(SUM(CASE "
+      "  WHEN type = 'sale' THEN paid_amount "
+      "  WHEN type = 'payment' THEN amount "
+      "  WHEN type = 'collection' THEN amount "
+      "  WHEN type = 'refund' THEN amount "
+      "  WHEN type = 'cancellation' THEN -paid_amount "
+      "  ELSE 0 "
+      "END), 0.0) as total "
+      "FROM financial_transactions WHERE customer_id = ?",
       [customerId],
     );
-    if (result.isEmpty) return 0;
-    return result.first['total'] as double? ?? 0;
+    if (result.isEmpty) return 0.0;
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 }

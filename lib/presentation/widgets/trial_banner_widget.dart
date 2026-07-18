@@ -1,5 +1,5 @@
 // lib/presentation/widgets/trial_banner_widget.dart
-// Serenut POS — Trial/License Countdown Banner
+// Serenut OS — Trial/License Countdown Banner
 // Backend: LicenseService.getRemainingDays() + checkLicenseStatus() — sıfır değişiklik
 // Created: Phase 4 — 01 Jul 2026
 

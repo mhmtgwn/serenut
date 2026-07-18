@@ -1,5 +1,5 @@
 // lib/presentation/pages/admin/observability_dashboard.dart
-// Serenut POS — System Observability Dashboard
+// Serenut OS — System Observability Dashboard
 // Backend: ObservabilityService.getSystemHealthMetrics() — sıfır değişiklik
 // Created: Phase 5 — 01 Jul 2026
 

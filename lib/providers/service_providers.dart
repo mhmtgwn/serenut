@@ -1,5 +1,5 @@
 // lib/providers/service_providers.dart
-// Serenut POS — Central Service Locator Providers
+// Serenut OS — Central Service Locator Providers
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
@@ -28,6 +28,7 @@ import 'package:serenutos/infrastructure/services/release_channel_service.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/license_manager.dart';
 import 'package:serenutos/domain/services/access_manager.dart';
+import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 
 import 'package:serenutos/domain/services/security_gate.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
@@ -105,9 +106,12 @@ final accessManagerProvider = Provider<AccessManager>((ref) {
   );
 });
 
-/// Provides ApiClient instance.
 final apiClientProvider = Provider<ApiClient>((ref) {
   final client = ApiClient();
+  final licenseService = ref.watch(licenseServiceProvider);
+  client.onDateHeaderReceived = (dateHeader) {
+    licenseService.updateTrustedServerTime(dateHeader);
+  };
   ref.onDispose(() => client.dispose());
   return client;
 });
@@ -172,6 +176,11 @@ final crashRecoveryManagerProvider = Provider<CrashRecoveryManager>((ref) {
 final releaseChannelServiceProvider = Provider<ReleaseChannelService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return ReleaseChannelService(prefs);
+});
+
+/// Provides ReleaseManagerService instance.
+final releaseManagerServiceProvider = Provider<ReleaseManagerService>((ref) {
+  return ReleaseManagerService();
 });
 
 /// Provides AuditLogService instance.

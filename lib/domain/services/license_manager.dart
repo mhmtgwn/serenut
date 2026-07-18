@@ -21,6 +21,12 @@ class LicenseManager {
     final isValid = _licenseService.verifyLicenseToken(token);
     if (!isValid) return null;
 
+    // Check expiration or revoked status if available in info
+    if (info.expiryDate.isBefore(DateTime.now())) {
+      // License expired
+      return null;
+    }
+
     return CompanyLicense(
       companyId: info.merchantId,
       tier: info.tier,
@@ -47,5 +53,24 @@ class LicenseManager {
   /// Clears stored license data.
   Future<void> clearLicense() async {
     await _licenseService.clearLicense();
+  }
+
+  /// Lockout mechanism
+  bool get isLockedDown {
+    final license = getLicense();
+    return license == null || !license.isActive;
+  }
+
+  void enforceWriteAccess({bool isInternalSync = false}) {
+    if (isLockedDown && !isInternalSync) {
+      throw Exception('LICENSE_LOCKDOWN: Access denied. System is locked due to invalid, expired, or revoked license.');
+    }
+  }
+
+  /// License Recovery: Apply a new license token without wiping local DB.
+  Future<bool> recoverLicense(String newToken) async {
+    // Save new token to license service
+    await _licenseService.saveLicenseToken(newToken);
+    return !isLockedDown;
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
@@ -180,6 +181,50 @@ class PaymentService {
         'paidAmount': paidAmount,
       }),
     );
+  }
+
+  /// Revises an order payment without mutating the append-only ledger.
+  /// The old debt is reversed and the revised debt is recorded as a new sale.
+  Future<void> reviseOrderPayment({
+    required String orderId,
+    required String oldCustomerId,
+    required String newCustomerId,
+    required double totalAmount,
+    required double paidAmount,
+  }) async {
+    final oldTransactions =
+        await _transactionRepository.getByCustomerId(oldCustomerId);
+    final oldSales = oldTransactions.where(
+      (tx) => tx.referenceId == orderId && tx.type == 'sale',
+    );
+
+    if (oldSales.isNotEmpty) {
+      final oldSale = oldSales.last;
+      await _transactionRepository.create(FinancialTransactionEntity(
+        id: _generateTxId('trans-revision-reverse'),
+        type: 'cancellation',
+        customerId: oldSale.customerId,
+        amount: oldSale.amount,
+        paidAmount: oldSale.paidAmount,
+        debtAmount: oldSale.debtAmount,
+        date: DateTime.now(),
+        referenceId: orderId,
+        metadata: {'reason': 'order_revision', 'reverses': oldSale.id},
+      ));
+    }
+
+    final debt = MathEngine.calculateDebt(totalAmount, paidAmount);
+    await _transactionRepository.create(FinancialTransactionEntity(
+      id: _generateTxId('trans-revision-sale'),
+      type: 'sale',
+      customerId: newCustomerId,
+      amount: totalAmount,
+      paidAmount: paidAmount,
+      debtAmount: debt,
+      date: DateTime.now(),
+      referenceId: orderId,
+      metadata: {'reason': 'order_revision'},
+    ));
   }
 
   /// Records general customer collection (tahsilat).

@@ -1,5 +1,5 @@
 // lib/presentation/widgets/pos_page_layout.dart
-// Serenut POS — Standart Ekran Tasarımı ve Üst Bar Bileşeni
+// Serenut OS — Standart Ekran Tasarımı ve Üst Bar Bileşeni
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';

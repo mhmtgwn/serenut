@@ -1,5 +1,5 @@
 // lib/presentation/pages/admin/admin_page.dart
-// Serenut POS — Admin Control Center
+// Serenut OS — Admin Control Center
 // Access: Settings > Admin Panel (admin role only)
 // Created: Phase 5 — 01 Jul 2026
 

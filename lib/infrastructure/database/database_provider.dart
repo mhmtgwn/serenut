@@ -41,7 +41,7 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 28;
+  static const int _databaseVersion = 30;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -285,6 +285,17 @@ class DatabaseManager {
             await db.execute('PRAGMA synchronous = NORMAL');
           } catch (_) {
             // Device doesn't support WAL — fall back silently
+          }
+        },
+        onOpen: (db) async {
+          // Sprint C - SQLite Corruption & Integrity Audit
+          final integrity = await db.rawQuery('PRAGMA integrity_check;');
+          if (integrity.first.values.first != 'ok') {
+            throw Exception('SQLite integrity check failed: \${integrity.first.values.first}');
+          }
+          final fkCheck = await db.rawQuery('PRAGMA foreign_key_check;');
+          if (fkCheck.isNotEmpty) {
+            throw Exception('SQLite foreign key check failed for \${fkCheck.length} constraints.');
           }
         },
       );

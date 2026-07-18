@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { pgPool, redisClient } from '../../config/database';
 import { logger } from '../../config/logger';
+import { enqueueNotification } from '../../workers/notification.worker';
 
 // ── STARTUP SECRETS VALIDATION ────────────────────────────────────────────────
 // Fail fast on startup if JWT_SECRET is missing or dangerously weak.
@@ -101,7 +102,7 @@ export class AuthService {
       const now = new Date();
 
       if (!user.is_active) {
-        if (!user.email_verified_at && process.env.REQUIRE_EMAIL_VERIFICATION === 'false') {
+        if (!user.email_verified_at && process.env.REQUIRE_EMAIL_VERIFICATION !== 'true') {
           await client.query(
             `UPDATE users SET is_active = true, email_verified_at = NOW() WHERE id = $1`,
             [user.id]
@@ -603,13 +604,14 @@ export class AuthService {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
       
-      const res = await client.query('SELECT id, name FROM users WHERE email = $1 AND is_active = TRUE', [email]);
+      const res = await client.query('SELECT id, company_id, name FROM users WHERE email = $1 AND is_active = TRUE', [email]);
       if (res.rows.length === 0) {
         await client.query('COMMIT');
         return null;
       }
       
       const userId = res.rows[0].id;
+      const companyId = res.rows[0].company_id;
       const userName = res.rows[0].name;
       const resetToken = crypto.randomBytes(30).toString('hex');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -618,18 +620,32 @@ export class AuthService {
         'UPDATE users SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3',
         [resetToken, expiresAt, userId]
       );
+
+      const notificationId = `notif-reset-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      const resetBody = `Merhaba ${userName},\n\nŞifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanabilirsiniz. Bu bağlantı 1 saat boyunca geçerlidir:\n\n${(process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '')}/reset-password?token=${resetToken}\n\nEğer bu talebi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız.`;
+      const resetTitle = 'Serenut OS — Şifre Sıfırlama Talebi';
+      await client.query(
+        `INSERT INTO notification_queue
+           (id, company_id, channel, recipient, title, body, status, scheduled_at)
+         VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
+        [notificationId, companyId, email, resetTitle, resetBody]
+      );
       
       await client.query('COMMIT');
       
-      // Queue email notification
-      const { getNotificationQueue } = require('../../workers/notification.worker');
-      const queue = getNotificationQueue();
-      await queue.add('send-email', {
-        channel: 'email',
-        recipient: email,
-        title: 'Serenut OS — Şifre Sıfırlama Talebi',
-        body: `Merhaba ${userName},\n\nŞifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanabilirsiniz. Bu bağlantı 1 saat boyunca geçerlidir:\n\n${process.env.PORTAL_URL || 'https://serenut.com/portal'}/?token=${resetToken}\n\nEğer bu talebi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız.`
-      });
+      try {
+        await enqueueNotification({
+          notification_id: notificationId,
+          company_id: companyId,
+          channel: 'email',
+          recipient: email,
+          title: resetTitle,
+          body: resetBody,
+        });
+      } catch (queueError) {
+        // The durable DB row remains pending and can be recovered by operations.
+        logger.error('Password reset email could not be enqueued', queueError);
+      }
       
       logger.info(`Password reset token generated and queued for ${email}`);
       return resetToken;

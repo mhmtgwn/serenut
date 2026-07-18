@@ -10,6 +10,7 @@ import 'package:serenutos/providers/dataset_import_provider.dart';
 import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/dataset_import_service.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/presentation/widgets/product_image.dart';
 
 const _kPrimary = Color(0xFF10B981); // Emerald Green
 const _kBackground = Color(0xFF0F172A); // Slate 900
@@ -161,6 +162,7 @@ class _CatalogImportWizardPageState
 
       // Invalidate the repository so components refresh product list
       ref.invalidate(productRepositoryProvider);
+      ProductImage.clearCache();
 
       setState(() {
         _importResult = result;

@@ -21,12 +21,30 @@ class ProductImage extends ConsumerWidget {
   final String barcode;
   final double size;
 
+  static String? _documentsDirectoryPath;
+  static final Map<String, bool> _imageExistsCache = {};
+
+  static void clearCache() {
+    _imageExistsCache.clear();
+  }
+
   const ProductImage({
     this.imageUrl,
     required this.barcode,
     this.size = 50.0,
     super.key,
   });
+
+  static String _resolveLocalPath(String path, String documentsDir) {
+    if (p.isAbsolute(path)) {
+      if (path.contains('product_images')) {
+        final relativePart = path.substring(path.indexOf('product_images'));
+        return p.join(documentsDir, relativePart);
+      }
+      return p.join(documentsDir, 'product_images', p.basename(path));
+    }
+    return p.join(documentsDir, path);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,22 +61,25 @@ class ProductImage extends ConsumerWidget {
       return _buildPlaceholder();
     }
 
-    // 2. Native: explicit imageUrl provided
-    if (imageUrl != null && imageUrl!.isNotEmpty) {
-      if (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:')) {
-        return _buildNetworkImage(context, imageUrl!);
-      } else {
-        return _buildFileImage(context, imageUrl!);
-      }
-    }
-
-    // 3. Native: fallback to barcode-matched image file
+    // 2. Native execution with directory resolution
     final docsDirAsync = ref.watch(appDocumentsDirectoryProvider);
     return docsDirAsync.when(
       data: (dir) {
+        _documentsDirectoryPath = dir.path;
+
+        if (imageUrl != null && imageUrl!.isNotEmpty) {
+          if (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:')) {
+            return _buildNetworkImage(context, imageUrl!);
+          } else {
+            final resolvedPath = _resolveLocalPath(imageUrl!, dir.path);
+            return _buildFileImage(context, resolvedPath);
+          }
+        }
+
+        // Fallback to barcode-matched image file
         final localPath = p.join(dir.path, 'product_images', '$barcode.jpg');
-        final file = File(localPath);
-        if (file.existsSync()) {
+        final exists = _imageExistsCache[barcode] ??= File(localPath).existsSync();
+        if (exists) {
           return _buildFileImage(context, localPath);
         }
         return _buildPlaceholder();

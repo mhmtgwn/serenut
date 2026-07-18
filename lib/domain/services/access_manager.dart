@@ -36,7 +36,8 @@ class AccessManager {
     final state = _trialManager.getEntitlementState();
 
     if (state == EntitlementState.active ||
-        state == EntitlementState.graceActive) {
+        state == EntitlementState.graceActive ||
+        state == EntitlementState.bootstrapPending) {
       return AccessStatus.trialActive; // Or licensed
     }
 

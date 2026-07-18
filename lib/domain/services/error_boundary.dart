@@ -1,5 +1,5 @@
-﻿// lib/domain/services/error_boundary.dart
-// Sentry-ready centralized error boundary for Serenut POS.
+// lib/domain/services/error_boundary.dart
+// Sentry-ready centralized error boundary for Serenut OS.
 // Coverage: Flutter framework, async zones, platform channels, and background isolates.
 
 import 'dart:async';

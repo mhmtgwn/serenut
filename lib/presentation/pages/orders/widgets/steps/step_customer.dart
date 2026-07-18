@@ -17,11 +17,7 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
           child: Text('Müşteriler yüklenemedi: $err',
               style: const TextStyle(color: _kRed))),
       data: (customersList) {
-        final filtered = customersList.where((c) {
-          final query = _customerQuery.toLowerCase();
-          return c.name.toLowerCase().contains(query) ||
-              c.phone.contains(query);
-        }).toList();
+        final filtered = customersList;
 
         return Padding(
           padding: const EdgeInsets.all(20),
@@ -39,8 +35,10 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                       suffixIcon: _customerQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, size: 18),
-                              onPressed: () =>
-                                  updateState(() => _customerQuery = ''),
+                              onPressed: () {
+                                updateState(() => _customerQuery = '');
+                                ref.read(ordersCustomerSearchQueryProvider.notifier).state = '';
+                              },
                             )
                           : null,
                       border: OutlineInputBorder(
@@ -48,7 +46,13 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                     ),
-                    onChanged: (val) => updateState(() => _customerQuery = val),
+                    onChanged: (val) {
+                      updateState(() => _customerQuery = val);
+                      if (_customerSearchDebounce?.isActive ?? false) _customerSearchDebounce!.cancel();
+                      _customerSearchDebounce = Timer(const Duration(milliseconds: 300), () {
+                        ref.read(ordersCustomerSearchQueryProvider.notifier).state = val;
+                      });
+                    },
                   );
 
                   final addBtn = ElevatedButton.icon(
@@ -114,8 +118,21 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                         ),
                       )
                     : ListView.builder(
-                        itemCount: filtered.length,
+                        controller: _customerScrollController,
+                        itemCount: filtered.length +
+                            (ref.read(ordersCustomersControllerProvider.notifier).isLoadingMore ? 1 : 0),
                         itemBuilder: (context, idx) {
+                          if (idx == filtered.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                                ),
+                              ),
+                            );
+                          }
                           final c = filtered[idx];
                           final isSel = _selectedCustomer?.id == c.id;
                           final isDebt = c.balance < 0;

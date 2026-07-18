@@ -11,7 +11,10 @@ import { emailVerificationEmail } from '../notifications/email.templates';
 import crypto from 'crypto';
 
 const router = Router();
-const emailVerificationRequired = process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+// Mail delivery is currently optional. Verification is enabled only when the
+// deployment explicitly opts in; a missing environment variable must not lock
+// newly-created accounts out.
+const emailVerificationRequired = process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
 
 /**
  * @swagger

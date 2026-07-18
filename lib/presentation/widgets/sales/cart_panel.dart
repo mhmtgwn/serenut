@@ -1,5 +1,5 @@
 // lib/presentation/widgets/sales/cart_panel.dart
-// Serenut POS — Sepet Paneli
+// Serenut OS — Sepet Paneli
 // UX Redesign v3: 44×44 touch targets, swipe-to-delete, improved empty state
 // Preserved: all callback signatures, no business logic changes
 

@@ -141,7 +141,7 @@ Add-Type -TypeDefinition \$code
 if ([RawPrinter]::OpenPrinter("$printerName", [ref] \$hPrinter, [IntPtr]::Zero)) {
     try {
         \$docInfo = New-Object RawPrinter+DOCINFO
-        \$docInfo.pDocName = "Serenut POS Fallback Receipt"
+        \$docInfo.pDocName = "Serenut OS Fallback Receipt"
         \$docInfo.pDataType = "RAW"
         if ([RawPrinter]::StartDocPrinter(\$hPrinter, 1, [ref] \$docInfo) -ne 0) {
             if ([RawPrinter]::StartPagePrinter(\$hPrinter)) {
@@ -197,7 +197,7 @@ if (-not \$success) {
       hPrinter = phPrinter.value;
 
       docInfo = calloc<DocInfo1W>();
-      docInfo.ref.pDocName = 'Serenut POS Raw Receipt'.toNativeUtf16();
+      docInfo.ref.pDocName = 'Serenut OS Raw Receipt'.toNativeUtf16();
       docInfo.ref.pOutputFile = nullptr;
       docInfo.ref.pDataType = 'RAW'.toNativeUtf16();
 

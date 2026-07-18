@@ -1,5 +1,5 @@
 // lib/presentation/pages/orders_page.dart
-// Serenut POS — Sipariş Yönetimi
+// Serenut OS — Sipariş Yönetimi
 // Phase 6 UI Redesign — Square/Loyverse POS Stili
 // Revized: 22 Jun 2026
 

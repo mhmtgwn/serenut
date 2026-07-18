@@ -1,5 +1,5 @@
 // lib/providers/sms_provider.dart
-// Serenut POS — SMS Service Riverpod Provider
+// Serenut OS — SMS Service Riverpod Provider
 // Created: 24 Jun 2026
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

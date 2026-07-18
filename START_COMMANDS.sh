@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🚀 SERENUT POS — ENGINEER START COMMANDS
+# 🚀 SERENUT OS — ENGINEER START COMMANDS
 # Copy-paste these into each engineer's Slack
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -451,7 +451,7 @@ Your mission: Keep both teams in sync (5-7 days parallel execution)
 
    PM Post (end of each day):
    """
-   🚀 SERENUT POS — Day X Status
+   🚀 SERENUT OS — Day X Status
    
    Backend (Track 1):
    ✅ Completed: [auth/state/error/transaction/etc.]

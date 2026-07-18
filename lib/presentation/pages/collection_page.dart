@@ -1,5 +1,5 @@
 // lib/presentation/pages/collection_page.dart
-// Serenut POS — Müşteri Tahsilat Sayfası (Tam Ekran)
+// Serenut OS — Müşteri Tahsilat Sayfası (Tam Ekran)
 // UX Redesign v3: Full-screen, no dialog, live balance preview
 
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/repository_providers.dart';
 
 const _kGreen = Color(0xFF16A34A);
 const _kGreenDark = Color(0xFF15803D);
@@ -32,6 +33,11 @@ class CollectionPage extends ConsumerStatefulWidget {
   @override
   ConsumerState<CollectionPage> createState() => _CollectionPageState();
 }
+
+final collectionCustomerDetailProvider = FutureProvider.family<CustomerEntity?, String>((ref, id) async {
+  final repo = await ref.watch(customerRepositoryProvider.future);
+  return repo.findById(id);
+});
 
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   final _formKey = GlobalKey<FormState>();
@@ -70,9 +76,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final customersAsync = ref.watch(collectionCustomersControllerProvider);
+    final customerAsync = ref.watch(collectionCustomerDetailProvider(widget.customerId));
 
-    return customersAsync.when(
+    return customerAsync.when(
       loading: () => const Scaffold(
         body: Center(
           child: CircularProgressIndicator(
@@ -84,9 +90,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         appBar: AppBar(title: const Text('Tahsilat')),
         body: Center(child: Text('Hata: $err')),
       ),
-      data: (customers) {
-        _customer =
-            customers.where((c) => c.id == widget.customerId).firstOrNull;
+      data: (customer) {
+        _customer = customer;
         if (_customer == null) {
           return Scaffold(
             appBar: AppBar(

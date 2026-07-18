@@ -335,7 +335,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeLarge);
     bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('SERENUT POS\n'));
+    bytes.addAll(_textToBytes('SERENUT OS\n'));
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('Yazıcı Bağlantı Testi\n'));
@@ -361,7 +361,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
     bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('SERENUT POS\n'));
+    bytes.addAll(_textToBytes('SERENUT OS\n'));
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes('Yazıcı Bağlantı Testi\n'));
     bytes.addAll(
@@ -1118,7 +1118,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeLarge);
     bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('SERENUT POS\n'));
+    bytes.addAll(_textToBytes('SERENUT OS\n'));
     bytes.addAll(EscPosCommands.boldOff);
 
     bytes.addAll(EscPosCommands.sizeNormal);

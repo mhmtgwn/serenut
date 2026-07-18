@@ -1,5 +1,5 @@
 // test/services/offline_sync_test.dart
-// Serenut POS — Offline Sync Safety Tests
+// Serenut OS — Offline Sync Safety Tests
 // Tests that unsynced sales are properly marked after sync using ApiClient.
 // Created: 04 Jul 2026
 

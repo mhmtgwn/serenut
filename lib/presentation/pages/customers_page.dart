@@ -1,5 +1,5 @@
 // lib/presentation/pages/customers_page.dart
-// Serenut POS — Müşteriler Sayfası
+// Serenut OS — Müşteriler Sayfası
 // Yeşil + Sarı + Premium POS Teması
 // Generated: 21 Jun 2026 (v2)
 

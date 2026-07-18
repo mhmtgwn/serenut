@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#10B981",
     "theme_color": "#10B981",
-    "description": "Serenut OS POS - Small/Medium Business Management System",
+    "description": "Serenut OS - Small/Medium Business Management System",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

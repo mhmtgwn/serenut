@@ -11,7 +11,7 @@ async function seed() {
       file_path, status, channel, is_mandatory, rollout_percentage, 
       file_size_bytes, release_notes
     ) VALUES (
-      'win-v1-stable', '1.0.0', 'windows', '/api/v1/updates/download/windows/latest', 
+      'win-v1-stable', '1.0.1', 'windows', '/api/v1/updates/download/windows/latest', 
       '4E36E6D63BBB9B903C7F30DBE73FDD686B29CE1FDE199DFF54EDDA6173925587', 
       'public/website/downloads/SerenutOSSetup.exe', 
       'active', 'stable', true, 100, 9214299, 'RC1 Release Build'

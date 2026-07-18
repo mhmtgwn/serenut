@@ -230,7 +230,7 @@ class MainActivity : FlutterActivity() {
                         // Test içeriği
                         val testContent = """
                             =========================
-                            SHAMAN YAZICI TEST SAYFASI
+                            SERENUT OS YAZICI TEST SAYFASI
                             =========================
                             
                             Bu bir test sayfasıdır.
@@ -262,7 +262,7 @@ class MainActivity : FlutterActivity() {
                                 sunmiPrinter?.setPrinterStyle(WoyouConsts.ENABLE_BOLD, WoyouConsts.ENABLE)
                                 sunmiPrinter?.setFontSize(24f, null)
                                 sunmiPrinter?.printText("=========================\n", null)
-                                sunmiPrinter?.printText("SHAMAN YAZICI TEST SAYFASI\n", null)
+                                sunmiPrinter?.printText("SERENUT OS YAZICI TEST SAYFASI\n", null)
                                 sunmiPrinter?.printText("=========================\n\n", null)
                                 
                                 // İçerik yazdır
@@ -349,7 +349,7 @@ class MainActivity : FlutterActivity() {
                                         paint.color = android.graphics.Color.BLACK
                                         paint.textSize = 50f
                                         paint.isFakeBoldText = true // Kalın yazı
-                                        canvas.drawText("SHAMAN", 100f, 60f, paint)
+                                        canvas.drawText("SERENUT OS", 100f, 60f, paint)
                                         
                                         sunmiPrinter?.printBitmap(bitmap, null)
                                         sunmiPrinter?.lineWrap(1, null)
@@ -366,12 +366,12 @@ class MainActivity : FlutterActivity() {
                                     Log.d("SunmiPrinter", "QR kod yazdırılıyor...")
                                     sunmiPrinter?.setAlignment(1, null) // Ortalı
                                     sunmiPrinter?.printText("QR KOD ÖRNEK:\n", null)
-                                    sunmiPrinter?.printQRCode("https://www.shaman.com", 8, 0, null)
+                                    sunmiPrinter?.printQRCode("https://serenut.com", 8, 0, null)
                                     sunmiPrinter?.lineWrap(1, null)
                                     
                                     // QR kod açıklaması - daha büyük yazı
                                     sunmiPrinter?.setFontSize(20f, null)
-                                    sunmiPrinter?.printText("www.shaman.com\n", null)
+                                    sunmiPrinter?.printText("serenut.com\n", null)
                                     sunmiPrinter?.lineWrap(1, null)
                                     
                                 } catch (e: Exception) {
@@ -460,7 +460,7 @@ class MainActivity : FlutterActivity() {
                 "printReceiptWithImage" -> {
                     try {
                         // Fiş verilerini al
-                        val title = call.argument<String>("title") ?: "SHAMAN TEST FİŞİ"
+                        val title = call.argument<String>("title") ?: "SERENUT OS TEST FİŞİ"
                         val subtitle = call.argument<String>("subtitle") ?: "Sunmi Yazıcı Test"
                         val date = call.argument<String>("date") ?: ""
                         val imagePath = call.argument<String>("imagePath") ?: "assets/logo.png"
@@ -615,7 +615,7 @@ class MainActivity : FlutterActivity() {
                                         paint.color = android.graphics.Color.BLACK
                                         paint.textSize = 50f
                                         paint.isFakeBoldText = true // Kalın yazı
-                                        canvas.drawText("SHAMAN", 100f, 60f, paint)
+                                        canvas.drawText("SERENUT OS", 100f, 60f, paint)
                                         
                                         sunmiPrinter?.setAlignment(1, null) // Ortalı
                                         sunmiPrinter?.printBitmap(bitmap, null)
@@ -852,7 +852,7 @@ class MainActivity : FlutterActivity() {
                     sunmiPrinter?.setAlignment(1, null) // Ortalı
                     sunmiPrinter?.setPrinterStyle(WoyouConsts.ENABLE_BOLD, WoyouConsts.ENABLE)
                     sunmiPrinter?.setFontSize(24f, null)
-                    sunmiPrinter?.printText("SHAMAN TEST FİŞİ\n\n", null)
+                    sunmiPrinter?.printText("SERENUT OS TEST FİŞİ\n\n", null)
                     
                     // Normal içerik
                     sunmiPrinter?.setAlignment(0, null) // Sola yaslı
@@ -870,7 +870,7 @@ class MainActivity : FlutterActivity() {
                     // Alt bilgi
                     sunmiPrinter?.setAlignment(1, null) // Ortalı
                     sunmiPrinter?.printText("Teşekkür Ederiz\n", null)
-                    sunmiPrinter?.printText("www.shaman.com\n\n\n", null)
+                    sunmiPrinter?.printText("serenut.com\n\n\n", null)
                     
                     // Kağıt ilerlet
                     sunmiPrinter?.lineWrap(4, null)

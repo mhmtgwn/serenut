@@ -495,7 +495,7 @@ router.post('/campaign', enforceCampaignAbuseLimit, requirePermission('notificat
         // Parse template
         const resolvedBody = TemplateParserService.parse(templateBody, {
           customer: rec.name,
-          store: 'Serenut POS'
+          store: 'Serenut OS'
         });
 
         const id = `notif-camp-${Date.now()}-${Math.floor(Math.random()*10000)}`;

@@ -1,5 +1,5 @@
 // lib/infrastructure/repositories/sms_log_repository.dart
-// Serenut POS — SMS Log Repository
+// Serenut OS — SMS Log Repository
 // Persists SMS send attempts to SQLite sms_logs table.
 // Created: 01 Jul 2026
 

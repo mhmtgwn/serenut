@@ -101,7 +101,7 @@ router.get('/check', async (req: Request, res: Response) => {
 
   try {
     const query = `
-      SELECT version_code, platform, download_url, sha256_hash, is_mandatory, release_notes
+      SELECT version_code, platform, download_url, sha256_hash, signature, file_size_bytes, is_mandatory, release_notes
       FROM app_versions
       WHERE platform = $1 AND status = 'active' AND channel = 'stable'
       ORDER BY created_at DESC
@@ -116,6 +116,8 @@ router.get('/check', async (req: Request, res: Response) => {
         isForceUpdate: false,
         downloadUrl: '',
         sha256_hash: '',
+        signature: null,
+        file_size_bytes: null,
         releaseNotes: 'Uygulama güncel.'
       });
     }
@@ -125,12 +127,23 @@ router.get('/check', async (req: Request, res: Response) => {
     // Simple comparison logic: if latest version code is different, suggest update
     const hasUpdate = compareVersions(current_version, latest.version_code) < 0;
 
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    let absoluteDownloadUrl = '';
+    if (hasUpdate && latest.download_url) {
+      absoluteDownloadUrl = latest.download_url.startsWith('http')
+        ? latest.download_url
+        : `${protocol}://${host}${latest.download_url}`;
+    }
+
     return res.json({
       latestVersion: latest.version_code,
       minRequiredVersion: latest.is_mandatory ? latest.version_code : current_version,
       isForceUpdate: latest.is_mandatory && hasUpdate,
-      downloadUrl: hasUpdate ? latest.download_url : '',
+      downloadUrl: absoluteDownloadUrl,
       sha256_hash: hasUpdate ? latest.sha256_hash : '',
+      signature: hasUpdate ? latest.signature : null,
+      file_size_bytes: hasUpdate ? latest.file_size_bytes : null,
       releaseNotes: latest.release_notes || ''
     });
   } catch (err) {

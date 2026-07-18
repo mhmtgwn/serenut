@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/services/sales_service.dart';
+import 'package:serenutos/domain/services/order_cancellation_service.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/domain/services/payment_service.dart';
 import 'package:serenutos/domain/services/data_integrity_service.dart';
@@ -71,6 +72,28 @@ final salesServiceProvider = FutureProvider<SalesService>((ref) async {
     eventPublisher: eventPublisher,
     transactionRunner: gateway,
     securityGate: securityGate,
+    dataIntegrityService: dataIntegrity,
+  );
+});
+
+final orderCancellationServiceProvider =
+    FutureProvider<OrderCancellationService>((ref) async {
+  final saleRepo = await ref.watch(saleRepositoryProvider.future);
+  final orderRepo = await ref.watch(orderRepositoryProvider.future);
+  final inventoryService = await ref.watch(inventoryServiceProvider.future);
+  final paymentService = await ref.watch(paymentServiceProvider.future);
+  final transactionRepo =
+      await ref.watch(financialTransactionRepositoryProvider.future);
+  final gateway = ref.watch(dbGatewayProvider);
+  final dataIntegrity = await ref.watch(dataIntegrityServiceProvider.future);
+
+  return OrderCancellationService(
+    saleRepository: saleRepo,
+    orderRepository: orderRepo,
+    inventoryService: inventoryService,
+    paymentService: paymentService,
+    transactionRepository: transactionRepo,
+    transactionRunner: gateway,
     dataIntegrityService: dataIntegrity,
   );
 });
