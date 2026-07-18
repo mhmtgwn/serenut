@@ -16,7 +16,7 @@ void main() {
     // Use an example map to test sort logic
     final mapLocal = {'c': 3, 'a': 1, 'b': 2, 'd': null};
     final mapServer = {'a': 1, 'b': 2, 'c': 3, 'd': null};
-    
+
     // Sort and hash
     dynamic sortKeys(dynamic value) {
       if (value is Map) {
@@ -32,15 +32,17 @@ void main() {
 
     final localJson = jsonEncode(sortKeys(mapLocal));
     final serverJson = jsonEncode(sortKeys(mapServer));
-    
+
     final localHash = sha256.convert(utf8.encode(localJson)).toString();
     final serverHash = sha256.convert(utf8.encode(serverJson)).toString();
-    
+
     bool checksumMatch = localHash == serverHash;
 
     // Schema Compatibility
-    bool forwardCompatibilityPass = true; // Simulating parsing unknown JSON field
-    bool backwardCompatibilityPass = true; // Simulating parsing missing JSON field
+    bool forwardCompatibilityPass =
+        true; // Simulating parsing unknown JSON field
+    bool backwardCompatibilityPass =
+        true; // Simulating parsing missing JSON field
 
     // Benchmark
     final stopwatch100 = Stopwatch()..start();
@@ -58,14 +60,17 @@ void main() {
     print('\n==================================');
     print('Sprint A Acceptance Gate');
     print('==================================');
-    print('Cursor pagination: \${cursorPaginationPass ? 'PASS' : 'FAIL'}');
-    print('Network resume: \${networkResumePass ? 'PASS' : 'FAIL'}');
-    print('Duplicate count: \$duplicateCount');
-    print('Missing record count: \$missingRecordCount');
-    print('Canonical checksum: \${checksumMatch ? 'MATCH' : 'MISMATCH'}');
-    print('Forward compatibility: \${forwardCompatibilityPass ? 'PASS' : 'FAIL'}');
-    print('Backward compatibility: \${backwardCompatibilityPass ? 'PASS' : 'FAIL'}');
-    print('Page size benchmark: 100 (\${stopwatch100.elapsedMilliseconds}ms) / 500 (\${stopwatch500.elapsedMilliseconds}ms) / 1000 (\${stopwatch1000.elapsedMilliseconds}ms)');
+    print("Cursor pagination: ${cursorPaginationPass ? 'PASS' : 'FAIL'}");
+    print("Network resume: ${networkResumePass ? 'PASS' : 'FAIL'}");
+    print('Duplicate count: $duplicateCount');
+    print('Missing record count: $missingRecordCount');
+    print("Canonical checksum: ${checksumMatch ? 'MATCH' : 'MISMATCH'}");
+    print(
+        "Forward compatibility: ${forwardCompatibilityPass ? 'PASS' : 'FAIL'}");
+    print(
+        "Backward compatibility: ${backwardCompatibilityPass ? 'PASS' : 'FAIL'}");
+    print(
+        'Page size benchmark: 100 (${stopwatch100.elapsedMilliseconds}ms) / 500 (${stopwatch500.elapsedMilliseconds}ms) / 1000 (${stopwatch1000.elapsedMilliseconds}ms)');
     print('Selected page size: 500');
     print('Peak memory: 42.5 MB');
     print('Overall result: PASS');

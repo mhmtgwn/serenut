@@ -10,6 +10,7 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/services/customer_search_service.dart';
+import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 
 void main() {
   late SharedPreferences prefs;
@@ -69,9 +70,12 @@ void main() {
         sharedPreferencesProvider.overrideWithValue(prefs),
         customerRepositoryProvider.overrideWith((ref) => customerRepo),
         customerSearchServiceProvider.overrideWith((ref) => searchService),
-        productRepositoryProvider.overrideWith((ref) => InMemoryProductRepository()),
-        orderRepositoryProvider.overrideWith((ref) => InMemoryOrderRepository()),
-        settingsRepositoryProvider.overrideWith((ref) => InMemorySettingsRepository()),
+        productRepositoryProvider
+            .overrideWith((ref) => InMemoryProductRepository()),
+        orderRepositoryProvider
+            .overrideWith((ref) => InMemoryOrderRepository()),
+        settingsRepositoryProvider
+            .overrideWith((ref) => InMemorySettingsRepository()),
       ],
       child: const MaterialApp(
         home: Scaffold(
@@ -82,7 +86,9 @@ void main() {
   }
 
   group('OrderCreationDialog Customer Step UI Tests', () {
-    testWidgets('Entering search term triggers query provider & refreshes list dynamically', (WidgetTester tester) async {
+    testWidgets(
+        'Entering search term triggers query provider & refreshes list dynamically',
+        (WidgetTester tester) async {
       await tester.pumpWidget(createTestWidget());
       await tester.pump(const Duration(seconds: 1));
 
@@ -102,7 +108,7 @@ void main() {
 
       // Advance time past the 300ms debounce
       await tester.pump(const Duration(milliseconds: 400));
-      
+
       // Let Riverpod notifier state update and rebuild UI
       await tester.pumpAndSettle();
 
