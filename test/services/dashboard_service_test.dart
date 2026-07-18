@@ -56,7 +56,9 @@ void main() {
             CREATE TABLE IF NOT EXISTS customers (
               id TEXT PRIMARY KEY,
               name TEXT NOT NULL,
+              normalized_name TEXT,
               email TEXT,
+              normalized_email TEXT,
               phone TEXT,
               balance REAL NOT NULL DEFAULT 0,
               credit_limit REAL,

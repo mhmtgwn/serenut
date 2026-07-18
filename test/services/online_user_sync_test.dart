@@ -102,13 +102,13 @@ void main() {
       await authService.setCurrentUser(user);
       apiClient.setJwtToken('valid_token');
 
-      // Mock deactivated response for /auth/me
+      // Mock deactivated response for /users/me
       apiClient.mockHandler = (request) {
-        if (request.url.path.contains('/auth/me')) {
+        if (request.url.path.contains('/users/me')) {
           return const ApiResponse(
             statusCode: 200,
             body:
-                '{"user": {"id": "user_deactivate", "is_active": false, "roles": ["cashier"]}}',
+                '{"id": "user_deactivate", "is_active": false, "roles": ["cashier"]}',
             headers: {},
           );
         }
@@ -139,13 +139,13 @@ void main() {
       await authService.setCurrentUser(user);
       apiClient.setJwtToken('valid_token');
 
-      // Mock updated manager response for /auth/me
+      // Mock updated manager response for /users/me
       apiClient.mockHandler = (request) {
-        if (request.url.path.contains('/auth/me')) {
+        if (request.url.path.contains('/users/me')) {
           return const ApiResponse(
             statusCode: 200,
             body:
-                '{"user": {"id": "user_upgrade", "is_active": true, "roles": ["manager"]}}',
+                '{"id": "user_upgrade", "is_active": true, "roles": ["manager"]}',
             headers: {},
           );
         }
