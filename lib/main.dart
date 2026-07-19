@@ -38,14 +38,20 @@ import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    final trustedRoot =
-        await rootBundle.load('assets/certificates/isrgrootx1.pem');
-    HttpOverrides.global = TrustedCaHttpOverrides(
-      trustedRoot.buffer.asUint8List(
-        trustedRoot.offsetInBytes,
-        trustedRoot.lengthInBytes,
-      ),
-    );
+    try {
+      final trustedRoot =
+          await rootBundle.load('assets/certificates/isrgrootx1.pem');
+      HttpOverrides.global = TrustedCaHttpOverrides(
+        trustedRoot.buffer.asUint8List(
+          trustedRoot.offsetInBytes,
+          trustedRoot.lengthInBytes,
+        ),
+      );
+    } catch (error) {
+      // A packaging mistake must never prevent the application window from
+      // opening. Network calls will surface their normal TLS error instead.
+      debugPrint('Trusted CA initialization failed: $error');
+    }
   }
 
   final envConfig = EnvironmentConfig.current;
