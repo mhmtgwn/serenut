@@ -32,7 +32,11 @@ export function createRedisLimiter(options: LimiterOptions) {
     }
 
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `rl:${req.baseUrl || req.path}:${ip}`;
+    // baseUrl alone groups /login, /register and /resend-verification into one
+    // bucket. Include the concrete route so unrelated auth actions cannot
+    // exhaust each other's allowance.
+    const route = `${req.baseUrl || ''}${req.path || req.originalUrl}`;
+    const key = `rl:${req.method}:${route}:${ip}`;
 
     try {
       const current = await redisClient.incr(key);

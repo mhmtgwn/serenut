@@ -52,7 +52,12 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
   const userAgent = req.headers['user-agent'] || undefined;
 
   try {
-    const result = await AuthService.login(email, password, ipAddress, userAgent);
+    const result = await AuthService.login(
+      String(email).trim().toLowerCase(),
+      password,
+      ipAddress,
+      userAgent
+    );
 
     // Publish UserLoggedIn event via WebSocket
     RealtimeBroadcastService.publishEvent(result.user.company_id, 'UserLoggedIn', {

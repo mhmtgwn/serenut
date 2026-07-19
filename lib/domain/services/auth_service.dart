@@ -103,7 +103,7 @@ class AuthService {
     if (_apiClient != null) {
       try {
         final response = await _apiClient!.post('/auth/login', {
-          'email': username.trim(),
+          'email': username.trim().toLowerCase(),
           'password': password,
         });
 
@@ -195,7 +195,13 @@ class AuthService {
             String message = 'Giriş başarısız.';
             if (body != null) {
               try {
-                message = jsonDecode(body)['message'] ?? message;
+                final decoded = jsonDecode(body) as Map<String, dynamic>;
+                final nestedError = decoded['error'];
+                message = decoded['message'] as String? ??
+                    (nestedError is Map<String, dynamic>
+                        ? nestedError['message'] as String?
+                        : null) ??
+                    message;
               } catch (_) {}
             }
             throw AuthException(message);

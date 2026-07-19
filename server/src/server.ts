@@ -140,8 +140,16 @@ app.use(
   })
 );
 
-// Trust proxy: yalnızca bilinen proxy/loopback IP'lerini güven.
-app.set('trust proxy', 'loopback');
+// Production traffic reaches this container through exactly one host nginx
+// proxy (port 3000 is bound to 127.0.0.1 in docker-compose.prod.yml). Trusting
+// that hop lets Express use the real client IP from X-Forwarded-For; otherwise
+// every customer is seen as the Docker gateway and shares one rate-limit bucket.
+app.set(
+  'trust proxy',
+  process.env.NODE_ENV === 'production'
+    ? Number(process.env.TRUST_PROXY_HOPS || 1)
+    : 'loopback'
+);
 
 app.use(helmet({
   contentSecurityPolicy: {

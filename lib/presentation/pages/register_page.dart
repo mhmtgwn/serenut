@@ -18,6 +18,7 @@ import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/config/theme.dart';
 
@@ -181,41 +182,47 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       });
       final registration = response.json as Map<String, dynamic>;
 
-      // 2. İşletme profilini kaydet
-      final profileRepo = SqliteBusinessProfileRepository(gateway);
-      final profile = BusinessProfile(
-        name: _bizNameCtrl.text.trim(),
-        ownerName: _ownerNameCtrl.text.trim(),
-        type: _selectedType ?? '',
-        phone: _phoneCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
-        taxNumber: _taxNoCtrl.text.trim(),
-        city: _selectedCity ?? '',
-        district: _selectedDistrict ?? '',
-        logoPath: _logoPath, // null = varsayılan logo
-        createdAt: DateTime.now(),
-      );
-      await profileRepo.saveProfile(profile);
+      // The server transaction above is the source of truth. Local profile
+      // caching must not turn a successful cloud registration into a false
+      // "registration failed" result.
+      try {
+        final profileRepo = SqliteBusinessProfileRepository(gateway);
+        final profile = BusinessProfile(
+          name: _bizNameCtrl.text.trim(),
+          ownerName: _ownerNameCtrl.text.trim(),
+          type: _selectedType ?? '',
+          phone: _phoneCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          taxNumber: _taxNoCtrl.text.trim(),
+          city: _selectedCity ?? '',
+          district: _selectedDistrict ?? '',
+          logoPath: _logoPath, // null = varsayılan logo
+          createdAt: DateTime.now(),
+        );
+        await profileRepo.saveProfile(profile);
 
-      // 3. Settings tablosuna da yaz (fişte kullanılır)
-      final settingsRepo = SqliteSettingsRepository(gateway);
-      await settingsRepo.updateSettings(Settings(
-        businessName: _bizNameCtrl.text.trim(),
-        businessPhone: _phoneCtrl.text.trim(),
-        businessAddress: '${_selectedDistrict ?? ''}, ${_selectedCity ?? ''}',
-        businessTaxId: _taxNoCtrl.text.trim(),
-        businessLogo: _logoPath,
-        ownerName: _ownerNameCtrl.text.trim(),
-        businessEmail:
-            _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-        businessCity: _selectedCity ?? '',
-        businessDistrict: _selectedDistrict ?? '',
-        businessType: _selectedType ?? '',
-        createdAt: DateTime.now(),
-      ));
+        // 3. Settings tablosuna da yaz (fişte kullanılır)
+        final settingsRepo = SqliteSettingsRepository(gateway);
+        await settingsRepo.updateSettings(Settings(
+          businessName: _bizNameCtrl.text.trim(),
+          businessPhone: _phoneCtrl.text.trim(),
+          businessAddress: '${_selectedDistrict ?? ''}, ${_selectedCity ?? ''}',
+          businessTaxId: _taxNoCtrl.text.trim(),
+          businessLogo: _logoPath,
+          ownerName: _ownerNameCtrl.text.trim(),
+          businessEmail:
+              _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+          businessCity: _selectedCity ?? '',
+          businessDistrict: _selectedDistrict ?? '',
+          businessType: _selectedType ?? '',
+          createdAt: DateTime.now(),
+        ));
 
-      await prefs.setString('admin_username', _emailCtrl.text.trim());
-      await prefs.setString('admin_full_name', _ownerNameCtrl.text.trim());
+        await prefs.setString('admin_username', _emailCtrl.text.trim());
+        await prefs.setString('admin_full_name', _ownerNameCtrl.text.trim());
+      } catch (e) {
+        debugPrint('Registration succeeded; local profile cache failed: $e');
+      }
 
       if (!mounted) return;
       final verificationRequired =
@@ -239,9 +246,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
       if (mounted) context.go('/login/form');
     } catch (e) {
+      var message = e.toString();
+      if (e is ApiException && e.responseBody != null) {
+        try {
+          final body = jsonDecode(e.responseBody!) as Map<String, dynamic>;
+          message = body['message'] as String? ?? message;
+        } catch (_) {}
+      }
       setState(() {
         _saving = false;
-        _error = 'Kayıt sırasında hata oluştu: $e';
+        _error = 'Kayıt sırasında hata oluştu: $message';
       });
     }
   }

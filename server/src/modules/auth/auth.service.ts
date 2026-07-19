@@ -82,6 +82,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<any> {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
@@ -90,8 +91,8 @@ export class AuthService {
       // 1. Fetch user status (lock check)
       const userRes = await client.query(
         `SELECT id, company_id, password_hash, failed_login_attempts, locked_until, is_active, email_verified_at
-         FROM users WHERE email = $1`,
-        [email]
+         FROM users WHERE LOWER(email) = $1`,
+        [normalizedEmail]
       );
 
       if (userRes.rows.length === 0) {
@@ -132,7 +133,7 @@ export class AuthService {
 
         if (failedAttempts >= MAX_LOGIN_ATTEMPTS) {
           lockUntil = new Date(Date.now() + LOCK_TIME_MS);
-          logger.warn(`Brute-force block: locking ${email} until ${lockUntil}`);
+          logger.warn(`Brute-force block: locking ${normalizedEmail} until ${lockUntil}`);
         }
 
         await client.query(
