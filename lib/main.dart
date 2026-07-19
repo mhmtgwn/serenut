@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:serenutos/config/environment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:serenutos/config/theme.dart';
@@ -27,6 +28,7 @@ import 'package:serenutos/infrastructure/services/password_hash_service.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/domain/services/error_boundary.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:serenutos/infrastructure/network/trusted_ca_http_overrides.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
@@ -34,6 +36,18 @@ import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    final trustedRoot =
+        await rootBundle.load('assets/certificates/isrgrootx1.pem');
+    HttpOverrides.global = TrustedCaHttpOverrides(
+      trustedRoot.buffer.asUint8List(
+        trustedRoot.offsetInBytes,
+        trustedRoot.lengthInBytes,
+      ),
+    );
+  }
+
   final envConfig = EnvironmentConfig.current;
   await SentryFlutter.init(
     (options) {
@@ -42,7 +56,6 @@ void main() async {
       options.environment = kReleaseMode ? 'production' : 'development';
     },
     appRunner: () async {
-      WidgetsFlutterBinding.ensureInitialized();
       ErrorBoundary.install();
       await initializeDateFormatting('tr_TR', null);
 
