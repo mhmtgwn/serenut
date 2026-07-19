@@ -31,10 +31,15 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "..\..\build\windows\x64\runner\Release\serenutos.exe"; DestDir: "{app}"; DestName: "serenutos.exe"; Flags: ignoreversion
 Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Flutter's Windows runner is linked against the Microsoft Visual C++ runtime.
+; Bundle the official x64 redistributable so a clean customer machine never
+; fails with a missing MSVCP140.dll / VCRUNTIME140.dll error.
+Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\Serenut OS"; Filename: "{app}\serenutos.exe"
 Name: "{autodesktop}\Serenut OS"; Filename: "{app}\serenutos.exe"; Tasks: desktopicon
 
 [Run]
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Microsoft Visual C++ çalışma zamanı kuruluyor..."; Flags: waituntilterminated
 Filename: "{app}\serenutos.exe"; Description: "{cm:LaunchProgram,Serenut OS}"; Flags: nowait postinstall skipifsilent
