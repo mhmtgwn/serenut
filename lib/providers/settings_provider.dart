@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
@@ -39,8 +40,81 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
       final repo = await ref.read(settingsRepositoryProvider.future);
       final settings = await repo.getSettings();
       state = AsyncValue.data(settings);
+
+      // Automatically sync company details from server if logged in
+      syncCompanyFromServer();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> syncCompanyFromServer() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.get('/api/v1/company');
+      if (response.isSuccess && response.json != null) {
+        final map = response.json as Map<String, dynamic>;
+        final companyName = map['name'] as String? ?? '';
+        if (companyName.trim().isNotEmpty) {
+          final gateway = ref.read(dbGatewayProvider);
+          final repo = await ref.read(settingsRepositoryProvider.future);
+          final current = await repo.getSettings();
+
+          final updated = current.copyWith(
+            businessName: companyName,
+            businessPhone: (map['phone'] as String?)?.isNotEmpty == true
+                ? map['phone'] as String
+                : current.businessPhone,
+            businessAddress: (map['address'] as String?)?.isNotEmpty == true
+                ? map['address'] as String
+                : current.businessAddress,
+            businessTaxId: (map['tax_number'] as String?)?.isNotEmpty == true
+                ? map['tax_number'] as String
+                : current.businessTaxId,
+            ownerName: (map['owner_name'] as String?)?.isNotEmpty == true
+                ? map['owner_name'] as String
+                : current.ownerName,
+            businessEmail: (map['email'] as String?)?.isNotEmpty == true
+                ? map['email'] as String
+                : current.businessEmail,
+            businessCity: (map['city'] as String?)?.isNotEmpty == true
+                ? map['city'] as String
+                : current.businessCity,
+            businessDistrict: (map['district'] as String?)?.isNotEmpty == true
+                ? map['district'] as String
+                : current.businessDistrict,
+            businessType: (map['type'] as String?)?.isNotEmpty == true
+                ? map['type'] as String
+                : current.businessType,
+          );
+
+          await repo.updateSettings(updated);
+
+          await gateway.insert(
+            'business_profile',
+            {
+              'id': 1,
+              'name': companyName,
+              'owner_name': map['owner_name'] ?? '',
+              'type': map['type'] ?? '',
+              'phone': map['phone'] ?? '',
+              'email': map['email'] ?? '',
+              'tax_number': map['tax_number'] ?? '',
+              'city': map['city'] ?? '',
+              'district': map['district'] ?? '',
+              'currency': map['currency'] ?? '₺',
+              'tax_included': 1,
+              'version': map['version'] ?? 1,
+              'created_at': DateTime.now().toIso8601String(),
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+
+          state = AsyncValue.data(updated);
+        }
+      }
+    } catch (e) {
+      debugPrint('[SettingsNotifier] ⚠️ Company sync from server skipped: $e');
     }
   }
 

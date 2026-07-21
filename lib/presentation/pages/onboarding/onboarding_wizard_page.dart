@@ -46,17 +46,57 @@ class OnboardingStep1Page extends ConsumerStatefulWidget {
 class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
   OnboardingState _state = const OnboardingState();
   late OnboardingPersistence _persistence;
+  bool _loading = true; // Sunucudan veri çekiliyor
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadAndMaybeSkip();
   }
 
-  void _load() {
+  Future<void> _loadAndMaybeSkip() async {
     final prefs = ref.read(sharedPreferencesProvider);
     _persistence = OnboardingPersistence(prefs);
-    setState(() => _state = _persistence.loadState());
+    var loadedState = _persistence.loadState();
+
+    // VPS'ten şirket bilgisini çek
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.get('/api/v1/company');
+      if (response.isSuccess && response.json != null) {
+        final map = response.json as Map<String, dynamic>;
+        final serverName = map['name'] as String? ?? '';
+        if (serverName.trim().isNotEmpty) {
+          // Şirket bilgileri VPS'te kayıtlı → state'i doldur
+          final serverBusiness = BusinessInfo(
+            businessName: serverName,
+            ownerName: map['owner_name'] as String? ?? '',
+            phone: map['phone'] as String? ?? '',
+            taxNumber: map['tax_number'] as String? ?? '',
+            email: map['email'] as String? ?? '',
+            city: map['city'] as String? ?? '',
+            district: map['district'] as String? ?? '',
+            businessType: map['type'] as String? ?? '',
+          );
+          loadedState = loadedState.copyWith(business: serverBusiness);
+          _persistence.saveState(loadedState);
+          _persistence.saveStep(2);
+
+          // Adımı atla — kullanıcının tekrar girmesine gerek yok
+          if (mounted) context.go('/onboarding/admin');
+          return;
+        }
+      }
+    } catch (_) {
+      // Çevrimdışı veya hata: kullanıcı manuel girer
+    }
+
+    if (mounted) {
+      setState(() {
+        _state = loadedState;
+        _loading = false;
+      });
+    }
   }
 
   void _onComplete(BusinessInfo info) {
@@ -68,6 +108,11 @@ class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Step1BusinessInfo(
       initialData: _state.business,
       onComplete: _onComplete,
@@ -77,6 +122,7 @@ class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 /// Admin hesabı adımı
+
 // ─────────────────────────────────────────────────────────────────────────────
 class OnboardingStep2Page extends ConsumerStatefulWidget {
   const OnboardingStep2Page({super.key});
