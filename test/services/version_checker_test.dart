@@ -40,7 +40,7 @@ void main() {
         return const ApiResponse(
           statusCode: 200,
           body:
-              '{"latestVersion": "1.1.1+0", "minRequiredVersion": "1.1.1+0", "isForceUpdate": false, "downloadUrl": ""}',
+              '{"latestVersion": "1.2.0+1", "minRequiredVersion": "1.2.0+1", "isForceUpdate": false, "downloadUrl": ""}',
           headers: {},
         );
       };

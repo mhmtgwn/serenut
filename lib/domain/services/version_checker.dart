@@ -70,7 +70,7 @@ class VersionChecker {
     ApiClient? apiClient,
   }) : _apiClient = apiClient ?? ApiClient();
 
-  static const String currentVersion = '1.1.0+8';
+  static const String currentVersion = '1.1.3+11';
   static const int currentSchemaVersion = 1;
 
   String get _platform => Platform.isAndroid ? 'android' : 'windows';
