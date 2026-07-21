@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:serenutos/domain/services/payment_fsm.dart';
+import 'package:serenutos/domain/hardware/hardware_status.dart';
 
 enum TerminalDecision { approved, declined, cancelled, unknown }
 
@@ -25,6 +29,104 @@ abstract class IPaymentTerminalAdapter {
   Future<TerminalPaymentResult> query(String transactionId);
   Future<TerminalPaymentResult> voidPayment(String transactionId);
   Future<void> cancelActive();
+}
+
+/// Talks to a local Windows hardware bridge over newline-delimited JSON.
+/// The bridge is responsible for the bank/vendor SDK. A sale is never treated
+/// as approved unless the bridge explicitly returns decision=approved and an
+/// authorizationCode.
+class TcpPaymentTerminalAdapter implements IPaymentTerminalAdapter {
+  TcpPaymentTerminalAdapter({required this.host, required this.port});
+
+  final String host;
+  final int port;
+
+  @override
+  String get adapterId => 'tcp-pos-$host:$port';
+
+  Future<TerminalPaymentResult> _send(Map<String, Object?> payload) async {
+    Socket? socket;
+    try {
+      socket =
+          await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+      socket.writeln(jsonEncode(payload));
+      await socket.flush();
+      final line = await socket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first
+          .timeout(const Duration(seconds: 90));
+      final json = jsonDecode(line) as Map<String, dynamic>;
+      final decision =
+          switch ((json['decision'] as String? ?? '').toLowerCase()) {
+        'approved' => TerminalDecision.approved,
+        'declined' => TerminalDecision.declined,
+        'cancelled' => TerminalDecision.cancelled,
+        _ => TerminalDecision.unknown,
+      };
+      final authorizationCode = json['authorizationCode'] as String? ?? '';
+      if (decision == TerminalDecision.approved && authorizationCode.isEmpty) {
+        throw const HardwareFailure('POS_INVALID_RESPONSE',
+            'POS onay verdi fakat provizyon kodu döndürmedi.');
+      }
+      return TerminalPaymentResult(
+        decision: decision,
+        transactionId: json['transactionId'] as String? ??
+            payload['transactionId'] as String? ??
+            '',
+        authorizationCode: authorizationCode,
+        errorCode: json['errorCode'] as String?,
+        errorMessage: json['errorMessage'] as String?,
+      );
+    } catch (error) {
+      if (error is HardwareFailure) rethrow;
+      throw HardwareFailure(
+          'POS_BRIDGE_FAILED', 'POS köprüsüyle iletişim kurulamadı: $error');
+    } finally {
+      await socket?.close();
+    }
+  }
+
+  @override
+  Future<TerminalPaymentResult> sale(PaymentRequest request) => _send({
+        'operation': 'sale',
+        'transactionId': request.transactionId,
+        'idempotencyKey': request.idempotencyKey,
+        'amountMinor': (request.amount * 100).round(),
+        'currency': request.currency,
+      });
+
+  @override
+  Future<TerminalPaymentResult> query(String transactionId) =>
+      _send({'operation': 'query', 'transactionId': transactionId});
+
+  @override
+  Future<TerminalPaymentResult> voidPayment(String transactionId) =>
+      _send({'operation': 'void', 'transactionId': transactionId});
+
+  @override
+  Future<void> cancelActive() async {
+    await _send({'operation': 'cancel'});
+  }
+}
+
+class UnconfiguredPaymentTerminal implements IPaymentTerminalAdapter {
+  @override
+  String get adapterId => 'pos-unconfigured';
+  HardwareFailure get _failure => const HardwareFailure('POS_NOT_CONFIGURED',
+      'Fiziksel POS köprüsü IP ve port ayarı yapılmamış.');
+  @override
+  Future<TerminalPaymentResult> sale(PaymentRequest request) =>
+      Future.error(_failure);
+  @override
+  Future<TerminalPaymentResult> query(String transactionId) =>
+      Future.error(_failure);
+  @override
+  Future<TerminalPaymentResult> voidPayment(String transactionId) =>
+      Future.error(_failure);
+  @override
+  Future<void> cancelActive() => Future.error(_failure);
 }
 
 class PaymentTerminalOrchestrator {

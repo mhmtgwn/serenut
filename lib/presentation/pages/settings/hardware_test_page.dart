@@ -10,6 +10,8 @@ import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.d
 import 'package:serenutos/domain/services/i_scanner_service.dart';
 import 'package:serenutos/domain/hardware/scale_service.dart';
 import 'package:serenutos/providers/hardware_provider.dart';
+import 'package:serenutos/providers/hardware_config_provider.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 class HardwareTestPage extends ConsumerStatefulWidget {
   const HardwareTestPage({super.key});
@@ -24,6 +26,11 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
   final List<String> _scannedBarcodes = [];
   StreamSubscription<ScanEvent>? _scannerSubscription;
   final FocusNode _scannerFocusNode = FocusNode();
+  final _scaleHostController = TextEditingController();
+  final _scalePortController = TextEditingController(text: '4001');
+  final _posHostController = TextEditingController();
+  final _posPortController = TextEditingController(text: '4100');
+  bool _hardwareConfigLoaded = false;
 
   @override
   void initState() {
@@ -49,6 +56,10 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
   void dispose() {
     _scannerSubscription?.cancel();
     _scannerFocusNode.dispose();
+    _scaleHostController.dispose();
+    _scalePortController.dispose();
+    _posHostController.dispose();
+    _posPortController.dispose();
     super.dispose();
   }
 
@@ -88,47 +99,43 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     }
   }
 
-  void _simulateScale(int grams) {
-    final adapter = ref.read(scaleAdapterProvider);
-    if (adapter is SimulatedScaleAdapter) {
-      adapter.emit(grams: grams, stable: true);
+  Future<void> _saveHardwareConfig() async {
+    final scalePort = int.tryParse(_scalePortController.text);
+    final posPort = int.tryParse(_posPortController.text);
+    if (scalePort == null || posPort == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Port değerleri sayı olmalıdır.')));
+      return;
+    }
+    await saveHardwareConfig(HardwareConfig(
+      scaleHost: _scaleHostController.text,
+      scalePort: scalePort,
+      posBridgeHost: _posHostController.text,
+      posBridgePort: posPort,
+    ));
+    ref.invalidate(hardwareConfigProvider);
+    ref.invalidate(scaleAdapterProvider);
+    ref.invalidate(scaleHardwareProvider);
+    ref.invalidate(paymentTerminalAdapterProvider);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Donanım bağlantıları kaydedildi ve yenilendi.')));
     }
   }
 
   Future<void> _runPosTest() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.credit_card_rounded),
-          SizedBox(width: 8),
-          Text('Fiziksel POS Testi'),
-        ]),
-        content: const Text(
-          'Bu test gerçek terminalden otomatik sonuç okumaz. '
-          'Yarın cihaz başında onay/red/zaman aşımı davranışı manuel raporlanır.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Reddedildi'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.check_circle_rounded),
-            label: const Text('Onaylandı'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(confirmed == true
-            ? 'POS test sonucu: onaylandı.'
-            : 'POS test sonucu: reddedildi / iptal.'),
-      ),
-    );
+    try {
+      final result = await ref
+          .read(paymentTerminalAdapterProvider)
+          .query('connection-test-${DateTime.now().millisecondsSinceEpoch}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('POS köprüsü yanıt verdi: ${result.decision.name}')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('POS bağlantı testi başarısız: $error')));
+    }
   }
 
   @override
@@ -137,6 +144,14 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     final settings = ref.watch(settingsNotifierProvider).value;
     final scaleState = ref.watch(scaleHardwareProvider);
     final reading = scaleState.reading;
+    final hardwareConfig = ref.watch(hardwareConfigProvider).valueOrNull;
+    if (!_hardwareConfigLoaded && hardwareConfig != null) {
+      _hardwareConfigLoaded = true;
+      _scaleHostController.text = hardwareConfig.scaleHost;
+      _scalePortController.text = hardwareConfig.scalePort.toString();
+      _posHostController.text = hardwareConfig.posBridgeHost;
+      _posPortController.text = hardwareConfig.posBridgePort.toString();
+    }
 
     return FullScreenSettingsPage(
       title: 'Donanım Testleri',
@@ -182,6 +197,9 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
             ),
             const SizedBox(height: 20),
 
+            _buildConnectionSettings(),
+            const SizedBox(height: 20),
+
             LayoutBuilder(
               builder: (context, constraints) {
                 final wide = constraints.maxWidth > 760;
@@ -193,26 +211,25 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                         ? 'Bağlı · ${reading?.netGrams ?? 0} g'
                         : 'Bağlı değil',
                     detail: reading?.stable == true
-                        ? 'Stabil ölçüm alındı; gerçek cihazda satış akışı doğrulanmalı.'
-                        : 'Tartılı ürün seçildiğinde canlı okuma oturumu açılır.',
+                        ? 'Cihazdan stabil canlı ölçüm alındı.'
+                        : (scaleState.error?.toString() ??
+                            'Tartılı ürün seçildiğinde canlı okuma başlar.'),
                     color: kGreen,
                     actions: [
-                      OutlinedButton(
-                        onPressed: () => _simulateScale(0),
-                        child: const Text('Sıfırla'),
-                      ),
                       FilledButton(
-                        onPressed: () => _simulateScale(735),
-                        child: const Text('735 g simülasyon'),
+                        onPressed: () => ref.invalidate(scaleHardwareProvider),
+                        child: const Text('Yeniden bağlan'),
                       ),
                     ],
                   ),
                   _buildHardwareCard(
                     icon: Icons.credit_card_rounded,
                     title: 'Fiziksel POS',
-                    subtitle: 'Gerçek terminal adaptörü bekliyor',
+                    subtitle: hardwareConfig?.hasPosBridge == true
+                        ? '${hardwareConfig!.posBridgeHost}:${hardwareConfig.posBridgePort}'
+                        : 'POS köprüsü yapılandırılmadı',
                     detail:
-                        'Kart satışında sonuç belirsizse satış tamamlanmaz; gerçek cihaz sonucu ayrıca doğrulanır.',
+                        'Terminal onay ve provizyon kodu vermeden kart satışı kaydedilmez.',
                     color: const Color(0xFFF59E0B),
                     actions: [
                       FilledButton.icon(
@@ -463,6 +480,61 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildConnectionSettings() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorderColor),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('CANLI DONANIM BAĞLANTILARI',
+            style: TextStyle(fontWeight: FontWeight.bold, color: kTextPrimary)),
+        const SizedBox(height: 6),
+        const Text(
+          'Terazi için cihazın veya RS232–Ethernet dönüştürücünün TCP adresini; POS için Windows donanım köprüsünün adresini girin.',
+          style: TextStyle(fontSize: 12, color: kTextSecondary),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+              flex: 3,
+              child: TextField(
+                  controller: _scaleHostController,
+                  decoration: const InputDecoration(labelText: 'Terazi IP'))),
+          const SizedBox(width: 8),
+          Expanded(
+              child: TextField(
+                  controller: _scalePortController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Port'))),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+              flex: 3,
+              child: TextField(
+                  controller: _posHostController,
+                  decoration:
+                      const InputDecoration(labelText: 'POS köprüsü IP'))),
+          const SizedBox(width: 8),
+          Expanded(
+              child: TextField(
+                  controller: _posPortController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Port'))),
+        ]),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: _saveHardwareConfig,
+          icon: const Icon(Icons.save_rounded),
+          label: const Text('Kaydet ve Bağlan'),
+        ),
+      ]),
     );
   }
 

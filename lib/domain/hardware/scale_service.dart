@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'hardware_status.dart';
 
@@ -33,6 +35,118 @@ abstract class IScaleAdapter {
 
   Future<void> connect();
   Future<void> disconnect();
+}
+
+/// Reads the common continuous ASCII output used by network-enabled scales
+/// and RS232-to-Ethernet converters. Frames may contain ST/US, GS/NT and a
+/// value suffixed with kg or g (for example: `ST,GS,+001.245kg`).
+class TcpScaleAdapter implements IScaleAdapter {
+  TcpScaleAdapter({required this.host, required this.port});
+
+  final String host;
+  final int port;
+  Socket? _socket;
+  StreamSubscription<String>? _subscription;
+  final _controller = StreamController<ScaleReading>.broadcast();
+  HardwareConnectionState _state = HardwareConnectionState.disconnected;
+  int _sequence = 0;
+
+  @override
+  String get deviceId => 'tcp-scale-$host:$port';
+  @override
+  HardwareConnectionState get connectionState => _state;
+  @override
+  Stream<ScaleReading> get readings => _controller.stream;
+
+  @override
+  Future<void> connect() async {
+    if (_socket != null) return;
+    _state = HardwareConnectionState.connecting;
+    try {
+      final socket =
+          await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+      _socket = socket;
+      _state = HardwareConnectionState.connected;
+      _subscription = socket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(_handleFrame, onError: _handleError, onDone: _handleDone);
+    } catch (error) {
+      _state = HardwareConnectionState.error;
+      throw HardwareFailure('SCALE_CONNECT_FAILED',
+          'Teraziye bağlanılamadı ($host:$port): $error');
+    }
+  }
+
+  void _handleFrame(String frame) {
+    final reading = ScaleFrameParser.parse(
+      frame,
+      deviceId: deviceId,
+      sequence: ++_sequence,
+    );
+    if (reading != null) _controller.add(reading);
+  }
+
+  void _handleError(Object error) {
+    _state = HardwareConnectionState.error;
+    _controller.addError(HardwareFailure(
+        'SCALE_READ_FAILED', 'Terazi verisi okunamadı: $error'));
+  }
+
+  void _handleDone() {
+    _socket = null;
+    _state = HardwareConnectionState.disconnected;
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _subscription?.cancel();
+    _subscription = null;
+    await _socket?.close();
+    _socket = null;
+    _state = HardwareConnectionState.disconnected;
+  }
+
+  Future<void> dispose() async {
+    await disconnect();
+    await _controller.close();
+  }
+}
+
+class ScaleFrameParser {
+  static final RegExp _weight = RegExp(
+    r'([+-]?\d+(?:[\.,]\d+)?)\s*(kg|g)\b',
+    caseSensitive: false,
+  );
+
+  static ScaleReading? parse(
+    String frame, {
+    required String deviceId,
+    required int sequence,
+    DateTime? measuredAt,
+  }) {
+    final normalized = frame.trim();
+    final match = _weight.firstMatch(normalized);
+    if (match == null) return null;
+    final value = double.tryParse(match.group(1)!.replaceAll(',', '.'));
+    if (value == null) return null;
+    final unit = match.group(2)!.toLowerCase();
+    final grams = (unit == 'kg' ? value * 1000 : value).round();
+    final upper = normalized.toUpperCase();
+    final unstable =
+        RegExp(r'(^|[,\s])(US|UNSTABLE|MOTION)([,\s]|$)').hasMatch(upper);
+    final overload = upper.contains('OL') || upper.contains('OVERLOAD');
+    return ScaleReading(
+      deviceId: deviceId,
+      sequence: sequence,
+      grossGrams: grams,
+      stable: !unstable,
+      overload: overload,
+      measuredAt: measuredAt ?? DateTime.now(),
+      rawFrame: frame,
+    );
+  }
 }
 
 enum ScaleSessionState {

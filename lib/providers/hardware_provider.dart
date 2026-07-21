@@ -2,12 +2,34 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/hardware/scale_service.dart';
+import 'package:serenutos/domain/hardware/hardware_status.dart';
+import 'package:serenutos/providers/hardware_config_provider.dart';
 
 final scaleAdapterProvider = Provider<IScaleAdapter>((ref) {
-  final adapter = SimulatedScaleAdapter();
+  final config = ref.watch(hardwareConfigProvider).valueOrNull;
+  if (config == null || !config.hasScale) {
+    return UnconfiguredScaleAdapter();
+  }
+  final adapter =
+      TcpScaleAdapter(host: config.scaleHost, port: config.scalePort);
   ref.onDispose(adapter.dispose);
   return adapter;
 });
+
+class UnconfiguredScaleAdapter implements IScaleAdapter {
+  @override
+  String get deviceId => 'scale-unconfigured';
+  @override
+  HardwareConnectionState get connectionState =>
+      HardwareConnectionState.disconnected;
+  @override
+  Stream<ScaleReading> get readings => const Stream.empty();
+  @override
+  Future<void> connect() => throw const HardwareFailure(
+      'SCALE_NOT_CONFIGURED', 'Terazi IP ve port ayarı yapılmamış.');
+  @override
+  Future<void> disconnect() async {}
+}
 
 class ScaleHardwareState {
   final ScaleReading? reading;

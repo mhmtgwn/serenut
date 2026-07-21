@@ -23,6 +23,9 @@ import 'package:serenutos/presentation/widgets/sales/cart_panel.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
 import 'package:serenutos/presentation/widgets/sales/live_scale_dialog.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/domain/hardware/payment_terminal_service.dart';
+import 'package:serenutos/domain/services/payment_fsm.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 part 'sales/animated_cart_tab.dart';
 
@@ -61,33 +64,27 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   }
 
   Future<bool> _confirmPhysicalCardPayment(double amount) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.credit_card_rounded),
-          SizedBox(width: 8),
-          Text('Fiziksel POS Ödemesi'),
-        ]),
-        content: Text(
-          'POS cihazından ₺${amount.toStringAsFixed(2)} tahsil edin. '
-          'Yalnız cihaz onay verdiyse “Ödeme Başarılı” seçeneğine basın.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('İptal / Reddedildi'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.check_circle_rounded),
-            label: const Text('Ödeme Başarılı'),
-          ),
-        ],
-      ),
-    );
-    return result == true;
+    final flow = ref.read(salesFlowProvider);
+    final transactionId = 'pos-${DateTime.now().microsecondsSinceEpoch}';
+    try {
+      final terminal = ref.read(paymentTerminalAdapterProvider);
+      final orchestrator = PaymentTerminalOrchestrator(terminal: terminal);
+      final result = await orchestrator.authorize(PaymentRequest(
+        transactionId: transactionId,
+        amount: amount,
+        idempotencyKey: flow.idempotencyKey.isNotEmpty
+            ? flow.idempotencyKey
+            : transactionId,
+        currency: 'TRY',
+      ));
+      if (result.decision == TerminalDecision.approved) return true;
+      _showErrorSnackBar(result.errorMessage ??
+          'POS işlemi onaylanmadı (${result.decision.name}).');
+      return false;
+    } catch (error) {
+      _showErrorSnackBar('Kart satışı tamamlanmadı: $error');
+      return false;
+    }
   }
 
   final TextEditingController _searchController = TextEditingController();
