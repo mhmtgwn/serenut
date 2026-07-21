@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_libserialport/flutter_libserialport.dart';
+
 import 'hardware_status.dart';
 
 class ScaleReading {
@@ -105,6 +107,98 @@ class TcpScaleAdapter implements IScaleAdapter {
     _subscription = null;
     await _socket?.close();
     _socket = null;
+    _state = HardwareConnectionState.disconnected;
+  }
+
+  Future<void> dispose() async {
+    await disconnect();
+    await _controller.close();
+  }
+}
+
+class SerialScaleAdapter implements IScaleAdapter {
+  SerialScaleAdapter({
+    required this.portName,
+    this.baudRate = 9600,
+    this.dataBits = 8,
+    this.stopBits = 1,
+  });
+
+  final String portName;
+  final int baudRate;
+  final int dataBits;
+  final int stopBits;
+  SerialPort? _port;
+  SerialPortReader? _reader;
+  StreamSubscription<String>? _subscription;
+  final _controller = StreamController<ScaleReading>.broadcast();
+  HardwareConnectionState _state = HardwareConnectionState.disconnected;
+  int _sequence = 0;
+
+  static List<String> get availablePorts => SerialPort.availablePorts;
+
+  @override
+  String get deviceId => 'serial-scale-$portName';
+  @override
+  HardwareConnectionState get connectionState => _state;
+  @override
+  Stream<ScaleReading> get readings => _controller.stream;
+
+  @override
+  Future<void> connect() async {
+    if (_port?.isOpen == true) return;
+    _state = HardwareConnectionState.connecting;
+    final port = SerialPort(portName);
+    try {
+      if (!port.openRead()) {
+        throw StateError(SerialPort.lastError?.message ?? 'Port açılamadı');
+      }
+      final config = SerialPortConfig()
+        ..baudRate = baudRate
+        ..bits = dataBits
+        ..stopBits = stopBits
+        ..parity = SerialPortParity.none
+        ..setFlowControl(SerialPortFlowControl.none);
+      port.config = config;
+      config.dispose();
+      _port = port;
+      _reader = SerialPortReader(port);
+      _state = HardwareConnectionState.connected;
+      _subscription = _reader!.stream
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(_handleFrame, onError: _handleError);
+    } catch (error) {
+      port.close();
+      port.dispose();
+      _state = HardwareConnectionState.error;
+      throw HardwareFailure('SCALE_SERIAL_CONNECT_FAILED',
+          '$portName seri terazisine bağlanılamadı: $error');
+    }
+  }
+
+  void _handleFrame(String frame) {
+    final reading = ScaleFrameParser.parse(frame,
+        deviceId: deviceId, sequence: ++_sequence);
+    if (reading != null) _controller.add(reading);
+  }
+
+  void _handleError(Object error) {
+    _state = HardwareConnectionState.error;
+    _controller.addError(HardwareFailure(
+        'SCALE_SERIAL_READ_FAILED', 'Seri terazi okunamadı: $error'));
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _subscription?.cancel();
+    _subscription = null;
+    _reader?.close();
+    _reader = null;
+    _port?.close();
+    _port?.dispose();
+    _port = null;
     _state = HardwareConnectionState.disconnected;
   }
 

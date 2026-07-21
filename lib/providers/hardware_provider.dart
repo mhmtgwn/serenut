@@ -10,6 +10,14 @@ final scaleAdapterProvider = Provider<IScaleAdapter>((ref) {
   if (config == null || !config.hasScale) {
     return UnconfiguredScaleAdapter();
   }
+  if (config.scaleConnection == 'serial') {
+    final adapter = SerialScaleAdapter(
+      portName: config.scaleSerialPort,
+      baudRate: config.scaleBaudRate,
+    );
+    ref.onDispose(adapter.dispose);
+    return adapter;
+  }
   final adapter =
       TcpScaleAdapter(host: config.scaleHost, port: config.scalePort);
   ref.onDispose(adapter.dispose);

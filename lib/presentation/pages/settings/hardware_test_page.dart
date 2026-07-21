@@ -28,9 +28,12 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
   final FocusNode _scannerFocusNode = FocusNode();
   final _scaleHostController = TextEditingController();
   final _scalePortController = TextEditingController(text: '4001');
+  final _scaleSerialPortController = TextEditingController();
+  final _scaleBaudController = TextEditingController(text: '9600');
   final _posHostController = TextEditingController();
   final _posPortController = TextEditingController(text: '4100');
   bool _hardwareConfigLoaded = false;
+  String _scaleConnection = 'tcp';
 
   @override
   void initState() {
@@ -58,6 +61,8 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     _scannerFocusNode.dispose();
     _scaleHostController.dispose();
     _scalePortController.dispose();
+    _scaleSerialPortController.dispose();
+    _scaleBaudController.dispose();
     _posHostController.dispose();
     _posPortController.dispose();
     super.dispose();
@@ -101,15 +106,19 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
 
   Future<void> _saveHardwareConfig() async {
     final scalePort = int.tryParse(_scalePortController.text);
+    final scaleBaud = int.tryParse(_scaleBaudController.text);
     final posPort = int.tryParse(_posPortController.text);
-    if (scalePort == null || posPort == null) {
+    if (scalePort == null || scaleBaud == null || posPort == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Port değerleri sayı olmalıdır.')));
       return;
     }
     await saveHardwareConfig(HardwareConfig(
+      scaleConnection: _scaleConnection,
       scaleHost: _scaleHostController.text,
       scalePort: scalePort,
+      scaleSerialPort: _scaleSerialPortController.text,
+      scaleBaudRate: scaleBaud,
       posBridgeHost: _posHostController.text,
       posBridgePort: posPort,
     ));
@@ -138,6 +147,37 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     }
   }
 
+  Future<void> _selectSerialPort() async {
+    try {
+      final ports = SerialScaleAdapter.availablePorts;
+      if (!mounted) return;
+      if (ports.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Windows üzerinde kullanılabilir COM portu bulunamadı.')));
+        return;
+      }
+      final selected = await showDialog<String>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('Terazi COM portunu seçin'),
+          children: [
+            for (final port in ports)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, port),
+                child: Text(port),
+              ),
+          ],
+        ),
+      );
+      if (selected != null) _scaleSerialPortController.text = selected;
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('COM portları taranamadı: $error')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scannerLabel = ref.watch(scannerModeLabelProvider);
@@ -149,6 +189,9 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
       _hardwareConfigLoaded = true;
       _scaleHostController.text = hardwareConfig.scaleHost;
       _scalePortController.text = hardwareConfig.scalePort.toString();
+      _scaleConnection = hardwareConfig.scaleConnection;
+      _scaleSerialPortController.text = hardwareConfig.scaleSerialPort;
+      _scaleBaudController.text = hardwareConfig.scaleBaudRate.toString();
       _posHostController.text = hardwareConfig.posBridgeHost;
       _posPortController.text = hardwareConfig.posBridgePort.toString();
     }
@@ -208,10 +251,10 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                     icon: Icons.scale_rounded,
                     title: 'Canlı Terazi',
                     subtitle: scaleState.connected
-                        ? 'Bağlı · ${reading?.netGrams ?? 0} g'
+                        ? 'Bağlı · ${reading?.netGrams ?? 0} g · ${hardwareConfig?.scaleConnection == 'serial' ? hardwareConfig?.scaleSerialPort : hardwareConfig?.scaleHost}'
                         : 'Bağlı değil',
                     detail: reading?.stable == true
-                        ? 'Cihazdan stabil canlı ölçüm alındı.'
+                        ? 'Ham veri: ${reading?.rawFrame ?? '(çerçeve yok)'}'
                         : (scaleState.error?.toString() ??
                             'Tartılı ürün seçildiğinde canlı okuma başlar.'),
                     color: kGreen,
@@ -496,23 +539,52 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
             style: TextStyle(fontWeight: FontWeight.bold, color: kTextPrimary)),
         const SizedBox(height: 6),
         const Text(
-          'Terazi için cihazın veya RS232–Ethernet dönüştürücünün TCP adresini; POS için Windows donanım köprüsünün adresini girin.',
+          'Teraziyi doğrudan Windows COM/USB-Serial ile veya TCP ağ üzerinden bağlayın. POS için Windows donanım köprüsünün adresini girin.',
           style: TextStyle(fontSize: 12, color: kTextSecondary),
         ),
         const SizedBox(height: 14),
-        Row(children: [
-          Expanded(
-              flex: 3,
-              child: TextField(
-                  controller: _scaleHostController,
-                  decoration: const InputDecoration(labelText: 'Terazi IP'))),
-          const SizedBox(width: 8),
-          Expanded(
-              child: TextField(
-                  controller: _scalePortController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Port'))),
-        ]),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'serial', label: Text('COM / USB')),
+            ButtonSegment(value: 'tcp', label: Text('TCP / Ağ')),
+          ],
+          selected: {_scaleConnection},
+          onSelectionChanged: (value) =>
+              setState(() => _scaleConnection = value.first),
+        ),
+        const SizedBox(height: 10),
+        if (_scaleConnection == 'serial')
+          Row(children: [
+            Expanded(
+                flex: 3,
+                child: TextField(
+                    controller: _scaleSerialPortController,
+                    decoration: const InputDecoration(labelText: 'COM portu'))),
+            const SizedBox(width: 8),
+            Expanded(
+                child: TextField(
+                    controller: _scaleBaudController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Baud'))),
+            IconButton(
+                tooltip: 'COM portlarını tara',
+                onPressed: _selectSerialPort,
+                icon: const Icon(Icons.refresh_rounded)),
+          ])
+        else
+          Row(children: [
+            Expanded(
+                flex: 3,
+                child: TextField(
+                    controller: _scaleHostController,
+                    decoration: const InputDecoration(labelText: 'Terazi IP'))),
+            const SizedBox(width: 8),
+            Expanded(
+                child: TextField(
+                    controller: _scalePortController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Port'))),
+          ]),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(
