@@ -10,25 +10,27 @@ class POSColors {
   POSColors._();
 
   // ── Ana Renk: Yeşil ──────────────────────────────────────
-  static const green = Color(0xFF16A34A);
-  static const greenDark = Color(0xFF15803D);
-  static const greenLight = Color(0xFFDCFCE7);
-  static const greenMid = Color(0xFF22C55E);
+  static const green = Color(0xFF11875D);
+  static const greenDark = Color(0xFF086B48);
+  static const greenLight = Color(0xFFE9F6EF);
+  static const greenMid = Color(0xFF20A574);
 
   // ── Vurgu: Sarı / Amber ──────────────────────────────────
-  static const amber = Color(0xFFEAB308);
-  static const amberDark = Color(0xFFD97706);
-  static const amberLight = Color(0xFFFEF9C3);
+  static const amber = Color(0xFFE8BD3F);
+  static const amberDark = Color(0xFFB8870E);
+  static const amberLight = Color(0xFFFFF8DC);
 
   // ── Yüzey ────────────────────────────────────────────────
-  static const surface = Color(0xFFF8FAFC); // Arka plan
+  static const surface = Color(0xFFF5F7F5); // Arka plan
   static const card = Color(0xFFFFFFFF); // Kart zemini
-  static const border = Color(0xFFE2E8F0); // Çerçeve
+  static const border = Color(0xFFDFE6E1); // Çerçeve
+  static const surfaceMuted = Color(0xFFEDF2EF);
+  static const darkSurface = Color(0xFF202B26);
 
   // ── Metin ────────────────────────────────────────────────
-  static const text = Color(0xFF0F172A); // Ana metin (siyah-slate)
-  static const textSecondary = Color(0xFF64748B); // İkincil metin
-  static const textDisabled = Color(0xFF94A3B8); // Devre dışı
+  static const text = Color(0xFF19231F); // Ana metin
+  static const textSecondary = Color(0xFF617069); // İkincil metin
+  static const textDisabled = Color(0xFF8FA096); // Devre dışı
 
   // ── Durum ────────────────────────────────────────────────
   static const red = Color(0xFFDC2626);
@@ -39,7 +41,7 @@ class POSColors {
   static const blueLight = Color(0xFFDBEAFE);
 
   // ── Navigasyon ───────────────────────────────────────────
-  static const navInactive = Color(0xFF9CA3AF);
+  static const navInactive = Color(0xFF8FA096);
   static const navBackground = Color(0xFFFFFFFF);
 
   // ── Gölge ────────────────────────────────────────────────
@@ -58,6 +60,14 @@ class AppSpacing {
   static const xl = 32.0;
 }
 
+class AppRadii {
+  AppRadii._();
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 18.0;
+  static const pill = 999.0;
+}
+
 /// ════════════════════════════════════════════════════════════
 /// AppTheme — ThemeData
 /// ════════════════════════════════════════════════════════════
@@ -65,7 +75,11 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData get light {
-    final baseTextTheme = GoogleFonts.nunitoTextTheme();
+    final baseTextTheme = GoogleFonts.interTextTheme();
+    TextStyle? heading(TextStyle? style) => GoogleFonts.outfit(
+          textStyle: style,
+          letterSpacing: -0.25,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -87,27 +101,27 @@ class AppTheme {
 
       // ── Text Theme ──────────────────────────────────────
       textTheme: baseTextTheme.copyWith(
-        displayLarge: baseTextTheme.displayLarge?.copyWith(
+        displayLarge: heading(baseTextTheme.displayLarge)?.copyWith(
           fontSize: 32,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
         ),
-        headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+        headlineLarge: heading(baseTextTheme.headlineLarge)?.copyWith(
           fontSize: 28,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
         ),
-        headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+        headlineMedium: heading(baseTextTheme.headlineMedium)?.copyWith(
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
         ),
-        headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+        headlineSmall: heading(baseTextTheme.headlineSmall)?.copyWith(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: POSColors.text,
         ),
-        titleLarge: baseTextTheme.titleLarge?.copyWith(
+        titleLarge: heading(baseTextTheme.titleLarge)?.copyWith(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: POSColors.text,
@@ -136,7 +150,7 @@ class AppTheme {
         shadowColor: Colors.black.withValues(alpha: 0.08),
         centerTitle: false,
         scrolledUnderElevation: 0,
-        titleTextStyle: baseTextTheme.titleLarge?.copyWith(
+        titleTextStyle: heading(baseTextTheme.titleLarge)?.copyWith(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
@@ -148,7 +162,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadii.md),
           side: const BorderSide(color: POSColors.border, width: 1),
         ),
         color: POSColors.card,
@@ -160,9 +174,9 @@ class AppTheme {
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: POSColors.green,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: BorderRadius.all(Radius.circular(AppRadii.md)),
         ),
       ),
 
@@ -178,11 +192,11 @@ class AppTheme {
             vertical: AppSpacing.sm + 4,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(9),
           ),
           textStyle: baseTextTheme.labelLarge?.copyWith(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -196,9 +210,9 @@ class AppTheme {
             vertical: AppSpacing.sm + 4,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(9),
           ),
-          side: const BorderSide(color: POSColors.green, width: 1.5),
+          side: const BorderSide(color: POSColors.border),
         ),
       ),
 
@@ -221,23 +235,23 @@ class AppTheme {
           vertical: AppSpacing.sm + 4,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
           borderSide: const BorderSide(color: POSColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
           borderSide: const BorderSide(color: POSColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
           borderSide: const BorderSide(color: POSColors.green, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
           borderSide: const BorderSide(color: POSColors.red),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
           borderSide: const BorderSide(color: POSColors.red, width: 2),
         ),
         labelStyle:
@@ -265,7 +279,7 @@ class AppTheme {
         ),
         side: const BorderSide(color: POSColors.border),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
         ),
       ),
 
@@ -281,9 +295,132 @@ class AppTheme {
           return POSColors.textDisabled;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected))
+          if (states.contains(WidgetState.selected)) {
             return POSColors.greenLight;
+          }
           return POSColors.border;
+        }),
+      ),
+
+      // ── Website ile ortak yüzey ve kontrol dili ─────────
+      dialogTheme: DialogThemeData(
+        backgroundColor: POSColors.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        shadowColor: POSColors.text.withValues(alpha: 0.14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          side: const BorderSide(color: POSColors.border),
+        ),
+        titleTextStyle: heading(baseTextTheme.titleLarge)?.copyWith(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: POSColors.text,
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: POSColors.card,
+        modalBackgroundColor: POSColors.card,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadii.lg),
+          ),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: POSColors.darkSurface,
+        contentTextStyle: baseTextTheme.bodyMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: const Color(0xFF6EE7AD),
+        behavior: SnackBarBehavior.floating,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+        ),
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: POSColors.textSecondary,
+        textColor: POSColors.text,
+        selectedColor: POSColors.green,
+        selectedTileColor: POSColors.greenLight,
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(AppRadii.sm)),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          foregroundColor:
+              const WidgetStatePropertyAll(POSColors.textSecondary),
+          overlayColor: WidgetStatePropertyAll(
+            POSColors.green.withValues(alpha: 0.08),
+          ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+            ),
+          ),
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return POSColors.green;
+          return Colors.transparent;
+        }),
+        checkColor: const WidgetStatePropertyAll(Colors.white),
+        side: const BorderSide(color: POSColors.textDisabled, width: 1.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return POSColors.green;
+          return POSColors.textDisabled;
+        }),
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: POSColors.green,
+        unselectedLabelColor: POSColors.textSecondary,
+        indicatorColor: POSColors.green,
+        dividerColor: POSColors.border,
+        labelStyle: baseTextTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: POSColors.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          side: const BorderSide(color: POSColors.border),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: POSColors.navBackground,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: POSColors.greenLight,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          return IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? POSColors.green
+                : POSColors.navInactive,
+          );
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          return baseTextTheme.labelSmall?.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? POSColors.green
+                : POSColors.navInactive,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w600,
+          );
         }),
       ),
 

@@ -6,15 +6,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:serenutos/config/router.dart';
+import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/realtime/realtime_provider.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
-const _kGreen = Color(0xFF16A34A);
-const _kGreenLight = Color(0xFFDCFCE7);
-const _kAmber = Color(0xFFEAB308);
-const _kInactive = Color(0xFF9CA3AF);
+const _kGreen = POSColors.green;
+const _kGreenLight = POSColors.greenLight;
+const _kInactive = POSColors.navInactive;
 
 final activeShellIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -37,11 +37,12 @@ class AppShell extends ConsumerWidget {
       }
     });
 
-    final activeIndex = navigationShell.currentIndex;
+    final shellIndex = navigationShell.currentIndex;
+    final currentUser = ref.watch(currentUserProvider);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (ref.read(activeShellIndexProvider) != activeIndex) {
-        ref.read(activeShellIndexProvider.notifier).state = activeIndex;
+      if (ref.read(activeShellIndexProvider) != shellIndex) {
+        ref.read(activeShellIndexProvider.notifier).state = shellIndex;
       }
       // Trigger connection if already authenticated on initial build
       if (ref.read(isAuthenticatedProvider)) {
@@ -49,53 +50,66 @@ class AppShell extends ConsumerWidget {
       }
     });
 
-    const navItems = [
-      _NavItem(
+    final navItems = <_NavItem>[
+      const _NavItem(
         label: 'Ana Sayfa',
         icon: Icons.home_outlined,
         activeIcon: Icons.home_rounded,
-        route: AppRoutes.home,
+        branchIndex: 0,
       ),
-      _NavItem(
-        label: 'Satış',
-        icon: Icons.shopping_cart_outlined,
-        activeIcon: Icons.shopping_cart_rounded,
-        route: AppRoutes.sales,
-      ),
-      _NavItem(
-        label: 'Siparişler',
-        icon: Icons.restaurant_menu_outlined,
-        activeIcon: Icons.restaurant_menu_rounded,
-        route: AppRoutes.orders,
-      ),
-      _NavItem(
-        label: 'Müşteriler',
-        icon: Icons.people_alt_outlined,
-        activeIcon: Icons.people_alt_rounded,
-        route: AppRoutes.customers,
-      ),
-      _NavItem(
-        label: 'Ürünler',
-        icon: Icons.inventory_2_outlined,
-        activeIcon: Icons.inventory_2_rounded,
-        route: AppRoutes.products,
-      ),
+      if (_hasPermission(currentUser, Permission.salesView))
+        const _NavItem(
+          label: 'Satış',
+          icon: Icons.shopping_cart_outlined,
+          activeIcon: Icons.shopping_cart_rounded,
+          branchIndex: 1,
+        ),
+      if (_hasPermission(currentUser, Permission.ordersView))
+        const _NavItem(
+          label: 'Siparişler',
+          icon: Icons.restaurant_menu_outlined,
+          activeIcon: Icons.restaurant_menu_rounded,
+          branchIndex: 2,
+        ),
+      if (_hasPermission(currentUser, Permission.customersView))
+        const _NavItem(
+          label: 'Müşteriler',
+          icon: Icons.people_alt_outlined,
+          activeIcon: Icons.people_alt_rounded,
+          branchIndex: 3,
+        ),
+      if (_hasPermission(currentUser, Permission.inventoryView))
+        const _NavItem(
+          label: 'Ürünler',
+          icon: Icons.inventory_2_outlined,
+          activeIcon: Icons.inventory_2_rounded,
+          branchIndex: 4,
+        ),
     ];
+    final activeIndex = navItems.indexWhere(
+      (item) => item.branchIndex == shellIndex,
+    );
 
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: _PosNavBar(
         items: navItems,
         activeIndex: activeIndex,
-        onTap: (index) => _onTap(index, navItems[index].route),
+        onTap: (index) => _onTap(navItems[index]),
       ),
     );
   }
 
-  void _onTap(int index, String route) {
+  bool _hasPermission(dynamic user, Permission permission) {
+    if (user == null) return false;
+    if (user.role == UserRole.owner || user.role == UserRole.admin) return true;
+    return user.hasPermission(permission.value);
+  }
+
+  void _onTap(_NavItem item) {
     navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
+      item.branchIndex,
+      initialLocation: item.branchIndex == navigationShell.currentIndex,
     );
   }
 }
@@ -117,13 +131,14 @@ class _PosNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+        color: POSColors.navBackground,
+        border:
+            const Border(top: BorderSide(color: POSColors.border, width: 1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
+            color: POSColors.text.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -153,13 +168,13 @@ class _NavItem {
   final String label;
   final IconData icon;
   final IconData activeIcon;
-  final String route;
+  final int branchIndex;
 
   const _NavItem({
     required this.label,
     required this.icon,
     required this.activeIcon,
-    required this.route,
+    required this.branchIndex,
   });
 }
 
@@ -184,10 +199,10 @@ class _NavBarItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
           color: isActive ? _kGreenLight : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

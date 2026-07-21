@@ -77,34 +77,43 @@ void main() {
       await deleteDatabase(path);
     });
 
-    test('findFiltered and search should handle Turkish casing normalization correctly', () async {
+    test(
+        'findFiltered and search should handle Turkish casing normalization correctly',
+        () async {
       // 1. Search 'mehmet' (lowercase, ASCII) should match 'Mehmet Ali'
-      final searchMehmet = await customerRepository.findFiltered(searchQuery: 'mehmet');
+      final searchMehmet =
+          await customerRepository.findFiltered(searchQuery: 'mehmet');
       expect(searchMehmet.length, 1);
       expect(searchMehmet.first.name, 'Mehmet Ali');
 
       // 2. Search 'ibrahim' (lowercase, ASCII) should match 'İbrahim Çelik' (non-ASCII capital 'İ')
-      final searchIbrahim = await customerRepository.findFiltered(searchQuery: 'ibrahim');
+      final searchIbrahim =
+          await customerRepository.findFiltered(searchQuery: 'ibrahim');
       expect(searchIbrahim.length, 1);
       expect(searchIbrahim.first.name, 'İbrahim Çelik');
 
       // 3. Search 'omer' (lowercase, ASCII) should match 'Ömer Şerif' (non-ASCII capital 'Ö')
-      final searchOmer = await customerRepository.findFiltered(searchQuery: 'omer');
+      final searchOmer =
+          await customerRepository.findFiltered(searchQuery: 'omer');
       expect(searchOmer.length, 1);
       expect(searchOmer.first.name, 'Ömer Şerif');
 
       // 4. Search 'serif' (lowercase, ASCII) should match 'Ömer Şerif' (non-ASCII capital 'Ş')
-      final searchSerif = await customerRepository.findFiltered(searchQuery: 'serif');
+      final searchSerif =
+          await customerRepository.findFiltered(searchQuery: 'serif');
       expect(searchSerif.length, 1);
       expect(searchSerif.first.name, 'Ömer Şerif');
     });
 
-    test('getTotalDebt and getTotalPaid should correctly calculate values with cancellations and partial payments', () async {
+    test(
+        'getTotalDebt and getTotalPaid should correctly calculate values with cancellations and partial payments',
+        () async {
       final db = await databaseManager.getDatabase();
       final customerId = 'cust-1';
 
       // Clean existing transactions for the customer
-      await db.delete('financial_transactions', where: 'customer_id = ?', whereArgs: [customerId]);
+      await db.delete('financial_transactions',
+          where: 'customer_id = ?', whereArgs: [customerId]);
 
       // 1. Incur a sale of 100 TL, 40 TL paid, 60 TL debt
       await db.insert('financial_transactions', {
@@ -140,7 +149,7 @@ void main() {
       totalPaid = await customerRepository.getTotalPaid(customerId);
 
       expect(totalDebt, 100.0); // Total purchase cost remains 100
-      expect(totalPaid, 70.0);  // Total paid accumulates to 70
+      expect(totalPaid, 70.0); // Total paid accumulates to 70
 
       // 3. Cancel the sale (reverses 100 TL amount and 40 TL paid)
       await db.insert('financial_transactions', {
@@ -157,8 +166,31 @@ void main() {
       totalDebt = await customerRepository.getTotalDebt(customerId);
       totalPaid = await customerRepository.getTotalPaid(customerId);
 
-      expect(totalDebt, 0.0);  // 100 - 100 = 0
-      expect(totalPaid, 30.0); // (40 from sale - 40 from cancellation) + 30 from payment = 30
+      expect(totalDebt, 0.0); // 100 - 100 = 0
+      expect(totalPaid,
+          30.0); // (40 from sale - 40 from cancellation) + 30 from payment = 30
+    });
+
+    test('manual debt is reflected in ledger totals and customer balance',
+        () async {
+      final db = await databaseManager.getDatabase();
+      const customerId = 'cust-2';
+
+      await db.insert('financial_transactions', {
+        'id': 'tx-manual-debt-1',
+        'type': 'manual_debt',
+        'customer_id': customerId,
+        'amount': 275.50,
+        'paid_amount': 0.0,
+        'debt_amount': 275.50,
+        'created_at': DateTime.now().toIso8601String(),
+        'is_synced': 0,
+      });
+
+      final customer = await customerRepository.findById(customerId);
+      expect(customer?.balance, -275.50);
+      expect(await customerRepository.getTotalDebt(customerId), 275.50);
+      expect(await customerRepository.getTotalPaid(customerId), 0.0);
     });
   });
 }

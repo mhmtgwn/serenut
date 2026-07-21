@@ -61,7 +61,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   final _addCustomerFormKey = GlobalKey<FormState>();
   final _newCustNameController = TextEditingController();
   final _newCustPhoneController = TextEditingController();
-  final _newCustBalanceController = TextEditingController();
   bool _isSavingCustomer = false;
 
   // Step 2: Product Catalog
@@ -311,7 +310,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _newCustNameController.dispose();
     _newCustPhoneController.dispose();
-    _newCustBalanceController.dispose();
     _notesController.dispose();
     _cashSplitController.dispose();
     _cardSplitController.dispose();

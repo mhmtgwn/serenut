@@ -11,17 +11,19 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 class SaleItemInput {
   final String productId;
   final int quantity;
+  final double saleQuantity;
   final double unitPrice;
 
   SaleItemInput({
     required this.productId,
     required this.quantity,
+    double? saleQuantity,
     required this.unitPrice,
-  });
+  }) : saleQuantity = saleQuantity ?? quantity.toDouble();
 
   Map<String, dynamic> toMap() => {
         'product_id': productId,
-        'quantity': quantity,
+        'quantity': saleQuantity,
         'unit_price': unitPrice,
       };
 }

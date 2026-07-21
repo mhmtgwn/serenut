@@ -55,6 +55,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   String? _selectedCategory;
   bool _isSaving = false;
   bool _showOptional = false;
+  late String _saleType;
+  late final TextEditingController _minimumWeightCtrl;
 
   @override
   void initState() {
@@ -78,6 +80,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _barcodeCtrl = TextEditingController(text: barcodeText);
     _supplierCtrl = TextEditingController(text: '');
     _unitCtrl = TextEditingController(text: 'Adet');
+    _saleType = p?.saleType ?? 'piece';
+    _minimumWeightCtrl =
+        TextEditingController(text: (p?.minimumWeightGrams ?? 20).toString());
     _notesCtrl = TextEditingController(text: '');
     _selectedCategory = p?.category;
   }
@@ -94,6 +99,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _barcodeCtrl.dispose();
     _supplierCtrl.dispose();
     _unitCtrl.dispose();
+    _minimumWeightCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -129,6 +135,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         quantity: int.parse(_qtyCtrl.text.trim()),
         category: _selectedCategory!,
         vat: int.tryParse(_vatCtrl.text.trim()) ?? 18,
+        saleType: _saleType,
+        minimumWeightGrams: int.tryParse(_minimumWeightCtrl.text.trim()) ?? 20,
       );
       final notifier = ref.read(productsControllerProvider.notifier);
       if (widget.isEditing) {
@@ -310,6 +318,51 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 color: _kGreenDark),
             const SizedBox(height: 10),
             _buildSection(children: [
+              DropdownButtonFormField<String>(
+                value: _saleType,
+                decoration: InputDecoration(
+                  labelText: 'Satış Tipi',
+                  prefixIcon: Icon(
+                    _saleType == 'weighed'
+                        ? Icons.monitor_weight_rounded
+                        : Icons.numbers_rounded,
+                  ),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'piece', child: Text('Adet')),
+                  DropdownMenuItem(
+                      value: 'weighed', child: Text('Tartılı (kg)')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => _saleType = value);
+                },
+              ),
+              if (_saleType == 'weighed') ...[
+                const SizedBox(height: 12),
+                _buildField(
+                  controller: _minimumWeightCtrl,
+                  label: 'Minimum Tartım (gram)',
+                  icon: Icons.scale_rounded,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    if (_saleType != 'weighed') return null;
+                    final grams = int.tryParse(value?.trim() ?? '');
+                    if (grams == null || grams <= 0) {
+                      return 'Geçerli bir minimum gram değeri giriniz.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Satış fiyatı kilogram fiyatı olarak kullanılır.',
+                  style: TextStyle(fontSize: 12, color: _kTextSecondary),
+                ),
+              ],
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(

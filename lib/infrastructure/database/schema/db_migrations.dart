@@ -554,7 +554,7 @@ class DatabaseMigrations {
                 'CREATE INDEX IF NOT EXISTS idx_customers_normalized_email ON customers(normalized_email COLLATE NOCASE)');
             await txn.execute(
                 'CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone COLLATE NOCASE)');
-            
+
             // Database-level partial unique indexes to prevent duplicate ledger transactions
             await txn.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_ft_unique_cancellation ON financial_transactions(reference_id) WHERE type = 'cancellation'");
@@ -568,6 +568,21 @@ class DatabaseMigrations {
           }
           await txn.insert('app_migration_history', {
             'version': 30,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 31) {
+          try {
+            await txn.execute(
+                "ALTER TABLE products ADD COLUMN sale_type TEXT NOT NULL DEFAULT 'piece'");
+            await txn.execute(
+                'ALTER TABLE products ADD COLUMN minimum_weight_grams INTEGER NOT NULL DEFAULT 20');
+          } catch (e) {
+            handleMigrationError(e, 31);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 31,
             'migrated_at': DateTime.now().toUtc().toIso8601String(),
             'status': 'success'
           });

@@ -70,7 +70,6 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                       _isAddingCustomer = true;
                       _newCustNameController.text = _customerQuery;
                       _newCustPhoneController.clear();
-                      _newCustBalanceController.text = '0';
                     }),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreenLight,
@@ -303,25 +302,6 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                   LengthLimitingTextInputFormatter(10),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Starting Balance Field
-              TextFormField(
-                controller: _newCustBalanceController,
-                keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true, signed: true),
-                decoration: InputDecoration(
-                  labelText: 'Başlangıç Bakiyesi (₺)',
-                  prefixIcon: const Icon(Icons.account_balance_wallet_rounded,
-                      color: _kTextSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  helperText:
-                      'Negatif: Müşteri borçlu, Pozitif: Müşteri alacaklı',
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^-?\d*[.,]?\d*')),
-                ],
-              ),
               const SizedBox(height: 32),
               // Action Buttons
               Row(
@@ -376,15 +356,12 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
     try {
       final name = _newCustNameController.text.trim();
       final phone = _newCustPhoneController.text.trim();
-      final balStr = _newCustBalanceController.text.replaceAll(',', '.').trim();
-      final double balance = double.tryParse(balStr) ?? 0.0;
-
       final newCustomer = CustomerEntity(
         id: 'cust-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(10000).toString().padLeft(4, '0')}',
         name: name,
         email: '',
         phone: phone,
-        balance: balance,
+        balance: 0.0,
         createdAt: DateTime.now(),
       );
 
@@ -392,27 +369,6 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
       await ref
           .read(ordersCustomersControllerProvider.notifier)
           .addCustomer(newCustomer);
-
-      // If there's initial balance (either positive or negative), record initial ledger transaction
-      if (balance != 0) {
-        final txRepo =
-            await ref.read(financialTransactionRepositoryProvider.future);
-        final transactionId =
-            'trans-init-${DateTime.now().microsecondsSinceEpoch}';
-        await txRepo.create(
-          FinancialTransactionEntity(
-            id: transactionId,
-            type: 'initial_balance',
-            customerId: newCustomer.id,
-            amount: balance.abs(),
-            paidAmount: balance > 0 ? balance : 0.0,
-            debtAmount: balance < 0 ? balance.abs() : 0.0,
-            date: DateTime.now(),
-            referenceId: 'init',
-            metadata: {'note': 'Başlangıç bakiyesi ayarı'},
-          ),
-        );
-      }
 
       await ref.read(ordersCustomersControllerProvider.notifier).refresh();
 

@@ -22,6 +22,8 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
+import 'package:serenutos/infrastructure/services/printer_discovery_service.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'dart:io';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_settings_sheet.dart';
@@ -867,7 +869,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!mounted) return;
       if (info == null) {
         messenger.showSnackBar(const SnackBar(
-          content: Text('Sunucuya ulaşılamadı. Lütfen daha sonra tekrar deneyin.'),
+          content:
+              Text('Sunucuya ulaşılamadı. Lütfen daha sonra tekrar deneyin.'),
           backgroundColor: Colors.orange,
         ));
         return;

@@ -83,7 +83,8 @@ class SalesFlowState {
     cartQuantities.forEach((id, qty) {
       final prod = cartProducts[id];
       if (prod != null) {
-        sum += prod.price * qty;
+        final saleQuantity = prod.isWeighed ? qty / 1000.0 : qty.toDouble();
+        sum += prod.price * saleQuantity;
       }
     });
     return sum;
@@ -256,6 +257,9 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
   }
 
   void addToCart(ProductEntity product) {
+    if (product.isWeighed) {
+      throw StateError('Tartılı ürün addMeasuredToCart ile eklenmelidir.');
+    }
     final currentQty = state.cartQuantities[product.id] ?? 0;
 
     _dispatch(SalesFlowEvent.addProduct);
@@ -278,6 +282,32 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     );
     _persistState();
 
+    if (state.status == SalesFlowStatus.productsAdded) {
+      _dispatch(SalesFlowEvent.proceedToPayment);
+    }
+  }
+
+  void addMeasuredToCart(ProductEntity product, int netGrams) {
+    if (!product.isWeighed) {
+      throw StateError('Yalnız tartılı ürünlere ağırlık eklenebilir.');
+    }
+    if (netGrams < product.minimumWeightGrams) {
+      throw ArgumentError.value(
+          netGrams, 'netGrams', 'Minimum ağırlığın altında.');
+    }
+    _dispatch(SalesFlowEvent.addProduct);
+    final quantities = Map<String, int>.from(state.cartQuantities);
+    final products = Map<String, ProductEntity>.from(state.cartProducts);
+    quantities[product.id] = (quantities[product.id] ?? 0) + netGrams;
+    products[product.id] = product;
+    state = state.copyWith(
+      cartQuantities: quantities,
+      cartProducts: products,
+      paidAmount: state.paymentMethod == 'cash' || state.paymentMethod == 'card'
+          ? _calculateTotal(quantities, products)
+          : state.paidAmount,
+    );
+    _persistState();
     if (state.status == SalesFlowStatus.productsAdded) {
       _dispatch(SalesFlowEvent.proceedToPayment);
     }
@@ -451,7 +481,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     quantities.forEach((id, qty) {
       final prod = products[id];
       if (prod != null) {
-        sum += prod.price * qty;
+        sum += prod.price * (prod.isWeighed ? qty / 1000.0 : qty.toDouble());
       }
     });
     return sum;

@@ -30,6 +30,113 @@ class CustomerDetailsPage extends ConsumerWidget {
   final String customerId;
   const CustomerDetailsPage({super.key, required this.customerId});
 
+  Future<void> _showManualDebtDialog(
+      BuildContext context, WidgetRef ref, CustomerEntity customer) async {
+    final amountController = TextEditingController();
+    final noteController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var saving = false;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Elle Borç Ekle'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    '${customer.name} için cari hesaba borç hareketi eklenir.'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: amountController,
+                  autofocus: true,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Borç Tutarı (₺)',
+                    prefixIcon: Icon(Icons.account_balance_wallet_rounded),
+                  ),
+                  validator: (value) {
+                    final amount = double.tryParse(
+                        (value ?? '').trim().replaceAll(',', '.'));
+                    return amount == null || amount <= 0
+                        ? 'Sıfırdan büyük bir tutar girin'
+                        : null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Açıklama',
+                    hintText: 'Örn. Önceki dönem devri',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (!(formKey.currentState?.validate() ?? false)) return;
+                      setDialogState(() => saving = true);
+                      try {
+                        await ref
+                            .read(customersControllerProvider.notifier)
+                            .recordManualDebt(
+                              customerId: customer.id,
+                              amount: double.parse(amountController.text
+                                  .trim()
+                                  .replaceAll(',', '.')),
+                              notes: noteController.text,
+                            );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Borç hareketi eklendi.'),
+                              backgroundColor: _kGreen,
+                            ),
+                          );
+                        }
+                      } catch (error) {
+                        if (dialogContext.mounted) {
+                          setDialogState(() => saving = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Borç eklenemedi: $error')),
+                          );
+                        }
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Borcu Ekle'),
+            ),
+          ],
+        ),
+      ),
+    );
+    amountController.dispose();
+    noteController.dispose();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customersVal = ref.watch(customersControllerProvider);
@@ -189,24 +296,32 @@ class CustomerDetailsPage extends ConsumerWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: () =>
-                      context.push('/customers/$customerId/collect'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 54,
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            context.push('/customers/$customerId/collect'),
+                        icon: const Icon(Icons.price_check_rounded, size: 20),
+                        label: const Text('Tahsilat Yap'),
+                      ),
+                    ),
                   ),
-                  icon: const Icon(Icons.price_check_rounded, size: 22),
-                  label: const Text(
-                    'Tahsilat Yap',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 54,
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            _showManualDebtDialog(context, ref, customer),
+                        icon: const Icon(Icons.add_card_rounded, size: 20),
+                        label: const Text('Borç Ekle'),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -707,6 +822,12 @@ class _TransactionRow extends ConsumerWidget {
         return const _TxnStyle(
             icon: Icons.shopping_cart_rounded,
             label: 'Vadeli Satış',
+            bgColor: _kRedLight,
+            fgColor: _kRed);
+      case 'manual_debt':
+        return const _TxnStyle(
+            icon: Icons.add_card_rounded,
+            label: 'Elle Eklenen Borç',
             bgColor: _kRedLight,
             fgColor: _kRed);
       case 'collection':

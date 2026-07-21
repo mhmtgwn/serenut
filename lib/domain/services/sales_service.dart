@@ -95,7 +95,7 @@ class SalesService {
     // Calculate totals
     double totalAmount = 0;
     for (final item in items) {
-      totalAmount += item.quantity * item.unitPrice;
+      totalAmount += item.saleQuantity * item.unitPrice;
     }
 
     final double finalPaidAmount = paidAmount ?? totalAmount;

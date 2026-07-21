@@ -417,6 +417,7 @@ class SqliteFinancialTransactionRepository
       'created_at': entity.date.toIso8601String(),
       'logical_clock': nextClock,
       'device_id': txDeviceId,
+      'is_synced': 0,
     });
   }
 

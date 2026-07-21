@@ -22,7 +22,7 @@ class RealSyncClient implements SyncClient {
   @override
   Future<bool> checkHealth() async {
     try {
-      final response = await _apiClient.get('/health');
+      final response = await _apiClient.get('/sync/health');
       return response.isSuccess && response.json['status'] == 'healthy';
     } catch (_) {
       return false;

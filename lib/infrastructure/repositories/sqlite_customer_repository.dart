@@ -34,6 +34,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
   Future<int> create(CustomerEntity entity) async {
     return await _executor.insert('customers', {
       ...entity.toMap(),
+      'is_synced': 0,
       'normalized_name': entity.name.normalizeTurkish,
       'normalized_email': entity.email.toLowerCase(),
       'created_at': DateTime.now().toIso8601String(),
@@ -47,6 +48,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
       'customers',
       {
         ...entity.toMap(),
+        'is_synced': 0,
         'normalized_name': entity.name.normalizeTurkish,
         'normalized_email': entity.email.toLowerCase(),
         'updated_at': DateTime.now().toIso8601String(),
@@ -66,6 +68,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
+        'is_synced': 0,
       },
       where: 'id = ?',
       whereArgs: [id],
@@ -233,7 +236,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
   @override
   Future<double> getTotalDebt(String customerId) async {
     final result = await _executor.rawQuery(
-      "SELECT COALESCE(SUM(CASE WHEN type = 'sale' THEN amount WHEN type = 'cancellation' THEN -amount ELSE 0 END), 0.0) as total "
+      "SELECT COALESCE(SUM(CASE WHEN type IN ('sale', 'manual_debt') THEN amount WHEN type = 'cancellation' THEN -amount ELSE 0 END), 0.0) as total "
       "FROM financial_transactions WHERE customer_id = ?",
       [customerId],
     );

@@ -330,6 +330,28 @@ if (-not \$success) {
     }
   }
 
+  /// Requests Android discovery. The native implementation may fall back to
+  /// bonded devices when active discovery is unavailable.
+  static Future<List<Map<String, String>>> scanBluetoothDevices() async {
+    if (!_isAndroid) return [];
+    try {
+      final List<dynamic>? devices =
+          await _bluetoothChannel.invokeMethod<List<dynamic>>('scanDevices');
+      if (devices == null) return [];
+      return devices.map((device) {
+        final map = Map<String, dynamic>.from(device as Map);
+        return {
+          'name': map['name']?.toString() ?? 'Bilinmeyen Cihaz',
+          'address': map['address']?.toString() ?? '',
+        };
+      }).toList();
+    } on PlatformException catch (_) {
+      return [];
+    } on MissingPluginException catch (_) {
+      return [];
+    }
+  }
+
   /// Connect to a Bluetooth printer by its MAC address.
   static Future<bool> connectBluetoothDevice(String address) async {
     if (!_isAndroid) return false;

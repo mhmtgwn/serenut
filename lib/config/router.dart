@@ -43,9 +43,7 @@ import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 
-import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/paywall_page.dart';
-import 'package:serenutos/domain/services/access_manager.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -112,9 +110,7 @@ String? _roleOrPermissionRedirect(BuildContext context, Permission permission) {
 /// GoRouter configuration provider
 final routerProvider = Provider<GoRouter>((ref) {
   final isAuthenticated = ref.watch(isAuthenticatedProvider);
-  final accessManager = ref.watch(accessManagerProvider);
-  final currentUser = ref.watch(currentUserProvider);
-  final accessStatus = accessManager.checkAccess(currentUser: currentUser);
+  ref.watch(currentUserProvider);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -225,7 +221,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.settings,
         name: 'settings',
         builder: (context, state) => const SettingsPage(),
-        redirect: _adminOnlyRedirect,
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsView),
       ),
       GoRoute(
         path: AppRoutes.catalogImportWizard,
@@ -261,7 +258,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'smsHistory',
         builder: (context, state) => const SmsHistoryPage(),
         redirect: (context, state) =>
-            _roleOrPermissionRedirect(context, Permission.settingsAudit),
+            _roleOrPermissionRedirect(context, Permission.settingsView),
       ),
       GoRoute(
         path: AppRoutes.dbHealth,
@@ -276,12 +273,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.reports,
         name: 'reports',
         builder: (context, state) => const ReportsPage(),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.reportsView),
       ),
 
       GoRoute(
         path: AppRoutes.finance,
         name: 'finance',
         builder: (context, state) => const FinanceHubPage(),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsFinance),
       ),
       GoRoute(
         path: AppRoutes.system,
@@ -323,6 +324,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.sales,
                 name: 'sales',
                 builder: (context, state) => const SalesPage(),
+                redirect: (context, state) =>
+                    _roleOrPermissionRedirect(context, Permission.salesView),
                 routes: [
                   GoRoute(
                     path: 'detail/:id',
@@ -348,6 +351,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.orders,
                 name: 'orders',
                 builder: (context, state) => const OrdersPage(),
+                redirect: (context, state) =>
+                    _roleOrPermissionRedirect(context, Permission.ordersView),
                 routes: [
                   GoRoute(
                     path: 'detail/:id',
@@ -368,6 +373,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.customers,
                 name: 'customers',
                 builder: (context, state) => const CustomersPage(),
+                redirect: (context, state) => _roleOrPermissionRedirect(
+                    context, Permission.customersView),
                 routes: [
                   GoRoute(
                     path: 'detail/:id',
@@ -382,6 +389,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const CustomerFormPage(
                       isEditing: false,
                     ),
+                    redirect: (context, state) => _roleOrPermissionRedirect(
+                        context, Permission.customersCreate),
                   ),
                   GoRoute(
                     path: 'edit/:id',
@@ -390,6 +399,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                       isEditing: true,
                       existingCustomer: state.extra as CustomerEntity?,
                     ),
+                    redirect: (context, state) => _roleOrPermissionRedirect(
+                        context, Permission.customersEdit),
                   ),
                   GoRoute(
                     path: ':id/collect',
@@ -410,6 +421,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.products,
                 name: 'products',
                 builder: (context, state) => const ProductsPage(),
+                redirect: (context, state) => _roleOrPermissionRedirect(
+                    context, Permission.inventoryView),
                 routes: [
                   GoRoute(
                     path: 'add',
@@ -417,6 +430,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const ProductFormPage(
                       isEditing: false,
                     ),
+                    redirect: (context, state) => _roleOrPermissionRedirect(
+                        context, Permission.inventoryAdjust),
                   ),
                   GoRoute(
                     path: 'edit/:id',
@@ -425,6 +440,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                       isEditing: true,
                       existingProduct: state.extra as ProductEntity?,
                     ),
+                    redirect: (context, state) => _roleOrPermissionRedirect(
+                        context, Permission.inventoryAdjust),
                   ),
                 ],
               ),

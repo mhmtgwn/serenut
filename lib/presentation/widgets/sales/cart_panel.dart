@@ -310,21 +310,24 @@ class _CartItemState extends State<_CartItem>
                   Row(
                     children: [
                       Text(
-                        '₺${widget.product.price.toStringAsFixed(2)}',
+                        '₺${widget.product.price.toStringAsFixed(2)}${widget.product.isWeighed ? '/kg' : ''}',
                         style: const TextStyle(
                             color: _kTextSecondary, fontSize: 11),
                       ),
                       const Text(' × ',
                           style:
                               TextStyle(color: _kTextSecondary, fontSize: 11)),
-                      Text('${widget.quantity}',
+                      Text(
+                          widget.product.isWeighed
+                              ? '${(widget.quantity / 1000).toStringAsFixed(3)} kg'
+                              : '${widget.quantity}',
                           style: const TextStyle(
                               color: _kTextSecondary,
                               fontSize: 11,
                               fontWeight: FontWeight.w700)),
                       const Spacer(),
                       Text(
-                        '₺${(widget.product.price * widget.quantity).toStringAsFixed(2)}',
+                        '₺${(widget.product.price * (widget.product.isWeighed ? widget.quantity / 1000.0 : widget.quantity)).toStringAsFixed(2)}',
                         style: const TextStyle(
                             color: _kGreenDark,
                             fontWeight: FontWeight.w900,
@@ -338,41 +341,49 @@ class _CartItemState extends State<_CartItem>
             const SizedBox(width: 10),
 
             // ── Miktar Kontrolcüsü ───────────────────────────────────────────
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _QtyButton(
-                    icon: Icons.remove_rounded,
-                    color: _kRed,
-                    onTap: widget.onRemove,
-                  ),
-                  InkWell(
-                    onTap: () => _showQtyEditDialog(context),
-                    borderRadius: BorderRadius.circular(4),
-                    child: SizedBox(
-                      width: 32,
-                      child: Text(
-                        '${widget.quantity}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w900, fontSize: 15),
+            if (widget.product.isWeighed)
+              IconButton(
+                tooltip: 'Yeniden tart',
+                onPressed: widget.onAdd,
+                icon: const Icon(Icons.monitor_weight_rounded,
+                    color: _kGreenDark),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _QtyButton(
+                      icon: Icons.remove_rounded,
+                      color: _kRed,
+                      onTap: widget.onRemove,
+                    ),
+                    InkWell(
+                      onTap: () => _showQtyEditDialog(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        width: 32,
+                        child: Text(
+                          '${widget.quantity}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900, fontSize: 15),
+                        ),
                       ),
                     ),
-                  ),
-                  _QtyButton(
-                    icon: Icons.add_rounded,
-                    color: _kGreen,
-                    onTap: widget.onAdd,
-                  ),
-                ],
+                    _QtyButton(
+                      icon: Icons.add_rounded,
+                      color: _kGreen,
+                      onTap: widget.onAdd,
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),

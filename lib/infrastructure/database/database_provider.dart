@@ -29,6 +29,7 @@ class DatabaseManager {
     SELECT COALESCE(SUM(
       CASE 
         WHEN type = 'sale' THEN -debt_amount
+        WHEN type = 'manual_debt' THEN -debt_amount
         WHEN type = 'payment' THEN paid_amount
         WHEN type = 'cancellation' THEN debt_amount
         WHEN type = 'collection' THEN paid_amount
@@ -41,7 +42,7 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 30;
+  static const int _databaseVersion = 31;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -291,11 +292,13 @@ class DatabaseManager {
           // Sprint C - SQLite Corruption & Integrity Audit
           final integrity = await db.rawQuery('PRAGMA integrity_check;');
           if (integrity.first.values.first != 'ok') {
-            throw Exception('SQLite integrity check failed: \${integrity.first.values.first}');
+            throw Exception(
+                'SQLite integrity check failed: \${integrity.first.values.first}');
           }
           final fkCheck = await db.rawQuery('PRAGMA foreign_key_check;');
           if (fkCheck.isNotEmpty) {
-            throw Exception('SQLite foreign key check failed for \${fkCheck.length} constraints.');
+            throw Exception(
+                'SQLite foreign key check failed for \${fkCheck.length} constraints.');
           }
         },
       );
@@ -334,6 +337,7 @@ class DatabaseManager {
             created_at,
             CASE 
               WHEN type = 'sale' THEN amount
+              WHEN type = 'manual_debt' THEN amount
               WHEN type = 'cancellation' THEN -amount
               ELSE 0
             END AS debit,

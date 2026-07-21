@@ -117,6 +117,10 @@ class SqliteProductRepository implements IProductRepository {
             category: override['category'] as String? ?? p.category,
             vat: override['vat'] as int? ?? p.vat,
             imageUrl: override['image_url'] as String? ?? p.imageUrl,
+            saleType: override['sale_type'] as String? ?? p.saleType,
+            minimumWeightGrams:
+                (override['minimum_weight_grams'] as num?)?.toInt() ??
+                    p.minimumWeightGrams,
           ));
         } else {
           result.add(p);
@@ -149,6 +153,7 @@ class SqliteProductRepository implements IProductRepository {
       'products',
       {
         ...product.toMap(),
+        'is_synced': 0,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -169,6 +174,7 @@ class SqliteProductRepository implements IProductRepository {
           'products',
           {
             ...product.toMap(),
+            'is_synced': 0,
             'updated_at': DateTime.now().toIso8601String(),
           },
           where: 'id = ?',
@@ -194,6 +200,7 @@ class SqliteProductRepository implements IProductRepository {
       'products',
       {
         ...product.toMap(),
+        'is_synced': 0,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -211,6 +218,7 @@ class SqliteProductRepository implements IProductRepository {
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
+        'is_synced': 0,
       },
       where: 'id = ?',
       whereArgs: [id],

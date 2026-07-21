@@ -120,7 +120,9 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 final bootstrapSyncServiceProvider = Provider<BootstrapSyncService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final apiClient = ref.watch(apiClientProvider);
-  return BootstrapSyncService(prefs, apiClient);
+  final companyId =
+      ref.watch(licenseServiceProvider).getLicenseInfo()?.merchantId;
+  return BootstrapSyncService(prefs, apiClient, scopeId: companyId);
 });
 
 /// Provides IntegrityCheckService instance.

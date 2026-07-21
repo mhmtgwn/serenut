@@ -159,6 +159,36 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     _invalidateAll();
   }
 
+  Future<void> recordManualDebt({
+    required String customerId,
+    required double amount,
+    String? notes,
+  }) async {
+    final paymentService = await ref.read(paymentServiceProvider.future);
+    await paymentService.recordManualDebt(
+      customerId: customerId,
+      amount: amount,
+      notes: notes,
+    );
+    try {
+      final auditService = await ref.read(auditServiceProvider.future);
+      final customer = await _repository.findById(customerId);
+      await auditService.logEvent(
+        eventType: 'manual_debt_created',
+        entityType: 'customer',
+        entityId: customerId,
+        newValue: 'Borç: ₺${amount.toStringAsFixed(2)}',
+        notes: notes?.trim().isNotEmpty == true
+            ? notes!.trim()
+            : '${customer?.name ?? 'Müşteri'} için elle borç eklendi',
+      );
+    } catch (_) {}
+    ref.invalidate(customerTransactionsProvider(customerId));
+    ref.invalidate(customerBalanceDetailsProvider(customerId));
+    await refresh();
+    _invalidateAll();
+  }
+
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

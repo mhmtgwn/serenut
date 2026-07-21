@@ -48,6 +48,9 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
   late String? selectedDeviceMac;
   bool isBluetoothSupported = true;
   bool hasCalledFetch = false;
+  final PrinterDiscoveryService _discovery = PrinterDiscoveryService();
+  List<DiscoveredPrinter> discoveredPrinters = [];
+  bool isDiscoveringPrinters = false;
 
   @override
   void initState() {
@@ -66,9 +69,33 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
     } else if (widget.settings.printerName != null &&
         widget.settings.printerName!.contains(':')) {
       connectionType = 'bluetooth';
+    } else if (!kIsWeb &&
+        Platform.isWindows &&
+        (widget.settings.printerName?.isNotEmpty ?? false) &&
+        (widget.settings.printerIp?.isEmpty ?? true)) {
+      connectionType = 'windows';
     }
     selectedDeviceMac =
         connectionType == 'bluetooth' ? widget.settings.printerName : null;
+  }
+
+  Future<void> discoverPrinters() async {
+    setState(() => isDiscoveringPrinters = true);
+    try {
+      final found = <DiscoveredPrinter>[];
+      if (!kIsWeb && Platform.isWindows) {
+        found.addAll(await _discovery.listWindowsPrinters());
+      }
+      if (connectionType == 'network') {
+        final subnets = await _discovery.localIpv4Subnets();
+        for (final subnet in subnets) {
+          found.addAll(await _discovery.scanSubnet(subnet));
+        }
+      }
+      if (mounted) setState(() => discoveredPrinters = found);
+    } finally {
+      if (mounted) setState(() => isDiscoveringPrinters = false);
+    }
   }
 
   @override
@@ -86,6 +113,21 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
       isLoadingDevices = true;
     });
     try {
+      if (!kIsWeb && Platform.isAndroid) {
+        final statuses = await [
+          ph.Permission.bluetoothScan,
+          ph.Permission.bluetoothConnect,
+        ].request();
+        if (statuses.values.any((status) => !status.isGranted)) {
+          if (mounted) {
+            setState(() {
+              isBluetoothSupported = false;
+              isLoadingDevices = false;
+            });
+          }
+          return;
+        }
+      }
       final available = await NativePrinterBridge.isBluetoothAvailable();
       if (!available) {
         if (mounted) {
@@ -96,7 +138,7 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
         }
         return;
       }
-      final list = await NativePrinterBridge.getPairedBluetoothDevices();
+      final list = await NativePrinterBridge.scanBluetoothDevices();
       if (mounted) {
         setState(() {
           pairedDevices = list;
@@ -145,14 +187,17 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
               ),
-              items: const [
-                DropdownMenuItem(
+              items: [
+                const DropdownMenuItem(
                     value: 'network', child: Text('WiFi / Network (Ethernet)')),
-                DropdownMenuItem(
+                const DropdownMenuItem(
                     value: 'bluetooth',
                     child: Text('Bluetooth (Mobil Termal)')),
-                DropdownMenuItem(
+                const DropdownMenuItem(
                     value: 'sunmi', child: Text('Sunmi Gömülü Yazıcı')),
+                if (!kIsWeb && Platform.isWindows)
+                  const DropdownMenuItem(
+                      value: 'windows', child: Text('Windows Kurulu Yazıcı')),
               ],
               onChanged: (val) {
                 if (val != null) {
@@ -201,6 +246,61 @@ class _ReceiptPrinterSheetState extends ConsumerState<_ReceiptPrinterSheet> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: isDiscoveringPrinters ? null : discoverPrinters,
+                icon: isDiscoveringPrinters
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.radar_rounded),
+                label: Text(isDiscoveringPrinters
+                    ? 'Yerel ağ taranıyor…'
+                    : 'Ağ Yazıcılarını Tara'),
+              ),
+              if (discoveredPrinters
+                  .any((p) => p.kind == DiscoveredPrinterKind.network))
+                ...discoveredPrinters
+                    .where((p) => p.kind == DiscoveredPrinterKind.network)
+                    .map((printer) => ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.print_rounded),
+                          title: Text(printer.name),
+                          subtitle: const Text(
+                              'Aday cihaz — kaydettikten sonra test çıktısı gönderin'),
+                          onTap: () {
+                            setState(() {
+                              ipCtrl.text = printer.address ?? '';
+                              portCtrl.text = (printer.port ?? 9100).toString();
+                              nameCtrl.text = printer.name;
+                            });
+                          },
+                        )),
+            ] else if (connectionType == 'windows') ...[
+              OutlinedButton.icon(
+                onPressed: isDiscoveringPrinters ? null : discoverPrinters,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Kurulu Yazıcıları Listele'),
+              ),
+              if (isDiscoveringPrinters)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
+                ...discoveredPrinters
+                    .where((p) => p.kind == DiscoveredPrinterKind.windows)
+                    .map((printer) => RadioListTile<String>(
+                          value: printer.name,
+                          groupValue: nameCtrl.text,
+                          title: Text(printer.name),
+                          subtitle: Text(printer.isDefault
+                              ? 'Varsayılan Windows yazıcısı'
+                              : (printer.address ?? '')),
+                          onChanged: (value) =>
+                              setState(() => nameCtrl.text = value ?? ''),
+                        )),
             ] else if (connectionType == 'bluetooth') ...[
               if (isLoadingDevices)
                 const Padding(

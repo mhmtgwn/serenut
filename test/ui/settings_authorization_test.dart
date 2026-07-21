@@ -19,11 +19,13 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
 
     // Mock binary messenger for assets/data/cities.json to prevent async leaks in tests
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(
       'flutter/assets',
       (ByteData? message) async {
         if (message == null) return null;
-        final Uint8List list = message.buffer.asUint8List(message.offsetInBytes, message.lengthInBytes);
+        final Uint8List list = message.buffer
+            .asUint8List(message.offsetInBytes, message.lengthInBytes);
         final String key = utf8.decode(list);
         if (key == 'assets/data/cities.json') {
           final jsonStr = jsonEncode({
@@ -59,7 +61,8 @@ void main() {
   });
 
   tearDownAll(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler(
       'flutter/assets',
       null,
     );
@@ -287,6 +290,7 @@ void main() {
       expect(find.text('Fiş Yazıcı Ayarları'), findsOneWidget);
       expect(find.text('Etiket Yazıcı Ayarları'), findsOneWidget);
       expect(find.text('Donanım Diagnostics Testleri'), findsOneWidget);
+      expect(find.text('SMS Geçmişi'), findsOneWidget);
 
       // Admin actions hidden
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
@@ -331,9 +335,10 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Safe self/debug settings are visible
-      expect(find.text('Hata Ayıklama Modu (Debug)'), findsOneWidget);
+      // Safe user settings are visible; debug remains sysadmin-only.
+      expect(find.text('Hata Ayıklama Modu (Debug)'), findsNothing);
       expect(find.text('Satışta Sesli Bildirim'), findsOneWidget);
+      expect(find.text('SMS Geçmişi'), findsOneWidget);
 
       // Printer options are hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
@@ -380,8 +385,8 @@ void main() {
       expect(find.text('Ayarlar sayfasına erişim yetkiniz bulunmuyor.'),
           findsNothing);
 
-      // Safe local settings visible
-      expect(find.text('Hata Ayıklama Modu (Debug)'), findsOneWidget);
+      // Safe local settings visible; debug remains sysadmin-only.
+      expect(find.text('Hata Ayıklama Modu (Debug)'), findsNothing);
       expect(find.text('Satışta Sesli Bildirim'), findsOneWidget);
 
       // Sensitive modules hidden

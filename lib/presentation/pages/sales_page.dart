@@ -21,6 +21,7 @@ import 'package:serenutos/presentation/widgets/sales/catalog_panel.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/presentation/widgets/sales/cart_panel.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
+import 'package:serenutos/presentation/widgets/sales/live_scale_dialog.dart';
 import 'package:serenutos/config/utils.dart';
 
 part 'sales/animated_cart_tab.dart';
@@ -43,6 +44,51 @@ class SalesPage extends ConsumerStatefulWidget {
 class _SalesPageState extends ConsumerState<SalesPage> {
   SaleEntity? _lastCompletedSale;
   bool _showSuccessNotification = false;
+
+  Future<void> _handleProductSelected(ProductEntity product) async {
+    if (!product.isWeighed) {
+      ref.read(salesFlowProvider.notifier).addToCart(product);
+      return;
+    }
+    final grams = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => LiveScaleDialog(product: product),
+    );
+    if (grams != null && mounted) {
+      ref.read(salesFlowProvider.notifier).addMeasuredToCart(product, grams);
+    }
+  }
+
+  Future<bool> _confirmPhysicalCardPayment(double amount) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.credit_card_rounded),
+          SizedBox(width: 8),
+          Text('Fiziksel POS Ödemesi'),
+        ]),
+        content: Text(
+          'POS cihazından ₺${amount.toStringAsFixed(2)} tahsil edin. '
+          'Yalnız cihaz onay verdiyse “Ödeme Başarılı” seçeneğine basın.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('İptal / Reddedildi'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.check_circle_rounded),
+            label: const Text('Ödeme Başarılı'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _paidController = TextEditingController();
@@ -192,6 +238,11 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       }
     }
 
+    if (flowState.paymentMethod == 'card') {
+      final approved = await _confirmPhysicalCardPayment(totalAmount);
+      if (!approved || !mounted) return;
+    }
+
     ref.read(salesFlowProvider.notifier).setSubmitting(true);
 
     try {
@@ -200,6 +251,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
         return SaleItemInput(
           productId: prod.id,
           quantity: entry.value,
+          saleQuantity:
+              prod.isWeighed ? entry.value / 1000.0 : entry.value.toDouble(),
           unitPrice: prod.price,
         );
       }).toList();
@@ -219,6 +272,9 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 items: itemsInput,
                 paymentMethod: flowState.paymentMethod,
                 paidAmount: finalPaid,
+                idempotencyKey: flowState.idempotencyKey.isNotEmpty
+                    ? flowState.idempotencyKey
+                    : 'checkout-${DateTime.now().microsecondsSinceEpoch}',
               );
 
       if (createdSale == null) {
@@ -368,9 +424,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             searchController: _searchController,
                             barcodeController: _barcodeController,
                             barcodeFocusNode: _barcodeFocusNode,
-                            onAddToCart: (p) => ref
-                                .read(salesFlowProvider.notifier)
-                                .addToCart(p),
+                            onAddToCart: _handleProductSelected,
                             onBarcodeSubmit: _handleBarcodeSubmit,
                           ),
                         ),
@@ -412,9 +466,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                                 onRemoveFromCart: (p) => ref
                                     .read(salesFlowProvider.notifier)
                                     .removeFromCart(p),
-                                onAddToCart: (p) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .addToCart(p),
+                                onAddToCart: _handleProductSelected,
                                 onDeleteFromCart: (p) => ref
                                     .read(salesFlowProvider.notifier)
                                     .deleteFromCart(p),
@@ -440,9 +492,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                             searchController: _searchController,
                             barcodeController: _barcodeController,
                             barcodeFocusNode: _barcodeFocusNode,
-                            onAddToCart: (p) => ref
-                                .read(salesFlowProvider.notifier)
-                                .addToCart(p),
+                            onAddToCart: _handleProductSelected,
                             onBarcodeSubmit: _handleBarcodeSubmit,
                           ),
                           Consumer(
@@ -480,9 +530,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                                 onRemoveFromCart: (p) => ref
                                     .read(salesFlowProvider.notifier)
                                     .removeFromCart(p),
-                                onAddToCart: (p) => ref
-                                    .read(salesFlowProvider.notifier)
-                                    .addToCart(p),
+                                onAddToCart: _handleProductSelected,
                                 onDeleteFromCart: (p) => ref
                                     .read(salesFlowProvider.notifier)
                                     .deleteFromCart(p),

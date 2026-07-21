@@ -41,6 +41,7 @@ class DatabaseTriggers {
           c.balance,
           c.balance + CASE 
             WHEN NEW.type = 'sale' THEN -NEW.debt_amount
+            WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
             WHEN NEW.type = 'payment' THEN NEW.paid_amount
             WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
             WHEN NEW.type = 'collection' THEN NEW.paid_amount
@@ -54,6 +55,7 @@ class DatabaseTriggers {
         UPDATE customers
         SET balance = balance + CASE 
           WHEN NEW.type = 'sale' THEN -NEW.debt_amount
+          WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
           WHEN NEW.type = 'payment' THEN NEW.paid_amount
           WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
           WHEN NEW.type = 'collection' THEN NEW.paid_amount
@@ -71,6 +73,7 @@ class DatabaseTriggers {
         UPDATE customers
         SET balance = balance - CASE 
           WHEN OLD.type = 'sale' THEN -OLD.debt_amount
+          WHEN OLD.type = 'manual_debt' THEN -OLD.debt_amount
           WHEN OLD.type = 'payment' THEN OLD.paid_amount
           WHEN OLD.type = 'cancellation' THEN OLD.debt_amount
           WHEN OLD.type = 'collection' THEN OLD.paid_amount
@@ -83,6 +86,7 @@ class DatabaseTriggers {
         UPDATE customers
         SET balance = balance + CASE 
           WHEN NEW.type = 'sale' THEN -NEW.debt_amount
+          WHEN NEW.type = 'manual_debt' THEN -NEW.debt_amount
           WHEN NEW.type = 'payment' THEN NEW.paid_amount
           WHEN NEW.type = 'cancellation' THEN NEW.debt_amount
           WHEN NEW.type = 'collection' THEN NEW.paid_amount
@@ -100,6 +104,7 @@ class DatabaseTriggers {
         UPDATE customers
         SET balance = balance - CASE 
           WHEN OLD.type = 'sale' THEN -OLD.debt_amount
+          WHEN OLD.type = 'manual_debt' THEN -OLD.debt_amount
           WHEN OLD.type = 'payment' THEN OLD.paid_amount
           WHEN OLD.type = 'cancellation' THEN OLD.debt_amount
           WHEN OLD.type = 'collection' THEN OLD.paid_amount

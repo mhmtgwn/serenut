@@ -34,7 +34,7 @@ class SyncResult {
     required this.errors,
   });
 
-  bool get success => failed == 0;
+  bool get success => failed == 0 && errors.isEmpty;
 }
 
 /// Production offline sync service.
@@ -51,6 +51,7 @@ class OfflineSyncService {
   final LicenseService _licenseService;
   final TrialManager? _trialManager;
   final ApiClient _apiClient;
+  final String? _syncScopeId;
 
   /// Optional chaos injector for simulating network cuts, latencies, etc.
   SyncChaosInjector? _chaosInjector;
@@ -69,6 +70,7 @@ class OfflineSyncService {
     required LicenseService licenseService,
     TrialManager? trialManager,
     ApiClient? apiClient,
+    String? syncScopeId,
     SyncChaosInjector? chaosInjector,
     SyncStateMachine? stateMachine,
   })  : _saleRepository = saleRepository,
@@ -76,6 +78,7 @@ class OfflineSyncService {
         _licenseService = licenseService,
         _trialManager = trialManager,
         _apiClient = apiClient ?? ApiClient(),
+        _syncScopeId = syncScopeId,
         _chaosInjector = chaosInjector,
         _stateMachine = stateMachine;
 
@@ -161,11 +164,24 @@ class OfflineSyncService {
         await _stateMachine!.transition(SyncTrigger.startSync);
       }
 
+      final masterPush = await _pushPendingEntities(
+        const ['product', 'customer'],
+        errors,
+      );
+      synced += masterPush.synced;
+      failed += masterPush.failed;
+
       // İSTEK 3 DÜZELTMESİ: findAll().where(isSynced==0) yerine findUnsynced() SQL filtresi.
       // Sadece bekleyen satışlar çekilir; tüm satış geçmişi RAM'e yüklenmiyor.
       final unsynced = await _saleRepository.findUnsynced();
 
       if (unsynced.isEmpty) {
+        final ledgerPush = await _pushPendingEntities(
+          const ['financial_transaction'],
+          errors,
+        );
+        synced += ledgerPush.synced;
+        failed += ledgerPush.failed;
         if (_chaosInjector != null) {
           await _chaosInjector!.trigger(FaultHook.beforePull);
         }
@@ -174,7 +190,7 @@ class OfflineSyncService {
         if (_stateMachine != null) {
           await _stateMachine!.transition(SyncTrigger.noSalesFound);
         }
-        return SyncResult(synced: 0, failed: 0, errors: errors);
+        return SyncResult(synced: synced, failed: failed, errors: errors);
       }
 
       for (final sale in unsynced) {
@@ -282,6 +298,13 @@ class OfflineSyncService {
       if (_chaosInjector != null) {
         await _chaosInjector!.trigger(FaultHook.beforePull);
       }
+      final ledgerPush = await _pushPendingEntities(
+        const ['financial_transaction'],
+        errors,
+      );
+      synced += ledgerPush.synced;
+      failed += ledgerPush.failed;
+
       await _pullUpdates(errors);
 
       if (_stateMachine != null &&
@@ -309,11 +332,103 @@ class OfflineSyncService {
     return SyncResult(synced: synced, failed: failed, errors: errors);
   }
 
+  Future<SyncResult> _pushPendingEntities(
+    List<String> entityTypes,
+    List<String> errors,
+  ) async {
+    final db = await DatabaseManager().getDatabase();
+    final items = <Map<String, dynamic>>[];
+    final locations = <String, ({String table, String entityId})>{};
+
+    for (final type in entityTypes) {
+      final table = switch (type) {
+        'product' => 'products',
+        'customer' => 'customers',
+        'financial_transaction' => 'financial_transactions',
+        _ => throw ArgumentError('Unsupported sync entity: $type'),
+      };
+      final rows = await db.query(table, where: 'is_synced = 0');
+      for (final row in rows) {
+        final id = row['id'] as String;
+        final payload = Map<String, dynamic>.from(row);
+        if (type == 'financial_transaction') {
+          payload['date'] = payload['created_at'];
+        }
+        final scope = _syncScopeId?.trim();
+        final queueId =
+            '${scope == null || scope.isEmpty ? 'local' : scope}:$type:$id';
+        items.add({
+          'id': queueId,
+          'entity_type': type,
+          'entity_id': id,
+          'payload': payload,
+        });
+        locations[queueId] = (table: table, entityId: id);
+      }
+    }
+
+    if (items.isEmpty) {
+      return const SyncResult(synced: 0, failed: 0, errors: []);
+    }
+
+    try {
+      final response = await _apiClient.post('/sync/push', {'items': items});
+      final body = response.json as Map<String, dynamic>;
+      final processed =
+          List<String>.from(body['processed'] as List? ?? const []);
+      final remoteErrors =
+          List<dynamic>.from(body['errors'] as List? ?? const []);
+
+      await db.transaction((txn) async {
+        final touchesLedger = processed.any(
+            (queueId) => locations[queueId]?.table == 'financial_transactions');
+        if (touchesLedger) {
+          await txn.update('ledger_bypass_flag', {'active': 1});
+        }
+        for (final queueId in processed) {
+          final location = locations[queueId];
+          if (location == null) continue;
+          await txn.update(
+            location.table,
+            {'is_synced': 1},
+            where: 'id = ?',
+            whereArgs: [location.entityId],
+          );
+        }
+        if (touchesLedger) {
+          await txn.update('ledger_bypass_flag', {'active': 0});
+        }
+      });
+
+      for (final error in remoteErrors) {
+        errors.add('Push sync failed: $error');
+      }
+      final failedCount = items.length - processed.length;
+      if (failedCount > remoteErrors.length) {
+        errors.add('$failedCount kayıt sunucu tarafından işlenmedi.');
+      }
+      return SyncResult(
+        synced: processed.length,
+        failed: failedCount,
+        errors: remoteErrors.map((e) => e.toString()).toList(),
+      );
+    } catch (e) {
+      errors.add('Push sync failed: $e');
+      return SyncResult(synced: 0, failed: items.length, errors: ['$e']);
+    }
+  }
+
   /// Pull updates from server and merge with local state
   Future<void> _pullUpdates(List<String> errors) async {
     try {
       final sharedPrefs = _licenseService.prefs;
-      final lastTimestamp = sharedPrefs.getInt('last_sync_timestamp') ?? 0;
+      final scope = _syncScopeId?.trim();
+      final timestampKey = scope == null || scope.isEmpty
+          ? 'last_sync_timestamp'
+          : 'last_sync_timestamp_$scope';
+      final typeKey = '${timestampKey}_type';
+      final idKey = '${timestampKey}_id';
+      final lastTimestamp = sharedPrefs.getInt(timestampKey) ?? 0;
 
       int maxLocalClock = 0;
       if (_transactionRepository != null) {
@@ -325,10 +440,18 @@ class OfflineSyncService {
 
       bool hasMore = true;
       int currentTimestamp = lastTimestamp;
+      String currentType = sharedPrefs.getString(typeKey) ?? '';
+      String currentId = sharedPrefs.getString(idKey) ?? '';
 
       while (hasMore) {
-        final response = await _apiClient
-            .get('/sync/pull?last_timestamp=$currentTimestamp&limit=500');
+        final query = StringBuffer(
+            '/sync/pull?last_timestamp=$currentTimestamp&limit=500');
+        if (currentType.isNotEmpty || currentId.isNotEmpty) {
+          query
+            ..write('&last_type=${Uri.encodeQueryComponent(currentType)}')
+            ..write('&last_id=${Uri.encodeQueryComponent(currentId)}');
+        }
+        final response = await _apiClient.get(query.toString());
         if (response.statusCode != 200) {
           errors.add('Pull sync failed with status: ${response.statusCode}');
           break;
@@ -670,14 +793,24 @@ class OfflineSyncService {
         });
 
         final nextTimestamp = data['last_timestamp'] as int?;
-        if (nextTimestamp != null && nextTimestamp > currentTimestamp) {
+        final nextType = data['last_type'] as String? ?? '';
+        final nextId = data['last_id']?.toString() ?? '';
+        final serverHasMore = data['has_more'] as bool? ?? false;
+        final cursorAdvanced = nextTimestamp != null &&
+            (nextTimestamp > currentTimestamp ||
+                (nextTimestamp == currentTimestamp &&
+                    (nextType != currentType || nextId != currentId)));
+        if (cursorAdvanced) {
           currentTimestamp = nextTimestamp;
-          await sharedPrefs.setInt('last_sync_timestamp', nextTimestamp);
+          currentType = nextType;
+          currentId = nextId;
+          await sharedPrefs.setInt(timestampKey, nextTimestamp);
+          await sharedPrefs.setString(typeKey, nextType);
+          await sharedPrefs.setString(idKey, nextId);
         } else {
           hasMore = false;
         }
 
-        final serverHasMore = data['has_more'] as bool? ?? false;
         if (!serverHasMore) {
           hasMore = false;
           final serverChecksum = data['checksum'] as String?;
@@ -857,7 +990,6 @@ class OfflineSyncService {
           'qty': item['quantity'] ?? item['qty'],
           'unitPrice': item['unit_price'] ?? item['unitPrice'],
         };
-        return item;
       }).toList(),
     };
   }

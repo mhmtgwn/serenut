@@ -114,6 +114,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     required List<SaleItemInput> items,
     required String paymentMethod,
     double? paidAmount,
+    String? idempotencyKey,
   }) async {
     await future;
     SaleEntity? created;
@@ -128,6 +129,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           items: items,
           paymentMethod: paymentMethod,
           paidAmount: paidAmount,
+          idempotencyKey: idempotencyKey,
           createdBy: cashierName,
         );
         if (created != null) {

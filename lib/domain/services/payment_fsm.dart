@@ -8,6 +8,8 @@ enum PaymentState {
   terminalSent,
   timeout,
   authorized,
+  declined,
+  cancelled,
   completed,
   unreconciled,
 }
@@ -94,6 +96,22 @@ class PaymentFSM {
   void authorize() {
     _verifyStateIn([PaymentState.terminalSent, PaymentState.timeout]);
     _transitionTo(PaymentState.authorized);
+  }
+
+  /// Terminal explicitly rejected the transaction. No sale may be completed.
+  void decline() {
+    _verifyStateIn([PaymentState.terminalSent, PaymentState.timeout]);
+    _transitionTo(PaymentState.declined);
+  }
+
+  /// User or terminal cancelled the active payment before completion.
+  void cancel() {
+    _verifyStateIn([
+      PaymentState.initiated,
+      PaymentState.terminalSent,
+      PaymentState.timeout,
+    ]);
+    _transitionTo(PaymentState.cancelled);
   }
 
   /// Successfully complete transaction and persist to database.

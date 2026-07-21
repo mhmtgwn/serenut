@@ -11,6 +11,7 @@ import '../../infrastructure/database/database_provider.dart';
 class BootstrapSyncService {
   final SharedPreferences _prefs;
   final ApiClient _apiClient;
+  final String? _scopeId;
 
   static const String _bootstrapIndexKey = 'nutopiano_bootstrap_index';
   static const String _bootstrapCompletedKey = 'nutopiano_bootstrap_completed';
@@ -29,19 +30,39 @@ class BootstrapSyncService {
     'license-config',
   ];
 
-  BootstrapSyncService(this._prefs, this._apiClient);
+  BootstrapSyncService(this._prefs, this._apiClient, {String? scopeId})
+      : _scopeId = scopeId;
+
+  String get _indexKey => _scopedKey(_bootstrapIndexKey);
+  String get _completedKey => _scopedKey(_bootstrapCompletedKey);
+
+  String _scopedKey(String base) {
+    var scope = _scopeId?.trim();
+    if (scope == null || scope.isEmpty) {
+      final storedUser = _prefs.getString('auth_user_json');
+      if (storedUser != null && storedUser.isNotEmpty) {
+        try {
+          final userMap = jsonDecode(storedUser) as Map<String, dynamic>;
+          scope = (userMap['companyId'] ?? userMap['company_id'])?.toString();
+        } catch (_) {
+          // Legacy/invalid session data falls back to the unscoped key.
+        }
+      }
+    }
+    return scope == null || scope.isEmpty ? base : '${base}_$scope';
+  }
 
   bool isCompleted() {
-    return _prefs.getBool(_bootstrapCompletedKey) ?? false;
+    return _prefs.getBool(_completedKey) ?? false;
   }
 
   int getProgressIndex() {
-    return _prefs.getInt(_bootstrapIndexKey) ?? 0;
+    return _prefs.getInt(_indexKey) ?? 0;
   }
 
   Future<void> resetBootstrap() async {
-    await _prefs.remove(_bootstrapIndexKey);
-    await _prefs.remove(_bootstrapCompletedKey);
+    await _prefs.remove(_indexKey);
+    await _prefs.remove(_completedKey);
   }
 
   /// Run bootstrap sync, updating state via [onProgress]
@@ -108,7 +129,7 @@ class BootstrapSyncService {
         }
       } on ApiException catch (e) {
         if (e.statusCode == 409) {
-          await _prefs.setBool('serenut_pending_company_patch', false);
+          await _prefs.setBool('serenut_pending_company_patch', true);
           debugPrint(
               '[BootstrapSync] ⚠️ Settings patch version conflict: 409 returned.');
         }
@@ -137,11 +158,11 @@ class BootstrapSyncService {
       await _saveModuleData(db, moduleName, payload);
 
       // Save current step progress
-      await _prefs.setInt(_bootstrapIndexKey, i + 1);
+      await _prefs.setInt(_indexKey, i + 1);
     }
 
     // Set as fully completed
-    await _prefs.setBool(_bootstrapCompletedKey, true);
+    await _prefs.setBool(_completedKey, true);
     onProgress(100.0, 'Tüm veriler başarıyla eşitlendi');
   }
 
@@ -212,7 +233,8 @@ class BootstrapSyncService {
             await txn.insert('settings', {
               'business_name': map['name'] ?? '',
               'business_phone': map['phone'] ?? '',
-              'business_address': '${map['district'] ?? ''}, ${map['city'] ?? ''}',
+              'business_address':
+                  '${map['district'] ?? ''}, ${map['city'] ?? ''}',
               'business_tax_id': map['tax_number'] ?? '',
               'owner_name': map['owner_name'] ?? '',
               'business_email': map['email'] ?? '',

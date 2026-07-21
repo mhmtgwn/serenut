@@ -28,7 +28,6 @@ class _CustomerSelectionSheetState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _balanceController = TextEditingController(text: '0');
 
   bool _isSaving = false;
 
@@ -50,7 +49,6 @@ class _CustomerSelectionSheetState
     _searchController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
-    _balanceController.dispose();
     _scrollController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
@@ -143,9 +141,13 @@ class _CustomerSelectionSheetState
                   ),
                   onChanged: (val) {
                     setState(() => _searchQuery = val);
-                    if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
-                    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-                      ref.read(salesCustomerSearchQueryProvider.notifier).state = val;
+                    if (_searchDebounce?.isActive ?? false)
+                      _searchDebounce!.cancel();
+                    _searchDebounce =
+                        Timer(const Duration(milliseconds: 300), () {
+                      ref
+                          .read(salesCustomerSearchQueryProvider.notifier)
+                          .state = val;
                     });
                   },
                 ),
@@ -231,7 +233,11 @@ class _CustomerSelectionSheetState
                 controller: _scrollController,
                 shrinkWrap: true,
                 itemCount: filtered.length +
-                    (ref.read(salesCustomersControllerProvider.notifier).isLoadingMore ? 1 : 0),
+                    (ref
+                            .read(salesCustomersControllerProvider.notifier)
+                            .isLoadingMore
+                        ? 1
+                        : 0),
                 separatorBuilder: (context, index) => const SizedBox(height: 6),
                 itemBuilder: (context, idx) {
                   if (idx == filtered.length) {
@@ -415,45 +421,6 @@ class _CustomerSelectionSheetState
               isDense: true,
             ),
           ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _balanceController,
-            keyboardType: const TextInputType.numberWithOptions(
-                decimal: true, signed: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[\d\.\,\-]'))
-            ],
-            decoration: InputDecoration(
-              labelText: 'Başlangıç Bakiyesi (₺)',
-              hintText: 'Negatif: Borçlu, Pozitif: Alacaklı',
-              prefixIcon: const Icon(Icons.account_balance_wallet_rounded,
-                  size: 18, color: _kTextSecondary),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorder),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kGreen, width: 2),
-              ),
-              filled: true,
-              fillColor: _kSurface,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              isDense: true,
-            ),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Bakiye giriniz';
-              if (double.tryParse(v.trim().replaceAll(',', '.')) == null) {
-                return 'Geçerli bir sayı giriniz';
-              }
-              return null;
-            },
-          ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -519,9 +486,7 @@ class _CustomerSelectionSheetState
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         email: '',
-        balance: double.tryParse(
-                _balanceController.text.trim().replaceAll(',', '.')) ??
-            0.0,
+        balance: 0.0,
         createdAt: DateTime.now(),
       );
 

@@ -9,9 +9,9 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:serenutos/config/router.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
-import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/providers/sync_provider.dart';
@@ -35,8 +35,6 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardProvider);
-    final ordersAsync = ref.watch(ordersControllerProvider);
-
     return Scaffold(
       backgroundColor: _kBgColor,
       body: SafeArea(
@@ -51,12 +49,10 @@ class HomePage extends ConsumerWidget {
             onRetry: () => ref.invalidate(dashboardProvider),
           ),
           data: (data) {
-            final orders = ordersAsync.value ?? [];
             return RefreshIndicator(
               color: const Color(0xFF10B981),
               onRefresh: () async {
                 ref.invalidate(dashboardProvider);
-                ref.invalidate(ordersControllerProvider);
                 ref.invalidate(customersControllerProvider);
                 ref.invalidate(debtAgingProvider);
               },
@@ -123,6 +119,11 @@ class HomePage extends ConsumerWidget {
         '${now.day} ${DateFormat('MMMM', 'tr_TR').format(now)} $dayName';
 
     final settings = ref.watch(settingsNotifierProvider).value;
+    final currentUser = ref.watch(currentUserProvider);
+    final canViewInventory = currentUser != null &&
+        (currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.hasPermission(Permission.inventoryView.value));
     final titleText =
         (settings?.businessName != null && settings!.businessName.isNotEmpty)
             ? settings.businessName
@@ -172,17 +173,14 @@ class HomePage extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.notifications_none_rounded,
                       color: Color(0xFF475569), size: 24),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Tüm bildirimler güncel.'),
-                        behavior: SnackBarBehavior.floating,
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  },
+                  tooltip: 'Bildirimler',
+                  onPressed: () => _showNotifications(
+                    context,
+                    data,
+                    canViewInventory: canViewInventory,
+                  ),
                 ),
-                if (data.lowStockProducts.isNotEmpty)
+                if (canViewInventory && data.lowStockProducts.isNotEmpty)
                   Positioned(
                     right: 12,
                     top: 12,
@@ -210,7 +208,10 @@ class HomePage extends ConsumerWidget {
               },
             ),
             const SizedBox(width: 4),
-            if (ref.watch(currentUserProvider) != null)
+            if (currentUser != null &&
+                (currentUser.role == UserRole.owner ||
+                    currentUser.role == UserRole.admin ||
+                    currentUser.hasPermission(Permission.settingsView.value)))
               IconButton(
                 icon: const Icon(Icons.settings_outlined,
                     color: Color(0xFF475569), size: 24),
@@ -219,6 +220,70 @@ class HomePage extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+
+  void _showNotifications(
+    BuildContext context,
+    DashboardData data, {
+    required bool canViewInventory,
+  }) {
+    final lowStockProducts =
+        canViewInventory ? data.lowStockProducts : const <ProductEntity>[];
+    if (lowStockProducts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Yeni bildiriminiz bulunmuyor.'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Kritik Stok Uyarıları',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              ...lowStockProducts.take(5).map(
+                    (product) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFFEE2E2),
+                        child: Icon(Icons.inventory_2_outlined,
+                            color: Color(0xFFDC2626)),
+                      ),
+                      title: Text(product.name),
+                      subtitle: Text('Kalan stok: ${product.quantity}'),
+                    ),
+                  ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    context.go(AppRoutes.products);
+                  },
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: const Text('Ürünlere Git'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

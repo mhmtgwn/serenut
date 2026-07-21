@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/license_model.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 

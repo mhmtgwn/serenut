@@ -282,6 +282,32 @@ class PaymentService {
     ));
   }
 
+  /// Adds a manually entered debt as an append-only ledger movement.
+  Future<void> recordManualDebt({
+    required String customerId,
+    required double amount,
+    String? notes,
+  }) async {
+    if (!amount.isFinite || amount <= 0) {
+      throw ArgumentError('Borç tutarı sıfırdan büyük olmalıdır.');
+    }
+    await _transactionRepository.create(
+      FinancialTransactionEntity(
+        id: _generateTxId('trans-debt'),
+        type: 'manual_debt',
+        customerId: customerId,
+        amount: amount,
+        paidAmount: 0,
+        debtAmount: amount,
+        date: DateTime.now(),
+        metadata: {
+          'source': 'customer_screen',
+          if (notes?.trim().isNotEmpty == true) 'notes': notes!.trim(),
+        },
+      ),
+    );
+  }
+
   /// Processes refund for returned items.
   /// Credites customer balance or cash refund transaction.
   Future<void> processRefund({

@@ -85,11 +85,13 @@ class _CatalogProductCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          outOfStock
-                              ? 'Tükendi'
-                              : (isLowStock
-                                  ? '${product.quantity} adet'
-                                  : '${product.quantity}'),
+                          product.isWeighed
+                              ? '⚖ kg'
+                              : outOfStock
+                                  ? 'Tükendi'
+                                  : (isLowStock
+                                      ? '${product.quantity} adet'
+                                      : '${product.quantity}'),
                           style: TextStyle(
                             fontSize: 9,
                             color: badgeTextColor,
@@ -134,7 +136,7 @@ class _CatalogProductCard extends StatelessWidget {
                     children: [
                       // Fiyat — POS için büyük ve belirgin
                       Text(
-                        '₺${product.price % 1 == 0 ? product.price.toInt() : product.price.toStringAsFixed(2)}',
+                        '₺${product.price % 1 == 0 ? product.price.toInt() : product.price.toStringAsFixed(2)}${product.isWeighed ? '/kg' : ''}',
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 17,

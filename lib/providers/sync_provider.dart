@@ -75,12 +75,14 @@ class SyncNotifier extends StateNotifier<SyncState>
           await _ref.read(financialTransactionRepositoryProvider.future);
       final licenseService = _ref.read(licenseServiceProvider);
       final trialManager = _ref.read(trialManagerProvider);
+      final currentUser = await _ref.read(authServiceProvider).getCurrentUser();
       _syncService = OfflineSyncService(
         saleRepository: saleRepo,
         transactionRepository: transactionRepo,
         licenseService: licenseService,
         trialManager: trialManager,
         apiClient: _ref.read(apiClientProvider),
+        syncScopeId: currentUser?.companyId,
       );
       await triggerSync();
     } catch (_) {
@@ -97,6 +99,7 @@ class SyncNotifier extends StateNotifier<SyncState>
     state = state.copyWith(status: SyncStatus.syncing);
 
     try {
+      String? companyPatchError;
       // Sync pending settings if any before main sync
       SharedPreferences? prefs;
       try {
@@ -155,10 +158,14 @@ class SyncNotifier extends StateNotifier<SyncState>
         }
       } on ApiException catch (e) {
         if (e.statusCode == 409 && prefs != null) {
-          await prefs.setBool('serenut_pending_company_patch', false);
+          await prefs.setBool('serenut_pending_company_patch', true);
+          companyPatchError =
+              'Şirket bilgileri başka bir cihazda değiştirildi. Yerel değişiklik beklemede tutuluyor.';
           debugPrint('[Sync] ⚠️ Company patch version conflict: 409 returned.');
         }
-      } catch (_) {}
+      } catch (e) {
+        companyPatchError = 'Şirket bilgileri senkronize edilemedi: $e';
+      }
 
       final db = kIsWeb ? null : await DatabaseManager().getDatabase();
       final machine = SyncStateMachine(db: db);
@@ -171,7 +178,7 @@ class SyncNotifier extends StateNotifier<SyncState>
         await authService.checkCurrentUserSessionOnline();
       } catch (_) {}
 
-      if (result.synced > 0 || result.failed == 0) {
+      if (result.success && companyPatchError == null) {
         state = state.copyWith(
           status: SyncStatus.success,
           lastSyncedCount: result.synced,
@@ -192,8 +199,8 @@ class SyncNotifier extends StateNotifier<SyncState>
         );
         state = state.copyWith(
           status: SyncStatus.error,
-          lastError:
-              result.errors.isNotEmpty ? result.errors.first : 'Sync failed',
+          lastError: companyPatchError ??
+              (result.errors.isNotEmpty ? result.errors.first : 'Sync failed'),
         );
       }
     } catch (e, st) {

@@ -11,6 +11,15 @@ router.use(syncLimiter);
 
 router.use(authenticateUser);
 
+router.get('/health', async (_req: Request, res: Response) => {
+  try {
+    await pgPool.query('SELECT 1');
+    return res.json({ status: 'healthy' });
+  } catch (_err) {
+    return res.status(503).json({ status: 'unhealthy' });
+  }
+});
+
 router.post('/push', async (req: Request, res: Response) => {
   const user = (req as any).user;
   const { items } = req.body;
@@ -61,6 +70,14 @@ router.post('/push', async (req: Request, res: Response) => {
     for (const item of items) {
       console.log(`[DEBUG] Processing item ${item.id}`);
       const { id, entity_type, entity_id, payload } = item;
+      if (!id || !entity_type || !entity_id || !payload) {
+        errors.push({ id, error: 'missing_fields' });
+        continue;
+      }
+      if (!['sale', 'customer', 'product', 'financial_transaction'].includes(entity_type)) {
+        errors.push({ id, error: 'unsupported_entity_type' });
+        continue;
+      }
       const itemTime = payload.created_at || payload.date || new Date().toISOString();
       const maxSkewMsGlobal = 60 * 60 * 1000;
       if (new Date(itemTime).getTime() > Date.now() + maxSkewMsGlobal) {
@@ -111,11 +128,6 @@ router.post('/push', async (req: Request, res: Response) => {
           continue;
         }
       }
-      if (!entity_type || !entity_id || !payload) {
-        errors.push({ id, error: 'missing_fields' });
-        continue;
-      }
-
       await client.query('BEGIN');
       try {
         // Enforce Multi-tenant RLS context for safety
@@ -335,6 +347,11 @@ router.get('/pull', async (req: Request, res: Response) => {
   const user = (req as any).user;
   const lastTimestampStr = req.query.last_timestamp as string;
   const lastTime = lastTimestampStr ? new Date(parseInt(lastTimestampStr, 10)) : new Date(0);
+  const cursorType = typeof req.query.last_type === 'string' ? req.query.last_type : '';
+  const cursorId = typeof req.query.last_id === 'string' ? req.query.last_id : '';
+  const requestedLimit = Number.parseInt(String(req.query.limit || '500'), 10);
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 500, 1), 1000);
+  const timestampOperator = cursorType || cursorId ? '>=' : '>';
 
   try {
     const client = await pgPool.connect();
@@ -369,25 +386,25 @@ router.get('/pull', async (req: Request, res: Response) => {
 
     // Gather modified products since last timestamp
     const prodRes = await pgPool.query(
-      'SELECT * FROM products WHERE company_id = $1 AND updated_at > $2',
+      `SELECT * FROM products WHERE company_id = $1 AND updated_at ${timestampOperator} $2`,
       [user.company_id, lastTime]
     );
 
     // Gather modified customers since last timestamp
     const custRes = await pgPool.query(
-      'SELECT * FROM customers WHERE company_id = $1 AND updated_at > $2',
+      `SELECT * FROM customers WHERE company_id = $1 AND updated_at ${timestampOperator} $2`,
       [user.company_id, lastTime]
     );
 
     // Gather modified sales since last timestamp
     const salesRes = await pgPool.query(
-      'SELECT * FROM sales WHERE company_id = $1 AND updated_at > $2',
+      `SELECT * FROM sales WHERE company_id = $1 AND updated_at ${timestampOperator} $2`,
       [user.company_id, lastTime]
     );
 
     // Gather modified financial transactions since last timestamp
     const transRes = await pgPool.query(
-      'SELECT * FROM financial_transactions WHERE company_id = $1 AND updated_at > $2',
+      `SELECT * FROM financial_transactions WHERE company_id = $1 AND updated_at ${timestampOperator} $2`,
       [user.company_id, lastTime]
     );
 
@@ -444,14 +461,29 @@ router.get('/pull', async (req: Request, res: Response) => {
       });
     }
 
-    // Sort by timestamp ascending to preserve order
-    transactions.sort((a, b) => a.timestamp - b.timestamp);
-
-    const nextTimestamp = transactions.length > 0 ? transactions[transactions.length - 1].timestamp : lastTime.getTime();
+    // Stable composite cursor prevents records sharing the same millisecond from
+    // being skipped between pages.
+    transactions.sort((a, b) =>
+      a.timestamp - b.timestamp || a.type.localeCompare(b.type) || String(a.id).localeCompare(String(b.id))
+    );
+    const filtered = transactions.filter((item) => {
+      if (item.timestamp > lastTime.getTime()) return true;
+      if (item.timestamp < lastTime.getTime()) return false;
+      if (!cursorType && !cursorId) return false;
+      return item.type.localeCompare(cursorType) > 0 ||
+        (item.type === cursorType && String(item.id).localeCompare(cursorId) > 0);
+    });
+    const page = filtered.slice(0, limit);
+    const hasMore = filtered.length > page.length;
+    const lastItem = page.length > 0 ? page[page.length - 1] : null;
+    const nextTimestamp = lastItem?.timestamp ?? lastTime.getTime();
 
     return res.json({
-      transactions,
-      last_timestamp: nextTimestamp
+      transactions: page,
+      last_timestamp: nextTimestamp,
+      last_type: lastItem?.type ?? cursorType,
+      last_id: lastItem?.id ?? cursorId,
+      has_more: hasMore
     });
   } catch (err) {
     console.error('Pull sync error:', err);

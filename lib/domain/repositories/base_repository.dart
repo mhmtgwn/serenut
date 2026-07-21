@@ -225,6 +225,8 @@ class ProductEntity {
   final String category;
   final int? vat; // VAT percentage
   final String? imageUrl;
+  final String saleType; // piece | weighed
+  final int minimumWeightGrams;
 
   ProductEntity({
     required this.id,
@@ -235,7 +237,11 @@ class ProductEntity {
     required this.category,
     this.vat,
     this.imageUrl,
+    this.saleType = 'piece',
+    this.minimumWeightGrams = 20,
   });
+
+  bool get isWeighed => saleType == 'weighed';
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -246,6 +252,8 @@ class ProductEntity {
         'category': category,
         'vat': vat,
         'image_url': imageUrl,
+        'sale_type': saleType,
+        'minimum_weight_grams': minimumWeightGrams,
       };
 
   factory ProductEntity.fromMap(Map<String, dynamic> map) => ProductEntity(
@@ -257,6 +265,9 @@ class ProductEntity {
         category: map['category'] as String,
         vat: map['vat'] as int?,
         imageUrl: map['image_url'] as String?,
+        saleType: map['sale_type'] as String? ?? 'piece',
+        minimumWeightGrams:
+            (map['minimum_weight_grams'] as num?)?.toInt() ?? 20,
       );
 }
 

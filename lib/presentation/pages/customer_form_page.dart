@@ -39,12 +39,10 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _emailFocus = FocusNode();
-  final _balanceFocus = FocusNode();
 
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
-  late final TextEditingController _balanceController;
 
   bool _isSaving = false;
 
@@ -55,8 +53,6 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     _nameController = TextEditingController(text: c?.name ?? '');
     _phoneController = TextEditingController(text: c?.phone ?? '');
     _emailController = TextEditingController(text: c?.email ?? '');
-    _balanceController = TextEditingController(
-        text: c == null ? '0' : c.balance.toStringAsFixed(2));
   }
 
   @override
@@ -64,11 +60,9 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _balanceController.dispose();
     _nameFocus.dispose();
     _phoneFocus.dispose();
     _emailFocus.dispose();
-    _balanceFocus.dispose();
     super.dispose();
   }
 
@@ -85,11 +79,7 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         email: _emailController.text.trim(),
-        balance: widget.isEditing
-            ? widget.existingCustomer!.balance
-            : (double.tryParse(
-                    _balanceController.text.trim().replaceAll(',', '.')) ??
-                0.0),
+        balance: widget.isEditing ? widget.existingCustomer!.balance : 0.0,
         createdAt: widget.isEditing
             ? widget.existingCustomer!.createdAt
             : DateTime.now(),
@@ -249,64 +239,10 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                   label: 'E-posta Adresi',
                   icon: Icons.email_rounded,
                   keyboardType: TextInputType.emailAddress,
-                  nextFocus: widget.isEditing ? null : _balanceFocus,
+                  nextFocus: null,
                 ),
               ],
             ),
-
-            // ── Açılış Bakiyesi (sadece yeni müşteride) ──────────────────
-            if (!widget.isEditing) ...[
-              const SizedBox(height: 16),
-              _buildSection(
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Başlangıç Bakiyesi',
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded,
-                            size: 16, color: Color(0xFFB45309)),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Negatif değer borç (ör: -150), pozitif değer alacak anlamına gelir.',
-                            style: TextStyle(
-                                fontSize: 11, color: Color(0xFF92400E)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildField(
-                    controller: _balanceController,
-                    focusNode: _balanceFocus,
-                    label: 'Başlangıç Bakiyesi (₺)',
-                    icon: Icons.account_balance_wallet_rounded,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[\d\.\,\-]'))
-                    ],
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty)
-                        return 'Bakiye giriniz';
-                      if (double.tryParse(v.trim().replaceAll(',', '.')) ==
-                          null) {
-                        return 'Geçerli bir sayı giriniz';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ],
 
             const SizedBox(height: 32),
 

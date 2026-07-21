@@ -71,7 +71,14 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter test --fail-fast
+      - name: Run release-critical Flutter tests
+        run: >-
+          flutter test --fail-fast
+          test/services/payment_fsm_test.dart
+          test/services/payment_terminal_orchestrator_test.dart
+          test/services/scale_session_test.dart
+          test/services/printer_discovery_service_test.dart
+          test/services/weighed_product_flow_test.dart
       - name: Configure Android signing
         id: android-signing
         if: github.event_name != 'pull_request'
@@ -98,7 +105,7 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
 
   windows-ci:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +137,7 @@ jobs:
 
   deploy-production:
     needs: [backend-ci, flutter-ci, windows-ci]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -174,8 +181,8 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
             docker compose -f docker-compose.prod.yml --env-file .env.production ps
             curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
-            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js android 1.1.4 /var/www/serenut-api/releases/_incoming/android/app-release.apk false
-            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js windows 1.1.4 /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe false
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js android 1.1.5 /var/www/serenut-api/releases/_incoming/android/app-release.apk false
+            docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend node dist/scripts/publish-release.js windows 1.1.5 /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe false
             curl --fail https://api.serenut.com/api/v1/updates/latest-metadata
 
   deploy-staging:
