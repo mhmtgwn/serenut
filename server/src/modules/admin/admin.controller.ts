@@ -1680,6 +1680,35 @@ router.post('/security/users/:id/force-logout', async (req: AuthenticatedRequest
   }
 });
 
+router.post('/security/users/:id/reset-password', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { new_password } = req.body;
+    if (!new_password || typeof new_password !== 'string' || new_password.length < 8) {
+      return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
+    }
+
+    const hash = await AuthService.hashPassword(new_password);
+    const userRes = await runBypassingRLS(
+      `UPDATE users 
+       SET password_hash = $1, failed_login_attempts = 0, locked_until = NULL, is_active = true, token_version = token_version + 1, updated_at = NOW() 
+       WHERE id = $2 
+       RETURNING id, name, email`,
+      [hash, req.params.id]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'user_not_found', message: 'Kullanıcı bulunamadı.' });
+    }
+
+    await writeAdminAudit(req.user!.id, 'RESET_USER_PASSWORD', 'users', req.params.id, null, { email: userRes.rows[0].email });
+
+    return res.json({ success: true, message: 'Şifre başarıyla güncellendi.', user: userRes.rows[0] });
+  } catch (err: any) {
+    console.error('Admin reset user password error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 // ── 24. DESTEK BILETI IC NOTLARI (Internal notes) ──────────────────────────
 router.get('/tickets/:id/notes', async (req: AuthenticatedRequest, res: Response) => {
   try {
