@@ -46,6 +46,3 @@
   .auth-launcher button{min-height:32px;padding:0 8px;font-size:.68rem}
   .desktop-nav a{flex-direction:column;gap:2px;font-size:.65rem}
 }
-
-/* App-aligned hero mockup */
-.app-preview .preview-content{grid-template-columns:1fr;gap:12px}.app-preview-content .preview-card{border-radius:14px}.command-card{background:#0f172a!important;border-color:#1f2a44!important;color:#fff}.command-card p,.settings-card p{margin:8px 0 0;color:#cbd5e1;font-size:.74rem;line-height:1.5}.hardware-mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.hardware-mini-grid span{padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:.68rem;font-weight:700}.hardware-mini-grid strong{display:block;margin-top:4px;color:#fff;font-size:.82rem}.settings-card{background:#fff!important}.settings-card p{color:var(--muted)}

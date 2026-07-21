@@ -22,7 +22,6 @@ import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
-import 'package:serenutos/providers/hardware_provider.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kBgColor = Color(0xFFF8FAFC);
@@ -83,9 +82,6 @@ class HomePage extends ConsumerWidget {
                         const QuickActionsPanel(),
                         const SizedBox(height: 20),
 
-                        _buildHardwareCommandCenter(context, ref),
-                        const SizedBox(height: 20),
-
                         // Finansal Özet Kartları (KPI)
                         _buildFinancialSummary(data.summary),
                         const SizedBox(height: 24),
@@ -111,112 +107,6 @@ class HomePage extends ConsumerWidget {
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildHardwareCommandCenter(BuildContext context, WidgetRef ref) {
-    final scaleState = ref.watch(scaleHardwareProvider);
-    final reading = scaleState.reading;
-    final grams = reading == null ? '-' : '${reading.netGrams} g';
-    final stable = reading?.stable == true;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.settings_input_component_rounded,
-                    color: Color(0xFF34D399)),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Donanım Merkezi',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Canlı terazi, fiziksel POS ve yazıcı durumu',
-                      style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: () => context.push(AppRoutes.hardware),
-                icon: const Icon(Icons.tune_rounded, size: 18),
-                label: const Text('Aç'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth > 680;
-              final cards = [
-                _HardwareStatusTile(
-                  icon: Icons.scale_rounded,
-                  label: 'Terazi',
-                  value: scaleState.connected ? grams : 'Bağlı değil',
-                  state: stable ? 'Stabil ölçüm' : 'Canlı oturum',
-                  accent: const Color(0xFF34D399),
-                ),
-                const _HardwareStatusTile(
-                  icon: Icons.credit_card_rounded,
-                  label: 'Fiziksel POS',
-                  value: 'Manuel onay',
-                  state: 'Adaptör bekliyor',
-                  accent: Color(0xFFFBBF24),
-                ),
-                const _HardwareStatusTile(
-                  icon: Icons.print_rounded,
-                  label: 'Yazıcı',
-                  value: 'Test edilebilir',
-                  state: 'Windows · Ağ · BT',
-                  accent: Color(0xFF60A5FA),
-                ),
-              ];
-              return wide
-                  ? Row(children: [
-                      for (final card in cards) Expanded(child: card),
-                    ])
-                  : Column(children: cards);
-            },
-          ),
-        ],
       ),
     );
   }
@@ -1249,77 +1139,6 @@ class _EmptyCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(message,
               style: TextStyle(color: color.withOpacity(0.7), fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
-
-class _HardwareStatusTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String state;
-  final Color accent;
-
-  const _HardwareStatusTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.state,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8, bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: accent, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        color: Color(0xFFCBD5E1),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 3),
-                Text(value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text(state,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: accent,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
         ],
       ),
     );

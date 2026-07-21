@@ -96,13 +96,6 @@ class QuickActionsPanel extends ConsumerWidget {
           color: const Color(0xFF0D9488),
           onTap: () => context.push('/products/add'),
         ),
-      if (_hasPermission(user, Permission.settingsPrinter))
-        QuickActionBtn(
-          label: 'Donanım',
-          icon: Icons.settings_input_component_rounded,
-          color: const Color(0xFF059669),
-          onTap: () => context.push(AppRoutes.hardware),
-        ),
       if (_hasPermission(user, Permission.settingsFinance))
         QuickActionBtn(
           label: 'Finans Özet',

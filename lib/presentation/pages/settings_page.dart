@@ -35,7 +35,6 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
-import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
@@ -303,12 +302,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
         // ”€”€ 3. GruplanmıŸ Menüler ”€”€
         const SizedBox(height: 16),
-        if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-            _matchesQuery('donanım', 'terazi', 'pos', 'yazıcı', 'hardware'))
-          _buildHardwareCenterCard(),
-        if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-            _matchesQuery('donanım', 'terazi', 'pos', 'yazıcı', 'hardware'))
-          const SizedBox(height: 16),
         if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
           _buildUpdateCheckCard(),
         if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
@@ -375,85 +368,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildHardwareCenterCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => context.push(AppRoutes.hardware),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: _kGreen.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.settings_input_component_rounded,
-                          color: _kGreen),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Donanım Merkezi',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Terazi, fiziksel POS ve yazıcı testleri',
-                            style: TextStyle(
-                              color: Color(0xFFCBD5E1),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Colors.white70),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Row(
-                  children: [
-                    _HardwarePill(icon: Icons.scale_rounded, label: 'Terazi'),
-                    SizedBox(width: 8),
-                    _HardwarePill(
-                        icon: Icons.credit_card_rounded, label: 'POS'),
-                    SizedBox(width: 8),
-                    _HardwarePill(icon: Icons.print_rounded, label: 'Yazıcı'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return _buildCategoryRow(
+      title: 'Donanım Testleri',
+      subtitle: 'Terazi, fiziksel POS ve yazıcı gerçek cihaz denemeleri',
+      icon: Icons.settings_input_component_rounded,
+      color: _kGreen,
+      onTap: () => context.push(AppRoutes.hardware),
     );
   }
 
@@ -711,7 +631,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Grup 2: Donanım ve Bağlantılar
     final group2 = <Widget>[];
     if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('donanım', 'terazi', 'pos', 'yazıcı', 'hardware', 'test',
+            'diagnostics', 'barkod')) {
+      group2.add(_buildHardwareCenterCard());
+    }
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
         _matchesQuery('yazıcı', 'bağlantı', 'ip', settings.printerIp ?? '')) {
+      if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
         title: 'Fiş Yazıcı Ayarları',
         subtitle: settings.printerIp ?? 'Tanımlı Değil',
@@ -743,25 +669,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onTap: () => _showSmsSettingsSheet(settings),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery(
-            'test', 'diagnostics', 'donanım', 'yazıcı', 'barkod', 'hardware')) {
-      if (group2.isNotEmpty) group2.add(const _IOSDivider());
-      group2.add(_buildCategoryRow(
-        title: 'Donanım Diagnostics Testleri',
-        subtitle: 'Yazıcı & Barkod Canlı Test Laboratuvarı',
-        icon: Icons.settings_input_hdmi_rounded,
-        color: _kGreen,
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const HardwareTestPage(),
-            ),
-          );
-        },
-      ));
-    }
-
     if (group2.isNotEmpty) {
       groups.add(_buildSectionHeader('DONANIM VE BAĞLANTILAR'));
       groups.add(_buildRoundedCard(group2));
@@ -1043,45 +950,5 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         backgroundColor: Colors.red,
       ));
     }
-  }
-}
-
-class _HardwarePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _HardwarePill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.10)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF34D399), size: 16),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

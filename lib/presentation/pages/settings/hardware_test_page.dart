@@ -105,8 +105,8 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
           Text('Fiziksel POS Testi'),
         ]),
         content: const Text(
-          'Gerçek terminal entegrasyonu cihazın üretici protokolüyle bağlanınca otomatikleşecek. '
-          'Şimdilik satış akışında cihaz onayı manuel olarak doğrulanır.',
+          'Bu test gerçek terminalden otomatik sonuç okumaz. '
+          'Yarın cihaz başında onay/red/zaman aşımı davranışı manuel raporlanır.',
         ),
         actions: [
           TextButton(
@@ -139,7 +139,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     final reading = scaleState.reading;
 
     return FullScreenSettingsPage(
-      title: 'Donanım Merkezi',
+      title: 'Donanım Testleri',
       child: GestureDetector(
         onTap: () => _scannerFocusNode.requestFocus(),
         child: Column(
@@ -163,7 +163,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Terazi, POS ve Yazıcı Kontrol Merkezi',
+                          'Gerçek Cihaz Testleri',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -171,7 +171,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Canlı tartım, fiziksel POS doğrulaması ve yazıcı testlerini aynı ekrandan yönetin.',
+                          'Terazi, fiziksel POS ve yazıcıları sahada deneyip çalışan/çalışmayan olarak raporlayın.',
                           style: TextStyle(fontSize: 12, color: kTextSecondary),
                         ),
                       ],
@@ -193,8 +193,8 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                         ? 'Bağlı · ${reading?.netGrams ?? 0} g'
                         : 'Bağlı değil',
                     detail: reading?.stable == true
-                        ? 'Stabil ölçüm satışta kullanılabilir.'
-                        : 'Tartılı ürün seçildiğinde canlı oturum açılır.',
+                        ? 'Stabil ölçüm alındı; gerçek cihazda satış akışı doğrulanmalı.'
+                        : 'Tartılı ürün seçildiğinde canlı okuma oturumu açılır.',
                     color: kGreen,
                     actions: [
                       OutlinedButton(
@@ -203,16 +203,16 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                       ),
                       FilledButton(
                         onPressed: () => _simulateScale(735),
-                        child: const Text('735 g test'),
+                        child: const Text('735 g simülasyon'),
                       ),
                     ],
                   ),
                   _buildHardwareCard(
                     icon: Icons.credit_card_rounded,
                     title: 'Fiziksel POS',
-                    subtitle: 'Manuel onay modu aktif',
+                    subtitle: 'Gerçek terminal adaptörü bekliyor',
                     detail:
-                        'Kart seçilirse satış, cihaz sonucu onaylanmadan tamamlanmaz.',
+                        'Kart satışında sonuç belirsizse satış tamamlanmaz; gerçek cihaz sonucu ayrıca doğrulanır.',
                     color: const Color(0xFFF59E0B),
                     actions: [
                       FilledButton.icon(
@@ -227,7 +227,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                     title: 'Yazıcı',
                     subtitle: settings?.printerName ?? 'Yazıcı seçilmedi',
                     detail:
-                        'Windows yazıcı, TCP 9100, Bluetooth ve Sunmi çıktıları test edilir.',
+                        'Windows yazıcı, TCP 9100, Bluetooth ve Sunmi çıktıları gerçek cihazda test edilir.',
                     color: const Color(0xFF3B82F6),
                     actions: [
                       FilledButton.icon(
@@ -250,9 +250,9 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
             ),
             const SizedBox(height: 24),
 
-            // ── SECTION 1: PRINTER DIAGNOSTICS ──
+            // ── SECTION 1: PRINTER TESTS ──
             const Text(
-              'FİŞ YAZICI DIAGNOSTICS',
+              'FİŞ YAZICI TESTLERİ',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -281,7 +281,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                     label: 'Yazıcı IP & Port',
                     value: settings?.printerIp != null &&
                             settings!.printerIp!.isNotEmpty
-                        ? '${settings.printerIp}:${settings.printerPort ?? 9100}'
+                        ? '${settings.printerIp}:${settings.printerPort}'
                         : 'Belirtilmedi (USB/BT/Gömülü)',
                   ),
                   const Divider(height: 24),
@@ -354,7 +354,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
 
             // ── SECTION 2: BARCODE SCANNER ──
             const Text(
-              'BARKOD OKUYUCU DIAGNOSTICS',
+              'BARKOD OKUYUCU TESTLERİ',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
