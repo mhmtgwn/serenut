@@ -469,6 +469,24 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
       logger.error('Verification email could not be queued after registration', notificationError);
     }
 
+    if (!emailVerificationRequired) {
+      try {
+        const loginResult = await AuthService.login(
+          normalizedEmail,
+          password,
+          req.ip || req.socket.remoteAddress || undefined,
+          req.headers['user-agent'] || undefined
+        );
+        return res.status(201).json({
+          ...loginResult,
+          email_verification_required: false,
+          message: 'Hesabınız oluşturuldu ve giriş yapıldı.'
+        });
+      } catch (loginErr) {
+        logger.error('Auto-login after registration failed:', loginErr);
+      }
+    }
+
     return res.status(201).json({
       user_id: registeredUserId,
       email_verification_required: emailVerificationRequired,

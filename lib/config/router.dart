@@ -118,30 +118,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: (accessStatus == AccessStatus.paywall)
-        ? AppRoutes.paywall
-        : (accessStatus == AccessStatus.restrictedOperation)
-            ? '/operational-error'
-            : (isAuthenticated ? AppRoutes.home : AppRoutes.login),
+    initialLocation: isAuthenticated ? AppRoutes.home : AppRoutes.login,
     redirect: (context, state) {
       final loggedIn = isAuthenticated;
-      final status = accessManager.checkAccess(currentUser: currentUser);
-      final onPaywall = state.matchedLocation == AppRoutes.paywall;
-      final onRestricted = state.matchedLocation == '/operational-error';
-
-      if (loggedIn && status == AccessStatus.paywall) {
-        if (!onPaywall) return AppRoutes.paywall;
-        return null;
-      }
-
-      if (loggedIn && status == AccessStatus.restrictedOperation) {
-        if (!onRestricted) return '/operational-error';
-        return null;
-      }
-
-      if (onPaywall || onRestricted) {
-        return loggedIn ? AppRoutes.home : AppRoutes.login;
-      }
 
       final onLogin = state.matchedLocation == AppRoutes.login;
       final onLoginForm = state.matchedLocation == '/login/form';
@@ -156,7 +135,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      if (onAuthScreen) return AppRoutes.home;
+      if (onAuthScreen) {
+        return AppRoutes.home;
+      }
+
       return null;
     },
     routes: [
