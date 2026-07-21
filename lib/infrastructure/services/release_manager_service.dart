@@ -48,18 +48,27 @@ class UpdateInfo {
         channel: 'stable',
       );
 
-  factory UpdateInfo.fromJson(Map<String, dynamic> json) => UpdateInfo(
-        hasUpdate: json['hasUpdate'] as bool? ?? false,
-        isForceUpdate: json['isForceUpdate'] as bool? ?? false,
-        latestVersion: json['latestVersion'] as String? ?? '',
-        minRequiredVersion: json['minRequiredVersion'] as String?,
-        downloadUrl: json['downloadUrl'] as String?,
-        sha256Hash: json['sha256Hash'] as String?,
-        signature: json['signature'] as String?,
-        fileSizeBytes: _parseOptionalInt(json['fileSizeBytes']),
-        releaseNotes: json['releaseNotes'] as String?,
-        channel: json['channel'] as String? ?? 'stable',
-      );
+  factory UpdateInfo.fromJson(Map<String, dynamic> json) {
+    final downloadUrl =
+        (json['downloadUrl'] ?? json['download_url']) as String?;
+    return UpdateInfo(
+      hasUpdate: (json['hasUpdate'] ?? json['has_update']) as bool? ??
+          (downloadUrl != null && downloadUrl.isNotEmpty),
+      isForceUpdate:
+          (json['isForceUpdate'] ?? json['is_force_update']) as bool? ?? false,
+      latestVersion:
+          (json['latestVersion'] ?? json['latest_version']) as String? ?? '',
+      minRequiredVersion: (json['minRequiredVersion'] ??
+          json['min_required_version']) as String?,
+      downloadUrl: downloadUrl,
+      sha256Hash: (json['sha256Hash'] ?? json['sha256_hash']) as String?,
+      signature: json['signature'] as String?,
+      fileSizeBytes:
+          _parseOptionalInt(json['fileSizeBytes'] ?? json['file_size_bytes']),
+      releaseNotes: (json['releaseNotes'] ?? json['release_notes']) as String?,
+      channel: json['channel'] as String? ?? 'stable',
+    );
+  }
 }
 
 int? _parseOptionalInt(Object? value) {
@@ -329,6 +338,8 @@ class ReleaseManagerService {
     }
 
     // File SHA-256 integrity is fully verified against server database hash
+    debugPrint(
+        '[ReleaseManager] RSA signature did not verify; allowing package because SHA-256 matched the active release metadata.');
     return true;
   }
 
@@ -346,10 +357,12 @@ class ReleaseManagerService {
           : InstallResult.openFileFailed;
     } else if (Platform.isWindows) {
       try {
-        await Process.start(path, ['/verysilent', '/suppressmsgboxes', '/norestart']);
+        await Process.start(
+            path, ['/verysilent', '/suppressmsgboxes', '/norestart']);
         return InstallResult.success;
       } catch (e) {
-        debugPrint('[ReleaseManager] Process.start failed, falling back to OpenFilex: $e');
+        debugPrint(
+            '[ReleaseManager] Process.start failed, falling back to OpenFilex: $e');
         final result = await OpenFilex.open(path);
         return result.type == ResultType.done
             ? InstallResult.success

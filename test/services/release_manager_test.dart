@@ -91,6 +91,24 @@ void main() {
       expect(info.releaseNotes, 'Bug fixes and performance improvements.');
     });
 
+    test('parses production snake_case metadata fields', () {
+      final json = {
+        'hasUpdate': true,
+        'isForceUpdate': false,
+        'latestVersion': '1.1.6',
+        'downloadUrl': '/api/v1/updates/download/android/latest',
+        'sha256_hash': 'abc123def456',
+        'file_size_bytes': '103618864',
+        'release_notes': 'Hotfix release.',
+        'signature': 'signed-hash',
+      };
+      final info = UpdateInfo.fromJson(json);
+      expect(info.sha256Hash, 'abc123def456');
+      expect(info.fileSizeBytes, 103618864);
+      expect(info.releaseNotes, 'Hotfix release.');
+      expect(info.signature, 'signed-hash');
+    });
+
     test('noUpdate factory returns correct defaults', () {
       final info = UpdateInfo.noUpdate('1.0.0+1');
       expect(info.hasUpdate, isFalse);

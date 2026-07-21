@@ -44,6 +44,8 @@ import 'package:serenutos/presentation/pages/license_page.dart'
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
+import 'package:serenutos/infrastructure/services/release_manager_service.dart';
+import 'package:serenutos/presentation/widgets/update_dialog.dart';
 
 part 'settings/widgets/printer_settings_sheet.dart';
 part 'settings/widgets/backup_settings_card.dart';
@@ -301,6 +303,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
         // ”€”€ 3. GruplanmıŸ Menüler ”€”€
         const SizedBox(height: 16),
+        if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
+          _buildUpdateCheckCard(),
+        if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
+          const SizedBox(height: 16),
         ..._buildGroupedSettings(settings, currentUser),
 
         // ── 4. Sürüm ve Çıkış Yap Grubu ──
@@ -309,6 +315,56 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         _buildSignOutGroup(),
         const SizedBox(height: 32),
       ],
+    );
+  }
+
+  Widget _buildUpdateCheckCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kBorderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: _kBlue.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.system_update_rounded, color: _kBlue),
+          ),
+          title: const Text(
+            'Güncelleme Denetle',
+            style: TextStyle(
+              color: _kTextPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          subtitle: const Text(
+            'Yeni sürümü indir ve kurulumu başlat',
+            style: TextStyle(color: _kTextSecondary, fontSize: 12),
+          ),
+          trailing:
+              const Icon(Icons.chevron_right_rounded, color: _kTextSecondary),
+          onTap: _checkForUpdate,
+        ),
+      ),
     );
   }
 
@@ -729,18 +785,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    // Güncelleme Denetle — her kullanıcı görebilir
-    if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(_buildCategoryRow(
-        title: 'Güncelleme Denetle',
-        subtitle: 'Mevcut sürüm: ${VersionChecker.currentVersion}',
-        icon: Icons.system_update_rounded,
-        color: _kBlue,
-        onTap: _checkForUpdate,
-      ));
-    }
-
     if (group5.isNotEmpty) {
       groups.add(_buildSectionHeader('LİSANS & İLETİŞİM'));
       groups.add(_buildRoundedCard(group5));
@@ -878,12 +922,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final hasUpdate = VersionChecker.isVersionOlder(
           VersionChecker.currentVersion, info.latestVersion);
       if (hasUpdate) {
-        messenger.showSnackBar(SnackBar(
-          content: Text(
-              'Yeni sürüm mevcut: ${info.latestVersion}. Lütfen uygulamayı güncelleyin.'),
-          backgroundColor: Colors.green.shade700,
-          duration: const Duration(seconds: 5),
-        ));
+        await showUpdateDialog(
+          context: context,
+          updateInfo: UpdateInfo(
+            hasUpdate: true,
+            isForceUpdate: info.isForceUpdate,
+            latestVersion: info.latestVersion,
+            minRequiredVersion: info.minRequiredVersion,
+            downloadUrl: info.downloadUrl,
+            sha256Hash: info.sha256Hash,
+            signature: info.signature,
+            fileSizeBytes: info.fileSizeBytes,
+            releaseNotes: info.releaseNotes,
+            channel: 'stable',
+          ),
+          releaseManager: ref.read(releaseManagerServiceProvider),
+          platform: Platform.isAndroid ? 'android' : 'windows',
+          jwtToken: ref.read(authServiceProvider).getJwtToken(),
+          deviceId: null,
+        );
       } else {
         messenger.showSnackBar(const SnackBar(
           content: Text('Uygulama güncel. Yeni sürüm bulunmuyor.'),

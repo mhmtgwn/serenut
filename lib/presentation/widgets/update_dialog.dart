@@ -460,6 +460,10 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
             },
             icon: const Icon(Icons.refresh),
             label: const Text('Tekrar Dene'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
           ),
           const SizedBox(width: 4),
         ];
