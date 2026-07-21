@@ -53,6 +53,8 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
       final user = await _authService.getCurrentUser();
       if (user != null) {
         state = AppState.success(user);
+        // Silently refresh entitlement status from backend on startup
+        _authService.refreshEntitlement().catchError((_) => false);
       } else {
         state = AppState.error(
           AuthException(message: 'No stored user found', code: 'AUTH_001'),

@@ -36,8 +36,29 @@ class LicenseManagementPage extends ConsumerStatefulWidget {
 class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
   final _tokenController = TextEditingController();
   bool _isValidating = false;
+  bool _isRefreshing = false;
   String? _validationError;
   bool _tokenVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshEntitlement();
+    });
+  }
+
+  Future<void> _refreshEntitlement() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      final authService = ref.read(authServiceProvider);
+      await authService.refreshEntitlement();
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -47,11 +68,9 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final licStatus = ref.watch(licenseStatusProvider);
     final licenseService = ref.watch(licenseServiceProvider);
-    final status = licenseService.checkLicenseStatus();
     final info = licenseService.getLicenseInfo();
-    final daysLeft = licenseService.getRemainingDays();
-    final deviceUuid = licenseService.getDeviceUuid();
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -66,19 +85,32 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
             fontSize: 18,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded, color: _kTextPrimary),
+            tooltip: 'Lisans Durumunu Yenile',
+            onPressed: _refreshEntitlement,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // ── Current License Status Card ─────────────────────────────────
-          _buildStatusHero(status, info, daysLeft),
+          _buildStatusHero(licStatus.status, info, licStatus.daysLeft),
           const SizedBox(height: 16),
 
           // ── License Details ─────────────────────────────────────────────
           if (info != null) ...[
             _buildSectionHeader('LİSANS DETAYLARI'),
             const SizedBox(height: 8),
-            _buildDetailsCard(info, daysLeft),
+            _buildDetailsCard(info, licStatus.daysLeft),
             const SizedBox(height: 16),
           ],
 
@@ -91,7 +123,7 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
           // ── Device UUID ─────────────────────────────────────────────────
           _buildSectionHeader('CİHAZ KİMLİĞİ'),
           const SizedBox(height: 8),
-          _buildDeviceCard(deviceUuid),
+          _buildDeviceCard(licStatus.deviceUuid),
           const SizedBox(height: 16),
 
           // ── Support ─────────────────────────────────────────────────────
@@ -107,13 +139,21 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
   Widget _buildStatusHero(String status, dynamic info, int daysLeft) {
     final (gradient, icon, title, subtitle, chipLabel, chipColor) =
         switch (status) {
-      'valid' => (
+      'active' || 'valid' => (
           [const Color(0xFF059669), const Color(0xFF10B981)],
           Icons.verified_rounded,
-          'Lisans Aktif',
-          info != null ? '${(info as dynamic).tier.name} Paketi' : 'Aktif',
+          'Ticari Lisans Aktif',
+          info != null ? '${(info as dynamic).tier.name} Paketi' : 'Tam Sürüm',
           '$daysLeft gün kaldı',
           _kGreen,
+        ),
+      'trial' => (
+          [const Color(0xFF0284C7), const Color(0xFF0EA5E9)],
+          Icons.timer_rounded,
+          'Deneme Sürümü Aktif',
+          '30 Günlük Ücretsiz Deneme',
+          '$daysLeft gün kaldı',
+          _kBlue,
         ),
       'expired' => (
           [const Color(0xFFDC2626), const Color(0xFFEF4444)],
