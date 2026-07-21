@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:serenutos/config/environment.dart';
+
 final appDocumentsDirectoryProvider = FutureProvider<Directory>((ref) async {
   if (kIsWeb) {
     throw UnsupportedError('Documents directory is not supported on Web');
@@ -35,6 +37,29 @@ class ProductImage extends ConsumerWidget {
     super.key,
   });
 
+  static bool _isNetworkUrl(String url) {
+    final clean = url.trim().toLowerCase();
+    return clean.startsWith('http://') ||
+        clean.startsWith('https://') ||
+        clean.startsWith('data:') ||
+        clean.startsWith('/uploads') ||
+        clean.startsWith('uploads/') ||
+        clean.startsWith('/api/') ||
+        clean.startsWith('/shared/');
+  }
+
+  static String _toAbsoluteUrl(String path) {
+    if (path.startsWith('http://') ||
+        path.startsWith('https://') ||
+        path.startsWith('data:')) {
+      return path;
+    }
+    final baseUri = Uri.parse(EnvironmentConfig.current.apiBaseUrl);
+    final origin =
+        '${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ":${baseUri.port}" : ""}';
+    return '$origin${path.startsWith('/') ? path : '/$path'}';
+  }
+
   static String _resolveLocalPath(String path, String documentsDir) {
     if (p.isAbsolute(path)) {
       if (path.contains('product_images')) {
@@ -54,9 +79,8 @@ class ProductImage extends ConsumerWidget {
 
     // 1. Web execution
     if (kIsWeb) {
-      if (imageUrl != null &&
-          (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:'))) {
-        return _buildNetworkImage(context, imageUrl!);
+      if (imageUrl != null && imageUrl!.isNotEmpty && _isNetworkUrl(imageUrl!)) {
+        return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
       }
       return _buildPlaceholder();
     }
@@ -68,11 +92,13 @@ class ProductImage extends ConsumerWidget {
         _documentsDirectoryPath = dir.path;
 
         if (imageUrl != null && imageUrl!.isNotEmpty) {
-          if (imageUrl!.startsWith('http') || imageUrl!.startsWith('data:')) {
-            return _buildNetworkImage(context, imageUrl!);
+          if (_isNetworkUrl(imageUrl!)) {
+            return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
           } else {
             final resolvedPath = _resolveLocalPath(imageUrl!, dir.path);
-            return _buildFileImage(context, resolvedPath);
+            if (File(resolvedPath).existsSync()) {
+              return _buildFileImage(context, resolvedPath);
+            }
           }
         }
 

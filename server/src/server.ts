@@ -281,18 +281,15 @@ app.get('/reset-password', (req, res) => {
 app.get(['/marketing/signup', '/marketing/signup.html', '/marketing/register', '/marketing/register.html'], (req, res) => {
   res.redirect(301, '/app/#register');
 });
-app.get('/marketing*', (req, res) => {
-  res.redirect(301, '/');
-});
-
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
 app.use('/app', express.static(path.join(process.cwd(), 'public/app')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
   res.redirect(301, '/app/');
 });
 
-// ── CLEAN URLs (no .html extension) ──────────────────────────────────────────
 const websiteDir = path.join(process.cwd(), 'public/website');
 const websitePages = ['platform', 'plans', 'downloads', 'contact', 'privacy', 'kvkk', 'terms', '404'];
 websitePages.forEach(page => {
