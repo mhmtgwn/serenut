@@ -5,7 +5,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -41,6 +41,8 @@ import 'package:serenutos/presentation/pages/license_page.dart'
     show LicenseManagementPage;
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
+import 'package:serenutos/domain/services/version_checker.dart';
+import 'package:serenutos/infrastructure/network/api_client.dart';
 
 part 'settings/widgets/printer_settings_sheet.dart';
 part 'settings/widgets/backup_settings_card.dart';
@@ -385,61 +387,68 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           onTap: () => _showProfileDetails(user),
-        leading: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [_kGreen, _kGreen.withOpacity(0.8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22),
-            ),
-          ),
-        ),
-        title: Text(
-          user.name,
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 16, color: _kTextPrimary),
-        ),
-        subtitle: Row(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: _kGreen.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(20),
+          leading: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [_kGreen, _kGreen.withOpacity(0.8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+            ),
+            child: Center(
               child: Text(
-                roleLabel,
+                initials,
                 style: const TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.bold, color: _kGreen),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22),
               ),
             ),
-          ],
+          ),
+          title: Text(
+            user.name,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: _kTextPrimary),
+          ),
+          subtitle: Row(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _kGreen.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  roleLabel,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: _kGreen),
+                ),
+              ),
+            ],
+          ),
+          trailing: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Yetkilerim',
+                  style: TextStyle(color: _kTextSecondary, fontSize: 13)),
+              SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded,
+                  color: _kTextSecondary, size: 20),
+            ],
+          ),
         ),
-        trailing: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Yetkilerim',
-                style: TextStyle(color: _kTextSecondary, fontSize: 13)),
-            SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, color: _kTextSecondary, size: 20),
-          ],
-        ),
-      ),
       ),
     );
   }
@@ -615,7 +624,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 4: Sistem
     final group4 = <Widget>[];
-    if (currentUser != null &&
+    if (currentUser?.role == UserRole.sysadmin &&
         _matchesQuery('hata ayıklama', 'debug', 'sistem')) {
       group4.add(_buildSwitchRow(
         title: 'Hata Ayıklama Modu (Debug)',
@@ -686,7 +695,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (_hasPermission(currentUser, Permission.settingsAudit) &&
+    if (_hasPermission(currentUser, Permission.settingsView) &&
         _matchesQuery('sms', 'mesaj', 'geçmiş', 'history', 'bildirim')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
@@ -719,8 +728,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
+    // Güncelleme Denetle — her kullanıcı görebilir
+    if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni')) {
+      if (group5.isNotEmpty) group5.add(const _IOSDivider());
+      group5.add(_buildCategoryRow(
+        title: 'Güncelleme Denetle',
+        subtitle: 'Mevcut sürüm: ${VersionChecker.currentVersion}',
+        icon: Icons.system_update_rounded,
+        color: _kBlue,
+        onTap: _checkForUpdate,
+      ));
+    }
+
     if (group5.isNotEmpty) {
-      groups.add(_buildSectionHeader('ÜRÜN & OPERASYON'));
+      groups.add(_buildSectionHeader('LİSANS & İLETİŞİM'));
       groups.add(_buildRoundedCard(group5));
       groups.add(const SizedBox(height: 16));
     }
@@ -776,8 +797,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return groups;
   }
 
-  // �”€�”€ Sürüm ve �‡ıkı�Ÿ Yap Grubu �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
-  // ”€”€ Sürüm ve ‡ıkıŸ Yap Grubu ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   Widget _buildSignOutGroup() {
     return Column(
       children: [
@@ -823,10 +842,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
         const SizedBox(height: 16),
-        const Center(
+        Center(
           child: Text(
-            'Serenut OS v1.2.0 �€� Phase 2.5',
-            style: TextStyle(
+            'Serenut OS v${VersionChecker.currentVersion}',
+            style: const TextStyle(
                 color: _kTextSecondary,
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -835,5 +854,46 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _checkForUpdate() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Güncellemeler denetleniyor...'),
+      duration: Duration(seconds: 2),
+    ));
+    try {
+      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
+      final info = await checker.getVersionInfo();
+      if (!mounted) return;
+      if (info == null) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Sunucuya ulaşılamadı. Lütfen daha sonra tekrar deneyin.'),
+          backgroundColor: Colors.orange,
+        ));
+        return;
+      }
+      final hasUpdate = VersionChecker.isVersionOlder(
+          VersionChecker.currentVersion, info.latestVersion);
+      if (hasUpdate) {
+        messenger.showSnackBar(SnackBar(
+          content: Text(
+              'Yeni sürüm mevcut: ${info.latestVersion}. Lütfen uygulamayı güncelleyin.'),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 5),
+        ));
+      } else {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Uygulama güncel. Yeni sürüm bulunmuyor.'),
+          backgroundColor: Colors.green,
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text('Güncelleme denetleme hatası: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 }
