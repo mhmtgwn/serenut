@@ -41,7 +41,7 @@ class LicenseGuard {
   /// Throws [LicenseException] on failure.
   Future<void> verifyAccess() async {
     // 1. If trial is active, allow bypass
-    if (await _trialManager.isTrialActiveAsync()) {
+    if (await _trialManager.isEntitlementActiveAsync()) {
       return;
     }
 

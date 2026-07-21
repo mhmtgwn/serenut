@@ -96,7 +96,7 @@ class OfflineSyncService {
       _stateMachine = stateMachine;
     }
     // 1. License & Feature Gate verification
-    final isTrial = _trialManager?.isTrialActive() ?? false;
+    final isTrial = _trialManager?.isEntitlementActive() ?? false;
     if (!isTrial) {
       final info = _licenseService.getLicenseInfo();
       final token = _licenseService.getLicenseToken();

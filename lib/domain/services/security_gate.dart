@@ -25,7 +25,7 @@ class SecurityGate {
   /// Central access validation at the domain layer.
   /// Throws LicenseException if license is not valid.
   void ensureAccess() {
-    if (_trialManager.isTrialActive()) {
+    if (_trialManager.isEntitlementActive()) {
       return; // Grant access during trial version
     }
 

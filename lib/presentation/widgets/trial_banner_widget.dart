@@ -20,12 +20,24 @@ final licenseStatusProvider = Provider<LicenseStatus>((ref) {
   final trialManager = ref.watch(trialManagerProvider);
 
   final isTrialActive = trialManager.isTrialActive();
+  final isCommercialActive = trialManager.isCommercialActive();
+  final remainingDays = trialManager.getRemainingDays();
+
   if (isTrialActive) {
-    final remainingDays = trialManager.getRemainingDays();
     return LicenseStatus(
       status: 'trial',
       daysLeft: remainingDays,
-      tierName: 'TRIAL',
+      tierName: 'DENEME',
+      expiryDate: null,
+      deviceUuid: service.getDeviceUuid(),
+    );
+  }
+
+  if (isCommercialActive) {
+    return LicenseStatus(
+      status: 'active',
+      daysLeft: remainingDays,
+      tierName: 'TİCARİ LİSANS',
       expiryDate: null,
       deviceUuid: service.getDeviceUuid(),
     );
@@ -76,6 +88,24 @@ class TrialBannerWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final licStatus = ref.watch(licenseStatusProvider);
 
+    // Active commercial license (e.g. 364 days remaining)
+    if (licStatus.status == 'active') {
+      if (licStatus.daysLeft > 14) {
+        return const SizedBox.shrink(); // Healthy commercial license — NO BANNER
+      }
+      final isLow = licStatus.daysLeft <= 3;
+      return _Banner(
+        icon: Icons.verified_user_rounded,
+        color: isLow ? _kRed : _kAmber,
+        title: 'Lisans Süreniz Doluyor',
+        subtitle:
+            'Ticari lisansınızın bitmesine ${licStatus.daysLeft} gün kaldı.',
+        actionLabel: 'Yenile',
+        onAction: () => context.push('/license'),
+        isCritical: isLow,
+      );
+    }
+
     // Active trial countdown
     if (licStatus.status == 'trial') {
       final isLow = licStatus.daysLeft <= 7;
@@ -83,7 +113,7 @@ class TrialBannerWidget extends ConsumerWidget {
         icon: Icons.timer_rounded,
         color: isLow ? _kAmber : _kGreen,
         title: 'Deneme Sürümü Aktif',
-        subtitle: 'Lisansınızın bitmesine ${licStatus.daysLeft} gün kaldı.',
+        subtitle: 'Deneme sürenizin bitmesine ${licStatus.daysLeft} gün kaldı.',
         actionLabel: 'Lisans Gir',
         onAction: () => context.push('/license'),
         isCritical: false,

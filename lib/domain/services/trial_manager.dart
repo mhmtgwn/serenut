@@ -77,7 +77,29 @@ class TrialManager {
     return EntitlementState.graceExpired;
   }
 
+  String getSubscriptionStatus() {
+    final sub = _getCache();
+    return sub?['status'] as String? ?? 'unknown';
+  }
+
+  /// Returns true ONLY if subscription is in trial status ('trialing' or 'trial')
   bool isTrialActive() {
+    final status = getSubscriptionStatus();
+    final state = getEntitlementState();
+    return (status == 'trialing' || status == 'trial') &&
+        (state == EntitlementState.active || state == EntitlementState.graceActive);
+  }
+
+  /// Returns true if paid commercial subscription is active ('active')
+  bool isCommercialActive() {
+    final status = getSubscriptionStatus();
+    final state = getEntitlementState();
+    return status == 'active' &&
+        (state == EntitlementState.active || state == EntitlementState.graceActive);
+  }
+
+  /// Returns true if ANY entitlement (trial OR commercial) is active
+  bool isEntitlementActive() {
     final state = getEntitlementState();
     return state == EntitlementState.active ||
         state == EntitlementState.graceActive;
@@ -85,6 +107,10 @@ class TrialManager {
 
   Future<bool> isTrialActiveAsync() async {
     return isTrialActive();
+  }
+
+  Future<bool> isEntitlementActiveAsync() async {
+    return isEntitlementActive();
   }
 
   int getRemainingDays() {
