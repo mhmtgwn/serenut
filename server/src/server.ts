@@ -170,6 +170,33 @@ app.use(helmet({
 }));
 app.disable('x-powered-by');
 
+// ── SUBDOMAIN & SEO ISOLATION MIDDLEWARE ─────────────────────────────────────
+// Prevents Google from indexing api.serenut.com by enforcing Disallow: / on api.serenut.com/robots.txt
+// and 301 redirecting any website page requests on api.serenut.com to serenut.com
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const host = (req.headers.host || '').toLowerCase();
+  
+  if (host.startsWith('api.')) {
+    if (req.path === '/robots.txt') {
+      res.type('text/plain');
+      return res.send('User-agent: *\nDisallow: /\n');
+    }
+    
+    if (
+      req.method === 'GET' &&
+      !req.path.startsWith('/api') &&
+      !req.path.startsWith('/health') &&
+      !req.path.startsWith('/uploads') &&
+      !req.path.startsWith('/shared') &&
+      !req.path.startsWith('/api-docs')
+    ) {
+      const targetUrl = `https://serenut.com${req.originalUrl}`;
+      return res.redirect(301, targetUrl);
+    }
+  }
+  next();
+});
+
 // ── BODY PARSER ───────────────────────────────────────────────────────────────
 app.use(express.json({
   limit: '10mb',
