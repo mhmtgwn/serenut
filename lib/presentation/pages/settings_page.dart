@@ -42,7 +42,6 @@ import 'package:serenutos/presentation/pages/license_page.dart'
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
-import 'package:serenutos/infrastructure/network/api_client.dart';
 
 part 'settings/widgets/printer_settings_sheet.dart';
 part 'settings/widgets/backup_settings_card.dart';
