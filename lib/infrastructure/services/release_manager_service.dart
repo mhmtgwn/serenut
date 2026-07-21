@@ -343,10 +343,16 @@ class ReleaseManagerService {
           ? InstallResult.success
           : InstallResult.openFileFailed;
     } else if (Platform.isWindows) {
-      final result = await Process.run('start', [path], runInShell: true);
-      return result.exitCode == 0
-          ? InstallResult.success
-          : InstallResult.openFileFailed;
+      try {
+        await Process.start(path, ['/verysilent', '/suppressmsgboxes', '/norestart']);
+        return InstallResult.success;
+      } catch (e) {
+        debugPrint('[ReleaseManager] Process.start failed, falling back to OpenFilex: $e');
+        final result = await OpenFilex.open(path);
+        return result.type == ResultType.done
+            ? InstallResult.success
+            : InstallResult.openFileFailed;
+      }
     }
 
     return InstallResult.platformUnsupported;
