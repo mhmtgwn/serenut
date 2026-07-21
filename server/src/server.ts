@@ -310,7 +310,22 @@ app.get(['/marketing/signup', '/marketing/signup.html', '/marketing/register', '
 });
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
+
+// Automatically redirect /app (without trailing slash) to /app/ to avoid relative asset path resolution errors
+app.get('/app', (req, res) => {
+  res.redirect(301, '/app/');
+});
+
 app.use('/app', express.static(path.join(process.cwd(), 'public/app')));
+
+// SPA fallback for Web App sub-routes (e.g. /app/dashboard, /app/users)
+app.get(['/app/*', '/portal/*', '/admin/*'], (req, res, next) => {
+  if (!req.path.includes('.')) {
+    return res.sendFile(path.join(process.cwd(), 'public/app/index.html'));
+  }
+  next();
+});
+
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
