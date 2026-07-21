@@ -300,8 +300,9 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     } catch (e) {
       // Split-brain oluşmasını engellemek için işlem yarıda kesiliyor.
       debugPrint('Onboarding: Backend kayıt başarısız: $e');
+      final messenger = ScaffoldMessenger.of(context);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        messenger.showSnackBar(SnackBar(
             content: Text(
                 'Kayıt başarısız: $e. İnternet bağlantınızı kontrol edin.')));
       }
