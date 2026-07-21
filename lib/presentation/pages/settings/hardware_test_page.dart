@@ -2,11 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:serenutos/providers/device_status_provider.dart';
+import 'package:serenutos/providers/device_status_provider.dart'
+    show scannerModeLabelProvider;
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/domain/services/i_scanner_service.dart';
+import 'package:serenutos/domain/hardware/scale_service.dart';
+import 'package:serenutos/providers/hardware_provider.dart';
 
 class HardwareTestPage extends ConsumerStatefulWidget {
   const HardwareTestPage({super.key});
@@ -85,14 +88,58 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
     }
   }
 
+  void _simulateScale(int grams) {
+    final adapter = ref.read(scaleAdapterProvider);
+    if (adapter is SimulatedScaleAdapter) {
+      adapter.emit(grams: grams, stable: true);
+    }
+  }
+
+  Future<void> _runPosTest() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.credit_card_rounded),
+          SizedBox(width: 8),
+          Text('Fiziksel POS Testi'),
+        ]),
+        content: const Text(
+          'Gerçek terminal entegrasyonu cihazın üretici protokolüyle bağlanınca otomatikleşecek. '
+          'Şimdilik satış akışında cihaz onayı manuel olarak doğrulanır.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Reddedildi'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.check_circle_rounded),
+            label: const Text('Onaylandı'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(confirmed == true
+            ? 'POS test sonucu: onaylandı.'
+            : 'POS test sonucu: reddedildi / iptal.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final deviceState = ref.watch(deviceStatusProvider);
     final scannerLabel = ref.watch(scannerModeLabelProvider);
     final settings = ref.watch(settingsNotifierProvider).value;
+    final scaleState = ref.watch(scaleHardwareProvider);
+    final reading = scaleState.reading;
 
     return FullScreenSettingsPage(
-      title: 'Donanım Diagnostics Testleri',
+      title: 'Donanım Merkezi',
       child: GestureDetector(
         onTap: () => _scannerFocusNode.requestFocus(),
         child: Column(
@@ -116,7 +163,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Donanım Teşhis Laboratuvarı',
+                          'Terazi, POS ve Yazıcı Kontrol Merkezi',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -124,7 +171,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Bağlı yazıcıları, kağıt genişliklerini ve barkod okuyucu sinyallerini canlı test edin.',
+                          'Canlı tartım, fiziksel POS doğrulaması ve yazıcı testlerini aynı ekrandan yönetin.',
                           style: TextStyle(fontSize: 12, color: kTextSecondary),
                         ),
                       ],
@@ -134,6 +181,74 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
               ),
             ),
             const SizedBox(height: 20),
+
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth > 760;
+                final cards = [
+                  _buildHardwareCard(
+                    icon: Icons.scale_rounded,
+                    title: 'Canlı Terazi',
+                    subtitle: scaleState.connected
+                        ? 'Bağlı · ${reading?.netGrams ?? 0} g'
+                        : 'Bağlı değil',
+                    detail: reading?.stable == true
+                        ? 'Stabil ölçüm satışta kullanılabilir.'
+                        : 'Tartılı ürün seçildiğinde canlı oturum açılır.',
+                    color: kGreen,
+                    actions: [
+                      OutlinedButton(
+                        onPressed: () => _simulateScale(0),
+                        child: const Text('Sıfırla'),
+                      ),
+                      FilledButton(
+                        onPressed: () => _simulateScale(735),
+                        child: const Text('735 g test'),
+                      ),
+                    ],
+                  ),
+                  _buildHardwareCard(
+                    icon: Icons.credit_card_rounded,
+                    title: 'Fiziksel POS',
+                    subtitle: 'Manuel onay modu aktif',
+                    detail:
+                        'Kart seçilirse satış, cihaz sonucu onaylanmadan tamamlanmaz.',
+                    color: const Color(0xFFF59E0B),
+                    actions: [
+                      FilledButton.icon(
+                        onPressed: _runPosTest,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('POS test'),
+                      ),
+                    ],
+                  ),
+                  _buildHardwareCard(
+                    icon: Icons.print_rounded,
+                    title: 'Yazıcı',
+                    subtitle: settings?.printerName ?? 'Yazıcı seçilmedi',
+                    detail:
+                        'Windows yazıcı, TCP 9100, Bluetooth ve Sunmi çıktıları test edilir.',
+                    color: const Color(0xFF3B82F6),
+                    actions: [
+                      FilledButton.icon(
+                        onPressed: _isPrinting ? null : _runPrinterTest,
+                        icon: const Icon(Icons.print_rounded),
+                        label: const Text('Test fişi'),
+                      ),
+                    ],
+                  ),
+                ];
+                return wide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final card in cards) Expanded(child: card),
+                        ],
+                      )
+                    : Column(children: cards);
+              },
+            ),
+            const SizedBox(height: 24),
 
             // ── SECTION 1: PRINTER DIAGNOSTICS ──
             const Text(
@@ -371,6 +486,68 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
               fontSize: 14, fontWeight: FontWeight.bold, color: kTextPrimary),
         ),
       ],
+    );
+  }
+
+  Widget _buildHardwareCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String detail,
+    required Color color,
+    required List<Widget> actions,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(right: 10, bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              color: kTextPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            detail,
+            style: const TextStyle(
+              color: kTextSecondary,
+              fontSize: 12,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(spacing: 8, runSpacing: 8, children: actions),
+        ],
+      ),
     );
   }
 }

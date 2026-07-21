@@ -25,3 +25,27 @@
 /* Account actions join the bottom navigation only on mobile. */
 .mobile-account-item{display:none!important}
 @media(max-width:920px){.desktop-nav a.mobile-account-item,.desktop-nav button.mobile-account-item{display:flex!important}}
+
+/* Mobile header: identity/actions stay on row one; page links wrap below. */
+@media(max-width:920px){
+  body{padding-bottom:0}
+  .site-header{position:sticky;top:0;z-index:120}
+  .header-row{width:min(100% - 24px,1160px);min-height:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:8px 0 7px}
+  .brand{grid-column:1;grid-row:1;min-width:0;align-self:center}
+  .header-actions{grid-column:2;grid-row:1;display:flex!important;min-width:0;justify-self:end}
+  .desktop-nav,.desktop-nav.has-auth-actions{position:static;grid-column:1/-1;grid-row:2;width:100%;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));padding:5px 0 0;border:0;border-top:1px solid var(--line);box-shadow:none;background:transparent;backdrop-filter:none}
+  .desktop-nav a{min-height:42px;display:flex!important;flex-direction:row;gap:5px;padding:5px 4px;font-size:.72rem}
+  .desktop-nav .mobile-account-item{display:none!important}
+  .desktop-nav svg{width:17px;height:17px}
+  .auth-launcher{box-shadow:none}
+}
+@media(max-width:460px){
+  .header-row{width:min(100% - 18px,1160px);gap:7px 8px}
+  .brand{font-size:1rem}
+  .brand:before{width:29px;height:29px;margin-right:7px}
+  .auth-launcher button{min-height:32px;padding:0 8px;font-size:.68rem}
+  .desktop-nav a{flex-direction:column;gap:2px;font-size:.65rem}
+}
+
+/* App-aligned hero mockup */
+.app-preview .preview-content{grid-template-columns:1fr;gap:12px}.app-preview-content .preview-card{border-radius:14px}.command-card{background:#0f172a!important;border-color:#1f2a44!important;color:#fff}.command-card p,.settings-card p{margin:8px 0 0;color:#cbd5e1;font-size:.74rem;line-height:1.5}.hardware-mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.hardware-mini-grid span{padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:.68rem;font-weight:700}.hardware-mini-grid strong{display:block;margin-top:4px;color:#fff;font-size:.82rem}.settings-card{background:#fff!important}.settings-card p{color:var(--muted)}

@@ -303,6 +303,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
         // ”€”€ 3. GruplanmıŸ Menüler ”€”€
         const SizedBox(height: 16),
+        if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+            _matchesQuery('donanım', 'terazi', 'pos', 'yazıcı', 'hardware'))
+          _buildHardwareCenterCard(),
+        if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+            _matchesQuery('donanım', 'terazi', 'pos', 'yazıcı', 'hardware'))
+          const SizedBox(height: 16),
         if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
           _buildUpdateCheckCard(),
         if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
@@ -363,6 +369,89 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           trailing:
               const Icon(Icons.chevron_right_rounded, color: _kTextSecondary),
           onTap: _checkForUpdate,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHardwareCenterCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.push(AppRoutes.hardware),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: _kGreen.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.settings_input_component_rounded,
+                          color: _kGreen),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Donanım Merkezi',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Terazi, fiziksel POS ve yazıcı testleri',
+                            style: TextStyle(
+                              color: Color(0xFFCBD5E1),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: Colors.white70),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    _HardwarePill(icon: Icons.scale_rounded, label: 'Terazi'),
+                    SizedBox(width: 8),
+                    _HardwarePill(
+                        icon: Icons.credit_card_rounded, label: 'POS'),
+                    SizedBox(width: 8),
+                    _HardwarePill(icon: Icons.print_rounded, label: 'Yazıcı'),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -954,5 +1043,45 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         backgroundColor: Colors.red,
       ));
     }
+  }
+}
+
+class _HardwarePill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _HardwarePill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.10)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: const Color(0xFF34D399), size: 16),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -42,6 +42,7 @@ import 'package:serenutos/presentation/pages/system_hub_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
+import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 
 import 'package:serenutos/presentation/pages/paywall_page.dart';
 
@@ -78,6 +79,7 @@ class AppRoutes {
   static const printing = '/printing';
   static const operations = '/operations';
   static const system = '/system';
+  static const hardware = '/hardware';
   static const printQueue = '/settings/print-queue';
   static const smsHistory = '/settings/sms-history';
   static const dbHealth = '/settings/db-health';
@@ -290,6 +292,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SystemHubPage(),
       ),
       GoRoute(
+        path: AppRoutes.hardware,
+        name: 'hardware',
+        builder: (context, state) => const HardwareTestPage(),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsPrinter),
+      ),
+      GoRoute(
         path: AppRoutes.operations,
         name: 'operations',
         builder: (context, state) => const OperationsHubPage(),
@@ -490,5 +499,6 @@ extension GoRouterX on GoRouter {
   void goOperations() => go(AppRoutes.operations);
   void goFinance() => go(AppRoutes.finance);
   void goSystem() => go(AppRoutes.system);
+  void goHardware() => go(AppRoutes.hardware);
   void goManagement() => go(AppRoutes.management);
 }
