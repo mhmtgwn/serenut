@@ -116,7 +116,9 @@ jobs:
       - name: Build Windows Installer with Inno Setup
         shell: powershell
         run: |
-          if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+          if (Test-Path "C:\Program Files (x86)\Inno Setup 7\ISCC.exe") {
+            & "C:\Program Files (x86)\Inno Setup 7\ISCC.exe" windows\installer\serenut_installer.iss
+          } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
             & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer\serenut_installer.iss
           } else {
             iscc windows\installer\serenut_installer.iss
