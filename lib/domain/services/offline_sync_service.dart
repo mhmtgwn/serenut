@@ -392,12 +392,16 @@ class OfflineSyncService {
                         : 0.0,
                     'vat_rate': payload['vat_rate'] != null
                         ? (payload['vat_rate'] as num).toDouble()
-                        : 0.0,
+                        : (payload['vat'] != null
+                            ? (payload['vat'] as num).toDouble()
+                            : 0.0),
                     'category': payload['category'],
-                    'image_url': payload['image_url'],
+                    'image_url': payload['image_url'] ?? payload['image_path'],
                     'stock': payload['stock'] != null
                         ? (payload['stock'] as num).toInt()
-                        : 0,
+                        : (payload['quantity'] != null
+                            ? (payload['quantity'] as num).toInt()
+                            : 0),
                     'is_deleted': (payload['is_deleted'] == true ||
                             payload['is_deleted'] == 1)
                         ? 1

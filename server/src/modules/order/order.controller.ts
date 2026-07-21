@@ -12,6 +12,7 @@ import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
 import crypto from 'crypto';
+import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 
 const router = Router();
 router.use(authenticateUser);
@@ -162,6 +163,13 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     await client.query('COMMIT');
+
+    RealtimeBroadcastService.publishEvent(user.company_id, 'OrderCreated', {
+      sale_id: orderId,
+      total_amount: finalTotal,
+      payment_method: paymentMethod,
+      customer_id: finalCustomerId
+    }).catch(() => {});
 
     return res.status(201).json({
       orderId,
