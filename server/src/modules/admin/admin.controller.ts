@@ -3,6 +3,8 @@ import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middl
 import { pgPool, redisClient } from '../../config/database';
 import os from 'os';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
+import { AuthService } from '../auth/auth.service';
 import { execSync } from 'child_process';
 import { getNotificationQueue } from '../../workers/notification.worker';
 import { getBillingQueue } from '../../workers/billing.scheduler';
