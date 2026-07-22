@@ -14,12 +14,19 @@ final scaleAdapterProvider = Provider<IScaleAdapter>((ref) {
     final adapter = SerialScaleAdapter(
       portName: config.scaleSerialPort,
       baudRate: config.scaleBaudRate,
+      dataBits: config.scaleDataBits,
+      stopBits: config.scaleStopBits,
+      parity: config.scaleParity,
+      defaultUnit: config.scaleDefaultUnit,
     );
     ref.onDispose(adapter.dispose);
     return adapter;
   }
-  final adapter =
-      TcpScaleAdapter(host: config.scaleHost, port: config.scalePort);
+  final adapter = TcpScaleAdapter(
+    host: config.scaleHost,
+    port: config.scalePort,
+    defaultUnit: config.scaleDefaultUnit,
+  );
   ref.onDispose(adapter.dispose);
   return adapter;
 });
@@ -33,6 +40,8 @@ class UnconfiguredScaleAdapter implements IScaleAdapter {
   @override
   Stream<ScaleReading> get readings => const Stream.empty();
   @override
+  Stream<String> get rawFrames => const Stream.empty();
+  @override
   Future<void> connect() => throw const HardwareFailure(
       'SCALE_NOT_CONFIGURED', 'Terazi IP ve port ayarı yapılmamış.');
   @override
@@ -41,22 +50,26 @@ class UnconfiguredScaleAdapter implements IScaleAdapter {
 
 class ScaleHardwareState {
   final ScaleReading? reading;
+  final String? rawFrame;
   final Object? error;
   final bool connected;
 
   const ScaleHardwareState({
     this.reading,
+    this.rawFrame,
     this.error,
     this.connected = false,
   });
 
   ScaleHardwareState copyWith({
     ScaleReading? reading,
+    String? rawFrame,
     Object? error,
     bool? connected,
   }) =>
       ScaleHardwareState(
         reading: reading ?? this.reading,
+        rawFrame: rawFrame ?? this.rawFrame,
         error: error,
         connected: connected ?? this.connected,
       );
@@ -65,6 +78,7 @@ class ScaleHardwareState {
 class ScaleHardwareNotifier extends StateNotifier<ScaleHardwareState> {
   final IScaleAdapter adapter;
   StreamSubscription<ScaleReading>? _subscription;
+  StreamSubscription<String>? _rawSubscription;
 
   ScaleHardwareNotifier(this.adapter) : super(const ScaleHardwareState()) {
     connect();
@@ -79,6 +93,10 @@ class ScaleHardwareNotifier extends StateNotifier<ScaleHardwareState> {
         onError: (Object error) =>
             state = state.copyWith(error: error, connected: false),
       );
+      await _rawSubscription?.cancel();
+      _rawSubscription = adapter.rawFrames.listen(
+        (frame) => state = state.copyWith(rawFrame: frame),
+      );
       state = state.copyWith(connected: true);
     } catch (error) {
       state = state.copyWith(error: error, connected: false);
@@ -88,6 +106,7 @@ class ScaleHardwareNotifier extends StateNotifier<ScaleHardwareState> {
   @override
   void dispose() {
     _subscription?.cancel();
+    _rawSubscription?.cancel();
     adapter.disconnect();
     super.dispose();
   }

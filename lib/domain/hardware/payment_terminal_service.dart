@@ -22,8 +22,25 @@ class TerminalPaymentResult {
   });
 }
 
+class TerminalCapabilities {
+  final String vendor;
+  final String model;
+  final String protocol;
+  final bool paired;
+  final bool saleSupported;
+
+  const TerminalCapabilities({
+    required this.vendor,
+    required this.model,
+    required this.protocol,
+    required this.paired,
+    required this.saleSupported,
+  });
+}
+
 abstract class IPaymentTerminalAdapter {
   String get adapterId;
+  Future<TerminalCapabilities> probe();
 
   Future<TerminalPaymentResult> sale(PaymentRequest request);
   Future<TerminalPaymentResult> query(String transactionId);
@@ -36,10 +53,17 @@ abstract class IPaymentTerminalAdapter {
 /// as approved unless the bridge explicitly returns decision=approved and an
 /// authorizationCode.
 class TcpPaymentTerminalAdapter implements IPaymentTerminalAdapter {
-  TcpPaymentTerminalAdapter({required this.host, required this.port});
+  TcpPaymentTerminalAdapter({
+    required this.host,
+    required this.port,
+    this.vendor = 'generic',
+    this.protocol = 'vendor_sdk',
+  });
 
   final String host;
   final int port;
+  final String vendor;
+  final String protocol;
 
   @override
   String get adapterId => 'tcp-pos-$host:$port';
@@ -89,12 +113,48 @@ class TcpPaymentTerminalAdapter implements IPaymentTerminalAdapter {
   }
 
   @override
+  Future<TerminalCapabilities> probe() async {
+    Socket? socket;
+    try {
+      socket =
+          await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+      socket.writeln(jsonEncode({
+        'operation': 'capabilities',
+        'vendor': vendor,
+        'protocol': protocol,
+      }));
+      await socket.flush();
+      final line = await socket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first
+          .timeout(const Duration(seconds: 10));
+      final response = jsonDecode(line) as Map<String, dynamic>;
+      return TerminalCapabilities(
+        vendor: response['vendor'] as String? ?? vendor,
+        model: response['model'] as String? ?? '',
+        protocol: response['protocol'] as String? ?? protocol,
+        paired: response['paired'] == true,
+        saleSupported: response['saleSupported'] == true,
+      );
+    } catch (error) {
+      throw HardwareFailure(
+          'POS_PROBE_FAILED', 'POS köprüsü hazır değil: $error');
+    } finally {
+      await socket?.close();
+    }
+  }
+
+  @override
   Future<TerminalPaymentResult> sale(PaymentRequest request) => _send({
         'operation': 'sale',
         'transactionId': request.transactionId,
         'idempotencyKey': request.idempotencyKey,
         'amountMinor': (request.amount * 100).round(),
         'currency': request.currency,
+        'vendor': vendor,
+        'protocol': protocol,
       });
 
   @override
@@ -116,6 +176,8 @@ class UnconfiguredPaymentTerminal implements IPaymentTerminalAdapter {
   String get adapterId => 'pos-unconfigured';
   HardwareFailure get _failure => const HardwareFailure('POS_NOT_CONFIGURED',
       'Fiziksel POS köprüsü IP ve port ayarı yapılmamış.');
+  @override
+  Future<TerminalCapabilities> probe() => Future.error(_failure);
   @override
   Future<TerminalPaymentResult> sale(PaymentRequest request) =>
       Future.error(_failure);
@@ -172,6 +234,15 @@ class SimulatedPaymentTerminal implements IPaymentTerminalAdapter {
 
   @override
   String get adapterId => 'payment-simulator';
+
+  @override
+  Future<TerminalCapabilities> probe() async => const TerminalCapabilities(
+        vendor: 'simulator',
+        model: 'test-only',
+        protocol: 'simulation',
+        paired: true,
+        saleSupported: true,
+      );
 
   @override
   Future<TerminalPaymentResult> sale(PaymentRequest request) async {

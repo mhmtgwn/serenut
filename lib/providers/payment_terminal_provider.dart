@@ -10,5 +10,7 @@ final paymentTerminalAdapterProvider = Provider<IPaymentTerminalAdapter>((ref) {
   return TcpPaymentTerminalAdapter(
     host: config.posBridgeHost,
     port: config.posBridgePort,
+    vendor: config.posVendor,
+    protocol: config.posProtocol,
   );
 });

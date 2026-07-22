@@ -26,6 +26,15 @@ void main() {
       expect(ScaleFrameParser.parse('READY', deviceId: 'test', sequence: 3),
           isNull);
     });
+
+    test('uses configured unit when device omits the unit', () {
+      final kg = ScaleFrameParser.parse('ST,+1.250',
+          deviceId: 'test', sequence: 4, defaultUnit: 'kg');
+      final grams = ScaleFrameParser.parse('ST,+1250',
+          deviceId: 'test', sequence: 5, defaultUnit: 'g');
+      expect(kg?.netGrams, 1250);
+      expect(grams?.netGrams, 1250);
+    });
   });
 
   test('TCP POS requires explicit approval and authorization code', () async {

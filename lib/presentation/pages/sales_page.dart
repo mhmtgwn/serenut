@@ -68,6 +68,12 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     final transactionId = 'pos-${DateTime.now().microsecondsSinceEpoch}';
     try {
       final terminal = ref.read(paymentTerminalAdapterProvider);
+      final capabilities = await terminal.probe();
+      if (!capabilities.paired || !capabilities.saleSupported) {
+        _showErrorSnackBar(
+            'POS eşleştirilmemiş veya satışa hazır değil. Donanım Testleri ekranını kontrol edin.');
+        return false;
+      }
       final orchestrator = PaymentTerminalOrchestrator(terminal: terminal);
       final result = await orchestrator.authorize(PaymentRequest(
         transactionId: transactionId,

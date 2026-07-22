@@ -34,6 +34,12 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
   final _posPortController = TextEditingController(text: '4100');
   bool _hardwareConfigLoaded = false;
   String _scaleConnection = 'tcp';
+  int _scaleDataBits = 8;
+  int _scaleStopBits = 1;
+  String _scaleParity = 'none';
+  String _scaleDefaultUnit = 'kg';
+  String _posVendor = 'generic';
+  String _posProtocol = 'vendor_sdk';
 
   @override
   void initState() {
@@ -119,8 +125,14 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
       scalePort: scalePort,
       scaleSerialPort: _scaleSerialPortController.text,
       scaleBaudRate: scaleBaud,
+      scaleDataBits: _scaleDataBits,
+      scaleStopBits: _scaleStopBits,
+      scaleParity: _scaleParity,
+      scaleDefaultUnit: _scaleDefaultUnit,
       posBridgeHost: _posHostController.text,
       posBridgePort: posPort,
+      posVendor: _posVendor,
+      posProtocol: _posProtocol,
     ));
     ref.invalidate(hardwareConfigProvider);
     ref.invalidate(scaleAdapterProvider);
@@ -134,12 +146,12 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
 
   Future<void> _runPosTest() async {
     try {
-      final result = await ref
-          .read(paymentTerminalAdapterProvider)
-          .query('connection-test-${DateTime.now().millisecondsSinceEpoch}');
+      final result = await ref.read(paymentTerminalAdapterProvider).probe();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('POS köprüsü yanıt verdi: ${result.decision.name}')));
+          content: Text(result.paired && result.saleSupported
+              ? 'POS hazır: ${result.vendor} ${result.model} (${result.protocol})'
+              : 'POS yanıt verdi fakat eşleşmiş/satışa hazır değil.')));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -192,8 +204,14 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
       _scaleConnection = hardwareConfig.scaleConnection;
       _scaleSerialPortController.text = hardwareConfig.scaleSerialPort;
       _scaleBaudController.text = hardwareConfig.scaleBaudRate.toString();
+      _scaleDataBits = hardwareConfig.scaleDataBits;
+      _scaleStopBits = hardwareConfig.scaleStopBits;
+      _scaleParity = hardwareConfig.scaleParity;
+      _scaleDefaultUnit = hardwareConfig.scaleDefaultUnit;
       _posHostController.text = hardwareConfig.posBridgeHost;
       _posPortController.text = hardwareConfig.posBridgePort.toString();
+      _posVendor = hardwareConfig.posVendor;
+      _posProtocol = hardwareConfig.posProtocol;
     }
 
     return FullScreenSettingsPage(
@@ -254,7 +272,7 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                         ? 'Bağlı · ${reading?.netGrams ?? 0} g · ${hardwareConfig?.scaleConnection == 'serial' ? hardwareConfig?.scaleSerialPort : hardwareConfig?.scaleHost}'
                         : 'Bağlı değil',
                     detail: reading?.stable == true
-                        ? 'Ham veri: ${reading?.rawFrame ?? '(çerçeve yok)'}'
+                        ? 'Ham veri: ${scaleState.rawFrame ?? reading?.rawFrame ?? '(çerçeve yok)'}'
                         : (scaleState.error?.toString() ??
                             'Tartılı ürün seçildiğinde canlı okuma başlar.'),
                     color: kGreen,
@@ -585,6 +603,75 @@ class _HardwareTestPageState extends ConsumerState<HardwareTestPage> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Port'))),
           ]),
+        if (_scaleConnection == 'serial') ...[
+          const SizedBox(height: 10),
+          Wrap(spacing: 10, runSpacing: 10, children: [
+            DropdownButton<int>(
+              value: _scaleDataBits,
+              items: const [7, 8]
+                  .map((v) => DropdownMenuItem(value: v, child: Text('$v bit')))
+                  .toList(),
+              onChanged: (v) => setState(() => _scaleDataBits = v ?? 8),
+            ),
+            DropdownButton<int>(
+              value: _scaleStopBits,
+              items: const [1, 2]
+                  .map(
+                      (v) => DropdownMenuItem(value: v, child: Text('$v stop')))
+                  .toList(),
+              onChanged: (v) => setState(() => _scaleStopBits = v ?? 1),
+            ),
+            DropdownButton<String>(
+              value: _scaleParity,
+              items: const {
+                'none': 'Parity yok',
+                'even': 'Çift parity',
+                'odd': 'Tek parity',
+              }
+                  .entries
+                  .map((e) =>
+                      DropdownMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
+              onChanged: (v) => setState(() => _scaleParity = v ?? 'none'),
+            ),
+            DropdownButton<String>(
+              value: _scaleDefaultUnit,
+              items: const [
+                DropdownMenuItem(value: 'kg', child: Text('Varsayılan kg')),
+                DropdownMenuItem(value: 'g', child: Text('Varsayılan g')),
+              ],
+              onChanged: (v) => setState(() => _scaleDefaultUnit = v ?? 'kg'),
+            ),
+          ]),
+        ],
+        const SizedBox(height: 10),
+        Wrap(spacing: 10, runSpacing: 10, children: [
+          DropdownButton<String>(
+            value: _posVendor,
+            items: const {
+              'generic': 'Genel POS',
+              'beko_token': 'Beko / Token',
+              'ingenico': 'Ingenico',
+              'verifone_profilo': 'Verifone / Profilo',
+              'hugin': 'Hugin',
+              'vera': 'Vera',
+            }
+                .entries
+                .map(
+                    (e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                .toList(),
+            onChanged: (v) => setState(() => _posVendor = v ?? 'generic'),
+          ),
+          DropdownButton<String>(
+            value: _posProtocol,
+            items: const [
+              DropdownMenuItem(value: 'vendor_sdk', child: Text('Üretici SDK')),
+              DropdownMenuItem(value: 'gmp3', child: Text('GMP-3')),
+              DropdownMenuItem(value: 'ecr', child: Text('ECR')),
+            ],
+            onChanged: (v) => setState(() => _posProtocol = v ?? 'vendor_sdk'),
+          ),
+        ]),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(

@@ -34,6 +34,7 @@ abstract class IScaleAdapter {
   String get deviceId;
   HardwareConnectionState get connectionState;
   Stream<ScaleReading> get readings;
+  Stream<String> get rawFrames;
 
   Future<void> connect();
   Future<void> disconnect();
@@ -43,13 +44,16 @@ abstract class IScaleAdapter {
 /// and RS232-to-Ethernet converters. Frames may contain ST/US, GS/NT and a
 /// value suffixed with kg or g (for example: `ST,GS,+001.245kg`).
 class TcpScaleAdapter implements IScaleAdapter {
-  TcpScaleAdapter({required this.host, required this.port});
+  TcpScaleAdapter(
+      {required this.host, required this.port, this.defaultUnit = 'kg'});
 
   final String host;
   final int port;
+  final String defaultUnit;
   Socket? _socket;
   StreamSubscription<String>? _subscription;
   final _controller = StreamController<ScaleReading>.broadcast();
+  final _rawController = StreamController<String>.broadcast();
   HardwareConnectionState _state = HardwareConnectionState.disconnected;
   int _sequence = 0;
 
@@ -59,6 +63,8 @@ class TcpScaleAdapter implements IScaleAdapter {
   HardwareConnectionState get connectionState => _state;
   @override
   Stream<ScaleReading> get readings => _controller.stream;
+  @override
+  Stream<String> get rawFrames => _rawController.stream;
 
   @override
   Future<void> connect() async {
@@ -82,10 +88,12 @@ class TcpScaleAdapter implements IScaleAdapter {
   }
 
   void _handleFrame(String frame) {
+    _rawController.add(frame);
     final reading = ScaleFrameParser.parse(
       frame,
       deviceId: deviceId,
       sequence: ++_sequence,
+      defaultUnit: defaultUnit,
     );
     if (reading != null) _controller.add(reading);
   }
@@ -113,6 +121,7 @@ class TcpScaleAdapter implements IScaleAdapter {
   Future<void> dispose() async {
     await disconnect();
     await _controller.close();
+    await _rawController.close();
   }
 }
 
@@ -122,16 +131,21 @@ class SerialScaleAdapter implements IScaleAdapter {
     this.baudRate = 9600,
     this.dataBits = 8,
     this.stopBits = 1,
+    this.parity = 'none',
+    this.defaultUnit = 'kg',
   });
 
   final String portName;
   final int baudRate;
   final int dataBits;
   final int stopBits;
+  final String parity;
+  final String defaultUnit;
   SerialPort? _port;
   SerialPortReader? _reader;
   StreamSubscription<String>? _subscription;
   final _controller = StreamController<ScaleReading>.broadcast();
+  final _rawController = StreamController<String>.broadcast();
   HardwareConnectionState _state = HardwareConnectionState.disconnected;
   int _sequence = 0;
 
@@ -143,6 +157,8 @@ class SerialScaleAdapter implements IScaleAdapter {
   HardwareConnectionState get connectionState => _state;
   @override
   Stream<ScaleReading> get readings => _controller.stream;
+  @override
+  Stream<String> get rawFrames => _rawController.stream;
 
   @override
   Future<void> connect() async {
@@ -157,7 +173,7 @@ class SerialScaleAdapter implements IScaleAdapter {
         ..baudRate = baudRate
         ..bits = dataBits
         ..stopBits = stopBits
-        ..parity = SerialPortParity.none
+        ..parity = _serialParity(parity)
         ..setFlowControl(SerialPortFlowControl.none);
       port.config = config;
       config.dispose();
@@ -179,8 +195,9 @@ class SerialScaleAdapter implements IScaleAdapter {
   }
 
   void _handleFrame(String frame) {
+    _rawController.add(frame);
     final reading = ScaleFrameParser.parse(frame,
-        deviceId: deviceId, sequence: ++_sequence);
+        deviceId: deviceId, sequence: ++_sequence, defaultUnit: defaultUnit);
     if (reading != null) _controller.add(reading);
   }
 
@@ -205,12 +222,19 @@ class SerialScaleAdapter implements IScaleAdapter {
   Future<void> dispose() async {
     await disconnect();
     await _controller.close();
+    await _rawController.close();
   }
+
+  static int _serialParity(String value) => switch (value) {
+        'odd' => SerialPortParity.odd,
+        'even' => SerialPortParity.even,
+        _ => SerialPortParity.none,
+      };
 }
 
 class ScaleFrameParser {
   static final RegExp _weight = RegExp(
-    r'([+-]?\d+(?:[\.,]\d+)?)\s*(kg|g)\b',
+    r'([+-]?\d+(?:[\.,]\d+)?)\s*(kg|g)?\b',
     caseSensitive: false,
   );
 
@@ -219,13 +243,14 @@ class ScaleFrameParser {
     required String deviceId,
     required int sequence,
     DateTime? measuredAt,
+    String defaultUnit = 'kg',
   }) {
     final normalized = frame.trim();
     final match = _weight.firstMatch(normalized);
     if (match == null) return null;
     final value = double.tryParse(match.group(1)!.replaceAll(',', '.'));
     if (value == null) return null;
-    final unit = match.group(2)!.toLowerCase();
+    final unit = (match.group(2) ?? defaultUnit).toLowerCase();
     final grams = (unit == 'kg' ? value * 1000 : value).round();
     final upper = normalized.toUpperCase();
     final unstable =
@@ -388,6 +413,9 @@ class SimulatedScaleAdapter implements IScaleAdapter {
 
   @override
   Stream<ScaleReading> get readings => _controller.stream;
+
+  @override
+  Stream<String> get rawFrames => const Stream.empty();
 
   @override
   Future<void> connect() async {
