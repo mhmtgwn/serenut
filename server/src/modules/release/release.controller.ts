@@ -115,6 +115,21 @@ function compareVersions(a: string, b: string): number {
   return buildA - buildB;
 }
 
+function resolveReleaseFilePath(filePath: string | null): string | null {
+  if (!filePath) return null;
+  if (fs.existsSync(filePath)) return filePath;
+  const p1 = path.resolve(process.cwd(), filePath);
+  if (fs.existsSync(p1)) return p1;
+  const p2 = path.resolve(process.cwd(), 'server', filePath);
+  if (fs.existsSync(p2)) return p2;
+  const baseName = path.basename(filePath);
+  const p3 = path.resolve(process.cwd(), 'public/website/downloads', baseName);
+  if (fs.existsSync(p3)) return p3;
+  const p4 = path.resolve(process.cwd(), 'server/public/website/downloads', baseName);
+  if (fs.existsSync(p4)) return p4;
+  return null;
+}
+
 // ── 0. PUBLIC RELEASE HISTORY (Called by website release notes) ──────────────
 router.get('/history', async (req: Request, res: Response) => {
   try {
@@ -126,7 +141,8 @@ router.get('/history', async (req: Request, res: Response) => {
     `);
     
     const mapped = list.rows.map(row => {
-      const isAvailable = row.file_path ? fs.existsSync(row.file_path) : false;
+      const resolved = resolveReleaseFilePath(row.file_path);
+      const isAvailable = Boolean(resolved);
       return {
         id: row.id,
         version_code: row.version_code,

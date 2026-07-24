@@ -4,49 +4,31 @@
 
 const BASE_URL = '/api/v1';
 
-function isUnifiedApp() {
-  return window.location.pathname.includes('/app');
-}
-
-function isAdminApp() {
-  return window.location.pathname.includes('/admin');
-}
-
-function getTokenKey() {
-  if (isUnifiedApp()) {
-    return 'app_token';
-  }
-  return isAdminApp() ? 'admin_token' : 'portal_token';
-}
-
-function getProfileKey() {
-  if (isUnifiedApp()) {
-    return 'app_profile';
-  }
-  return isAdminApp() ? 'admin_profile' : 'portal_profile';
-}
-
 /**
- * Resolves the authentication token based on current app context (portal vs admin)
+ * Resolves the authentication token from sessionStorage or localStorage
  * @returns {string}
  */
 export function getAuthToken() {
-  return sessionStorage.getItem(getTokenKey()) || sessionStorage.getItem('app_token') || '';
+  return sessionStorage.getItem('app_token') || localStorage.getItem('app_token') || '';
 }
 
 /**
- * Saves the authentication token for the current app context
+ * Saves the refresh token
  * @param {string} token 
  */
 export function setRefreshToken(token) {
-  if (token) sessionStorage.setItem('app_refresh_token', token);
+  if (!token) return;
+  try {
+    sessionStorage.setItem('app_refresh_token', token);
+    localStorage.setItem('app_refresh_token', token);
+  } catch (_) {}
 }
 
 let refreshPromise = null;
 
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
-  const refreshToken = sessionStorage.getItem('app_refresh_token');
+  const refreshToken = sessionStorage.getItem('app_refresh_token') || localStorage.getItem('app_refresh_token');
   if (!refreshToken) return false;
   refreshPromise = fetch(`${BASE_URL}/auth/refresh`, {
     method: 'POST',
@@ -64,46 +46,46 @@ async function refreshAccessToken() {
   return refreshPromise;
 }
 
+/**
+ * Saves the access token to session and local storage
+ * @param {string} token 
+ */
 export function setAuthToken(token) {
-  sessionStorage.setItem(getTokenKey(), token);
-  if (isUnifiedApp()) {
-    sessionStorage.setItem('portal_token', token);
-    sessionStorage.setItem('admin_token', token);
-  }
+  if (!token) return;
+  try {
+    sessionStorage.setItem('app_token', token);
+    localStorage.setItem('app_token', token);
+  } catch (_) {}
 }
 
 /**
- * Clears the authentication token and triggers a page refresh/redirect
+ * Clears the authentication token and profile session
  */
 export function clearAuthSession() {
-  [
-    getTokenKey(),
-    getProfileKey(),
-    'app_token',
-    'app_profile',
-    'portal_token',
-    'portal_profile',
-    'admin_token',
-    'admin_profile',
-    'app_refresh_token'
-  ].forEach((key) => sessionStorage.removeItem(key));
-
-  if (!isAdminApp() && !isUnifiedApp()) {
-    sessionStorage.removeItem('selected_plan_id');
-    sessionStorage.removeItem('selected_billing_period');
-    sessionStorage.removeItem('pending_download_release_id');
+  const refreshToken = sessionStorage.getItem('app_refresh_token') || localStorage.getItem('app_refresh_token');
+  if (refreshToken) {
+    fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    }).catch(() => {});
   }
+  const keys = ['app_token', 'app_profile', 'app_refresh_token', 'portal_token', 'portal_profile', 'admin_token', 'admin_profile', 'selected_plan_id', 'selected_billing_period', 'pending_download_release_id'];
+  keys.forEach((key) => {
+    try {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    } catch (_) {}
+  });
 }
 
 export function clearAuthToken() {
   clearAuthSession();
-
-  if (isUnifiedApp()) {
+  if (window.location.pathname.startsWith('/app')) {
     window.location.href = '/app/';
-    return;
+  } else {
+    window.location.href = '/app/';
   }
-
-  window.location.href = isAdminApp() ? '/admin/' : '/portal/';
 }
 
 /**

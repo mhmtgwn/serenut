@@ -15,6 +15,21 @@ function compareVersions(a: string, b: string): number {
   return (Number.parseInt(a.split('+')[1] || '0', 10) || 0) - (Number.parseInt(b.split('+')[1] || '0', 10) || 0);
 }
 
+function resolveReleaseFilePath(filePath: string | null): string | null {
+  if (!filePath) return null;
+  if (fs.existsSync(filePath)) return filePath;
+  const p1 = path.resolve(process.cwd(), filePath);
+  if (fs.existsSync(p1)) return p1;
+  const p2 = path.resolve(process.cwd(), 'server', filePath);
+  if (fs.existsSync(p2)) return p2;
+  const baseName = path.basename(filePath);
+  const p3 = path.resolve(process.cwd(), 'public/website/downloads', baseName);
+  if (fs.existsSync(p3)) return p3;
+  const p4 = path.resolve(process.cwd(), 'server/public/website/downloads', baseName);
+  if (fs.existsSync(p4)) return p4;
+  return null;
+}
+
 router.get('/download/:platform/latest', async (req: Request, res: Response) => {
   const { platform } = req.params;
   
@@ -42,11 +57,9 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
     }
 
     const release = result.rows[0];
-    const resolvedPath = path.isAbsolute(release.file_path) 
-      ? release.file_path 
-      : path.resolve(process.cwd(), release.file_path);
+    const resolvedPath = resolveReleaseFilePath(release.file_path);
 
-    if (!fs.existsSync(resolvedPath)) {
+    if (!resolvedPath) {
       return res.status(404).send(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
           <h2 style="color: #ef4444;">Dosya Bulunamadı</h2>

@@ -365,16 +365,23 @@ class ReleaseManagerService {
           : InstallResult.openFileFailed;
     } else if (Platform.isWindows) {
       try {
-        await Process.start(
-            path, ['/verysilent', '/suppressmsgboxes', '/norestart']);
+        debugPrint('[ReleaseManager] Launching Windows installer: $path');
+        await Process.start(path, ['/SILENT', '/SP-']);
+        Future.delayed(const Duration(milliseconds: 600), () {
+          exit(0);
+        });
         return InstallResult.success;
       } catch (e) {
         debugPrint(
             '[ReleaseManager] Process.start failed, falling back to OpenFilex: $e');
         final result = await OpenFilex.open(path);
-        return result.type == ResultType.done
-            ? InstallResult.success
-            : InstallResult.openFileFailed;
+        if (result.type == ResultType.done) {
+          Future.delayed(const Duration(milliseconds: 600), () {
+            exit(0);
+          });
+          return InstallResult.success;
+        }
+        return InstallResult.openFileFailed;
       }
     }
 

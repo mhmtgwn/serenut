@@ -185,22 +185,24 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
       // Install
       setState(() {
         _state = _DialogState.done;
-        _progressText = 'Kurulum başlatılıyor...';
+        _progressText = 'Kurulum başlatıldı. Uygulama kapatılıyor...';
       });
 
       final result = await widget.releaseManager
           .installUpdate(downloadedFile, widget.platform);
 
       if (result == InstallResult.success) {
-        if (mounted) Navigator.of(context).pop(true);
+        // App will terminate automatically via releaseManager service
       } else {
         // Trigger automated rollback
         await rollback.triggerRollback();
-        setState(() {
-          _state = _DialogState.error;
-          _errorMessage =
-              'Kurulum başlatılamadı (${result.name}). Sistem önceki stabil sürüme geri döndürüldü (Rollback).';
-        });
+        if (mounted) {
+          setState(() {
+            _state = _DialogState.error;
+            _errorMessage =
+                'Kurulum başlatılamadı (${result.name}). Dosya konumu: ${downloadedFile?.path}';
+          });
+        }
       }
     } catch (e) {
       if (!mounted) return;

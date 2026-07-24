@@ -4,13 +4,6 @@
 
 import { getAuthToken, clearAuthToken } from './api-client.js';
 
-function getProfileStorageKey() {
-  if (window.location.pathname.includes('/app')) {
-    return 'app_profile';
-  }
-  return window.location.pathname.includes('/admin') ? 'admin_profile' : 'portal_profile';
-}
-
 /**
  * Checks if the user has an active session token
  * @returns {boolean}
@@ -20,28 +13,29 @@ export function isAuthenticated() {
 }
 
 /**
- * Returns the parsed user profile stored in the session
+ * Returns the parsed user profile stored in session or local storage
  * @returns {object|null}
  */
 export function getUserProfile() {
   try {
-    const profile = sessionStorage.getItem(getProfileStorageKey()) || sessionStorage.getItem('app_profile');
-    return profile ? JSON.parse(profile) : null;
+    const raw = sessionStorage.getItem('app_profile') || localStorage.getItem('app_profile');
+    return raw ? JSON.parse(raw) : null;
   } catch (_) {
     return null;
   }
 }
 
 /**
- * Sets the user profile in session storage
+ * Sets the user profile in session and local storage
  * @param {object} profile 
  */
 export function setUserProfile(profile) {
-  sessionStorage.setItem(getProfileStorageKey(), JSON.stringify(profile));
-  if (window.location.pathname.includes('/app')) {
-    sessionStorage.setItem('portal_profile', JSON.stringify(profile));
-    sessionStorage.setItem('admin_profile', JSON.stringify(profile));
-  }
+  if (!profile) return;
+  try {
+    const json = JSON.stringify(profile);
+    sessionStorage.setItem('app_profile', json);
+    localStorage.setItem('app_profile', json);
+  } catch (_) {}
 }
 
 /**
@@ -74,3 +68,4 @@ export function adminGuard() {
     clearAuthToken();
   }
 }
+

@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const icons = { product:icon('M4 6h16M4 12h16M4 18h10'), plans:icon('M4 4h16v16H4zM8 9h8M8 13h5'), download:icon('M12 3v12m0 0 5-5m-5 5-5-5M5 21h14'), contact:icon('M4 5h16v14H4zM4 7l8 6 8-6') };
   const escapeHtml = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let profile = null;
-  try { profile = JSON.parse(sessionStorage.getItem('app_profile') || sessionStorage.getItem('portal_profile') || 'null'); } catch (_) {}
+  try { profile = JSON.parse(sessionStorage.getItem('app_profile') || localStorage.getItem('app_profile') || 'null'); } catch (_) {}
   const accountWidget = profile
     ? `<a class="account-widget is-authenticated" href="/app/"><span class="account-avatar">${escapeHtml((profile.name||profile.email||'S').slice(0,1).toUpperCase())}</span><span><strong>${escapeHtml(profile.name||'Hesabım')}</strong><small>Panele git</small></span></a>`
     : `<div class="auth-launcher" aria-label="Hesap işlemleri"><a href="/app/">Giriş yap</a><a href="/app/#register">Kayıt ol</a></div>`;
@@ -107,10 +107,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
     if (event.data?.type === 'serenut-authenticated') {
       try {
-        if (event.data.token) sessionStorage.setItem('app_token', event.data.token);
-        if (event.data.user) sessionStorage.setItem('app_profile', JSON.stringify(event.data.user));
+        if (event.data.token) {
+          sessionStorage.setItem('app_token', event.data.token);
+          localStorage.setItem('app_token', event.data.token);
+        }
+        if (event.data.user) {
+          sessionStorage.setItem('app_profile', JSON.stringify(event.data.user));
+          localStorage.setItem('app_profile', JSON.stringify(event.data.user));
+        }
       } catch (_) {}
       closeAuthModal();
       window.location.href = '/app/';

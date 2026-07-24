@@ -1,12 +1,8 @@
 import { apiFetch } from '/shared/js/api-client.js';
+import { escapeHtml as esc, formatCurrency as money, formatDate as date, translateStatus as tr } from '/shared/js/formatters.js';
 
-const esc = (v = '') => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const date = v => v ? new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(v)) : '—';
-const money = (v, c = 'TRY') => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c }).format(Number(v || 0));
 const badge = v => `<span class="status-badge status-${esc(String(v || 'unknown').toLowerCase())}">${esc(v || '—')}</span>`;
 const metric = (label, value) => `<article class="metric-card"><span>${esc(label)}</span><strong>${esc(value)}</strong></article>`;
-const labels = {active:'Aktif',inactive:'Pasif',trial:'Deneme',trialing:'Deneme',pending:'Bekliyor',paid:'Ödendi',unpaid:'Ödenmedi',suspended:'Askıda','plan-basic':'Başlangıç','plan-pro':'Profesyonel','plan-enterprise':'Kurumsal',owner:'Firma sahibi',admin:'Yönetici',manager:'Müdür',cashier:'Kasiyer',staff:'Personel'};
-const tr = value => labels[String(value || '').toLowerCase()] || value || '—';
 
 function table(columns, rows) {
   if (!Array.isArray(rows) || !rows.length) return '<div class="state-panel">Kayıt bulunamadı.</div>';

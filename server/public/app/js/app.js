@@ -1,5 +1,6 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, clearAuthSession, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
+import { escapeHtml } from '/shared/js/formatters.js';
 import { loadModule } from './module-runtime.js?v=20260721-authfix4';
 
 const authView = document.getElementById('auth-view');
@@ -37,10 +38,6 @@ const navIconPaths = {
   'account-settings': 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2 3.46-.08-.02a1.7 1.7 0 00-1.8.22l-.45.26a1.7 1.7 0 00-.8 1.63V22h-4v-.09a1.7 1.7 0 00-.8-1.63l-.45-.26a1.7 1.7 0 00-1.8-.22l-.08.02-2-3.46.06-.06A1.7 1.7 0 005 15v-.52a1.7 1.7 0 00-1.14-1.6L3.8 12.85v-4l.08-.02A1.7 1.7 0 005 7.23v-.52a1.7 1.7 0 00-.34-1.88l-.06-.06 2-3.46.08.02a1.7 1.7 0 001.8-.22l.45-.26A1.7 1.7 0 009.73-.58V-.67h4v.09a1.7 1.7 0 00.8 1.63l.45.26a1.7 1.7 0 001.8.22l.08-.02 2 3.46-.06.06a1.7 1.7 0 00-.34 1.88v.52a1.7 1.7 0 001.14 1.6l.08.02v4l-.08.02A1.7 1.7 0 0019.4 15z'
 };
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
-const escapeHtml = (value = '') => String(value).replace(
-  /[&<>"']/g,
-  (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
-);
 
 function initApp() {
   const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1' || window.self !== window.top;
@@ -67,8 +64,31 @@ function bindEvents() {
   document.getElementById('open-reset')?.addEventListener('click', () => openLayer('reset'));
   document.getElementById('close-register')?.addEventListener('click', closeLayers);
   document.getElementById('close-reset')?.addEventListener('click', closeLayers);
-  document.getElementById('btn-login')?.addEventListener('click', handleLogin);
-  document.getElementById('btn-register')?.addEventListener('click', handleRegister);
+  
+  document.getElementById('login-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleLogin();
+  });
+  document.getElementById('register-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleRegister();
+  });
+  document.getElementById('reset-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const hasResetToken = Boolean(new URLSearchParams(window.location.search).get('token'));
+    if (hasResetToken) {
+      applyReset();
+    } else {
+      requestReset();
+    }
+  });
+
+  document.getElementById('btn-login')?.addEventListener('click', (e) => {
+    if (e.target.type !== 'submit') handleLogin();
+  });
+  document.getElementById('btn-register')?.addEventListener('click', (e) => {
+    if (e.target.type !== 'submit') handleRegister();
+  });
   document.getElementById('btn-request-reset')?.addEventListener('click', requestReset);
   document.getElementById('btn-apply-reset')?.addEventListener('click', applyReset);
   document.getElementById('btn-logout')?.addEventListener('click', () => {
@@ -92,10 +112,27 @@ function bindEvents() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') document.body.classList.remove('sidebar-open');
   });
+  window.addEventListener('hashchange', handleInitialIntent);
+}
+
+function getErrorMessage(data, fallback = 'Bir hata oluştu.') {
+  if (typeof data === 'string') return data;
+  if (data?.error?.message) return data.error.message;
+  if (typeof data?.error === 'string') return data.error;
+  if (data?.message) return data.message;
+  return fallback;
 }
 
 function handleInitialIntent() {
   const params = new URLSearchParams(window.location.search);
+  if (params.get('verified') === '1') {
+    const statusEl = document.getElementById('login-status');
+    if (statusEl) {
+      statusEl.className = 'auth-status text-sm text-green';
+      statusEl.innerText = 'E-posta adresiniz başarıyla doğrulandı. Hesabınıza giriş yapabilirsiniz.';
+    }
+  }
+
   if (params.get('token')) {
     openLayer('reset');
     return;
@@ -103,6 +140,8 @@ function handleInitialIntent() {
 
   if (window.location.hash.startsWith('#register')) {
     openLayer('register');
+  } else {
+    closeLayers();
   }
 }
 
@@ -140,6 +179,7 @@ function showShell() {
 
 async function handleLogin() {
   const statusEl = document.getElementById('login-status');
+  statusEl.className = 'auth-status text-sm text-red';
   statusEl.innerText = '';
 
   try {
@@ -151,7 +191,7 @@ async function handleLogin() {
         password: document.getElementById('login-password').value
       })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (data?.error?.code === 'EMAIL_NOT_VERIFIED') {
         const email = document.getElementById('login-email').value.trim();
@@ -164,21 +204,16 @@ async function handleLogin() {
         statusEl.appendChild(resend);
         return;
       }
-      throw new Error(data?.error?.message || data?.message || 'Giriş başarısız.');
+      throw new Error(getErrorMessage(data, 'Giriş başarısız.'));
     }
     setAuthToken(data.access_token);
     setRefreshToken(data.refresh_token);
     setUserProfile(data.user);
 
-    try {
-      localStorage.setItem('app_token', data.access_token);
-      localStorage.setItem('app_profile', JSON.stringify(data.user));
-    } catch (_) {}
-
     const isIframe = window.self !== window.top;
     if (document.body.classList.contains('embed-mode') || isIframe) {
       try {
-        window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, '*');
+        window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, window.location.origin);
       } catch (_) {}
       return;
     }
@@ -190,45 +225,74 @@ async function handleLogin() {
 
 async function handleRegister() {
   const statusEl = document.getElementById('register-status');
+  statusEl.className = 'auth-status text-sm text-red';
   statusEl.innerText = '';
+
+  const companyName = document.getElementById('register-company').value.trim();
+  const name = document.getElementById('register-name').value.trim();
+  const email = document.getElementById('register-email').value.trim();
+  const phone = document.getElementById('register-phone').value.trim();
+  const rawTax = document.getElementById('register-tax-number').value.trim();
+  const cleanTax = rawTax.replace(/\D/g, '');
+  const taxOffice = document.getElementById('register-tax-office').value.trim();
+  const city = document.getElementById('register-city').value.trim();
+  const district = document.getElementById('register-district').value.trim();
+  const address = document.getElementById('register-address').value.trim();
+  const password = document.getElementById('register-password').value;
+  const acceptTerms = document.getElementById('accept-terms').checked;
+  const acceptPrivacy = document.getElementById('accept-privacy').checked;
+  const acceptKvkk = document.getElementById('accept-kvkk').checked;
+  const acceptMarketing = document.getElementById('accept-marketing').checked;
+
+  if (!companyName || !name || !email || !password || !rawTax) {
+    statusEl.innerText = 'Firma adı, ad soyad, e-posta, şifre ve TC/VKN zorunludur.';
+    return;
+  }
+  if (![10, 11].includes(cleanTax.length)) {
+    statusEl.innerText = 'TC Kimlik No 11 haneli, Vergi Kimlik No (VKN) 10 haneli olmalıdır.';
+    return;
+  }
+  if (password.length < 8) {
+    statusEl.innerText = 'Şifre en az 8 karakter olmalıdır.';
+    return;
+  }
+  if (!acceptTerms || !acceptPrivacy || !acceptKvkk) {
+    statusEl.innerText = 'Devam etmek için Üyelik Koşullarını, Gizlilik Politikasını ve KVKK Metnini onaylamalısınız.';
+    return;
+  }
 
   try {
     const res = await fetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        company_name: document.getElementById('register-company').value.trim(),
-        name: document.getElementById('register-name').value.trim(),
-        email: document.getElementById('register-email').value.trim(),
-        phone: document.getElementById('register-phone').value.trim(),
-        tax_number: document.getElementById('register-tax-number').value.trim(),
-        tax_office: document.getElementById('register-tax-office').value.trim(),
-        city: document.getElementById('register-city').value.trim(),
-        district: document.getElementById('register-district').value.trim(),
-        address: document.getElementById('register-address').value.trim(),
-        accept_terms: document.getElementById('accept-terms').checked,
-        accept_privacy: document.getElementById('accept-privacy').checked,
-        accept_kvkk: document.getElementById('accept-kvkk').checked,
-        accept_marketing: document.getElementById('accept-marketing').checked,
-        password: document.getElementById('register-password').value
+        company_name: companyName,
+        name: name,
+        email: email,
+        phone: phone,
+        tax_number: rawTax,
+        tax_office: taxOffice,
+        city: city,
+        district: district,
+        address: address,
+        accept_terms: acceptTerms,
+        accept_privacy: acceptPrivacy,
+        accept_kvkk: acceptKvkk,
+        accept_marketing: acceptMarketing,
+        password: password
       })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || 'Kayıt oluşturulamadı.');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(getErrorMessage(data, 'Kayıt oluşturulamadı.'));
     if (data.access_token) {
       setAuthToken(data.access_token);
       setRefreshToken(data.refresh_token);
       if (data.user) setUserProfile(data.user);
 
-      try {
-        localStorage.setItem('app_token', data.access_token);
-        localStorage.setItem('app_profile', JSON.stringify(data.user));
-      } catch (_) {}
-
       const isIframe = window.self !== window.top;
       if (document.body.classList.contains('embed-mode') || isIframe) {
         try {
-          window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, '*');
+          window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, window.location.origin);
         } catch (_) {}
         return;
       }
@@ -238,10 +302,11 @@ async function handleRegister() {
       return;
     }
     statusEl.className = 'auth-status text-sm text-green';
-    statusEl.innerText = data.message;
+    statusEl.innerText = data.message || 'Hesabınız başarıyla oluşturuldu.';
     const registerButton = document.getElementById('btn-register');
     const loginButton = registerButton.cloneNode(true);
     loginButton.disabled = false;
+    loginButton.type = 'button';
     loginButton.innerText = 'Giriş Ekranına Dön';
     loginButton.addEventListener('click', closeLayers);
     registerButton.replaceWith(loginButton);
@@ -258,8 +323,8 @@ async function resendVerification(email, button) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
-    const data = await res.json();
-    button.innerText = res.ok ? data.message : 'Gönderilemedi';
+    const data = await res.json().catch(() => ({}));
+    button.innerText = res.ok ? (data.message || 'Gönderildi') : 'Gönderilemedi';
   } catch (_) {
     button.innerText = 'Gönderilemedi';
   }
@@ -275,10 +340,10 @@ async function requestReset() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: document.getElementById('reset-email').value.trim() })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || 'Link gönderilemedi.');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(getErrorMessage(data, 'Link gönderilemedi.'));
     statusEl.classList.add('text-green');
-    statusEl.innerText = data.message;
+    statusEl.innerText = data.message || 'Sıfırlama linki gönderildi.';
   } catch (error) {
     statusEl.classList.add('text-red');
     statusEl.innerText = error.message;
@@ -317,11 +382,11 @@ async function applyReset() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, newPassword })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || 'Şifre güncellenemedi.');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(getErrorMessage(data, 'Şifre güncellenemedi.'));
     history.replaceState({}, '', '/app/');
     statusEl.classList.add('text-green');
-    statusEl.innerText = data.message;
+    statusEl.innerText = data.message || 'Şifreniz güncellendi.';
     const applyButton = document.getElementById('btn-apply-reset');
     const loginButton = applyButton.cloneNode(true);
     loginButton.innerText = 'Giriş Ekranına Dön';

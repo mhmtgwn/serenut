@@ -3,6 +3,18 @@
    ========================================================================== */
 
 /**
+ * Escapes HTML characters to prevent XSS injections
+ * @param {string|number} value 
+ * @returns {string}
+ */
+export function escapeHtml(value = '') {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"']/g, (character) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]
+  ));
+}
+
+/**
  * Formats numeric values to currency notation
  * @param {number|string} amount 
  * @param {string} currency 

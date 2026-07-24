@@ -23,6 +23,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
+CloseApplications=yes
 ; Installer output
 OutputDir=..\server\public\website\downloads
 OutputBaseFilename=SerenutOSSetup
