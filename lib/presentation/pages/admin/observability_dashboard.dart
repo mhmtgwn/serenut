@@ -21,7 +21,6 @@ const _kGreen = Color(0xFF3FB950);
 const _kRed = Color(0xFFF85149);
 const _kAmber = Color(0xFFD29922);
 const _kBlue = Color(0xFF58A6FF);
-const _kPurple = Color(0xFFBC8CFF);
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 

@@ -17,6 +17,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 
 final inventoryServiceProvider = FutureProvider<InventoryService>((ref) async {
   final productRepo = await ref.watch(productRepositoryProvider.future);
@@ -159,6 +160,9 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       ref.invalidate(customersControllerProvider);
       ref.invalidate(customerTransactionsProvider(customerId));
       ref.invalidate(customerBalanceDetailsProvider(customerId));
+    }
+    if (created != null) {
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
     }
     return created;
   }

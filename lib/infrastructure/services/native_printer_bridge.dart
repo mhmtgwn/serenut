@@ -234,8 +234,9 @@ if (-not \$success) {
       if (phPrinter != null) calloc.free(phPrinter);
       if (docInfo != null) {
         if (docInfo.ref.pDocName != nullptr) calloc.free(docInfo.ref.pDocName);
-        if (docInfo.ref.pDataType != nullptr)
+        if (docInfo.ref.pDataType != nullptr) {
           calloc.free(docInfo.ref.pDataType);
+        }
         calloc.free(docInfo);
       }
       if (hPrinter != 0) {

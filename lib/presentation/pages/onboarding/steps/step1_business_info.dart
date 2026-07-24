@@ -205,10 +205,12 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               required: true,
                               keyboard: TextInputType.phone,
                               validator: (v) {
-                                if (v?.trim().isEmpty ?? true)
+                                if (v?.trim().isEmpty ?? true) {
                                   return 'Telefon gerekli';
-                                if ((v?.trim().length ?? 0) < 10)
+                                }
+                                if ((v?.trim().length ?? 0) < 10) {
                                   return 'Geçerli bir numara girin';
+                                }
                                 return null;
                               },
                             ),

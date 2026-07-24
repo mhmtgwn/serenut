@@ -4,7 +4,6 @@
 
 import { pgPool } from '../config/database';
 import { runMigrations } from '../migrations';
-import express from 'express';
 import { ConnectionRegistry } from '../modules/realtime/connection-registry';
 import { RealtimeBroadcastService } from '../modules/realtime/broadcast.service';
 

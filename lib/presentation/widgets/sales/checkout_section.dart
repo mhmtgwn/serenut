@@ -23,7 +23,6 @@ const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
 const _kBlue = Color(0xFF2563EB);
 const _kOrange = Color(0xFFEA580C);
-const _kOrangeLight = Color(0xFFFFEDD5);
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
 const _kSurface = Color(0xFFF8FAFC);

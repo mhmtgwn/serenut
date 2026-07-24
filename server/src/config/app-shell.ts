@@ -90,12 +90,32 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-billing',
-    label: 'Ödemeler ve Planlar',
+    label: 'Ödemeler',
     section: 'platform',
     href: '/app/#platform-billing',
     description: 'Havale onayları, ödeme yöntemleri ve planlar.',
     module: 'admin',
     moduleTab: 'transfers',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-subscriptions',
+    label: 'Abonelikler',
+    section: 'platform',
+    href: '/app/#platform-subscriptions',
+    description: 'Deneme, aktif ve sona eren abonelikleri izleyin.',
+    module: 'admin',
+    moduleTab: 'subscriptions',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-plans',
+    label: 'Planlar',
+    section: 'platform',
+    href: '/app/#platform-plans',
+    description: 'Satış planlarını, limitleri ve fiyatları yönetin.',
+    module: 'admin',
+    moduleTab: 'plans',
     roles: ['sysadmin']
   },
   {

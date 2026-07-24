@@ -53,8 +53,9 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
                     ),
                     onChanged: (val) {
                       updateState(() => _customerQuery = val);
-                      if (_customerSearchDebounce?.isActive ?? false)
+                      if (_customerSearchDebounce?.isActive ?? false) {
                         _customerSearchDebounce!.cancel();
+                      }
                       _customerSearchDebounce =
                           Timer(const Duration(milliseconds: 300), () {
                         ref

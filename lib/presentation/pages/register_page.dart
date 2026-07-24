@@ -372,8 +372,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 icon: Icons.email_outlined,
                 keyboard: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'E-posta zorunludur';
+                  }
                   if (!v.contains('@')) return 'Geçerli bir e-posta girin';
                   return null;
                 },

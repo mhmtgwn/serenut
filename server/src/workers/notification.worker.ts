@@ -9,7 +9,7 @@
 //   - Ölü Mektup Kuyruğu (DLQ) — kalıcı hatalar ayrı kuyruğa taşınır
 //   - Gateway şablonları: email, SMS, WhatsApp, push
 
-import { Queue, Worker, Job, QueueEvents } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import { pgPool, redisClient } from '../config/database';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';

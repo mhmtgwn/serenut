@@ -249,8 +249,9 @@ class _BarChartPainter extends CustomPainter {
         final ttH = tp.height + 8;
         var ttX = x + barW / 2 - ttW / 2;
         if (ttX < leftPad) ttX = leftPad;
-        if (ttX + ttW > size.width - rightPad)
+        if (ttX + ttW > size.width - rightPad) {
           ttX = size.width - rightPad - ttW;
+        }
         final ttY = barTop - ttH - 4;
 
         final ttRect = RRect.fromRectAndRadius(

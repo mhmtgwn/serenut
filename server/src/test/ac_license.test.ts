@@ -5,7 +5,6 @@
 import { pgPool } from '../config/database';
 import { LicenseFSM } from '../modules/license/license.fsm';
 import { runMigrations } from '../migrations';
-import crypto from 'crypto';
 
 async function setup() {
   console.log('🔄 Setting up database for License Test...');

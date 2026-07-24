@@ -4,7 +4,6 @@
 // Created: 04 Jul 2026
 
 import { pgPool } from '../../config/database';
-import { PoolClient } from 'pg';
 import { logger } from '../../config/logger';
 
 async function runBypassingRLS(sql: string, params: any[] = []) {

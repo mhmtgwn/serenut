@@ -12,7 +12,6 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 
-part 'catalog/catalog_search_field.dart';
 part 'catalog/catalog_product_card.dart';
 
 // ── Mevcut POS Tema Renkleri (korundu) ───────────────────────────────────────
@@ -23,7 +22,6 @@ const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
-const _kSurface = Color(0xFFF8FAFC);
 const _kCardBg = Colors.white;
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
@@ -52,7 +50,6 @@ class CatalogPanel extends ConsumerStatefulWidget {
 class _CatalogPanelState extends ConsumerState<CatalogPanel> {
   bool _isSearching = false;
   final ScrollController _scrollController = ScrollController();
-  bool _showFilters = false;
 
   @override
   void initState() {
@@ -101,55 +98,36 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
     }
   }
 
-  Widget _buildCategoryListRow(
-    BuildContext context, {
+  Widget _buildCategoryChip({
     required String label,
     required IconData icon,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2.5),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSelected ? _kGreen : const Color(0xFFE2E8F0),
-          width: isSelected ? 1.5 : 1,
-        ),
+    return Material(
+      color: isSelected ? _kGreen : Colors.white,
+      shape: StadiumBorder(
+        side: BorderSide(color: isSelected ? _kGreen : _kBorder),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected ? _kGreen : const Color(0xFF64748B),
-                  size: 18,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  label,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 17, color: isSelected ? Colors.white : _kTextSecondary),
+              const SizedBox(width: 7),
+              Text(label,
+                  maxLines: 1,
                   style: TextStyle(
-                    color: isSelected ? _kGreenDark : const Color(0xFF334155),
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? Colors.white : _kText,
                     fontSize: 13,
-                  ),
-                ),
-                const Spacer(),
-                if (isSelected)
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: _kGreen,
-                    size: 16,
-                  ),
-              ],
-            ),
+                    fontWeight: FontWeight.w700,
+                  )),
+            ],
           ),
         ),
       ),
@@ -206,144 +184,34 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
             ),
             const SizedBox(width: 4),
           ],
-          filterWidget: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              InkWell(
-                onTap: () => setState(() => _showFilters = !_showFilters),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _kSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.filter_list_rounded,
-                          size: 16, color: _kGreenDark),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          selectedCategory == null
-                              ? 'Kategori: Tümü'
-                              : 'Kategori: $selectedCategory',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _kText,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        _showFilters
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: _kTextSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              AnimatedCrossFade(
-                firstChild: const SizedBox.shrink(),
-                secondChild: Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _kBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            child: Text(
-                              'Kategori Seçin',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: _kText,
-                              ),
-                            ),
-                          ),
-                          if (selectedCategory != null)
-                            TextButton(
-                              onPressed: () {
-                                ref
-                                    .read(salesProductCategoryFilterProvider
-                                        .notifier)
-                                    .state = null;
-                                setState(() => _showFilters = false);
-                              },
-                              style: TextButton.styleFrom(
-                                foregroundColor: _kGreen,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: const Text('Temizle',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12)),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Column(
-                        children:
-                            List.generate(categoriesVal.length + 1, (index) {
-                          final isAll = index == 0;
-                          final catName =
-                              isAll ? 'Tümü' : categoriesVal[index - 1];
-                          final isSelected = isAll
-                              ? selectedCategory == null
-                              : selectedCategory == catName;
-                          final icon = isAll
-                              ? Icons.grid_view_rounded
-                              : _getCategoryIcon(catName);
-
-                          return _buildCategoryListRow(
-                            context,
-                            label: catName,
-                            icon: icon,
-                            isSelected: isSelected,
-                            onTap: () {
-                              ref
-                                  .read(salesProductCategoryFilterProvider
-                                      .notifier)
-                                  .state = isAll ? null : catName;
-                              setState(() => _showFilters = false);
-                            },
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-                crossFadeState: _showFilters
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 200),
-              ),
-            ],
+          filterWidget: SizedBox(
+            height: 42,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              itemCount: categoriesVal.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final isAll = index == 0;
+                final category = isAll ? 'Tümü' : categoriesVal[index - 1];
+                final isSelected = isAll
+                    ? selectedCategory == null
+                    : selectedCategory == category;
+                return _buildCategoryChip(
+                  label: category,
+                  icon: isAll
+                      ? Icons.grid_view_rounded
+                      : _getCategoryIcon(category),
+                  isSelected: isSelected,
+                  onTap: () {
+                    ref
+                        .read(salesProductCategoryFilterProvider.notifier)
+                        .state = isAll ? null : category;
+                  },
+                );
+              },
+            ),
           ),
         ),
         const Divider(height: 1, color: _kBorder),

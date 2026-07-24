@@ -98,11 +98,9 @@ final licenseManagerProvider = Provider<LicenseManager>((ref) {
 final accessManagerProvider = Provider<AccessManager>((ref) {
   final trialManager = ref.watch(trialManagerProvider);
   final licenseManager = ref.watch(licenseManagerProvider);
-  final deviceManager = ref.watch(deviceManagerProvider);
   return AccessManager(
     trialManager: trialManager,
     licenseManager: licenseManager,
-    deviceManager: deviceManager,
   );
 });
 

@@ -102,7 +102,9 @@ class AppShell extends ConsumerWidget {
 
   bool _hasPermission(dynamic user, Permission permission) {
     if (user == null) return false;
-    if (user.role == UserRole.owner || user.role == UserRole.admin) return true;
+    if (user.role == UserRole.owner || user.role == UserRole.sysadmin) {
+      return true;
+    }
     return user.hasPermission(permission.value);
   }
 
@@ -193,40 +195,48 @@ class _NavBarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? _kGreenLight : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.sm),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: Icon(
-                isActive ? item.activeIcon : item.icon,
-                key: ValueKey(isActive),
-                color: isActive ? _kGreen : _kInactive,
-                size: 22,
-              ),
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: item.label,
+      child: Tooltip(
+        message: item.label,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(
+              color: isActive ? _kGreenLight : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
             ),
-            const SizedBox(height: 2),
-            Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? _kGreen : _kInactive,
-                letterSpacing: isActive ? 0.2 : 0,
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: Icon(
+                    isActive ? item.activeIcon : item.icon,
+                    key: ValueKey(isActive),
+                    color: isActive ? _kGreen : _kInactive,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                    color: isActive ? _kGreen : _kInactive,
+                    letterSpacing: isActive ? 0.2 : 0,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -16,37 +16,20 @@ import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
-import 'package:serenutos/presentation/controllers/customers_controller.dart';
-import 'package:serenutos/presentation/controllers/products_controller.dart';
-import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:uuid/uuid.dart';
 import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
-import 'package:serenutos/infrastructure/services/printer_discovery_service.dart';
-import 'package:permission_handler/permission_handler.dart' as ph;
 import 'dart:io';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_settings_sheet.dart';
-import 'package:serenutos/presentation/pages/settings/backup_manage_page.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
-import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 import 'package:serenutos/presentation/pages/data_transfer_page.dart';
-import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
-import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
-import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
-import 'package:serenutos/presentation/controllers/sales_controller.dart';
-import 'package:serenutos/presentation/pages/admin/admin_page.dart';
-import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
+import 'package:serenutos/presentation/pages/operations_center_page.dart';
+import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
+import 'package:serenutos/presentation/pages/settings/about_page.dart';
+import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/license_page.dart'
     show LicenseManagementPage;
-import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
-import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
-import 'package:serenutos/domain/services/version_checker.dart';
-import 'package:serenutos/infrastructure/services/release_manager_service.dart';
-import 'package:serenutos/presentation/widgets/update_dialog.dart';
 
-part 'settings/widgets/printer_settings_sheet.dart';
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
 part 'settings/widgets/system_config_section.dart';
@@ -55,14 +38,12 @@ part 'settings/widgets/system_config_section.dart';
 part 'settings/widgets/settings_ui_helpers.dart';
 part 'settings/widgets/settings_dialogs.dart';
 
-const _kBgColor =
-    Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
+const _kBgColor = Color(0xFFF8FAFC);
 const _kCardBg = Colors.white;
-const _kBorderColor = Color(0xFFF0F0F3); // Faint, subtle border
-const _kTextPrimary =
-    Color(0xFF1E293B); // Slate-900: softer and cleaner than raw black
-const _kTextSecondary = Color(0xFF64748B); // Slate-500: elegant subtitle color
-const _kGreen = Color(0xFF10B981); // Emerald Green
+const _kBorderColor = Color(0xFFE2E8F0);
+const _kTextPrimary = Color(0xFF0F172A);
+const _kTextSecondary = Color(0xFF64748B);
+const _kGreen = Color(0xFF16A34A);
 const _kBlue = Color(0xFF3B82F6); // Modern Blue
 const _kOrange = Color(0xFFF59E0B); // Modern Amber
 const _kPurple = Color(0xFF8B5CF6); // Modern Violet
@@ -80,9 +61,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String? _adminPinCode;
   bool _isUnlocked = false;
-  final bool _soundNotificationEnabled = false;
 
   List<String> _cities = [];
   Map<String, List<String>> _cityMap = {};
@@ -206,6 +185,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     await _loadSettingsAndPin();
   }
 
+  // ignore: unused_element
   Future<void> _handleLogout() async {
     await ref.read(authNotifierProvider.notifier).logout();
     if (mounted) {
@@ -287,93 +267,57 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildBody(Settings settings, AuthUser? currentUser) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      children: [
-        // �”€�”€ 1. Arama �‡ubu�Ÿu (Search Bar) �”€�”€
-        _buildSearchBar(),
-        const SizedBox(height: 16),
+    return LayoutBuilder(
+      builder: (context, constraints) => Center(
+        child: SizedBox(
+          width: constraints.maxWidth > 760 ? 760 : constraints.maxWidth,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              // �”€�”€ 1. Arama �‡ubu�Ÿu (Search Bar) �”€�”€
+              _buildSearchBar(),
+              const SizedBox(height: 16),
 
-        // �”€�”€ 2. Kullanıcı Profil Kartı �”€�”€
-        if (currentUser != null &&
-            _matchesQuery('Profil', 'Hesap', 'Yetki', currentUser.name))
-          _buildProfileCard(currentUser),
+              // �”€�”€ 2. Kullanıcı Profil Kartı �”€�”€
+              if (currentUser != null &&
+                  _matchesQuery('Profil', 'Hesap', 'Yetki', currentUser.name))
+                _buildRoundedCard([
+                  _buildCategoryRow(
+                    title: 'Hesabım',
+                    subtitle: '${currentUser.name} · Oturum ve yetkiler',
+                    icon: Icons.account_circle_rounded,
+                    color: _kGreen,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AccountPage()),
+                    ),
+                  ),
+                ]),
 
-        // ”€”€ 3. GruplanmıŸ Menüler ”€”€
-        const SizedBox(height: 16),
-        if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
-          _buildUpdateCheckCard(),
-        if (_matchesQuery('güncelleme', 'update', 'sürüm', 'versiyon', 'yeni'))
-          const SizedBox(height: 16),
-        ..._buildGroupedSettings(settings, currentUser),
+              // ”€”€ 3. GruplanmıŸ Menüler ”€”€
+              const SizedBox(height: 16),
+              ..._buildGroupedSettings(settings, currentUser),
 
-        // ── 4. Sürüm ve Çıkış Yap Grubu ──
-        const SizedBox(height: 16),
+              // ── 4. Sürüm ve Çıkış Yap Grubu ──
+              const SizedBox(height: 16),
 
-        _buildSignOutGroup(),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-
-  Widget _buildUpdateCheckCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+              const SizedBox(height: 32),
+            ],
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _kBlue.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.system_update_rounded, color: _kBlue),
-          ),
-          title: const Text(
-            'Güncelleme Denetle',
-            style: TextStyle(
-              color: _kTextPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          subtitle: const Text(
-            'Yeni sürümü indir ve kurulumu başlat',
-            style: TextStyle(color: _kTextSecondary, fontSize: 12),
-          ),
-          trailing:
-              const Icon(Icons.chevron_right_rounded, color: _kTextSecondary),
-          onTap: _checkForUpdate,
         ),
       ),
     );
   }
 
-  Widget _buildHardwareCenterCard() {
+  Widget _buildHardwareCenterCard(Settings settings) {
     return _buildCategoryRow(
-      title: 'Donanım Testleri',
-      subtitle: 'Terazi, fiziksel POS ve yazıcı gerçek cihaz denemeleri',
+      title: 'Cihazlar ve Donanım',
+      subtitle: 'Cihazları ekleyin, bağlantıları yönetin ve test edin',
       icon: Icons.settings_input_component_rounded,
       color: _kGreen,
-      onTap: () => context.push(AppRoutes.hardware),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const HardwareTestPage()),
+      ),
     );
   }
 
@@ -387,7 +331,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         border: Border.all(color: _kBorderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.015),
+            color: Colors.black.withValues(alpha: 0.015),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -423,102 +367,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // �”€�”€ Profil Kartı �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
-  Widget _buildProfileCard(AuthUser user) {
-    final initials = user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U';
-    final roleLabel = switch (user.role) {
-      UserRole.owner => 'Kurucu/Sahip',
-      UserRole.admin => 'Yönetici',
-      UserRole.sysadmin => 'Sistem Yöneticisi',
-      UserRole.manager => 'Müdür',
-      UserRole.cashier => 'Kasiyer',
-      UserRole.staff => 'Personel',
-    };
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          onTap: () => _showProfileDetails(user),
-          leading: Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [_kGreen, _kGreen.withOpacity(0.8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22),
-              ),
-            ),
-          ),
-          title: Text(
-            user.name,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: _kTextPrimary),
-          ),
-          subtitle: Row(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _kGreen.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  roleLabel,
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: _kGreen),
-                ),
-              ),
-            ],
-          ),
-          trailing: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Yetkilerim',
-                  style: TextStyle(color: _kTextSecondary, fontSize: 13)),
-              SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded,
-                  color: _kTextSecondary, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   // ── License Subtitle Helper ───────────────────────────────────────────────
   String _buildLicenseSubtitleFromRef() {
     try {
@@ -545,6 +393,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 1: İşletme Ayarları
     final group1 = <Widget>[];
+    final groupData = <Widget>[];
     if (_hasPermission(currentUser, Permission.settingsReceipt) &&
         _matchesQuery('işletme', 'bilgiler', settings.businessName)) {
       group1.add(_buildCategoryRow(
@@ -562,19 +411,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (_hasPermission(currentUser, Permission.settingsDatabase) &&
         (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') ||
             _matchesQuery('müşteri', 'rehber'))) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Veri İçeri / Dışarı Aktar',
-        subtitle: 'Katalog, Yedek & Müşteriler',
+      groupData.add(_buildCategoryRow(
+        title: 'Veri Aktarımı',
+        subtitle: 'Ürün ve müşteri verilerini içeri veya dışarı aktarın',
         icon: Icons.import_export_rounded,
         color: _kTeal,
         onTap: () => _runGuardedAction(Permission.settingsDatabase, () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => const DataTransferPage(),
+              builder: (context) => const DataTransferPage(
+                mode: DataManagementMode.transfer,
+              ),
             ),
           );
-        }, title: 'Veri İçeri / Dışarı Aktar'),
+        }, title: 'Veri Aktarımı'),
+      ));
+      groupData.add(const _IOSDivider());
+      groupData.add(_buildCategoryRow(
+        title: 'Yedekleme ve Geri Yükleme',
+        subtitle: 'İşletme verilerinin güvenli yedeklerini yönetin',
+        icon: Icons.backup_rounded,
+        color: _kOrange,
+        onTap: () => _runGuardedAction(Permission.settingsDatabase, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const DataTransferPage(
+                mode: DataManagementMode.backup,
+              ),
+            ),
+          );
+        }, title: 'Yedekleme ve Geri Yükleme'),
       ));
     }
     if (_hasPermission(currentUser, Permission.settingsUsers) &&
@@ -590,41 +456,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: 'Kullanıcı Yönetimi'),
       ));
     }
-    if (_hasPermission(currentUser, Permission.settingsFinance) &&
-        (_matchesQuery('bütünlük', 'audit', 'drift', 'ledger') ||
-            _matchesQuery('replay', 'cari', 'bakiye'))) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Cari Hesap Bütünlüğü & Replay',
-        subtitle: 'Bakiye Sapmalarını Denetle ve Onar',
-        icon: Icons.account_balance_rounded,
-        color: _kPurple,
-        onTap: () => _runGuardedAction(
-            Permission.settingsFinance, () => _showLedgerReplayDialog(),
-            title: 'Cari Hesap Bütünlüğü & Replay'),
-      ));
-    }
-    if (_hasPermission(currentUser, Permission.settingsDatabase) &&
-        (_matchesQuery('sağlık', 'health', 'veritabanı', 'db', 'check'))) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Veritabanı Sağlık Kontrolü',
-        subtitle: 'Yetim Kayıtlar & Negatif Stok Denetimi',
-        icon: Icons.health_and_safety_rounded,
-        color: _kTeal,
-        onTap: () => _runGuardedAction(Permission.settingsDatabase, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const DbHealthPage(),
-            ),
-          );
-        }, title: 'Veritabanı Sağlık Kontrolü'),
-      ));
-    }
-
     if (group1.isNotEmpty) {
-      groups.add(_buildSectionHeader('İŞLETME AYARLARI'));
+      groups.add(_buildSectionHeader('İŞLETME'));
       groups.add(_buildRoundedCard(group1));
+      groups.add(const SizedBox(height: 16));
+    }
+    if (groupData.isNotEmpty) {
+      groups.add(_buildSectionHeader('VERİ YÖNETİMİ'));
+      groups.add(_buildRoundedCard(groupData));
       groups.add(const SizedBox(height: 16));
     }
 
@@ -633,53 +472,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (_hasPermission(currentUser, Permission.settingsPrinter) &&
         _matchesQuery('donanım', 'terazi', 'pos', 'yazıcı', 'hardware', 'test',
             'diagnostics', 'barkod')) {
-      group2.add(_buildHardwareCenterCard());
-    }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery('yazıcı', 'bağlantı', 'ip', settings.printerIp ?? '')) {
-      if (group2.isNotEmpty) group2.add(const _IOSDivider());
-      group2.add(_buildCategoryRow(
-        title: 'Fiş Yazıcı Ayarları',
-        subtitle: settings.printerIp ?? 'Tanımlı Değil',
-        icon: Icons.print_rounded,
-        color: _kBlue,
-        onTap: () => _showReceiptPrinterSheet(settings),
-      ));
-    }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery('etiket yazıcı', 'barkod yazıcı', 'ip')) {
-      if (group2.isNotEmpty) group2.add(const _IOSDivider());
-      group2.add(_buildCategoryRow(
-        title: 'Etiket Yazıcı Ayarları',
-        subtitle: 'İkinci Yazıcı',
-        icon: Icons.label_rounded,
-        color: _kTeal,
-        onTap: () => _showLabelPrinterSheet(settings),
-      ));
+      group2.add(_buildHardwareCenterCard(settings));
     }
     if (_hasPermission(currentUser, Permission.settingsFinance) &&
         _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(_buildCategoryRow(
-        title: 'SMS Servis Ayarları',
-        subtitle:
-            settings.smsEnabled ? (settings.smsProvider ?? 'Aktif') : 'Pasif',
+        title: 'SMS ve Bildirimler',
+        subtitle: settings.smsEnabled ? 'Yerel SIM etkin' : 'Pasif',
         icon: Icons.sms_rounded,
         color: _kOrange,
         onTap: () => _showSmsSettingsSheet(settings),
       ));
     }
     if (group2.isNotEmpty) {
-      groups.add(_buildSectionHeader('DONANIM VE BAĞLANTILAR'));
+      groups.add(_buildSectionHeader('CİHAZLAR VE İLETİŞİM'));
       groups.add(_buildRoundedCard(group2));
       groups.add(const SizedBox(height: 16));
     }
 
     // Grup 4: Sistem
     final group4 = <Widget>[];
+    final groupDeveloper = <Widget>[];
     if (currentUser?.role == UserRole.sysadmin &&
         _matchesQuery('hata ayıklama', 'debug', 'sistem')) {
-      group4.add(_buildSwitchRow(
+      groupDeveloper.add(_buildSwitchRow(
         title: 'Hata Ayıklama Modu (Debug)',
         subtitle: 'Sistem loglarını ve detayları aktif eder',
         icon: Icons.bug_report_rounded,
@@ -708,17 +525,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
 
     if (group4.isNotEmpty) {
-      groups.add(_buildSectionHeader('SİSTEM VE GÜVENLİK'));
+      groups.add(_buildSectionHeader('UYGULAMA TERCİHLERİ'));
       groups.add(_buildRoundedCard(group4));
+      groups.add(const SizedBox(height: 16));
+    }
+    if (groupDeveloper.isNotEmpty) {
+      groups.add(_buildSectionHeader('GELİŞTİRİCİ VE DESTEK'));
+      groups.add(_buildRoundedCard(groupDeveloper));
       groups.add(const SizedBox(height: 16));
     }
 
     // Grup 5: Ürün & Operasyon Merkezi (Phase 4-6)
     final group5 = <Widget>[];
 
+    if (currentUser != null &&
+        (currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.role == UserRole.sysadmin) &&
+        _matchesQuery('admin', 'yönetim', 'denetim', 'kurtarma', 'telemetri')) {
+      group5.add(_buildCategoryRow(
+        title: 'Admin Kontrol Merkezi',
+        subtitle: 'Sistem sağlığı, denetim ve veri kurtarma',
+        icon: Icons.admin_panel_settings_rounded,
+        color: _kPurple,
+        onTap: () => context.push(AppRoutes.admin),
+      ));
+    }
+
     if (_hasPermission(currentUser, Permission.settingsLicense) &&
         _matchesQuery(
             'lisans', 'license', 'abonelik', 'tier', 'plan', 'cihaz')) {
+      if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
         title: 'Lisans Yönetimi',
         subtitle: _buildLicenseSubtitleFromRef(),
@@ -732,223 +569,73 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
     }
 
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery('yazıcı', 'kuyruk', 'fiş', 'print', 'queue', 'baskı')) {
+    if (_hasPermission(currentUser, Permission.settingsRecovery) &&
+        (currentUser?.role == UserRole.owner ||
+            currentUser?.role == UserRole.sysadmin) &&
+        _matchesQuery('tehlikeli', 'sıfırla', 'temizle', 'fabrika')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(_buildCategoryRow(
-        title: 'Yazıcı Kuyruğu',
-        subtitle: 'Bekleyen fiş işleri ve yeniden deneme',
-        icon: Icons.print_rounded,
+        title: 'Tehlikeli İşlemler',
+        subtitle: 'Veri temizleme ve fabrika ayarları',
+        icon: Icons.warning_amber_rounded,
+        color: _kPink,
+        onTap: () => _runGuardedAction(Permission.settingsRecovery, () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const DataTransferPage(
+                mode: DataManagementMode.dangerous,
+              ),
+            ),
+          );
+        },
+            title: 'Tehlikeli İşlemler',
+            allowedRoles: [UserRole.owner, UserRole.sysadmin]),
+      ));
+    }
+
+    if ((_hasPermission(currentUser, Permission.settingsPrinter) ||
+            _hasPermission(currentUser, Permission.settingsFinance)) &&
+        _matchesQuery(
+            'operasyon', 'yazıcı', 'kuyruk', 'sms', 'geçmiş', 'başarısız')) {
+      if (group5.isNotEmpty) group5.add(const _IOSDivider());
+      group5.add(_buildCategoryRow(
+        title: 'Operasyon Merkezi',
+        subtitle: 'Yazıcı kuyruğu ve SMS gönderim durumları',
+        icon: Icons.monitor_heart_outlined,
         color: _kTeal,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PrintQueuePage()),
+            MaterialPageRoute(builder: (_) => const OperationsCenterPage()),
           );
         },
-      ));
-    }
-
-    if (_hasPermission(currentUser, Permission.settingsView) &&
-        _matchesQuery('sms', 'mesaj', 'geçmiş', 'history', 'bildirim')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(_buildCategoryRow(
-        title: 'SMS Geçmişi',
-        subtitle: 'Gönderim durumu ve başarısız SMS kayıtları',
-        icon: Icons.sms_rounded,
-        color: _kOrange,
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SmsHistoryPage()),
-          );
-        },
-      ));
-    }
-
-    if (currentUser?.role == UserRole.sysadmin &&
-        _matchesQuery('admin', 'kontrol', 'merkezi', 'observability', 'sistem',
-            'operasyon')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(_buildCategoryRow(
-        title: 'Admin Kontrol Merkezi',
-        subtitle: 'Sistem izleme, sync, incident ve daha fazlası',
-        icon: Icons.admin_panel_settings_rounded,
-        color: _kPurple,
-        onTap: () => _runGuardedAction(Permission.settingsView, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AdminPage()),
-          );
-        }, title: 'Admin Kontrol Merkezi', allowedRoles: [UserRole.sysadmin]),
       ));
     }
 
     if (group5.isNotEmpty) {
-      groups.add(_buildSectionHeader('LİSANS & İLETİŞİM'));
+      groups.add(_buildSectionHeader('YÖNETİM & İLETİŞİM'));
       groups.add(_buildRoundedCard(group5));
       groups.add(const SizedBox(height: 16));
     }
 
-    // Grup 6: Gelişmiş Yönetim (PIN Korumalı)
-    final group6 = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsFinance) &&
-        _matchesQuery('finans', 'hub', 'cari', 'raporlar', 'excel', 'kdv')) {
-      group6.add(_buildCategoryRow(
-        title: 'Finans Hub & Raporlar',
-        subtitle: 'Ciro raporu, KDV analizleri ve Excel çıktısı',
-        icon: Icons.account_balance_wallet_rounded,
-        color: _kGreen,
-        onTap: () => _runGuardedAction(
-            Permission.settingsFinance, () => context.push(AppRoutes.finance),
-            title: 'Finans Hub & Raporlar'),
-      ));
-    }
-    if (_hasPermission(currentUser, Permission.settingsAudit) &&
-        _matchesQuery('denetim', 'merkezi', 'audit', 'fiyat', 'log')) {
-      if (group6.isNotEmpty) group6.add(const _IOSDivider());
-      group6.add(_buildCategoryRow(
-        title: 'Denetim Merkezi (Audit Center)',
-        subtitle: 'Fiyat değişimleri, silmeler ve sistem logları',
-        icon: Icons.assignment_turned_in_rounded,
-        color: _kBlue,
-        onTap: () => _runGuardedAction(Permission.settingsAudit, () {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const AuditCenterPage()));
-        }, title: 'Denetim Merkezi'),
-      ));
-    }
-    if (_hasPermission(currentUser, Permission.settingsRecovery) &&
-        _matchesQuery('kurtarma', 'recovery', 'çöp', 'silinen')) {
-      if (group6.isNotEmpty) group6.add(const _IOSDivider());
-      group6.add(_buildCategoryRow(
-        title: 'Veri Kurtarma Merkezi',
-        subtitle: 'Silinen ürünleri, müşterileri ve satışları kurtarın',
-        icon: Icons.restore_from_trash_rounded,
-        color: _kPink,
-        onTap: () => _runGuardedAction(Permission.settingsRecovery, () {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const RecoveryCenterPage()));
-        }, title: 'Veri Kurtarma Merkezi'),
-      ));
-    }
-
-    if (group6.isNotEmpty) {
-      groups.add(_buildSectionHeader('GELİŞMİŞ YÖNETİM VE FİNANS'));
-      groups.add(_buildRoundedCard(group6));
+    if (_matchesQuery(
+        'uygulama', 'hakkında', 'güncelleme', 'sürüm', 'versiyon')) {
+      groups.add(_buildSectionHeader('UYGULAMA'));
+      groups.add(_buildRoundedCard([
+        _buildCategoryRow(
+          title: 'Uygulama Hakkında',
+          subtitle: 'Sürüm bilgisi ve güncelleme denetimi',
+          icon: Icons.info_outline_rounded,
+          color: _kBlue,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AboutPage()),
+          ),
+        ),
+      ]));
+      groups.add(const SizedBox(height: 16));
     }
 
     return groups;
   }
 
-  Widget _buildSignOutGroup() {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: _kCardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _kBorderColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.015),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _handleLogout,
-              borderRadius: BorderRadius.circular(16),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.power_settings_new_rounded,
-                        color: _kPink, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Oturumu Kapat',
-                      style: TextStyle(
-                        color: _kPink,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: Text(
-            'Serenut OS v${VersionChecker.currentVersion}',
-            style: const TextStyle(
-                color: _kTextSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _checkForUpdate() async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(
-      content: Text('Güncellemeler denetleniyor...'),
-      duration: Duration(seconds: 2),
-    ));
-    try {
-      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
-      final info = await checker.getVersionInfo();
-      if (!mounted) return;
-      if (info == null) {
-        messenger.showSnackBar(const SnackBar(
-          content:
-              Text('Sunucuya ulaşılamadı. Lütfen daha sonra tekrar deneyin.'),
-          backgroundColor: Colors.orange,
-        ));
-        return;
-      }
-      final hasUpdate = VersionChecker.isVersionOlder(
-          VersionChecker.currentVersion, info.latestVersion);
-      if (hasUpdate) {
-        await showUpdateDialog(
-          context: context,
-          updateInfo: UpdateInfo(
-            hasUpdate: true,
-            isForceUpdate: info.isForceUpdate,
-            latestVersion: info.latestVersion,
-            minRequiredVersion: info.minRequiredVersion,
-            downloadUrl: info.downloadUrl,
-            sha256Hash: info.sha256Hash,
-            signature: info.signature,
-            fileSizeBytes: info.fileSizeBytes,
-            releaseNotes: info.releaseNotes,
-            channel: 'stable',
-          ),
-          releaseManager: ref.read(releaseManagerServiceProvider),
-          platform: Platform.isAndroid ? 'android' : 'windows',
-          jwtToken: ref.read(authServiceProvider).getJwtToken(),
-          deviceId: null,
-        );
-      } else {
-        messenger.showSnackBar(const SnackBar(
-          content: Text('Uygulama güncel. Yeni sürüm bulunmuyor.'),
-          backgroundColor: Colors.green,
-        ));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text('Güncelleme denetleme hatası: $e'),
-        backgroundColor: Colors.red,
-      ));
-    }
-  }
+  // ignore: unused_element
 }

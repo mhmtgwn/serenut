@@ -126,10 +126,12 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                               icon: Icons.alternate_email_rounded,
                               keyboard: TextInputType.text,
                               validator: (v) {
-                                if (v?.trim().isEmpty ?? true)
+                                if (v?.trim().isEmpty ?? true) {
                                   return 'Kullanıcı adı gerekli';
-                                if ((v?.length ?? 0) < 3)
+                                }
+                                if ((v?.length ?? 0) < 3) {
                                   return 'En az 3 karakter olmalı';
+                                }
                                 return null;
                               },
                             ),
@@ -207,10 +209,12 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                     size: 20, color: POSColors.textSecondary),
                               ),
                               validator: (v) {
-                                if (v == null || v.isEmpty)
+                                if (v == null || v.isEmpty) {
                                   return 'PIN gerekli';
-                                if (v.length != _pinLength)
+                                }
+                                if (v.length != _pinLength) {
                                   return '$_pinLength haneli PIN girin';
+                                }
                                 return null;
                               },
                             ),
@@ -238,8 +242,9 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                     color: POSColors.textSecondary),
                               ),
                               validator: (v) {
-                                if (v != _pinCtrl.text)
+                                if (v != _pinCtrl.text) {
                                   return 'PIN\'ler eşleşmiyor';
+                                }
                                 return null;
                               },
                             ),
@@ -290,8 +295,9 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                 ),
                                 validator: (v) {
                                   if (!_showPasswordField) return null;
-                                  if ((v?.length ?? 0) < 8)
+                                  if ((v?.length ?? 0) < 8) {
                                     return 'En az 8 karakter';
+                                  }
                                   return null;
                                 },
                               ),

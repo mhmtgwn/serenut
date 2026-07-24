@@ -60,3 +60,51 @@ body{background:var(--ui-canvas);color:var(--ui-ink)}
 #register-layer .modal-panel{width:min(960px,calc(100vw - 32px));max-width:960px;grid-template-columns:260px minmax(0,1fr);gap:0;max-height:calc(100vh - 32px);overflow:auto}#register-layer .registration-intro{grid-column:1;grid-row:2;margin:0;padding:26px 24px}.registration-fields{grid-column:2;display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:13px 16px;padding:22px 24px 24px}.registration-fields .form-group{margin:0}.registration-fields .form-row-two{gap:10px}.registration-fields .legal-consents{grid-column:1/-1;margin:0;padding:13px 15px;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}.registration-fields #register-status,.registration-fields #btn-register{grid-column:1/-1;margin:0}.registration-fields textarea{min-height:44px;max-height:62px}.embed-mode #register-layer .modal-panel{width:100%;max-width:960px;min-height:0}.embed-mode #register-layer .registration-intro{border-radius:0}
 .payment-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;margin-top:14px}.payment-summary,.transfer-panel{border:1px solid var(--ui-line);border-radius:12px;background:#fff}.payment-summary{padding:24px;background:#17231e;color:#fff}.payment-summary>span,.transfer-result>span{font-size:.67rem;font-weight:800;letter-spacing:.11em;color:#6ee7ad}.payment-summary h3{margin:14px 0 5px;font:700 1.55rem Outfit,sans-serif}.payment-summary strong{font-size:1.35rem}.payment-summary p{color:#b8c7c0}.payment-summary .btn{width:100%;margin-top:12px}.transfer-panel{padding:22px}.bank-choice-grid{display:grid;gap:10px}.bank-choice{display:flex;align-items:flex-start;gap:12px;padding:15px;border:1px solid var(--ui-line);border-radius:9px;cursor:pointer}.bank-choice:has(input:checked){border-color:var(--ui-green);background:#eef9f3}.bank-choice input{width:auto!important;min-height:auto!important;margin-top:4px}.bank-choice span{display:grid;gap:4px}.bank-choice small{color:var(--ui-muted)}.bank-choice code{font:700 .94rem Inter,sans-serif;color:#17231e}.transfer-steps{margin:14px 0;padding:15px 17px;border-radius:9px;background:#f5f7f5}.transfer-steps ol{display:grid;gap:6px;margin:9px 0 0;padding-left:20px;color:#52615a;font-size:.82rem}.transfer-panel .btn{width:100%}.back-button{margin-bottom:4px}.transfer-result{margin-top:16px;padding:20px;border:1px solid #8ee5bd;border-radius:11px;background:#ebfbf3}.transfer-result strong{display:block;margin:7px 0;font-size:1.25rem;color:#08704b}.result-amount{font-size:1.25rem;font-weight:800;color:#17231e}.checkout-frame{display:block;width:100%;min-height:720px;margin-top:16px;border:1px solid var(--ui-line);border-radius:12px;background:#fff}
 @media(max-width:800px){#register-layer{padding:0}#register-layer .modal-panel{width:100%;max-height:none;min-height:100vh;grid-template-columns:1fr;border-radius:0}#register-layer .registration-intro{grid-column:1;grid-row:auto;padding:20px 22px}.registration-fields{grid-column:1;padding:18px;grid-template-columns:1fr}.registration-fields .legal-consents,.registration-fields #register-status,.registration-fields #btn-register{grid-column:1}.registration-fields .legal-consents{grid-template-columns:1fr}.payment-layout{grid-template-columns:1fr}}@media(max-width:650px){.customer-shell .shell-layout{grid-template-columns:1fr}}
+
+/* Final responsive cascade for authenticated customer and admin portals. */
+@media(max-width:1080px){
+  .customer-shell .shell-layout,
+  .sysadmin-shell .shell-layout{grid-template-columns:minmax(0,1fr)}
+  .customer-shell .shell-main,
+  .sysadmin-shell .shell-main{width:100%;min-width:0;padding:18px 14px}
+  .customer-shell .shell-header,
+  .sysadmin-shell .shell-header{margin:-18px -14px 0;padding:16px 14px}
+  .customer-shell .embed-panel,
+  .customer-shell .embed-content,
+  .sysadmin-shell .embed-panel,
+  .sysadmin-shell .embed-content{width:100%;min-width:0;max-width:100%}
+  .customer-shell .table-wrap,
+  .sysadmin-shell .table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:650px){
+  .customer-shell .shell-header,
+  .sysadmin-shell .shell-header,
+  .customer-shell .module-panel-head,
+  .sysadmin-shell .module-panel-head,
+  .customer-shell .section-heading,
+  .sysadmin-shell .section-heading,
+  .customer-shell .toolbar,
+  .sysadmin-shell .toolbar{align-items:stretch;flex-direction:column}
+  .customer-shell .module-panel-head>* ,
+  .sysadmin-shell .module-panel-head>* ,
+  .customer-shell .toolbar>* ,
+  .sysadmin-shell .toolbar>*{width:100%;min-width:0;max-width:100%}
+  .customer-form-grid,
+  .support-form,
+  .role-name-grid,
+  .permission-grid,
+  .customer-plan-grid,
+  .sysadmin-shell .inline-form,
+  .admin-form-grid,
+  .admin-plan-grid,
+  .admin-columns{grid-template-columns:minmax(0,1fr)}
+  .customer-form-grid .wide-field,
+  .support-form .wide-field,
+  .sysadmin-shell .inline-form textarea{grid-column:auto}
+  .customer-shell table,
+  .sysadmin-shell table{min-width:620px}
+  .customer-shell .shell-title,
+  .sysadmin-shell .shell-title{font-size:1.45rem}
+  .admin-welcome,
+  .company-detail-head{align-items:flex-start;flex-direction:column}
+}

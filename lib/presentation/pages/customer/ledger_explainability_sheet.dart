@@ -15,7 +15,6 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 const _kGreen = Color(0xFF10B981);
 const _kRed = Color(0xFFEF4444);
 const _kBlue = Color(0xFF3B82F6);
-const _kAmber = Color(0xFFF59E0B);
 const _kPurple = Color(0xFF8B5CF6);
 const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
@@ -135,7 +134,6 @@ class _LedgerExplainabilitySheetState
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final isWide = media.size.width >= 600;
 
     return Container(
       height: media.size.height * 0.85,

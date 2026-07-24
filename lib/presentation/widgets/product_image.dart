@@ -23,7 +23,6 @@ class ProductImage extends ConsumerWidget {
   final String barcode;
   final double size;
 
-  static String? _documentsDirectoryPath;
   static final Map<String, bool> _imageExistsCache = {};
 
   static void clearCache() {
@@ -79,7 +78,9 @@ class ProductImage extends ConsumerWidget {
 
     // 1. Web execution
     if (kIsWeb) {
-      if (imageUrl != null && imageUrl!.isNotEmpty && _isNetworkUrl(imageUrl!)) {
+      if (imageUrl != null &&
+          imageUrl!.isNotEmpty &&
+          _isNetworkUrl(imageUrl!)) {
         return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
       }
       return _buildPlaceholder();
@@ -89,8 +90,6 @@ class ProductImage extends ConsumerWidget {
     final docsDirAsync = ref.watch(appDocumentsDirectoryProvider);
     return docsDirAsync.when(
       data: (dir) {
-        _documentsDirectoryPath = dir.path;
-
         if (imageUrl != null && imageUrl!.isNotEmpty) {
           if (_isNetworkUrl(imageUrl!)) {
             return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
@@ -104,7 +103,8 @@ class ProductImage extends ConsumerWidget {
 
         // Fallback to barcode-matched image file
         final localPath = p.join(dir.path, 'product_images', '$barcode.jpg');
-        final exists = _imageExistsCache[barcode] ??= File(localPath).existsSync();
+        final exists =
+            _imageExistsCache[barcode] ??= File(localPath).existsSync();
         if (exists) {
           return _buildFileImage(context, localPath);
         }

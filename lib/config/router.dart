@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/domain/services/access_manager.dart';
 import 'package:serenutos/presentation/pages/onboarding/onboarding_wizard_page.dart';
 import 'package:serenutos/presentation/pages/onboarding/bootstrap_loading_view.dart';
 import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
@@ -36,9 +38,7 @@ import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_import_wizard_page.dart';
 import 'package:serenutos/domain/models/permission.dart'
     show UserRole, Permission;
-import 'package:serenutos/presentation/pages/operations_hub_page.dart';
 import 'package:serenutos/presentation/pages/finance_hub_page.dart';
-import 'package:serenutos/presentation/pages/system_hub_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
@@ -59,31 +59,18 @@ class AppRoutes {
   static const home = '/';
   static const sales = '/sales';
   static const customers = '/customers';
-  static const customerDetail = '/customers/detail';
-  static const customerAdd = '/customers/add';
-  static const customerEdit = '/customers/edit';
-  static const customerCollect = '/customers/collect';
   static const products = '/products';
-  static const productAdd = '/products/add';
-  static const productEdit = '/products/edit';
   static const reports = '/reports';
   static const orders = '/orders';
-  static const orderDetail = '/orders/detail';
-  static const orderAdd = '/orders/add';
-  static const orderEdit = '/orders/edit';
   static const settings = '/settings';
   static const catalogImportWizard = '/settings/catalog-import';
   static const license = '/settings/license';
   static const admin = '/admin';
   static const finance = '/finance';
-  static const printing = '/printing';
-  static const operations = '/operations';
-  static const system = '/system';
   static const hardware = '/hardware';
   static const printQueue = '/settings/print-queue';
   static const smsHistory = '/settings/sms-history';
   static const dbHealth = '/settings/db-health';
-  static const management = '/management';
 }
 
 String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
@@ -100,7 +87,7 @@ String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
 String? _roleOrPermissionRedirect(BuildContext context, Permission permission) {
   final user = ProviderScope.containerOf(context).read(currentUserProvider);
   if (user == null) return AppRoutes.login;
-  if (user.role == UserRole.owner || user.role == UserRole.admin) {
+  if (user.role == UserRole.owner || user.role == UserRole.sysadmin) {
     return null;
   }
   if (user.hasPermission(permission.value)) {
@@ -125,6 +112,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onLoginSub = state.matchedLocation == AppRoutes.loginSub;
       final onRegister = state.matchedLocation.startsWith('/register');
       final onOnboarding = state.matchedLocation.startsWith('/onboarding');
+      final onPaywall = state.matchedLocation == AppRoutes.paywall;
+      final onOperationalError = state.matchedLocation == '/operational-error';
+      final onLicenseRecovery = state.matchedLocation == AppRoutes.license;
       final onAuthScreen =
           onLogin || onLoginForm || onLoginSub || onRegister || onOnboarding;
 
@@ -134,6 +124,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (onAuthScreen) {
+        return AppRoutes.home;
+      }
+
+      final accessStatus = ref
+          .read(accessManagerProvider)
+          .checkAccess(currentUser: ref.read(currentUserProvider));
+
+      if (accessStatus == AccessStatus.paywall) {
+        if (onPaywall || onLicenseRecovery) return null;
+        return AppRoutes.paywall;
+      }
+
+      if (accessStatus == AccessStatus.restrictedOperation) {
+        if (onOperationalError) return null;
+        return '/operational-error';
+      }
+
+      if (onPaywall || onOperationalError) {
         return AppRoutes.home;
       }
 
@@ -287,26 +295,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             _roleOrPermissionRedirect(context, Permission.settingsFinance),
       ),
       GoRoute(
-        path: AppRoutes.system,
-        name: 'system',
-        builder: (context, state) => const SystemHubPage(),
-      ),
-      GoRoute(
         path: AppRoutes.hardware,
         name: 'hardware',
         builder: (context, state) => const HardwareTestPage(),
         redirect: (context, state) =>
             _roleOrPermissionRedirect(context, Permission.settingsPrinter),
-      ),
-      GoRoute(
-        path: AppRoutes.operations,
-        name: 'operations',
-        builder: (context, state) => const OperationsHubPage(),
-      ),
-      GoRoute(
-        path: AppRoutes.management,
-        name: 'management',
-        builder: (context, state) => const SettingsPage(),
       ),
 
       // ── Main shell with 5-tab Bottom Navigation Bar ───────────────────
@@ -485,20 +478,3 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
   );
 });
-
-/// GoRouter extension for easy navigation
-extension GoRouterX on GoRouter {
-  void goLogin() => go(AppRoutes.login);
-  void goHome() => go(AppRoutes.home);
-  void goSales() => go(AppRoutes.sales);
-  void goCustomers() => go(AppRoutes.customers);
-  void goProducts() => go(AppRoutes.products);
-  void goReports() => go(AppRoutes.reports);
-  void goOrders() => go(AppRoutes.orders);
-  void goSettings() => go(AppRoutes.settings);
-  void goOperations() => go(AppRoutes.operations);
-  void goFinance() => go(AppRoutes.finance);
-  void goSystem() => go(AppRoutes.system);
-  void goHardware() => go(AppRoutes.hardware);
-  void goManagement() => go(AppRoutes.management);
-}

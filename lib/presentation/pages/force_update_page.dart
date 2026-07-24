@@ -58,7 +58,6 @@ class ForceUpdatePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const primaryColor = Color(0xFF10B981); // Emerald Green
     const backgroundColor = Color(0xFF0F172A); // Slate 900
     const cardBgColor = Color(0xFF1E293B); // Slate 800
     const textMutedColor = Color(0xFF94A3B8); // Slate 400

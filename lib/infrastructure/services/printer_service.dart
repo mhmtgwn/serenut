@@ -277,8 +277,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         if (!ok) throw Exception('USB print failed');
       case PrinterBackend.network:
         final ip = settings.printerIp?.trim();
-        if (ip == null || ip.isEmpty)
+        if (ip == null || ip.isEmpty) {
           throw Exception('No printer IP configured');
+        }
         await _sendViaTcp(bytes, ip, settings.printerPort);
       case PrinterBackend.bluetooth:
         final mac = settings.printerName?.trim() ?? '';

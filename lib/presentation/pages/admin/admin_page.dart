@@ -6,13 +6,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/presentation/pages/admin/observability_dashboard.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
+import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
@@ -39,8 +40,6 @@ class AdminPage extends ConsumerWidget {
     final currentUser = ref.watch(currentUserProvider);
     final syncState = ref.watch(syncProvider);
     final licStatus = ref.watch(licenseStatusProvider);
-    final printQueue = ref.watch(persistentPrintQueueProvider);
-
     // Guard — admin, owner, or sysadmin only
     if (currentUser == null ||
         !(currentUser.role == UserRole.admin ||
@@ -149,6 +148,15 @@ class AdminPage extends ConsumerWidget {
                   MaterialPageRoute(
                       builder: (_) => const RecoveryCenterPage())),
             ),
+            const _Divider(),
+            _AdminTile(
+              icon: Icons.assignment_turned_in_rounded,
+              color: _kPurple,
+              title: 'Denetim Merkezi',
+              subtitle: 'Fiyat değişimleri, silmeler ve sistem kayıtları',
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const AuditCenterPage())),
+            ),
           ]),
           const SizedBox(height: 16),
 
@@ -192,14 +200,18 @@ class AdminPage extends ConsumerWidget {
               color: licStatus.status == 'valid' ? _kGreen : _kRed,
               title: 'Lisans Yönetimi',
               subtitle: _buildLicenseSubtitle(licStatus),
-              onTap: () => context.push('/license'),
+              onTap: () => context.push(AppRoutes.license),
             ),
             const _Divider(),
             _AdminTile(
               icon: Icons.devices_rounded,
               color: _kBlue,
               title: 'Cihaz Kimliği',
-              subtitle: '${licStatus.deviceUuid.substring(0, 18)}...',
+              subtitle: licStatus.deviceUuid.isEmpty
+                  ? 'Cihaz kimliği alınamadı'
+                  : licStatus.deviceUuid.length > 18
+                      ? '${licStatus.deviceUuid.substring(0, 18)}...'
+                      : licStatus.deviceUuid,
               onTap: () => _showDeviceUuidDialog(context, licStatus.deviceUuid),
             ),
           ]),

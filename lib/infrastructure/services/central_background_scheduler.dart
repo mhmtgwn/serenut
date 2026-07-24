@@ -15,7 +15,6 @@ abstract class SchedulerJob {
 }
 
 class CentralBackgroundScheduler {
-  final SharedPreferences _prefs;
   final List<SchedulerJob> _jobs = [];
   final Map<String, DateTime> _lastRunTimes = {};
   final Map<String, int> _backoffFactors = {};
@@ -25,7 +24,7 @@ class CentralBackgroundScheduler {
   bool _isNetworkAvailable = true;
   double _batteryLevel = 100.0; // Fallback helper
 
-  CentralBackgroundScheduler(this._prefs);
+  CentralBackgroundScheduler(SharedPreferences prefs);
 
   void registerJob(SchedulerJob job) {
     _jobs.add(job);

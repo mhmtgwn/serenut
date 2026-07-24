@@ -1,14 +1,33 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { pgPool, redisClient } from '../../config/database';
-import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
 import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate-limit.middleware';
 
 const router = Router();
 
+const requireSmsHistoryAccess = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  const permissions = req.user?.permissions || [];
+  if (
+    permissions.includes('notifications.history.read') ||
+    permissions.includes('settings:view')
+  ) {
+    return next();
+  }
+  return res.status(403).json({
+    error: 'forbidden',
+    message: 'SMS geçmişini görüntüleme yetkiniz bulunmuyor.',
+  });
+};
+
 // Apply auth globally
 router.use(authenticateUser);
+router.use(requireActiveEntitlementForMutations);
 
 async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
   const client = await pgPool.connect();
@@ -260,6 +279,15 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
       return res.status(403).json({ error: 'not_primary_sms_gateway' });
     }
     await client.query(
+      `UPDATE notification_queue
+       SET status = 'retrying', error_message = 'sms_gateway_interrupted',
+           retry_count = retry_count + 1, gateway_updated_at = NOW()
+       WHERE company_id = $1 AND channel = 'sms'
+         AND status IN ('delivered_to_device', 'sending')
+         AND gateway_updated_at < NOW() - INTERVAL '5 minutes'`,
+      [user.company_id]
+    );
+    await client.query(
       `UPDATE notification_queue SET status = 'failed', error_message = 'sms_gateway_timeout', gateway_updated_at = NOW()
        WHERE company_id = $1 AND channel = 'sms' AND status IN ('queued','pending','retrying')
          AND created_at < NOW() - INTERVAL '24 hours'`,
@@ -324,7 +352,7 @@ router.post('/sms-gateway/messages/:id/result', async (req: AuthenticatedRequest
  *   get:
  *     summary: Get message queue delivery history
  */
-router.get('/queue', requirePermission('notifications.history.read'), async (req: AuthenticatedRequest, res: Response) => {
+router.get('/queue', requireSmsHistoryAccess, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const history = await runWithTenantContext(

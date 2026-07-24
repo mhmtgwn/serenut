@@ -97,6 +97,7 @@ class SqliteOrderRepository implements IOrderRepository {
       'created_at': entity.createdAt.toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
       'created_by': entity.createdBy,
+      'is_synced': 0,
     });
     int index = 0;
     for (final item in entity.items) {
@@ -132,6 +133,7 @@ class SqliteOrderRepository implements IOrderRepository {
         'actual_delivery_date': entity.actualDeliveryDate?.toIso8601String(),
         'notes': entity.notes,
         'updated_at': DateTime.now().toIso8601String(),
+        'is_synced': 0,
       },
       where: 'id = ?',
       whereArgs: [entity.id],
@@ -163,6 +165,7 @@ class SqliteOrderRepository implements IOrderRepository {
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
+        'is_synced': 0,
       },
       where: 'id = ?',
       whereArgs: [id],
@@ -221,6 +224,7 @@ class SqliteOrderRepository implements IOrderRepository {
     final updateMap = <String, dynamic>{
       'status': status,
       'updated_at': DateTime.now().toIso8601String(),
+      'is_synced': 0,
     };
     if (status == 'delivered') {
       updateMap['actual_delivery_date'] = DateTime.now().toIso8601String();
@@ -231,7 +235,7 @@ class SqliteOrderRepository implements IOrderRepository {
       where: 'id = ? AND status != ?',
       whereArgs: [orderId, status],
     );
-    
+
     if (count == 0) {
       final existing = await _executor.query(
         'orders',

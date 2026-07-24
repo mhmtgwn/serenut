@@ -31,7 +31,14 @@ if (missingEnv.length > 0) {
 }
 
 // Operational warning for optional API keys
-const optionalEnv = ['REDIS_URL', 'SMS_API_KEY', 'SMTP_API_KEY', 'RSA_PRIVATE_KEY', 'APP_SECRET'];
+const optionalEnv = [
+  'REDIS_URL',
+  'SMS_API_KEY',
+  'SMTP_API_KEY',
+  'RSA_PRIVATE_KEY',
+  'RELEASE_RSA_PRIVATE_KEY',
+  'APP_SECRET',
+];
 optionalEnv.forEach(key => {
   if (!process.env[key]) {
     console.warn(`⚠️ Warning: Optional operational key ${key} is not set. Related features may fallback to insecure defaults or fail.`);
@@ -50,7 +57,6 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import { pgPool, redisClient } from './config/database';
 import { runMigrations } from './migrations';
 import { logger } from './config/logger';
-import { getJwtFailuresCount, getLicenseSuccessCount, getLicenseFailuresCount, getSlowQueriesCount } from './utils/telemetry';
 import { generalApiLimiter, authLimiter, licenseLimiter } from './middleware/rate-limit.middleware';
 import { idempotencyMiddleware } from './middleware/idempotency';
 
@@ -84,7 +90,6 @@ import healthRouter from './modules/health/health.controller';
 // BullMQ Workers
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
 import { startBillingScheduler, stopBillingScheduler } from './workers/billing.scheduler';
-import { AuthService } from './modules/auth/auth.service';
 
 export const app = express();
 
@@ -599,59 +604,6 @@ async function warmupCache() {
 }
 
 // ── LOCAL/DEV SYSADMIN SEED ────────────────────────────────────────────────
-async function ensureDefaultSysadmin() {
-  try {
-    // This helper is intentionally not called during bootstrap. It is retained
-    // temporarily for controlled migrations and refuses to run without explicit
-    // one-time credentials supplied by the operator.
-    const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
-    const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-    if (!bootstrapEmail || !bootstrapPassword) {
-      throw new Error('Explicit bootstrap administrator credentials are required');
-    }
-    const companyId = 'serenut_cloud';
-    const roleId = 'sysadmin';
-    const userId = 'user-sysadmin';
-    const email = bootstrapEmail.trim().toLowerCase();
-
-    await pgPool.query(`
-      INSERT INTO companies (id, name, tax_number, phone, email, status)
-      VALUES ($1, 'Serenut Cloud', '0000000000', NULL, $2, 'active')
-      ON CONFLICT (id) DO NOTHING
-    `, [companyId, email]);
-
-    await pgPool.query(`
-      INSERT INTO roles (id, name, description)
-      VALUES ($1, 'sysadmin', 'System Administrator')
-      ON CONFLICT (id) DO NOTHING
-    `, [roleId]);
-
-    const userRes = await pgPool.query(
-      `SELECT id FROM users WHERE email = $1 LIMIT 1`,
-      [email]
-    );
-
-    if (userRes.rows.length === 0) {
-      const hash = await AuthService.hashPassword(bootstrapPassword);
-      await pgPool.query(`
-        INSERT INTO users (id, company_id, name, email, password_hash, is_active)
-        VALUES ($1, $2, 'System Admin', $3, $4, true)
-      `, [userId, companyId, email, hash]);
-    }
-
-    await pgPool.query(`
-      INSERT INTO user_roles (user_id, role_id)
-      SELECT u.id, $2
-      FROM users u
-      WHERE u.email = $1
-      ON CONFLICT DO NOTHING
-    `, [email, roleId]);
-
-    logger.info('✅ Explicit bootstrap administrator verified');
-  } catch (err: any) {
-    logger.error(`Failed to ensure default sysadmin account: ${err.message}`);
-  }
-}
 
 // ── BOOTSTRAP ─────────────────────────────────────────────────────────────────
 async function bootstrap() {

@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/license_model.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/pages/onboarding/license_activation_flow.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
@@ -35,11 +36,7 @@ class LicenseManagementPage extends ConsumerStatefulWidget {
 }
 
 class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
-  final _tokenController = TextEditingController();
-  bool _isValidating = false;
   bool _isRefreshing = false;
-  String? _validationError;
-  bool _tokenVisible = false;
 
   @override
   void initState() {
@@ -59,12 +56,6 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
     } finally {
       if (mounted) setState(() => _isRefreshing = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _tokenController.dispose();
-    super.dispose();
   }
 
   @override
@@ -125,6 +116,11 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
           _buildSectionHeader('CİHAZ KİMLİĞİ'),
           const SizedBox(height: 8),
           _buildDeviceCard(licStatus.deviceUuid),
+          const SizedBox(height: 16),
+
+          _buildSectionHeader('LİSANS AKTİVASYONU'),
+          const SizedBox(height: 8),
+          _buildActivationCard(),
           const SizedBox(height: 16),
 
           // ── Support ─────────────────────────────────────────────────────
@@ -422,7 +418,7 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
 
   // ── Token Entry Card ──────────────────────────────────────────────────────
 
-  Widget _buildTokenEntryCard() {
+  Widget _buildActivationCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -434,109 +430,29 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Lisans anahtarınızı girin:',
-            style: TextStyle(
-              color: _kTextSecondary,
-              fontSize: 12,
-            ),
+            'Yeni bir lisans anahtarınız varsa bu cihazda güvenli şekilde etkinleştirebilirsiniz.',
+            style: TextStyle(color: _kTextSecondary, fontSize: 12),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _tokenController,
-            obscureText: !_tokenVisible,
-            maxLines: _tokenVisible ? 3 : 1,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 11,
-              color: _kTextPrimary,
-            ),
-            decoration: InputDecoration(
-              hintText: 'eyJtZXJjaGFudElk...',
-              hintStyle: const TextStyle(color: _kTextSecondary, fontSize: 11),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBorderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kBlue),
-              ),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _tokenVisible
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded,
-                  color: _kTextSecondary,
-                  size: 18,
-                ),
-                onPressed: () => setState(() => _tokenVisible = !_tokenVisible),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
-          ),
-          if (_validationError != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: _kRed, size: 14),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    _validationError!,
-                    style: const TextStyle(color: _kRed, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    _tokenController.clear();
-                    setState(() => _validationError = null);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _kTextSecondary,
-                    side: const BorderSide(color: _kBorderColor),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => LicenseActivationFlow(
+                      continueOnboarding: false,
+                      onLicenseActivated: (_, __) {
+                        ref.invalidate(licenseStatusProvider);
+                      },
+                    ),
                   ),
-                  child: const Text('Temizle'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: _isValidating ? null : _validateAndSave,
-                  icon: _isValidating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.verified_rounded, size: 18),
-                  label: Text(_isValidating
-                      ? 'Doğrulanıyor...'
-                      : 'Anahtarı Doğrula & Kaydet'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-            ],
+                );
+                if (mounted) await _refreshEntitlement();
+              },
+              icon: const Icon(Icons.key_rounded),
+              label: const Text('Lisans Anahtarı Gir'),
+            ),
           ),
         ],
       ),
@@ -662,46 +578,6 @@ class _LicenseManagementPageState extends ConsumerState<LicenseManagementPage> {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
-
-  Future<void> _validateAndSave() async {
-    final token = _tokenController.text.trim();
-    if (token.isEmpty) {
-      setState(() => _validationError = 'Lütfen bir lisans anahtarı girin.');
-      return;
-    }
-
-    setState(() {
-      _isValidating = true;
-      _validationError = null;
-    });
-
-    try {
-      final service = ref.read(licenseServiceProvider);
-      final saved = await service.saveLicenseToken(token);
-
-      if (!mounted) return;
-
-      if (saved) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Lisans başarıyla doğrulandı ve kaydedildi.'),
-            backgroundColor: _kGreen,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        _tokenController.clear();
-        // Invalidate license status providers
-        ref.invalidate(licenseStatusProvider);
-      } else {
-        setState(() => _validationError =
-            'Geçersiz lisans anahtarı. RSA imzası doğrulanamadı veya cihaz kimliği uyuşmuyor.');
-      }
-    } catch (e) {
-      setState(() => _validationError = 'Doğrulama hatası: $e');
-    } finally {
-      if (mounted) setState(() => _isValidating = false);
-    }
-  }
 
   Widget _buildSectionHeader(String title) {
     return Padding(

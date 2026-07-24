@@ -52,7 +52,6 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600),
                             onChanged: (val) {
-                              updateState(() => _productQuery = val);
                               ref
                                   .read(
                                       ordersProductSearchQueryProvider.notifier)
@@ -66,7 +65,6 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                         onPressed: () {
                           updateState(() {
                             _isProductSearching = false;
-                            _productQuery = '';
                             _productSearchController.clear();
                           });
                           ref
@@ -434,37 +432,8 @@ extension OrderCreationProductStep on OrderCreationDialogState {
     );
   }
 
-  Widget _buildCategoryModalChip(
-    BuildContext context, {
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? _kGreen : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? _kGreen : const Color(0xFFE2E8F0),
-            width: 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF475569),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showCategoryBottomSheet(BuildContext context, List<String> categoriesList) {
+  void _showCategoryBottomSheet(
+      BuildContext context, List<String> categoriesList) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(

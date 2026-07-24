@@ -13,7 +13,6 @@ interface CachedResponse {
 }
 
 class IdempotencyCache {
-  private localCache = new Map<string, CachedResponse>();
   private redisClient: any;
   private useRedis = false;
 

@@ -48,13 +48,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final TextEditingController _minStockCtrl;
   late final TextEditingController _vatCtrl;
   late final TextEditingController _barcodeCtrl;
-  late final TextEditingController _supplierCtrl;
-  late final TextEditingController _unitCtrl;
-  late final TextEditingController _notesCtrl;
 
   String? _selectedCategory;
   bool _isSaving = false;
-  bool _showOptional = false;
   late String _saleType;
   late final TextEditingController _minimumWeightCtrl;
 
@@ -78,12 +74,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             : p.id)
         : '';
     _barcodeCtrl = TextEditingController(text: barcodeText);
-    _supplierCtrl = TextEditingController(text: '');
-    _unitCtrl = TextEditingController(text: 'Adet');
     _saleType = p?.saleType ?? 'piece';
     _minimumWeightCtrl =
         TextEditingController(text: (p?.minimumWeightGrams ?? 20).toString());
-    _notesCtrl = TextEditingController(text: '');
     _selectedCategory = p?.category;
   }
 
@@ -97,10 +90,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _minStockCtrl.dispose();
     _vatCtrl.dispose();
     _barcodeCtrl.dispose();
-    _supplierCtrl.dispose();
-    _unitCtrl.dispose();
     _minimumWeightCtrl.dispose();
-    _notesCtrl.dispose();
     super.dispose();
   }
 
@@ -321,7 +311,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               DropdownButtonFormField<String>(
                 value: _saleType,
                 decoration: InputDecoration(
-                  labelText: 'Satış Tipi',
+                  labelText: 'Birim',
                   prefixIcon: Icon(
                     _saleType == 'weighed'
                         ? Icons.monitor_weight_rounded
@@ -332,8 +322,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 ),
                 items: const [
                   DropdownMenuItem(value: 'piece', child: Text('Adet')),
-                  DropdownMenuItem(
-                      value: 'weighed', child: Text('Tartılı (kg)')),
+                  DropdownMenuItem(value: 'weighed', child: Text('Ağırlık')),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => _saleType = value);
@@ -377,8 +366,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                         FilteringTextInputFormatter.allow(RegExp(r'[\d\.,]'))
                       ],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty)
+                        if (v == null || v.trim().isEmpty) {
                           return 'Lütfen bir satış fiyatı giriniz.';
+                        }
                         if (double.tryParse(v.trim().replaceAll(',', '.')) ==
                             null) {
                           return 'Lütfen geçerli bir satış fiyatı giriniz.';
@@ -414,10 +404,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty)
+                        if (v == null || v.trim().isEmpty) {
                           return 'Lütfen stok miktarı giriniz.';
-                        if (int.tryParse(v.trim()) == null)
+                        }
+                        if (int.tryParse(v.trim()) == null) {
                           return 'Lütfen geçerli bir tam sayı giriniz.';
+                        }
                         return null;
                       },
                     ),
@@ -455,10 +447,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty)
+                        if (v == null || v.trim().isEmpty) {
                           return 'Lütfen KDV oranı giriniz.';
-                        if (int.tryParse(v.trim()) == null)
+                        }
+                        if (int.tryParse(v.trim()) == null) {
                           return 'Lütfen geçerli bir tam sayı giriniz.';
+                        }
                         return null;
                       },
                     ),
@@ -475,73 +469,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 ],
               ),
             ]),
-            const SizedBox(height: 16),
-
-            // ── Bölüm 4: Opsiyonel Alanlar ────────────────────────────────
-            GestureDetector(
-              onTap: () => setState(() => _showOptional = !_showOptional),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _kBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.tune_rounded,
-                        size: 16, color: _kTextSecondary),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Gelişmiş Seçenekler',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: _kTextSecondary),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      _showOptional
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: _kTextSecondary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_showOptional) ...[
-              const SizedBox(height: 10),
-              _buildSection(children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildField(
-                        controller: _supplierCtrl,
-                        label: 'Tedarikçi',
-                        icon: Icons.local_shipping_rounded,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildField(
-                        controller: _unitCtrl,
-                        label: 'Birim (Adet/Kg/Lt)',
-                        icon: Icons.straighten_rounded,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildField(
-                  controller: _notesCtrl,
-                  label: 'Notlar',
-                  icon: Icons.sticky_note_2_rounded,
-                  maxLines: 2,
-                ),
-              ]),
-            ],
             const SizedBox(height: 28),
 
             // ── Kaydet Butonu ─────────────────────────────────────────────

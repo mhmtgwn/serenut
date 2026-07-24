@@ -111,8 +111,9 @@ void main() {
       await saleRepo.create(_makeSale('sale-race-multi'));
 
       final slowMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath))
+        if (req.url.path.contains(_versionCheckPath)) {
           return _versionOkResponse();
+        }
         await Future<void>.delayed(const Duration(milliseconds: 150));
         return http.Response('{"status":"ok"}', 200);
       });
@@ -148,8 +149,9 @@ void main() {
       await saleRepo.create(_makeSale('sale-delayed'));
 
       final slowMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath))
+        if (req.url.path.contains(_versionCheckPath)) {
           return _versionOkResponse();
+        }
         await Future<void>.delayed(const Duration(milliseconds: 300));
         return http.Response('{"status":"ok"}', 200);
       });
@@ -172,8 +174,9 @@ void main() {
           reason: 'Second is rejected while first is in-flight');
 
       final fastMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath))
+        if (req.url.path.contains(_versionCheckPath)) {
           return _versionOkResponse();
+        }
         return http.Response('{"status":"ok"}', 200);
       });
       final apiClient2 = ApiClient(httpClient: fastMock);
@@ -194,8 +197,9 @@ void main() {
       await saleRepo.create(_makeSale('sale-p3'));
 
       final partialMock = MockClient((req) async {
-        if (req.url.path.contains(_versionCheckPath))
+        if (req.url.path.contains(_versionCheckPath)) {
           return _versionOkResponse();
+        }
         if (req.body.contains('sale-p2')) {
           throw const SocketException('Simulated mid-batch network failure');
         }

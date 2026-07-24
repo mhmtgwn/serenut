@@ -165,7 +165,7 @@ class OfflineSyncService {
       }
 
       final masterPush = await _pushPendingEntities(
-        const ['product', 'customer'],
+        const ['product', 'customer', 'order'],
         errors,
       );
       synced += masterPush.synced;
@@ -185,7 +185,7 @@ class OfflineSyncService {
         if (_chaosInjector != null) {
           await _chaosInjector!.trigger(FaultHook.beforePull);
         }
-        await _pullUpdates(errors);
+        synced += await _pullUpdates(errors);
 
         if (_stateMachine != null) {
           await _stateMachine!.transition(SyncTrigger.noSalesFound);
@@ -305,7 +305,7 @@ class OfflineSyncService {
       synced += ledgerPush.synced;
       failed += ledgerPush.failed;
 
-      await _pullUpdates(errors);
+      synced += await _pullUpdates(errors);
 
       if (_stateMachine != null &&
           _stateMachine!.currentState == SyncState.syncing) {
@@ -345,12 +345,20 @@ class OfflineSyncService {
         'product' => 'products',
         'customer' => 'customers',
         'financial_transaction' => 'financial_transactions',
+        'order' => 'orders',
         _ => throw ArgumentError('Unsupported sync entity: $type'),
       };
       final rows = await db.query(table, where: 'is_synced = 0');
       for (final row in rows) {
         final id = row['id'] as String;
         final payload = Map<String, dynamic>.from(row);
+        if (type == 'order') {
+          payload['items'] = await db.query(
+            'order_items',
+            where: 'order_id = ?',
+            whereArgs: [id],
+          );
+        }
         if (type == 'financial_transaction') {
           payload['date'] = payload['created_at'];
         }
@@ -419,7 +427,8 @@ class OfflineSyncService {
   }
 
   /// Pull updates from server and merge with local state
-  Future<void> _pullUpdates(List<String> errors) async {
+  Future<int> _pullUpdates(List<String> errors) async {
+    var pulled = 0;
     try {
       final sharedPrefs = _licenseService.prefs;
       final scope = _syncScopeId?.trim();
@@ -467,8 +476,9 @@ class OfflineSyncService {
         if (txs.isEmpty) {
           break;
         }
+        pulled += txs.length;
 
-        // Sort to enforce dependency order: product -> customer -> sale -> financial_transaction
+        // Sort to enforce dependency order before child records are merged.
         txs.sort((a, b) {
           final tA =
               a is Map<String, dynamic> ? (a['type'] as String? ?? '') : '';
@@ -482,6 +492,8 @@ class OfflineSyncService {
               case 'customer':
                 return 2;
               case 'sale':
+                return 3;
+              case 'order':
                 return 3;
               case 'financial_transaction':
                 return 4;
@@ -675,6 +687,60 @@ class OfflineSyncService {
                     }
                   }
                 }
+              } else if (type == 'order') {
+                final customerId = payload['customer_id'] as String?;
+                if (customerId == null || customerId.isEmpty) continue;
+                final custCheck = await txn.query('customers',
+                    where: 'id = ?', whereArgs: [customerId], limit: 1);
+                if (custCheck.isEmpty) {
+                  errors.add(
+                      'Parent customer $customerId not found for order ${payload['id']}. Order quarantined.');
+                  continue;
+                }
+                await txn.insert(
+                  'orders',
+                  {
+                    'id': payload['id'],
+                    'customer_id': customerId,
+                    'status': payload['status'] ?? 'created',
+                    'total_amount':
+                        (payload['total_amount'] as num?)?.toDouble(),
+                    'order_date': payload['order_date'],
+                    'expected_delivery_date': payload['expected_delivery_date'],
+                    'actual_delivery_date': payload['actual_delivery_date'],
+                    'notes': payload['notes'],
+                    'created_at': payload['created_at'],
+                    'updated_at': payload['updated_at'],
+                    'is_deleted': (payload['is_deleted'] == true ||
+                            payload['is_deleted'] == 1)
+                        ? 1
+                        : 0,
+                    'deleted_at': payload['deleted_at'],
+                    'deleted_by': payload['deleted_by'],
+                    'created_by': payload['created_by'],
+                    'is_synced': 1,
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.replace,
+                );
+                await txn.delete('order_items',
+                    where: 'order_id = ?', whereArgs: [payload['id']]);
+                for (final rawItem in (payload['items'] as List? ?? const [])) {
+                  if (rawItem is! Map<String, dynamic>) continue;
+                  await txn.insert(
+                      'order_items',
+                      {
+                        'id': rawItem['id'],
+                        'order_id': payload['id'],
+                        'product_id': rawItem['product_id'],
+                        'quantity':
+                            (rawItem['quantity'] as num?)?.toDouble() ?? 0.0,
+                        'unit_price':
+                            (rawItem['unit_price'] as num?)?.toDouble() ?? 0.0,
+                        'created_at':
+                            rawItem['created_at'] ?? payload['created_at'],
+                      },
+                      conflictAlgorithm: ConflictAlgorithm.replace);
+                }
               } else if (type == 'financial_transaction') {
                 final customerId = payload['customer_id'] as String?;
                 bool parentExists = true;
@@ -828,6 +894,7 @@ class OfflineSyncService {
     } catch (e) {
       errors.add('Pull sync failed: $e');
     }
+    return pulled;
   }
 
   /// Check if the remote API is reachable.
@@ -894,26 +961,7 @@ class OfflineSyncService {
 
     if (statusOverride != null) {
       if (statusOverride == 409) {
-        if (_stateMachine != null) {
-          await _stateMachine!.transition(
-            SyncTrigger.pushConflict,
-            saleId: sale.id,
-            metadata: {
-              'http_status': 409,
-              'message': 'Duplicate push conflict detected'
-            },
-          );
-          await _stateMachine!
-              .transition(SyncTrigger.startSync, saleId: sale.id);
-          await _stateMachine!.transition(
-            SyncTrigger.mergeComplete,
-            saleId: sale.id,
-            metadata: {
-              'policy': 'server-authoritative',
-              'action': 'marked_synced'
-            },
-          );
-        }
+        await _recordDuplicateConflict(sale.id);
         return true;
       }
       return false;
@@ -927,29 +975,39 @@ class OfflineSyncService {
       debugPrint(
           '[OfflineSync] ❌ ApiException pushing sale (ID: ${sale.id}, local method: ${sale.paymentMethod}, mapped: ${payload['paymentMethod']}): status=${e.statusCode}, body=${e.responseBody}, msg=${e.message}');
       if (e.statusCode == 409) {
-        if (_stateMachine != null) {
-          await _stateMachine!.transition(
-            SyncTrigger.pushConflict,
-            saleId: sale.id,
-            metadata: {
-              'http_status': 409,
-              'message': 'Duplicate push conflict detected'
-            },
-          );
-          await _stateMachine!
-              .transition(SyncTrigger.startSync, saleId: sale.id);
-          await _stateMachine!.transition(
-            SyncTrigger.mergeComplete,
-            saleId: sale.id,
-            metadata: {
-              'policy': 'server-authoritative',
-              'action': 'marked_synced'
-            },
-          );
-        }
+        await _recordDuplicateConflict(sale.id);
         return true;
       }
       rethrow;
+    }
+  }
+
+  Future<void> _recordDuplicateConflict(String saleId) async {
+    final machine = _stateMachine;
+    if (machine == null) return;
+    try {
+      await machine.transition(
+        SyncTrigger.pushConflict,
+        saleId: saleId,
+        metadata: {
+          'http_status': 409,
+          'message': 'Duplicate push conflict detected',
+        },
+      );
+      await machine.transition(SyncTrigger.startSync, saleId: saleId);
+      await machine.transition(
+        SyncTrigger.mergeComplete,
+        saleId: saleId,
+        metadata: {
+          'policy': 'server-authoritative',
+          'action': 'marked_synced',
+        },
+      );
+    } catch (error) {
+      // A duplicate is already committed remotely. Telemetry/FSM bookkeeping
+      // must never turn that idempotent success into a failed upload.
+      debugPrint(
+          '[OfflineSync] Duplicate conflict bookkeeping skipped: $error');
     }
   }
 

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 import 'dart:math';
 import 'dart:async';
 import 'package:serenutos/config/utils.dart';
@@ -65,7 +64,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   // Step 2: Product Catalog
   final Map<ProductEntity, double> _cart = {};
-  String _productQuery = '';
   String _selectedCategory = 'Tümü';
   final _barcodeController = TextEditingController();
   final _barcodeFocusNode = FocusNode();
@@ -79,7 +77,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   // Step 4: Checkout
   String _paymentMethod = '';
-  double _paidAmount = 0.0;
   final TextEditingController _cashSplitController = TextEditingController();
   final TextEditingController _cardSplitController = TextEditingController();
   final TextEditingController _debtSplitController = TextEditingController();
@@ -165,9 +162,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   void _onBarcodeScanned(String barcode) {
     _productSearchController.clear();
-    setState(() {
-      _productQuery = '';
-    });
     ref.read(productsControllerProvider).whenData((productsList) {
       _handleBarcodeSubmit(barcode, productsList);
     });
@@ -246,10 +240,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           final debt = orderTx.debtAmount;
           if (paid == total) {
             _paymentMethod = 'cash';
-            _paidAmount = total;
           } else if (paid == 0) {
             _paymentMethod = 'debt';
-            _paidAmount = 0.0;
           } else {
             _paymentMethod = 'karma';
             _cashSplitController.text = paid.toStringAsFixed(2);
@@ -526,211 +518,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     }
   }
 
-  Widget _buildSummaryRow(
-      {required IconData icon,
-      required String label,
-      required String value,
-      Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: _kTextSecondary),
-          const SizedBox(width: 8),
-          Expanded(
-              child: Text(label,
-                  style:
-                      const TextStyle(color: _kTextSecondary, fontSize: 12))),
-          const SizedBox(width: 8),
-          Text(value,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: valueColor ?? _kText)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKarmaFields() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: _karmaValid ? _kGreen.withValues(alpha: 0.4) : _kBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.call_split_rounded,
-                  size: 14, color: _kTextSecondary),
-              const SizedBox(width: 6),
-              const Text('Karma Ödeme Dağılımı',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              if (_karmaValid)
-                const Text('✓ Tamam',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: _kGreenDark,
-                        fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSplitField(
-                  controller: _cashSplitController,
-                  label: 'Nakit',
-                  icon: Icons.payments_rounded,
-                  color: _kGreen,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildSplitField(
-                  controller: _cardSplitController,
-                  label: 'Kart',
-                  icon: Icons.credit_card_rounded,
-                  color: Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildSplitField(
-                  controller: _debtSplitController,
-                  label: 'Vadeli',
-                  icon: Icons.account_balance_wallet_rounded,
-                  color: Colors.orange,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSplitField(
-      {required TextEditingController controller,
-      required String label,
-      required IconData icon,
-      required Color color}) {
-    return TextField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d,.]'))],
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle:
-            TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
-        prefixIcon: Icon(icon, color: color, size: 16),
-        prefixText: '₺',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        isDense: true,
-      ),
-      onChanged: (_) => setState(() {}),
-    );
-  }
-
-  Widget _buildPaymentSelectionGrid() {
-    final methods = [
-      {
-        'id': 'cash',
-        'label': 'Nakit',
-        'icon': Icons.payments_rounded,
-        'color': _kGreen
-      },
-      {
-        'id': 'card',
-        'label': 'Kart',
-        'icon': Icons.credit_card_rounded,
-        'color': Colors.blue
-      },
-      {
-        'id': 'debt',
-        'label': 'Vadeli (Borç)',
-        'icon': Icons.account_balance_wallet_rounded,
-        'color': Colors.orange
-      },
-      {
-        'id': 'karma',
-        'label': 'Karma (Split)',
-        'icon': Icons.call_split_rounded,
-        'color': Colors.purple
-      },
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double aspectRatio = constraints.maxWidth > 400 ? 2.4 : 3.0;
-
-        return GridView.count(
-          shrinkWrap: true,
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: aspectRatio,
-          physics: const NeverScrollableScrollPhysics(),
-          children: methods.map((m) {
-            final isSel = _paymentMethod == m['id'];
-            final color = m['color'] as Color;
-
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _paymentMethod = m['id'] as String;
-                  if (_paymentMethod == 'cash' || _paymentMethod == 'card') {
-                    _paidAmount = _totalAmount;
-                  } else if (_paymentMethod == 'debt') {
-                    _paidAmount = 0.0;
-                  } else if (_paymentMethod == 'karma') {
-                    _cashSplitController.clear();
-                    _cardSplitController.clear();
-                    _debtSplitController.clear();
-                  }
-                });
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isSel ? color : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isSel ? color : _kBorder),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      m['icon'] as IconData,
-                      color: isSel ? Colors.white : color,
-                      size: 20,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      m['label'] as String,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        color: isSel ? Colors.white : _kText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
   Widget _buildBottomActionBar() {
     final nextDisabled = _isNextDisabled();
 
@@ -929,7 +716,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         if (_printLabel) {
           // Read label printer config from SQLite settings (single source of truth)
           final labelIp = settings.labelPrinterIp ?? '';
-          final labelPort = settings.labelPrinterPort ?? 9100;
+          final labelPort = settings.labelPrinterPort;
           final labelSettings = settings.copyWith(
             printerName: 'network',
             printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
@@ -1096,12 +883,10 @@ class _InlineQuantityFieldState extends State<_InlineQuantityField> {
 class _InlineCopyCountField extends StatefulWidget {
   final int value;
   final ValueChanged<int> onChanged;
-  final bool isEnabled;
 
   const _InlineCopyCountField({
     required this.value,
     required this.onChanged,
-    this.isEnabled = true,
   });
 
   @override
@@ -1158,18 +943,9 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final Color bgColor = widget.isEnabled
-        ? Colors.white
-        : (isDark ? Colors.black26 : Colors.grey.shade100);
-
-    final Color borderColor = widget.isEnabled
-        ? _kBorder
-        : (isDark ? Colors.white24 : Colors.grey.shade300);
-
-    final Color textColor =
-        widget.isEnabled ? _kText : _kTextSecondary.withValues(alpha: 0.5);
+    const Color bgColor = Colors.white;
+    const Color borderColor = _kBorder;
+    const Color textColor = _kText;
 
     return Container(
       width: 36,
@@ -1183,10 +959,10 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
-        enabled: widget.isEnabled,
+        enabled: true,
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
-        style: TextStyle(
+        style: const TextStyle(
             fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
         maxLines: 1,
         decoration: const InputDecoration(

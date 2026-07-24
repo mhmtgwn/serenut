@@ -25,7 +25,6 @@ import {
   trialExpiredEmail,
   paymentFailedEmail,
   paymentRetryEmail,
-  paymentSuccessEmail,
   subscriptionCancelledEmail,
   SmsTemplates,
 } from '../modules/notifications/email.templates';

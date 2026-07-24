@@ -4,7 +4,7 @@
 // FSM: unassigned → active → expired | suspended
 //      active → unassigned (deactivate)
 
-import { pgPool, redisClient } from '../../config/database';
+import { pgPool } from '../../config/database';
 import { logger } from '../../config/logger';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import crypto from 'crypto';

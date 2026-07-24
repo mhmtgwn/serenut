@@ -7,15 +7,21 @@
 //   POST /api/v1/orders/:id/refund   — Refund order
 
 import { Router, Response } from 'express';
-import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import {
+  authenticateUser,
+  AuthenticatedRequest,
+  requireActiveEntitlement,
+} from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
 import crypto from 'crypto';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
+import { resolvePaidAmount } from './order.policy';
 
 const router = Router();
 router.use(authenticateUser);
+router.use(requireActiveEntitlement);
 
 // ── ALLOWED ORDER FSM TRANSITIONS ─────────────────────────────────────────────
 // pending → completed | cancelled
@@ -64,10 +70,9 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     branchId,
     items,
     paymentMethod,
-    customerId,
     discount,
-    deviceUuid,
-    note,
+    customerId,
+    paidAmount,
   } = req.body;
   const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
 
@@ -78,10 +83,18 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   if (!paymentMethod || !['cash', 'card', 'credit', 'mixed'].includes(paymentMethod)) {
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçerli ödeme yöntemi: cash, card, credit, mixed.' } });
   }
+  if (typeof branchId !== 'string' || branchId.trim().length === 0) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Şube zorunludur.' } });
+  }
+  if (discount != null &&
+      (typeof discount !== 'number' || !Number.isFinite(discount) || discount < 0)) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'İndirim geçerli bir pozitif tutar olmalıdır.' } });
+  }
 
   // Validate items structure
   for (const item of items) {
-    if (!item.productId || typeof item.qty !== 'number' || item.qty <= 0 || typeof item.unitPrice !== 'number') {
+    if (!item.productId || typeof item.qty !== 'number' || !Number.isInteger(item.qty) || item.qty <= 0 ||
+        typeof item.unitPrice !== 'number' || !Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
       return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçersiz kalem verisi.' } });
     }
   }
@@ -90,6 +103,15 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+    const branchResult = await client.query(
+      'SELECT id FROM branches WHERE id = $1 AND company_id = $2',
+      [branchId, user.company_id]
+    );
+    if (branchResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şube bulunamadı.' } });
+    }
 
     // Idempotency check: if same key exists for this company, return existing
     if (idempotencyKey) {
@@ -112,18 +134,38 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
 
     const subtotal = items.reduce((sum: number, item: any) => sum + item.qty * item.unitPrice, 0);
     const discountAmount = discount ?? 0;
-    const computedTotal = Math.max(0, subtotal - discountAmount);
+    if (discountAmount > subtotal) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: { code: 'VALIDATION', message: 'İndirim ara toplamı aşamaz.' } });
+    }
+    const computedTotal = subtotal - discountAmount;
     
     // Security Fix: Do not trust totalAmount and status from client
     const finalTotal = computedTotal;
-    const finalPaid = req.body.paidAmount != null ? Math.min(req.body.paidAmount, finalTotal) : finalTotal;
+    if (paidAmount != null &&
+        (typeof paidAmount !== 'number' || !Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > finalTotal)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: { code: 'VALIDATION', message: 'Ödenen tutar sipariş toplamı aralığında olmalıdır.' } });
+    }
+    const finalPaid = resolvePaidAmount(paymentMethod, paidAmount, finalTotal);
     const finalStatus = 'completed';
 
     const orderId = req.body.id || `ord-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
     // Normalize customerId (nullify walkin or empty)
-    const rawCustomerId = req.body.customerId;
+    const rawCustomerId = customerId;
     const finalCustomerId = (rawCustomerId && rawCustomerId !== 'walkin' && rawCustomerId !== '') ? rawCustomerId : null;
+
+    if (finalCustomerId) {
+      const customerResult = await client.query(
+        'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
+        [finalCustomerId, user.company_id]
+      );
+      if (customerResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Müşteri bulunamadı.' } });
+      }
+    }
 
     // Insert sale
     await client.query(
@@ -132,7 +174,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
           total_amount, paid_amount, status, fsm_state, idempotency_key, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'completed', $9, COALESCE($10, CURRENT_TIMESTAMP))`,
       [
-        orderId, user.company_id, req.body.branchId ?? null,
+        orderId, user.company_id, branchId,
         finalCustomerId, paymentMethod, finalTotal, finalPaid,
         finalStatus, idempotencyKey ?? null, req.body.createdAt ?? null
       ]
@@ -141,11 +183,11 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     // Insert sale items
     for (const item of items) {
       await client.query(
-        `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal, company_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           crypto.randomUUID(), orderId, item.productId,
-          item.qty, item.unitPrice, item.qty * item.unitPrice,
+          item.qty, item.unitPrice, item.qty * item.unitPrice, user.company_id,
         ]
       );
 

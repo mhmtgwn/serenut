@@ -11,11 +11,12 @@ enum EntitlementState {
   graceExpired,
   revoked,
   unknown,
-  bootstrapPending
 }
 
 class TrialManager {
   static const String _subCacheKey = 'serenut_subscription_cache';
+  static const String _verifiedAtKey = 'serenut_entitlement_verified_at';
+  static const String _lastClockKey = 'serenut_entitlement_last_clock_ms';
 
   final SharedPreferences _prefs;
 
@@ -24,6 +25,9 @@ class TrialManager {
   /// Saves the subscription payload from backend into local cache
   Future<void> cacheSubscription(Map<String, dynamic> subData) async {
     await _prefs.setString(_subCacheKey, jsonEncode(subData));
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    await _prefs.setInt(_verifiedAtKey, now);
+    await _prefs.setInt(_lastClockKey, now);
   }
 
   Map<String, dynamic>? _getCache() {
@@ -37,9 +41,17 @@ class TrialManager {
   }
 
   EntitlementState getEntitlementState() {
+    final now = DateTime.now().toUtc();
+    final nowMs = now.millisecondsSinceEpoch;
+    final lastClockMs = _prefs.getInt(_lastClockKey);
+    if (lastClockMs != null && nowMs < lastClockMs - 5 * 60 * 1000) {
+      return EntitlementState.unknown;
+    }
+    _prefs.setInt(_lastClockKey, nowMs);
+
     final sub = _getCache();
     if (sub == null) {
-      return EntitlementState.bootstrapPending;
+      return EntitlementState.unknown;
     }
 
     final status = sub['status'] as String?;
@@ -64,7 +76,6 @@ class TrialManager {
 
     if (expirationDate == null) return EntitlementState.unknown;
 
-    final now = DateTime.now().toUtc();
     if (now.isBefore(expirationDate)) {
       return EntitlementState.active;
     }
@@ -82,27 +93,40 @@ class TrialManager {
     return sub?['status'] as String? ?? 'unknown';
   }
 
+  bool _wasRecentlyVerified() {
+    final verifiedAt = _prefs.getInt(_verifiedAtKey);
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    return verifiedAt != null &&
+        now >= verifiedAt &&
+        now - verifiedAt <= const Duration(hours: 24).inMilliseconds;
+  }
+
   /// Returns true ONLY if subscription is in trial status ('trialing' or 'trial')
   bool isTrialActive() {
     final status = getSubscriptionStatus();
     final state = getEntitlementState();
-    return (status == 'trialing' || status == 'trial') &&
-        (state == EntitlementState.active || state == EntitlementState.graceActive);
+    return _wasRecentlyVerified() &&
+        (status == 'trialing' || status == 'trial') &&
+        (state == EntitlementState.active ||
+            state == EntitlementState.graceActive);
   }
 
   /// Returns true if paid commercial subscription is active ('active')
   bool isCommercialActive() {
     final status = getSubscriptionStatus();
     final state = getEntitlementState();
-    return status == 'active' &&
-        (state == EntitlementState.active || state == EntitlementState.graceActive);
+    return _wasRecentlyVerified() &&
+        status == 'active' &&
+        (state == EntitlementState.active ||
+            state == EntitlementState.graceActive);
   }
 
   /// Returns true if ANY entitlement (trial OR commercial) is active
   bool isEntitlementActive() {
     final state = getEntitlementState();
-    return state == EntitlementState.active ||
-        state == EntitlementState.graceActive;
+    return _wasRecentlyVerified() &&
+        (state == EntitlementState.active ||
+            state == EntitlementState.graceActive);
   }
 
   Future<bool> isTrialActiveAsync() async {
@@ -153,8 +177,9 @@ class TrialManager {
       if (trialEndsStr != null) return DateTime.tryParse(trialEndsStr);
     } else {
       final currentPeriodEndStr = sub['current_period_end'] as String?;
-      if (currentPeriodEndStr != null)
+      if (currentPeriodEndStr != null) {
         return DateTime.tryParse(currentPeriodEndStr);
+      }
     }
     return null;
   }

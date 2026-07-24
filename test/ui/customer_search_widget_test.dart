@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +7,6 @@ import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dar
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/domain/services/customer_search_service.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 

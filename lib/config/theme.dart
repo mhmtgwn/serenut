@@ -10,10 +10,10 @@ class POSColors {
   POSColors._();
 
   // ── Ana Renk: Yeşil ──────────────────────────────────────
-  static const green = Color(0xFF11875D);
-  static const greenDark = Color(0xFF086B48);
-  static const greenLight = Color(0xFFE9F6EF);
-  static const greenMid = Color(0xFF20A574);
+  static const green = Color(0xFF16A34A);
+  static const greenDark = Color(0xFF15803D);
+  static const greenLight = Color(0xFFDCFCE7);
+  static const greenMid = Color(0xFF22C55E);
 
   // ── Vurgu: Sarı / Amber ──────────────────────────────────
   static const amber = Color(0xFFE8BD3F);
@@ -21,16 +21,16 @@ class POSColors {
   static const amberLight = Color(0xFFFFF8DC);
 
   // ── Yüzey ────────────────────────────────────────────────
-  static const surface = Color(0xFFF5F7F5); // Arka plan
+  static const surface = Color(0xFFF8FAFC); // Arka plan
   static const card = Color(0xFFFFFFFF); // Kart zemini
-  static const border = Color(0xFFDFE6E1); // Çerçeve
-  static const surfaceMuted = Color(0xFFEDF2EF);
-  static const darkSurface = Color(0xFF202B26);
+  static const border = Color(0xFFE2E8F0); // Çerçeve
+  static const surfaceMuted = Color(0xFFF1F5F9);
+  static const darkSurface = Color(0xFF0F172A);
 
   // ── Metin ────────────────────────────────────────────────
-  static const text = Color(0xFF19231F); // Ana metin
-  static const textSecondary = Color(0xFF617069); // İkincil metin
-  static const textDisabled = Color(0xFF8FA096); // Devre dışı
+  static const text = Color(0xFF0F172A); // Ana metin
+  static const textSecondary = Color(0xFF64748B); // İkincil metin
+  static const textDisabled = Color(0xFF94A3B8); // Devre dışı
 
   // ── Durum ────────────────────────────────────────────────
   static const red = Color(0xFFDC2626);
@@ -41,7 +41,7 @@ class POSColors {
   static const blueLight = Color(0xFFDBEAFE);
 
   // ── Navigasyon ───────────────────────────────────────────
-  static const navInactive = Color(0xFF8FA096);
+  static const navInactive = Color(0xFF64748B);
   static const navBackground = Color(0xFFFFFFFF);
 
   // ── Gölge ────────────────────────────────────────────────

@@ -8,13 +8,18 @@
 //   DELETE /api/v1/branches/:id     — Delete branch (COMPANY401 if active devices)
 
 import { Router, Response } from 'express';
-import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import {
+  authenticateUser,
+  AuthenticatedRequest,
+  requireActiveEntitlement,
+} from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
 import crypto from 'crypto';
 
 const router = Router();
 router.use(authenticateUser);
+router.use(requireActiveEntitlement);
 
 /**
  * @swagger
@@ -84,16 +89,27 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const id = `br-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+  const storeId = `store-${crypto.randomUUID()}`;
+  const client = await pgPool.connect();
 
   try {
-    const result = await pgPool.query(
-      `INSERT INTO branches (id, company_id, name, address, phone)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [id, user.company_id, name.trim(), address ?? null, phone ?? null]
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    await client.query(
+      `INSERT INTO stores (id, company_id, name, address)
+       VALUES ($1, $2, $3, $4)`,
+      [storeId, user.company_id, name.trim(), address ?? null]
     );
+    const result = await client.query(
+      `INSERT INTO branches (id, company_id, store_id, name, address, phone)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [id, user.company_id, storeId, name.trim(), address ?? null, phone ?? null]
+    );
+    await client.query('COMMIT');
     return res.status(201).json(result.rows[0]);
   } catch (err: any) {
+    await client.query('ROLLBACK');
     if (err.code === '23505') {
       return res.status(409).json({
         error: { code: 'DUPLICATE', message: 'Bu isimde bir şube zaten mevcut.' },
@@ -101,6 +117,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
     console.error('Create branch error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Şube oluşturulamadı.' } });
+  } finally {
+    client.release();
   }
 });
 
@@ -139,19 +157,37 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
   updates.push(`updated_at = CURRENT_TIMESTAMP`);
   values.push(id, user.company_id);
 
+  const client = await pgPool.connect();
   try {
-    const result = await pgPool.query(
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const result = await client.query(
       `UPDATE branches SET ${updates.join(', ')}
        WHERE id = $${idx++} AND company_id = $${idx}
        RETURNING *`,
       values
     );
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şube bulunamadı.' } });
     }
+    const storeId = result.rows[0].store_id as string | null;
+    if (storeId && (name !== undefined || address !== undefined)) {
+      await client.query(
+        `UPDATE stores
+         SET name = COALESCE($1, name),
+             address = COALESCE($2, address)
+         WHERE id = $3 AND company_id = $4`,
+        [name?.trim() ?? null, address ?? null, storeId, user.company_id]
+      );
+    }
+    await client.query('COMMIT');
     return res.json(result.rows[0]);
   } catch (err) {
+    await client.query('ROLLBACK');
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Şube güncellenemedi.' } });
+  } finally {
+    client.release();
   }
 });
 
@@ -184,40 +220,66 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
   const client = await pgPool.connect();
   try {
+    await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
 
     // Check if branch has active devices (COMPANY401)
-    const deviceCheck = await client.query(
-      `SELECT COUNT(*) as count FROM devices
-       WHERE company_id = $1 AND status = 'active'`,
-      [user.company_id]
+    const branchResult = await client.query(
+      `SELECT store_id FROM branches WHERE id = $1 AND company_id = $2`,
+      [id, user.company_id]
     );
+    if (branchResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şube bulunamadı.' } });
+    }
+    const storeId = branchResult.rows[0].store_id as string | null;
+
+    const deviceCheck = storeId
+      ? await client.query(
+          `SELECT COUNT(*) as count FROM devices
+           WHERE company_id = $1 AND store_id = $2 AND status = 'active'`,
+          [user.company_id, storeId]
+        )
+      : { rows: [{ count: '0' }] };
     // Also check device_licenses for this branch's devices
     // For now, check if any device is linked to a license in this company
-    const licCheck = await client.query(
-      `SELECT COUNT(*) as count
-       FROM device_licenses dl
-       JOIN devices d ON d.id = dl.device_id
-       JOIN licenses l ON l.id = dl.license_id
-       WHERE l.company_id = $1`,
-      [user.company_id]
-    );
+    const licCheck = storeId
+      ? await client.query(
+          `SELECT COUNT(*) as count
+           FROM device_licenses dl
+           JOIN devices d ON d.id = dl.device_id
+           JOIN licenses l ON l.id = dl.license_id
+           WHERE l.company_id = $1 AND d.store_id = $2`,
+          [user.company_id, storeId]
+        )
+      : { rows: [{ count: '0' }] };
 
-    if (parseInt(licCheck.rows[0].count, 10) > 0) {
+    if (parseInt(deviceCheck.rows[0].count, 10) > 0 ||
+        parseInt(licCheck.rows[0].count, 10) > 0) {
+      await client.query('ROLLBACK');
       return res.status(409).json(createError('COMPANY401'));
     }
 
-    const result = await pgPool.query(
+    const result = await client.query(
       `DELETE FROM branches WHERE id = $1 AND company_id = $2 RETURNING id`,
       [id, user.company_id]
     );
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Şube bulunamadı.' } });
     }
 
+    if (storeId) {
+      await client.query(
+        `DELETE FROM stores WHERE id = $1 AND company_id = $2`,
+        [storeId, user.company_id]
+      );
+    }
+    await client.query('COMMIT');
     return res.status(204).send();
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Delete branch error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Şube silinemedi.' } });
   } finally {

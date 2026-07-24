@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -61,9 +61,9 @@ function computeFileSha256(filePath: string): Promise<string> {
 
 // Helper: sign the computed SHA-256 hash using RSA Private Key
 function signReleaseFile(sha256Hash: string): string {
-  const privateKey = process.env.RSA_PRIVATE_KEY;
+  const privateKey = process.env.RELEASE_RSA_PRIVATE_KEY;
   if (!privateKey) {
-    throw new Error('RSA_PRIVATE_KEY is not defined in environment. Digital signature is mandatory for releases.');
+    throw new Error('RELEASE_RSA_PRIVATE_KEY is not defined in environment. Digital signature is mandatory for releases.');
   }
   try {
     const sign = crypto.createSign('SHA256');

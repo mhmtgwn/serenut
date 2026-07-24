@@ -4,12 +4,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
+import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
 const _kRed = Color(0xFFDC2626);
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
@@ -153,8 +153,9 @@ class PosHeader extends StatelessWidget {
                     icon: const Icon(Icons.settings_outlined,
                         color: _kTextSecondary, size: 22),
                     tooltip: 'Ayarlar',
-                    onPressed: () => requireAdminAccess(
+                    onPressed: () => requirePermissionAccess(
                       context,
+                      permission: Permission.settingsView,
                       title: 'Ayarlar Yetkisi',
                       onGranted: (_, __) => context.push(AppRoutes.settings),
                     ),

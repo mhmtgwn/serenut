@@ -103,6 +103,13 @@ class QuickActionsPanel extends ConsumerWidget {
           color: const Color(0xFF6366F1),
           onTap: () => context.push(AppRoutes.finance),
         ),
+      if (_hasPermission(user, Permission.reportsView))
+        QuickActionBtn(
+          label: 'Raporlar',
+          icon: Icons.assessment_rounded,
+          color: const Color(0xFF7C3AED),
+          onTap: () => context.push(AppRoutes.reports),
+        ),
     ];
 
     if (actions.isEmpty) return const SizedBox.shrink();
@@ -169,7 +176,9 @@ class QuickActionsPanel extends ConsumerWidget {
 
   bool _hasPermission(dynamic user, Permission permission) {
     if (user == null) return false;
-    if (user.role == UserRole.owner || user.role == UserRole.admin) return true;
+    if (user.role == UserRole.owner || user.role == UserRole.sysadmin) {
+      return true;
+    }
     return user.hasPermission(permission.value);
   }
 }

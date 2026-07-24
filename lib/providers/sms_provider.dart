@@ -21,39 +21,12 @@ SmsConfig? _buildSmsConfig(Settings? settings) {
   if (settings == null) return null;
   if (!settings.smsEnabled) return null;
 
-  final provider = settings.smsProvider?.toLowerCase();
-  SmsProvider smsProvider;
-  switch (provider) {
-    case 'sim':
-      smsProvider = SmsProvider.sim;
-    case 'netgsm':
-      smsProvider = SmsProvider.netgsm;
-    case 'twilio':
-      smsProvider = SmsProvider.twilio;
-    case 'custom':
-      smsProvider = SmsProvider.custom;
-    default:
-      smsProvider = SmsProvider.none;
-  }
-
-  if (smsProvider == SmsProvider.none) return null;
-
-  if (smsProvider != SmsProvider.sim) {
-    if (settings.smsApiKey == null || settings.smsApiKey!.isEmpty) return null;
-  }
-
-  final apiKey = settings.smsApiKey ?? '';
-  final username = apiKey.isNotEmpty ? apiKey.split(':').first : '';
-
   return SmsConfig(
-    provider: smsProvider,
-    apiKey: apiKey,
-    username: username,
+    provider: SmsProvider.sim,
+    apiKey: '',
+    username: '',
     sender:
         settings.businessPhone.isNotEmpty ? settings.businessPhone : 'SERENUT',
-    apiSecret: smsProvider == SmsProvider.twilio
-        ? (apiKey.contains(':') ? apiKey.split(':').last : null)
-        : null,
     simSubscriptionId: settings.smsSimSubscriptionId,
     monthlyLimit: settings.smsMonthlyLimit,
     sentThisMonth: settings.smsSentThisMonth,

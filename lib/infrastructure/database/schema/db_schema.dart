@@ -153,6 +153,7 @@ class DatabaseSchema {
         deleted_at TEXT,
         deleted_by TEXT,
         created_by TEXT,
+        is_synced INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');

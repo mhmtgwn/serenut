@@ -84,25 +84,6 @@ const loaders = {
   'sales-operations': async () => {
     const [devices,stores,gateway] = await Promise.all([apiFetch('/portal/devices'),apiFetch('/portal/stores'),apiFetch('/notifications/sms-gateway')]);
     const androidDevices=devices.filter(d=>String(d.platform||'').toLowerCase()==='android');
-      } catch(e) { notice(e.message); } finally { button.disabled=false; }
-    };
-}
-function errorView(error, retry) {
-  const box = document.createElement('div'); box.className = 'state-panel state-error';
-  const title = document.createElement('h3'); title.textContent = 'Modül yüklenemedi';
-  const message = document.createElement('p'); message.textContent = error.message || 'Sunucu yanıt vermedi.';
-  const button = document.createElement('button'); button.className = 'btn btn-secondary'; button.textContent = 'Tekrar Dene'; button.onclick = retry;
-  box.append(title, message, button); document.getElementById('embed-content').replaceChildren(box);
-}
-
-const loaders = {
-  'company-dashboard': async () => {
-    const d = await apiFetch('/portal/dashboard'); const s = d.summary || {};
-    set(`<div class="metrics-grid">${metric('Şube',s.stores||0)}${metric('Bağlı Cihaz',s.devices||0)}${metric('Ödenmemiş Fatura',s.unpaidInvoices||0)}${metric('Son 30 Gün Satış',money(s.monthlyRevenue))}</div><div class="section-heading spaced"><div><h3>Lisans Durumu</h3><p>Uygulamalarınızın kullanım hakkı ve cihaz sınırı.</p></div></div>${table([{label:'Paket',render:r=>esc(tr(r.tier))},{label:'Cihaz Hakkı',render:r=>esc(r.allowed_devices_count||1)},{label:'Geçerlilik',render:r=>esc(date(r.expires_at))},{label:'Durum',render:r=>badge(tr(r.status))}],d.licenses||[])}`);
-  },
-  'sales-operations': async () => {
-    const [devices,stores,gateway] = await Promise.all([apiFetch('/portal/devices'),apiFetch('/portal/stores'),apiFetch('/notifications/sms-gateway')]);
-    const androidDevices=devices.filter(d=>String(d.platform||'').toLowerCase()==='android');
     set(`<div class="metrics-grid">${metric('Toplam Cihaz',devices.length)}${metric('Çevrimiçi',devices.filter(d=>d.is_online).length)}${metric('Şube',stores.length)}${metric('SMS Ana Cihaz',gateway?.device_name||'Seçilmedi')}</div><h3 class="content-title">SMS Ana Cihazı</h3><form class="payment-form" id="sms-gateway-form"><select id="sms-gateway-device"><option value="">Android cihaz seçin</option>${androidDevices.map(d=>`<option value="${esc(d.id)}" ${gateway?.device_activation_id===d.id?'selected':''}>${esc(d.name||d.id)}</option>`).join('')}</select><button class="btn btn-primary" type="submit">Ana Cihaz Yap</button></form><p>${gateway?`Son bağlantı: ${esc(date(gateway.last_poll_at))} — ${gateway.is_online?'Çevrimiçi':'Çevrimdışı'}`:'SMS işlemleri seçilen SIM kartlı Android cihazdan gönderilir.'}</p><h3 class="content-title">Cihazlar</h3>${table([{label:'Cihaz',render:r=>esc(r.name||r.id)},{label:'Platform',key:'platform'},{label:'Şube',key:'store_name'},{label:'Bağlantı',render:r=>badge(r.is_online?'online':'offline')},{label:'Son Aktivite',render:r=>esc(date(r.last_active_at))},{label:'Durum',render:r=>badge(r.status)}],devices)}<h3 class="content-title">Şubeler</h3>${table([{label:'Şube',key:'name'},{label:'Adres',key:'address'},{label:'Durum',render:r=>badge(r.status||'active')}],stores)}`);
     document.getElementById('sms-gateway-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{await apiFetch('/notifications/sms-gateway',{method:'PUT',body:{device_id:document.getElementById('sms-gateway-device').value}});await loaders['sales-operations']();}catch(x){notice(x.message)}finally{b.disabled=false}};
   },
@@ -119,6 +100,10 @@ const loaders = {
   'billing-center': async () => {
     const [sub,invoices,plans] = await Promise.all([apiFetch('/billing/subscription'),apiFetch('/portal/invoices'),apiFetch('/billing/plans')]);
     set(`<div class="metrics-grid">${metric('Mevcut Plan',sub.plan_name||'Plan yok')}${metric('Abonelik',tr(sub.status))}${metric('Geçerlilik',date(sub.current_period_end))}</div><div class="toolbar billing-toolbar"><div><h3 class="content-title">Planlar</h3><p>Deneme süreniz bitince istediğiniz planı seçebilirsiniz.</p></div><div class="billing-toggle" role="radiogroup" aria-label="Ödeme dönemi"><input id="billing-monthly" type="radio" name="billing-period" value="monthly" checked><label for="billing-monthly">Aylık</label><input id="billing-yearly" type="radio" name="billing-period" value="yearly"><label for="billing-yearly">Yıllık</label><span aria-hidden="true"></span></div></div><div class="plan-grid customer-plan-grid">${plans.map(p=>`<article class="module-card"><h3>${esc(p.name)}</h3><strong>${money(p.price,p.currency||'TRY')} / ay</strong><p>${esc(p.description||'')}</p><button class="btn btn-primary buy-plan" data-plan="${esc(p.id)}">Havale / EFT ile Al</button></article>`).join('')}</div><div class="section-heading spaced"><div><h3>Ödeme Geçmişi</h3><p>Oluşturduğunuz ödeme talepleri ve faturalar.</p></div></div>${table([{label:'Fatura',key:'invoice_number'},{label:'Tutar',render:r=>esc(money(r.amount,r.currency||'TRY'))},{label:'Tarih',render:r=>esc(date(r.created_at||r.due_at))},{label:'Durum',render:r=>badge(tr(r.status))}],invoices)}`);
+    document.querySelectorAll('.buy-plan').forEach(button => {
+      button.onclick = () => beginCheckout(button.dataset.plan);
+    });
+  },
   'support-center': async () => {
     const result=await apiFetch('/support/tickets');const tickets=result.tickets||[];
     set(`<form class="customer-form-grid support-form" id="create-ticket-form"><label>Konu<input id="ticket-title" required placeholder="Kısaca neyle ilgili?"></label><label>Öncelik<select id="ticket-priority"><option value="P3">Normal</option><option value="P2">Yüksek</option><option value="P1">Acil</option><option value="P4">Düşük</option></select></label><label class="wide-field">Açıklama<textarea id="ticket-description" required placeholder="Sorunu ve denediğiniz adımları yazın"></textarea></label><button class="btn btn-primary" type="submit">Talep Oluştur</button></form><h3 class="content-title">Taleplerim</h3>${table([{label:'No',render:r=>esc(String(r.id).slice(0,8))},{label:'Konu',key:'subject'},{label:'Öncelik',render:r=>badge(r.priority)},{label:'Güncelleme',render:r=>esc(date(r.updated_at))},{label:'Durum',render:r=>badge(r.status)}],tickets)}`);

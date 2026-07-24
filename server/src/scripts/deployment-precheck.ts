@@ -4,6 +4,7 @@ import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 dotenv.config();
 
 async function runPrecheck() {
@@ -13,7 +14,15 @@ async function runPrecheck() {
   let failed = false;
 
   // 1. Secret Management Verification
-  const requiredVars = ['DATABASE_URL', 'JWT_SECRET', 'NODE_ENV'];
+  const requiredVars = [
+    'DATABASE_URL',
+    'JWT_SECRET',
+    'REFRESH_SECRET',
+    'APP_SECRET',
+    'RSA_PRIVATE_KEY',
+    'RELEASE_RSA_PRIVATE_KEY',
+    'NODE_ENV',
+  ];
   const missingVars = requiredVars.filter(v => !process.env[v]);
   
   if (missingVars.length > 0) {
@@ -23,8 +32,28 @@ async function runPrecheck() {
     console.log('✅ [PASS] Secret Management: All required environment variables are set.');
     // Check JWT key complexity
     const secret = process.env.JWT_SECRET!;
-    if (secret === 'REPLACE_WITH_OPENSSL_RAND_HEX_64_OUTPUT' || secret.length < 32) {
-      console.warn('⚠️ [WARN] JWT_SECRET is weak or uses placeholder value.');
+    if (secret === 'REPLACE_WITH_OPENSSL_RAND_HEX_64_OUTPUT' || secret.length < 64) {
+      console.error('❌ [FAIL] JWT_SECRET is weak or uses a placeholder value.');
+      failed = true;
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('❌ [FAIL] NODE_ENV must be production for a production deployment.');
+      failed = true;
+    }
+    for (const keyName of ['RSA_PRIVATE_KEY', 'RELEASE_RSA_PRIVATE_KEY']) {
+      try {
+        const key = crypto.createPrivateKey(
+          process.env[keyName]!.replace(/\\n/g, '\n')
+        );
+        const bits = key.asymmetricKeyDetails?.modulusLength ?? 0;
+        if (key.asymmetricKeyType !== 'rsa' || bits < 3072) {
+          console.error(`❌ [FAIL] ${keyName} must be an RSA key of at least 3072 bits.`);
+          failed = true;
+        }
+      } catch {
+        console.error(`❌ [FAIL] ${keyName} is not a valid private key.`);
+        failed = true;
+      }
     }
   }
 

@@ -41,8 +41,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
 
   Future<void> loadNextPage() async {
     if (_paginationService == null) return;
-    if (_paginationService!.isLoading || !_paginationService!.hasMoreData)
+    if (_paginationService!.isLoading || !_paginationService!.hasMoreData) {
       return;
+    }
     try {
       await _paginationService!.loadNextPage();
       state = AsyncValue.data(List.from(_paginationService!.items));

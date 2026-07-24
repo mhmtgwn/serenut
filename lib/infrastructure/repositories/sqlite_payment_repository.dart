@@ -424,13 +424,13 @@ class SqliteFinancialTransactionRepository
   @override
   Future<int> update(FinancialTransactionEntity entity) async {
     throw UnsupportedError(
-        'Finansal defter kayÄ±tlarÄ± gÃ¼ncellenemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.');
+        'Finansal defter kayıtları güncellenemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.');
   }
 
   @override
   Future<int> delete(dynamic id) async {
     throw UnsupportedError(
-        'Finansal defter kayÄ±tlarÄ± silinemez. LÃ¼tfen dÃ¼zeltme (Adjustment) veya ters kayÄ±t (Reverse Entry) oluÅŸturun.');
+        'Finansal defter kayıtları silinemez. Lütfen düzeltme (Adjustment) veya ters kayıt (Reverse Entry) oluşturun.');
   }
 
   @override

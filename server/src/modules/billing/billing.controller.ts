@@ -9,15 +9,6 @@ import { webhookLimiter } from '../../middleware/rate-limit.middleware';
 loadIyzicoConfig(pgPool).catch(err => {
   logger.warn('Failed to load iyzico config at startup:', err);
 });
-import {
-  schedulePaymentRetry,
-  processSubscriptionCancellation,
-  processReactivation,
-} from '../../workers/billing.scheduler';
-import { enqueueNotification } from '../../workers/notification.worker';
-import {
-  welcomePaidEmail,
-} from '../notifications/email.templates';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -44,28 +35,6 @@ async function runBypassingRLS(sql: string, params: any[] = []) {
 }
 
 // Helper to write admin audit log
-async function writeAdminAudit(userId: string, action: string, entity: string, entityId: string, oldValue: any = null, newValue: any = null, ipAddress: string = 'admin_panel') {
-  const auditId = `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  try {
-    await runBypassingRLS(
-      `INSERT INTO audit_logs (id, company_id, user_id, action, entity, entity_id, old_value, new_value, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        auditId,
-        'serenut_cloud', // Admin platform indicator
-        userId,
-        action,
-        entity,
-        entityId,
-        oldValue ? JSON.stringify(oldValue) : null,
-        newValue ? JSON.stringify(newValue) : null,
-        ipAddress
-      ]
-    );
-  } catch (err: any) {
-    logger.error('Failed to write admin audit log:', err);
-  }
-}
 
 async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {
   const client = await pgPool.connect();
@@ -1188,7 +1157,7 @@ router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Respons
     return res.status(400).json({ error: 'stale_webhook_event' });
   }
 
-  const { eventType, token, status, conversationId } = payload;
+  const { token, status, conversationId } = payload;
   const eventId = payload.iyziReferenceCode || payload.paymentId || token;
   const redisKey = eventId ? `webhook:processed:${eventId}` : null;
 

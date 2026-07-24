@@ -115,9 +115,9 @@ async function main() {
     `, [saleId1, coId, userId]);
 
     await runBypassingRLS(`
-      INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal)
-      VALUES ($1, $2, $3, 3.0, 50.00, 150.00)
-    `, [`item-1-${Date.now()}`, saleId1, pId1]);
+      INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal, company_id)
+      VALUES ($1, $2, $3, 3.0, 50.00, 150.00, $4)
+    `, [`item-1-${Date.now()}`, saleId1, pId1, coId]);
 
     // Retrieve analytics using tenant context simulation
     const todayRes = await runBypassingRLS(`

@@ -141,8 +141,9 @@ class _CustomerSelectionSheetState
                   ),
                   onChanged: (val) {
                     setState(() => _searchQuery = val);
-                    if (_searchDebounce?.isActive ?? false)
+                    if (_searchDebounce?.isActive ?? false) {
                       _searchDebounce!.cancel();
+                    }
                     _searchDebounce =
                         Timer(const Duration(milliseconds: 300), () {
                       ref

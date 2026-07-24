@@ -11,6 +11,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/providers/database_provider.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 
 // ─── Pagination constants ─────────────────────────────────────────────────────
 const _kPageSize = 25;
@@ -136,6 +137,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         customerIdStr: order.customerId,
       ));
     } catch (_) {}
+
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
 
     // Log to Audit Trail
     try {

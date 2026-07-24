@@ -410,8 +410,9 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
   Color _getEventColor(String type) {
     if (type.contains('create')) return Colors.greenAccent;
     if (type.contains('delete')) return Colors.redAccent;
-    if (type.contains('price') || type.contains('change'))
+    if (type.contains('price') || type.contains('change')) {
       return Colors.orangeAccent;
+    }
     if (type.contains('restore')) return Colors.lightBlueAccent;
     return Colors.amberAccent;
   }

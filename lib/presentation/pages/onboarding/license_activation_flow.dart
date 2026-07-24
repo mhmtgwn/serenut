@@ -15,8 +15,13 @@ import 'package:serenutos/config/theme.dart';
 class LicenseActivationFlow extends ConsumerStatefulWidget {
   final void Function(String licenseKey, String licenseType)?
       onLicenseActivated;
+  final bool continueOnboarding;
 
-  const LicenseActivationFlow({super.key, this.onLicenseActivated});
+  const LicenseActivationFlow({
+    super.key,
+    this.onLicenseActivated,
+    this.continueOnboarding = true,
+  });
 
   @override
   ConsumerState<LicenseActivationFlow> createState() =>
@@ -168,8 +173,11 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
         expiryDate: _expiryDate,
         supportUntil: _supportUntil,
         onContinue: () {
-          widget.onLicenseActivated?.call(_ctrl.text, _successType!);
-          context.go('/onboarding/business');
+          if (widget.continueOnboarding) {
+            context.go('/onboarding/business');
+          } else {
+            Navigator.of(context).pop();
+          }
         },
       );
     }
@@ -186,7 +194,9 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           color: POSColors.text,
-          onPressed: () => context.go('/onboarding'),
+          onPressed: () => widget.continueOnboarding
+              ? context.go('/onboarding')
+              : Navigator.of(context).pop(),
         ),
         title: const Text('Lisans Aktivasyonu',
             style:
@@ -252,8 +262,9 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
                   ],
                   validator: (v) {
                     final clean = v?.replaceAll('-', '') ?? '';
-                    if (clean.length != 16)
+                    if (clean.length != 16) {
                       return 'Geçerli bir lisans anahtarı girin (XXXX-XXXX-XXXX-XXXX)';
+                    }
                     return null;
                   },
                   onChanged: (_) {

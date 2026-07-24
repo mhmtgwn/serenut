@@ -46,15 +46,15 @@ void main() {
 
     // Benchmark
     final stopwatch100 = Stopwatch()..start();
-    await Future.delayed(Duration(milliseconds: 150));
+    await Future.delayed(const Duration(milliseconds: 150));
     stopwatch100.stop();
 
     final stopwatch500 = Stopwatch()..start();
-    await Future.delayed(Duration(milliseconds: 320));
+    await Future.delayed(const Duration(milliseconds: 320));
     stopwatch500.stop();
 
     final stopwatch1000 = Stopwatch()..start();
-    await Future.delayed(Duration(milliseconds: 980));
+    await Future.delayed(const Duration(milliseconds: 980));
     stopwatch1000.stop();
 
     print('\n==================================');

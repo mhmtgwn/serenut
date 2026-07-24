@@ -1,6 +1,6 @@
-import { setAuthToken, setRefreshToken, clearAuthToken, apiFetch } from '/shared/js/api-client.js';
+import { setAuthToken, setRefreshToken, clearAuthToken, clearAuthSession, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
-import { loadModule } from './module-runtime.js?v=20260718-commerce2';
+import { loadModule } from './module-runtime.js?v=20260721-authfix4';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -37,6 +37,10 @@ const navIconPaths = {
   'account-settings': 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2 3.46-.08-.02a1.7 1.7 0 00-1.8.22l-.45.26a1.7 1.7 0 00-.8 1.63V22h-4v-.09a1.7 1.7 0 00-.8-1.63l-.45-.26a1.7 1.7 0 00-1.8-.22l-.08.02-2-3.46.06-.06A1.7 1.7 0 005 15v-.52a1.7 1.7 0 00-1.14-1.6L3.8 12.85v-4l.08-.02A1.7 1.7 0 005 7.23v-.52a1.7 1.7 0 00-.34-1.88l-.06-.06 2-3.46.08.02a1.7 1.7 0 001.8-.22l.45-.26A1.7 1.7 0 009.73-.58V-.67h4v.09a1.7 1.7 0 00.8 1.63l.45.26a1.7 1.7 0 001.8.22l.08-.02 2 3.46-.06.06a1.7 1.7 0 00-.34 1.88v.52a1.7 1.7 0 001.14 1.6l.08.02v4l-.08.02A1.7 1.7 0 0019.4 15z'
 };
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
+const escapeHtml = (value = '') => String(value).replace(
+  /[&<>"']/g,
+  (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
+);
 
 document.addEventListener('DOMContentLoaded', () => {
   const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
@@ -48,11 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  if (!isEmbed) {
-    const intent = window.location.hash.startsWith('#register') ? 'register' : 'login';
-    window.location.replace(`/?auth=${intent}`);
-    return;
-  }
   showAuth();
   handleInitialIntent();
 });
@@ -72,10 +71,21 @@ function bindEvents() {
       showAuth();
       return;
     }
-    window.location.replace('/?auth=login');
+    window.location.replace('/app/');
   });
   document.getElementById('btn-home')?.addEventListener('click', () => selectModule('home'));
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
+  document.getElementById('app-nav')?.addEventListener('click', (event) => {
+    if (event.target.closest('[data-module-id]')) document.body.classList.remove('sidebar-open');
+  });
+  document.addEventListener('click', (event) => {
+    if (!document.body.classList.contains('sidebar-open')) return;
+    if (event.target.closest('.shell-sidebar, #sidebar-toggle')) return;
+    document.body.classList.remove('sidebar-open');
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') document.body.classList.remove('sidebar-open');
+  });
 }
 
 function handleInitialIntent() {
@@ -190,6 +200,14 @@ async function handleRegister() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || 'Kayıt oluşturulamadı.');
+    if (data.access_token) {
+      setAuthToken(data.access_token);
+      setRefreshToken(data.refresh_token);
+      if (data.user) setUserProfile(data.user);
+      closeLayers();
+      await bootShell();
+      return;
+    }
     statusEl.className = 'auth-status text-sm text-green';
     statusEl.innerText = data.message;
     const registerButton = document.getElementById('btn-register');
@@ -294,7 +312,14 @@ async function bootShell() {
     renderShell(bootstrap);
     showShell();
     startRealtime();
-  } catch (_) {
+  } catch (error) {
+    if (error?.status === 403) {
+      clearAuthSession();
+      const status = document.getElementById('login-status');
+      if (status) {
+        status.innerText = error.message || 'Web yönetim portalına erişim yetkiniz bulunmuyor.';
+      }
+    }
     showAuth();
   }
 }
@@ -302,28 +327,10 @@ async function bootShell() {
 function renderShell(bootstrap) {
   realtimeCompanyId = bootstrap.company?.id || bootstrap.user?.company_id || '';
   const isSysadmin = (bootstrap.user?.roles || []).includes('sysadmin');
-  const adminNavigation = [
-    ['platform-overview','Genel Bakış','Günlük ticari durum ve bekleyen işler.'],
-    ['platform-companies','Firmalar','Firma hesaplarını ve ayrıntılarını yönetin.'],
-    ['platform-subscriptions','Abonelikler','Deneme, aktif ve sona eren abonelikleri izleyin.'],
-    ['platform-billing','Ödemeler','Havale ve EFT bildirimlerini onaylayın.'],
-    ['platform-plans','Planlar','Satış planlarını ve fiyatlarını düzenleyin.'],
-    ['platform-licenses','Lisanslar ve Cihazlar','Lisans süreleri ile bağlı cihazları yönetin.'],
-    ['platform-releases','Güncellemeler','Windows ve Android sürümlerini yayınlayın.'],
-    ['platform-support','Destek','Firmalardan gelen talepleri yönetin.'],
-    ['platform-health','Sistem','Servis sağlığını ve sistem olaylarını izleyin.']
-  ].map(([id,label,description])=>({id,label,description,section:'platform',href:`/app/#${id}`,module:'admin'}));
-  const customerDefinitions = {
-    'company-dashboard':['Genel Bakış','Firma, lisans ve kullanım özeti.','overview'],
-    'sales-operations':['Cihazlar ve SMS','Bağlı cihazlar ve SMS ana cihazı.','operations'],
-    'team-management':['Ekip','Alt kullanıcılar ve görev rolleri.','operations'],
-    'billing-center':['Abonelik ve Ödemeler','Plan, lisans ve ödeme geçmişi.','commerce'],
-    'support-center':['Destek','Destek talepleri ve yanıt geçmişi.','commerce'],
-    'account-settings':['Firma Ayarları','Firma, profil ve oturum ayarları.','account']
-  };
-  const allowedCustomerIds = new Set((bootstrap.navigation || []).map(item=>item.id));
-  const customerNavigation = Object.entries(customerDefinitions).filter(([id])=>allowedCustomerIds.has(id)).map(([id,[label,description,section]])=>({id,label,description,section,href:`/app/#${id}`,module:'customer'}));
-  navigationItems = isSysadmin ? adminNavigation : customerNavigation;
+  navigationItems = (bootstrap.navigation || []).map((item) => ({
+    ...item,
+    module: isSysadmin ? 'admin' : 'customer'
+  }));
   document.body.classList.toggle('sysadmin-shell', isSysadmin);
   document.body.classList.toggle('customer-shell', !isSysadmin);
 
@@ -339,13 +346,13 @@ function renderShell(bootstrap) {
     : 'Bu kullanıcı firma modülleri ile sınırlandırılmıştır.';
 
   document.getElementById('role-chips').innerHTML = (bootstrap.user?.roles || [])
-    .map((role) => `<span class="role-chip">${role}</span>`)
+    .map((role) => `<span class="role-chip">${escapeHtml(role)}</span>`)
     .join('');
 
   document.getElementById('company-meta').innerHTML = `
-    <div><strong>Şirket:</strong> ${bootstrap.company?.name || '—'}</div>
-    <div><strong>Kod:</strong> ${bootstrap.company?.business_code || '—'}</div>
-    <div><strong>Durum:</strong> ${bootstrap.company?.status || '—'}</div>
+    <div><strong>Şirket:</strong> ${escapeHtml(bootstrap.company?.name || '—')}</div>
+    <div><strong>Kod:</strong> ${escapeHtml(bootstrap.company?.business_code || '—')}</div>
+    <div><strong>Durum:</strong> ${escapeHtml(bootstrap.company?.status || '—')}</div>
   `;
 
   renderNav(navigationItems);

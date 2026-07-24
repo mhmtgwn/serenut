@@ -7,7 +7,6 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/domain/services/customer_search_service.dart';
-import 'package:serenutos/domain/repositories/base_repository.dart';
 
 void main() {
   sqfliteFfiInit();

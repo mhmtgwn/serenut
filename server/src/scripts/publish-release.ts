@@ -19,8 +19,8 @@ async function main() {
     throw new Error('Usage: publish-release <android|windows> <version> <file>');
   }
 
-  const privateKey = process.env.RSA_PRIVATE_KEY;
-  if (!privateKey) throw new Error('RSA_PRIVATE_KEY is required');
+  const privateKey = process.env.RELEASE_RSA_PRIVATE_KEY;
+  if (!privateKey) throw new Error('RELEASE_RSA_PRIVATE_KEY is required');
   if (!fs.existsSync(incomingPath)) throw new Error(`Release file not found: ${incomingPath}`);
 
   const ext = path.extname(incomingPath).toLowerCase();

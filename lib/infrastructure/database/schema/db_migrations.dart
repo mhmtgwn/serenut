@@ -587,6 +587,21 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 32) {
+          try {
+            await txn.execute(
+                'ALTER TABLE orders ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0');
+            await txn.execute(
+                'CREATE INDEX IF NOT EXISTS idx_orders_is_synced ON orders(is_synced)');
+          } catch (e) {
+            handleMigrationError(e, 32);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 32,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

@@ -23,6 +23,12 @@ async function setup() {
     const hash = await AuthService.hashPassword('password123');
     await client.query(`INSERT INTO companies (id, name, tax_number, status) VALUES ($1, 'Test Company', '1234567890', 'active')`, [mockCompanyId]);
     await client.query(`INSERT INTO users (id, company_id, name, email, password_hash, is_active) VALUES ($1, $2, 'Test User', 'testuser@stock.com', $3, true)`, [mockUserId, mockCompanyId, hash]);
+    await client.query(
+      `INSERT INTO subscriptions
+         (id, company_id, status, current_period_start, current_period_end)
+       VALUES ($1, $2, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days')`,
+      [`sub-${mockCompanyId}`, mockCompanyId],
+    );
 
     await client.query(`
       INSERT INTO products (id, company_id, name, price, quantity, status) 
@@ -178,6 +184,58 @@ async function run() {
     const p2 = await pgPool.query('SELECT quantity FROM products WHERE id = $1', [prod2Id]);
     if (Number(p2.rows[0].quantity) !== 48) throw new Error('STOCK-05 FAILED on Product 2');
     console.log('  ✔️ STOCK-05: Passed');
+
+    // STOCK-06: a colliding sale id owned by another tenant must not accept
+    // child rows from the authenticated tenant.
+    const foreignCompanyId = `foreign-company-${Date.now()}`;
+    const foreignSaleId = `foreign-sale-${Date.now()}`;
+    await pgPool.query(
+      `INSERT INTO companies (id, name, tax_number, status)
+       VALUES ($1, 'Foreign Company', $2, 'active')`,
+      [foreignCompanyId, String(Date.now()).slice(-10)],
+    );
+    await pgPool.query(
+      `INSERT INTO sales
+         (id, company_id, total_amount, paid_amount, payment_method, status, created_at)
+       VALUES ($1, $2, 10, 10, 'cash', 'completed', CURRENT_TIMESTAMP)`,
+      [foreignSaleId, foreignCompanyId],
+    );
+    const collisionPayload = {
+      items: [{
+        id: `sync-${foreignSaleId}`,
+        entity_type: 'sale',
+        entity_id: foreignSaleId,
+        payload: {
+          id: foreignSaleId,
+          total_amount: 50,
+          items: [{
+            id: `forged-item-${foreignSaleId}`,
+            product_id: productId,
+            quantity: 1,
+            unit_price: 50,
+          }],
+        },
+      }],
+    };
+    res = await fetch('http://localhost:9999/api/v1/sync/push', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(collisionPayload),
+    });
+    const collisionBody = await res.json() as any;
+    if (!collisionBody.errors?.length) {
+      throw new Error('STOCK-06 FAILED: Cross-tenant sale collision was accepted');
+    }
+    const forgedItems = await pgPool.query(
+      'SELECT COUNT(*) FROM sale_items WHERE id = $1',
+      [`forged-item-${foreignSaleId}`],
+    );
+    if (Number(forgedItems.rows[0].count) !== 0) {
+      throw new Error('STOCK-06 FAILED: Cross-tenant child row was inserted');
+    }
+    await pgPool.query('DELETE FROM sales WHERE id = $1', [foreignSaleId]);
+    await pgPool.query('DELETE FROM companies WHERE id = $1', [foreignCompanyId]);
+    console.log('  ✔️ STOCK-06: Cross-tenant collision blocked');
 
     console.log('🏆 Stock Regression Tests: PASS');
     if(server) server.close();

@@ -1,5 +1,10 @@
 import { Router, Response } from 'express';
-import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import {
+  authenticateUser,
+  AuthenticatedRequest,
+  requireActiveEntitlement,
+  requirePortalAccess,
+} from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { AuthService } from '../auth/auth.service';
 import fs from 'fs';
@@ -11,6 +16,16 @@ const router = Router();
 
 // Apply auth globally
 router.use(authenticateUser);
+router.use(requirePortalAccess);
+router.use((req, res, next) => {
+  const isReadOnly = req.method === 'GET' || req.method === 'HEAD';
+  const isSupportRecoveryRoute = req.path === '/tickets' ||
+    req.path.startsWith('/tickets/');
+  if (isReadOnly || isSupportRecoveryRoute) {
+    return next();
+  }
+  return requireActiveEntitlement(req, res, next);
+});
 
 // Helper to run database queries setting tenant context for RLS
 async function runWithTenantContext(companyId: string, sql: string, params: any[] = []) {

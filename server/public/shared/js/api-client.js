@@ -75,7 +75,7 @@ export function setAuthToken(token) {
 /**
  * Clears the authentication token and triggers a page refresh/redirect
  */
-export function clearAuthToken() {
+export function clearAuthSession() {
   [
     getTokenKey(),
     getProfileKey(),
@@ -93,6 +93,10 @@ export function clearAuthToken() {
     sessionStorage.removeItem('selected_billing_period');
     sessionStorage.removeItem('pending_download_release_id');
   }
+}
+
+export function clearAuthToken() {
+  clearAuthSession();
 
   if (isUnifiedApp()) {
     window.location.href = '/app/';
@@ -154,7 +158,7 @@ export async function apiFetch(endpoint, options = {}, retry = true) {
     } catch (_) {
       // Response is not JSON
     }
-    if (response.status === 403 && ['user_suspended', 'forbidden'].includes(errorData?.error)) {
+    if (response.status === 403 && errorData?.error === 'user_suspended') {
       clearAuthToken();
     }
 

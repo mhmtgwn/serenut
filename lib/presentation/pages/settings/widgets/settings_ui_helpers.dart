@@ -148,7 +148,7 @@ extension SettingsPageUiHelpers on _SettingsPageState {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ayarlar güncellenirken hata oluŸtu: $e'),
+          content: Text('Ayarlar güncellenirken hata oluştu: $e'),
           backgroundColor: _kPink,
         ),
       );
@@ -156,6 +156,7 @@ extension SettingsPageUiHelpers on _SettingsPageState {
   }
 
   // ”€”€ Yetki / Profil Detay Modalı ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ignore: unused_element
   void _showProfileDetails(AuthUser user) {
     final roleLabel = switch (user.role) {
       UserRole.owner => 'Kurucu/Sahip',
@@ -176,11 +177,11 @@ extension SettingsPageUiHelpers on _SettingsPageState {
             children: [
               _buildInfoRow('Kullanıcı Adı', user.name),
               _buildInfoRow('Sistem Rolü', roleLabel.toUpperCase()),
-              _buildInfoRow('Hesap OluŸturulma Tarihi',
+              _buildInfoRow('Hesap Oluşturulma Tarihi',
                   user.createdAt.toLocal().toString().substring(0, 16)),
               const SizedBox(height: 16),
               const Text(
-                'Sahip OlduŸum Yetkiler',
+                'Sahip Olduğum Yetkiler',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,

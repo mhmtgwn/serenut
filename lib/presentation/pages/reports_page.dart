@@ -1608,67 +1608,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final Color bg;
-  final String? subtitle;
-
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.bg,
-    this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha(40)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(label,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                    overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  )),
-              if (subtitle != null)
-                Text(subtitle!,
-                    style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _AgingBucket extends StatelessWidget {
   final String label;
   final double amount;
@@ -1841,8 +1780,9 @@ class _AnalyticsTab extends ConsumerWidget {
                             height: 180,
                             child: summaryVal.when(
                               data: (s) {
-                                if (s.totalRevenue == 0)
+                                if (s.totalRevenue == 0) {
                                   return _emptyState('Veri yok');
+                                }
                                 return _buildProfitabilityPie(s);
                               },
                               loading: () => const Center(
@@ -1877,8 +1817,9 @@ class _AnalyticsTab extends ConsumerWidget {
                             height: 180,
                             child: summaryVal.when(
                               data: (s) {
-                                if (s.totalRevenue == 0)
+                                if (s.totalRevenue == 0) {
                                   return _emptyState('Veri yok');
+                                }
                                 return _buildCollectionsPie(s);
                               },
                               loading: () => const Center(

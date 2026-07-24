@@ -18,8 +18,13 @@ import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
 
 class SmsSettingsSheet extends ConsumerStatefulWidget {
   final Settings settings;
+  final bool operationsOnly;
 
-  const SmsSettingsSheet({required this.settings, super.key});
+  const SmsSettingsSheet({
+    required this.settings,
+    this.operationsOnly = false,
+    super.key,
+  });
 
   @override
   ConsumerState<SmsSettingsSheet> createState() => _SmsSettingsSheetState();
@@ -49,7 +54,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
     listTemplates = _parseFlexibleSmsTemplates(widget.settings.smsTemplate);
     apiKeyCtrl = TextEditingController(text: widget.settings.smsApiKey ?? '');
     smsEnabled = widget.settings.smsEnabled;
-    selectedProvider = widget.settings.smsProvider ?? 'sim';
+    selectedProvider = 'sim';
     autoDebtReminderEnabled = widget.settings.smsAutoDebtReminderEnabled;
     minAmountCtrl = TextEditingController(
         text: widget.settings.smsAutoDebtReminderMinAmount.toStringAsFixed(0));
@@ -314,6 +319,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
       bool isResume = false;
 
       if (activeLogs.isNotEmpty) {
+        if (!context.mounted) return;
         pendingIds = activeLogs
             .map((log) => log.id.replaceFirst('bulk_debt_', ''))
             .toList();
@@ -384,6 +390,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
           return;
         }
 
+        if (!context.mounted) return;
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -779,8 +786,66 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
     );
   }
 
+  Widget _buildOperationsCenter() {
+    return FullScreenSettingsPage(
+      title: 'SMS Operasyonları',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: POSColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: POSColors.border),
+            ),
+            child: const Text(
+              'Toplu gönderimleri başlatın ve teslimat sonuçlarını takip edin. SMS yapılandırması bu ekranda değiştirilemez.',
+              style: TextStyle(color: POSColors.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: isSendingBulk
+                ? null
+                : () async {
+                    setState(() => isSendingBulk = true);
+                    await _sendBulkDebtReminder(context);
+                    if (mounted) setState(() => isSendingBulk = false);
+                  },
+            icon: const Icon(Icons.people_alt_rounded),
+            label: const Text('Borçlulara SMS gönder'),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.tonalIcon(
+            onPressed: isSendingBulk
+                ? null
+                : () async {
+                    setState(() => isSendingBulk = true);
+                    await _sendBulkAnnouncement(context);
+                    if (mounted) setState(() => isSendingBulk = false);
+                  },
+            icon: const Icon(Icons.campaign_rounded),
+            label: const Text('Toplu duyuru gönder'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SmsHistoryPage()),
+            ),
+            icon: const Icon(Icons.history_rounded),
+            label: const Text('SMS gönderim geçmişi'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.operationsOnly) {
+      return _buildOperationsCenter();
+    }
     final limit =
         int.tryParse(limitCtrl.text) ?? widget.settings.smsMonthlyLimit;
     final sent = widget.settings.smsSentThisMonth;
@@ -789,7 +854,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
         limit != null && limit > 0 ? (sent / limit).clamp(0.0, 1.0) : 0.0;
 
     return FullScreenSettingsPage(
-      title: 'SMS Servis Ayarları',
+      title: 'SMS ve Bildirimler',
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -942,7 +1007,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
 
               if (smsEnabled) ...[
                 const Text(
-                  'SMS Servis Sağlayıcı',
+                  'Yerel SIM Gönderimi',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -950,7 +1015,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
 
-                // Sağlayıcı Kartları
                 _buildProviderCard(
                   providerId: 'sim',
                   title: 'Cihazın SIM Kartı (Yerel)',
@@ -959,19 +1023,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                   icon: Icons.sim_card_rounded,
                   isSupported: !kIsWeb &&
                       Theme.of(context).platform == TargetPlatform.android,
-                ),
-                _buildProviderCard(
-                  providerId: 'netgsm',
-                  title: 'NetGSM',
-                  subtitle: 'NetGSM API entegrasyonu üzerinden gönderim.',
-                  icon: Icons.cloud_done_rounded,
-                ),
-                _buildProviderCard(
-                  providerId: 'twilio',
-                  title: 'Twilio',
-                  subtitle:
-                      'Uluslararası Twilio Gateway API üzerinden gönderim.',
-                  icon: Icons.api_rounded,
                 ),
                 const SizedBox(height: AppSpacing.md),
 
@@ -1135,23 +1186,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                   const SizedBox(height: AppSpacing.md),
                 ],
 
-                // SMS History Log Trigger Button
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.history_toggle_off_rounded, size: 18),
-                  label: const Text('SMS Gönderim Geçmişini Görüntüle'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SmsHistoryPage()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: POSColors.text,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
                 if (kDebugMode) ...[
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
@@ -1221,79 +1255,83 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                 ],
                 const SizedBox(height: AppSpacing.lg),
 
-                // Toplu SMS İşlemleri
-                const Text(
-                  'Toplu SMS İşlemleri',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: POSColors.text),
-                ),
-                const Divider(color: POSColors.border),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: isSendingBulk
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Color(0xFF8B5CF6)))
-                            : const Icon(Icons.people_alt_rounded,
-                                size: 16, color: Color(0xFF8B5CF6)),
-                        label: const Text('Borçlulara SMS',
-                            style:
-                                TextStyle(color: POSColors.text, fontSize: 12)),
-                        onPressed: !isSendingBulk
-                            ? () async {
-                                setState(() => isSendingBulk = true);
-                                await _sendBulkDebtReminder(context);
-                                if (mounted)
-                                  setState(() => isSendingBulk = false);
-                              }
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: POSColors.border),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                if (widget.operationsOnly) ...[
+                  // Toplu SMS İşlemleri
+                  const Text(
+                    'Toplu SMS İşlemleri',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: POSColors.text),
+                  ),
+                  const Divider(color: POSColors.border),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: isSendingBulk
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Color(0xFF8B5CF6)))
+                              : const Icon(Icons.people_alt_rounded,
+                                  size: 16, color: Color(0xFF8B5CF6)),
+                          label: const Text('Borçlulara SMS',
+                              style: TextStyle(
+                                  color: POSColors.text, fontSize: 12)),
+                          onPressed: !isSendingBulk
+                              ? () async {
+                                  setState(() => isSendingBulk = true);
+                                  await _sendBulkDebtReminder(context);
+                                  if (mounted) {
+                                    setState(() => isSendingBulk = false);
+                                  }
+                                }
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: POSColors.border),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: isSendingBulk
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: POSColors.green))
-                            : const Icon(Icons.campaign_rounded,
-                                size: 16, color: POSColors.green),
-                        label: const Text('Toplu Duyuru SMS',
-                            style:
-                                TextStyle(color: POSColors.text, fontSize: 12)),
-                        onPressed: !isSendingBulk
-                            ? () async {
-                                setState(() => isSendingBulk = true);
-                                await _sendBulkAnnouncement(context);
-                                if (mounted)
-                                  setState(() => isSendingBulk = false);
-                              }
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: POSColors.border),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: isSendingBulk
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: POSColors.green))
+                              : const Icon(Icons.campaign_rounded,
+                                  size: 16, color: POSColors.green),
+                          label: const Text('Toplu Duyuru SMS',
+                              style: TextStyle(
+                                  color: POSColors.text, fontSize: 12)),
+                          onPressed: !isSendingBulk
+                              ? () async {
+                                  setState(() => isSendingBulk = true);
+                                  await _sendBulkAnnouncement(context);
+                                  if (mounted) {
+                                    setState(() => isSendingBulk = false);
+                                  }
+                                }
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: POSColors.border),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
 
                 // Flexible Templates Header
                 Row(
@@ -1478,10 +1516,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                   // Save SMS Settings including new SIM and limits fields
                   final updated = widget.settings.copyWith(
                     smsEnabled: smsEnabled,
-                    smsProvider: selectedProvider,
-                    smsApiKey: apiKeyCtrl.text.trim().isEmpty
-                        ? null
-                        : apiKeyCtrl.text.trim(),
+                    smsProvider: 'sim',
+                    smsApiKey: null,
                     smsTemplate: templateJson,
                     smsSimSubscriptionId: selectedSubscriptionId,
                     smsMonthlyLimit: limitCtrl.text.trim().isEmpty
@@ -1499,9 +1535,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                     await ref
                         .read(settingsNotifierProvider.notifier)
                         .updateSettings(updatedWithReminder);
-                    if (mounted) Navigator.pop(context);
+                    if (context.mounted) Navigator.pop(context);
                   } catch (e) {
-                    if (mounted) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                             content: Text('Hata: $e'),

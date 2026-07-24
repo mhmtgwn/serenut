@@ -108,3 +108,75 @@ export function requireRole(roleName: string) {
     next();
   };
 }
+
+/**
+ * Enforces the short-lived entitlement snapshot embedded in the access token.
+ * Access tokens expire after 15 minutes, so a billing state change can remain
+ * stale for at most that window. Recovery, billing and license routes must not
+ * use this middleware.
+ */
+export function requireActiveEntitlement(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  if (req.user.roles.includes('sysadmin')) {
+    return next();
+  }
+
+  const allowedStates = new Set(['active', 'trial', 'trialing']);
+  const validUntil = req.user.entitlement_valid_until;
+  const isActive =
+    allowedStates.has(req.user.entitlement_state ?? '') &&
+    typeof validUntil === 'number' &&
+    Number.isFinite(validUntil) &&
+    validUntil > Date.now();
+
+  if (!isActive) {
+    return res.status(402).json({
+      error: 'entitlement_required',
+      message: 'Abonelik veya deneme süresi aktif değil.',
+    });
+  }
+
+  return next();
+}
+
+/** Keeps read-only and recovery views available while protecting mutations. */
+export function requireActiveEntitlementForMutations(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next();
+  }
+  return requireActiveEntitlement(req, res, next);
+}
+
+export function requirePortalAccess(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  const hasAccess =
+    req.user.roles.includes('sysadmin') ||
+    req.user.roles.includes('owner') ||
+    req.user.permissions.includes('portal:access');
+
+  if (!hasAccess) {
+    return res.status(403).json({
+      error: 'forbidden',
+      message: 'Web yönetim portalına erişim yetkiniz bulunmuyor.'
+    });
+  }
+  next();
+}

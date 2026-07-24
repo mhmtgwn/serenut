@@ -30,10 +30,8 @@ import 'package:serenutos/providers/payment_terminal_provider.dart';
 part 'sales/animated_cart_tab.dart';
 
 const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
 const _kRed = Color(0xFFDC2626);
 const _kSurface = Color(0xFFF8FAFC);
-const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
 
@@ -45,7 +43,6 @@ class SalesPage extends ConsumerStatefulWidget {
 }
 
 class _SalesPageState extends ConsumerState<SalesPage> {
-  SaleEntity? _lastCompletedSale;
   bool _showSuccessNotification = false;
 
   Future<void> _handleProductSelected(ProductEntity product) async {
@@ -306,7 +303,6 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       }
 
       setState(() {
-        _lastCompletedSale = createdSale;
         _showSuccessNotification = true;
       });
 

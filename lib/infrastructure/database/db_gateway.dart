@@ -4,7 +4,7 @@
 
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';

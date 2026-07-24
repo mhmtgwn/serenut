@@ -16,6 +16,22 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# ── 0. VPS DISK & RESOURCE CLEANUP ────────────────────────────────────────────
+echo "🧹 [Disk Cleanup] Clearing APT caches, PM2 logs, temp files and system journals..."
+apt-get clean || true
+apt-get autoremove -y || true
+npm cache clean --force 2>/dev/null || true
+journalctl --vacuum-time=3d --vacuum-size=100M 2>/dev/null || true
+rm -rf /tmp/*.sql /tmp/*.tar.gz /tmp/*.log /tmp/npm-* 2>/dev/null || true
+if command -v pm2 &> /dev/null; then
+  pm2 flush || true
+fi
+if command -v docker &> /dev/null; then
+  echo "🧹 [Docker Cleanup] Pruning unused Docker containers, images and volumes..."
+  docker system prune -af --volumes 2>/dev/null || true
+fi
+df -h /
+
 # ── 1. SYSTEM ENVIRONMENT & PACKAGES ──────────────────────────────────────────
 echo "⚙️ [System] Updating packages index and system upgrades..."
 apt-get update -y && apt-get upgrade -y

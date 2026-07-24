@@ -290,7 +290,7 @@ packages:
     source: hosted
     version: "1.3.2"
   ffi:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: ffi
       sha256: "289279317b4b16eb2bb7e271abccd4bf84ec9bdcbe999e278a94b804f5630418"
@@ -377,10 +377,9 @@ packages:
   flutter_libserialport:
     dependency: "direct main"
     description:
-      name: flutter_libserialport
-      sha256: f24b5fe6f1821d1c1b3bf2be737ca53f6b0ae78657032a790aa00abb810c8759
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/flutter_libserialport"
+      relative: true
+    source: path
     version: "0.6.0"
   flutter_lints:
     dependency: "direct dev"
@@ -886,7 +885,7 @@ packages:
     source: hosted
     version: "2.1.8"
   pointycastle:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: pointycastle
       sha256: "4be0097fcf3fd3e8449e53730c631200ebc7b88016acecab2b0da2f0149222fe"
@@ -1107,7 +1106,7 @@ packages:
     source: hosted
     version: "2.5.5"
   sqflite_common_ffi:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       name: sqflite_common_ffi
       sha256: "9faa2fedc5385ef238ce772589f7718c24cdddd27419b609bb9c6f703ea27988"

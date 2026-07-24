@@ -254,27 +254,3 @@ enum UserRole {
 /// | inventory:* (all 3) | ✅ | ✅ | ❌ | ❌ |
 /// | reports:* (all 3) | ✅ | ✅ | ❌ | ❌ |
 /// | admin:* (all 2) | ✅ | ❌ | ❌ | ❌ |
-class PermissionMatrix {
-  static const String _matrix = '''
-  Permission Matrix (27 total)
-  ═══════════════════════════════════════════════════════════
-  
-  ADMIN (All 27 permissions)
-  MANAGER (15 permissions)
-    - Sales: view, print
-    - Orders: all 4
-    - Customers: view, create, edit
-    - Payments: view, record
-    - Inventory: all 3
-    - Reports: all 3
-  
-  CASHIER (5 permissions)
-    - Sales: view, create, print
-    - Customers: view
-    - Payments: record
-  
-  STAFF (3 permissions)
-    - Sales: view, create
-    - Customers: view
-  ''';
-}

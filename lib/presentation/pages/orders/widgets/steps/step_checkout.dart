@@ -464,13 +464,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
           onTap: () {
             updateState(() {
               _paymentMethod = id;
-              if (id == 'cash') {
-                _paidAmount = _totalAmount;
-              } else if (id == 'card') {
-                _paidAmount = _totalAmount;
-              } else if (id == 'debt') {
-                _paidAmount = 0.0;
-              } else if (id == 'karma') {
+              if (id == 'karma') {
                 _cashSplitController.text = _totalAmount.toStringAsFixed(2);
                 _cardSplitController.text = '0.00';
                 _debtSplitController.text = '0.00';

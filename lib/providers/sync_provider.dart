@@ -2,6 +2,8 @@
 // Serenut OS — Offline Sync Riverpod Provider + AppLifecycle Trigger
 // Created: 24 Jun 2026
 
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -61,6 +63,7 @@ class SyncNotifier extends StateNotifier<SyncState>
   /// Active state machine for the current sync session.
   /// Updated on every triggerSync() call with a fresh session.
   SyncStateMachine? _machine;
+  Timer? _periodicSyncTimer;
   SyncStateMachine? get stateMachine => _machine;
 
   SyncNotifier(this._ref) : super(const SyncState()) {
@@ -85,6 +88,10 @@ class SyncNotifier extends StateNotifier<SyncState>
         syncScopeId: currentUser?.companyId,
       );
       await triggerSync();
+      _periodicSyncTimer ??= Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => triggerSync(),
+      );
     } catch (_) {
       // Silent — sync will be retried on next foreground
     }
@@ -158,9 +165,11 @@ class SyncNotifier extends StateNotifier<SyncState>
         }
       } on ApiException catch (e) {
         if (e.statusCode == 409 && prefs != null) {
-          await prefs.setBool('serenut_pending_company_patch', true);
+          // Retrying an unchanged version-conflicting patch can never succeed.
+          // Preserve local settings and require a fresh user edit to queue again.
+          await prefs.setBool('serenut_pending_company_patch', false);
           companyPatchError =
-              'Şirket bilgileri başka bir cihazda değiştirildi. Yerel değişiklik beklemede tutuluyor.';
+              'Şirket bilgileri başka bir cihazda değiştirildi. Yerel bilgiler korundu; yeniden göndermek için ayarları gözden geçirip kaydedin.';
           debugPrint('[Sync] ⚠️ Company patch version conflict: 409 returned.');
         }
       } catch (e) {
@@ -172,6 +181,25 @@ class SyncNotifier extends StateNotifier<SyncState>
       _machine = machine;
 
       final result = await service.syncPendingSales(stateMachine: machine);
+
+      // Repository consumers keep their own AsyncNotifier caches. Rebuild them
+      // after either a local push or a remote pull so open screens immediately
+      // show changes made on another device.
+      if (result.synced > 0) {
+        _ref.invalidate(productRepositoryProvider);
+        _ref.invalidate(customerRepositoryProvider);
+        _ref.invalidate(saleRepositoryProvider);
+        _ref.invalidate(financialTransactionRepositoryProvider);
+        _ref.invalidate(orderRepositoryProvider);
+        _ref.invalidate(allProductsProvider);
+        _ref.invalidate(allCustomersProvider);
+        _ref.invalidate(allSalesProvider);
+        _ref.invalidate(todayRevenueProvider);
+        _ref.invalidate(lowStockProductsProvider);
+        _ref.invalidate(debtorsProvider);
+        _ref.invalidate(reportRepositoryProvider);
+        _ref.invalidate(dashboardRepositoryProvider);
+      }
 
       try {
         final authService = _ref.read(authServiceProvider);
@@ -229,6 +257,7 @@ class SyncNotifier extends StateNotifier<SyncState>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _periodicSyncTimer?.cancel();
     _syncService?.dispose();
     super.dispose();
   }

@@ -48,13 +48,48 @@ const _kTextSecondary = Color(0xFF8E8E93);
 const _kGreen = Color(0xFF34C759);
 const _kBlue = Color(0xFF007AFF);
 const _kOrange = Color(0xFFFF9500);
-const _kPurple = Color(0xFFAF52DE);
 const _kPink = Color(0xFFFF2D55);
 const _kTeal = Color(0xFF5856D6);
 const _kTealLight = Color(0xFF00C7BE);
 
+enum DataManagementMode { transfer, backup, dangerous }
+
+extension DataManagementModePresentation on DataManagementMode {
+  String get title => switch (this) {
+        DataManagementMode.transfer => 'Veri Aktarımı',
+        DataManagementMode.backup => 'Yedekleme ve Geri Yükleme',
+        DataManagementMode.dangerous => 'Tehlikeli İşlemler',
+      };
+
+  String get description => switch (this) {
+        DataManagementMode.transfer =>
+          'Ürün ve müşteri verilerini kontrollü biçimde içeri veya dışarı aktarın.',
+        DataManagementMode.backup =>
+          'İşletme verilerinizin yedeğini oluşturun ve gerektiğinde geri yükleyin.',
+        DataManagementMode.dangerous =>
+          'Geri alınamayan veri temizleme işlemlerini yalnızca zorunlu olduğunda kullanın.',
+      };
+
+  IconData get icon => switch (this) {
+        DataManagementMode.transfer => Icons.swap_horizontal_circle_outlined,
+        DataManagementMode.backup => Icons.backup_rounded,
+        DataManagementMode.dangerous => Icons.warning_amber_rounded,
+      };
+
+  Color get color => switch (this) {
+        DataManagementMode.transfer => _kTeal,
+        DataManagementMode.backup => _kOrange,
+        DataManagementMode.dangerous => _kPink,
+      };
+}
+
 class DataTransferPage extends ConsumerStatefulWidget {
-  const DataTransferPage({super.key});
+  final DataManagementMode mode;
+
+  const DataTransferPage({
+    super.key,
+    this.mode = DataManagementMode.transfer,
+  });
 
   @override
   ConsumerState<DataTransferPage> createState() => _DataTransferPageState();
@@ -70,9 +105,9 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
         elevation: 0.5,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'Veri İçeri / Dışarı Aktar',
-          style: TextStyle(
+        title: Text(
+          widget.mode.title,
+          style: const TextStyle(
             color: _kTextPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 17,
@@ -92,78 +127,85 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             _buildIntroBanner(),
             const SizedBox(height: 20),
 
-            // GRUP 1: İÇE AKTARMA SEÇENEKLERİ
-            _buildSectionHeader('İÇE AKTARMA SEÇENEKLERİ'),
-            _buildRoundedCard([
-              _buildTransferRow(
-                title: 'Ürün Kataloğu İçe Aktar (.zip / .xlsx)',
-                subtitle:
-                    'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',
-                icon: Icons.upload_file_rounded,
-                color: _kGreen,
-                onTap: () => _handleImportZipCatalog(context),
-              ),
-              const _Divider(),
-              _buildTransferRow(
-                title: 'Rehberden Müşteri Aktar',
-                subtitle: 'Cihazdaki kişileri müşteri olarak içeri yükler.',
-                icon: Icons.contact_phone_rounded,
-                color: _kBlue,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      fullscreenDialog: true,
-                      builder: (context) => const ContactImportPage(),
-                    ),
-                  );
-                },
-              ),
-            ]),
-            const SizedBox(height: 20),
+            if (widget.mode == DataManagementMode.transfer) ...[
+              // GRUP 1: İÇE AKTARMA SEÇENEKLERİ
+              _buildSectionHeader('İÇE AKTARMA SEÇENEKLERİ'),
+              _buildRoundedCard([
+                _buildTransferRow(
+                  title: 'Ürün Kataloğu İçe Aktar (.zip / .xlsx)',
+                  subtitle:
+                      'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',
+                  icon: Icons.upload_file_rounded,
+                  color: _kGreen,
+                  onTap: () => _handleImportZipCatalog(context),
+                ),
+                const _Divider(),
+                _buildTransferRow(
+                  title: 'Rehberden Müşteri Aktar',
+                  subtitle: 'Cihazdaki kişileri müşteri olarak içeri yükler.',
+                  icon: Icons.contact_phone_rounded,
+                  color: _kBlue,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        fullscreenDialog: true,
+                        builder: (context) => const ContactImportPage(),
+                      ),
+                    );
+                  },
+                ),
+              ]),
+              const SizedBox(height: 20),
 
-            // GRUP 2: DIŞARI AKTARMA & YEDEKLEME SEÇENEKLERİ
-            _buildSectionHeader('DIŞARI AKTARMA & YEDEKLEME'),
-            _buildRoundedCard([
-              _buildTransferRow(
-                title: 'Ürün Kataloğu Dışarı Aktar (.zip)',
-                subtitle:
-                    'Mevcut kataloğu Excel tablosu ve görsellerle yedekler.',
-                icon: Icons.download_rounded,
-                color: _kTealLight,
-                onTap: () => _handleExportZipCatalog(context),
-              ),
-              const _Divider(),
-              _buildTransferRow(
-                title: 'Yedekleme ve Geri Yükleme',
-                subtitle: 'Uygulama veritabanını yedekler veya geri yükler.',
-                icon: Icons.backup_rounded,
-                color: _kOrange,
-                onTap: () => _showBackupRestoreSheet(),
-              ),
-            ]),
-            const SizedBox(height: 20),
+              // GRUP 2: DIŞARI AKTARMA & YEDEKLEME SEÇENEKLERİ
+              _buildSectionHeader('DIŞARI AKTARMA & YEDEKLEME'),
+              _buildRoundedCard([
+                _buildTransferRow(
+                  title: 'Ürün Kataloğu Dışarı Aktar (.zip)',
+                  subtitle:
+                      'Mevcut kataloğu Excel tablosu ve görsellerle yedekler.',
+                  icon: Icons.download_rounded,
+                  color: _kTealLight,
+                  onTap: () => _handleExportZipCatalog(context),
+                ),
+              ]),
+            ],
+            if (widget.mode == DataManagementMode.backup) ...[
+              _buildSectionHeader('YEDEKLEME VE GERİ YÜKLEME'),
+              _buildRoundedCard([
+                _buildTransferRow(
+                  title: 'Yedekleme ve Geri Yükleme',
+                  subtitle: 'Uygulama veritabanını yedekler veya geri yükler.',
+                  icon: Icons.backup_rounded,
+                  color: _kOrange,
+                  onTap: () => _showBackupRestoreSheet(),
+                ),
+              ]),
+              const SizedBox(height: 20),
+            ],
 
-            // GRUP 3: TEMİZLİK VE SIFIRLAMA
-            _buildSectionHeader('TEMİZLİK VE SIFIRLAMA'),
-            _buildRoundedCard([
-              _buildTransferRow(
-                title: 'Tüm Ürün Kataloğunu Temizle',
-                subtitle:
-                    'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
-                icon: Icons.delete_sweep_rounded,
-                color: _kPink,
-                onTap: () => _clearAllProducts(),
-              ),
-              const _Divider(),
-              _buildTransferRow(
-                title: 'Tüm Verileri Sıfırla (Fabrika Ayarları)',
-                subtitle:
-                    'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
-                icon: Icons.phonelink_erase_rounded,
-                color: _kPink,
-                onTap: () => _resetAllUserData(),
-              ),
-            ]),
+            if (widget.mode == DataManagementMode.dangerous) ...[
+              _buildSectionHeader('GERİ ALINAMAYAN İŞLEMLER'),
+              _buildRoundedCard([
+                _buildTransferRow(
+                  title: 'Tüm Ürün Kataloğunu Temizle',
+                  subtitle:
+                      'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
+                  icon: Icons.delete_sweep_rounded,
+                  color: _kPink,
+                  onTap: () => _clearAllProducts(),
+                ),
+                const _Divider(),
+                _buildTransferRow(
+                  title: 'Tüm Verileri Sıfırla (Fabrika Ayarları)',
+                  subtitle:
+                      'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
+                  icon: Icons.phonelink_erase_rounded,
+                  color: _kPink,
+                  onTap: () => _resetAllUserData(),
+                ),
+              ]),
+            ],
             const SizedBox(height: 32),
           ],
         ),
@@ -179,25 +221,25 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorderColor),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.swap_horizontal_circle_outlined, color: _kTeal, size: 40),
-          SizedBox(width: 16),
+          Icon(widget.mode.icon, color: widget.mode.color, size: 40),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Veri Yönetim Paneli',
-                  style: TextStyle(
+                  widget.mode.title,
+                  style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
                       color: _kTextPrimary),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Bu panelden katalog verinizi yedekleyebilir, yeni kataloglar yükleyebilir veya müşteri listelerinizi aktarabilirsiniz.',
-                  style: TextStyle(
+                  widget.mode.description,
+                  style: const TextStyle(
                       fontSize: 12, color: _kTextSecondary, height: 1.3),
                 ),
               ],

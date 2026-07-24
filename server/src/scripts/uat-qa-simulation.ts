@@ -1,7 +1,6 @@
 /* uat-qa-simulation.ts — Automated E2E User Acceptance Testing & QA Verification Suite */
 
 import { pgPool } from '../config/database';
-import { logger } from '../config/logger';
 
 async function runUatSuite() {
   console.log('🌀 STARTING SERENUT OS LAUNCH CANDIDATE v1.0 UAT SYSTEM VERIFICATION...');

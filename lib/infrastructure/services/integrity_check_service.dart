@@ -26,9 +26,7 @@ class IntegrityReport {
 }
 
 class IntegrityCheckService {
-  final SharedPreferences _prefs;
-
-  IntegrityCheckService(this._prefs);
+  IntegrityCheckService(SharedPreferences prefs);
 
   /// Scans all local resources and returns an IntegrityReport
   Future<IntegrityReport> runDiagnostics() async {

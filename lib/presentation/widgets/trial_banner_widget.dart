@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:serenutos/config/router.dart';
 import 'package:serenutos/providers/service_providers.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
@@ -91,7 +92,8 @@ class TrialBannerWidget extends ConsumerWidget {
     // Active commercial license (e.g. 364 days remaining)
     if (licStatus.status == 'active') {
       if (licStatus.daysLeft > 14) {
-        return const SizedBox.shrink(); // Healthy commercial license — NO BANNER
+        return const SizedBox
+            .shrink(); // Healthy commercial license — NO BANNER
       }
       final isLow = licStatus.daysLeft <= 3;
       return _Banner(
@@ -101,7 +103,7 @@ class TrialBannerWidget extends ConsumerWidget {
         subtitle:
             'Ticari lisansınızın bitmesine ${licStatus.daysLeft} gün kaldı.',
         actionLabel: 'Yenile',
-        onAction: () => context.push('/license'),
+        onAction: () => context.push(AppRoutes.license),
         isCritical: isLow,
       );
     }
@@ -115,7 +117,7 @@ class TrialBannerWidget extends ConsumerWidget {
         title: 'Deneme Sürümü Aktif',
         subtitle: 'Deneme sürenizin bitmesine ${licStatus.daysLeft} gün kaldı.',
         actionLabel: 'Lisans Gir',
-        onAction: () => context.push('/license'),
+        onAction: () => context.push(AppRoutes.license),
         isCritical: false,
       );
     }
@@ -143,7 +145,7 @@ class TrialBannerWidget extends ConsumerWidget {
         subtitle:
             'Sistem kısıtlı modda çalışıyor. Lisansı yenilemek için tıklayın.',
         actionLabel: 'Yenile',
-        onAction: () => context.push('/license'),
+        onAction: () => context.push(AppRoutes.license),
         isCritical: true,
       );
     }
@@ -156,7 +158,7 @@ class TrialBannerWidget extends ConsumerWidget {
         title: 'Lisans Bulunamadı',
         subtitle: 'Geçerli bir lisans anahtarı girin veya destek alın.',
         actionLabel: 'Lisans Gir',
-        onAction: () => context.push('/license'),
+        onAction: () => context.push(AppRoutes.license),
         isCritical: false,
       );
     }
@@ -172,7 +174,7 @@ class TrialBannerWidget extends ConsumerWidget {
             : 'Lisansınızın dolmasına ${licStatus.daysLeft} gün kaldı',
         subtitle: 'Kesintisiz kullanım için lisansı yenileyin.',
         actionLabel: 'Yenile',
-        onAction: () => context.push('/license'),
+        onAction: () => context.push(AppRoutes.license),
         isCritical: urgency,
       );
     }

@@ -5,7 +5,6 @@ import 'package:path/path.dart' hide equals;
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
-import 'package:serenutos/domain/repositories/base_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -109,7 +108,7 @@ void main() {
         'getTotalDebt and getTotalPaid should correctly calculate values with cancellations and partial payments',
         () async {
       final db = await databaseManager.getDatabase();
-      final customerId = 'cust-1';
+      const customerId = 'cust-1';
 
       // Clean existing transactions for the customer
       await db.delete('financial_transactions',

@@ -129,7 +129,9 @@ class BootstrapSyncService {
         }
       } on ApiException catch (e) {
         if (e.statusCode == 409) {
-          await _prefs.setBool('serenut_pending_company_patch', true);
+          // A version conflict cannot be resolved by retrying the same patch.
+          // Keep the local values, but stop the automatic retry loop.
+          await _prefs.setBool('serenut_pending_company_patch', false);
           debugPrint(
               '[BootstrapSync] ⚠️ Settings patch version conflict: 409 returned.');
         }

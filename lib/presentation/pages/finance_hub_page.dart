@@ -16,13 +16,9 @@ const _kBorderColor = Color(0xFFE2E8F0);
 const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kGreen = Color(0xFF10B981);
-const _kGreenDark = Color(0xFF047857);
 const _kRed = Color(0xFFEF4444);
 const _kRedLight = Color(0xFFFEF2F2);
 const _kBlue = Color(0xFF3B82F6);
-const _kBlueLight = Color(0xFFEFF6FF);
-const _kAmber = Color(0xFFF59E0B);
-const _kAmberLight = Color(0xFFFEF3C7);
 const _kPurple = Color(0xFF8B5CF6);
 
 // ── Page ──────────────────────────────────────────────────────────────────────

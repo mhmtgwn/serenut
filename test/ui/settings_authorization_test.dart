@@ -11,8 +11,6 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
-import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/domain/services/i_printer_service.dart';
 
 void main() {
   setUpAll(() async {
@@ -70,7 +68,7 @@ void main() {
 
   group('SettingsPage Granular RBAC Authorization Tests', () {
     testWidgets(
-        'Sysadmin sees all sections including platform-level Admin Kontrol Merkezi',
+        'Sysadmin sees operational settings without duplicated management tools',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -105,18 +103,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
-      expect(find.text('Cari Hesap Bütünlüğü & Replay'), findsOneWidget);
-      expect(find.text('Veritabanı Sağlık Kontrolü'), findsOneWidget);
-      expect(find.text('Finans Hub & Raporlar'), findsOneWidget);
-      expect(find.text('Denetim Merkezi (Audit Center)'), findsOneWidget);
-      expect(find.text('Veri Kurtarma Merkezi'), findsOneWidget);
+      expect(find.text('Cari Hesap Bütünlüğü & Replay'), findsNothing);
+      expect(find.text('Veritabanı Sağlık Kontrolü'), findsNothing);
+      expect(find.text('Finans Hub & Raporlar'), findsNothing);
+      expect(find.text('Denetim Merkezi (Audit Center)'), findsNothing);
+      expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
       expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
 
       await tester.pump();
     });
 
     testWidgets(
-        'Owner sees all tenant-level sections but NOT Admin Kontrol Merkezi (platform level)',
+        'Owner sees operational settings without duplicated management tools',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -151,18 +149,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
-      expect(find.text('Cari Hesap Bütünlüğü & Replay'), findsOneWidget);
-      expect(find.text('Veritabanı Sağlık Kontrolü'), findsOneWidget);
-      expect(find.text('Finans Hub & Raporlar'), findsOneWidget);
-      expect(find.text('Denetim Merkezi (Audit Center)'), findsOneWidget);
-      expect(find.text('Veri Kurtarma Merkezi'), findsOneWidget);
-      expect(find.text('Admin Kontrol Merkezi'), findsNothing);
+      expect(find.text('Cari Hesap Bütünlüğü & Replay'), findsNothing);
+      expect(find.text('Veritabanı Sağlık Kontrolü'), findsNothing);
+      expect(find.text('Finans Hub & Raporlar'), findsNothing);
+      expect(find.text('Denetim Merkezi (Audit Center)'), findsNothing);
+      expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
+      expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
 
       await tester.pump();
     });
 
-    testWidgets(
-        'Admin with all permissions sees all tenant-level sections but NOT Admin Kontrol Merkezi',
+    testWidgets('Admin with all permissions sees operational settings only',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 2400);
       tester.view.devicePixelRatio = 1.0;
@@ -197,8 +194,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
-      expect(find.text('Veritabanı Sağlık Kontrolü'), findsOneWidget);
-      expect(find.text('Admin Kontrol Merkezi'), findsNothing);
+      expect(find.text('Veritabanı Sağlık Kontrolü'), findsNothing);
+      expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
 
       await tester.pump();
     });
@@ -287,10 +284,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Settings screen and safe printer settings visible
-      expect(find.text('Fiş Yazıcı Ayarları'), findsOneWidget);
-      expect(find.text('Etiket Yazıcı Ayarları'), findsOneWidget);
-      expect(find.text('Donanım Diagnostics Testleri'), findsOneWidget);
-      expect(find.text('SMS Geçmişi'), findsOneWidget);
+      expect(find.text('Cihazlar ve Donanım'), findsOneWidget);
+      expect(find.text('Operasyon Merkezi'), findsOneWidget);
 
       // Admin actions hidden
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
@@ -338,11 +333,12 @@ void main() {
       // Safe user settings are visible; debug remains sysadmin-only.
       expect(find.text('Hata Ayıklama Modu (Debug)'), findsNothing);
       expect(find.text('Satışta Sesli Bildirim'), findsOneWidget);
-      expect(find.text('SMS Geçmişi'), findsOneWidget);
+      expect(find.text('Operasyon Merkezi'), findsNothing);
 
       // Printer options are hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
       expect(find.text('Etiket Yazıcı Ayarları'), findsNothing);
+      expect(find.text('Cihazlar ve Donanım'), findsNothing);
 
       await tester.pump();
     });
@@ -391,6 +387,7 @@ void main() {
 
       // Sensitive modules hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
+      expect(find.text('Cihazlar ve Donanım'), findsNothing);
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
 
       await tester.pump();

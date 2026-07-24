@@ -8,9 +8,6 @@ dotenv.config();
 import { pgPool } from '../config/database';
 import { runMigrations } from '../migrations';
 import { AuthService } from '../modules/auth/auth.service';
-import { SubscriptionService } from '../modules/subscription/subscription.service';
-import { LicenseFSM } from '../modules/license/license.fsm';
-import { ConnectionRegistry } from '../modules/realtime/connection-registry';
 
 async function setup() {
   console.log('🔄 Setting up database for E2E Launch Readiness Test...');

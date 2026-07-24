@@ -151,6 +151,12 @@ void main() {
             200,
           );
         }
+        if (request.url.path.contains('/sync/pull')) {
+          return http.Response(
+            '{"transactions":[],"has_more":false}',
+            200,
+          );
+        }
         // Simulate a duplicate conflict (409) which is successfully managed by client idempotency
         return http.Response('{"error": "idempotency duplicate"}', 409);
       });

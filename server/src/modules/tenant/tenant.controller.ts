@@ -8,12 +8,13 @@
 //   GET    /api/v1/devices         — List devices
 
 import { Router, Response } from 'express';
-import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
 
 const router = Router();
 router.use(authenticateUser);
+router.use(requireActiveEntitlementForMutations);
 
 /**
  * @swagger

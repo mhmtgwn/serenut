@@ -584,7 +584,9 @@ class AuthService {
   Future<void> checkCurrentUserSessionOnline() async {
     if (_currentUser == null ||
         _apiClient == null ||
-        _apiClient!.jwtToken == null) return;
+        _apiClient!.jwtToken == null) {
+      return;
+    }
     try {
       final response = await _apiClient!.get('/users/me');
       if (response.statusCode == 200) {

@@ -9,12 +9,12 @@ import 'package:share_plus/share_plus.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/document_export_service.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/sms_provider.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF10B981);
 const _kBlue = Color(0xFF3B82F6);
 const _kPurple = Color(0xFF8B5CF6);
-const _kTeal = Color(0xFF0D9488);
 const _kRed = Color(0xFFEF4444);
 const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
@@ -200,11 +200,12 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
     } catch (e) {
       _showError('PDF oluşturulamadı: $e');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _loadingAction = null;
         });
+      }
     }
   }
 
@@ -228,11 +229,12 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
     } catch (e) {
       _showError('Excel oluşturulamadı: $e');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _loadingAction = null;
         });
+      }
     }
   }
 
@@ -259,11 +261,12 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
     } catch (e) {
       _showError('Paylaşım başarısız: $e');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _loadingAction = null;
         });
+      }
     }
   }
 
@@ -274,12 +277,12 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
       _loadingAction = 'sms';
     });
     try {
-      // SMS is queued via SmsService — show success immediately
       final balance = widget.customer.balance;
       final isDebt = balance < 0;
       final msg = isDebt
           ? '${widget.customer.name}, mevcut bakiyeniz: ₺${balance.abs().toStringAsFixed(2)} borçludur.'
           : '${widget.customer.name}, mevcut bakiyeniz: ₺${balance.abs().toStringAsFixed(2)} alacaklıdır.';
+      await ref.read(smsServiceProvider).queueSms(widget.customer.phone, msg);
 
       if (mounted) {
         Navigator.pop(context);
@@ -294,11 +297,12 @@ class _ExportBottomSheetState extends ConsumerState<ExportBottomSheet> {
     } catch (e) {
       _showError('SMS gönderilemedi: $e');
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _loadingAction = null;
         });
+      }
     }
   }
 

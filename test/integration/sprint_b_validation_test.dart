@@ -7,8 +7,8 @@ void main() {
       // Senaryo: POS-1 cihaz saati 5 dakika geri, POS-2 cihaz saati 5 dakika ileri.
       // Her ikisi de aynı ürünü güncelliyor.
       // Beklenen: LWW (Last-Write-Wins) kuralı lokal saat yerine sunucu zaman damgasını veya logical clock'u baz alır.
-      final pos1Time = DateTime.now().subtract(Duration(minutes: 5));
-      final pos2Time = DateTime.now().add(Duration(minutes: 5));
+      final pos1Time = DateTime.now().subtract(const Duration(minutes: 5));
+      final pos2Time = DateTime.now().add(const Duration(minutes: 5));
       
       bool isPos2Winner = true; // Sunucuya en son ulaşan (veya logical clock'u yüksek olan) kazanır.
       expect(isPos2Winner, true);

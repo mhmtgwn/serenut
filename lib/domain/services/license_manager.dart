@@ -46,8 +46,13 @@ class LicenseManager {
       return true;
     }
 
-    // Check if package quota limit has room for a new registration
-    return license.activeDeviceIds.length < license.tier.deviceLimit;
+    // Yeni cihaz kaydı yalnızca sunucudaki atomik aktivasyon endpoint'i
+    // tarafından yapılabilir. İstemci tarafında kota boşluğu varsayılmaz.
+    return false;
+  }
+
+  bool isCurrentDeviceAllowed() {
+    return isDeviceAllowed(_licenseService.getDeviceUuid());
   }
 
   /// Clears stored license data.
@@ -63,7 +68,8 @@ class LicenseManager {
 
   void enforceWriteAccess({bool isInternalSync = false}) {
     if (isLockedDown && !isInternalSync) {
-      throw Exception('LICENSE_LOCKDOWN: Access denied. System is locked due to invalid, expired, or revoked license.');
+      throw Exception(
+          'LICENSE_LOCKDOWN: Access denied. System is locked due to invalid, expired, or revoked license.');
     }
   }
 

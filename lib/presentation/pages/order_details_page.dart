@@ -526,46 +526,6 @@ class OrderDetailsPage extends ConsumerWidget {
     ];
   }
 
-  String _nextStepLabel(String status) {
-    switch (status) {
-      case 'created':
-        return 'Hazırlamaya Başla';
-      case 'preparing':
-        return 'Hazır İşaretle';
-      case 'ready':
-        return 'Teslim Et';
-      default:
-        return 'Devam';
-    }
-  }
-
-  String _nextStatus(String current) {
-    final idx = _statusFlow.indexOf(current);
-    if (idx < _statusFlow.length - 1) return _statusFlow[idx + 1];
-    return current;
-  }
-
-  void _advanceStatus(BuildContext context, WidgetRef ref, OrderEntity order) {
-    final next = _nextStatus(order.status);
-    ref.read(ordersControllerProvider.notifier).updateStatus(order.id, next);
-
-    // VADELİ teslim bilgilendirmesi
-    final isVadeli = order.items.any((item) =>
-        item['payment_method']?.toString() == 'vadeli' ||
-        ((item['debt_amount'] as num?)?.toDouble() ?? 0) > 0);
-    final msg = next == 'delivered' && isVadeli
-        ? 'Teslim edildi ✓ — Borç cari hesapta kayıtlı.'
-        : 'Durum güncellendi: ${_statusLabels[next]}';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: _kGreenDark,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
   void _confirmCancel(BuildContext context, WidgetRef ref, OrderEntity order) {
     showDialog(
       context: context,
@@ -1331,7 +1291,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         if (settings != null) {
           // Read label printer config from SQLite settings (single source of truth)
           final labelIp = settings.labelPrinterIp ?? '';
-          final labelPort = settings.labelPrinterPort ?? 9100;
+          final labelPort = settings.labelPrinterPort;
           final labelSettings = settings.copyWith(
             printerName: 'network',
             printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,

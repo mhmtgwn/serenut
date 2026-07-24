@@ -5,12 +5,13 @@
 import { Router, Response } from 'express';
 import os from 'os';
 import { pgPool } from '../../config/database';
-import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requirePermission, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { logger } from '../../config/logger';
 
 const router = Router();
 
 router.use(authenticateUser);
+router.use(requireActiveEntitlementForMutations);
 
 router.post('/upload', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;

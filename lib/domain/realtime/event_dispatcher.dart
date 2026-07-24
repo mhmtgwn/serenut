@@ -21,20 +21,28 @@ class EventDispatcher {
     return _eventController.stream.where((e) {
       final type = e.type.toLowerCase();
       if (topicCategory == 'orders' &&
-          (type.contains('order') || type.contains('sale'))) return true;
+          (type.contains('order') || type.contains('sale'))) {
+        return true;
+      }
       if (topicCategory == 'inventory' &&
-          (type.contains('inventory') || type.contains('price'))) return true;
+          (type.contains('inventory') || type.contains('price'))) {
+        return true;
+      }
       if (topicCategory == 'payments' && type.contains('payment')) return true;
-      if (topicCategory == 'customers' && type.contains('customer'))
+      if (topicCategory == 'customers' && type.contains('customer')) {
         return true;
-      if (topicCategory == 'notifications' && type.contains('notification'))
+      }
+      if (topicCategory == 'notifications' && type.contains('notification')) {
         return true;
+      }
       if (topicCategory == 'license' && type.contains('license')) return true;
       if (topicCategory == 'backup' && type.contains('backup')) return true;
       if (topicCategory == 'auth' &&
           (type.contains('user') ||
               type.contains('auth') ||
-              type.contains('log'))) return true;
+              type.contains('log'))) {
+        return true;
+      }
       if (topicCategory == 'settings' && type.contains('setting')) return true;
       if (topicCategory == 'reports' && type.contains('report')) return true;
       return false;

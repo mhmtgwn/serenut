@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
-import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requirePortalAccess } from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { filterNavByEntitlements, resolveLandingRoute } from '../../config/app-shell';
 
 const router = Router();
 
 router.use(authenticateUser);
+router.use(requirePortalAccess);
 
 router.get('/bootstrap', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
@@ -36,7 +37,7 @@ router.get('/bootstrap', async (req: AuthenticatedRequest, res: Response) => {
       landing_route: resolveLandingRoute(roles, permissions),
       workspaces: {
         platform: roles.includes('sysadmin'),
-        company: permissions.includes('devices:view') || permissions.includes('billing:view') || roles.includes('owner') || roles.includes('manager') || roles.includes('cashier') || roles.includes('staff')
+        company: roles.includes('owner') || permissions.includes('portal:access')
       }
     });
   } catch (err) {

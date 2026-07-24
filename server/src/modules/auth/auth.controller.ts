@@ -14,7 +14,15 @@ const router = Router();
 // Mail delivery is currently optional. Verification is enabled only when the
 // deployment explicitly opts in; a missing environment variable must not lock
 // newly-created accounts out.
-const emailVerificationRequired = process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
+const emailDeliveryEnabled = process.env.EMAIL_DELIVERY_ENABLED === 'true';
+const emailVerificationRequired =
+  emailDeliveryEnabled && process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
+
+if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !emailDeliveryEnabled) {
+  logger.warn(
+    'REQUIRE_EMAIL_VERIFICATION was requested while EMAIL_DELIVERY_ENABLED is false; verification remains disabled.'
+  );
+}
 
 /**
  * @swagger
@@ -239,6 +247,13 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'missing_email' });
+  }
+
+  if (!emailDeliveryEnabled) {
+    return res.status(503).json({
+      error: 'email_service_unavailable',
+      message: 'E-posta ile şifre sıfırlama henüz aktif değil. Lütfen destek ekibiyle iletişime geçin.'
+    });
   }
 
   try {
@@ -545,6 +560,12 @@ router.get('/verify-email', async (req: Request, res: Response) => {
 });
 
 router.post('/resend-verification', signupLimiter, async (req: Request, res: Response) => {
+  if (!emailDeliveryEnabled) {
+    return res.status(503).json({
+      error: 'email_service_unavailable',
+      message: 'E-posta doğrulaması henüz aktif değil.'
+    });
+  }
   const normalizedEmail = String(req.body.email || '').trim().toLowerCase();
   const genericResponse = {
     message: 'Doğrulanmamış bir hesap varsa yeni bağlantı gönderildi.'

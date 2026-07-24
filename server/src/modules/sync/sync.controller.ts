@@ -3,13 +3,17 @@ import crypto from 'crypto';
 import { pgPool } from '../../config/database';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { syncLimiter } from '../../middleware/rate-limit.middleware';
-import { authenticateUser } from '../../middleware/auth.middleware';
+import {
+  authenticateUser,
+  requireActiveEntitlement,
+} from '../../middleware/auth.middleware';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
 router.use(syncLimiter);
 
 router.use(authenticateUser);
+router.use(requireActiveEntitlement);
 
 router.get('/health', async (_req: Request, res: Response) => {
   try {
@@ -147,9 +151,11 @@ router.post('/push', async (req: Request, res: Response) => {
           const saleQuery = `
             INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, payment_method, status, created_at, updated_at, idempotency_key, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, $9, $10)
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT (id) DO UPDATE SET id = sales.id
+            WHERE sales.company_id = EXCLUDED.company_id
+            RETURNING id
           `;
-          await client.query(saleQuery, [
+          const saleUpsert = await client.query(saleQuery, [
             payload.id,
             user.company_id,
             payload.customer_id || null,
@@ -161,15 +167,35 @@ router.post('/push', async (req: Request, res: Response) => {
             payload.id, // Sale ID acts as idempotency key
             user.id
           ]);
+          if (saleUpsert.rows.length === 0) {
+            throw new Error('sale_tenant_conflict');
+          }
+
+          if (payload.customer_id) {
+            const customer = await client.query(
+              'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
+              [payload.customer_id, user.company_id]
+            );
+            if (customer.rows.length === 0) {
+              throw new Error('sale_customer_tenant_conflict');
+            }
+          }
 
           // Insert sale items and update stock if new
           if (payload.items && Array.isArray(payload.items)) {
             for (const itemObj of payload.items) {
               const qty = parseFloat(itemObj.quantity) || 0.0;
               const price = parseFloat(itemObj.unit_price) || 0.0;
+              const product = await client.query(
+                'SELECT id FROM products WHERE id = $1 AND company_id = $2',
+                [itemObj.product_id, user.company_id]
+              );
+              if (product.rows.length === 0) {
+                throw new Error('sale_product_tenant_conflict');
+              }
               const insertItemRes = await client.query(
-                `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal)
-                 VALUES ($1, $2, $3, $4, $5, $6)
+                `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal, company_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                  ON CONFLICT (id) DO NOTHING RETURNING id`,
                 [
                   itemObj.id || `item-${payload.id}-${itemObj.product_id}`,
@@ -177,7 +203,8 @@ router.post('/push', async (req: Request, res: Response) => {
                   itemObj.product_id,
                   qty,
                   price,
-                  qty * price
+                  qty * price,
+                  user.company_id
                 ]
               );
               
@@ -276,6 +303,58 @@ router.post('/push', async (req: Request, res: Response) => {
             payload.reference_id || null,
             payload.is_deleted || false
           ]);
+        }
+        else if (entity_type === 'order') {
+          const customer = await client.query(
+            'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
+            [payload.customer_id, user.company_id]
+          );
+          if (customer.rows.length === 0) {
+            throw new Error('order_customer_tenant_conflict');
+          }
+          const orderUpsert = await client.query(
+            `INSERT INTO customer_orders
+              (id, company_id, customer_id, status, total_amount, order_date, expected_delivery_date,
+               actual_delivery_date, notes, created_at, updated_at, is_deleted, deleted_at, deleted_by, created_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CURRENT_TIMESTAMP,$11,$12,$13,$14)
+             ON CONFLICT (id) DO UPDATE SET customer_id=EXCLUDED.customer_id,
+               status=EXCLUDED.status, total_amount=EXCLUDED.total_amount, order_date=EXCLUDED.order_date,
+               expected_delivery_date=EXCLUDED.expected_delivery_date,
+               actual_delivery_date=EXCLUDED.actual_delivery_date, notes=EXCLUDED.notes,
+               updated_at=CURRENT_TIMESTAMP, is_deleted=EXCLUDED.is_deleted,
+               deleted_at=EXCLUDED.deleted_at, deleted_by=EXCLUDED.deleted_by, created_by=EXCLUDED.created_by
+             WHERE customer_orders.company_id = EXCLUDED.company_id
+             RETURNING id`,
+            [payload.id, user.company_id, payload.customer_id, payload.status || 'created',
+             payload.total_amount || 0, payload.order_date ? new Date(payload.order_date) : null,
+             payload.expected_delivery_date ? new Date(payload.expected_delivery_date) : null,
+             payload.actual_delivery_date ? new Date(payload.actual_delivery_date) : null,
+             payload.notes || null, payload.created_at ? new Date(payload.created_at) : new Date(),
+             payload.is_deleted === true || payload.is_deleted === 1,
+             payload.deleted_at ? new Date(payload.deleted_at) : null,
+             payload.deleted_by || null, payload.created_by || user.id]
+          );
+          if (orderUpsert.rows.length === 0) {
+            throw new Error('order_tenant_conflict');
+          }
+          await client.query('DELETE FROM customer_order_items WHERE order_id = $1', [payload.id]);
+          for (const item of Array.isArray(payload.items) ? payload.items : []) {
+            const product = await client.query(
+              'SELECT id FROM products WHERE id = $1 AND company_id = $2',
+              [item.product_id, user.company_id]
+            );
+            if (product.rows.length === 0) {
+              throw new Error('order_product_tenant_conflict');
+            }
+            await client.query(
+              `INSERT INTO customer_order_items (id, order_id, product_id, quantity, unit_price, created_at, company_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+              [item.id || `item-${payload.id}-${item.product_id}`, payload.id, item.product_id,
+               item.quantity || 0, item.unit_price || 0,
+               item.created_at ? new Date(item.created_at) : new Date(),
+               user.company_id]
+            );
+          }
         }
 
         await client.query('COMMIT');
@@ -408,6 +487,11 @@ router.get('/pull', async (req: Request, res: Response) => {
       [user.company_id, lastTime]
     );
 
+    const ordersRes = await pgPool.query(
+      `SELECT * FROM customer_orders WHERE company_id = $1 AND updated_at ${timestampOperator} $2`,
+      [user.company_id, lastTime]
+    );
+
     const transactions: any[] = [];
 
     for (const row of prodRes.rows) {
@@ -432,6 +516,28 @@ router.get('/pull', async (req: Request, res: Response) => {
       transactions.push({
         id: row.id,
         type: 'financial_transaction',
+        payload: row,
+        timestamp: new Date(row.updated_at).getTime()
+      });
+    }
+
+    const orderIds = ordersRes.rows.map((r: any) => r.id);
+    const itemsByOrderId: Record<string, any[]> = {};
+    if (orderIds.length > 0) {
+      const orderItemsRes = await pgPool.query(
+        'SELECT * FROM customer_order_items WHERE order_id = ANY($1::text[])',
+        [orderIds]
+      );
+      for (const item of orderItemsRes.rows) {
+        if (!itemsByOrderId[item.order_id]) itemsByOrderId[item.order_id] = [];
+        itemsByOrderId[item.order_id].push(item);
+      }
+    }
+    for (const row of ordersRes.rows) {
+      row.items = itemsByOrderId[row.id] || [];
+      transactions.push({
+        id: row.id,
+        type: 'order',
         payload: row,
         timestamp: new Date(row.updated_at).getTime()
       });

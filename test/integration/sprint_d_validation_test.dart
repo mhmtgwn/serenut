@@ -24,7 +24,7 @@ void main() {
     test('3. WebSocket Latency (Realtime Push Notification)', () {
       // Simüle: Cihaz-A'dan satış atıldı. VPS PostgreSQL -> Redis Pub/Sub -> WebSocket -> Cihaz-B.
       // Beklenen: Gecikme süresinin kabul edilebilir (< 500ms) olması.
-      final latencyMs = 120; // Simulated latency
+      const latencyMs = 120; // Simulated latency
       expect(latencyMs < 500, true);
       print('✔ WebSocket Latency: Çoklu cihaz gerçek zamanlı güncellemeleri \${latencyMs}ms içerisinde ulaştı.');
     });

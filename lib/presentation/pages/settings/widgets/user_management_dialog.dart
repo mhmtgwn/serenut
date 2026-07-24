@@ -585,8 +585,9 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'E-posta gerekli';
-                  if (!v.contains('@') || !v.contains('.'))
+                  if (!v.contains('@') || !v.contains('.')) {
                     return 'Geçersiz e-posta';
+                  }
                   return null;
                 },
               ),
@@ -814,8 +815,9 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'E-posta gerekli';
-                  if (!v.contains('@') || !v.contains('.'))
+                  if (!v.contains('@') || !v.contains('.')) {
                     return 'Geçersiz e-posta';
+                  }
                   return null;
                 },
               ),
@@ -1029,8 +1031,9 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                 prefixIcon: Icon(Icons.lock_outline),
               ),
               validator: (v) {
-                if (v == null || v.length != 4)
+                if (v == null || v.length != 4) {
                   return 'PIN tam olarak 4 haneli olmalıdır.';
+                }
                 return null;
               },
             ),

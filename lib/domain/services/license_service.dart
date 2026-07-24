@@ -89,10 +89,12 @@ class LicenseService {
   static const String _lastSystemTimeKey = 'last_system_time';
   static const String _maxTimestampSeenKey = 'max_timestamp_seen';
 
-  // RSA-2048 Public Key Modulus & Exponent
-  static const String _rsaModulusHex =
-      '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
-  static const String _rsaExponentHex = '65537';
+  static const String _configuredRsaModulus = String.fromEnvironment(
+    'LICENSE_RSA_MODULUS',
+    defaultValue: '',
+  );
+  final String _rsaModulus;
+  final String _rsaExponent;
 
   String? _cachedLicenseToken;
   String? _cachedLastSystemTime;
@@ -101,24 +103,16 @@ class LicenseService {
   final Stopwatch _stopwatch = Stopwatch()..start();
   final DateTime _startTime = DateTime.now();
 
-  LicenseService(this._prefs);
+  LicenseService(
+    this._prefs, {
+    String? rsaModulus,
+    String rsaExponent = '65537',
+  })  : _rsaModulus = rsaModulus ?? _configuredRsaModulus,
+        _rsaExponent = rsaExponent;
 
   SharedPreferences get prefs => _prefs;
 
   Future<Database> _getDb() => DatabaseManager().getDatabase();
-
-  Future<String?> _getSettingsValue(String column) async {
-    try {
-      final db = await _getDb();
-      final rows = await db.query('settings', columns: [column], limit: 1);
-      if (rows.isNotEmpty) {
-        return rows.first[column] as String?;
-      }
-    } catch (e) {
-      debugPrint('Failed to read settings column $column: $e');
-    }
-    return null;
-  }
 
   Future<void> _setSettingsValue(String column, String? value) async {
     try {
@@ -226,8 +220,9 @@ class LicenseService {
       final payload = json.encode(sortedMap);
       final payloadBytes = utf8.encode(payload);
 
-      final modulus = BigInt.parse(_rsaModulusHex);
-      final publicExponent = BigInt.parse(_rsaExponentHex);
+      if (_rsaModulus.isEmpty) return false;
+      final modulus = BigInt.parse(_rsaModulus);
+      final publicExponent = BigInt.parse(_rsaExponent);
 
       final publicKey = RSAPublicKey(modulus, publicExponent);
       final verifier = RSASigner(SHA256Digest(), '0609608648016503040201');
@@ -403,53 +398,6 @@ class LicenseService {
     _cachedLastSystemTime = nowStr;
     _prefs.setString(_lastSystemTimeKey, nowStr);
     await _setSettingsValue('last_system_time', nowStr);
-
-    updateMaxTimestampSeen(now);
-    return true;
-  }
-
-  bool _checkClockIntegritySync() {
-    final now = DateTime.now().toUtc();
-
-    // 1. Check last recorded system time
-    final lastTimeStr =
-        _cachedLastSystemTime ?? _prefs.getString(_lastSystemTimeKey);
-    if (lastTimeStr != null) {
-      try {
-        final lastTime = _parseLegacyOrUtc(lastTimeStr);
-        final isLegacy = !lastTimeStr.endsWith('Z');
-        final grace =
-            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
-        if (now.add(grace).isBefore(lastTime)) {
-          return false;
-        }
-      } catch (_) {
-        return false;
-      }
-    }
-
-    // 2. Check max observed timestamp seen
-    final maxTimeStr =
-        _cachedMaxTimestampSeen ?? _prefs.getString(_maxTimestampSeenKey);
-    if (maxTimeStr != null) {
-      try {
-        final maxTime = _parseLegacyOrUtc(maxTimeStr);
-        final isLegacy = !maxTimeStr.endsWith('Z');
-        final grace =
-            isLegacy ? const Duration(hours: 2) : const Duration(minutes: 5);
-        if (now.add(grace).isBefore(maxTime)) {
-          return false;
-        }
-      } catch (_) {
-        return false;
-      }
-    }
-
-    // Update both trackers in UTC format
-    final nowStr = now.toIso8601String();
-    _cachedLastSystemTime = nowStr;
-    _prefs.setString(_lastSystemTimeKey, nowStr);
-    _setSettingsValue('last_system_time', nowStr);
 
     updateMaxTimestampSeen(now);
     return true;

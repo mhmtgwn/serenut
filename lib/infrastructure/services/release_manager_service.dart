@@ -113,18 +113,25 @@ enum InstallResult {
 /// if (info.hasUpdate) { ... }
 /// ```
 class ReleaseManagerService {
-  static const String _rsaModulusHex =
-      '24411462201226996438841939549021454888733195236274468065775741224235870828599975687442961469702706222823140813618470146034318791144081164140895510392862259766582087914988353091642332590862692172508245336721761478288563513793312713764686147506940136020087563505042690937627842320486248227124477581576031460706918080381582170251418495030474651546222624978118721452561800320320246965787168638531779352900516824205685716199734459208444432818729619600489270457687453750695905613821629449668637610680017348238336982462564377297468305133351943448287065558841371731196118193920355175788560618289960848258703300389635524278281';
-  static const String _rsaExponentHex = '65537';
+  static const String _configuredRsaModulus = String.fromEnvironment(
+    'RELEASE_RSA_MODULUS',
+    defaultValue: '',
+  );
 
   final EnvironmentConfig _config;
   final http.Client _httpClient;
+  final String _rsaModulus;
+  final String _rsaExponent;
 
   ReleaseManagerService({
     EnvironmentConfig? config,
     http.Client? httpClient,
+    String? rsaModulus,
+    String rsaExponent = '65537',
   })  : _config = config ?? EnvironmentConfig.current,
-        _httpClient = httpClient ?? http.Client();
+        _httpClient = httpClient ?? http.Client(),
+        _rsaModulus = rsaModulus ?? _configuredRsaModulus,
+        _rsaExponent = rsaExponent;
 
   // ── PUBLIC API ──────────────────────────────────────────────────────────────
 
@@ -321,8 +328,9 @@ class ReleaseManagerService {
       final payloadBytes =
           utf8.encode(actualHash); // The signed data is the file hash
 
-      final modulus = BigInt.parse(_rsaModulusHex);
-      final publicExponent = BigInt.parse(_rsaExponentHex);
+      if (_rsaModulus.isEmpty) return false;
+      final modulus = BigInt.parse(_rsaModulus);
+      final publicExponent = BigInt.parse(_rsaExponent);
 
       final publicKey = RSAPublicKey(modulus, publicExponent);
       final verifier = RSASigner(SHA256Digest(), '0609608648016503040201');

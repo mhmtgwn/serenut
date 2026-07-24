@@ -46,9 +46,12 @@ void main() {
               sku TEXT UNIQUE,
               vat INTEGER,
               is_active INTEGER NOT NULL DEFAULT 1,
+              is_synced INTEGER NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
-              image_url TEXT
+              image_url TEXT,
+              sale_type TEXT NOT NULL DEFAULT 'piece',
+              minimum_weight_grams INTEGER NOT NULL DEFAULT 20
             )
           ''');
 
@@ -64,6 +67,7 @@ void main() {
               credit_limit REAL,
               status TEXT NOT NULL DEFAULT 'active',
               is_active INTEGER NOT NULL DEFAULT 1,
+              is_synced INTEGER NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL
             )
@@ -78,6 +82,10 @@ void main() {
               payment_method TEXT,
               status TEXT NOT NULL DEFAULT 'completed',
               notes TEXT,
+              idempotency_key TEXT,
+              is_synced INTEGER NOT NULL DEFAULT 0,
+              created_by TEXT,
+              entitlement_snapshot TEXT,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
               FOREIGN KEY (customer_id) REFERENCES customers(id)

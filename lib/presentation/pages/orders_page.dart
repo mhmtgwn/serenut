@@ -10,9 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
-import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 
@@ -22,7 +20,6 @@ import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialo
 const _kGreen = Color(0xFF16A34A);
 const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
 const _kAmberDark = Color(0xFFB45309);
 const _kRed = Color(0xFFDC2626);
@@ -589,108 +586,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
       ),
     );
   }
-
-  void _confirmDelete(BuildContext context, OrderEntity order) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Siparişi Sil'),
-        content: const Text(
-            'Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: _kRed,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
-            onPressed: () {
-              ref.read(ordersControllerProvider.notifier).deleteOrder(order.id);
-              ref.invalidate(dashboardProvider);
-              ref.invalidate(productsControllerProvider);
-              Navigator.pop(context);
-            },
-            child: const Text('Sil'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ── Filtre Chip ───────────────────────────────────────────────────────────────
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final int count;
-  final String status;
-  final String selected;
-  final void Function(String) onTap;
-  const _FilterChip(
-      {required this.label,
-      required this.count,
-      required this.status,
-      required this.selected,
-      required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = selected == status;
-    final meta = status == 'all'
-        ? const _StatusMeta(
-            color: _kGreen,
-            bg: _kGreenLight,
-            icon: Icons.list_rounded,
-            label: 'Tümü')
-        : _statusMeta(status);
-
-    return GestureDetector(
-      onTap: () => onTap(status),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? meta.color : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? meta.color : _kBorder),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? Colors.white : _kTextSecondary,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color:
-                    isSelected ? Colors.white.withValues(alpha: 0.25) : meta.bg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: isSelected ? Colors.white : meta.color,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── Sipariş Kartı ─────────────────────────────────────────────────────────────
 class _OrderCard extends StatelessWidget {

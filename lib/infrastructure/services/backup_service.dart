@@ -250,12 +250,15 @@ class BackupService implements IBackupService {
       if (await walFile.exists()) await walFile.delete();
       if (await shmFile.exists()) await shmFile.delete();
 
-      if (await tempBackupDbFile.exists())
+      if (await tempBackupDbFile.exists()) {
         await tempBackupDbFile.rename(dbPath);
-      if (await tempBackupWalFile.exists())
+      }
+      if (await tempBackupWalFile.exists()) {
         await tempBackupWalFile.rename(walPath);
-      if (await tempBackupShmFile.exists())
+      }
+      if (await tempBackupShmFile.exists()) {
         await tempBackupShmFile.rename(shmPath);
+      }
 
       throw Exception(
           'Veritabanı geri yükleme yazma hatası, değişiklikler geri alındı: $e');

@@ -229,14 +229,6 @@ export class CommercialLifecycleService {
       if (subRes.rows.length > 0) planId = subRes.rows[0].plan_id;
     }
 
-    const now = new Date();
-    if (billingPeriod === 'yearly') {
-      // It sets periodEnd = NOW + 1 month by default in activatePaidSubscription.
-      // Wait, activatePaidSubscription currently hardcodes periodEnd to +1 month:
-      // periodEnd.setMonth(periodEnd.getMonth() + 1);
-      // Let's pass billingPeriod to activatePaidSubscription if we modify it, but let's just do it directly.
-    }
-
     // Call activatePaidSubscription
     const { subscriptionId } = await this.activatePaidSubscription(client, {
       companyId: invoice.company_id,
