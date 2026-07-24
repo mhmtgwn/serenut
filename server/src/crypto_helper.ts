@@ -1,43 +1,54 @@
 import crypto from 'crypto';
 
-function loadPrivateKey(): crypto.KeyObject | null {
+let cachedPrivateKey: crypto.KeyObject | null = null;
+
+export function getPrivateKey(): crypto.KeyObject | null {
+  if (cachedPrivateKey) return cachedPrivateKey;
+
   const envKey = process.env.RSA_PRIVATE_KEY;
-  if (!envKey) {
-    console.error('🚨 RSA_PRIVATE_KEY environment variable is not set. RSA signing features are disabled.');
-    return null;
+  if (envKey) {
+    try {
+      if (envKey.startsWith('{')) {
+        cachedPrivateKey = crypto.createPrivateKey({
+          key: JSON.parse(envKey),
+          format: 'jwk'
+        });
+      } else {
+        const formattedKey = envKey.replace(/\\n/g, '\n');
+        cachedPrivateKey = crypto.createPrivateKey({
+          key: formattedKey,
+          format: 'pem'
+        });
+      }
+      return cachedPrivateKey;
+    } catch (err: any) {
+      console.error('❌ Failed to load RSA_PRIVATE_KEY from environment variables:', err);
+    }
   }
 
-  try {
-    if (envKey.startsWith('{')) {
-      // Load from JWK format
-      return crypto.createPrivateKey({
-        key: JSON.parse(envKey),
-        format: 'jwk'
-      });
-    } else {
-      // Load from PEM format
-      const formattedKey = envKey.replace(/\\n/g, '\n');
-      return crypto.createPrivateKey({
-        key: formattedKey,
-        format: 'pem'
-      });
-    }
-  } catch (err: any) {
-    console.error('❌ Failed to load RSA_PRIVATE_KEY from environment variables. RSA signing features are disabled until the key is fixed:', err);
-    return null;
+  if (process.env.NODE_ENV === 'test' || process.env.GENERATE_EPHEMERAL_RSA_KEY === 'true') {
+    const { privateKey: ephemeralKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048
+    });
+    cachedPrivateKey = ephemeralKey;
+    return cachedPrivateKey;
   }
+
+  console.error('🚨 RSA_PRIVATE_KEY environment variable is not set. RSA signing features are disabled.');
+  return null;
 }
 
-export const privateKey = loadPrivateKey();
+export const privateKey = getPrivateKey();
 
 export function signPayload(payload: string): string {
-  if (!privateKey) {
+  const key = getPrivateKey();
+  if (!key) {
     throw new Error('RSA_PRIVATE_KEY is not configured; cannot sign payload.');
   }
   const signer = crypto.createSign('RSA-SHA256');
   signer.update(payload);
   signer.end();
-  return signer.sign(privateKey, 'base64');
+  return signer.sign(key, 'base64');
 }
 
 // ── SYMMETRIC ENCRYPTION (AES-256-GCM) ─────────────────────────────────────────
