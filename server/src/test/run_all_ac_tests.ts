@@ -4,6 +4,7 @@
 
 import dotenv from 'dotenv';
 dotenv.config();
+process.env.NODE_ENV = 'test';
 
 import { exec } from 'child_process';
 import path from 'path';
