@@ -61,6 +61,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  let authModal = null;
+
+  const openAuthModal = (targetUrl) => {
+    const embedUrl = targetUrl.includes('#register') 
+      ? '/app/?embed=1#register' 
+      : '/app/?embed=1';
+
+    if (!authModal) {
+      authModal = document.createElement('div');
+      authModal.id = 'auth-modal';
+      authModal.className = 'auth-modal-backdrop app-hidden';
+      authModal.innerHTML = `
+        <div class="auth-modal-dialog">
+          <button class="auth-modal-close" id="auth-modal-close" type="button" aria-label="Kapat">×</button>
+          <iframe id="auth-modal-iframe" title="Giriş ve Kayıt Ekranı" src="about:blank"></iframe>
+        </div>
+      `;
+      document.body.appendChild(authModal);
+
+      document.getElementById('auth-modal-close')?.addEventListener('click', closeAuthModal);
+      authModal.addEventListener('click', (e) => {
+        if (e.target === authModal) closeAuthModal();
+      });
+    }
+
+    const iframe = document.getElementById('auth-modal-iframe');
+    if (iframe) iframe.src = embedUrl;
+    authModal.classList.remove('app-hidden');
+    document.body.style.overflow = 'hidden';
+  };
+
+  const closeAuthModal = () => {
+    if (!authModal) return;
+    authModal.classList.add('app-hidden');
+    const iframe = document.getElementById('auth-modal-iframe');
+    if (iframe) iframe.src = 'about:blank';
+    document.body.style.overflow = '';
+  };
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && authModal && !authModal.classList.contains('app-hidden')) {
+      closeAuthModal();
+    }
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'serenut-authenticated') {
+      try {
+        if (event.data.token) sessionStorage.setItem('app_token', event.data.token);
+        if (event.data.user) sessionStorage.setItem('app_profile', JSON.stringify(event.data.user));
+      } catch (_) {}
+      closeAuthModal();
+      window.location.href = '/app/';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const authLink = e.target.closest('.auth-launcher a, a[href="/app/"], a[href="/app/#register"]');
+    if (authLink && !profile) {
+      e.preventDefault();
+      closeMenu();
+      const href = authLink.getAttribute('href') || '/app/';
+      openAuthModal(href);
+    }
+  });
+
   const syncHeader = () => {
     header?.classList.toggle('scrolled', window.scrollY > 12);
   };

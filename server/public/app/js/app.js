@@ -42,8 +42,8 @@ const escapeHtml = (value = '') => String(value).replace(
   (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]
 );
 
-document.addEventListener('DOMContentLoaded', () => {
-  const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
+function initApp() {
+  const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1' || window.self !== window.top;
   if (isEmbed) document.body.classList.add('embed-mode');
   bindEvents();
 
@@ -54,7 +54,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   showAuth();
   handleInitialIntent();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 function bindEvents() {
   document.getElementById('open-register')?.addEventListener('click', () => openLayer('register'));
@@ -163,8 +169,17 @@ async function handleLogin() {
     setAuthToken(data.access_token);
     setRefreshToken(data.refresh_token);
     setUserProfile(data.user);
-    if (document.body.classList.contains('embed-mode')) {
-      window.parent.postMessage({ type: 'serenut-authenticated' }, window.location.origin);
+
+    try {
+      localStorage.setItem('app_token', data.access_token);
+      localStorage.setItem('app_profile', JSON.stringify(data.user));
+    } catch (_) {}
+
+    const isIframe = window.self !== window.top;
+    if (document.body.classList.contains('embed-mode') || isIframe) {
+      try {
+        window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, '*');
+      } catch (_) {}
       return;
     }
     await bootShell();
@@ -204,6 +219,20 @@ async function handleRegister() {
       setAuthToken(data.access_token);
       setRefreshToken(data.refresh_token);
       if (data.user) setUserProfile(data.user);
+
+      try {
+        localStorage.setItem('app_token', data.access_token);
+        localStorage.setItem('app_profile', JSON.stringify(data.user));
+      } catch (_) {}
+
+      const isIframe = window.self !== window.top;
+      if (document.body.classList.contains('embed-mode') || isIframe) {
+        try {
+          window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, '*');
+        } catch (_) {}
+        return;
+      }
+
       closeLayers();
       await bootShell();
       return;

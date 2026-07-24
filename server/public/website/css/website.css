@@ -40,9 +40,16 @@
 }
 @media(max-width:380px){.menu-toggle span{display:none}.mobile-nav{grid-template-columns:1fr}}
 
-/* Header authentication uses the real application routes, not an iframe. */
 .auth-launcher a{min-height:36px;display:inline-flex;align-items:center;padding:0 13px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:700 .78rem Inter,sans-serif}
 .auth-launcher a:last-child{background:var(--green);color:#fff}
 .auth-launcher a:hover{background:var(--soft-green);color:var(--green)}
 .auth-launcher a:last-child:hover{background:var(--green-dark);color:#fff}
 @media(max-width:600px){.auth-launcher a{min-height:32px;padding:0 8px;font-size:.68rem}}
+
+/* Auth Iframe Modal Dialog Overlay */
+.auth-modal-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(18,27,23,.72);backdrop-filter:blur(8px);animation:authModalFadeIn .2s ease-out}
+.auth-modal-dialog{position:relative;width:min(480px,100%);height:min(660px,92vh);background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden}
+.auth-modal-close{position:absolute;top:12px;right:12px;z-index:10;width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:#fff;color:var(--ink);font-size:1.3rem;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.08);transition:transform .15s ease,background .15s ease}
+.auth-modal-close:hover{transform:scale(1.08);background:var(--canvas)}
+#auth-modal-iframe{width:100%;height:100%;border:none}
+@keyframes authModalFadeIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
