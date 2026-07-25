@@ -257,17 +257,27 @@ class ProductEntity {
       };
 
   factory ProductEntity.fromMap(Map<String, dynamic> map) => ProductEntity(
-        id: map['id'] as String,
-        name: map['name'] as String,
-        description: map['description'] as String,
-        price: map['price'] as double,
-        quantity: map['quantity'] as int,
-        category: map['category'] as String,
-        vat: map['vat'] as int?,
-        imageUrl: map['image_url'] as String?,
-        saleType: map['sale_type'] as String? ?? 'piece',
-        minimumWeightGrams:
-            (map['minimum_weight_grams'] as num?)?.toInt() ?? 20,
+        id: (map['id'] ?? '').toString(),
+        name: (map['name'] ?? '').toString(),
+        description: (map['description'] ?? '').toString(),
+        price: (map['price'] is num)
+            ? (map['price'] as num).toDouble()
+            : (double.tryParse((map['price'] ?? '0').toString()) ?? 0.0),
+        quantity: (map['quantity'] is num)
+            ? (map['quantity'] as num).toInt()
+            : (int.tryParse((map['quantity'] ?? '0').toString()) ?? 0),
+        category: (map['category'] ?? 'Genel').toString(),
+        vat: map['vat'] != null
+            ? ((map['vat'] is num)
+                ? (map['vat'] as num).toInt()
+                : int.tryParse(map['vat'].toString()))
+            : null,
+        imageUrl: (map['image_url'] ?? map['image_path'])?.toString(),
+        saleType: (map['sale_type'] ?? 'piece').toString(),
+        minimumWeightGrams: (map['minimum_weight_grams'] is num)
+            ? (map['minimum_weight_grams'] as num).toInt()
+            : (int.tryParse((map['minimum_weight_grams'] ?? '20').toString()) ??
+                20),
       );
 }
 
@@ -299,12 +309,16 @@ class CustomerEntity {
       };
 
   factory CustomerEntity.fromMap(Map<String, dynamic> map) => CustomerEntity(
-        id: map['id'] as String,
-        name: map['name'] as String,
-        email: map['email'] as String,
-        phone: map['phone'] as String,
-        balance: map['balance'] as double,
-        createdAt: DateTime.parse(map['created_at'] as String),
+        id: (map['id'] ?? '').toString(),
+        name: (map['name'] ?? '').toString(),
+        email: (map['email'] ?? '').toString(),
+        phone: (map['phone'] ?? '').toString(),
+        balance: (map['balance'] is num)
+            ? (map['balance'] as num).toDouble()
+            : (double.tryParse((map['balance'] ?? '0').toString()) ?? 0.0),
+        createdAt: map['created_at'] != null
+            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
       );
 }
 
@@ -356,17 +370,25 @@ class SaleEntity {
       };
 
   factory SaleEntity.fromMap(Map<String, dynamic> map) => SaleEntity(
-        id: map['id'] as String,
-        customerId: map['customer_id'] as String,
-        totalAmount: map['total_amount'] as double,
-        paidAmount: map['paid_amount'] as double,
-        paymentMethod: map['payment_method'] as String,
-        status: map['status'] as String,
-        createdAt: DateTime.parse(map['created_at'] as String),
-        idempotencyKey: map['idempotency_key'] as String?,
-        isSynced: map['is_synced'] as int? ?? 0,
-        createdBy: map['created_by'] as String?,
-        entitlementSnapshot: map['entitlement_snapshot'] as String?,
+        id: (map['id'] ?? '').toString(),
+        customerId: (map['customer_id'] ?? '').toString(),
+        totalAmount: (map['total_amount'] is num)
+            ? (map['total_amount'] as num).toDouble()
+            : (double.tryParse((map['total_amount'] ?? '0').toString()) ?? 0.0),
+        paidAmount: (map['paid_amount'] is num)
+            ? (map['paid_amount'] as num).toDouble()
+            : (double.tryParse((map['paid_amount'] ?? '0').toString()) ?? 0.0),
+        paymentMethod: (map['payment_method'] ?? 'cash').toString(),
+        status: (map['status'] ?? 'completed').toString(),
+        createdAt: map['created_at'] != null
+            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+        idempotencyKey: map['idempotency_key']?.toString(),
+        isSynced: (map['is_synced'] is num)
+            ? (map['is_synced'] as num).toInt()
+            : (int.tryParse((map['is_synced'] ?? '0').toString()) ?? 0),
+        createdBy: map['created_by']?.toString(),
+        entitlementSnapshot: map['entitlement_snapshot']?.toString(),
         items: [],
       );
 }
@@ -415,22 +437,32 @@ class FinancialTransactionEntity {
 
   factory FinancialTransactionEntity.fromMap(Map<String, dynamic> map) =>
       FinancialTransactionEntity(
-        id: map['id'] as String,
-        type: map['type'] as String,
-        customerId: map['customer_id'] as String,
-        amount: map['amount'] as double,
-        paidAmount: map['paid_amount'] as double,
-        debtAmount: map['debt_amount'] as double,
-        date: DateTime.parse((map['created_at'] ??
-            map['date'] ??
-            map['occurred_at'] ??
-            DateTime.now().toIso8601String()) as String),
-        referenceId: map['reference_id'] as String?,
+        id: (map['id'] ?? '').toString(),
+        type: (map['type'] ?? 'payment').toString(),
+        customerId: (map['customer_id'] ?? '').toString(),
+        amount: (map['amount'] is num)
+            ? (map['amount'] as num).toDouble()
+            : (double.tryParse((map['amount'] ?? '0').toString()) ?? 0.0),
+        paidAmount: (map['paid_amount'] is num)
+            ? (map['paid_amount'] as num).toDouble()
+            : (double.tryParse((map['paid_amount'] ?? '0').toString()) ?? 0.0),
+        debtAmount: (map['debt_amount'] is num)
+            ? (map['debt_amount'] as num).toDouble()
+            : (double.tryParse((map['debt_amount'] ?? '0').toString()) ?? 0.0),
+        date: DateTime.tryParse((map['created_at'] ??
+                    map['date'] ??
+                    map['occurred_at'] ??
+                    '')
+                .toString()) ??
+            DateTime.now(),
+        referenceId: map['reference_id']?.toString(),
         metadata: map['metadata'] is String
             ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>?
             : map['metadata'] as Map<String, dynamic>?,
-        logicalClock: map['logical_clock'] as int? ?? 0,
-        deviceId: map['device_id'] as String?,
+        logicalClock: (map['logical_clock'] is num)
+            ? (map['logical_clock'] as num).toInt()
+            : (int.tryParse((map['logical_clock'] ?? '0').toString()) ?? 0),
+        deviceId: map['device_id']?.toString(),
       );
 }
 

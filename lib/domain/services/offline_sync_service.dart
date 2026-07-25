@@ -22,6 +22,27 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/config/utils.dart';
 
+double _toDouble(dynamic val, [double defaultValue = 0.0]) {
+  if (val == null) return defaultValue;
+  if (val is num) return val.toDouble();
+  if (val is String) return double.tryParse(val) ?? defaultValue;
+  return defaultValue;
+}
+
+int _toInt(dynamic val, [int defaultValue = 0]) {
+  if (val == null) return defaultValue;
+  if (val is num) return val.toInt();
+  if (val is String) return int.tryParse(val) ?? defaultValue;
+  return defaultValue;
+}
+
+int _toBoolInt(dynamic val, [int defaultValue = 0]) {
+  if (val == null) return defaultValue;
+  if (val == true || val == 1 || val == '1' || val == 'true' || val == 'active') return 1;
+  if (val == false || val == 0 || val == '0' || val == 'false' || val == 'inactive') return 0;
+  return defaultValue;
+}
+
 /// Result of a single sync operation.
 class SyncResult {
   final int synced;
@@ -396,82 +417,59 @@ class OfflineSyncService {
         await db.transaction((txn) async {
           for (final txMap in txs) {
             if (txMap is Map<String, dynamic>) {
-              final type = txMap['type'] as String? ?? 'financial_transaction';
-              final payload = txMap['payload'] as Map<String, dynamic>;
-              final id = payload['id'] as String;
+              final type = (txMap['type'] ?? 'financial_transaction').toString();
+              final payload = txMap['payload'] is Map<String, dynamic>
+                  ? txMap['payload'] as Map<String, dynamic>
+                  : <String, dynamic>{};
+              final id = (payload['id'] ?? '').toString();
+              if (id.isEmpty) continue;
 
               if (type == 'product') {
                 await txn.insert(
                   'products',
                   {
-                    'id': payload['id'],
-                    'name': payload['name'] ?? '',
-                    'description': payload['description'] ?? '',
-                    'price': payload['price'] != null
-                        ? (payload['price'] as num).toDouble()
-                        : 0.0,
-                    'quantity': payload['quantity'] != null
-                        ? (payload['quantity'] as num).toInt()
-                        : (payload['stock'] != null
-                            ? (payload['stock'] as num).toInt()
-                            : 0),
-                    'category': payload['category'] ?? 'Genel',
-                    'vat': payload['vat'] != null
-                        ? (payload['vat'] as num).toInt()
-                        : (payload['vat_rate'] != null
-                            ? (payload['vat_rate'] as num).toInt()
-                            : 0),
-                    'image_url': payload['image_url'] ?? payload['image_path'],
-                    'is_active': (payload['is_active'] == false ||
-                            payload['is_active'] == 0)
-                        ? 0
-                        : 1,
-                    'is_deleted': (payload['is_deleted'] == true ||
-                            payload['is_deleted'] == 1)
-                        ? 1
-                        : 0,
+                    'id': id,
+                    'name': (payload['name'] ?? '').toString(),
+                    'description': (payload['description'] ?? '').toString(),
+                    'price': _toDouble(payload['price']),
+                    'quantity': _toInt(payload['quantity'] ?? payload['stock']),
+                    'category': (payload['category'] ?? 'Genel').toString(),
+                    'vat': _toInt(payload['vat'] ?? payload['vat_rate']),
+                    'image_url': (payload['image_url'] ?? payload['image_path'])?.toString(),
+                    'is_active': _toBoolInt(payload['is_active'], 1),
+                    'is_deleted': _toBoolInt(payload['is_deleted'], 0),
                     'is_synced': 1,
-                    'created_at': payload['created_at'] ??
-                        DateTime.now().toIso8601String(),
-                    'updated_at': payload['updated_at'] ??
-                        DateTime.now().toIso8601String(),
+                    'created_at': (payload['created_at'] ?? DateTime.now().toIso8601String()).toString(),
+                    'updated_at': (payload['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
                   },
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
               } else if (type == 'customer') {
-                final customerId = payload['id'] as String?;
-                if (customerId != null && customerId.isNotEmpty) {
+                final customerId = id;
+                if (customerId.isNotEmpty) {
                   affectedCustomerIds.add(customerId);
                 }
+                final custName = (payload['name'] ?? '').toString();
                 await txn.insert(
                   'customers',
                   {
-                    'id': payload['id'],
-                    'name': payload['name'],
-                    'normalized_name':
-                        (payload['name'] as String? ?? '').normalizeTurkish,
-                    'email': payload['email'],
-                    'normalized_email':
-                        (payload['email'] as String? ?? '').toLowerCase(),
-                    'phone': payload['phone'],
-                    'balance': payload['balance'] != null
-                        ? (payload['balance'] as num).toDouble()
-                        : 0.0,
-                    'is_deleted': (payload['is_deleted'] == true ||
-                            payload['is_deleted'] == 1)
-                        ? 1
-                        : 0,
+                    'id': customerId,
+                    'name': custName,
+                    'normalized_name': custName.normalizeTurkish,
+                    'email': (payload['email'] ?? '').toString(),
+                    'normalized_email': (payload['email'] ?? '').toString().toLowerCase(),
+                    'phone': (payload['phone'] ?? '').toString(),
+                    'balance': _toDouble(payload['balance']),
+                    'is_deleted': _toBoolInt(payload['is_deleted'], 0),
                     'is_synced': 1,
-                    'created_at': payload['created_at'] ??
-                        DateTime.now().toIso8601String(),
-                    'updated_at': payload['updated_at'] ??
-                        DateTime.now().toIso8601String(),
+                    'created_at': (payload['created_at'] ?? DateTime.now().toIso8601String()).toString(),
+                    'updated_at': (payload['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
                   },
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
               } else if (type == 'sale') {
-                // Dependency quarantine check: Parent customer must exist
-                final customerId = payload['customer_id'] as String?;
+                // Dependency quarantine check: Parent customer must exist if customer_id provided
+                final customerId = payload['customer_id']?.toString();
                 bool parentExists = true;
                 if (customerId != null && customerId.isNotEmpty) {
                   final custCheck = await txn.query('customers',
@@ -482,26 +480,23 @@ class OfflineSyncService {
                 }
                 if (!parentExists) {
                   errors.add(
-                      'Parent customer $customerId not found for sale ${payload['id']}. Sale quarantined.');
+                      'Parent customer $customerId not found for sale $id. Sale quarantined.');
                   continue;
                 }
 
                 // Immutable Transaction Logic (LWW uygulanmaz)
                 final existingSale = await txn.query('sales',
-                    where: 'id = ?', whereArgs: [payload['id']], limit: 1);
+                    where: 'id = ?', whereArgs: [id], limit: 1);
                 if (existingSale.isNotEmpty) {
                   // Mevcut kaydın ve gelen payload'un Hash doğrulaması
-                  final localVal = existingSale.first['total_amount'];
-                  final remoteVal = payload['total_amount'] != null
-                      ? (payload['total_amount'] as num).toDouble()
-                      : 0.0;
-                  // Basit hash/eşitlik kontrolü (Gerçek sistemde canonical hash compare yapılmalıdır)
+                  final localVal = _toDouble(existingSale.first['total_amount']);
+                  final remoteVal = _toDouble(payload['total_amount']);
                   if (localVal != remoteVal) {
                     await TelemetryService().logStructured(
                       event: 'sync_immutable_conflict_alarm',
                       level: LogLevel.critical,
                       metadata: {
-                        'sale_id': payload['id'],
+                        'sale_id': id,
                         'local_amount': localVal,
                         'remote_amount': remoteVal,
                         'reason':
@@ -509,8 +504,7 @@ class OfflineSyncService {
                       },
                     );
                     errors.add(
-                        "Veri Uyuşmazlığı: ${payload['id']} ID'li satış kaydı değiştirilmeye çalışıldı. Quarantine'a alındı.");
-                    // Dead-letter kuyruğuna atılabilir. Şimdilik ignore edip alarm üretiyoruz.
+                        "Veri Uyuşmazlığı: $id ID'li satış kaydı değiştirilmeye çalışıldı. Quarantine'a alındı.");
                   }
                   continue; // Her halükarda üzerine yazmıyoruz (Immutable)
                 }
@@ -518,25 +512,18 @@ class OfflineSyncService {
                 await txn.insert(
                   'sales',
                   {
-                    'id': payload['id'],
-                    'customer_id': payload['customer_id'],
-                    'total_amount': payload['total_amount'] != null
-                        ? (payload['total_amount'] as num).toDouble()
-                        : 0.0,
-                    'paid_amount': payload['paid_amount'] != null
-                        ? (payload['paid_amount'] as num).toDouble()
-                        : 0.0,
-                    'payment_method': payload['payment_method'],
-                    'status': payload['status'],
-                    'created_at': payload['created_at'],
-                    'updated_at': payload['updated_at'],
-                    'idempotency_key': payload['idempotency_key'],
+                    'id': id,
+                    'customer_id': customerId,
+                    'total_amount': _toDouble(payload['total_amount']),
+                    'paid_amount': _toDouble(payload['paid_amount']),
+                    'payment_method': (payload['payment_method'] ?? 'cash').toString(),
+                    'status': (payload['status'] ?? 'completed').toString(),
+                    'created_at': (payload['created_at'] ?? DateTime.now().toIso8601String()).toString(),
+                    'updated_at': (payload['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
+                    'idempotency_key': payload['idempotency_key']?.toString(),
                     'is_synced': 1,
-                    'created_by': payload['created_by'],
-                    'is_deleted': (payload['is_deleted'] == true ||
-                            payload['is_deleted'] == 1)
-                        ? 1
-                        : 0,
+                    'created_by': payload['created_by']?.toString(),
+                    'is_deleted': _toBoolInt(payload['is_deleted'], 0),
                   },
                   conflictAlgorithm: ConflictAlgorithm.ignore,
                 );
@@ -546,8 +533,9 @@ class OfflineSyncService {
 
                   for (final item in items) {
                     if (item is Map<String, dynamic>) {
-                      // Dependency check: Product must exist
-                      final prodId = item['product_id'] ?? item['productId'];
+                      final prodId = (item['product_id'] ?? item['productId'])?.toString();
+                      if (prodId == null || prodId.isEmpty) continue;
+
                       final prodCheck = await txn.query('products',
                           where: 'id = ?', whereArgs: [prodId], limit: 1);
                       if (prodCheck.isEmpty) {
@@ -556,35 +544,22 @@ class OfflineSyncService {
                         continue;
                       }
 
-                      final qty = item['quantity'] != null
-                          ? (item['quantity'] as num).toDouble()
-                          : (item['qty'] != null
-                              ? (item['qty'] as num).toDouble()
-                              : 0.0);
-                      final price = item['unit_price'] != null
-                          ? (item['unit_price'] as num).toDouble()
-                          : (item['unitPrice'] != null
-                              ? (item['unitPrice'] as num).toDouble()
-                              : 0.0);
-                      final subtotal = item['subtotal'] != null
-                          ? (item['subtotal'] as num).toDouble()
-                          : (item['total_price'] != null
-                              ? (item['total_price'] as num).toDouble()
-                              : qty * price);
+                      final qty = _toDouble(item['quantity'] ?? item['qty']);
+                      final price = _toDouble(item['unit_price'] ?? item['unitPrice']);
+                      final subtotal = item['subtotal'] != null || item['total_price'] != null
+                          ? _toDouble(item['subtotal'] ?? item['total_price'])
+                          : qty * price;
 
                       await txn.insert(
                         'sale_items',
                         {
-                          'id': item['id'] ??
-                              'si-${payload['id']}-${item['product_id'] ?? item['productId']}',
-                          'sale_id': payload['id'],
+                          'id': (item['id'] ?? 'si-$id-$prodId').toString(),
+                          'sale_id': id,
                           'product_id': prodId,
                           'quantity': qty,
                           'unit_price': price,
                           'subtotal': subtotal,
-                          'created_at': item['created_at'] ??
-                              payload['created_at'] ??
-                              DateTime.now().toIso8601String(),
+                          'created_at': (item['created_at'] ?? payload['created_at'] ?? DateTime.now().toIso8601String()).toString(),
                         },
                         conflictAlgorithm: ConflictAlgorithm.ignore,
                       );
@@ -592,56 +567,49 @@ class OfflineSyncService {
                   }
                 }
               } else if (type == 'order') {
-                final customerId = payload['customer_id'] as String?;
+                final customerId = payload['customer_id']?.toString();
                 if (customerId == null || customerId.isEmpty) continue;
                 final custCheck = await txn.query('customers',
                     where: 'id = ?', whereArgs: [customerId], limit: 1);
                 if (custCheck.isEmpty) {
                   errors.add(
-                      'Parent customer $customerId not found for order ${payload['id']}. Order quarantined.');
+                      'Parent customer $customerId not found for order $id. Order quarantined.');
                   continue;
                 }
                 await txn.insert(
                   'orders',
                   {
-                    'id': payload['id'],
+                    'id': id,
                     'customer_id': customerId,
-                    'status': payload['status'] ?? 'created',
-                    'total_amount':
-                        (payload['total_amount'] as num?)?.toDouble(),
-                    'order_date': payload['order_date'],
-                    'expected_delivery_date': payload['expected_delivery_date'],
-                    'actual_delivery_date': payload['actual_delivery_date'],
-                    'notes': payload['notes'],
-                    'created_at': payload['created_at'],
-                    'updated_at': payload['updated_at'],
-                    'is_deleted': (payload['is_deleted'] == true ||
-                            payload['is_deleted'] == 1)
-                        ? 1
-                        : 0,
-                    'deleted_at': payload['deleted_at'],
-                    'deleted_by': payload['deleted_by'],
-                    'created_by': payload['created_by'],
+                    'status': (payload['status'] ?? 'created').toString(),
+                    'total_amount': _toDouble(payload['total_amount']),
+                    'order_date': payload['order_date']?.toString(),
+                    'expected_delivery_date': payload['expected_delivery_date']?.toString(),
+                    'actual_delivery_date': payload['actual_delivery_date']?.toString(),
+                    'notes': payload['notes']?.toString(),
+                    'created_at': (payload['created_at'] ?? DateTime.now().toIso8601String()).toString(),
+                    'updated_at': (payload['updated_at'] ?? DateTime.now().toIso8601String()).toString(),
+                    'is_deleted': _toBoolInt(payload['is_deleted'], 0),
+                    'deleted_at': payload['deleted_at']?.toString(),
+                    'deleted_by': payload['deleted_by']?.toString(),
+                    'created_by': payload['created_by']?.toString(),
                     'is_synced': 1,
                   },
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
                 await txn.delete('order_items',
-                    where: 'order_id = ?', whereArgs: [payload['id']]);
+                    where: 'order_id = ?', whereArgs: [id]);
                 for (final rawItem in (payload['items'] as List? ?? const [])) {
                   if (rawItem is! Map<String, dynamic>) continue;
                   await txn.insert(
                       'order_items',
                       {
-                        'id': rawItem['id'],
-                        'order_id': payload['id'],
-                        'product_id': rawItem['product_id'],
-                        'quantity':
-                            (rawItem['quantity'] as num?)?.toDouble() ?? 0.0,
-                        'unit_price':
-                            (rawItem['unit_price'] as num?)?.toDouble() ?? 0.0,
-                        'created_at':
-                            rawItem['created_at'] ?? payload['created_at'],
+                        'id': (rawItem['id'] ?? '').toString(),
+                        'order_id': id,
+                        'product_id': (rawItem['product_id'] ?? '').toString(),
+                        'quantity': _toDouble(rawItem['quantity']),
+                        'unit_price': _toDouble(rawItem['unit_price']),
+                        'created_at': (rawItem['created_at'] ?? payload['created_at'] ?? DateTime.now().toIso8601String()).toString(),
                       },
                       conflictAlgorithm: ConflictAlgorithm.replace);
                 }
