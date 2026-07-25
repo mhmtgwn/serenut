@@ -29,18 +29,30 @@ function sign(hash) {
 const apkHash = '571b529ef7c5453c7f0aa6b8c2b6919e21abe4ab2d4a22c64ba6bd1c34d84841';
 const apkSig = sign(apkHash);
 
-console.log('APK_SIG generated successfully');
+const winHash = '4dd4c7b462651ee66f2529bb561a5b17417d32095220cf1908ad94362407503c';
+const winSig = sign(winHash);
+
+console.log('Signatures generated successfully');
 
 const sql = `
 INSERT INTO app_versions (
   id, version_code, platform, channel, download_url, file_path,
   sha256_hash, signature, file_size_bytes, is_mandatory, min_required_version,
   release_notes, status, rollout_percentage, published_by
-) VALUES (
+) VALUES
+(
   'rel-apk-119-21', '1.1.9+21', 'android', 'stable',
   '/api/v1/updates/download/android/latest',
   '/var/www/serenut/server/public/website/downloads/serenut.apk',
   '${apkHash}', '${apkSig}', 51129114, true, '1.1.8',
+  'Serenut OS v1.1.9+21 — Veri eşitleme (ürün, müşteri, satış) veri dönüşüm çökmesi düzeltildi.',
+  'active', 100, 'system'
+),
+(
+  'rel-win-119-21', '1.1.9+21', 'windows', 'stable',
+  '/api/v1/updates/download/windows/latest',
+  '/var/www/serenut/server/public/website/downloads/SerenutOSSetup.exe',
+  '${winHash}', '${winSig}', 40435256, true, '1.1.8',
   'Serenut OS v1.1.9+21 — Veri eşitleme (ürün, müşteri, satış) veri dönüşüm çökmesi düzeltildi.',
   'active', 100, 'system'
 ) ON CONFLICT (id) DO UPDATE SET
