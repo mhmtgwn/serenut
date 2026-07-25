@@ -20,7 +20,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={userappdata}\SerenutOS
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 CloseApplications=yes
@@ -37,8 +37,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Privacy / UAC
-PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequired=lowest
 ; Sign installer
 ; SignTool=signtool sign /n "Serenut" /t "http://timestamp.digicert.com" $f
 
