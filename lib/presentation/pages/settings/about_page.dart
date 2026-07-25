@@ -20,6 +20,14 @@ class _AboutPageState extends ConsumerState<AboutPage> {
   String? _lastResult;
 
   @override
+  void initState() {
+    super.initState();
+    VersionChecker.getAppVersion().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -50,9 +58,9 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                             fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'Sürüm ${VersionChecker.currentVersion}',
-                        style: TextStyle(color: Color(0xFF64748B)),
+                        style: const TextStyle(color: Color(0xFF64748B)),
                       ),
                       if (_lastResult != null) ...[
                         const SizedBox(height: 12),

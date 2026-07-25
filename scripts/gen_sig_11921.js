@@ -27,7 +27,7 @@ function sign(hash) {
 }
 
 const apkHash = '8c3a46c6e456f0d8b1e217ae61d7a4c4c6d892ca5407135ce87aa2d184a52953';
-const winHash = '1cbf1356c9d86e1254c6ab50df9fded1e68db3c3211ac65b1c3deffebb166a24';
+const winHash = 'ab718051b7ab05374ae3fb1d5f108a790158f327514015257b3895914bd2efa0';
 
 const apkSig = sign(apkHash);
 const winSig = sign(winHash);
@@ -52,7 +52,7 @@ INSERT INTO app_versions (
   'rel-win-119-21', '1.1.9+21', 'windows', 'stable',
   '/api/v1/updates/download/windows/latest',
   '/var/www/serenut/server/public/website/downloads/SerenutOSSetup.exe',
-  '${winHash}', '${winSig}', 16363446, false, '1.1.8',
+  '${winHash}', '${winSig}', 16363452, false, '1.1.8',
   'Serenut OS v1.1.9+21 — Veri eşitleme (ürün, müşteri, satış) veri dönüşüm çökmesi düzeltildi.',
   'active', 100, 'system'
 )

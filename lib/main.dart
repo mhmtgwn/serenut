@@ -233,6 +233,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _checkVersion() async {
+    await VersionChecker.getAppVersion();
     final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
     final required = await checker.checkForceUpdateRequired();
     final info = await checker.getVersionInfo();

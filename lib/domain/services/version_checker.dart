@@ -1,5 +1,6 @@
 // lib/domain/services/version_checker.dart
 import 'dart:io';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/config/environment.dart';
 
@@ -70,8 +71,23 @@ class VersionChecker {
     ApiClient? apiClient,
   }) : _apiClient = apiClient ?? ApiClient();
 
-  static const String currentVersion = '1.1.9+21';
+  static String _cachedVersion = '1.1.9+21';
 
+  static Future<String> getAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (info.version.isNotEmpty) {
+        _cachedVersion = info.buildNumber.isNotEmpty 
+            ? '${info.version}+${info.buildNumber}' 
+            : info.version;
+      }
+      return _cachedVersion;
+    } catch (_) {
+      return _cachedVersion;
+    }
+  }
+
+  static String get currentVersion => _cachedVersion;
 
   static const int currentSchemaVersion = 1;
 
@@ -80,8 +96,9 @@ class VersionChecker {
   /// Check version from backend and decide if a force update is required
   Future<bool> checkForceUpdateRequired() async {
     try {
+      final activeVer = await getAppVersion();
       final response = await _apiClient.get(
-          '/updates/check?platform=$_platform&current_version=$currentVersion');
+          '/updates/check?platform=$_platform&current_version=$activeVer');
 
       if (response.statusCode != 200) return false;
 
