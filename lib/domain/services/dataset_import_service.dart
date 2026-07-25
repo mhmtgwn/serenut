@@ -601,6 +601,7 @@ class DatasetImportService {
                     'category': category,
                     'vat': vat,
                     'is_active': 1,
+                    'is_synced': 0,
                     'created_at': DateTime.now().toIso8601String(),
                     'updated_at': DateTime.now().toIso8601String(),
                     'image_url': finalImageUrl,
@@ -616,6 +617,7 @@ class DatasetImportService {
 
                 if (strategy.updateExisting) {
                   final updateFields = <String, dynamic>{
+                    'is_synced': 0,
                     'updated_at': DateTime.now().toIso8601String(),
                   };
 

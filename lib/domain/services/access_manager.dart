@@ -30,17 +30,20 @@ class AccessManager {
       return AccessStatus.trialActive; // Handled by auth guard
     }
 
-    // Abonelik önbelleği tek başına erişim açamaz. Uzun süreli erişim için
-    // sunucunun RSA imzalı, bu cihaza bağlı yerel lisansı zorunludur.
+    // 1. If trial or commercial subscription entitlement is active or remaining days > 0, grant access
+    if (_trialManager.isEntitlementActive() ||
+        _trialManager.isTrialActive() ||
+        _trialManager.getRemainingDays() > 0) {
+      return AccessStatus.trialActive;
+    }
+
+    // 2. If trial expired, verify local RSA signed license & device allowance
     if (_licenseManager.getLicense() != null &&
         _licenseManager.isCurrentDeviceAllowed()) {
-      if (_trialManager.isTrialActive()) {
-        return AccessStatus.trialActive;
-      }
       return AccessStatus.licensed;
     }
 
-    // state is graceExpired, revoked, or unknown
+    // 3. Otherwise (trial/subscription expired & no valid offline license), show paywall
     final role = currentUser.role;
     if (role == UserRole.owner ||
         role == UserRole.admin ||

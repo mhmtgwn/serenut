@@ -8,7 +8,9 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/domain/services/pagination_service.dart';
 
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/audit_provider.dart';
+
 
 class ProductsController extends AsyncNotifier<List<ProductEntity>> {
   late IProductRepository _repository;
@@ -89,6 +91,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
   }
@@ -152,6 +155,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
   }
@@ -183,6 +187,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
   }

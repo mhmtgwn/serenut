@@ -28,8 +28,10 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Automatically manage real-time WebSocket connection based on authentication
+    // Automatically manage real-time WebSocket connection and auto-sync topics
+    ref.watch(realtimeAutoSyncProvider);
     ref.listen(isAuthenticatedProvider, (previous, next) {
+
       if (next) {
         ref.read(connectionManagerProvider).connect();
       } else {

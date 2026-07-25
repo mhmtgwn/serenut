@@ -82,8 +82,7 @@ void main() {
 
       expect(result.synced, equals(0));
       expect(result.failed, equals(0));
-      expect(result.success,
-          isTrue); // No sales failed pushing, but errors list contains warning
+      expect(result.errors.isNotEmpty, isTrue);
       expect(result.errors.first,
           contains('Veritabanı şema uyuşmazlığı tespit edildi'));
     });

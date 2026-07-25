@@ -6,6 +6,7 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/domain/services/pagination_service.dart';
 import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 
 final customerSearchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -204,6 +205,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       ref.invalidate(salesCustomersControllerProvider);
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(collectionCustomersControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
     });
   }
 }

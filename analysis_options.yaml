@@ -10,7 +10,8 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
-  # exclude: Bu dizinler artık repoda mevcut değil, ölü konfigürasyon kaldırıldı.
+  exclude:
+    - 'third_party/**'
 
 
 linter:

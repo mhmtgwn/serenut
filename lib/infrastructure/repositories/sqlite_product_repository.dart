@@ -294,9 +294,10 @@ class SqliteProductRepository implements IProductRepository {
             'price': original.price,
             'quantity': newQty,
             'category': original.category,
-            'vat_rate': original.vat ?? 18,
+            'vat': original.vat ?? 18,
             'is_active': 1,
             'is_deleted': 0,
+            'is_synced': 0,
             'created_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
           });
@@ -305,7 +306,7 @@ class SqliteProductRepository implements IProductRepository {
       }
     }
     await _executor.rawUpdate(
-      'UPDATE products SET quantity = quantity - ?, updated_at = ? WHERE id = ?',
+      'UPDATE products SET quantity = quantity - ?, updated_at = ?, is_synced = 0 WHERE id = ?',
       [quantity, DateTime.now().toIso8601String(), productId],
     );
   }
@@ -326,9 +327,10 @@ class SqliteProductRepository implements IProductRepository {
             'price': original.price,
             'quantity': newQty,
             'category': original.category,
-            'vat_rate': original.vat ?? 18,
+            'vat': original.vat ?? 18,
             'is_active': 1,
             'is_deleted': 0,
+            'is_synced': 0,
             'created_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
           });
@@ -337,7 +339,7 @@ class SqliteProductRepository implements IProductRepository {
       }
     }
     await _executor.rawUpdate(
-      'UPDATE products SET quantity = quantity + ?, updated_at = ? WHERE id = ?',
+      'UPDATE products SET quantity = quantity + ?, updated_at = ?, is_synced = 0 WHERE id = ?',
       [quantity, DateTime.now().toIso8601String(), productId],
     );
   }

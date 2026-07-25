@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://serenut.com/schemas/release_manifest.schema.json",
+  "title": "ReleaseManifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "manifestVersion",
+    "releaseId",
+    "version",
+    "channel",
+    "publishedAt",
+    "buildMetadata",
+    "compatibility",
+    "rules",
+    "artifacts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "manifestVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "releaseId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(\\+[0-9]+)?$"
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "beta", "rc"]
+    },
+    "publishedAt": {
+      "type": "string"
+    },
+    "buildMetadata": {
+      "type": "object",
+      "required": ["commitHash", "buildNumber", "buildDate", "signatureAlgorithm"],
+      "properties": {
+        "commitHash": { "type": "string" },
+        "buildNumber": { "type": "integer" },
+        "buildDate": { "type": "string" },
+        "signatureAlgorithm": { "type": "string", "enum": ["RSA-SHA256"] }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["minClientVersion", "minimumUpdaterVersion", "requiredBootstrapper", "migrationRequired", "targetSchemaVersion"],
+      "properties": {
+        "minClientVersion": { "type": "string" },
+        "minimumUpdaterVersion": { "type": "string" },
+        "requiredBootstrapper": { "type": "string" },
+        "requiredPreVersion": { "type": ["string", "null"] },
+        "migrationRequired": { "type": "boolean" },
+        "targetSchemaVersion": { "type": "integer" }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "required": ["isMandatory", "allowRollback", "minFreeDiskMb", "minRamMb", "supportedArchitectures"],
+      "properties": {
+        "isMandatory": { "type": "boolean" },
+        "allowRollback": { "type": "boolean" },
+        "minFreeDiskMb": { "type": "integer", "minimum": 0 },
+        "minRamMb": { "type": "integer", "minimum": 0 },
+        "supportedArchitectures": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type", "filename", "downloadUrl", "sizeBytes", "sha256", "signature"],
+        "properties": {
+          "type": { "type": "string" },
+          "filename": { "type": "string" },
+          "downloadUrl": { "type": "string" },
+          "sizeBytes": { "type": "integer", "minimum": 1 },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "signature": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

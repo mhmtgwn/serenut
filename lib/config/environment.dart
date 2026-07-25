@@ -74,26 +74,75 @@ class EnvironmentConfig {
     }
   }
 
+  static String? _customApiBaseUrl;
+
+  static void setCustomApiBaseUrl(String? url) {
+    if (url != null && url.trim().isNotEmpty) {
+      var clean = url.trim();
+      if (clean.endsWith('/')) {
+        clean = clean.substring(0, clean.length - 1);
+      }
+      if (!clean.endsWith('/api/v1')) {
+        clean = '$clean/api/v1';
+      }
+      _customApiBaseUrl = clean;
+    } else {
+      _customApiBaseUrl = null;
+    }
+  }
+
+  static String? get customApiBaseUrl => _customApiBaseUrl;
+
   /// Resolves the runtime environment configuration.
   /// Reads variables passed via '--dart-define=ENVIRONMENT=prod/test/dev'.
   /// Defaults to dev if not specified.
   static EnvironmentConfig get current {
     const envString = String.fromEnvironment('ENVIRONMENT', defaultValue: '');
+    EnvironmentConfig baseConfig;
     if (envString.isEmpty) {
-      return EnvironmentConfig.fromEnv(
+      baseConfig = EnvironmentConfig.fromEnv(
           kDebugMode ? AppEnvironment.dev : AppEnvironment.prod);
+    } else {
+      switch (envString.toLowerCase()) {
+        case 'prod':
+        case 'production':
+          baseConfig = EnvironmentConfig.fromEnv(AppEnvironment.prod);
+          break;
+        case 'test':
+        case 'staging':
+          baseConfig = EnvironmentConfig.fromEnv(AppEnvironment.test);
+          break;
+        case 'dev':
+        case 'development':
+        default:
+          baseConfig = EnvironmentConfig.fromEnv(AppEnvironment.dev);
+          break;
+      }
     }
-    switch (envString.toLowerCase()) {
-      case 'prod':
-      case 'production':
-        return EnvironmentConfig.fromEnv(AppEnvironment.prod);
-      case 'test':
-      case 'staging':
-        return EnvironmentConfig.fromEnv(AppEnvironment.test);
-      case 'dev':
-      case 'development':
-      default:
-        return EnvironmentConfig.fromEnv(AppEnvironment.dev);
+
+    if (_customApiBaseUrl != null && _customApiBaseUrl!.isNotEmpty) {
+      return EnvironmentConfig(
+        environment: baseConfig.environment,
+        apiBaseUrl: _customApiBaseUrl!,
+        authEndpoint: baseConfig.authEndpoint,
+        syncEndpoint: baseConfig.syncEndpoint,
+        updateEndpoint: baseConfig.updateEndpoint,
+        releaseEndpoint: baseConfig.releaseEndpoint,
+        releaseChannel: baseConfig.releaseChannel,
+        sentryDsn: baseConfig.sentryDsn,
+      );
     }
+    return baseConfig;
+  }
+
+  /// Feature flag controlling migration to Enterprise Release Management Platform v2.
+  /// Defaults to false in production builds, true in dev/test/internal builds unless overridden.
+  bool get useV2UpdatePlatform {
+    const flagDefined = bool.hasEnvironment('USE_V2_UPDATE_PLATFORM');
+    if (flagDefined) {
+      return const bool.fromEnvironment('USE_V2_UPDATE_PLATFORM');
+    }
+    return environment != AppEnvironment.prod;
   }
 }
+

@@ -446,7 +446,7 @@ void main() {
       final result = await syncService.syncPendingSales();
       expect(result.failed, equals(1));
       expect(result.synced, equals(0));
-      expect(result.errors.first, contains('Remote sync failed for sale'));
+      expect(result.errors.first, contains('Push sync failed'));
     });
 
     test('syncPendingSales should abort retrying on permanent 400 Bad Request',
@@ -455,7 +455,8 @@ void main() {
           ApiClient(config: EnvironmentConfig.fromEnv(AppEnvironment.test));
       int requestCount = 0;
       badRequestClient.mockHandler = (request) {
-        if (request.url.path.endsWith('/version/check')) {
+        if (request.url.path.endsWith('/version/check') ||
+            request.url.path.endsWith('/updates/check')) {
           return const ApiResponse(
             statusCode: 200,
             body:
@@ -463,7 +464,7 @@ void main() {
             headers: {},
           );
         }
-        if (request.url.path.endsWith('/sales')) {
+        if (request.url.path.endsWith('/sync/push')) {
           requestCount++;
           return const ApiResponse(
             statusCode: 400,

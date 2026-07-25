@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "manifestVersion": "1.0",
+  "releaseId": "rel-2026.07.25.4",
+  "version": "1.2.0+22",
+  "channel": "stable",
+  "publishedAt": "2026-07-25T18:20:00Z",
+  "buildMetadata": {
+    "commitHash": "abc1234f567890",
+    "buildNumber": 22,
+    "buildDate": "2026-07-25T18:00:00Z",
+    "signatureAlgorithm": "RSA-SHA256"
+  },
+  "compatibility": {
+    "minClientVersion": "1.0.0+1",
+    "minimumUpdaterVersion": "1.0.0",
+    "requiredBootstrapper": "1",
+    "requiredPreVersion": "1.1.0+0",
+    "migrationRequired": true,
+    "targetSchemaVersion": 4
+  },
+  "rules": {
+    "isMandatory": false,
+    "allowRollback": true,
+    "minFreeDiskMb": 300,
+    "minRamMb": 2048,
+    "supportedArchitectures": ["x64"]
+  },
+  "artifacts": [
+    {
+      "type": "installer_windows",
+      "filename": "SerenutOSSetup-1.2.0.exe",
+      "downloadUrl": "/api/v1/releases/artifacts/SerenutOSSetup-1.2.0.exe",
+      "sizeBytes": 48120890,
+      "sha256": "4dd4c7b462651ee66f2529bb561a5b17417d32095220cf1908ad94362407503c",
+      "signature": "MEUCIQDx7TESTVECTORBASE64SIG"
+    }
+  ]
+}

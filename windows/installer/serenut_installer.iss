@@ -5,7 +5,7 @@
 [Setup]
 AppId={{5E22B005-9B28-4DE3-BB10-388C838F5F2B}
 AppName=Serenut OS
-AppVersion=1.1.3
+AppVersion=1.1.9+19
 AppPublisher=Serenut OS Software Technologies A.Ş.
 AppPublisherURL=https://serenut.com/
 AppSupportURL=https://serenut.com/faq.html
@@ -21,6 +21,9 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
+AppMutex=SerenutOS_App_Mutex
+CloseApplications=yes
+CloseApplicationsFilter=*serenutos.exe*
 
 [Languages]
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"

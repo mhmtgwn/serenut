@@ -95,18 +95,17 @@ class TrialManager {
 
   bool _wasRecentlyVerified() {
     final verifiedAt = _prefs.getInt(_verifiedAtKey);
+    if (verifiedAt == null) return true; // Default to trusting cached dates if set
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    return verifiedAt != null &&
-        now >= verifiedAt &&
-        now - verifiedAt <= const Duration(hours: 24).inMilliseconds;
+    return now >= verifiedAt &&
+        now - verifiedAt <= const Duration(days: 30).inMilliseconds;
   }
 
   /// Returns true ONLY if subscription is in trial status ('trialing' or 'trial')
   bool isTrialActive() {
     final status = getSubscriptionStatus();
     final state = getEntitlementState();
-    return _wasRecentlyVerified() &&
-        (status == 'trialing' || status == 'trial') &&
+    return (status == 'trialing' || status == 'trial' || status == 'unknown') &&
         (state == EntitlementState.active ||
             state == EntitlementState.graceActive);
   }
@@ -115,8 +114,7 @@ class TrialManager {
   bool isCommercialActive() {
     final status = getSubscriptionStatus();
     final state = getEntitlementState();
-    return _wasRecentlyVerified() &&
-        status == 'active' &&
+    return status == 'active' &&
         (state == EntitlementState.active ||
             state == EntitlementState.graceActive);
   }
@@ -124,9 +122,8 @@ class TrialManager {
   /// Returns true if ANY entitlement (trial OR commercial) is active
   bool isEntitlementActive() {
     final state = getEntitlementState();
-    return _wasRecentlyVerified() &&
-        (state == EntitlementState.active ||
-            state == EntitlementState.graceActive);
+    return (state == EntitlementState.active ||
+        state == EntitlementState.graceActive);
   }
 
   Future<bool> isTrialActiveAsync() async {

@@ -4,7 +4,6 @@
 // Updated: 24 Jun 2026
 
 import 'dart:async';
-import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -468,20 +467,31 @@ class OfflineSyncService {
                   conflictAlgorithm: ConflictAlgorithm.replace,
                 );
               } else if (type == 'sale') {
-                // Dependency quarantine check: Parent customer must exist if customer_id provided
+                // Auto-stub parent customer if missing instead of permanently dropping sale
                 final customerId = payload['customer_id']?.toString();
-                bool parentExists = true;
                 if (customerId != null && customerId.isNotEmpty) {
                   final custCheck = await txn.query('customers',
                       where: 'id = ?', whereArgs: [customerId], limit: 1);
                   if (custCheck.isEmpty) {
-                    parentExists = false;
+                    await txn.insert(
+                      'customers',
+                      {
+                        'id': customerId,
+                        'name': 'Eşitleniyor... (Müşteri)',
+                        'normalized_name': 'esitleniyor... (musteri)',
+                        'email': '',
+                        'normalized_email': '',
+                        'phone': '',
+                        'balance': 0.0,
+                        'is_deleted': 0,
+                        'is_synced': 1,
+                        'created_at': DateTime.now().toIso8601String(),
+                        'updated_at': DateTime.now().toIso8601String(),
+                      },
+                      conflictAlgorithm: ConflictAlgorithm.ignore,
+                    );
+                    affectedCustomerIds.add(customerId);
                   }
-                }
-                if (!parentExists) {
-                  errors.add(
-                      'Parent customer $customerId not found for sale $id. Sale quarantined.');
-                  continue;
                 }
 
                 // Immutable Transaction Logic (LWW uygulanmaz)
@@ -536,19 +546,34 @@ class OfflineSyncService {
                       final prodId = (item['product_id'] ?? item['productId'])?.toString();
                       if (prodId == null || prodId.isEmpty) continue;
 
-                      final prodCheck = await txn.query('products',
-                          where: 'id = ?', whereArgs: [prodId], limit: 1);
-                      if (prodCheck.isEmpty) {
-                        errors.add(
-                            'Product $prodId not found for sale item. Item skipped.');
-                        continue;
-                      }
-
                       final qty = _toDouble(item['quantity'] ?? item['qty']);
                       final price = _toDouble(item['unit_price'] ?? item['unitPrice']);
                       final subtotal = item['subtotal'] != null || item['total_price'] != null
                           ? _toDouble(item['subtotal'] ?? item['total_price'])
                           : qty * price;
+
+                      final prodCheck = await txn.query('products',
+                          where: 'id = ?', whereArgs: [prodId], limit: 1);
+                      if (prodCheck.isEmpty) {
+                        await txn.insert(
+                          'products',
+                          {
+                            'id': prodId,
+                            'name': 'Eşitleniyor... (Ürün)',
+                            'description': '',
+                            'price': price,
+                            'quantity': 0,
+                            'category': 'Genel',
+                            'vat': 0,
+                            'is_active': 1,
+                            'is_deleted': 0,
+                            'is_synced': 1,
+                            'created_at': DateTime.now().toIso8601String(),
+                            'updated_at': DateTime.now().toIso8601String(),
+                          },
+                          conflictAlgorithm: ConflictAlgorithm.ignore,
+                        );
+                      }
 
                       await txn.insert(
                         'sale_items',
@@ -568,13 +593,29 @@ class OfflineSyncService {
                 }
               } else if (type == 'order') {
                 final customerId = payload['customer_id']?.toString();
-                if (customerId == null || customerId.isEmpty) continue;
-                final custCheck = await txn.query('customers',
-                    where: 'id = ?', whereArgs: [customerId], limit: 1);
-                if (custCheck.isEmpty) {
-                  errors.add(
-                      'Parent customer $customerId not found for order $id. Order quarantined.');
-                  continue;
+                if (customerId != null && customerId.isNotEmpty) {
+                  final custCheck = await txn.query('customers',
+                      where: 'id = ?', whereArgs: [customerId], limit: 1);
+                  if (custCheck.isEmpty) {
+                    await txn.insert(
+                      'customers',
+                      {
+                        'id': customerId,
+                        'name': 'Eşitleniyor... (Müşteri)',
+                        'normalized_name': 'esitleniyor... (musteri)',
+                        'email': '',
+                        'normalized_email': '',
+                        'phone': '',
+                        'balance': 0.0,
+                        'is_deleted': 0,
+                        'is_synced': 1,
+                        'created_at': DateTime.now().toIso8601String(),
+                        'updated_at': DateTime.now().toIso8601String(),
+                      },
+                      conflictAlgorithm: ConflictAlgorithm.ignore,
+                    );
+                    affectedCustomerIds.add(customerId);
+                  }
                 }
                 await txn.insert(
                   'orders',
@@ -615,21 +656,28 @@ class OfflineSyncService {
                 }
               } else if (type == 'financial_transaction') {
                 final customerId = payload['customer_id'] as String?;
-                bool parentExists = true;
                 if (customerId != null && customerId.isNotEmpty) {
                   final custCheck = await txn.query('customers',
                       where: 'id = ?', whereArgs: [customerId], limit: 1);
                   if (custCheck.isEmpty) {
-                    parentExists = false;
+                    await txn.insert(
+                      'customers',
+                      {
+                        'id': customerId,
+                        'name': 'Eşitleniyor... (Müşteri)',
+                        'normalized_name': 'esitleniyor... (musteri)',
+                        'email': '',
+                        'normalized_email': '',
+                        'phone': '',
+                        'balance': 0.0,
+                        'is_deleted': 0,
+                        'is_synced': 1,
+                        'created_at': DateTime.now().toIso8601String(),
+                        'updated_at': DateTime.now().toIso8601String(),
+                      },
+                      conflictAlgorithm: ConflictAlgorithm.ignore,
+                    );
                   }
-                }
-                if (!parentExists) {
-                  errors.add(
-                      'Parent customer $customerId not found for transaction ${payload['id']}. Transaction quarantined.');
-                  continue;
-                }
-
-                if (customerId != null && customerId.isNotEmpty) {
                   affectedCustomerIds.add(customerId);
                 }
 
@@ -762,8 +810,21 @@ class OfflineSyncService {
             final isMatch =
                 await hashService.verifyChecksumMatch(serverChecksum);
             if (!isMatch) {
-              errors.add(
-                  'Veri tutarlılık hatası: Sunucu ve istemci checksum değerleri eşleşmiyor.');
+              final resyncKey = '${timestampKey}_resync_attempts';
+              final attempts = sharedPrefs.getInt(resyncKey) ?? 0;
+              if (attempts < 1) {
+                await sharedPrefs.setInt(resyncKey, attempts + 1);
+                await sharedPrefs.setInt(timestampKey, 0);
+                await sharedPrefs.setString(typeKey, '');
+                await sharedPrefs.setString(idKey, '');
+                debugPrint('[OfflineSync] 🔄 Checksum mismatch! Resetting cursor for auto-recovery resync...');
+                errors.add('Veri tutarlılık uyuşmazlığı tespit edildi. Otomatik tam senkronizasyon başlatıldı.');
+              } else {
+                await sharedPrefs.setInt(resyncKey, 0);
+                errors.add('Veri tutarlılık hatası: Sunucu ve istemci checksum değerleri eşleşmiyor.');
+              }
+            } else {
+              await sharedPrefs.setInt('${timestampKey}_resync_attempts', 0);
             }
           }
         }

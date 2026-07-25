@@ -1,7 +1,10 @@
 // lib/providers/realtime/realtime_provider.dart
 // Riverpod DI and Stream Providers for Realtime event channels
 
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/providers/sync_provider.dart';
+
 import 'package:serenutos/domain/realtime/realtime_event.dart';
 import 'package:serenutos/domain/realtime/realtime_status.dart';
 import 'package:serenutos/domain/realtime/event_dispatcher.dart';
@@ -101,3 +104,31 @@ final realtimeNotificationsStreamProvider =
 
   return repo.subscribeToTopic(user.companyId, 'notifications');
 });
+
+// Auto-sync listener: Subscribes to company topics and triggers immediate sync pull on incoming events
+final realtimeAutoSyncProvider = Provider<void>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return;
+
+  final repo = ref.watch(realtimeRepositoryProvider);
+  ref.read(connectionManagerProvider).connect();
+
+  final subOrders = repo.subscribeToTopic(user.companyId, 'orders').listen((_) {
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
+  });
+
+  final subInventory = repo.subscribeToTopic(user.companyId, 'inventory').listen((_) {
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
+  });
+
+  final subCustomers = repo.subscribeToTopic(user.companyId, 'customers').listen((_) {
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
+  });
+
+  ref.onDispose(() {
+    subOrders.cancel();
+    subInventory.cancel();
+    subCustomers.cancel();
+  });
+});
+

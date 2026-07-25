@@ -4,60 +4,71 @@ document.addEventListener('DOMContentLoaded', async () => {
   const root = document.getElementById('downloads-container');
   if (!root) return;
 
-  function renderFallback() {
+  function renderCards(windows, android) {
+    const winVer  = windows ? `v${esc(windows.version_code)}` : '';
+    const apkVer  = android ? `v${esc(android.version_code)}` : '';
+    const winNote = windows ? esc(windows.release_notes  || 'Masaüstü kurulum paketi.') : 'Masaüstü kurulum paketi.';
+    const apkNote = android ? esc(android.release_notes  || 'Android uygulama paketi.') : 'Android uygulama paketi.';
     root.innerHTML = `
       <article class="feature-card">
         <div class="eyebrow">Windows</div>
-        <h3>Serenut OS v1.1.9</h3>
-        <p>Masaüstü kurulum paketi. WebSocket kararlılığı, otomatik yeniden bağlanma ve telemetri kayıtları.</p>
-        <a class="btn btn-primary" href="/api/v1/updates/download/windows/latest" download>Paketi İndir</a>
+        <h3>Serenut OS ${winVer}</h3>
+        <p>${winNote}</p>
+        <a class="btn btn-primary" href="/api/v1/updates/download/windows/latest" download>Paketi İndir (.exe)</a>
       </article>
       <article class="feature-card">
         <div class="eyebrow">Android APK</div>
-        <h3>Serenut OS v1.1.9</h3>
-        <p>Mobil ve kiosk cihazlar için Android uygulama paketi. Otomatik senkronizasyon ve çevrimdışı mod desteği.</p>
-        <a class="btn btn-primary" href="/api/v1/updates/download/android/latest" download>Paketi İndir</a>
+        <h3>Serenut OS ${apkVer}</h3>
+        <p>${apkNote}</p>
+        <a class="btn btn-primary" href="/api/v1/updates/download/android/latest" download>Paketi İndir (.apk)</a>
+      </article>
+      <article class="feature-card">
+        <div class="eyebrow">Aktivasyon</div>
+        <h3>Aktivasyon Akışı</h3>
+        <p>Kurulum sonrası lisans, cihaz ve tenant bağlantısı uygulama içindeki cihaz/lisans modülünden yapılır.</p>
+        <a class="btn btn-secondary" href="/app/">Uygulamaya Gir</a>
       </article>
     `;
   }
 
+  function renderFallback() {
+    renderCards(null, null);
+  }
+
+  // Primary: /api/v1/releases/history (full release metadata)
   try {
     const res = await fetch('/api/v1/releases/history');
-    if (!res.ok) {
-      renderFallback();
-      return;
+    if (res.ok) {
+      const all = await res.json();
+      if (Array.isArray(all) && all.length > 0) {
+        const seen = new Set();
+        const rows = all.filter(r => {
+          const p = String(r.platform).toLowerCase();
+          if (seen.has(p)) return false;
+          seen.add(p);
+          return true;
+        });
+        const windows = rows.find(r => r.platform === 'windows') || null;
+        const android = rows.find(r => r.platform === 'android') || null;
+        renderCards(windows, android);
+        return;
+      }
     }
-    const all = await res.json();
-    if (!Array.isArray(all) || all.length === 0) {
-      renderFallback();
-      return;
+  } catch (_) {}
+
+  // Secondary: /api/v1/updates/latest-metadata (lighter endpoint)
+  try {
+    const res2 = await fetch('/api/v1/updates/latest-metadata');
+    if (res2.ok) {
+      const meta = await res2.json();
+      if (Array.isArray(meta) && meta.length > 0) {
+        const windows = meta.find(r => r.platform === 'windows') || null;
+        const android = meta.find(r => r.platform === 'android') || null;
+        renderCards(windows, android);
+        return;
+      }
     }
+  } catch (_) {}
 
-    const seen = new Set();
-    const rows = all.filter(r => {
-      const p = String(r.platform).toLowerCase();
-      if (seen.has(p)) return false;
-      seen.add(p);
-      return true;
-    });
-
-    root.innerHTML = rows.map(r => {
-      const platformKey = String(r.platform).toLowerCase();
-      const platformLabel = platformKey === 'android' ? 'Android APK' : 'Windows';
-      const downloadUrl = `/api/v1/updates/download/${encodeURIComponent(platformKey)}/latest`;
-      const isAvailable = r.is_available !== false; // Default to true if not explicitly false
-
-      return `
-        <article class="feature-card">
-          <div class="eyebrow">${esc(platformLabel)}</div>
-          <h3>Serenut OS ${esc(r.version_code)}</h3>
-          <p>${esc(r.release_notes || 'Kararlılık ve performans güncellemeleri.')}</p>
-          <a class="btn btn-primary" href="${downloadUrl}" download>Paketi İndir</a>
-        </article>
-      `;
-    }).join('');
-  } catch (_) {
-    renderFallback();
-  }
+  renderFallback();
 });
-

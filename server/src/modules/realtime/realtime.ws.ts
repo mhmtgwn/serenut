@@ -236,10 +236,16 @@ export function initRealtimeWebSocket(server: Server) {
     }, 30000);
 
     ws.on('message', async (data: string) => {
+      isAlive = true;
       try {
         const rawMessage = data.toString();
         const frame = JSON.parse(rawMessage);
         const { action, topic, correlationId } = frame;
+
+        if (action === 'ping') {
+          ws.send(JSON.stringify({ action: 'pong' }));
+          return;
+        }
 
         if (action === 'subscribe') {
           if (!topic) {
