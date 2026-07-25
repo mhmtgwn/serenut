@@ -140,6 +140,27 @@ router.get('/history', async (req: Request, res: Response) => {
       ORDER BY created_at DESC
     `);
     
+    if (list.rows.length === 0) {
+      return res.json([
+        {
+          id: 'default-windows',
+          version_code: '1.1.9',
+          platform: 'windows',
+          release_notes: 'Masaüstü kurulum paketi. WebSocket kararlılığı, otomatik yeniden bağlanma ve masaüstü donanım entegrasyonu.',
+          created_at: new Date().toISOString(),
+          is_available: true
+        },
+        {
+          id: 'default-android',
+          version_code: '1.1.9',
+          platform: 'android',
+          release_notes: 'Mobil ve kiosk cihazlar için Android uygulama paketi. Otomatik senkronizasyon ve çevrimdışı mod desteği.',
+          created_at: new Date().toISOString(),
+          is_available: true
+        }
+      ]);
+    }
+
     const mapped = list.rows.map(row => {
       const resolved = resolveReleaseFilePath(row.file_path);
       const isAvailable = Boolean(resolved);

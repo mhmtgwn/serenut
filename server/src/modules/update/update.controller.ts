@@ -46,18 +46,31 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       LIMIT 1
     `;
     const result = await pgPool.query(query, [platform]);
-    if (result.rows.length === 0 || !result.rows[0].file_path) {
-      return res.status(404).send(`
-        <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
-          <h2 style="color: #ef4444;">Dosya Bulunamadı</h2>
-          <p>${platform} için henüz yüklenmiş bir release dosyası bulunmamaktadır.</p>
-          <a href="/" style="color: #10b981; text-decoration: none; font-weight: bold;">Ana Sayfaya Dön</a>
-        </div>
-      `);
+    let resolvedPath: string | null = null;
+    let versionCode = '1.1.9';
+
+    if (result.rows.length > 0 && result.rows[0].file_path) {
+      const release = result.rows[0];
+      versionCode = release.version_code || versionCode;
+      resolvedPath = resolveReleaseFilePath(release.file_path);
     }
 
-    const release = result.rows[0];
-    const resolvedPath = resolveReleaseFilePath(release.file_path);
+    // Fallback: check static public downloads folder if DB query returns empty or file is missing on server disk
+    if (!resolvedPath) {
+      const staticFileName = platform === 'windows' ? 'SerenutOSSetup.exe' : 'serenut.apk';
+      const staticCandidates = [
+        path.resolve(process.cwd(), 'public/website/downloads', staticFileName),
+        path.resolve(process.cwd(), 'server/public/website/downloads', staticFileName),
+        path.resolve(__dirname, '../../../public/website/downloads', staticFileName),
+        path.resolve(__dirname, '../../public/website/downloads', staticFileName)
+      ];
+      for (const candidate of staticCandidates) {
+        if (fs.existsSync(candidate)) {
+          resolvedPath = candidate;
+          break;
+        }
+      }
+    }
 
     if (!resolvedPath) {
       return res.status(404).send(`
@@ -70,7 +83,7 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
     }
 
     const ext = path.extname(resolvedPath);
-    const filename = `serenut-${release.version_code}-${platform}${ext}`;
+    const filename = `serenut-${versionCode}-${platform}${ext}`;
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     const stream = fs.createReadStream(resolvedPath);
