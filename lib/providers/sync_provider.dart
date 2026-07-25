@@ -185,7 +185,8 @@ class SyncNotifier extends StateNotifier<SyncState>
       // Repository consumers keep their own AsyncNotifier caches. Rebuild them
       // after either a local push or a remote pull so open screens immediately
       // show changes made on another device.
-      if (result.synced > 0) {
+      // FIX: also invalidate when pull-only data arrives (no local push pending)
+      if (result.synced > 0 || result.pulled > 0) {
         _ref.invalidate(productRepositoryProvider);
         _ref.invalidate(customerRepositoryProvider);
         _ref.invalidate(saleRepositoryProvider);

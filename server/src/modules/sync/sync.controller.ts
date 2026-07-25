@@ -247,15 +247,17 @@ router.post('/push', async (req: Request, res: Response) => {
           ]);
         } 
         else if (entity_type === 'product') {
+          // Note: sku column added in migration v49. Safe to include after migration.
           const productQuery = `
-            INSERT INTO products (id, company_id, name, description, price, quantity, category, vat, image_path, status, is_deleted)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO products (id, company_id, name, description, price, quantity, category, sku, vat, image_path, status, is_deleted)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (id) DO UPDATE SET
               name = EXCLUDED.name,
               description = EXCLUDED.description,
               price = EXCLUDED.price,
               quantity = EXCLUDED.quantity,
               category = EXCLUDED.category,
+              sku = EXCLUDED.sku,
               vat = EXCLUDED.vat,
               image_path = EXCLUDED.image_path,
               status = EXCLUDED.status,
@@ -270,8 +272,9 @@ router.post('/push', async (req: Request, res: Response) => {
             payload.price || 0.00,
             payload.quantity || 0,
             payload.category || null,
+            payload.sku || payload.id,
             payload.vat || 0,
-            payload.image_path || null,
+            payload.image_url || payload.image_path || null,
             payload.status || 'active',
             payload.is_deleted || false
           ]);
