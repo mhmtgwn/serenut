@@ -26,13 +26,13 @@ function sign(hash) {
   return s.sign(key, 'base64');
 }
 
-const apkHash = '571b529ef7c5453c7f0aa6b8c2b6919e21abe4ab2d4a22c64ba6bd1c34d84841';
-const apkSig = sign(apkHash);
+const apkHash = '8c3a46c6e456f0d8b1e217ae61d7a4c4c6d892ca5407135ce87aa2d184a52953';
+const winHash = '1cbf1356c9d86e1254c6ab50df9fded1e68db3c3211ac65b1c3deffebb166a24';
 
-const winHash = '4dd4c7b462651ee66f2529bb561a5b17417d32095220cf1908ad94362407503c';
+const apkSig = sign(apkHash);
 const winSig = sign(winHash);
 
-console.log('Signatures generated successfully');
+console.log('APK & WIN Signatures generated successfully for 1.1.9+21');
 
 const sql = `
 INSERT INTO app_versions (
@@ -44,7 +44,7 @@ INSERT INTO app_versions (
   'rel-apk-119-21', '1.1.9+21', 'android', 'stable',
   '/api/v1/updates/download/android/latest',
   '/var/www/serenut/server/public/website/downloads/serenut.apk',
-  '${apkHash}', '${apkSig}', 51129114, true, '1.1.8',
+  '${apkHash}', '${apkSig}', 51133388, false, '1.1.8',
   'Serenut OS v1.1.9+21 — Veri eşitleme (ürün, müşteri, satış) veri dönüşüm çökmesi düzeltildi.',
   'active', 100, 'system'
 ),
@@ -52,15 +52,17 @@ INSERT INTO app_versions (
   'rel-win-119-21', '1.1.9+21', 'windows', 'stable',
   '/api/v1/updates/download/windows/latest',
   '/var/www/serenut/server/public/website/downloads/SerenutOSSetup.exe',
-  '${winHash}', '${winSig}', 40435256, true, '1.1.8',
+  '${winHash}', '${winSig}', 16363446, false, '1.1.8',
   'Serenut OS v1.1.9+21 — Veri eşitleme (ürün, müşteri, satış) veri dönüşüm çökmesi düzeltildi.',
   'active', 100, 'system'
-) ON CONFLICT (id) DO UPDATE SET
+)
+ON CONFLICT (id) DO UPDATE SET
   version_code = EXCLUDED.version_code,
   sha256_hash = EXCLUDED.sha256_hash,
   signature = EXCLUDED.signature,
   file_size_bytes = EXCLUDED.file_size_bytes,
   release_notes = EXCLUDED.release_notes,
+  is_mandatory = false,
   updated_at = CURRENT_TIMESTAMP;
 
 SELECT id, version_code, platform, sha256_hash, length(signature) as sig_len, status FROM app_versions WHERE version_code = '1.1.9+21';
