@@ -5,14 +5,28 @@ import path from 'path';
 
 const router = Router();
 
-function compareVersions(a: string, b: string): number {
-  const parts = (value: string) => value.replace(/\+.*/, '').split('.').map(x => Number.parseInt(x, 10) || 0);
-  const left = parts(a); const right = parts(b);
-  for (let i = 0; i < Math.max(left.length, right.length); i++) {
-    const diff = (left[i] || 0) - (right[i] || 0);
-    if (diff !== 0) return diff;
-  }
-  return (Number.parseInt(a.split('+')[1] || '0', 10) || 0) - (Number.parseInt(b.split('+')[1] || '0', 10) || 0);
+function parseVersionString(v: string | null | undefined) {
+  if (!v) return { major: 0, minor: 0, patch: 0, build: 0 };
+  // URL query params convert '+' into space (' '). Normalize space back to '+' before build number.
+  const normalized = v.trim().replace(/\s+(\d+)/, '+$1');
+  const [verPart, buildPart] = normalized.split('+');
+  const nums = (verPart || '').split('.').map(x => Number.parseInt(x, 10) || 0);
+  return {
+    major: nums[0] || 0,
+    minor: nums[1] || 0,
+    patch: nums[2] || 0,
+    build: Number.parseInt(buildPart || '0', 10) || 0
+  };
+}
+
+function compareVersions(aStr: string, bStr: string): number {
+  const a = parseVersionString(aStr);
+  const b = parseVersionString(bStr);
+
+  if (a.major !== b.major) return a.major - b.major;
+  if (a.minor !== b.minor) return a.minor - b.minor;
+  if (a.patch !== b.patch) return a.patch - b.patch;
+  return a.build - b.build;
 }
 
 function resolveReleaseFilePath(filePath: string | null): string | null {
@@ -167,7 +181,7 @@ router.get('/check', async (req: Request, res: Response) => {
 
     return res.json({
       latestVersion: latest.version_code,
-      minRequiredVersion: latest.is_mandatory ? latest.version_code : current_version,
+      minRequiredVersion: (latest.is_mandatory && hasUpdate) ? latest.version_code : current_version,
       isForceUpdate: latest.is_mandatory && hasUpdate,
       downloadUrl: absoluteDownloadUrl,
       sha256_hash: hasUpdate ? latest.sha256_hash : '',
