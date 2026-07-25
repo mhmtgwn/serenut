@@ -16,6 +16,7 @@ RUN npm ci --only=production --legacy-peer-deps
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/db ./db
+COPY --from=builder /app/public ./public
 
 # Harden directory permissions and assign to non-root user
 RUN chown -R node:node /app

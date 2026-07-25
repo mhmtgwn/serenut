@@ -61,6 +61,9 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       const staticCandidates = [
         path.resolve(process.cwd(), 'public/website/downloads', staticFileName),
         path.resolve(process.cwd(), 'server/public/website/downloads', staticFileName),
+        `/var/www/serenut-api/public/website/downloads/${staticFileName}`,
+        `/var/www/serenut/server/public/website/downloads/${staticFileName}`,
+        `/var/www/serenut/public/website/downloads/${staticFileName}`,
         path.resolve(__dirname, '../../../public/website/downloads', staticFileName),
         path.resolve(__dirname, '../../public/website/downloads', staticFileName)
       ];
