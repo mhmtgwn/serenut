@@ -19,8 +19,18 @@ async function main() {
     throw new Error('Usage: publish-release <android|windows> <version> <file>');
   }
 
-  const privateKey = process.env.RELEASE_RSA_PRIVATE_KEY;
-  if (!privateKey) throw new Error('RELEASE_RSA_PRIVATE_KEY is required');
+  const privateKeyValue =
+      process.env.RELEASE_RSA_PRIVATE_KEY || process.env.RSA_PRIVATE_KEY;
+  if (!privateKeyValue) {
+    throw new Error('RELEASE_RSA_PRIVATE_KEY is required');
+  }
+  // dotenv stores multi-line PEM values with literal "\\n" sequences. Node's
+  // crypto API requires real newlines, otherwise OpenSSL cannot decode the key.
+  const privateKey = crypto.createPrivateKey({
+    key: privateKeyValue.replace(/\\\\n/g, '\n'),
+    format: 'pem',
+    type: 'pkcs8',
+  });
   if (!fs.existsSync(incomingPath)) throw new Error(`Release file not found: ${incomingPath}`);
 
   const ext = path.extname(incomingPath).toLowerCase();
