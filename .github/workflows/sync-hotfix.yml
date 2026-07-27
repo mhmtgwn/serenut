@@ -1,0 +1,47 @@
+name: Sync Backend Hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/sync-hotfix.yml'
+
+concurrency:
+  group: sync-backend-production
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --legacy-peer-deps
+        working-directory: server
+      - run: npm run build
+        working-directory: server
+      - name: Deploy sync backend and migrations
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
+          script: |
+            cd /var/www/serenut
+            git fetch origin main
+            git reset --hard origin/main
+            cd server
+            docker compose -f docker-compose.prod.yml --env-file .env.production build backend
+            docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/run-migrations.js
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d backend
+            curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
+            status=$(curl -s -o /dev/null -w '%{http_code}' 'https://api.serenut.com/api/v4/sync/pull?cursor=0')
+            test "$status" = "401"
