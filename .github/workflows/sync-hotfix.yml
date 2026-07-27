@@ -41,6 +41,12 @@ jobs:
             cd server
             docker compose -f docker-compose.prod.yml --env-file .env.production build backend
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/run-migrations.js
+            # A previous failed compose run can leave the stopped production
+            # container behind. Remove only that named container so compose can
+            # create the freshly built backend without a name conflict.
+            if docker container inspect serenut-backend >/dev/null 2>&1; then
+              docker rm -f serenut-backend
+            fi
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d backend
             curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/health
             status=$(curl -s -o /dev/null -w '%{http_code}' 'https://api.serenut.com/api/v4/sync/pull?cursor=0')
