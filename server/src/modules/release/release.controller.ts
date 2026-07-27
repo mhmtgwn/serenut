@@ -758,4 +758,26 @@ router.get('/monitor', authenticateUser, requireRole('sysadmin'), async (req: Au
   }
 });
 
+// ── 8. DELETE A RELEASE RECORD (Sysadmin Only) ──────────────────────────────
+router.delete('/:id', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const existing = await runBypassingRLS('SELECT file_path FROM app_versions WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found', message: 'Sürüm bulunamadı.' });
+    }
+
+    const filePath = existing.rows[0].file_path;
+    if (filePath && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (_) {}
+    }
+
+    await runBypassingRLS('DELETE FROM app_versions WHERE id = $1', [id]);
+    return res.json({ success: true, message: 'Sürüm kaydı silindi.' });
+  } catch (err: any) {
+    console.error('Delete release error:', err);
+    return res.status(500).json({ error: 'server_error', message: err.message || 'Sürüm silinirken hata oluştu.' });
+  }
+});
+
 export default router;
