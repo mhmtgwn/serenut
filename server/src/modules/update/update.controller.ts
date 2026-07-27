@@ -32,15 +32,20 @@ function compareVersions(aStr: string, bStr: string): number {
 function resolveReleaseFilePath(filePath: string | null): string | null {
   if (!filePath) return null;
   if (fs.existsSync(filePath)) return filePath;
-  const p1 = path.resolve(process.cwd(), filePath);
-  if (fs.existsSync(p1)) return p1;
-  const p2 = path.resolve(process.cwd(), 'server', filePath);
-  if (fs.existsSync(p2)) return p2;
   const baseName = path.basename(filePath);
-  const p3 = path.resolve(process.cwd(), 'public/website/downloads', baseName);
-  if (fs.existsSync(p3)) return p3;
-  const p4 = path.resolve(process.cwd(), 'server/public/website/downloads', baseName);
-  if (fs.existsSync(p4)) return p4;
+  const candidates = [
+    filePath,
+    path.resolve('/var/www/serenut-api/releases', baseName),
+    path.resolve('/var/www/serenut/server/releases', baseName),
+    path.resolve(process.cwd(), 'releases', baseName),
+    path.resolve(process.cwd(), filePath),
+    path.resolve(process.cwd(), 'server', filePath),
+    path.resolve(process.cwd(), 'public/website/downloads', baseName),
+    path.resolve(process.cwd(), 'server/public/website/downloads', baseName)
+  ];
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) return candidate;
+  }
   return null;
 }
 

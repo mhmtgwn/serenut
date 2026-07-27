@@ -30,8 +30,11 @@ if not os.path.exists(apk_path) or not os.path.exists(win_path):
 apk_chk, apk_sig, apk_size = get_signature_and_hash(apk_path)
 win_chk, win_sig, win_size = get_signature_and_hash(win_path)
 
-os.system("chmod -R 777 /var/www/serenut/server/releases")
-os.system("chown -R 1000:1000 /var/www/serenut/server/releases")
+os.system("mkdir -p /var/www/serenut-api/releases")
+os.system("cp /var/www/serenut/server/releases/app-release-1.2.0+23.apk /var/www/serenut-api/releases/app-release-1.2.0+23.apk")
+os.system("cp /var/www/serenut/server/releases/SerenutOSSetup-1.2.0+23.exe /var/www/serenut-api/releases/SerenutOSSetup-1.2.0+23.exe")
+os.system("chmod -R 777 /var/www/serenut/server/releases /var/www/serenut-api/releases")
+os.system("chown -R 1000:1000 /var/www/serenut/server/releases /var/www/serenut-api/releases")
 
 def insert_db(id_val, version, platform, channel, path, size, checksum, sig, notes):
     sql = f"""
