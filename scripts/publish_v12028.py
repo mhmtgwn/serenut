@@ -20,8 +20,8 @@ def get_signature_and_hash(filepath):
     signature = res.stdout.strip()
     return checksum, signature, file_size
 
-apk_path = "/var/www/serenut/server/releases/app-release-1.2.0+27.apk"
-win_path = "/var/www/serenut/server/releases/SerenutOSSetup-1.2.0+27.exe"
+apk_path = "/var/www/serenut/server/releases/app-release-1.2.0+28.apk"
+win_path = "/var/www/serenut/server/releases/SerenutOSSetup-1.2.0+28.exe"
 
 if not os.path.exists(apk_path) or not os.path.exists(win_path):
     print("Files not fully uploaded yet")
@@ -31,8 +31,8 @@ apk_chk, apk_sig, apk_size = get_signature_and_hash(apk_path)
 win_chk, win_sig, win_size = get_signature_and_hash(win_path)
 
 os.system("mkdir -p /var/www/serenut-api/releases")
-os.system("cp /var/www/serenut/server/releases/app-release-1.2.0+27.apk /var/www/serenut-api/releases/app-release-1.2.0+27.apk")
-os.system("cp /var/www/serenut/server/releases/SerenutOSSetup-1.2.0+27.exe /var/www/serenut-api/releases/SerenutOSSetup-1.2.0+27.exe")
+os.system("cp /var/www/serenut/server/releases/app-release-1.2.0+28.apk /var/www/serenut-api/releases/app-release-1.2.0+28.apk")
+os.system("cp /var/www/serenut/server/releases/SerenutOSSetup-1.2.0+28.exe /var/www/serenut-api/releases/SerenutOSSetup-1.2.0+28.exe")
 os.system("chmod -R 777 /var/www/serenut/server/releases /var/www/serenut-api/releases")
 os.system("chown -R 1000:1000 /var/www/serenut/server/releases /var/www/serenut-api/releases")
 
@@ -58,6 +58,6 @@ def insert_db(id_val, version, platform, channel, path, size, checksum, sig, not
     res = subprocess.run(cmd, capture_output=True, text=True)
     print(f"DB Result {platform}:", res.stdout, res.stderr)
 
-insert_db("rel-apk-12027", "1.2.0+27", "android", "stable", "/var/www/serenut-api/releases/app-release-1.2.0+27.apk", apk_size, apk_chk, apk_sig, "Serenut Sync v6.0 - Zero-Loss Event Driven Sync Engine")
-insert_db("rel-win-12027", "1.2.0+27", "windows", "stable", "/var/www/serenut-api/releases/SerenutOSSetup-1.2.0+27.exe", win_size, win_chk, win_sig, "Serenut Sync v6.0 - Zero-Loss Event Driven Sync Engine")
-print("ALL_RELEASES_1.2.0+27_PUBLISHED_SUCCESSFULLY")
+insert_db("rel-apk-12028", "1.2.0+28", "android", "stable", "/var/www/serenut-api/releases/app-release-1.2.0+28.apk", apk_size, apk_chk, apk_sig, "Serenut Sync v6.0 - Zero-Loss Event Driven Sync Engine")
+insert_db("rel-win-12028", "1.2.0+28", "windows", "stable", "/var/www/serenut-api/releases/SerenutOSSetup-1.2.0+28.exe", win_size, win_chk, win_sig, "Serenut Sync v6.0 - Zero-Loss Event Driven Sync Engine")
+print("ALL_RELEASES_1.2.0+28_PUBLISHED_SUCCESSFULLY")

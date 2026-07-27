@@ -172,6 +172,31 @@ class DatabaseSchema {
       )
     ''');
 
+    // Sync v4 write-ahead journal and durable pull cursor. These are also
+    // created here (not only in upgrades) so a brand-new local database has
+    // the same crash-safety guarantees as an upgraded installation.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_outbox_v4 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mutation_id TEXT NOT NULL UNIQUE,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        state TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sync_outbox_v4_state ON sync_outbox_v4(state, id)');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_cursor_v4 (
+        key TEXT PRIMARY KEY,
+        cursor INTEGER NOT NULL
+      )
+    ''');
+
     // Create audit logs table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS audit_logs (

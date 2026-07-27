@@ -602,6 +602,22 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 33) {
+          await txn.execute('''CREATE TABLE IF NOT EXISTS sync_outbox_v4 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, mutation_id TEXT NOT NULL UNIQUE,
+            entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, operation TEXT NOT NULL,
+            payload TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL)''');
+          await txn.execute(
+              'CREATE INDEX IF NOT EXISTS idx_sync_outbox_v4_state ON sync_outbox_v4(state, id)');
+          await txn.execute(
+              'CREATE TABLE IF NOT EXISTS sync_cursor_v4 (key TEXT PRIMARY KEY, cursor INTEGER NOT NULL)');
+          await txn.insert('app_migration_history', {
+            'version': 33,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

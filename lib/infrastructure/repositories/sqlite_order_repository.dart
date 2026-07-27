@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 class SqliteOrderRepository implements IOrderRepository {
   final DbGateway _gateway;
@@ -86,31 +87,42 @@ class SqliteOrderRepository implements IOrderRepository {
           ((item['unit_price'] as double? ?? 0.0) *
               ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
     );
-    final rowId = await _executor.insert('orders', {
-      'id': entity.id,
-      'customer_id': entity.customerId,
-      'status': entity.status,
-      'total_amount': totalAmount,
-      'order_date': entity.createdAt.toIso8601String(),
-      'expected_delivery_date': entity.expectedDeliveryDate?.toIso8601String(),
-      'notes': entity.notes,
-      'created_at': entity.createdAt.toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-      'created_by': entity.createdBy,
-      'is_synced': 0,
+    return _gateway.transaction(() async {
+      final payload = {
+        'id': entity.id,
+        'customer_id': entity.customerId,
+        'status': entity.status,
+        'total_amount': totalAmount,
+        'order_date': entity.createdAt.toIso8601String(),
+        'expected_delivery_date':
+            entity.expectedDeliveryDate?.toIso8601String(),
+        'notes': entity.notes,
+        'created_at': entity.createdAt.toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'created_by': entity.createdBy,
+        'is_synced': 0,
+        'items': entity.items,
+      };
+      final rowPayload = Map<String, dynamic>.from(payload)..remove('items');
+      final rowId = await _executor.insert('orders', rowPayload);
+      int index = 0;
+      for (final item in entity.items) {
+        await _executor.insert('order_items', {
+          'id': 'item-${entity.id}-${item['product_id']}-${++index}',
+          'order_id': entity.id,
+          'product_id': item['product_id'] as String,
+          'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
+          'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'order',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return rowId;
     });
-    int index = 0;
-    for (final item in entity.items) {
-      await _executor.insert('order_items', {
-        'id': 'item-${entity.id}-${item['product_id']}-${++index}',
-        'order_id': entity.id,
-        'product_id': item['product_id'] as String,
-        'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
-        'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    }
-    return rowId;
   }
 
   @override
@@ -122,9 +134,8 @@ class SqliteOrderRepository implements IOrderRepository {
           ((item['unit_price'] as double? ?? 0.0) *
               ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
     );
-    await _executor.update(
-      'orders',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         'customer_id': entity.customerId,
         'status': entity.status,
         'total_amount': totalAmount,
@@ -134,42 +145,54 @@ class SqliteOrderRepository implements IOrderRepository {
         'notes': entity.notes,
         'updated_at': DateTime.now().toIso8601String(),
         'is_synced': 0,
-      },
-      where: 'id = ?',
-      whereArgs: [entity.id],
-    );
+        'items': entity.items,
+      };
+      final rowPayload = Map<String, dynamic>.from(payload)..remove('items');
+      await _executor.update('orders', rowPayload,
+          where: 'id = ?', whereArgs: [entity.id]);
 
-    // Re-insert items
-    await _executor
-        .delete('order_items', where: 'order_id = ?', whereArgs: [entity.id]);
-    int index = 0;
-    for (final item in entity.items) {
-      await _executor.insert('order_items', {
-        'id': 'item-${entity.id}-${item['product_id']}-${++index}',
-        'order_id': entity.id,
-        'product_id': item['product_id'] as String,
-        'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
-        'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    }
-    return 1;
+      // Re-insert items
+      await _executor
+          .delete('order_items', where: 'order_id = ?', whereArgs: [entity.id]);
+      int index = 0;
+      for (final item in entity.items) {
+        await _executor.insert('order_items', {
+          'id': 'item-${entity.id}-${item['product_id']}-${++index}',
+          'order_id': entity.id,
+          'product_id': item['product_id'] as String,
+          'quantity': (item['quantity'] as num?)?.toDouble() ?? 0.0,
+          'unit_price': (item['unit_price'] as num?)?.toDouble() ?? 0.0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'order',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return 1;
+    });
   }
 
   @override
   Future<int> delete(dynamic id) async {
     // Soft delete order, keep order_items intact so we can restore!
-    return await _executor.update(
-      'orders',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
         'is_synced': 0,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+      };
+      final result = await _executor
+          .update('orders', payload, where: 'id = ?', whereArgs: [id]);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'order',
+          entityId: id.toString(),
+          operation: 'DELETE',
+          payload: payload);
+      return result;
+    });
   }
 
   @override

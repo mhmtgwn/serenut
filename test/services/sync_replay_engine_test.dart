@@ -99,7 +99,7 @@ void main() {
         const SocketException(
             'Connection timed out (NetworkCutFault simulated)'),
         StackTrace.current,
-        context: 'OfflineSyncService._syncSaleWithRetry',
+        context: 'SyncV4Service.sync',
         correlationId: corrId,
       );
 

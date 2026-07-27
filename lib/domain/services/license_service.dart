@@ -577,7 +577,7 @@ class LicenseService {
   Future<bool> syncLicenseFromServer(ApiClient apiClient) async {
     try {
       final response =
-          await apiClient.send('GET', '/api/v1/sync/bootstrap/license-config');
+          await apiClient.send('GET', '/api/v4/sync/bootstrap/license-config');
       debugPrint(
           '[LicenseSync] GET /sync/bootstrap/license-config → ${response.statusCode}');
       if (response.isSuccess) {

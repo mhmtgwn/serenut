@@ -5,7 +5,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import { pgPool, redisClient } from '../config/database';
+import { pgPool } from '../config/database';
 import { AuthService } from '../modules/auth/auth.service';
 import fs from 'fs';
 import path from 'path';

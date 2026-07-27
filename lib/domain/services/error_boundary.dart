@@ -94,8 +94,8 @@ class ErrorBoundary {
   /// Usage:
   /// ```dart
   /// await ErrorBoundary.run(() async {
-  ///   await syncPendingSales();
-  /// }, context: 'syncPendingSales');
+  ///   await syncService.sync();
+  /// }, context: 'sync_v4');
   /// ```
   static Future<void> run(
     Future<void> Function() body, {

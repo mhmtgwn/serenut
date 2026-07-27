@@ -4,6 +4,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 class SqliteProductRepository implements IProductRepository {
   final DbGateway _gateway;
@@ -149,15 +150,21 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<int> create(ProductEntity product) async {
-    return await _executor.insert(
-      'products',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         ...product.toMap(),
         'is_synced': 0,
         'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-    );
+        'updated_at': DateTime.now().toIso8601String()
+      };
+      final result = await _executor.insert('products', payload);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'product',
+          entityId: product.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return result;
+    });
   }
 
   @override
@@ -180,6 +187,11 @@ class SqliteProductRepository implements IProductRepository {
           where: 'id = ?',
           whereArgs: [oldId],
         );
+        await SyncOutboxV4.enqueue(_executor,
+            entityType: 'product',
+            entityId: product.id,
+            operation: 'UPSERT',
+            payload: {...product.toMap(), 'is_synced': 0});
         await _executor.update(
           'sale_items',
           {'product_id': product.id},
@@ -196,33 +208,43 @@ class SqliteProductRepository implements IProductRepository {
       return 1;
     }
 
-    return await _executor.update(
-      'products',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         ...product.toMap(),
         'is_synced': 0,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [targetId],
-    );
+        'updated_at': DateTime.now().toIso8601String()
+      };
+      final result = await _executor
+          .update('products', payload, where: 'id = ?', whereArgs: [targetId]);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'product',
+          entityId: targetId,
+          operation: 'UPSERT',
+          payload: payload);
+      return result;
+    });
   }
 
   @override
   Future<int> delete(dynamic id) async {
     // Soft delete
-    return await _executor.update(
-      'products',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         'is_active': 0,
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
         'is_synced': 0,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+      };
+      final result = await _executor
+          .update('products', payload, where: 'id = ?', whereArgs: [id]);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'product',
+          entityId: id.toString(),
+          operation: 'DELETE',
+          payload: payload);
+      return result;
+    });
   }
 
   @override
@@ -305,10 +327,21 @@ class SqliteProductRepository implements IProductRepository {
         }
       }
     }
-    await _executor.rawUpdate(
-      'UPDATE products SET quantity = quantity - ?, updated_at = ?, is_synced = 0 WHERE id = ?',
-      [quantity, DateTime.now().toIso8601String(), productId],
-    );
+    await _gateway.transaction(() async {
+      await _executor.rawUpdate(
+        'UPDATE products SET quantity = quantity - ?, updated_at = ?, is_synced = 0 WHERE id = ?',
+        [quantity, DateTime.now().toIso8601String(), productId],
+      );
+      final rows = await _executor.query('products',
+          where: 'id = ?', whereArgs: [productId], limit: 1);
+      if (rows.isNotEmpty) {
+        await SyncOutboxV4.enqueue(_executor,
+            entityType: 'product',
+            entityId: productId,
+            operation: 'UPSERT',
+            payload: Map<String, dynamic>.from(rows.first));
+      }
+    });
   }
 
   @override
@@ -338,10 +371,21 @@ class SqliteProductRepository implements IProductRepository {
         }
       }
     }
-    await _executor.rawUpdate(
-      'UPDATE products SET quantity = quantity + ?, updated_at = ?, is_synced = 0 WHERE id = ?',
-      [quantity, DateTime.now().toIso8601String(), productId],
-    );
+    await _gateway.transaction(() async {
+      await _executor.rawUpdate(
+        'UPDATE products SET quantity = quantity + ?, updated_at = ?, is_synced = 0 WHERE id = ?',
+        [quantity, DateTime.now().toIso8601String(), productId],
+      );
+      final rows = await _executor.query('products',
+          where: 'id = ?', whereArgs: [productId], limit: 1);
+      if (rows.isNotEmpty) {
+        await SyncOutboxV4.enqueue(_executor,
+            entityType: 'product',
+            entityId: productId,
+            operation: 'UPSERT',
+            payload: Map<String, dynamic>.from(rows.first));
+      }
+    });
   }
 
   @override

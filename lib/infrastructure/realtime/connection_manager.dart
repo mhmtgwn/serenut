@@ -213,17 +213,21 @@ class ConnectionManager {
     _reconnectTimer = Timer(delay, () async {
       _reconnectTimer = null;
       try {
-        final refreshed = await authService.refreshToken();
-        if (!refreshed) {
-          _record('ws_refresh_rejected', level: LogLevel.error);
-          // Permanent auth error (invalid/expired refresh token, session revoked, replay attack)
-          // Set status and trigger immediate session expired redirect to login page.
+        String? token = authService.getJwtToken();
+        if (token == null) {
+          final refreshed = await authService.refreshToken();
+          if (refreshed) {
+            token = authService.getJwtToken();
+          }
+        }
+
+        if (token == null) {
+          _record('ws_refresh_rejected', level: LogLevel.warning);
           _setStatus(RealtimeStatus.disconnected);
-          authService.triggerSessionExpired();
+          _scheduleReconnect();
           return;
         }
 
-        // Reset status to disconnected temporarily so connect() isn't filtered out
         if (_status == RealtimeStatus.reconnecting) {
           _status = RealtimeStatus.disconnected;
         }

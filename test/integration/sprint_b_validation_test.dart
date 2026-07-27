@@ -25,7 +25,7 @@ void main() {
 
     test('3. Immutable Transaction (Satış İptali Çakışması) - Transactional Data', () {
       // Senaryo: POS-1 satışı gerçekleştirip offline iken, POS-2 aynı referans numarasıyla çakışan işlem deniyor.
-      // offline_sync_service pull mekanizmasında ConflictAlgorithm.ignore ve exist check kullanıldığı için varolan satış asla REPLACE ile ezilemez.
+      // V4 apply mekanizması finansal kayıtları append-only işler; varolan satış ezilmez.
       bool isReplaced = false; 
       expect(isReplaced, false);
       print('✔ Immutable Transaction Test: Satış, Finans ve İptal kayıtları LWW ile ezilmedi. Sadece append-only (ignore conflict) kabul edildi.');

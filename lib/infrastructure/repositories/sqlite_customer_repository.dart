@@ -4,6 +4,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 class SqliteCustomerRepository implements ICustomerRepository {
   final DbGateway _gateway;
@@ -32,47 +33,66 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   @override
   Future<int> create(CustomerEntity entity) async {
-    return await _executor.insert('customers', {
-      ...entity.toMap(),
-      'is_synced': 0,
-      'normalized_name': entity.name.normalizeTurkish,
-      'normalized_email': entity.email.toLowerCase(),
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
+    return _gateway.transaction(() async {
+      final payload = {
+        ...entity.toMap(),
+        'is_synced': 0,
+        'normalized_name': entity.name.normalizeTurkish,
+        'normalized_email': entity.email.toLowerCase(),
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      final result = await _executor.insert('customers', payload);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'customer',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return result;
     });
   }
 
   @override
   Future<int> update(CustomerEntity entity) async {
-    return await _executor.update(
-      'customers',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         ...entity.toMap(),
         'is_synced': 0,
         'normalized_name': entity.name.normalizeTurkish,
         'normalized_email': entity.email.toLowerCase(),
         'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [entity.id],
-    );
+      };
+      final result = await _executor.update('customers', payload,
+          where: 'id = ?', whereArgs: [entity.id]);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'customer',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return result;
+    });
   }
 
   @override
   Future<int> delete(dynamic id) async {
     if (id == null || id == '') return 0;
-    return await _executor.update(
-      'customers',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         'is_active': 0,
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
         'is_synced': 0,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+      };
+      final result = await _executor
+          .update('customers', payload, where: 'id = ?', whereArgs: [id]);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'customer',
+          entityId: id.toString(),
+          operation: 'DELETE',
+          payload: payload);
+      return result;
+    });
   }
 
   @override

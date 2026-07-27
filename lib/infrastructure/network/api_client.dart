@@ -100,7 +100,13 @@ class ApiClient {
         _config.apiBaseUrl.endsWith('/api/v1')) {
       cleanPath = cleanPath.substring(7);
     }
-    final uri = Uri.parse('${_config.apiBaseUrl}$cleanPath');
+    // Most mobile builds use an /api/v1 base URL. Versioned endpoints outside
+    // that prefix (for example Sync v4) must resolve from the server origin.
+    final hasVersionedBase = RegExp(r'/api/v\d+$').hasMatch(_config.apiBaseUrl);
+    final baseUrl = cleanPath.startsWith('/api/v') && hasVersionedBase
+        ? _config.apiBaseUrl.replaceFirst(RegExp(r'/api/v\d+$'), '')
+        : _config.apiBaseUrl;
+    final uri = Uri.parse('$baseUrl$cleanPath');
     final headers = _buildHeaders(idempotencyKey: resolvedIdempotencyKey);
     final String? bodyString = body != null ? jsonEncode(body) : null;
 
@@ -135,7 +141,9 @@ class ApiClient {
       );
 
       final dateHeader = response.headers['date'] ?? response.headers['Date'];
-      if (dateHeader != null && onDateHeaderReceived != null && apiResponse.isSuccess) {
+      if (dateHeader != null &&
+          onDateHeaderReceived != null &&
+          apiResponse.isSuccess) {
         onDateHeaderReceived!(dateHeader);
       }
 
@@ -166,7 +174,8 @@ class ApiClient {
           );
 
           if (retryApiResponse.isSuccess) {
-            final dateHeader = retryResponse.headers['date'] ?? retryResponse.headers['Date'];
+            final dateHeader =
+                retryResponse.headers['date'] ?? retryResponse.headers['Date'];
             if (dateHeader != null && onDateHeaderReceived != null) {
               onDateHeaderReceived!(dateHeader);
             }

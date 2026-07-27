@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:serenutos/domain/services/offline_sync_service.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_v4_service.dart';
 import 'package:serenutos/domain/services/sync_state_machine.dart';
 import 'package:serenutos/domain/services/sync_trace_service.dart';
 import 'package:serenutos/domain/services/incident_repository.dart';
@@ -19,9 +19,9 @@ import 'package:serenutos/infrastructure/network/api_client.dart';
 
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
@@ -61,7 +61,7 @@ class SyncState {
 class SyncNotifier extends StateNotifier<SyncState>
     with WidgetsBindingObserver {
   final Ref _ref;
-  OfflineSyncService? _syncService;
+  SyncV4Service? _syncService;
 
   /// Active state machine for the current sync session.
   /// Updated on every triggerSync() call with a fresh session.
@@ -76,20 +76,7 @@ class SyncNotifier extends StateNotifier<SyncState>
 
   Future<void> _initAndSync() async {
     try {
-      final saleRepo = await _ref.read(saleRepositoryProvider.future);
-      final transactionRepo =
-          await _ref.read(financialTransactionRepositoryProvider.future);
-      final licenseService = _ref.read(licenseServiceProvider);
-      final trialManager = _ref.read(trialManagerProvider);
-      final currentUser = await _ref.read(authServiceProvider).getCurrentUser();
-      _syncService = OfflineSyncService(
-        saleRepository: saleRepo,
-        transactionRepository: transactionRepo,
-        licenseService: licenseService,
-        trialManager: trialManager,
-        apiClient: _ref.read(apiClientProvider),
-        syncScopeId: currentUser?.companyId,
-      );
+      _syncService = SyncV4Service(_ref.read(apiClientProvider));
       await triggerSync();
       _periodicSyncTimer ??= Timer.periodic(
         const Duration(seconds: 30),
@@ -103,16 +90,9 @@ class SyncNotifier extends StateNotifier<SyncState>
   /// Force a full re-sync from server by clearing the last sync timestamp cursor.
   Future<void> forceFullSync() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final currentUser =
-          await _ref.read(authServiceProvider).getCurrentUser();
-      final scope = currentUser?.companyId?.trim();
-      final timestampKey = scope == null || scope.isEmpty
-          ? 'last_sync_timestamp'
-          : 'last_sync_timestamp_$scope';
-      await prefs.remove(timestampKey);
-      await prefs.remove('${timestampKey}_type');
-      await prefs.remove('${timestampKey}_id');
+      final db = kIsWeb ? null : await DatabaseManager().getDatabase();
+      await db
+          ?.delete('sync_cursor_v4', where: 'key = ?', whereArgs: ['global']);
     } catch (_) {}
 
     state = const SyncState();
@@ -202,7 +182,7 @@ class SyncNotifier extends StateNotifier<SyncState>
       final machine = SyncStateMachine(db: db);
       _machine = machine;
 
-      final result = await service.syncPendingSales(stateMachine: machine);
+      final result = await service.sync();
 
       // Repository consumers keep their own AsyncNotifier caches. Rebuild them
       // after either a local push or a remote pull so open screens immediately
@@ -284,7 +264,6 @@ class SyncNotifier extends StateNotifier<SyncState>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _periodicSyncTimer?.cancel();
-    _syncService?.dispose();
     super.dispose();
   }
 }

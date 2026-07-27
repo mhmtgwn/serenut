@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { pgPool, redisClient } from '../config/database';
-import { runMigrations } from '../migrations';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';

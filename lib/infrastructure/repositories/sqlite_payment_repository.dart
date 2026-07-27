@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 class SqliteSaleRepository implements ISaleRepository {
   final DbGateway _gateway;
@@ -152,35 +153,45 @@ class SqliteSaleRepository implements ISaleRepository {
 
   @override
   Future<int> create(SaleEntity entity) async {
-    await _executor.insert('sales', {
-      'id': entity.id,
-      'customer_id': entity.customerId,
-      'total_amount': entity.totalAmount,
-      'paid_amount': entity.paidAmount,
-      'payment_method': entity.paymentMethod,
-      'status': entity.status,
-      'created_at': entity.createdAt.toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-      'idempotency_key': entity.idempotencyKey,
-      'is_synced': entity.isSynced,
-      'created_by': entity.createdBy,
-      'entitlement_snapshot': entity.entitlementSnapshot,
-    });
+    return _gateway.transaction(() async {
+      final payload = {
+        'id': entity.id,
+        'customer_id': entity.customerId,
+        'total_amount': entity.totalAmount,
+        'paid_amount': entity.paidAmount,
+        'payment_method': entity.paymentMethod,
+        'status': entity.status,
+        'created_at': entity.createdAt.toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'idempotency_key': entity.idempotencyKey,
+        'is_synced': entity.isSynced,
+        'created_by': entity.createdBy,
+        'entitlement_snapshot': entity.entitlementSnapshot,
+        'items': entity.items,
+      };
+      final salePayload = Map<String, dynamic>.from(payload)..remove('items');
+      await _executor.insert('sales', salePayload);
 
-    for (final item in entity.items) {
-      final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-      await _executor.insert('sale_items', {
-        'id': 'item-${entity.id}-${item['product_id']}',
-        'sale_id': entity.id,
-        'product_id': item['product_id'] as String,
-        'quantity': qty,
-        'unit_price': price,
-        'subtotal': qty * price,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    }
-    return 1;
+      for (final item in entity.items) {
+        final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+        final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+        await _executor.insert('sale_items', {
+          'id': 'item-${entity.id}-${item['product_id']}',
+          'sale_id': entity.id,
+          'product_id': item['product_id'] as String,
+          'quantity': qty,
+          'unit_price': price,
+          'subtotal': qty * price,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'sale',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return 1;
+    });
   }
 
   @override
@@ -222,22 +233,32 @@ class SqliteSaleRepository implements ISaleRepository {
           'created_at': DateTime.now().toIso8601String(),
         });
       }
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'sale',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: {...entity.toMap(), 'items': entity.items});
     });
     return 1;
   }
 
   @override
   Future<int> delete(dynamic id) async {
-    return await _executor.update(
-      'sales',
-      {
+    return _gateway.transaction(() async {
+      final payload = {
         'is_deleted': 1,
         'deleted_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+      };
+      final result = await _executor
+          .update('sales', payload, where: 'id = ?', whereArgs: [id]);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'sale',
+          entityId: id.toString(),
+          operation: 'DELETE',
+          payload: payload);
+      return result;
+    });
   }
 
   @override
@@ -405,19 +426,29 @@ class SqliteFinancialTransactionRepository
 
     final txDeviceId = entity.deviceId ?? deviceId ?? 'unknown-device';
 
-    return await _executor.insert('financial_transactions', {
-      'id': entity.id,
-      'type': entity.type,
-      'customer_id': entity.customerId,
-      'amount': entity.amount,
-      'paid_amount': entity.paidAmount,
-      'debt_amount': entity.debtAmount,
-      'reference_id': entity.referenceId,
-      'metadata': entity.metadata != null ? jsonEncode(entity.metadata) : null,
-      'created_at': entity.date.toIso8601String(),
-      'logical_clock': nextClock,
-      'device_id': txDeviceId,
-      'is_synced': 0,
+    return _gateway.transaction(() async {
+      final payload = {
+        'id': entity.id,
+        'type': entity.type,
+        'customer_id': entity.customerId,
+        'amount': entity.amount,
+        'paid_amount': entity.paidAmount,
+        'debt_amount': entity.debtAmount,
+        'reference_id': entity.referenceId,
+        'metadata':
+            entity.metadata != null ? jsonEncode(entity.metadata) : null,
+        'created_at': entity.date.toIso8601String(),
+        'logical_clock': nextClock,
+        'device_id': txDeviceId,
+        'is_synced': 0,
+      };
+      final result = await _executor.insert('financial_transactions', payload);
+      await SyncOutboxV4.enqueue(_executor,
+          entityType: 'financial_transaction',
+          entityId: entity.id,
+          operation: 'UPSERT',
+          payload: payload);
+      return result;
     });
   }
 
