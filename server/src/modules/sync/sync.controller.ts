@@ -234,6 +234,7 @@ router.post('/push', async (req: Request, res: Response) => {
               is_deleted = EXCLUDED.is_deleted,
               updated_at = CURRENT_TIMESTAMP
           `;
+          const custIsDeleted = payload.is_deleted === true || payload.is_deleted === 1 || payload.is_deleted === '1';
           await client.query(customerQuery, [
             payload.id,
             user.company_id,
@@ -243,7 +244,7 @@ router.post('/push', async (req: Request, res: Response) => {
             payload.balance || 0.00,
             payload.credit_limit || 0.00,
             payload.status || 'active',
-            payload.is_deleted || false
+            custIsDeleted
           ]);
         } 
         else if (entity_type === 'product') {
@@ -264,6 +265,8 @@ router.post('/push', async (req: Request, res: Response) => {
               is_deleted = EXCLUDED.is_deleted,
               updated_at = CURRENT_TIMESTAMP
           `;
+          const isDeleted = payload.is_deleted === true || payload.is_deleted === 1 || payload.is_deleted === '1';
+          console.log(`[DEBUG-PRODUCT] Inserting product id=${payload.id} name=${payload.name} is_deleted=${payload.is_deleted}→${isDeleted}`);
           await client.query(productQuery, [
             payload.id,
             user.company_id,
@@ -276,7 +279,7 @@ router.post('/push', async (req: Request, res: Response) => {
             payload.vat || 0,
             payload.image_url || payload.image_path || null,
             payload.status || 'active',
-            payload.is_deleted || false
+            isDeleted
           ]);
         }
         else if (entity_type === 'financial_transaction') {
@@ -294,6 +297,7 @@ router.post('/push', async (req: Request, res: Response) => {
               is_deleted = EXCLUDED.is_deleted,
               updated_at = CURRENT_TIMESTAMP
           `;
+          const transIsDeleted = payload.is_deleted === true || payload.is_deleted === 1 || payload.is_deleted === '1';
           await client.query(transQuery, [
             payload.id,
             user.company_id,
@@ -304,16 +308,23 @@ router.post('/push', async (req: Request, res: Response) => {
             payload.debt_amount || 0.00,
             payload.date ? new Date(payload.date) : new Date(),
             payload.reference_id || null,
-            payload.is_deleted || false
+            transIsDeleted
           ]);
         }
         else if (entity_type === 'order') {
-          const customer = await client.query(
-            'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
-            [payload.customer_id, user.company_id]
-          );
-          if (customer.rows.length === 0) {
-            throw new Error('order_customer_tenant_conflict');
+          if (payload.customer_id) {
+            const customer = await client.query(
+              'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
+              [payload.customer_id, user.company_id]
+            );
+            if (customer.rows.length === 0) {
+              await client.query(
+                `INSERT INTO customers (id, company_id, name, status, created_at, updated_at)
+                 VALUES ($1, $2, $3, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 ON CONFLICT (id) DO NOTHING`,
+                [payload.customer_id, user.company_id, 'Müşteri (Eşitleniyor)']
+              );
+            }
           }
           const orderUpsert = await client.query(
             `INSERT INTO customer_orders
@@ -328,7 +339,7 @@ router.post('/push', async (req: Request, res: Response) => {
                deleted_at=EXCLUDED.deleted_at, deleted_by=EXCLUDED.deleted_by, created_by=EXCLUDED.created_by
              WHERE customer_orders.company_id = EXCLUDED.company_id
              RETURNING id`,
-            [payload.id, user.company_id, payload.customer_id, payload.status || 'created',
+            [payload.id, user.company_id, payload.customer_id || null, payload.status || 'created',
              payload.total_amount || 0, payload.order_date ? new Date(payload.order_date) : null,
              payload.expected_delivery_date ? new Date(payload.expected_delivery_date) : null,
              payload.actual_delivery_date ? new Date(payload.actual_delivery_date) : null,
@@ -342,12 +353,19 @@ router.post('/push', async (req: Request, res: Response) => {
           }
           await client.query('DELETE FROM customer_order_items WHERE order_id = $1', [payload.id]);
           for (const item of Array.isArray(payload.items) ? payload.items : []) {
-            const product = await client.query(
-              'SELECT id FROM products WHERE id = $1 AND company_id = $2',
-              [item.product_id, user.company_id]
-            );
-            if (product.rows.length === 0) {
-              throw new Error('order_product_tenant_conflict');
+            if (item.product_id) {
+              const product = await client.query(
+                'SELECT id FROM products WHERE id = $1 AND company_id = $2',
+                [item.product_id, user.company_id]
+              );
+              if (product.rows.length === 0) {
+                await client.query(
+                  `INSERT INTO products (id, company_id, name, price, quantity, status, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, 0, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                   ON CONFLICT (id) DO NOTHING`,
+                  [item.product_id, user.company_id, 'Ürün (Eşitleniyor)', item.unit_price || 0]
+                );
+              }
             }
             await client.query(
               `INSERT INTO customer_order_items (id, order_id, product_id, quantity, unit_price, created_at, company_id)
@@ -409,7 +427,7 @@ router.post('/push', async (req: Request, res: Response) => {
       } catch (err: any) {
         console.log('[DEBUG] Error checking subscription:', err);
         await client.query('ROLLBACK');
-        console.error(`Error syncing item ${id}:`, err);
+        console.error(`[SYNC_ERROR] Error syncing item ${id} (entity_type=${entity_type}):`, err?.message || err);
         errors.push({ id, error: err.message || 'database_error' });
       }
     }
