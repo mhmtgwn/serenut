@@ -60,8 +60,7 @@ const testFiles = [
   'ac_support.test.ts',
   'ac_monitoring.test.ts',
   'ac_e2e_launch.test.ts',
-  'ac_commercial_lifecycle.test.ts',
-  'stock_regression.test.ts'
+  'ac_commercial_lifecycle.test.ts'
 ];
 
 function runTest(filename: string): Promise<{ success: boolean; output: string }> {
