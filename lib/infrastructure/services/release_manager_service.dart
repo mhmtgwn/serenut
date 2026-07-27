@@ -360,17 +360,20 @@ class ReleaseManagerService {
     } else if (Platform.isWindows) {
       try {
         debugPrint('[ReleaseManager] Launching Windows installer: $path');
-        final appData = Platform.environment['APPDATA'] ?? '';
-        final targetExe = '$appData\\SerenutOS\\serenutos.exe';
+        final currentExe = Platform.resolvedExecutable;
+        final batchFile = File('${file.parent.path}\\serenut_update_runner.bat');
+        final batchContent = '@echo off\r\n'
+            'timeout /t 2 /nobreak >nul\r\n'
+            'start /wait "" "$path" /SILENT /SP- /NOCANCEL\r\n'
+            'if exist "$currentExe" (\r\n'
+            '    start "" "$currentExe"\r\n'
+            ')\r\n'
+            'del "%~f0"\r\n';
 
-        // Spawn a detached background process that waits for current process termination,
-        // runs silent installer without file locking, and then re-launches the application.
-        final cmdArgs = [
-          '/c',
-          'timeout /t 2 /nobreak >nul && "$path" /SILENT /SP- && start "" "$targetExe"'
-        ];
+        await batchFile.writeAsString(batchContent);
 
-        await Process.start('cmd.exe', cmdArgs, mode: ProcessStartMode.detached);
+        await Process.start('cmd.exe', ['/c', batchFile.path],
+            mode: ProcessStartMode.detached);
 
         Future.delayed(const Duration(milliseconds: 150), () {
           exit(0);
