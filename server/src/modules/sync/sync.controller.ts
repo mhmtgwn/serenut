@@ -312,20 +312,24 @@ router.post('/push', async (req: Request, res: Response) => {
           ]);
         }
         else if (entity_type === 'order') {
-          if (payload.customer_id) {
-            const customer = await client.query(
-              'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
-              [payload.customer_id, user.company_id]
-            );
-            if (customer.rows.length === 0) {
-              await client.query(
-                `INSERT INTO customers (id, company_id, name, status, created_at, updated_at)
-                 VALUES ($1, $2, $3, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                 ON CONFLICT (id) DO NOTHING`,
-                [payload.customer_id, user.company_id, 'Müşteri (Eşitleniyor)']
-              );
-            }
+          let targetCustomerId = (payload.customer_id || '').toString().trim();
+          if (!targetCustomerId || targetCustomerId === 'null' || targetCustomerId === 'undefined') {
+            targetCustomerId = `guest_${user.company_id}`;
           }
+
+          const customer = await client.query(
+            'SELECT id FROM customers WHERE id = $1 AND company_id = $2',
+            [targetCustomerId, user.company_id]
+          );
+          if (customer.rows.length === 0) {
+            await client.query(
+              `INSERT INTO customers (id, company_id, name, status, created_at, updated_at)
+               VALUES ($1, $2, $3, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+               ON CONFLICT (id) DO NOTHING`,
+              [targetCustomerId, user.company_id, targetCustomerId.startsWith('guest_') ? 'Genel Müşteri' : 'Müşteri (Eşitleniyor)']
+            );
+          }
+
           const orderUpsert = await client.query(
             `INSERT INTO customer_orders
               (id, company_id, customer_id, status, total_amount, order_date, expected_delivery_date,
@@ -339,7 +343,7 @@ router.post('/push', async (req: Request, res: Response) => {
                deleted_at=EXCLUDED.deleted_at, deleted_by=EXCLUDED.deleted_by, created_by=EXCLUDED.created_by
              WHERE customer_orders.company_id = EXCLUDED.company_id
              RETURNING id`,
-            [payload.id, user.company_id, payload.customer_id || null, payload.status || 'created',
+            [payload.id, user.company_id, targetCustomerId, payload.status || 'created',
              payload.total_amount || 0, payload.order_date ? new Date(payload.order_date) : null,
              payload.expected_delivery_date ? new Date(payload.expected_delivery_date) : null,
              payload.actual_delivery_date ? new Date(payload.actual_delivery_date) : null,
@@ -353,24 +357,27 @@ router.post('/push', async (req: Request, res: Response) => {
           }
           await client.query('DELETE FROM customer_order_items WHERE order_id = $1', [payload.id]);
           for (const item of Array.isArray(payload.items) ? payload.items : []) {
-            if (item.product_id) {
-              const product = await client.query(
-                'SELECT id FROM products WHERE id = $1 AND company_id = $2',
-                [item.product_id, user.company_id]
+            let targetProductId = (item.product_id || '').toString().trim();
+            if (!targetProductId || targetProductId === 'null' || targetProductId === 'undefined') {
+              targetProductId = `genel_urun_${user.company_id}`;
+            }
+
+            const product = await client.query(
+              'SELECT id FROM products WHERE id = $1 AND company_id = $2',
+              [targetProductId, user.company_id]
+            );
+            if (product.rows.length === 0) {
+              await client.query(
+                `INSERT INTO products (id, company_id, name, price, quantity, status, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, 0, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 ON CONFLICT (id) DO NOTHING`,
+                [targetProductId, user.company_id, 'Genel Ürün', item.unit_price || 0]
               );
-              if (product.rows.length === 0) {
-                await client.query(
-                  `INSERT INTO products (id, company_id, name, price, quantity, status, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, 0, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                   ON CONFLICT (id) DO NOTHING`,
-                  [item.product_id, user.company_id, 'Ürün (Eşitleniyor)', item.unit_price || 0]
-                );
-              }
             }
             await client.query(
               `INSERT INTO customer_order_items (id, order_id, product_id, quantity, unit_price, created_at, company_id)
                VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-              [item.id || `item-${payload.id}-${item.product_id}`, payload.id, item.product_id,
+              [item.id || `item-${payload.id}-${targetProductId}`, payload.id, targetProductId,
                item.quantity || 0, item.unit_price || 0,
                item.created_at ? new Date(item.created_at) : new Date(),
                user.company_id]
