@@ -13,24 +13,53 @@ async function sha256(filePath: string): Promise<string> {
   });
 }
 
+function loadReleaseSigningKey(): crypto.KeyObject {
+  const values = [
+    process.env.RELEASE_RSA_PRIVATE_KEY,
+    process.env.RSA_PRIVATE_KEY,
+  ].filter((value): value is string => Boolean(value));
+  let lastError: unknown;
+
+  for (const value of values) {
+    const normalized = value.replace(/\\r?\\n/g, '\n').trim();
+    const candidates = [normalized];
+
+    // Some secret stores persist PEM values as base64. Decode only values that
+    // actually produce a PEM or JWK payload, never arbitrary key material.
+    if (/^[A-Za-z0-9+/=_-]+$/.test(normalized)) {
+      const decoded = Buffer.from(normalized, 'base64').toString('utf8').trim();
+      if (decoded.startsWith('-----BEGIN ') || decoded.startsWith('{')) {
+        candidates.push(decoded);
+      }
+    }
+
+    for (const candidate of candidates) {
+      try {
+        return candidate.startsWith('{')
+            ? crypto.createPrivateKey({ key: JSON.parse(candidate), format: 'jwk' })
+            : crypto.createPrivateKey({ key: candidate, format: 'pem' });
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  if (values.length === 0) {
+    throw new Error('RELEASE_RSA_PRIVATE_KEY or RSA_PRIVATE_KEY is required');
+  }
+  throw new Error(
+      `Release signing key could not be decoded as PEM, base64 PEM, or JWK: ${
+          lastError instanceof Error ? lastError.message : 'unknown error'
+      }`);
+}
+
 async function main() {
   const [platform, versionCode, incomingPath, mandatoryArg] = process.argv.slice(2);
   if (!['android', 'windows'].includes(platform) || !versionCode || !incomingPath) {
     throw new Error('Usage: publish-release <android|windows> <version> <file>');
   }
 
-  const privateKeyValue =
-      process.env.RELEASE_RSA_PRIVATE_KEY || process.env.RSA_PRIVATE_KEY;
-  if (!privateKeyValue) {
-    throw new Error('RELEASE_RSA_PRIVATE_KEY is required');
-  }
-  // dotenv stores multi-line PEM values with literal "\\n" sequences. Node's
-  // crypto API requires real newlines, otherwise OpenSSL cannot decode the key.
-  const privateKey = crypto.createPrivateKey({
-    key: privateKeyValue.replace(/\\\\n/g, '\n'),
-    format: 'pem',
-    type: 'pkcs8',
-  });
+  const privateKey = loadReleaseSigningKey();
   if (!fs.existsSync(incomingPath)) throw new Error(`Release file not found: ${incomingPath}`);
 
   const ext = path.extname(incomingPath).toLowerCase();
