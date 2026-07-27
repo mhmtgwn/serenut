@@ -154,7 +154,9 @@ Future<void> main(List<String> args) async {
 
   // Local Pre-publishing Artifact Checksum Validation
   stdout.writeln('🔍 Performing pre-publishing artifact verification check...');
-  final manifestArtifactSha = manifestMap['artifacts']![0]['sha256'];
+  final manifestArtifacts =
+      manifestMap['artifacts'] as List<Map<String, Object>>;
+  final manifestArtifactSha = manifestArtifacts.single['sha256'] as String;
   if (manifestArtifactSha != artifactSha256) {
     stderr.writeln('❌ Error: Local file checksum does not match manifest checksum!');
     exit(1);
