@@ -36,18 +36,18 @@ os.system("chown -R 1000:1000 /var/www/serenut/server/releases")
 def insert_db(id_val, version, platform, channel, path, size, checksum, sig, notes):
     sql = f"""
     INSERT INTO app_versions (
-      id, version_code, platform, channel, min_required_version,
-      is_mandatory, rollout_percentage, release_notes, file_path,
-      file_size_bytes, sha256_checksum, rsa_signature, status, created_at, updated_at
+      id, version_code, platform, channel, download_url, file_path,
+      sha256_hash, signature, file_size_bytes, is_mandatory, min_required_version,
+      release_notes, status, rollout_percentage, created_at, updated_at
     ) VALUES (
-      '{id_val}', '{version}', '{platform}', '{channel}', '1.0.0',
-      true, 100, '{notes}', '{path}',
-      {size}, '{checksum}', '{sig}', 'active', NOW(), NOW()
+      '{id_val}', '{version}', '{platform}', '{channel}', '/api/v1/updates/download/{platform}/latest', '{path}',
+      '{checksum}', '{sig}', {size}, true, '1.0.0',
+      '{notes}', 'active', 100, NOW(), NOW()
     ) ON CONFLICT (version_code, platform, channel) DO UPDATE SET
       file_path = EXCLUDED.file_path,
       file_size_bytes = EXCLUDED.file_size_bytes,
-      sha256_checksum = EXCLUDED.sha256_checksum,
-      rsa_signature = EXCLUDED.rsa_signature,
+      sha256_hash = EXCLUDED.sha256_hash,
+      signature = EXCLUDED.signature,
       status = 'active',
       updated_at = NOW();
     """
