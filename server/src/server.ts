@@ -65,7 +65,7 @@ import authRouter from './modules/auth/auth.controller';
 import licenseRouter from './modules/license/license.controller';
 import updateRouter from './modules/update/update.controller';
 import syncRouter from './modules/sync/sync.controller';
-import syncV2Router from './modules/sync_v2/routes/sync-v2.routes';
+import syncV4Router from './modules/sync_v4/sync-v4.routes';
 import analyticsRouter from './modules/analytics/analytics.controller';
 import biRouter from './modules/analytics/bi.controller';
 import userRouter from './modules/user/user.controller';
@@ -86,7 +86,6 @@ import supportRouter from './modules/support/support.controller';
 import branchRouter from './modules/branch/branch.controller';
 import orderRouter from './modules/order/order.controller';
 import remoteConfigRouter from './modules/remote-config/remote-config.controller';
-import { SignalBroadcaster } from './modules/sync_v2/ws/signal-broadcaster';
 import logsRouter from './modules/logs/logs.controller';
 import healthRouter from './modules/health/health.controller';
 
@@ -347,8 +346,9 @@ app.use('/api/licenses', licenseLimiter, licenseRouter);
 app.use('/api/v1/updates', updateRouter);
 app.use('/api/v1/releases', releaseRouter);
 app.use('/api/v2/releases', releaseV2Router);
+// Kept during the V4 rollout so installed V1 clients do not lose sync.
 app.use('/api/v1/sync', syncRouter);
-app.use('/api/v2/sync', syncV2Router);
+app.use('/api/v4/sync', syncV4Router);
 app.use('/api/v1/telemetry', telemetryRouter);
 app.use('/api/v1/analytics', biRouter);
 app.use('/api/v1/analytics', analyticsRouter);
@@ -602,7 +602,6 @@ async function bootstrap() {
     await runMigrations(pgPool);
     initAnalyticsWebSocket(server);
     initRealtimeWebSocket(server);
-    SignalBroadcaster.init(server);
 
     // BullMQ Workers
     startNotificationWorker();
