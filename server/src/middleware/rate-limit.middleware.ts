@@ -9,6 +9,7 @@ interface LimiterOptions {
   error: string;
   message: string;
   skip?: (req: Request) => boolean;
+  key?: (req: Request) => string;
 }
 
 // Custom Redis-based rate limiter middleware
@@ -36,7 +37,8 @@ export function createRedisLimiter(options: LimiterOptions) {
     // bucket. Include the concrete route so unrelated auth actions cannot
     // exhaust each other's allowance.
     const route = `${req.baseUrl || ''}${req.path || req.originalUrl}`;
-    const key = `rl:${req.method}:${route}:${ip}`;
+    const identity = options.key?.(req) ?? ip;
+    const key = `rl:${req.method}:${route}:${identity}`;
 
     try {
       const current = await redisClient.incr(key);
@@ -120,9 +122,16 @@ export const passwordResetLimiter = createRedisLimiter({
 // ── SENKRONİZASYON (SYNC) LİMİTER ────────────────────────────────────────────
 export const syncLimiter = createRedisLimiter({
   windowMs: 60 * 1000,
-  max: 100,
+  // Sync is a durable background protocol. Keying by reverse-proxy IP caused
+  // unrelated tenants to share one quota and receive false 429 responses.
+  max: 240,
   error: 'sync_rate_limit_exceeded',
-  message: 'Çok fazla senkronizasyon isteği gönderildi. Lütfen 1 dakika bekleyin.'
+  message: 'Çok fazla senkronizasyon isteği gönderildi. Lütfen 1 dakika bekleyin.',
+  key: (req) => {
+    const companyId = (req as AuthenticatedRequest).user?.company_id;
+    const deviceId = req.header('x-device-id') || 'shared-pull';
+    return `${companyId ?? 'unknown'}:${deviceId}`;
+  },
 });
 
 // ── WEBHOOK LİMİTER ──────────────────────────────────────────────────────────
