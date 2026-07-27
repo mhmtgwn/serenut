@@ -16,48 +16,61 @@ export class SignalBroadcaster {
   private static wss: WebSocketServer;
   private static tenantSockets: Map<string, Set<WebSocket>> = new Map();
 
-  public static init(server: Server) {
-    this.wss = new WebSocketServer({ noServer: true });
+  public static init(server?: Server) {
+    if (!this.wss) {
+      this.wss = new WebSocketServer({ noServer: true });
 
-    // Handle WebSocket HTTP Upgrade for /api/v2/sync/live
-    server.on('upgrade', (request, socket, head) => {
-      const pathname = url.parse(request.url || '').pathname;
-      if (pathname === '/api/v2/sync/live') {
-        const query = url.parse(request.url || '', true).query;
-        const tenantId = query.tenant_id as string;
+      this.wss.on('connection', (ws: WebSocket, request: any, tenantId: string) => {
+        logger.info(`SyncV2 WS: Client connected for tenant ${tenantId}`);
 
-        if (!tenantId) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
+        if (!this.tenantSockets.has(tenantId)) {
+          this.tenantSockets.set(tenantId, new Set());
         }
+        this.tenantSockets.get(tenantId)!.add(ws);
 
-        this.wss.handleUpgrade(request, socket, head, (ws) => {
-          this.wss.emit('connection', ws, request, tenantId);
-        });
-      }
-    });
-
-    this.wss.on('connection', (ws: WebSocket, request: any, tenantId: string) => {
-      logger.info(`SyncV2 WS: Client connected for tenant ${tenantId}`);
-
-      if (!this.tenantSockets.has(tenantId)) {
-        this.tenantSockets.set(tenantId, new Set());
-      }
-      this.tenantSockets.get(tenantId)!.add(ws);
-
-      // Setup Active Ping/Pong Heartbeat
-      (ws as any).isAlive = true;
-      ws.on('pong', () => {
+        // Setup Active Ping/Pong Heartbeat
         (ws as any).isAlive = true;
-      });
+        ws.on('pong', () => {
+          (ws as any).isAlive = true;
+        });
 
-      ws.on('close', () => {
-        this.tenantSockets.get(tenantId)?.delete(ws);
-        logger.info(`SyncV2 WS: Client disconnected for tenant ${tenantId}`);
-      });
+        ws.on('close', () => {
+          this.tenantSockets.get(tenantId)?.delete(ws);
+          logger.info(`SyncV2 WS: Client disconnected for tenant ${tenantId}`);
+        });
 
-      ws.on('error', (err) => {
+        ws.on('error', (err) => {
+          logger.error(`SyncV2 WS: Socket error for tenant ${tenantId}: ${err.message}`);
+          this.tenantSockets.get(tenantId)?.delete(ws);
+        });
+      });
+    }
+
+    if (server) {
+      server.on('upgrade', (request, socket, head) => {
+        const pathname = url.parse(request.url || '').pathname;
+        if (pathname === '/api/v2/sync/live' || pathname === '/sync/live') {
+          this.handleUpgrade(request, socket, head);
+        }
+      });
+    }
+  }
+
+  public static handleUpgrade(request: any, socket: any, head: any) {
+    this.init();
+    const query = url.parse(request.url || '', true).query;
+    const tenantId = (query.tenant_id || query.tenantId) as string;
+
+    if (!tenantId) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    this.wss.handleUpgrade(request, socket, head, (ws) => {
+      this.wss.emit('connection', ws, request, tenantId);
+    });
+  }
         logger.error(`SyncV2 WS Socket error: ${err.message}`);
         this.tenantSockets.get(tenantId)?.delete(ws);
       });

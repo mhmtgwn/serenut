@@ -26,7 +26,8 @@ class RealtimeSignalClient {
     stateMachine.transitionTo(SocketConnectionState.connecting);
 
     try {
-      final uri = Uri.parse('$serverWsUrl/api/v2/sync/live?tenant_id=$tenantId');
+      final base = serverWsUrl.replaceFirst(RegExp(r'/api(/v\d+)?/?$'), '');
+      final uri = Uri.parse('$base/api/v2/sync/live?tenant_id=$tenantId');
       _socket = await WebSocket.connect(uri.toString());
       stateMachine.transitionTo(SocketConnectionState.connected);
 

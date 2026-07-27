@@ -115,9 +115,10 @@ export function initRealtimeWebSocket(server: Server) {
   };
 
   server.on('upgrade', async (request, socket, head) => {
-    const pathname = url.parse(request.url || '').pathname;
+    const rawPath = url.parse(request.url || '').pathname || '';
+    const pathname = rawPath.endsWith('/') && rawPath.length > 1 ? rawPath.slice(0, -1) : rawPath;
 
-    if (pathname === '/api/v1/realtime/live') {
+    if (pathname === '/api/v1/realtime/live' || pathname === '/realtime/live') {
       const query = url.parse(request.url || '', true).query;
       const token = query.token as string;
       const clientReconnects = parseInt((query.reconnectCount as string) || '0', 10);

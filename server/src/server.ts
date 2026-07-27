@@ -86,6 +86,7 @@ import supportRouter from './modules/support/support.controller';
 import branchRouter from './modules/branch/branch.controller';
 import orderRouter from './modules/order/order.controller';
 import remoteConfigRouter from './modules/remote-config/remote-config.controller';
+import { SignalBroadcaster } from './modules/sync_v2/ws/signal-broadcaster';
 import logsRouter from './modules/logs/logs.controller';
 import healthRouter from './modules/health/health.controller';
 
@@ -298,22 +299,8 @@ app.get(['/features', '/features.html'], (req, res) => {
 app.get(['/marketing/features', '/marketing/features.html', '/marketing/platform.html'], (req, res) => {
   res.redirect(301, '/platform.html');
 });
-app.get(['/login', '/login.html'], (req, res) => {
-  res.redirect(301, '/app/');
-});
-app.get(['/marketing/login', '/marketing/login.html'], (req, res) => {
-  res.redirect(301, '/app/');
-});
-app.get(['/signup', '/signup.html', '/register', '/register.html'], (req, res) => {
-  res.redirect(301, '/app/#register');
-});
-app.get('/reset-password', (req, res) => {
-  const token = typeof req.query.token === 'string' ? req.query.token : '';
-  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
-  res.redirect(302, `/app/${qs}`);
-});
-app.get(['/marketing/signup', '/marketing/signup.html', '/marketing/register', '/marketing/register.html'], (req, res) => {
-  res.redirect(301, '/app/#register');
+app.get(['/login', '/login.html', '/signup', '/signup.html', '/register', '/register.html', '/reset-password'], (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public/app/index.html'));
 });
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
@@ -615,6 +602,7 @@ async function bootstrap() {
     await runMigrations(pgPool);
     initAnalyticsWebSocket(server);
     initRealtimeWebSocket(server);
+    SignalBroadcaster.init(server);
 
     // BullMQ Workers
     startNotificationWorker();
