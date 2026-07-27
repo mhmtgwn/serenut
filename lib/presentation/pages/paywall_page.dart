@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/config/environment.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _kPrimary = Color(0xFF10B981); // Emerald Green
@@ -58,6 +59,19 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  /// Derives the web portal billing URL from the configured API base URL.
+  /// e.g. https://api.serenut.com/api/v1 → https://api.serenut.com/app/#billing-center
+  String _portalBillingUrl() {
+    try {
+      final apiBase = EnvironmentConfig.current.apiBaseUrl;
+      final uri = Uri.parse(apiBase);
+      final origin = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+      return '$origin/app/#billing-center';
+    } catch (_) {
+      return 'https://serenut.com/app/#billing-center';
     }
   }
 
@@ -185,16 +199,30 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Web site actions
+                    // Primary: Bank transfer action (Havale/EFT)
                     ElevatedButton.icon(
-                      onPressed: () => _launchWebUrl(
-                          'https://serenut.com/app/#billing-center'),
-                      icon: const Icon(Icons.shopping_bag_rounded),
-                      label: const Text('Lisans Satın Al / Yenile (Web)'),
+                      onPressed: () => _launchWebUrl(_portalBillingUrl()),
+                      icon: const Icon(Icons.account_balance_rounded),
+                      label: const Text('Havale / EFT ile Abone Ol'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
+                        backgroundColor: _kPrimary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14.0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Secondary: Full portal link
+                    OutlinedButton.icon(
+                      onPressed: () => _launchWebUrl(_portalBillingUrl()),
+                      icon: const Icon(Icons.open_in_browser_rounded, size: 18),
+                      label: const Text('Müşteri Portalı (Web)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: const BorderSide(color: Color(0xFF475569)),
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8.0),
                         ),

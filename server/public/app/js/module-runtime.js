@@ -95,7 +95,30 @@ const loaders = {
   },
   'billing-center': async () => {
     const [sub,invoices,plans] = await Promise.all([apiFetch('/billing/subscription'),apiFetch('/portal/invoices'),apiFetch('/billing/plans')]);
-    set(`<div class="metrics-grid">${metric('Mevcut Plan',sub.plan_name||'Plan yok')}${metric('Abonelik',tr(sub.status))}${metric('Geçerlilik',date(sub.current_period_end))}</div><div class="toolbar billing-toolbar"><div><h3 class="content-title">Planlar</h3><p>Deneme süreniz bitince istediğiniz planı seçebilirsiniz.</p></div><div class="billing-toggle" role="radiogroup" aria-label="Ödeme dönemi"><input id="billing-monthly" type="radio" name="billing-period" value="monthly" checked><label for="billing-monthly">Aylık</label><input id="billing-yearly" type="radio" name="billing-period" value="yearly"><label for="billing-yearly">Yıllık</label><span aria-hidden="true"></span></div></div><div class="plan-grid customer-plan-grid">${plans.map(p=>`<article class="module-card"><h3>${esc(p.name)}</h3><strong>${money(p.price,p.currency||'TRY')} / ay</strong><p>${esc(p.description||'')}</p><button class="btn btn-primary buy-plan" data-plan="${esc(p.id)}">Havale / EFT ile Al</button></article>`).join('')}</div><div class="section-heading spaced"><div><h3>Ödeme Geçmişi</h3><p>Oluşturduğunuz ödeme talepleri ve faturalar.</p></div></div>${table([{label:'Fatura',key:'invoice_number'},{label:'Tutar',render:r=>esc(money(r.amount,r.currency||'TRY'))},{label:'Tarih',render:r=>esc(date(r.created_at||r.due_at))},{label:'Durum',render:r=>badge(tr(r.status))}],invoices)}`);
+
+    function planPrice(plan, period) {
+      const base = Number(plan.price || 0);
+      const cur  = plan.currency || 'TRY';
+      if (period === 'yearly') {
+        const yearly = base * 12 * 0.85;
+        return `<span class="plan-price-amount">${money(yearly, cur)}</span> <small class="plan-price-label">/ yıl <span class="plan-price-badge">%15 indirim</span></small>`;
+      }
+      return `<span class="plan-price-amount">${money(base, cur)}</span> <small class="plan-price-label">/ ay</small>`;
+    }
+
+    set(`<div class="metrics-grid">${metric('Mevcut Plan',sub.plan_name||'Plan yok')}${metric('Abonelik',tr(sub.status))}${metric('Geçerlilik',date(sub.current_period_end))}</div><div class="toolbar billing-toolbar"><div><h3 class="content-title">Planlar</h3><p>Deneme süreniz bitince istediğiniz planı seçebilirsiniz.</p></div><div class="billing-toggle" role="radiogroup" aria-label="Ödeme dönemi"><input id="billing-monthly" type="radio" name="billing-period" value="monthly" checked><label for="billing-monthly">Aylık</label><input id="billing-yearly" type="radio" name="billing-period" value="yearly"><label for="billing-yearly">Yıllık</label><span aria-hidden="true"></span></div></div><div class="plan-grid customer-plan-grid">${plans.map(p=>`<article class="module-card plan-card" data-plan-id="${esc(p.id)}" data-plan-price="${esc(String(p.price))}" data-plan-currency="${esc(p.currency||'TRY')}"><h3>${esc(p.name)}</h3><strong class="plan-card-price">${planPrice(p,'monthly')}</strong><p>${esc(p.description||'')}</p><button class="btn btn-primary buy-plan" data-plan="${esc(p.id)}">Havale / EFT ile Al</button></article>`).join('')}</div><div class="section-heading spaced"><div><h3>Ödeme Geçmişi</h3><p>Oluşturduğunuz ödeme talepleri ve faturalar.</p></div></div>${table([{label:'Fatura',key:'invoice_number'},{label:'Tutar',render:r=>esc(money(r.amount,r.currency||'TRY'))},{label:'Tarih',render:r=>esc(date(r.created_at||r.due_at))},{label:'Durum',render:r=>badge(tr(r.status))}],invoices)}`);
+
+    document.querySelectorAll('input[name="billing-period"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const period = document.querySelector('input[name="billing-period"]:checked')?.value || 'monthly';
+        document.querySelectorAll('.plan-card').forEach(card => {
+          const fakePlan = { price: card.dataset.planPrice, currency: card.dataset.planCurrency };
+          const priceEl = card.querySelector('.plan-card-price');
+          if (priceEl) priceEl.innerHTML = planPrice(fakePlan, period);
+        });
+      });
+    });
+
     document.querySelectorAll('.buy-plan').forEach(button => {
       button.onclick = () => beginCheckout(button.dataset.plan);
     });
@@ -139,11 +162,44 @@ const loaders = {
   },
   'platform-releases': async () => {
     const releases=await apiFetch('/releases/list');
-    set(`<h3 class="content-title">Yeni Sürüm Yayınla</h3><form class="inline-form" id="release-upload-form"><input id="release-version" required placeholder="Sürüm (örn. 1.2.0+42)"><select id="release-platform"><option value="android">Android</option><option value="windows">Windows</option></select><select id="release-channel"><option value="stable">Kararlı</option><option value="beta">Beta</option></select><input id="release-min-version" placeholder="Asgari sürüm (isteğe bağlı)"><label><input id="release-mandatory" type="checkbox"> Zorunlu güncelleme</label><input id="release-file" type="file" required><textarea id="release-notes" required placeholder="Sürüm notları"></textarea><button class="btn btn-primary" type="submit">Sürümü İmzala ve Yayınla</button></form><h3 class="content-title">Yayın Geçmişi</h3>${table([{label:'Sürüm',render:r=>`${esc(r.version_code)}<small>${esc(r.platform)} / ${esc(r.channel)}</small>`},{label:'Dağıtım',render:r=>`<input class="release-rollout" data-id="${esc(r.id)}" type="number" min="0" max="100" value="${esc(r.rollout_percentage)}" style="width:5rem"> %`},{label:'İndirme',key:'total_downloads'},{label:'Kurulum',key:'verified_installs'},{label:'Yayın',render:r=>esc(date(r.created_at))},{label:'Durum',render:r=>badge(r.status)},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm save-rollout" data-id="${esc(r.id)}">Kaydet</button> ${r.status!=='yanked'?`<button class="btn btn-secondary btn-sm yank-release" data-id="${esc(r.id)}">Geri Çek</button>`:''}`}],releases)}`);
-    document.getElementById('release-upload-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;const form=new FormData();form.append('version_code',document.getElementById('release-version').value.trim());form.append('platform',document.getElementById('release-platform').value);form.append('channel',document.getElementById('release-channel').value);form.append('min_required_version',document.getElementById('release-min-version').value.trim());form.append('is_mandatory',String(document.getElementById('release-mandatory').checked));form.append('release_notes',document.getElementById('release-notes').value.trim());form.append('file',document.getElementById('release-file').files[0]);b.disabled=true;try{await apiFetch('/releases/upload',{method:'POST',body:form});notice('Sürüm yayınlandı.');await loaders['platform-releases']();}catch(x){notice(x.message)}finally{b.disabled=false}};
+    set(`<h3 class="content-title">Yeni Sürüm Yayınla</h3><form class="inline-form" id="release-upload-form"><input id="release-version" required placeholder="Sürüm (örn. 1.2.0+42)"><select id="release-platform"><option value="android">Android</option><option value="windows">Windows</option></select><select id="release-channel"><option value="stable">Kararlı</option><option value="beta">Beta</option></select><input id="release-min-version" placeholder="Asgari sürüm (isteğe bağlı)"><label><input id="release-mandatory" type="checkbox"> Zorunlu güncelleme</label><input id="release-file" type="file" required><textarea id="release-notes" required placeholder="Sürüm notları"></textarea><button class="btn btn-primary" type="submit" id="btn-release-submit">Sürümü İmzala ve Yayınla</button></form><div id="release-upload-status" class="release-status-box" style="display:none"></div><h3 class="content-title">Yayın Geçmişi</h3>${table([{label:'Sürüm',render:r=>`${esc(r.version_code)}<small>${esc(r.platform)} / ${esc(r.channel)}</small>`},{label:'Dağıtım',render:r=>`<input class="release-rollout" data-id="${esc(r.id)}" type="number" min="0" max="100" value="${esc(r.rollout_percentage)}" style="width:5rem"> %`},{label:'İndirme',key:'total_downloads'},{label:'Kurulum',key:'verified_installs'},{label:'Yayın',render:r=>esc(date(r.created_at))},{label:'Durum',render:r=>badge(r.status)},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm save-rollout" data-id="${esc(r.id)}">Kaydet</button> ${r.status!=='yanked'?`<button class="btn btn-secondary btn-sm yank-release" data-id="${esc(r.id)}">Geri Çek</button>`:''}`}],releases)}`);
+    document.getElementById('release-upload-form').onsubmit=async e=>{
+      e.preventDefault();
+      const b=document.getElementById('btn-release-submit');
+      const statusBox=document.getElementById('release-upload-status');
+      const form=new FormData();
+      form.append('version_code',document.getElementById('release-version').value.trim());
+      form.append('platform',document.getElementById('release-platform').value);
+      form.append('channel',document.getElementById('release-channel').value);
+      form.append('min_required_version',document.getElementById('release-min-version').value.trim());
+      form.append('is_mandatory',String(document.getElementById('release-mandatory').checked));
+      form.append('release_notes',document.getElementById('release-notes').value.trim());
+      form.append('file',document.getElementById('release-file').files[0]);
+      
+      b.disabled=true;
+      b.innerText='Yükleniyor & İmzalanıyor…';
+      if(statusBox){
+        statusBox.style.display='block';
+        statusBox.innerHTML='<div class="attention-strip"><strong>⏳ Yükleniyor:</strong> <span>Dosya sunucuya aktarılıyor ve RSA ile dijital olarak imzalanıyor. Lütfen sayfayı kapatmayın (50MB dosya için 30-90 sn sürebilir)…</span></div>';
+      }
+      try{
+        await apiFetch('/releases/upload',{method:'POST',body:form});
+        notice('✅ Sürüm başarıyla imzalandı ve yayınlandı!');
+        await loaders['platform-releases']();
+      }catch(x){
+        notice('❌ Hata: ' + x.message);
+        if(statusBox){
+          statusBox.innerHTML=`<div class="attention-strip" style="background:#fee2e2;border-color:#fca5a5"><strong style="color:#991b1b">❌ Hata:</strong> <span style="color:#991b1b">${esc(x.message)}</span></div>`;
+        }
+      }finally{
+        b.disabled=false;
+        b.innerText='Sürümü İmzala ve Yayınla';
+      }
+    };
     document.querySelectorAll('.save-rollout').forEach(b=>b.onclick=async()=>{const input=document.querySelector(`.release-rollout[data-id="${CSS.escape(b.dataset.id)}"]`);b.disabled=true;try{await apiFetch(`/releases/${encodeURIComponent(b.dataset.id)}`,{method:'PUT',body:{rollout_percentage:Number(input.value)}});notice('Dağıtım oranı güncellendi.');}catch(x){notice(x.message)}finally{b.disabled=false}});
     document.querySelectorAll('.yank-release').forEach(b=>b.onclick=async()=>{const reason=prompt('Geri çekme nedeni:','Kritik sorun nedeniyle geri çekildi.');if(reason===null)return;b.disabled=true;try{await apiFetch(`/releases/${encodeURIComponent(b.dataset.id)}/yank`,{method:'POST',body:{reason}});await loaders['platform-releases']();}catch(x){notice(x.message);b.disabled=false}});
   },
+
   'platform-health': async () => {
     const [d,incidents]=await Promise.all([apiFetch('/admin/dashboard'),apiFetch('/admin/incidents')]);const s=d.system||{};set(`<div class="metrics-grid">${metric('PostgreSQL',s.database||'—')}${metric('Redis',s.redis||'—')}${metric('CPU',`${s.cpuUsage||0}%`)}${metric('RAM',`${s.ramUsage||0}%`)}${metric('Disk',`${s.diskUsage||0}%`)}</div><h3 class="content-title">Sistem Olayları</h3>${table([{label:'Önem',render:r=>badge(r.severity)},{label:'Başlık',key:'title'},{label:'Şirket',key:'company_name'},{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Durum',render:r=>badge(r.status)}],incidents)}`);
   },
