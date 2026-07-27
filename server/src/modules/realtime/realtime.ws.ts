@@ -189,16 +189,6 @@ export function initRealtimeWebSocket(server: Server) {
       reconnectCount += clientReconnects;
     }
 
-    // Duplicate connection cleanup: terminate any other active socket of the same user
-    const activeConnections = ConnectionRegistry.getAllConnections();
-    for (const [activeWs, activeMeta] of activeConnections.entries()) {
-      if (activeMeta.userId === user.id && activeWs.readyState === WebSocket.OPEN) {
-        logger.info(`WS Client cleanup: closing duplicate active socket for user_id=${user.id}`);
-        activeWs.send(JSON.stringify({ action: 'close', reason: 'duplicate_connection' }));
-        activeWs.terminate();
-      }
-    }
-
     ConnectionRegistry.register(ws, meta);
     logger.info(`WS Client connected: user_id=${user.id}, company_id=${user.company_id}, reconnects=${clientReconnects}`);
 
