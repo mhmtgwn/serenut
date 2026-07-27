@@ -78,7 +78,7 @@ router.post('/push', async (req: Request, res: Response) => {
         errors.push({ id, error: 'missing_fields' });
         continue;
       }
-      if (!['sale', 'customer', 'product', 'financial_transaction'].includes(entity_type)) {
+      if (!['sale', 'customer', 'product', 'order', 'financial_transaction'].includes(entity_type)) {
         errors.push({ id, error: 'unsupported_entity_type' });
         continue;
       }
