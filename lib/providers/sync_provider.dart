@@ -22,6 +22,9 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/presentation/controllers/customers_controller.dart';
 
 // ── Sync Status ───────────────────────────────────────────────────────────────
 enum SyncStatus { idle, syncing, success, error }
@@ -95,6 +98,25 @@ class SyncNotifier extends StateNotifier<SyncState>
     } catch (_) {
       // Silent — sync will be retried on next foreground
     }
+  }
+
+  /// Force a full re-sync from server by clearing the last sync timestamp cursor.
+  Future<void> forceFullSync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentUser =
+          await _ref.read(authServiceProvider).getCurrentUser();
+      final scope = currentUser?.companyId?.trim();
+      final timestampKey = scope == null || scope.isEmpty
+          ? 'last_sync_timestamp'
+          : 'last_sync_timestamp_$scope';
+      await prefs.remove(timestampKey);
+      await prefs.remove('${timestampKey}_type');
+      await prefs.remove('${timestampKey}_id');
+    } catch (_) {}
+
+    state = const SyncState();
+    await triggerSync();
   }
 
   /// Trigger sync manually (e.g., after a sale is created).
@@ -192,6 +214,9 @@ class SyncNotifier extends StateNotifier<SyncState>
         _ref.invalidate(saleRepositoryProvider);
         _ref.invalidate(financialTransactionRepositoryProvider);
         _ref.invalidate(orderRepositoryProvider);
+        _ref.invalidate(ordersControllerProvider);
+        _ref.invalidate(salesControllerProvider);
+        _ref.invalidate(customersControllerProvider);
         _ref.invalidate(allProductsProvider);
         _ref.invalidate(allCustomersProvider);
         _ref.invalidate(allSalesProvider);

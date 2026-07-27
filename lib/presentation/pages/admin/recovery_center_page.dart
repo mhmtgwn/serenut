@@ -10,6 +10,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/domain/models/permission.dart';
 
 class RecoveryCenterPage extends ConsumerStatefulWidget {
@@ -214,6 +215,20 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          IconButton(
+            tooltip: 'Tüm Verileri Buluttan Senkronize Et',
+            icon: const Icon(Icons.cloud_download_rounded, color: Color(0xFF10B981)),
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tüm veriler sunucudan çekiliyor...'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              await ref.read(syncProvider.notifier).forceFullSync();
+              _loadDeletedItems();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: _loadDeletedItems,
