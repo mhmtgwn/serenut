@@ -144,7 +144,8 @@ export async function apiFetch(endpoint, options = {}, retry = true) {
       clearAuthToken();
     }
 
-    const error = new Error(errorData?.message || errorData?.error?.message || `HTTP error! status: ${response.status}`);
+    const errorMsg = errorData?.message || errorData?.error?.message || (typeof errorData?.error === 'string' ? errorData.error : null) || `HTTP error! status: ${response.status}`;
+    const error = new Error(errorMsg);
     error.status = response.status;
     error.data = errorData;
     throw error;

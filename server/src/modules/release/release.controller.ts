@@ -61,18 +61,39 @@ function computeFileSha256(filePath: string): Promise<string> {
 
 // Helper: sign the computed SHA-256 hash using RSA Private Key
 function signReleaseFile(sha256Hash: string): string {
-  const privateKey = process.env.RELEASE_RSA_PRIVATE_KEY;
+  let privateKey = process.env.RELEASE_RSA_PRIVATE_KEY || process.env.RSA_PRIVATE_KEY;
+
   if (!privateKey) {
-    throw new Error('RELEASE_RSA_PRIVATE_KEY is not defined in environment. Digital signature is mandatory for releases.');
+    const possiblePaths = [
+      '/var/www/serenut-api/.rsa-private.pem',
+      '/var/www/serenut/server/.rsa-private.pem',
+      path.join(process.cwd(), '.rsa-private.pem'),
+      path.join(__dirname, '../../../.rsa-private.pem')
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        try {
+          privateKey = fs.readFileSync(p, 'utf8');
+          if (privateKey) break;
+        } catch (_) {}
+      }
+    }
   }
+
+  if (!privateKey) {
+    throw new Error('RELEASE_RSA_PRIVATE_KEY is not defined in environment or key file.');
+  }
+
+  const formattedKey = privateKey.replace(/\\n/g, '\n');
+
   try {
     const sign = crypto.createSign('SHA256');
     sign.update(sha256Hash);
     sign.end();
-    return sign.sign(privateKey, 'base64');
+    return sign.sign(formattedKey, 'base64');
   } catch (err: any) {
     console.error(`🔴 Cryptographic signing failed: ${err.message}`);
-    return '';
+    throw new Error(`Dijital imzalama başarısız: ${err.message}`);
   }
 }
 
@@ -537,7 +558,7 @@ router.post(
         return res.status(409).json({ error: 'duplicate_version', message: 'Bu sürüm kodu bu kanal için zaten mevcut.' });
       }
       console.error('Upload error:', err);
-      return res.status(500).json({ error: 'server_error' });
+      return res.status(500).json({ error: 'server_error', message: err.message || 'Yükleme/imzalama sırasında sunucu hatası oluştu.' });
     }
   }
 );
