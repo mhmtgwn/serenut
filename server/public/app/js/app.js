@@ -93,11 +93,7 @@ function bindEvents() {
   document.getElementById('btn-apply-reset')?.addEventListener('click', applyReset);
   document.getElementById('btn-logout')?.addEventListener('click', () => {
     clearAuthToken();
-    if (document.body.classList.contains('embed-mode')) {
-      showAuth();
-      return;
-    }
-    window.location.replace('/app/');
+    showAuth();
   });
   document.getElementById('btn-home')?.addEventListener('click', () => selectModule('home'));
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
@@ -123,6 +119,13 @@ function getErrorMessage(data, fallback = 'Bir hata oluştu.') {
   return fallback;
 }
 
+function updateUrlPath(path) {
+  if (document.body.classList.contains('embed-mode')) return;
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
+  }
+}
+
 function handleInitialIntent() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('verified') === '1') {
@@ -138,10 +141,18 @@ function handleInitialIntent() {
     return;
   }
 
-  if (window.location.hash.startsWith('#register')) {
+  const pathname = window.location.pathname.toLowerCase();
+  if (pathname.includes('/register') || pathname.includes('/signup') || window.location.hash.startsWith('#register')) {
     openLayer('register');
   } else {
     closeLayers();
+    if (!isAuthenticated() && !document.body.classList.contains('embed-mode')) {
+      if (pathname.includes('/register') || pathname.includes('/signup')) {
+        updateUrlPath('/register');
+      } else {
+        updateUrlPath('/login');
+      }
+    }
   }
 }
 
@@ -149,6 +160,7 @@ function openLayer(type) {
   closeLayers();
   if (type === 'register') {
     registerLayer?.classList.remove('app-hidden');
+    updateUrlPath('/register');
     return;
   }
   const hasResetToken = Boolean(new URLSearchParams(window.location.search).get('token'));
@@ -163,18 +175,26 @@ function openLayer(type) {
 function closeLayers() {
   registerLayer?.classList.add('app-hidden');
   resetLayer?.classList.add('app-hidden');
+  if (!isAuthenticated() && !document.body.classList.contains('embed-mode')) {
+    const pathname = window.location.pathname.toLowerCase();
+    if (!pathname.includes('/login')) {
+      updateUrlPath('/login');
+    }
+  }
 }
 
 function showAuth() {
   authView?.classList.remove('app-hidden');
   shellView?.classList.add('app-hidden');
   closeLayers();
+  updateUrlPath('/login');
 }
 
 function showShell() {
   authView?.classList.add('app-hidden');
   shellView?.classList.remove('app-hidden');
   closeLayers();
+  updateUrlPath('/app');
 }
 
 async function handleLogin() {
