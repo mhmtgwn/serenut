@@ -599,7 +599,6 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     requireAdminAccess(
       context,
       title: 'Ürün Silme Yetkisi',
-      requirePin: true,
       onGranted: (approvedByUserId, approvedByUserName) {
         showDialog(
           context: context,

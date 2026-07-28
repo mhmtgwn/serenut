@@ -30,9 +30,19 @@ class EnvironmentConfig {
   });
 
   String get wsBaseUrl {
-    final wsScheme = apiBaseUrl.startsWith('https') ? 'wss' : 'ws';
-    final rawHostPath = apiBaseUrl.substring(apiBaseUrl.indexOf('://') + 3);
-    return '$wsScheme://$rawHostPath/realtime/live';
+    final apiUri = Uri.parse(apiBaseUrl);
+    final secure = apiUri.scheme == 'https';
+    final apiPath = apiUri.path.endsWith('/')
+        ? apiUri.path.substring(0, apiUri.path.length - 1)
+        : apiUri.path;
+    return Uri(
+      scheme: secure ? 'wss' : 'ws',
+      host: apiUri.host,
+      // web_socket_channel/io_web_socket may otherwise translate an absent
+      // WSS port to HTTPS port 0 on Windows/Android.
+      port: apiUri.hasPort ? apiUri.port : (secure ? 443 : 80),
+      path: '$apiPath/realtime/live',
+    ).toString();
   }
 
   /// Factory configuration mapping based on active environment parameter.
@@ -145,4 +155,3 @@ class EnvironmentConfig {
     return environment != AppEnvironment.prod;
   }
 }
-

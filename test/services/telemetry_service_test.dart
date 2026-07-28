@@ -39,6 +39,7 @@ void main() {
 
   setUp(() async {
     await telemetryService.clearLogs();
+    telemetryService.onOperationalEvent = null;
   });
 
   group('TelemetryService Tests', () {
@@ -83,6 +84,24 @@ void main() {
       await telemetryService.clearLogs();
       events = await telemetryService.getEvents();
       expect(events, isEmpty);
+    });
+
+    test('warning and error events are forwarded to the operational buffer',
+        () async {
+      final forwarded = <TelemetryEvent>[];
+      telemetryService.onOperationalEvent = (event) async {
+        forwarded.add(event);
+      };
+
+      await telemetryService.logStructured(
+          event: 'informational', level: LogLevel.info);
+      await telemetryService.logStructured(
+          event: 'sync_warning', level: LogLevel.warning);
+      await telemetryService.logStructured(
+          event: 'payment_error', level: LogLevel.error);
+
+      expect(forwarded.map((event) => event.event),
+          equals(['sync_warning', 'payment_error']));
     });
   });
 }

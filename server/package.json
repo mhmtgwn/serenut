@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "migrate": "ts-node src/scripts/run-migrations.ts",
+    "create:sysadmin": "ts-node src/scripts/create-sysadmin.ts",
     "test": "ts-node src/test/run_all_ac_tests.ts"
   },
   "dependencies": {

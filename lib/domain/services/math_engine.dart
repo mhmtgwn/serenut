@@ -87,8 +87,8 @@ class MathEngine {
   }
 
   /// Müşteri bakiyesi (SUM_TL) = sum(all transactions)
-  /// Kuralı: müşteri satıştan sonra yapılan ödeme negatif (+), satış borcu pozitif (-)
-  /// Örnek: 100 TL satış (borç) = +100, 50 TL ödeme = -50, net = +50 (müşteri 50 borcu var)
+  /// Kuralı: Veritabanı şeması gereği müşteri borcu negatif (-), yapılan ödeme pozitif (+) kabul edilir.
+  /// Örnek: 100 TL satış (borç) = -100, 50 TL ödeme = +50, net = -50 (müşterinin 50 TL borcu var)
   static double calculateCustomerBalance(List<double> transactions) {
     return transactions.fold(0.0, (sum, txn) => sum + txn);
   }

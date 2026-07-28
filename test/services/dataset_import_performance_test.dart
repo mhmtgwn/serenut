@@ -65,6 +65,7 @@ void main() {
   setUp(() async {
     final db = await dbManager.getDatabase();
     await db.execute('DELETE FROM products');
+    await db.execute('DELETE FROM sync_outbox_v4');
   });
 
   Uint8List createMockZip(List<Map<String, dynamic>> rowsData) {
@@ -188,6 +189,15 @@ void main() {
       expect(prod!.price, equals(25.0));
       expect(prod.quantity, equals(50));
       expect(prod.description, equals('Updated Brand 2'));
+
+      final db = await dbManager.getDatabase();
+      final mutations = await db.query(
+        'sync_outbox_v4',
+        where: 'entity_type = ? AND entity_id = ?',
+        whereArgs: ['product', '8690001112224'],
+      );
+      expect(mutations, hasLength(1));
+      expect(mutations.single['operation'], equals('UPSERT'));
     });
 
     test('DuplicateResolution.merge accumulates stock', () async {

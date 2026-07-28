@@ -107,7 +107,7 @@ class DatabaseSchema {
         unit_price REAL NOT NULL,
         subtotal REAL NOT NULL,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (sale_id) REFERENCES sales(id),
+        FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products(id)
       )
     ''');
@@ -122,7 +122,9 @@ class DatabaseSchema {
         paid_amount REAL NOT NULL DEFAULT 0,
         debt_amount REAL NOT NULL DEFAULT 0,
         reference_id TEXT,
+        description TEXT,
         metadata TEXT,
+        payment_method TEXT,
         created_at TEXT NOT NULL,
         logical_clock INTEGER NOT NULL DEFAULT 0,
         device_id TEXT,
@@ -167,7 +169,7 @@ class DatabaseSchema {
         quantity REAL NOT NULL,
         unit_price REAL NOT NULL,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (order_id) REFERENCES orders(id),
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products(id)
       )
     ''');
@@ -183,6 +185,7 @@ class DatabaseSchema {
         entity_id TEXT NOT NULL,
         operation TEXT NOT NULL,
         payload TEXT NOT NULL,
+        base_revision INTEGER NOT NULL DEFAULT 0,
         state TEXT NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
@@ -194,6 +197,16 @@ class DatabaseSchema {
       CREATE TABLE IF NOT EXISTS sync_cursor_v4 (
         key TEXT PRIMARY KEY,
         cursor INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sync_conflicts_v4 (
+        mutation_id TEXT PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        server_revision INTEGER NOT NULL,
+        detected_at TEXT NOT NULL,
+        resolved_at TEXT
       )
     ''');
 
@@ -254,6 +267,12 @@ class DatabaseSchema {
         'CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_products_active_lookup ON products(is_deleted, is_active, category)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_customers_active_lookup ON customers(is_deleted, is_active)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_sales_active_lookup ON sales(is_deleted, status, created_at)');
 
     // Create financial ledger view
     await db.execute('''

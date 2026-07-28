@@ -1,4 +1,4 @@
-﻿// lib/providers/audit_provider.dart
+// lib/providers/audit_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:serenutos/domain/services/audit_service.dart';
@@ -19,11 +19,17 @@ final auditServiceProvider = FutureProvider<AuditService>((ref) async {
 
   final user = await authService.getCurrentUser();
   final deviceId = licenseService.getDeviceUuid();
+  final telemetryUpload = ref.watch(telemetryUploadServiceProvider);
 
   return AuditService(
     repository: repository,
     currentUserId: user?.id,
     currentUserName: user?.name,
     deviceId: deviceId,
+    remoteBuffer: (event) => telemetryUpload.recordMetric(
+      'audit_event',
+      1,
+      metadata: event.toMap(),
+    ),
   );
 });

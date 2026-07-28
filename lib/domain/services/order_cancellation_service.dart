@@ -91,14 +91,17 @@ class OrderCancellationService {
       for (final item in items) {
         final productId =
             item['product_id'] as String? ?? item['productId'] as String?;
-        final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+        final double rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
         final price = (item['unit_price'] as num?)?.toDouble() ??
             (item['unitPrice'] as num?)?.toDouble() ??
             0.0;
-        if (productId != null && qty > 0) {
+        if (productId != null && rawQty > 0) {
+          final int intQty =
+              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
           restoredItems.add(SaleItemInput(
             productId: productId,
-            quantity: qty.toInt(),
+            quantity: intQty,
+            saleQuantity: rawQty,
             unitPrice: price,
           ));
         }

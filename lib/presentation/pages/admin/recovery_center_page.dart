@@ -76,7 +76,6 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
       context,
       permission: Permission.settingsRecovery,
       title: actionTitle,
-      requirePin: true,
       onGranted: (approvedByUserId, approvedByUserName) {
         if (mounted) {
           action(approvedByUserId, approvedByUserName);
@@ -217,7 +216,8 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         actions: [
           IconButton(
             tooltip: 'Tüm Verileri Buluttan Senkronize Et',
-            icon: const Icon(Icons.cloud_download_rounded, color: Color(0xFF10B981)),
+            icon: const Icon(Icons.cloud_download_rounded,
+                color: Color(0xFF10B981)),
             onPressed: () async {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(

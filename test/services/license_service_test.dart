@@ -40,6 +40,32 @@ String generateLicenseTokenHelper({
   return base64.encode(utf8.encode(json.encode(info.toJson())));
 }
 
+String generateDeviceBoundToken({
+  required String merchantId,
+  required String activationId,
+  required String deviceId,
+  required DateTime expiryDate,
+  int tokenVersion = 1,
+}) {
+  final payloadMap = <String, dynamic>{
+    'activation_id': activationId,
+    'device_id': deviceId,
+    'device_token_version': 1,
+    'expiry_date': expiryDate.toIso8601String(),
+    'features': ['cloud_sync'],
+    'merchant_id': merchantId,
+    'tier': 'basic',
+    'token_version': tokenVersion,
+  };
+  final signature = base64.encode(
+    testLicenseKeys.sign(utf8.encode(json.encode(payloadMap))),
+  );
+  return base64.encode(utf8.encode(json.encode({
+    ...payloadMap,
+    'signature': signature,
+  })));
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -84,6 +110,18 @@ void main() {
 
       final isValid = licenseService.verifyLicenseToken(token);
       expect(isValid, isTrue);
+    });
+
+    test('accepts device-bound server token whose revocation version is 1', () {
+      final uuid = licenseService.getDeviceUuid();
+      final token = generateDeviceBoundToken(
+        merchantId: 'M123',
+        activationId: 'dact-123',
+        deviceId: uuid,
+        expiryDate: DateTime.now().toUtc().add(const Duration(days: 30)),
+      );
+
+      expect(licenseService.verifyLicenseToken(token), isTrue);
     });
 
     test('verifyLicenseToken fails on device UUID mismatch', () {

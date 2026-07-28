@@ -30,7 +30,17 @@ const maskFormat = winston.format((info) => {
   if (typeof info.message === 'string') {
     info.message = info.message.replace(/(password|cvv|pan|client_secret|pin|secret)=([^&\s]+)/gi, '$1=***MASKED***');
   }
-  return maskSensitiveData(info) as winston.Logform.TransformableInfo;
+  // Mutate string-keyed metadata in place. Returning a cloned object drops
+  // Winston's Symbol.for('level') / Symbol.for('message') fields, which makes
+  // file transports silently discard records while console output may remain.
+  for (const key of Object.keys(info)) {
+    if (key === 'message') continue;
+    const value = info[key];
+    info[key] = maskFields.has(key.toLowerCase())
+      ? '***MASKED***'
+      : maskSensitiveData(value);
+  }
+  return info;
 })();
 
 const logFormat = winston.format.combine(

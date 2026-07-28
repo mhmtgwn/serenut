@@ -33,7 +33,6 @@ class SmsSettingsSheet extends ConsumerStatefulWidget {
 class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
   final _formKey = GlobalKey<FormState>();
   late List<Map<String, dynamic>> listTemplates;
-  late final TextEditingController apiKeyCtrl;
   late final TextEditingController minAmountCtrl;
   late final TextEditingController ageDaysCtrl;
   late final TextEditingController limitCtrl;
@@ -52,7 +51,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
   void initState() {
     super.initState();
     listTemplates = _parseFlexibleSmsTemplates(widget.settings.smsTemplate);
-    apiKeyCtrl = TextEditingController(text: widget.settings.smsApiKey ?? '');
     smsEnabled = widget.settings.smsEnabled;
     selectedProvider = 'sim';
     autoDebtReminderEnabled = widget.settings.smsAutoDebtReminderEnabled;
@@ -76,7 +74,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
 
   @override
   void dispose() {
-    apiKeyCtrl.dispose();
     minAmountCtrl.dispose();
     ageDaysCtrl.dispose();
     limitCtrl.dispose();
@@ -1176,14 +1173,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                     ),
                     const SizedBox(height: AppSpacing.md),
                   ],
-                ] else ...[
-                  // API Şifre alanı (Twilio/Netgsm)
-                  _buildFormTextField(
-                    controller: apiKeyCtrl,
-                    label: 'API Anahtarı / Şifre',
-                    icon: Icons.key_rounded,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
                 ],
 
                 if (kDebugMode) ...[

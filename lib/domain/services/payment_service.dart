@@ -45,6 +45,12 @@ class PaymentService {
     required String paymentMethod,
     Map<String, dynamic>? terminalMetadata,
   }) async {
+    if (!totalAmount.isFinite || totalAmount < 0) {
+      throw ArgumentError.value(totalAmount, 'totalAmount');
+    }
+    if (!paidAmount.isFinite || paidAmount < 0 || paidAmount > totalAmount) {
+      throw ArgumentError.value(paidAmount, 'paidAmount');
+    }
     if (await _isDuplicateTransaction(saleId, 'sale')) {
       return; // Idempotency check: Already processed
     }
@@ -107,6 +113,16 @@ class PaymentService {
     required double totalAmount,
     Map<String, dynamic>? terminalMetadata,
   }) async {
+    if (!amount.isFinite || amount <= 0) {
+      throw ArgumentError.value(amount, 'amount');
+    }
+    if (!currentPaidAmount.isFinite ||
+        !totalAmount.isFinite ||
+        currentPaidAmount < 0 ||
+        totalAmount < 0 ||
+        currentPaidAmount + amount > totalAmount) {
+      throw ArgumentError('Ödeme satışın kalan tutarını aşamaz.');
+    }
     final newPaidAmount = currentPaidAmount + amount;
     // DÜZELTME: .abs() kaldırıldı — fazla ödeme (overpayment) borç olarak kayıt edilmemeliydi.
     // remaining > 0  → hâlâ borç var

@@ -46,11 +46,23 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(keystoreProperties["storeFile"] as String? ?: "serenut-release.jks")
-            storePassword = keystoreProperties["storePassword"] as String? ?: ""
-            keyAlias = keystoreProperties["keyAlias"] as String? ?: ""
-            keyPassword = keystoreProperties["keyPassword"] as String? ?: ""
-            storeType = "PKCS12"
+            val keyFile = keystoreProperties["storeFile"] as String? ?: System.getenv("KEYSTORE_FILE") ?: "serenut-release.jks"
+            val storePass = keystoreProperties["storePassword"] as String? ?: System.getenv("KEYSTORE_PASSWORD")
+            val alias = keystoreProperties["keyAlias"] as String? ?: System.getenv("KEY_ALIAS")
+            val keyPass = keystoreProperties["keyPassword"] as String? ?: System.getenv("KEY_PASSWORD")
+
+            if (file(keyFile).exists() && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty()) {
+                storeFile = file(keyFile)
+                storePassword = storePass
+                keyAlias = alias
+                keyPassword = keyPass ?: storePass
+                storeType = "PKCS12"
+            } else {
+                throw GradleException(
+                    "Release signing is not configured. Provide android/key.properties " +
+                        "or KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD."
+                )
+            }
         }
     }
 

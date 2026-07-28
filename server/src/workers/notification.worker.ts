@@ -13,6 +13,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { pgPool, redisClient } from '../config/database';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';
+import { assertNotificationChannelEnabled } from '../modules/notification/notification_channels';
 
 // ── REDIS BAĞLANTI AYARLARI ──────────────────────────────────────────────────
 // BullMQ kendi ioredis bağlantısını yönetir.
@@ -79,6 +80,7 @@ export interface NotificationJobData {
 // ── GATEWAY DISPATCH ─────────────────────────────────────────────────────────
 async function dispatchGateway(data: NotificationJobData): Promise<boolean> {
   const { channel, recipient, title, body } = data;
+  assertNotificationChannelEnabled(channel);
 
   switch (channel) {
     case 'sms':
@@ -199,17 +201,11 @@ async function dispatchEmail(to: string, subject: string, body: string): Promise
 }
 
 async function dispatchWhatsApp(to: string, body: string): Promise<boolean> {
-  // TODO Sprint 2: WhatsApp Business API entegrasyonu
-  logger.info(`[WHATSAPP] → ${to}: "${body.substring(0, 40)}..."`);
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  return true;
+  throw new Error('notification_channel_not_enabled:whatsapp');
 }
 
 async function dispatchPush(deviceToken: string, title?: string, body?: string): Promise<boolean> {
-  // TODO Sprint 2: FCM/APNs entegrasyonu
-  logger.info(`[PUSH] → ${deviceToken}: "${title}"`);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  return true;
+  throw new Error('notification_channel_not_enabled:push');
 }
 
 // ── VERİTABANI DURUM GÜNCELLEME ──────────────────────────────────────────────

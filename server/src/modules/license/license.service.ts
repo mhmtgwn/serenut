@@ -122,6 +122,73 @@ export class LicenseService {
         [deviceHash, entitlement.company_id]
       );
 
+      // Clearing/reinstalling the app creates a new installation UUID. If the
+      // stable hardware fingerprint matches an existing activation owned by
+      // the same company, rebind that activation instead of consuming another
+      // device seat or returning device_limit_exceeded.
+      if (devRes.rows.length === 0 &&
+          fingerprint?.machine_hash && fingerprint?.hardware_hash) {
+        const physicalDevice = await client.query(
+          `SELECT da.id, da.status
+           FROM device_activations da
+           JOIN device_fingerprints df ON df.device_id = da.id
+           WHERE da.company_id = $1
+             AND df.machine_hash = $2
+             AND df.hardware_hash = $3
+           ORDER BY da.activated_at DESC
+           LIMIT 1
+           FOR UPDATE OF da`,
+          [entitlement.company_id, fingerprint.machine_hash, fingerprint.hardware_hash]
+        );
+        if (physicalDevice.rows.length > 0) {
+          await client.query(
+            `UPDATE device_activations
+             SET device_hash = $1, status = 'active', last_seen_at = NOW(), updated_at = NOW()
+             WHERE id = $2`,
+            [deviceHash, physicalDevice.rows[0].id]
+          );
+          devRes = physicalDevice;
+        }
+      }
+
+      // One-time migration for activations created by clients that predate
+      // hardware fingerprints. If this entitlement has exactly one active
+      // device and it has never stored a fingerprint, attach the first modern
+      // client fingerprint to that legacy seat instead of falsely rejecting
+      // the same installation after an app-data clear.
+      if (devRes.rows.length === 0 &&
+          fingerprint?.machine_hash && fingerprint?.hardware_hash) {
+        const legacyDevice = await client.query(
+          `SELECT da.id, da.status
+           FROM device_activations da
+           LEFT JOIN device_fingerprints df ON df.device_id = da.id
+           WHERE da.entitlement_id = $1
+             AND da.status = 'active'
+             AND df.device_id IS NULL
+             AND (SELECT COUNT(*) FROM device_activations active_da
+                  WHERE active_da.entitlement_id = $1
+                    AND active_da.status = 'active') = 1
+           LIMIT 1
+           FOR UPDATE OF da`,
+          [entitlement.id]
+        );
+        if (legacyDevice.rows.length > 0) {
+          await client.query(
+            `UPDATE device_activations
+             SET device_hash = $1, device_name = $2, platform = $3,
+                 last_seen_at = NOW(), updated_at = NOW()
+             WHERE id = $4`,
+            [
+              deviceHash,
+              deviceName,
+              fingerprint.platform || 'unknown',
+              legacyDevice.rows[0].id,
+            ]
+          );
+          devRes = legacyDevice;
+        }
+      }
+
       let deviceId: string;
       let deviceTokenVersion = 1;
       if (devRes.rows.length === 0) {

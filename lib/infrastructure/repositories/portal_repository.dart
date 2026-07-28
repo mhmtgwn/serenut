@@ -173,4 +173,22 @@ class PortalRepository {
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => Map<String, dynamic>.from(item)).toList();
   }
+
+  Future<List<Map<String, dynamic>>> getClientTelemetryEvents(
+      {int limit = 200}) async {
+    final safeLimit = limit.clamp(1, 1000);
+    final response = await _apiClient
+        .get('/api/v1/telemetry/client-events?limit=$safeLimit');
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list.map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getServerErrorLogs(
+      {int limit = 200}) async {
+    final safeLimit = limit.clamp(1, 1000);
+    final response = await _apiClient
+        .get('/api/v1/admin/server-logs?limit=$safeLimit&level=all');
+    final list = jsonDecode(response.body) as List<dynamic>;
+    return list.map((item) => Map<String, dynamic>.from(item)).toList();
+  }
 }

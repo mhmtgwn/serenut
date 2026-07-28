@@ -180,9 +180,13 @@ class LicenseService {
       final info = LicenseInfo.fromJson(jsonMap);
 
       final localUuid = getDeviceUuid();
+      // `token_version` is the server-side revocation/version counter, not the
+      // wire-format version. Fresh device-bound entitlements legitimately
+      // start at 1, so determine the format from the signed fields themselves.
+      final isDeviceBound = info.activationId != null && info.deviceId != null;
 
       // 1. Device binding check
-      if (info.tokenVersion >= 2) {
+      if (isDeviceBound) {
         if (info.deviceId == null || info.deviceId != localUuid) {
           return false;
         }
@@ -197,7 +201,7 @@ class LicenseService {
       final signatureBytes = base64.decode(info.signature);
 
       final Map<String, dynamic> payloadMap;
-      if (info.tokenVersion >= 2) {
+      if (isDeviceBound) {
         payloadMap = {
           if (info.activationId != null) 'activation_id': info.activationId,
           'device_id': info.deviceId,
@@ -612,5 +616,4 @@ class LicenseService {
       return false;
     }
   }
-
 }

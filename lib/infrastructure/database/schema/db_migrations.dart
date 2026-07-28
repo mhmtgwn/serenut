@@ -619,7 +619,8 @@ class DatabaseMigrations {
           });
         }
         if (oldVersion < 34) {
-          await txn.execute('''CREATE TABLE IF NOT EXISTS terminal_payment_intents (
+          await txn
+              .execute('''CREATE TABLE IF NOT EXISTS terminal_payment_intents (
             id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
             terminal_transaction_id TEXT NOT NULL UNIQUE, amount REAL NOT NULL,
             currency TEXT NOT NULL, authorization_code TEXT, state TEXT NOT NULL,
@@ -629,6 +630,54 @@ class DatabaseMigrations {
               'CREATE INDEX IF NOT EXISTS idx_terminal_payment_intents_state ON terminal_payment_intents(state, updated_at)');
           await txn.insert('app_migration_history', {
             'version': 34,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 35) {
+          try {
+            await txn.execute(
+                'ALTER TABLE sync_outbox_v4 ADD COLUMN base_revision INTEGER NOT NULL DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 35);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 35,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 36) {
+          await txn.execute('''CREATE TABLE IF NOT EXISTS sync_conflicts_v4 (
+            mutation_id TEXT PRIMARY KEY, entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL, server_revision INTEGER NOT NULL,
+            detected_at TEXT NOT NULL, resolved_at TEXT)''');
+          await txn.insert('app_migration_history', {
+            'version': 36,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 37) {
+          final ledgerTable = await txn.rawQuery(
+              "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'financial_transactions'");
+          if (ledgerTable.isNotEmpty) {
+            final ledgerColumns = (await txn
+                    .rawQuery('PRAGMA table_info(financial_transactions)'))
+                .map((row) => row['name']?.toString())
+                .toSet();
+            for (final column in const {
+              'description': 'TEXT',
+              'payment_method': 'TEXT',
+            }.entries) {
+              if (!ledgerColumns.contains(column.key)) {
+                await txn.execute(
+                    'ALTER TABLE financial_transactions ADD COLUMN ${column.key} ${column.value}');
+              }
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 37,
             'migrated_at': DateTime.now().toUtc().toIso8601String(),
             'status': 'success'
           });

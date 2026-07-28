@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -142,7 +143,8 @@ class AuditLogger {
           'timestamp': r['created_at'],
         };
       }).toList();
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('[AuditLogger] Failed to fetch recent logs: $e\n$stack');
       return [];
     }
   }

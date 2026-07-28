@@ -1,4 +1,5 @@
 // test/sqlite_repositories_smoke_test.dart
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
@@ -215,6 +216,25 @@ void main() {
         final foundAfterUpdate = await orderRepo.findById(order.id);
         expect(foundAfterUpdate!.status, equals('preparing'));
         expect(foundAfterUpdate.actualDeliveryDate, isNotNull);
+
+        // A status-only transition must be durable and replicated. Previously
+        // this changed SQLite but never entered the v4 outbox.
+        await orderRepo.updateStatus(order.id, 'ready');
+        final foundAfterStatus = await orderRepo.findById(order.id);
+        expect(foundAfterStatus!.status, equals('ready'));
+        final statusMutations = await db.query(
+          'sync_outbox_v4',
+          where: 'entity_type = ? AND entity_id = ?',
+          whereArgs: ['order', order.id],
+          orderBy: 'id DESC',
+          limit: 1,
+        );
+        expect(statusMutations, hasLength(1));
+        final statusPayload =
+            jsonDecode(statusMutations.single['payload']! as String)
+                as Map<String, dynamic>;
+        expect(statusPayload['status'], equals('ready'));
+        expect(statusPayload['items'], isA<List<dynamic>>());
 
         // 4. List
         final allOrders = await orderRepo.findAll();

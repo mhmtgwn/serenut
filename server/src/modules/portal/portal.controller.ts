@@ -121,6 +121,63 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// ── 2b. COMPANY DIAGNOSTICS ────────────────────────────────────────────────
+// Tenant owners need actionable evidence for support and sync investigation,
+// without exposing platform-wide server logs or another company's data.
+router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const canInspect = user.roles?.some((role) =>
+    ['owner', 'admin', 'manager', 'sysadmin'].includes(role),
+  );
+  if (!canInspect) {
+    return res.status(403).json({ error: 'forbidden', message: 'Sistem kayıtlarını görüntüleme yetkiniz yok.' });
+  }
+
+  try {
+    const [devices, conflicts, crashes, audit] = await Promise.all([
+      runWithTenantContext(user.company_id,
+        `SELECT da.id, da.device_name AS name, da.platform, da.status,
+                da.last_seen_at AS last_active_at
+         FROM device_activations da WHERE da.company_id = $1
+         ORDER BY da.last_seen_at DESC NULLS LAST LIMIT 50`,
+        [user.company_id]),
+      runWithTenantContext(user.company_id,
+        `SELECT mutation_id, entity_type, entity_id, base_revision,
+                server_revision, created_at
+         FROM sync_v4_conflicts WHERE tenant_id = $1
+         ORDER BY created_at DESC LIMIT 100`,
+        [user.company_id]),
+      runWithTenantContext(user.company_id,
+        `SELECT id, error_message, stack_trace, app_version, device_id, created_at
+         FROM crash_logs WHERE company_id = $1
+         ORDER BY created_at DESC LIMIT 100`,
+        [user.company_id]),
+      runWithTenantContext(user.company_id,
+        `SELECT id, action, entity, entity_id, ip_address, created_at
+         FROM audit_logs WHERE company_id = $1
+         ORDER BY created_at DESC LIMIT 100`,
+        [user.company_id]),
+    ]);
+
+    return res.json({
+      summary: {
+        devices: devices.rows.length,
+        online_devices: devices.rows.filter((row: any) => row.last_active_at &&
+          Date.now() - new Date(row.last_active_at).getTime() < 5 * 60 * 1000).length,
+        sync_conflicts: conflicts.rows.length,
+        crashes: crashes.rows.length,
+      },
+      devices: devices.rows,
+      sync_conflicts: conflicts.rows,
+      crashes: crashes.rows,
+      audit: audit.rows,
+    });
+  } catch (err) {
+    logger.error('Portal diagnostics query failed:', err);
+    return res.status(500).json({ error: 'diagnostics_unavailable' });
+  }
+});
+
 // ── 3. STORES ───────────────────────────────────────────────────────────────
 router.get('/stores', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;

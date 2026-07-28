@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
 const _kAmber = Color(0xFFF59E0B);
@@ -17,6 +19,11 @@ const _kGreen = Color(0xFF10B981);
 // ── License Status Provider ───────────────────────────────────────────────────
 
 final licenseStatusProvider = Provider<LicenseStatus>((ref) {
+  // Entitlement/license objects are backed by SharedPreferences and keep a
+  // stable service identity. Recompute this derived snapshot whenever auth
+  // publishes a post-bootstrap refresh; otherwise Riverpod retains the old
+  // pre-activation "unlicensed" value for the lifetime of the process.
+  ref.watch(authNotifierProvider);
   final service = ref.watch(licenseServiceProvider);
   final trialManager = ref.watch(trialManagerProvider);
 
@@ -141,12 +148,12 @@ class TrialBannerWidget extends ConsumerWidget {
       return _Banner(
         icon: Icons.lock_clock_rounded,
         color: _kRed,
-        title: 'Lisansınız Sona Erdi',
+        title: 'Salt okunur mod',
         subtitle:
-            'Sistem kısıtlı modda çalışıyor. Lisansı yenilemek için tıklayın.',
-        actionLabel: 'Yenile',
-        onAction: () => context.push(AppRoutes.license),
-        isCritical: true,
+            'Lisans süresi doldu. Verileri görebilir, işlem yapamazsınız.',
+        actionLabel: 'Lisansı Yenile',
+        onAction: _openBillingCenter,
+        isCritical: false,
       );
     }
 
@@ -155,10 +162,10 @@ class TrialBannerWidget extends ConsumerWidget {
       return _Banner(
         icon: Icons.warning_amber_rounded,
         color: _kAmber,
-        title: 'Lisans Bulunamadı',
-        subtitle: 'Geçerli bir lisans anahtarı girin veya destek alın.',
-        actionLabel: 'Lisans Gir',
-        onAction: () => context.push(AppRoutes.license),
+        title: 'Salt okunur mod',
+        subtitle: 'Aktif lisans yok. Verileri görebilir, işlem yapamazsınız.',
+        actionLabel: 'Lisans Al',
+        onAction: _openBillingCenter,
         isCritical: false,
       );
     }
@@ -181,6 +188,13 @@ class TrialBannerWidget extends ConsumerWidget {
 
     // All good — no banner
     return const SizedBox.shrink();
+  }
+
+  Future<void> _openBillingCenter() async {
+    await launchUrl(
+      Uri.parse('https://serenut.com/app#billing-center'),
+      mode: LaunchMode.externalApplication,
+    );
   }
 }
 
@@ -234,7 +248,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (_dismissed && !widget.isCritical) return const SizedBox.shrink();
+    if (_dismissed) return const SizedBox.shrink();
 
     return AnimatedBuilder(
       animation: _pulse,
@@ -242,8 +256,8 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
         final alpha = widget.isCritical ? (0.06 + _pulse.value * 0.04) : 0.06;
 
         return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          margin: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: widget.color.withValues(alpha: alpha),
             borderRadius: BorderRadius.circular(12),
@@ -251,8 +265,8 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
           ),
           child: Row(
             children: [
-              Icon(widget.icon, color: widget.color, size: 22),
-              const SizedBox(width: 12),
+              Icon(widget.icon, color: widget.color, size: 18),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,25 +276,25 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                       style: TextStyle(
                         color: widget.color,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     ),
                     Text(
                       widget.subtitle,
                       style: TextStyle(
                         color: widget.color.withValues(alpha: 0.8),
-                        fontSize: 11,
+                        fontSize: 10,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               GestureDetector(
                 onTap: widget.onAction,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
                     color: widget.color,
                     borderRadius: BorderRadius.circular(8),
@@ -295,14 +309,12 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                   ),
                 ),
               ),
-              if (!widget.isCritical) ...[
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () => setState(() => _dismissed = true),
-                  child: Icon(Icons.close_rounded,
-                      size: 16, color: widget.color.withValues(alpha: 0.6)),
-                ),
-              ],
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => setState(() => _dismissed = true),
+                child: Icon(Icons.close_rounded,
+                    size: 16, color: widget.color.withValues(alpha: 0.6)),
+              ),
             ],
           ),
         );

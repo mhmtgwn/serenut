@@ -16,7 +16,6 @@ import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart'
 import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/domain/services/dashboard_service.dart';
 import 'package:serenutos/presentation/pages/global_search_page.dart';
-import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
@@ -69,11 +68,6 @@ class HomePage extends ConsumerWidget {
                         // 1. Üst Alan (Header)
                         _buildHeader(context, ref, data),
                         const SizedBox(height: 16),
-
-                        // 1b. Trial / License Banner (görünür sadece uyarı varsa)
-                        const TrialBannerWidget(),
-
-                        const SizedBox(height: 8),
 
                         // Hızlı işlemler operasyon ekranının odağıdır. Teknik
                         // sistem sağlığı ve ayrıntılı olaylar web panelindedir.

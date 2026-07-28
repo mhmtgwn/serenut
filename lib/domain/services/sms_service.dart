@@ -1,6 +1,5 @@
 // lib/domain/services/sms_service.dart
-// Serenut OS — SMS Notification Service
-// Supports: Netgsm (TR), Twilio (global)
+// Serenut OS — SMS Notification Service (Local SIM Only)
 // Features: Queue, retry, offline buffering, delivery status logging
 // Created: 24 Jun 2026
 
@@ -13,7 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
 // ── SMS Provider Enum ─────────────────────────────────────────────────────────
-enum SmsProvider { sim, netgsm, twilio, custom, none }
+enum SmsProvider { sim, none }
 
 // ── SMS Queue Item ─────────────────────────────────────────────────────────────
 class SmsQueueItem {
@@ -56,9 +55,8 @@ class SmsQueueItem {
 class SmsConfig {
   final SmsProvider provider;
   final String apiKey;
-  final String username; // Netgsm: kullanıcı adı | Twilio: accountSid
-  final String sender; // Netgsm: başlık | Twilio: phone number
-  final String? apiSecret; // Twilio only
+  final String username;
+  final String sender;
 
   // SIM Specifics
   final int? simSubscriptionId;
@@ -68,10 +66,9 @@ class SmsConfig {
 
   const SmsConfig({
     required this.provider,
-    required this.apiKey,
-    required this.username,
-    required this.sender,
-    this.apiSecret,
+    this.apiKey = '',
+    this.username = '',
+    this.sender = '',
     this.simSubscriptionId,
     this.monthlyLimit,
     this.sentThisMonth = 0,
@@ -267,16 +264,10 @@ class SmsService {
 
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
-        bool success;
+        bool success = false;
         switch (config.provider) {
           case SmsProvider.sim:
             success = await _sendSim(item.phone, item.message, config);
-          case SmsProvider.netgsm:
-            success = await _sendNetgsm(item.phone, item.message, config);
-          case SmsProvider.twilio:
-            success = await _sendTwilio(item.phone, item.message, config);
-          case SmsProvider.custom:
-            success = false;
           case SmsProvider.none:
             return false;
         }
@@ -304,60 +295,6 @@ class SmsService {
           Future.value());
     }
     return false;
-  }
-
-  // ── Netgsm HTTP API ────────────────────────────────────────────────────────
-  // Docs: https://www.netgsm.com.tr/dokuman/
-
-  Future<bool> _sendNetgsm(
-      String phone, String message, SmsConfig config) async {
-    final url = Uri.parse('https://api.netgsm.com.tr/sms/send/get/');
-    final params = {
-      'usercode': config.username,
-      'password': config.apiKey,
-      'gsmno': phone.replaceAll('+', '').replaceAll(' ', ''),
-      'message': message,
-      'msgheader': config.sender,
-      'encoding': 'TR',
-    };
-
-    final response = await _httpClient
-        .get(Uri.parse('$url?${_buildQuery(params)}'))
-        .timeout(const Duration(seconds: 15));
-
-    // Netgsm returns a code: 00 = success, 20 = auth error, etc.
-    final body = response.body.trim();
-    return response.statusCode == 200 && body.startsWith('00');
-  }
-
-  // ── Twilio REST API ────────────────────────────────────────────────────────
-  // Docs: https://www.twilio.com/docs/sms/api
-
-  Future<bool> _sendTwilio(
-      String phone, String message, SmsConfig config) async {
-    if (config.apiSecret == null) return false;
-
-    final url = Uri.parse(
-      'https://api.twilio.com/2010-04-01/Accounts/${config.username}/Messages.json',
-    );
-
-    final credentials =
-        base64.encode(utf8.encode('${config.username}:${config.apiSecret}'));
-
-    final response = await _httpClient.post(
-      url,
-      headers: {
-        'Authorization': 'Basic $credentials',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: {
-        'To': phone,
-        'From': config.sender,
-        'Body': message,
-      },
-    ).timeout(const Duration(seconds: 15));
-
-    return response.statusCode == 201;
   }
 
   // ── Queue Persistence ──────────────────────────────────────────────────────
@@ -415,11 +352,6 @@ class SmsService {
     if (!p.startsWith('+')) p = '+90$p';
     return p;
   }
-
-  String _buildQuery(Map<String, String> params) => params.entries
-      .map((e) =>
-          '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
-      .join('&');
 
   Future<bool> _sendSim(String phone, String message, SmsConfig config) async {
     try {

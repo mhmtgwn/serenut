@@ -9,8 +9,6 @@ import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
-const _kGreen = Color(0xFF16A34A);
-const _kRed = Color(0xFFDC2626);
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
@@ -49,122 +47,115 @@ class PosHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasSearch = onSearchChanged != null || searchController != null;
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Title & Actions Row — Always Stable & Clean
           Row(
             children: [
-              if (isSearching) ...[
-                Expanded(
-                  child: Container(
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: searchHint ?? 'Ara...',
-                        hintStyle: const TextStyle(
-                            color: _kTextSecondary, fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: _kTextSecondary, size: 18),
-                        suffixIcon: searchController != null &&
-                                searchController!.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded, size: 18),
-                                onPressed: () {
-                                  searchController!.clear();
-                                  if (onSearchChanged != null) {
-                                    onSearchChanged!('');
-                                  }
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            vertical: 9, horizontal: 12),
-                      ),
-                      style: const TextStyle(
-                          color: _kText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600),
-                      onChanged: onSearchChanged,
-                    ),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: _kText,
                   ),
                 ),
+              ),
+              if (actions != null) ...actions!,
+              if (showRefresh && onRefresh != null)
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: _kRed),
-                  onPressed: () {
-                    if (onSearchToggled != null) {
-                      onSearchToggled!(false);
-                    }
-                    if (searchController != null) {
-                      searchController!.clear();
-                    }
-                    if (onSearchChanged != null) {
-                      onSearchChanged!('');
-                    }
-                  },
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(),
+                  onPressed: onRefresh,
+                  icon: const Icon(Icons.refresh_rounded,
+                      color: _kTextSecondary, size: 22),
+                  tooltip: 'Yenile',
                 ),
-              ] else ...[
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: _kText,
-                    ),
-                  ),
-                ),
-                if (onSearchToggled != null)
-                  IconButton(
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.search_rounded,
-                        color: _kGreen, size: 22),
-                    tooltip: 'Ara',
-                    onPressed: () => onSearchToggled!(true),
-                  ),
-                if (actions != null) ...actions!,
-                if (showRefresh && onRefresh != null)
-                  IconButton(
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                    onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh_rounded,
-                        color: _kTextSecondary, size: 22),
-                    tooltip: 'Yenile',
-                  ),
-                if (showStatusIndicator) ...[
-                  const RealtimeStatusIndicator(compact: true),
-                  const SizedBox(width: 4),
-                ],
-                if (showSettings)
-                  IconButton(
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.settings_outlined,
-                        color: _kTextSecondary, size: 22),
-                    tooltip: 'Ayarlar',
-                    onPressed: () => requirePermissionAccess(
-                      context,
-                      permission: Permission.settingsView,
-                      title: 'Ayarlar Yetkisi',
-                      onGranted: (_, __) => context.push(AppRoutes.settings),
-                    ),
-                  ),
+              if (showStatusIndicator) ...[
+                const RealtimeStatusIndicator(compact: true),
+                const SizedBox(width: 4),
               ],
+              if (showSettings)
+                IconButton(
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.settings_outlined,
+                      color: _kTextSecondary, size: 22),
+                  tooltip: 'Ayarlar',
+                  onPressed: () => requirePermissionAccess(
+                    context,
+                    permission: Permission.settingsView,
+                    title: 'Ayarlar Yetkisi',
+                    onGranted: (_, __) => context.push(AppRoutes.settings),
+                  ),
+                ),
             ],
           ),
-          if (!isSearching && filterWidget != null) ...[
-            const SizedBox(height: 12),
+
+          // Inline Search Bar (Zero-Click Mode & 1-Tap Clear)
+          if (hasSearch || isSearching) ...[
+            const SizedBox(height: 10),
+            Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: searchController ?? TextEditingController(),
+                builder: (context, value, _) {
+                  final isNotEmpty = value.text.isNotEmpty;
+
+                  return TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: searchHint ?? 'Ara...',
+                      hintStyle: const TextStyle(
+                          color: _kTextSecondary, fontSize: 13),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: _kTextSecondary, size: 18),
+                      suffixIcon: isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.cancel_rounded,
+                                  size: 18, color: _kTextSecondary),
+                              onPressed: () {
+                                if (searchController != null) {
+                                  searchController!.clear();
+                                }
+                                if (onSearchChanged != null) {
+                                  onSearchChanged!('');
+                                }
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 12),
+                    ),
+                    style: const TextStyle(
+                        color: _kText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                    onChanged: onSearchChanged,
+                  );
+                },
+              ),
+            ),
+          ],
+
+          // Filter Widget Row
+          if (filterWidget != null) ...[
+            const SizedBox(height: 8),
             filterWidget!,
           ],
         ],

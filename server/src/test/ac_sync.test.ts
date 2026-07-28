@@ -16,6 +16,7 @@ const activationA = 'sync-http-activation-a';
 const activationB = 'sync-http-activation-b';
 const installationA = 'sync-http-installation-a';
 const installationB = 'sync-http-installation-b';
+const syncProtocolHeader = { 'x-sync-protocol-version': '5' };
 
 function fail(message: string): never {
   throw new Error(`Sync V4 HTTP acceptance failed: ${message}`);
@@ -44,7 +45,7 @@ function tokenForDevice(): string {
 async function setup() {
   let client = await pgPool.connect();
   try {
-    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;');
   } finally {
     client.release();
   }
@@ -95,6 +96,7 @@ async function run() {
     entity_type: 'product',
     entity_id: 'sync-http-product',
     operation: 'UPSERT',
+    base_revision: 0,
     payload: {
       name: 'HTTP Senkron Ürün', price: 42.5, quantity: 7,
       category: 'Test', sku: 'HTTP-42', vat: 20,
@@ -104,12 +106,27 @@ async function run() {
   const noActivation = await request(app)
     .post('/api/v4/sync/push')
     .set('Authorization', bearer)
+    .set(syncProtocolHeader)
     .send({ device_id: installationA, mutations: [productMutation] });
   if (noActivation.status !== 400) fail(`missing activation must be 400, got ${noActivation.status}`);
+
+  const unsupportedProtocol = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set('x-sync-protocol-version', '4')
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      mutations: [productMutation],
+    });
+  if (unsupportedProtocol.status !== 426 || unsupportedProtocol.body.required_version !== 5) {
+    fail(`outdated sync protocol was not rejected safely: ${unsupportedProtocol.status}`);
+  }
 
   const pushed = await request(app)
     .post('/api/v4/sync/push')
     .set('Authorization', bearer)
+    .set(syncProtocolHeader)
     .send({
       device_activation_id: activationA,
       device_id: installationA,
@@ -122,6 +139,7 @@ async function run() {
   const duplicate = await request(app)
     .post('/api/v4/sync/push')
     .set('Authorization', bearer)
+    .set(syncProtocolHeader)
     .send({
       device_activation_id: activationA,
       device_id: installationA,
@@ -133,7 +151,8 @@ async function run() {
 
   const pulled = await request(app)
     .get(`/api/v4/sync/pull?cursor=0&limit=200&device_activation_id=${activationB}&device_id=${installationB}`)
-    .set('Authorization', bearer);
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader);
   const received = (pulled.body.changes ?? []).find((change: any) =>
     change.entity_type === 'product' && change.entity_id === productMutation.entity_id,
   );
@@ -149,7 +168,72 @@ async function run() {
     fail('HTTP push was acknowledged without materializing the canonical product.');
   }
 
-  console.log('✔ Sync V4 HTTP: authorized device A push → idempotent retry → device B pull passed.');
+  const staleConcurrentWrite = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationB,
+      device_id: installationB,
+      mutations: [{ ...productMutation,
+        mutation_id: '22222222-2222-4222-8222-222222222222',
+        payload: { ...productMutation.payload, name: 'Stale overwrite' },
+      }],
+    });
+  if (staleConcurrentWrite.status !== 200 || staleConcurrentWrite.body.conflicts?.length !== 1) {
+    fail(`stale concurrent write was not recorded: ${staleConcurrentWrite.status} ${JSON.stringify(staleConcurrentWrite.body)}`);
+  }
+
+  const duplicateConflict = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationB,
+      device_id: installationB,
+      mutations: [{ ...productMutation,
+        mutation_id: '22222222-2222-4222-8222-222222222222',
+        payload: { ...productMutation.payload, name: 'Stale overwrite' },
+      }],
+    });
+  if (duplicateConflict.status !== 200 || duplicateConflict.body.conflicts?.length !== 1) {
+    fail(`conflict retry was not idempotent: ${duplicateConflict.status} ${JSON.stringify(duplicateConflict.body)}`);
+  }
+
+  const poisonBatch = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      mutations: [
+        {
+          mutation_id: '33333333-3333-4333-8333-333333333333',
+          entity_type: 'product', entity_id: 'invalid-product',
+          operation: 'UPSERT', base_revision: 0, payload: {},
+        },
+        {
+          mutation_id: '44444444-4444-4444-8444-444444444444',
+          entity_type: 'product', entity_id: 'valid-after-invalid',
+          operation: 'UPSERT', base_revision: 0,
+          payload: { name: 'Sağlam Paket Ürünü', price: 10, quantity: 2 },
+        },
+      ],
+    });
+  if (poisonBatch.status !== 200 || poisonBatch.body.rejected?.length !== 1 ||
+      poisonBatch.body.results?.length !== 1) {
+    fail(`one invalid mutation poisoned its healthy batch peer: ${poisonBatch.status} ${JSON.stringify(poisonBatch.body)}`);
+  }
+  const healthyPeer = await pgPool.query(
+    'SELECT name FROM products WHERE id = $1 AND company_id = $2',
+    ['valid-after-invalid', companyId],
+  );
+  if (healthyPeer.rowCount !== 1 || healthyPeer.rows[0].name !== 'Sağlam Paket Ürünü') {
+    fail('healthy mutation after a rejected peer was not materialized.');
+  }
+
+  console.log('✔ Sync V4 HTTP: push, retry, pull, conflict and poison-batch isolation passed.');
 }
 
 run()

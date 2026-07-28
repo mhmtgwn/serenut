@@ -11,6 +11,8 @@ import 'package:serenutos/presentation/state/app_state.dart';
 import 'package:serenutos/providers/auth/auth_notifier.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/database_provider.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository.dart';
 
 // ════════════════════════════════════════════════════════════
 // Core Providers
@@ -29,11 +31,31 @@ final authServiceProvider = Provider<AuthService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   final deviceManager = ref.watch(deviceManagerProvider);
   final licenseService = ref.watch(licenseServiceProvider);
+  final fingerprintService = ref.watch(deviceFingerprintServiceProvider);
+  final settingsRepository =
+      SqliteSettingsRepository(ref.watch(dbGatewayProvider));
   return AuthService(
     userRepository: userRepo,
     hashService: hashService,
     deviceManager: deviceManager,
     licenseService: licenseService,
+    deviceFingerprintService: fingerprintService,
+    cacheCompanyProfile: (company) async {
+      final current = await settingsRepository.getSettings();
+      await settingsRepository.updateSettings(current.copyWith(
+        businessName: company['name']?.toString() ?? current.businessName,
+        businessPhone: company['phone']?.toString() ?? current.businessPhone,
+        businessAddress:
+            company['address']?.toString() ?? current.businessAddress,
+        businessTaxId:
+            company['tax_number']?.toString() ?? current.businessTaxId,
+        ownerName: company['owner_name']?.toString() ?? current.ownerName,
+        businessEmail: company['email']?.toString() ?? current.businessEmail,
+        businessCity: company['city']?.toString() ?? current.businessCity,
+        businessDistrict:
+            company['district']?.toString() ?? current.businessDistrict,
+      ));
+    },
     apiClient: apiClient,
   );
 });

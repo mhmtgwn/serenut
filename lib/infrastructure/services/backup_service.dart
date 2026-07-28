@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:developer' as developer;
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -90,7 +91,9 @@ class BackupService implements IBackupService {
           notes: 'Veritabanı yedeği alındı: ${basename(backupPath)}',
           timestamp: DateTime.now(),
         ));
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        developer.log('Yedekleme audit olayı kaydedilemedi', error: e, stackTrace: stackTrace);
+      }
 
       return backupPath;
     } finally {

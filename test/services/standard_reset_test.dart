@@ -84,6 +84,24 @@ void main() {
         'subtotal': 300.0,
         'created_at': DateTime.now().toIso8601String(),
       });
+      await db.insert('orders', {
+        'id': 'ord-1',
+        'customer_id': 'cust-1',
+        'status': 'created',
+        'total_amount': 300.0,
+        'order_date': DateTime.now().toIso8601String(),
+        'is_synced': 1,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      await db.insert('order_items', {
+        'id': 'oi-1',
+        'order_id': 'ord-1',
+        'product_id': 'prod-1',
+        'quantity': 2.0,
+        'unit_price': 150.0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
       await db.insert('financial_transactions', {
         'id': 'ft-1',
         'type': 'payment',
@@ -94,39 +112,71 @@ void main() {
         'is_synced': 1,
         'created_at': DateTime.now().toIso8601String(),
       });
+      await db.insert('sync_outbox_v4', {
+        'mutation_id': 'mut-1',
+        'entity_type': 'sale',
+        'entity_id': 'sale-1',
+        'operation': 'UPSERT',
+        'payload': '{}',
+        'state': 'PENDING',
+        'attempts': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      await db.insert('sync_cursor_v4', {
+        'key': 'global',
+        'cursor': 42,
+      });
     }
 
-    test('standart sifirlama tum tablolari transaction icinde temizlemeli',
+    test('standart sifirlama tum tablolari transaction icinde temizlemeli ve siparislerde FK hatasi vermemeli',
         () async {
       final db = await dbManager.getDatabase();
       await seedData(db);
 
       expect((await db.query('sales')).length, 1);
+      expect((await db.query('orders')).length, 1);
+      expect((await db.query('order_items')).length, 1);
       expect((await db.query('products')).length, 1);
       expect((await db.query('financial_transactions')).length, 1);
       expect((await db.query('customers')).length, 2);
+      expect((await db.query('sync_outbox_v4')).length, 1);
+      expect((await db.query('sync_cursor_v4')).length, 1);
 
       // Standart sifirlama mantigini simule et (data_transfer_page.dart ile ayni)
       await db.transaction((txn) async {
         await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
         await txn.rawDelete('DELETE FROM sale_items');
         await txn.rawDelete('DELETE FROM sales');
+        await txn.rawDelete('DELETE FROM order_items');
+        try {
+          await txn.rawDelete('DELETE FROM customer_order_items');
+        } catch (_) {}
         await txn.rawDelete('DELETE FROM orders');
         await txn.rawDelete('DELETE FROM financial_transactions');
         await txn.rawDelete('DELETE FROM products');
         await txn.rawDelete(
             "DELETE FROM customers WHERE id != '' AND id != 'default'");
+        await txn.rawDelete('DELETE FROM sync_outbox_v4');
+        await txn.rawDelete('DELETE FROM sync_cursor_v4');
         await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
       });
 
       final salesCount = (await db.query('sales')).length;
+      final ordersCount = (await db.query('orders')).length;
+      final orderItemsCount = (await db.query('order_items')).length;
       final productsCount = (await db.query('products')).length;
       final txCount = (await db.query('financial_transactions')).length;
+      final outboxCount = (await db.query('sync_outbox_v4')).length;
+      final cursorCount = (await db.query('sync_cursor_v4')).length;
       final custRows = await db.query('customers');
 
       expect(salesCount, 0, reason: 'Tum satislar silinmeli');
+      expect(ordersCount, 0, reason: 'Tum siparisler silinmeli');
+      expect(orderItemsCount, 0, reason: 'Tum siparis kalemleri silinmeli');
       expect(productsCount, 0, reason: 'Tum urunler silinmeli');
       expect(txCount, 0, reason: 'Tum finansal islemler silinmeli');
+      expect(outboxCount, 0, reason: 'Outbox temizlenmeli');
+      expect(cursorCount, 0, reason: 'Cursor sifirlanmali');
       expect(custRows.length, 1, reason: 'Sadece pesin musteri kalmali');
       expect(custRows.first['id'], 'default',
           reason: 'Kalan musteri pesin musteri olmali');

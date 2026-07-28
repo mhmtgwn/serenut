@@ -4,7 +4,7 @@ import { runMigrations } from '../migrations';
 async function run() {
   const client = await pgPool.connect();
   try {
-    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;');
     await runMigrations(pgPool);
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");

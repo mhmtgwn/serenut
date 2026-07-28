@@ -324,6 +324,16 @@ app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
   res.redirect(301, '/app/');
 });
 
+// Short & Clean Download Links
+app.get('/download/windows', (req, res) => {
+  req.url = '/download/windows/latest';
+  return updateRouter(req, res, () => res.sendStatus(404));
+});
+app.get('/download/android', (req, res) => {
+  req.url = '/download/android/latest';
+  return updateRouter(req, res, () => res.sendStatus(404));
+});
+
 const websiteDir = path.join(process.cwd(), 'public/website');
 const websitePages = ['platform', 'plans', 'downloads', 'contact', 'privacy', 'kvkk', 'terms', '404'];
 websitePages.forEach(page => {

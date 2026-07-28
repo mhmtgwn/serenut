@@ -12,6 +12,7 @@ import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
+import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, listEquals;
 
 class AuthException implements Exception {
@@ -30,6 +31,9 @@ class AuthService {
   final ApiClient? _apiClient;
   final DeviceManager _deviceManager;
   final LicenseService? _licenseService;
+  final DeviceFingerprintService? _deviceFingerprintService;
+  final Future<void> Function(Map<String, dynamic> company)?
+      _cacheCompanyProfile;
   late SharedPreferences _prefs;
   AuthUser? _currentUser;
 
@@ -38,11 +42,15 @@ class AuthService {
     required IHashService hashService,
     required DeviceManager deviceManager,
     LicenseService? licenseService,
+    DeviceFingerprintService? deviceFingerprintService,
+    Future<void> Function(Map<String, dynamic> company)? cacheCompanyProfile,
     ApiClient? apiClient,
   })  : _userRepository = userRepository,
         _hashService = hashService,
         _deviceManager = deviceManager,
         _licenseService = licenseService,
+        _deviceFingerprintService = deviceFingerprintService,
+        _cacheCompanyProfile = cacheCompanyProfile,
         _apiClient = apiClient;
 
   /// Initialize service (call once on app startup)
@@ -73,7 +81,19 @@ class AuthService {
         final lastVerifiedStr =
             _prefs.getString('serenut_last_authz_verified_at_${user.id}');
         if (lastVerifiedStr != null) {
-          // Lease check removed from here to allow offline POS sales.
+          final lastVerified = DateTime.tryParse(lastVerifiedStr);
+          final leaseDays = _prefs.getInt('offline_auth_lease_days') ?? 7;
+          if (lastVerified != null &&
+              DateTime.now().toUtc().difference(lastVerified).inDays >
+                  leaseDays) {
+            // A locally stored bearer token is not proof of a valid session:
+            // it may be expired, malformed, or revoked on the server. Once the
+            // offline lease expires, access must be re-established online.
+            debugPrint(
+                '[AuthService] ⚠️ Offline auth lease expired for user ${user.id}');
+            await _clearStoredSession();
+            return;
+          }
         }
         _currentUser = user;
       } catch (e) {
@@ -84,16 +104,15 @@ class AuthService {
     }
   }
 
-  // ════════════════════════════════════════════════════════════
-  // LOGIN — Secure PBKDF2 verification
-  // ════════════════════════════════════════════════════════════
+  Future<void> _clearStoredSession() async {
+    await _prefs.remove(_userStorageKey);
+    await _prefs.remove('auth_jwt_token');
+    await _prefs.remove('auth_refresh_token');
+    _apiClient?.setJwtToken(null);
+    _currentUser = null;
+  }
 
   /// Login with username (email or name) and password.
-  ///
-  /// Security notes:
-  /// - Uses PBKDF2-HMAC-SHA256 for hash verification.
-  /// - Supports legacy hashes from old system and rehashes on successful login.
-  /// - Does NOT fall back to username == password (removed exploit).
   Future<AuthUser> login(String username, String password) async {
     if (username.trim().isEmpty || password.isEmpty) {
       throw AuthException('Kullanıcı adı ve şifre boş olamaz.');
@@ -106,7 +125,6 @@ class AuthService {
           'email': username.trim().toLowerCase(),
           'password': password,
         });
-
         if (response.isSuccess) {
           final data = response.json;
           final token = data['access_token'] as String;
@@ -114,7 +132,8 @@ class AuthService {
           final userMap = data['user'] as Map<String, dynamic>;
           final companyId = userMap['company_id'] as String?;
           if (companyId == null || companyId.trim().isEmpty) {
-            throw AuthException('Sunucu oturumunda şirket kimliği eksik. Giriş reddedildi.');
+            throw AuthException(
+                'Sunucu oturumunda şirket kimliği eksik. Giriş reddedildi.');
           }
 
           await _prefs.setString('auth_jwt_token', token);
@@ -250,18 +269,18 @@ class AuthService {
     if (_apiClient == null) return;
     final body = <String, dynamic>{};
     if (!kIsWeb) {
-      final deviceId = _licenseService?.getDeviceUuid() ??
-          _deviceManager.getDeviceId();
+      final deviceId =
+          _licenseService?.getDeviceUuid() ?? _deviceManager.getDeviceId();
       body['device_hash'] = deviceId;
       body['device_name'] = 'POS Cihazı - $deviceId';
+      final fingerprint = await _deviceFingerprintService?.getFingerprint();
+      if (fingerprint != null) body['fingerprint'] = fingerprint.toJson();
     }
     try {
       final response = await _apiClient!.post('/auth/session-bootstrap', body);
       if (!response.isSuccess) {
         final payload = response.json;
-        final error = payload is Map<String, dynamic>
-            ? payload['error']
-            : null;
+        final error = payload is Map<String, dynamic> ? payload['error'] : null;
         final message = error is Map<String, dynamic>
             ? error['message']?.toString()
             : payload is Map<String, dynamic>
@@ -276,6 +295,10 @@ class AuthService {
       if (subscription != null) {
         await TrialManager(_prefs).cacheSubscription(subscription);
       }
+      final company = payload['company'] as Map<String, dynamic>?;
+      if (company != null && _cacheCompanyProfile != null) {
+        await _cacheCompanyProfile!(company);
+      }
       await _cacheLicenseActivation(
         payload['activation'],
         licenseKey: payload['license_key'] as String?,
@@ -283,7 +306,8 @@ class AuthService {
     } catch (e) {
       if (e is AuthException) rethrow;
       if (e is ApiException && (e.statusCode == 403 || e.statusCode == 409)) {
-        String message = 'Cihaz aktivasyonu veya lisans doğrulaması reddedildi.';
+        String message =
+            'Cihaz aktivasyonu veya lisans doğrulaması reddedildi.';
         final body = e.responseBody;
         if (body != null) {
           try {
@@ -291,7 +315,9 @@ class AuthService {
             final error = payload['error'];
             message = error is Map<String, dynamic>
                 ? error['message']?.toString() ?? message
-                : payload['message']?.toString() ?? error?.toString() ?? message;
+                : payload['message']?.toString() ??
+                    error?.toString() ??
+                    message;
           } catch (_) {}
         }
         throw AuthException(message);
@@ -302,7 +328,8 @@ class AuthService {
     }
   }
 
-  Future<void> _cacheLicenseActivation(dynamic responseJson, {String? licenseKey}) async {
+  Future<void> _cacheLicenseActivation(dynamic responseJson,
+      {String? licenseKey}) async {
     final licenseService = _licenseService;
     if (licenseService == null || responseJson is! Map<String, dynamic>) return;
     if (!licenseService.hasVerificationKey) {
@@ -334,225 +361,6 @@ class AuthService {
     }
     if (_apiClient != null) {
       licenseService.startHeartbeat(_apiClient!);
-    }
-  }
-
-  /// Login sub-user (cashier, manager, staff) using business_code, username, and PIN.
-  /// Enforces online lookup with automatic local SQLite cache and offline fallback.
-  Future<AuthUser> loginSubUser(
-      String businessCode, String username, String pin) async {
-    if (businessCode.trim().isEmpty || username.trim().isEmpty || pin.isEmpty) {
-      throw AuthException('İşletme kodu, kullanıcı adı ve PIN boş olamaz.');
-    }
-
-    // Try online path first
-    if (_apiClient != null) {
-      try {
-        final response = await _apiClient!.post('/auth/login/sub', {
-          'business_code': businessCode.trim().toUpperCase(),
-          'username': username.trim(),
-          'pin': pin,
-        });
-
-        if (response.isSuccess) {
-          final data = response.json;
-          final token = (data['access_token'] ?? data['accessToken']) as String;
-          final refreshToken =
-              (data['refresh_token'] ?? data['refreshToken']) as String;
-          final userMap = data['user'] as Map<String, dynamic>;
-          final companyId = userMap['company_id'] as String?;
-          if (companyId == null || companyId.trim().isEmpty) {
-            throw AuthException('Sunucu oturumunda şirket kimliği eksik. Giriş reddedildi.');
-          }
-
-          await _prefs.setString('auth_jwt_token', token);
-          await _prefs.setString('auth_refresh_token', refreshToken);
-          _apiClient!.setJwtToken(token);
-
-          final subscription = data['subscription'] as Map<String, dynamic>?;
-          if (subscription != null) {
-            final trialManager = TrialManager(_prefs);
-            await trialManager.cacheSubscription(subscription);
-          }
-
-          final roles = userMap['roles'] as List<dynamic>? ?? [];
-          final roleStr = roles.isNotEmpty ? roles.first.toString() : 'cashier';
-          final role = UserRole.values.firstWhere(
-            (r) => r.name == roleStr.toLowerCase(),
-            orElse: () => UserRole.cashier,
-          );
-
-          final user = AuthUser(
-            id: userMap['id'] as String,
-            companyId: companyId,
-            name: userMap['name'] as String,
-            email: userMap['email'] as String? ?? '',
-            role: role,
-            permissions: (userMap['permissions'] as List<dynamic>?)
-                    ?.map((e) => e.toString())
-                    .toList() ??
-                getPermissionsForRole(role),
-            createdAt: DateTime.now(),
-          );
-
-          await _bootstrapAuthenticatedSession();
-
-          // Cache credentials in local sqlite for offline login
-          try {
-            final hashedPin = _hashService.hashPassword(pin);
-            await _userRepository.insertUser(
-              user,
-              '', // no password
-              username: username.trim(),
-              pinHash: hashedPin,
-              businessCode: businessCode.trim().toUpperCase(),
-            );
-          } catch (_) {
-            try {
-              final hashedPin = _hashService.hashPassword(pin);
-              await _userRepository.updateUserFields(
-                user,
-                isActive: true,
-                username: username.trim(),
-                pinHash: hashedPin,
-                businessCode: businessCode.trim().toUpperCase(),
-              );
-            } catch (_) {}
-          }
-
-          _currentUser = user;
-          await _prefs.setString(_userStorageKey, user.toJson());
-          await _prefs.setString('serenut_last_authz_verified_at_${user.id}',
-              DateTime.now().toUtc().toIso8601String());
-          return user;
-        }
-      } catch (e) {
-        if (e is AuthException) rethrow;
-        if (e is ApiException) {
-          if (e.statusCode == 400 ||
-              e.statusCode == 401 ||
-              e.statusCode == 403) {
-            final body = e.responseBody;
-            String message = 'Giriş başarısız.';
-            if (body != null) {
-              try {
-                message = jsonDecode(body)['message'] ?? message;
-              } catch (_) {}
-            }
-            throw AuthException(message);
-          }
-        }
-        // Network timeout / DNS resolution issues — fall back to offline DB check
-      }
-    }
-
-    // Offline path fallback
-    try {
-      final user = await _userRepository.findByBusinessCodeAndUsername(
-        businessCode.trim(),
-        username.trim(),
-      );
-      if (user != null) {
-        // Check brute-force lockout
-        final lockoutData = await _userRepository.getFailedPinAttempts(user.id);
-        final lockedUntilStr = lockoutData['locked_until'] as String?;
-        if (lockedUntilStr != null) {
-          final lockedUntil = DateTime.tryParse(lockedUntilStr);
-          if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
-            final remaining = lockedUntil.difference(DateTime.now()).inSeconds;
-            throw AuthException(
-                'Hesap çok fazla başarısız deneme nedeniyle kilitlendi. Lütfen $remaining saniye bekleyin.');
-          }
-        }
-
-        final hashes = await _userRepository.getCredentialHashes(user.id);
-        final pinHash = hashes['pin_hash'];
-        if (pinHash != null) {
-          final isValid = _hashService.verifyPassword(pin, pinHash);
-          if (isValid) {
-            // Lease check removed from here to allow offline POS sales.
-            await _userRepository.resetPinAttempts(user.id);
-            await _onLoginSuccess(user);
-            await _userRepository.updateLastLogin(user.id);
-            return user;
-          } else {
-            await _userRepository.incrementFailedPinAttempts(user.id);
-            final updated = await _userRepository.getFailedPinAttempts(user.id);
-            final attempts = updated['failed_pin_attempts'] as int? ?? 0;
-            final remainingAttempts = 5 - attempts;
-            if (remainingAttempts <= 0) {
-              throw AuthException(
-                  'Çok fazla başarısız deneme. Hesap 5 dakika süreyle kilitlendi.');
-            } else {
-              throw AuthException(
-                  'İşletme kodu, kullanıcı adı veya PIN hatalı. Kalan deneme hakkı: $remainingAttempts');
-            }
-          }
-        }
-      }
-    } catch (e) {
-      if (e is AuthException) rethrow;
-    }
-
-    throw AuthException('İşletme kodu, kullanıcı adı veya PIN hatalı.');
-  }
-
-  /// Verifies a sub-user PIN for the currently logged-in user or an admin/manager.
-  /// Used for gated action verification with brute-force lockout.
-  Future<({bool success, String? approverUserId, String? approverUserName})>
-      verifyCurrentUserPin(String pin) async {
-    final user = await getCurrentUser();
-    if (user == null) {
-      return (success: false, approverUserId: null, approverUserName: null);
-    }
-
-    // Offline lease check for admin-gated actions
-    final lastVerifiedStr =
-        _prefs.getString('serenut_last_authz_verified_at_${user.id}');
-    if (lastVerifiedStr != null) {
-      final lastVerified = DateTime.tryParse(lastVerifiedStr);
-      final leaseDays = _prefs.getInt('offline_auth_lease_days') ?? 7;
-      if (lastVerified != null &&
-          DateTime.now().toUtc().difference(lastVerified).inDays > leaseDays) {
-        throw AuthException(
-            'Oturum süresi (offline lease) dolmuştur. Hassas yetkili işlemler için lütfen internete bağlanın.');
-      }
-    }
-
-    // Check brute-force lockout first
-    final lockoutData = await _userRepository.getFailedPinAttempts(user.id);
-    final lockedUntilStr = lockoutData['locked_until'] as String?;
-    if (lockedUntilStr != null) {
-      final lockedUntil = DateTime.tryParse(lockedUntilStr);
-      if (lockedUntil != null && lockedUntil.isAfter(DateTime.now())) {
-        return (success: false, approverUserId: null, approverUserName: null);
-      }
-    }
-
-    final hashes = await _userRepository.getCredentialHashes(user.id);
-    final pinHash = hashes['pin_hash'];
-    bool isValid = false;
-
-    if (pinHash != null && pinHash.isNotEmpty) {
-      isValid = _hashService.verifyPassword(pin, pinHash);
-    } else {
-      // Fallback to password hash if PIN is not configured
-      final passwordHash = hashes['password_hash'];
-      if (passwordHash != null && passwordHash.isNotEmpty) {
-        isValid = _hashService.verifyPassword(pin, passwordHash);
-      }
-    }
-
-    if (isValid) {
-      await _userRepository.resetPinAttempts(user.id);
-      return (
-        success: true,
-        approverUserId: user.id,
-        approverUserName: user.name
-      );
-    } else {
-      await _userRepository.incrementFailedPinAttempts(user.id);
-      return (success: false, approverUserId: null, approverUserName: null);
     }
   }
 
@@ -622,11 +430,22 @@ class AuthService {
 
   /// Logout — clears session
   Future<void> logout() async {
+    final refreshToken = _prefs.getString('auth_refresh_token');
+    final api = _apiClient;
+    // Revoke local authority synchronously before any network wait. Session
+    // expiry/deactivation callers must not retain access while logout is in
+    // flight or the network is unavailable.
     _currentUser = null;
-    await _prefs.remove(_userStorageKey);
-    await _prefs.remove('auth_jwt_token');
-    await _prefs.remove('auth_refresh_token');
-    _apiClient?.setJwtToken(null);
+    api?.setJwtToken(null);
+    if (api != null && refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        await api.post('/auth/logout', {'refresh_token': refreshToken});
+      } catch (_) {
+        // Local logout must always complete. Server sessions are short-lived
+        // and can still be revoked by the account security controls.
+      }
+    }
+    await _clearStoredSession();
   }
 
   void Function()? onSessionExpiredCallback;

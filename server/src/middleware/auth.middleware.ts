@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService, UserPayload } from '../modules/auth/auth.service';
 import { pgPool, tenantLocalStorage } from '../config/database';
 import { incrementJwtFailures } from '../utils/telemetry';
+import { logger } from '../config/logger';
 
 export interface AuthenticatedRequest extends Request {
   user?: UserPayload;
@@ -23,12 +24,8 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     }
 
     const decoded = AuthService.verifyAccessToken(token);
-    console.log('authenticateUser verifyAccessToken DONE');
-
     // Dynamic database check for active status and token version
-    console.log('authenticateUser pgPool.query...');
     const resUser = await pgPool.query('SELECT is_active, token_version FROM users WHERE id = $1', [decoded.id]);
-    console.log('authenticateUser pgPool.query DONE');
     if (resUser.rows.length === 0 || !resUser.rows[0].is_active) {
       incrementJwtFailures();
       return res.status(403).json({ error: 'user_suspended', message: 'Hesabınız askıya alınmıştır.' });
@@ -46,8 +43,13 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     tenantLocalStorage.run({ companyId: decoded.company_id, bypassRls: false }, () => {
       next();
     });
-  } catch (err) {
-    console.error('authenticateUser Error:', err);
+  } catch (err: any) {
+    logger.warn('Authentication rejected', {
+      reason: err?.message || 'invalid_access_token',
+      route: req.originalUrl,
+      method: req.method,
+      ip: req.ip,
+    });
     incrementJwtFailures();
     return res.status(401).json({ error: 'unauthorized', message: 'Geçersiz veya süresi dolmuş token.' });
   }

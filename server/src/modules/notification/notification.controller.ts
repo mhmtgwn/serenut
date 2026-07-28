@@ -3,6 +3,7 @@ import { pgPool, redisClient } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest, requireRole, requirePermission, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
+import { isNotificationChannelEnabled } from './notification_channels';
 import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate-limit.middleware';
 
 const router = Router();
@@ -118,6 +119,12 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
 
   if (!channel || !recipient) {
     return res.status(400).json({ error: 'missing_fields', message: 'Kanal ve alıcı bilgileri zorunludur.' });
+  }
+  if (!isNotificationChannelEnabled(channel)) {
+    return res.status(409).json({
+      error: 'notification_channel_not_enabled',
+      message: 'Bu bildirim kanalı bu sunucuda etkin değil.',
+    });
   }
 
   try {

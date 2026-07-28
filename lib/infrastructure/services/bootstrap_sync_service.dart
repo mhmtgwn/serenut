@@ -8,6 +8,7 @@ import 'dart:convert';
 
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_v4_service.dart';
+import 'package:serenutos/domain/services/license_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BootstrapSyncService {
@@ -48,7 +49,12 @@ class BootstrapSyncService {
     void Function(double progress, String statusText) onProgress,
   ) async {
     onProgress(10, 'Yetkili ilk senkronizasyon başlatılıyor...');
-    final result = await SyncV4Service(_apiClient).sync();
+    // Bootstrap must resolve the activation from exactly the same canonical
+    // license store as routine synchronization.
+    final result = await SyncV4Service(
+      _apiClient,
+      licenseService: LicenseService(_prefs),
+    ).sync();
     if (!result.success) {
       throw Exception(
         result.errors.isEmpty

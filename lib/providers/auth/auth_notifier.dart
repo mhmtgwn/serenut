@@ -53,8 +53,17 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
       final user = await _authService.getCurrentUser();
       if (user != null) {
         state = AppState.success(user);
-        // Silently refresh entitlement status from backend on startup
-        _authService.refreshEntitlement().catchError((_) => false);
+        // Refresh the server-owned entitlement and publish a fresh auth state
+        // afterwards. License/access providers read the verified cache; without
+        // this second state emission an expired banner could remain visible
+        // until the next full application restart even after a successful
+        // bootstrap activated the trial.
+        try {
+          final refreshed = await _authService.refreshEntitlement();
+          if (refreshed) state = AppState.success(user);
+        } catch (_) {
+          // Keep the already restored offline session and its normal lease.
+        }
       } else {
         state = AppState.error(
           AuthException(message: 'No stored user found', code: 'AUTH_001'),
@@ -81,18 +90,6 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
       final user = await _authService.login(username, password);
       // Trial sync: AuthService.login() içinde backend'den halloluyor
       // Burada çift tetiklemeye gerek yok
-      state = AppState.success(user);
-    } catch (e) {
-      state = AppState.error(AppException.from(e));
-    }
-  }
-
-  /// Perform sub-user login with businessCode, username, and PIN
-  Future<void> loginSubUser(
-      String businessCode, String username, String pin) async {
-    try {
-      state = AppState.loading();
-      final user = await _authService.loginSubUser(businessCode, username, pin);
       state = AppState.success(user);
     } catch (e) {
       state = AppState.error(AppException.from(e));

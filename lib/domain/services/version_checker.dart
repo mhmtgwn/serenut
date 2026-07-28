@@ -77,8 +77,8 @@ class VersionChecker {
     try {
       final info = await PackageInfo.fromPlatform();
       if (info.version.isNotEmpty) {
-        _cachedVersion = info.buildNumber.isNotEmpty 
-            ? '${info.version}+${info.buildNumber}' 
+        _cachedVersion = info.buildNumber.isNotEmpty
+            ? '${info.version}+${info.buildNumber}'
             : info.version;
       }
       return _cachedVersion;
@@ -89,7 +89,7 @@ class VersionChecker {
 
   static String get currentVersion => _cachedVersion;
 
-  static const int currentSchemaVersion = 1;
+  static const int currentSchemaVersion = 36;
 
   String get _platform => Platform.isAndroid ? 'android' : 'windows';
 
@@ -97,8 +97,8 @@ class VersionChecker {
   Future<bool> checkForceUpdateRequired() async {
     try {
       final activeVer = await getAppVersion();
-      final response = await _apiClient.get(
-          '/updates/check?platform=$_platform&current_version=$activeVer');
+      final response = await _apiClient
+          .get('/updates/check?platform=$_platform&current_version=$activeVer');
 
       if (response.statusCode != 200) return false;
 

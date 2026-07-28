@@ -403,32 +403,57 @@ class _CloudBiTab extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Real-time badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(width: 6),
-                    const Text('WebSocket Gerçek Zamanlı Bulut BI Aktif',
-                        style: TextStyle(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
                             color: Colors.green,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                ),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text('WebSocket Gerçek Zamanlı Bulut BI Aktif',
+                            style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sync_rounded, color: Colors.blue, size: 12),
+                        SizedBox(width: 4),
+                        Text('Sync V4 Otomatik Mutabakat',
+                            style: TextStyle(
+                                color: Colors.blue,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               // KPI Cards
@@ -616,7 +641,7 @@ class _KpiCard extends StatelessWidget {
                         color: Colors.grey,
                         fontSize: 11,
                         fontWeight: FontWeight.w600)),
-                Icon(icon, color: color.withOpacity(0.8), size: 20),
+                Icon(icon, color: color.withValues(alpha: 0.8), size: 20),
               ],
             ),
             const SizedBox(height: 6),
@@ -787,7 +812,7 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
                           dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: Colors.green.withOpacity(0.1),
+                            color: Colors.green.withValues(alpha: 0.1),
                           ),
                         ),
                       ],
@@ -863,8 +888,8 @@ class _CloudStockAlertWidget extends StatelessWidget {
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: item.quantity <= 3
-                              ? Colors.red.withOpacity(0.1)
-                              : Colors.orange.withOpacity(0.1),
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : Colors.orange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -962,7 +987,7 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                                             ? branches.first.revenue
                                             : 1),
                                     backgroundColor:
-                                        Colors.grey.withOpacity(0.2),
+                                        Colors.grey.withValues(alpha: 0.2),
                                     valueColor: const AlwaysStoppedAnimation(
                                         Colors.green),
                                     minHeight: 8,
@@ -1018,7 +1043,7 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                         children: [
                           TableRow(
                             decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.1)),
+                                color: Colors.grey.withValues(alpha: 0.1)),
                             children: const [
                               Padding(
                                   padding: EdgeInsets.all(8.0),

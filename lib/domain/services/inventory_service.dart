@@ -73,18 +73,21 @@ class InventoryService {
   /// Decreases product stock levels for the given items and publishes StockChangedEvents.
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
-      await _productRepository.decreaseStock(item.productId, item.quantity);
+      final product = await _productRepository.findById(item.productId);
+      final int effectiveQty = (product != null && product.isWeighed && item.quantity >= 100)
+          ? item.saleQuantity.round()
+          : item.quantity;
+      final qtyToDeduct = effectiveQty > 0 ? effectiveQty : 1;
 
-      // Try to parse product ID as int for DomainEvent compatibility
-      int parsedProductId = 0;
-      try {
-        parsedProductId =
-            int.parse(item.productId.replaceAll(RegExp(r'[^0-9]'), ''));
-      } catch (_) {}
+      await _productRepository.decreaseStock(item.productId, qtyToDeduct);
+
+      final parsedProductId =
+          int.tryParse(item.productId.replaceAll(RegExp(r'[^0-9]'), '')) ??
+              item.productId.hashCode.abs();
 
       _eventPublisher.publish(StockChangedEvent(
         productId: parsedProductId,
-        quantityChange: -item.quantity,
+        quantityChange: -qtyToDeduct,
         reason: 'sale',
       ));
     }
@@ -93,17 +96,21 @@ class InventoryService {
   /// Increases product stock levels for the given items (returns/reversals) and publishes StockChangedEvents.
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
-      await _productRepository.increaseStock(item.productId, item.quantity);
+      final product = await _productRepository.findById(item.productId);
+      final int effectiveQty = (product != null && product.isWeighed && item.quantity >= 100)
+          ? item.saleQuantity.round()
+          : (item.quantity > 0 ? item.quantity : item.saleQuantity.round());
+      final qtyToApply = effectiveQty > 0 ? effectiveQty : 1;
 
-      int parsedProductId = 0;
-      try {
-        parsedProductId =
-            int.parse(item.productId.replaceAll(RegExp(r'[^0-9]'), ''));
-      } catch (_) {}
+      await _productRepository.increaseStock(item.productId, qtyToApply);
+
+      final parsedProductId =
+          int.tryParse(item.productId.replaceAll(RegExp(r'[^0-9]'), '')) ??
+              item.productId.hashCode.abs();
 
       _eventPublisher.publish(StockChangedEvent(
         productId: parsedProductId,
-        quantityChange: item.quantity,
+        quantityChange: qtyToApply,
         reason: 'refund',
       ));
     }

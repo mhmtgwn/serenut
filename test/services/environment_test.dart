@@ -23,6 +23,13 @@ void main() {
       final config = EnvironmentConfig.fromEnv(AppEnvironment.prod);
       expect(config.environment, AppEnvironment.prod);
       expect(config.apiBaseUrl, 'https://api.serenut.com/api/v1');
+      expect(
+          config.wsBaseUrl, 'wss://api.serenut.com:443/api/v1/realtime/live');
+    });
+
+    test('Preserves explicit development WebSocket port', () {
+      final config = EnvironmentConfig.fromEnv(AppEnvironment.dev);
+      expect(config.wsBaseUrl, 'ws://localhost:3000/api/v1/realtime/live');
     });
 
     test('Loads default current config', () {

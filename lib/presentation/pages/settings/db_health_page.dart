@@ -49,7 +49,6 @@ class _DbHealthPageState extends ConsumerState<DbHealthPage> {
       context,
       permission: Permission.settingsDatabase,
       title: 'Veritabanı Onarım Yetkisi',
-      requirePin: true,
       onGranted: (approvedByUserId, approvedByUserName) async {
         setState(() {
           _isLoading = true;
