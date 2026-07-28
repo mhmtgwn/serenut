@@ -30,6 +30,7 @@ import 'package:serenutos/domain/services/error_boundary.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/network/trusted_ca_http_overrides.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
+import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
@@ -89,6 +90,8 @@ void main() async {
       }
 
       final deviceManager = DeviceManager(prefs);
+      final fingerprintService = DeviceFingerprintService(prefs, deviceManager);
+      final settingsRepository = SqliteSettingsRepository(gateway);
 
       final authService = AuthService(
         userRepository: userRepository,
@@ -96,11 +99,40 @@ void main() async {
         apiClient: apiClient,
         deviceManager: deviceManager,
         licenseService: licenseService,
+        deviceFingerprintService: fingerprintService,
+        cacheCompanyProfile: (company) async {
+          final current = await settingsRepository.getSettings();
+          await settingsRepository.updateSettings(current.copyWith(
+            businessName: company['name']?.toString() ?? current.businessName,
+            businessPhone:
+                company['phone']?.toString() ?? current.businessPhone,
+            businessAddress:
+                company['address']?.toString() ?? current.businessAddress,
+            businessTaxId:
+                company['tax_number']?.toString() ?? current.businessTaxId,
+            ownerName: company['owner_name']?.toString() ?? current.ownerName,
+            businessEmail:
+                company['email']?.toString() ?? current.businessEmail,
+            businessCity: company['city']?.toString() ?? current.businessCity,
+            businessDistrict:
+                company['district']?.toString() ?? current.businessDistrict,
+          ));
+        },
       );
       // Global event publisher will be eagerly initialized in MyApp build
 
       // Initialize Auth service
       await authService.initialize();
+
+      // Perform session bootstrap & online token validation if JWT token is saved
+      if (apiClient.jwtToken != null && apiClient.jwtToken!.isNotEmpty) {
+        try {
+          await authService.checkCurrentUserSessionOnline();
+          await authService.refreshEntitlement();
+        } catch (e) {
+          debugPrint('Startup session bootstrap note: $e');
+        }
+      }
 
       // If database contains no users, reset onboarding status to show the wizard
       try {
@@ -325,7 +357,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           releaseManager: ref.read(releaseManagerServiceProvider),
           platform: Platform.isAndroid ? 'android' : 'windows',
           jwtToken: ref.read(authServiceProvider).getJwtToken(),
-          deviceId: ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
+          deviceId:
+              ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
         );
       } finally {
         _updateDialogVisible = false;
@@ -443,6 +476,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // Eagerly initialize sync provider so AppLifecycle observer is registered
     // and auto-sync fires when app resumes from background.
     ref.watch(syncProvider);
+
+    // Yerel hata/uyarı loglarını dayanıklı kuyruk üzerinden Admin telemetrisine bağla.
+    ref.watch(telemetryBridgeProvider);
 
     // Eagerly initialize SMS notification handler to subscribe to domain events on startup
     ref.watch(smsNotificationHandlerProvider);

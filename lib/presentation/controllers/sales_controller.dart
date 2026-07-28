@@ -164,6 +164,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       ref.invalidate(customerBalanceDetailsProvider(customerId));
     }
     if (created != null) {
+      ref.invalidate(salesHistoryControllerProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
     }
     return created;
@@ -191,6 +192,10 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       ref.invalidate(dashboardProvider);
       return _saleRepository.findAll();
     });
+    if (!state.hasError) {
+      ref.invalidate(salesHistoryControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+    }
   }
 
   Future<void> returnItems({
@@ -227,6 +232,10 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       ref.invalidate(dashboardProvider);
       return _saleRepository.findAll();
     });
+    if (!state.hasError) {
+      ref.invalidate(salesHistoryControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+    }
   }
 
   Future<void> recordPartialPayment({
@@ -267,6 +276,10 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
       }
       return _saleRepository.findAll();
     });
+    if (!state.hasError) {
+      ref.invalidate(salesHistoryControllerProvider);
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+    }
   }
 
   Future<void> refresh() async {

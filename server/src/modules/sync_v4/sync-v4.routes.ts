@@ -16,11 +16,13 @@ const entityTypes = new Set([
 ]);
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const syncProtocolVersion = 5;
 
 type SyncMutation = {
   entity_type: string;
   entity_id: string;
   operation: "UPSERT" | "DELETE";
+  base_revision: number;
   payload: Record<string, unknown>;
 };
 
@@ -212,20 +214,36 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
 
 async function upsertFinancialTransaction(client: PoolClient, companyId: string, id: string, payload: Record<string, unknown>) {
   const customerId = nullableId(stringValue(payload, "customer_id"));
+  const description = stringValue(payload, "description") || stringValue(payload, "notes") || null;
+  const metadata = typeof payload.metadata === "object" && payload.metadata !== null ? JSON.stringify(payload.metadata) : (stringValue(payload, "metadata") || null);
+  const paymentMethod = stringValue(payload, "payment_method") || null;
   await client.query(
-    `INSERT INTO financial_transactions (id, company_id, type, customer_id, amount, paid_amount, debt_amount, date, reference_id, logical_clock, device_id, is_deleted, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()),$9,$10,$11,false,NOW())
-     ON CONFLICT (id) DO NOTHING`,
+    `INSERT INTO financial_transactions (id, company_id, type, customer_id, amount, paid_amount, debt_amount, date, reference_id, logical_clock, device_id, description, metadata, payment_method, is_deleted, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()),$9,$10,$11,$12,$13,$14,false,NOW())
+     ON CONFLICT (id) DO UPDATE SET
+       description = COALESCE(EXCLUDED.description, financial_transactions.description),
+       metadata = COALESCE(EXCLUDED.metadata, financial_transactions.metadata),
+       payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method)`,
     [id, companyId, stringValue(payload, "type", "payment"), customerId, numberValue(payload, "amount"),
       numberValue(payload, "paid_amount"), numberValue(payload, "debt_amount"),
       stringValue(payload, "date") || stringValue(payload, "created_at") || null,
       stringValue(payload, "reference_id") || null, numberValue(payload, "logical_clock"),
-      stringValue(payload, "device_id") || null],
+      stringValue(payload, "device_id") || null, description, metadata, paymentMethod],
   );
 }
 
 router.use(authenticateUser as any);
 router.use(requireActiveEntitlement as any);
+router.use((req, res, next) => {
+  if (req.header("x-sync-protocol-version") !== String(syncProtocolVersion)) {
+    return res.status(426).json({
+      error: "sync_protocol_upgrade_required",
+      required_version: syncProtocolVersion,
+      message: "Senkronizasyon protokolü güncel değil. Lütfen uygulamayı güncelleyin.",
+    });
+  }
+  next();
+});
 router.use(syncLimiter);
 
 router.post("/push", async (req, res) => {
@@ -258,12 +276,16 @@ router.post("/push", async (req, res) => {
       [deviceActivationId],
     );
     const results = [] as Array<{ mutation_id: string; revision: number }>;
+    const conflicts: Array<{ mutation_id: string; entity_type: string; entity_id: string; server_revision: number }> = [];
+    const rejected: Array<{ mutation_id: string | null; error: string }> = [];
     const notifications: Array<{
       type: string;
       entityId: string;
       revision: number;
     }> = [];
     for (const mutation of mutations) {
+      await client.query("SAVEPOINT sync_mutation");
+      try {
       if (
         !mutation ||
         typeof mutation.mutation_id !== "string" ||
@@ -271,6 +293,7 @@ router.post("/push", async (req, res) => {
         !entityTypes.has(mutation.entity_type) ||
         typeof mutation.entity_id !== "string" ||
         !["UPSERT", "DELETE"].includes(mutation.operation) ||
+        !Number.isSafeInteger(mutation.base_revision) || mutation.base_revision < 0 ||
         typeof mutation.payload !== "object" ||
         mutation.payload === null ||
         mutation.entity_id.length > 128 ||
@@ -296,10 +319,35 @@ router.post("/push", async (req, res) => {
         [user.company_id, `${mutation.entity_type}:${mutation.entity_id}`],
       );
       const entity = await client.query(
-        `SELECT is_deleted FROM sync_v4_entities
+        `SELECT is_deleted, updated_revision FROM sync_v4_entities
           WHERE tenant_id = $1 AND entity_type = $2 AND entity_id = $3 FOR UPDATE`,
         [user.company_id, mutation.entity_type, mutation.entity_id],
       );
+      const currentRevision = Number(entity.rows[0]?.updated_revision ?? 0);
+      if (currentRevision > mutation.base_revision) {
+        const source = await client.query(
+          `SELECT device_id FROM sync_v4_changes
+           WHERE tenant_id = $1 AND revision = $2 LIMIT 1`,
+          [user.company_id, currentRevision],
+        );
+        // Multiple queued edits from one device are causally ordered by the
+        // outbox. A different device editing after this mutation's base cursor
+        // is a true concurrent write and must never be silently overwritten.
+        if (source.rows[0]?.device_id !== deviceInstallationId) {
+          await client.query(
+            `INSERT INTO sync_v4_conflicts
+             (tenant_id, mutation_id, entity_type, entity_id, base_revision, server_revision, device_id, payload)
+             VALUES ($1,$2::uuid,$3,$4,$5,$6,$7,$8::jsonb)
+             ON CONFLICT (tenant_id, mutation_id) DO NOTHING`,
+            [user.company_id, mutation.mutation_id, mutation.entity_type,
+              mutation.entity_id, mutation.base_revision, currentRevision,
+              deviceInstallationId, JSON.stringify(mutation.payload)],
+          );
+          conflicts.push({ mutation_id: mutation.mutation_id, entity_type: mutation.entity_type,
+            entity_id: mutation.entity_id, server_revision: currentRevision });
+          continue;
+        }
+      }
       const effectiveOperation =
         entity.rows[0]?.is_deleted === true ? "DELETE" : mutation.operation;
       const domainMutation: SyncMutation = {
@@ -307,6 +355,7 @@ router.post("/push", async (req, res) => {
         entity_id: mutation.entity_id,
         operation: effectiveOperation,
         payload: mutation.payload,
+        base_revision: mutation.base_revision,
       };
       // The domain write and the durable replication record are atomic. Never
       // acknowledge a mutation that cannot be materialized for another device.
@@ -367,6 +416,18 @@ router.post("/push", async (req, res) => {
           revision: Number(previous.rows[0].revision),
         });
       }
+        await client.query("RELEASE SAVEPOINT sync_mutation");
+      } catch (mutationError: any) {
+        await client.query("ROLLBACK TO SAVEPOINT sync_mutation");
+        await client.query("RELEASE SAVEPOINT sync_mutation");
+        rejected.push({
+          mutation_id:
+            mutation && typeof mutation.mutation_id === "string"
+              ? mutation.mutation_id
+              : null,
+          error: mutationError?.message || "mutation_failed",
+        });
+      }
     }
     await client.query("COMMIT");
     for (const notification of notifications) {
@@ -379,7 +440,7 @@ router.post("/push", async (req, res) => {
         },
       );
     }
-    return res.json({ results });
+    return res.json({ results, conflicts, rejected });
   } catch (error: any) {
     await client.query("ROLLBACK");
     return res
@@ -508,7 +569,8 @@ router.get("/bootstrap", async (req, res) => {
         default:
           return { id: row.id, type: row.type, customer_id: row.customer_id ?? "", amount: row.amount,
             paid_amount: row.paid_amount, debt_amount: row.debt_amount, reference_id: row.reference_id,
-            metadata: null, created_at: row.date, logical_clock: row.logical_clock ?? 0,
+            description: row.description ?? "", metadata: row.metadata ?? null, payment_method: row.payment_method ?? null,
+            created_at: row.date, logical_clock: row.logical_clock ?? 0,
             device_id: row.device_id, is_deleted: deleted, deleted_at: row.deleted_at,
             deleted_by: row.deleted_by };
       }

@@ -5,7 +5,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
-import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
@@ -20,7 +19,6 @@ void main() {
     late Database db;
     late IProductRepository productRepo;
     late ICustomerRepository customerRepo;
-    late ISaleRepository saleRepo;
     late IDashboardRepository dashboardRepo;
     late DashboardService dashboardService;
 
@@ -167,7 +165,6 @@ void main() {
       final gateway = DbGatewayImpl.raw(db);
       productRepo = SqliteProductRepository(gateway);
       customerRepo = SqliteCustomerRepository(gateway);
-      saleRepo = SqliteSaleRepository(gateway);
       dashboardRepo = SqliteDashboardRepository(gateway);
       dashboardService = DashboardService(dashboardRepo);
 

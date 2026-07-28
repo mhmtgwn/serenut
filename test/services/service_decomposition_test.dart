@@ -151,7 +151,7 @@ void main() {
         items: [
           SaleItemInput(productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
         ],
-        paymentMethod: 'credit',
+        paymentMethod: 'debt',
         paidAmount: 100.0,
       );
 
@@ -185,7 +185,7 @@ void main() {
         items: [
           SaleItemInput(productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
         ],
-        paymentMethod: 'credit',
+        paymentMethod: 'debt',
         paidAmount: 100.0,
       );
 
@@ -221,7 +221,7 @@ void main() {
         items: [
           SaleItemInput(productId: 'prod-test-1', quantity: 4, unitPrice: 100.0)
         ],
-        paymentMethod: 'credit',
+        paymentMethod: 'debt',
         paidAmount: 100.0, // total: 400, paid: 100, debt: 300
       );
 
@@ -316,7 +316,7 @@ void main() {
             SaleItemInput(
                 productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
           ],
-          paymentMethod: 'credit',
+          paymentMethod: 'debt',
           paidAmount: 100.0,
         );
 

@@ -37,6 +37,26 @@ final _recentLogsProvider =
   return TelemetryService().getEventsByLevel(LogLevel.warning);
 });
 
+final _cloudHealthProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ref.watch(portalRepositoryProvider).getTelemetryHealth();
+});
+
+final _cloudEventsProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(portalRepositoryProvider).getClientTelemetryEvents();
+});
+
+final _cloudAuditProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(portalRepositoryProvider).getAuditLogs();
+});
+
+final _serverErrorsProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(portalRepositoryProvider).getServerErrorLogs();
+});
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 class ObservabilityDashboard extends ConsumerStatefulWidget {
@@ -59,6 +79,10 @@ class _ObservabilityDashboardState
       if (mounted) {
         ref.invalidate(_healthMetricsProvider);
         ref.invalidate(_recentLogsProvider);
+        ref.invalidate(_cloudHealthProvider);
+        ref.invalidate(_cloudEventsProvider);
+        ref.invalidate(_cloudAuditProvider);
+        ref.invalidate(_serverErrorsProvider);
       }
     });
   }
@@ -73,6 +97,10 @@ class _ObservabilityDashboardState
   Widget build(BuildContext context) {
     final metricsAsync = ref.watch(_healthMetricsProvider);
     final logsAsync = ref.watch(_recentLogsProvider);
+    final cloudHealthAsync = ref.watch(_cloudHealthProvider);
+    final cloudEventsAsync = ref.watch(_cloudEventsProvider);
+    final cloudAuditAsync = ref.watch(_cloudAuditProvider);
+    final serverErrorsAsync = ref.watch(_serverErrorsProvider);
 
     return Scaffold(
       backgroundColor: _kBgColor,
@@ -115,6 +143,10 @@ class _ObservabilityDashboardState
             onPressed: () {
               ref.invalidate(_healthMetricsProvider);
               ref.invalidate(_recentLogsProvider);
+              ref.invalidate(_cloudHealthProvider);
+              ref.invalidate(_cloudEventsProvider);
+              ref.invalidate(_cloudAuditProvider);
+              ref.invalidate(_serverErrorsProvider);
             },
           ),
         ],
@@ -125,6 +157,10 @@ class _ObservabilityDashboardState
         onRefresh: () async {
           ref.invalidate(_healthMetricsProvider);
           ref.invalidate(_recentLogsProvider);
+          ref.invalidate(_cloudHealthProvider);
+          ref.invalidate(_cloudEventsProvider);
+          ref.invalidate(_cloudAuditProvider);
+          ref.invalidate(_serverErrorsProvider);
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -163,9 +199,133 @@ class _ObservabilityDashboardState
               error: (e, _) => _ErrorCard(message: e.toString()),
               data: (events) => _buildEventLog(events),
             ),
+            const SizedBox(height: 16),
+            _buildSectionHeader('☁️ SUNUCU VE KUYRUK SAĞLIĞI'),
+            const SizedBox(height: 8),
+            cloudHealthAsync.when(
+              loading: () => const _LoadingCard(),
+              error: (e, _) => _ErrorCard(message: e.toString()),
+              data: _buildCloudHealth,
+            ),
+            const SizedBox(height: 16),
+            _buildSectionHeader('🚨 TÜM CİHAZ HATA/UYARI OLAYLARI'),
+            const SizedBox(height: 8),
+            cloudEventsAsync.when(
+              loading: () => const _LoadingCard(),
+              error: (e, _) => _ErrorCard(message: e.toString()),
+              data: (events) => _buildCloudRows(events, telemetry: true),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionHeader('🛡️ BULUT DENETİM KAYITLARI'),
+            const SizedBox(height: 8),
+            cloudAuditAsync.when(
+              loading: () => const _LoadingCard(),
+              error: (e, _) => _ErrorCard(message: e.toString()),
+              data: (events) => _buildCloudRows(events),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionHeader('🖥️ SUNUCU LOGLARI (SYSADMIN)'),
+            const SizedBox(height: 8),
+            serverErrorsAsync.when(
+              loading: () => const _LoadingCard(),
+              error: (e, _) => _ErrorCard(message: e.toString()),
+              data: (events) => _buildServerErrors(events),
+            ),
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildServerErrors(List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) return const _EmptyLogCard();
+    return Container(
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        border: Border.all(color: _kBorderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: rows
+            .take(200)
+            .map((row) => ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.dns_rounded, color: _kRed),
+                  title: Text(row['message']?.toString() ?? 'server_error',
+                      style:
+                          const TextStyle(color: _kTextPrimary, fontSize: 13)),
+                  subtitle: Text(
+                    '${row['timestamp'] ?? '-'} • ${row['level'] ?? 'error'}',
+                    style:
+                        const TextStyle(color: _kTextSecondary, fontSize: 11),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildCloudHealth(Map<String, dynamic> data) {
+    final system = Map<String, dynamic>.from(data['system'] as Map? ?? {});
+    final queue = Map<String, dynamic>.from(data['queue'] as Map? ?? {});
+    final gateways = Map<String, dynamic>.from(data['gateways'] as Map? ?? {});
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        border: Border.all(color: _kBorderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        'Bellek: ${system['memoryUsage'] ?? '-'}  •  DB bağlantı: ${system['dbActivePool'] ?? '-'}\n'
+        'Kuyruk: ${queue.entries.map((e) => '${e.key}:${e.value}').join('  ')}\n'
+        'Kanallar: ${gateways.entries.map((e) => '${e.key}:${e.value}').join('  ')}',
+        style: const TextStyle(color: _kTextPrimary, height: 1.6),
+      ),
+    );
+  }
+
+  Widget _buildCloudRows(List<Map<String, dynamic>> rows,
+      {bool telemetry = false}) {
+    if (rows.isEmpty) {
+      return const _EmptyLogCard();
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        border: Border.all(color: _kBorderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: rows.take(100).map((row) {
+          final metadata = row['metadata'];
+          final title = telemetry
+              ? (metadata is Map
+                  ? metadata['event']?.toString() ??
+                      row['metric_name']?.toString() ??
+                      'operational_event'
+                  : row['metric_name']?.toString() ?? 'operational_event')
+              : row['action']?.toString() ?? 'audit_event';
+          final time = telemetry
+              ? row['occurred_at']?.toString()
+              : row['created_at']?.toString();
+          return ListTile(
+            dense: true,
+            leading: Icon(
+              telemetry ? Icons.error_outline_rounded : Icons.shield_outlined,
+              color: telemetry ? _kAmber : _kBlue,
+            ),
+            title: Text(title,
+                style: const TextStyle(color: _kTextPrimary, fontSize: 13)),
+            subtitle: Text(
+              '${time ?? '-'}\n${telemetry ? (metadata ?? '') : (row['entity_type'] ?? row['entity'] ?? '')}',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _kTextSecondary, fontSize: 11),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -566,4 +726,22 @@ class _ErrorCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyLogCard extends StatelessWidget {
+  const _EmptyLogCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kBorderColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Kayıt bulunamadı.',
+          style: TextStyle(color: _kTextSecondary),
+        ),
+      );
 }

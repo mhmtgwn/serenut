@@ -187,6 +187,14 @@ class SqliteProductRepository implements IProductRepository {
           where: 'id = ?',
           whereArgs: [oldId],
         );
+        // 1. Send DELETE tombstone for oldId so other devices remove the previous ID/barcode
+        await SyncOutboxV4.enqueue(_executor,
+            entityType: 'product',
+            entityId: oldId,
+            operation: 'DELETE',
+            payload: {'id': oldId, 'is_deleted': 1});
+
+        // 2. Send UPSERT for new product ID/barcode
         await SyncOutboxV4.enqueue(_executor,
             entityType: 'product',
             entityId: product.id,

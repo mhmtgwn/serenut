@@ -299,13 +299,6 @@ void main() {
 
       // Basic cashier permissions are still allowed
       expect(await authService.hasPermission('sales:create'), isTrue);
-
-      // 3. And explicitly blocks verifyCurrentUserPin
-      await expectLater(
-        authService.verifyCurrentUserPin('pwd'),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message',
-            contains('Oturum süresi (offline lease) dolmuştur'))),
-      );
     });
   });
 }

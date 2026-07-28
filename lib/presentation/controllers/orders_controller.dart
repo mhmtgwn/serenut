@@ -32,12 +32,15 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     _repository = await ref.watch(orderRepositoryProvider.future);
     _offset = 0;
     _hasMore = true;
-    return _repository.findFiltered(
+    final firstPage = await _repository.findFiltered(
       status: _statusFilter,
       searchQuery: _searchQuery,
       limit: _kPageSize,
       offset: 0,
     );
+    _offset = firstPage.length;
+    _hasMore = firstPage.length == _kPageSize;
+    return firstPage;
   }
 
   // ── Filtering & Search ──────────────────────────────────────────────────────
@@ -138,8 +141,6 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       ));
     } catch (_) {}
 
-    unawaited(ref.read(syncProvider.notifier).triggerSync());
-
     // Log to Audit Trail
     try {
       final auditService = await ref.read(auditServiceProvider.future);
@@ -155,6 +156,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       );
     } catch (_) {}
 
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
 
@@ -188,6 +190,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       );
     } catch (_) {}
 
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
 
@@ -230,76 +233,76 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       );
     } catch (_) {}
 
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
 
   Future<void> updateStatus(String id, String status) async {
     await future;
+    final order = await _repository.findById(id);
+    if (order == null) throw StateError('Sipariş bulunamadı: $id');
+    final publisher = ref.read(eventPublisherProvider);
 
-    try {
-      final order = await _repository.findById(id);
-      if (order != null) {
-        final publisher = ref.read(eventPublisherProvider);
+    if (status == 'cancelled') {
+      final cancellationService =
+          await ref.read(orderCancellationServiceProvider.future);
 
-        if (status == 'cancelled') {
-          final cancellationService =
-              await ref.read(orderCancellationServiceProvider.future);
+      await cancellationService.cancel(
+        id: order.id,
+        isOrder: true,
+      );
 
-          await cancellationService.cancel(
-            id: order.id,
-            isOrder: true,
-          );
+      publisher.publish(OrderCancelledEvent(
+        orderId: 0,
+        customerId: 0,
+        orderIdStr: order.id,
+        customerIdStr: order.customerId,
+      ));
 
-          publisher.publish(OrderCancelledEvent(
-            orderId: 0,
-            customerId: 0,
-            orderIdStr: order.id,
-            customerIdStr: order.customerId,
-          ));
+      // Invalidate balance/transaction providers to refresh UI state immediately
+      ref.invalidate(customersControllerProvider);
+      ref.invalidate(customerTransactionsProvider(order.customerId));
+      ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+    } else {
+      await _repository.updateStatus(id, status);
 
-          // Invalidate balance/transaction providers to refresh UI state immediately
-          ref.invalidate(customersControllerProvider);
-          ref.invalidate(customerTransactionsProvider(order.customerId));
-          ref.invalidate(customerBalanceDetailsProvider(order.customerId));
-        } else {
-          await _repository.updateStatus(id, status);
-
-          if (status == 'delivered') {
-            publisher.publish(OrderDeliveredEvent(
-              orderId: 0,
-              customerId: 0,
-              orderIdStr: order.id,
-              customerIdStr: order.customerId,
-            ));
-          } else if (status == 'preparing') {
-            publisher.publish(OrderPreparingEvent(
-              orderId: 0,
-              customerId: 0,
-              orderIdStr: order.id,
-              customerIdStr: order.customerId,
-            ));
-          } else if (status == 'ready') {
-            publisher.publish(OrderReadyEvent(
-              orderId: 0,
-              customerId: 0,
-              orderIdStr: order.id,
-              customerIdStr: order.customerId,
-            ));
-          }
-        }
-
-        // Log status update to audit trail
-        final auditService = await ref.read(auditServiceProvider.future);
-        await auditService.logEvent(
-          eventType: 'order_status_updated',
-          entityType: 'order',
-          entityId: id,
-          newValue: status,
-          notes: 'Sipariş durumu güncellendi: $id -> $status',
-        );
+      if (status == 'delivered') {
+        publisher.publish(OrderDeliveredEvent(
+          orderId: 0,
+          customerId: 0,
+          orderIdStr: order.id,
+          customerIdStr: order.customerId,
+        ));
+      } else if (status == 'preparing') {
+        publisher.publish(OrderPreparingEvent(
+          orderId: 0,
+          customerId: 0,
+          orderIdStr: order.id,
+          customerIdStr: order.customerId,
+        ));
+      } else if (status == 'ready') {
+        publisher.publish(OrderReadyEvent(
+          orderId: 0,
+          customerId: 0,
+          orderIdStr: order.id,
+          customerIdStr: order.customerId,
+        ));
       }
+    }
+
+    // Audit failure must not hide or roll back a successful status mutation.
+    try {
+      final auditService = await ref.read(auditServiceProvider.future);
+      await auditService.logEvent(
+        eventType: 'order_status_updated',
+        entityType: 'order',
+        entityId: id,
+        newValue: status,
+        notes: 'Sipariş durumu güncellendi: $id -> $status',
+      );
     } catch (_) {}
 
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
 }

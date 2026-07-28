@@ -67,6 +67,7 @@ class SyncNotifier extends StateNotifier<SyncState>
   /// Updated on every triggerSync() call with a fresh session.
   SyncStateMachine? _machine;
   Timer? _periodicSyncTimer;
+  bool _syncRequestedWhileRunning = false;
   SyncStateMachine? get stateMachine => _machine;
 
   SyncNotifier(this._ref) : super(const SyncState()) {
@@ -76,7 +77,10 @@ class SyncNotifier extends StateNotifier<SyncState>
 
   Future<void> _initAndSync() async {
     try {
-      _syncService = SyncV4Service(_ref.read(apiClientProvider));
+      _syncService = SyncV4Service(
+        _ref.read(apiClientProvider),
+        licenseService: _ref.read(licenseServiceProvider),
+      );
       await triggerSync();
       _periodicSyncTimer ??= Timer.periodic(
         const Duration(seconds: 30),
@@ -103,20 +107,50 @@ class SyncNotifier extends StateNotifier<SyncState>
   Future<void> triggerSync() async {
     final service = _syncService;
     if (service == null) return;
-    if (state.status == SyncStatus.syncing) return;
+    if (state.status == SyncStatus.syncing) {
+      // Never lose a mutation/event that arrives during an active pass. One
+      // trailing pass is sufficient because the outbox coalesces entity edits.
+      _syncRequestedWhileRunning = true;
+      return;
+    }
 
-    // A fresh or offline-only installation has no server activation yet. Its
-    // outbox remains durable, but repeatedly attempting an authorized push
-    // would create a misleading error every 30 seconds.
-    final activationId =
+    // Check device activation and license status before initiating network sync.
+    // Preserves local outbox while setting classified error state.
+    var activationId =
         _ref.read(licenseServiceProvider).getLicenseInfo()?.activationId;
     if (activationId == null || activationId.isEmpty) {
-      state = state.copyWith(status: SyncStatus.idle, lastError: null);
+      // A successful server activation may not yet be present in the local
+      // cache after reinstall/update. Recover the entitlement and signed
+      // device token before classifying sync as blocked.
+      try {
+        await _ref.read(authServiceProvider).refreshEntitlement();
+        activationId =
+            _ref.read(licenseServiceProvider).getLicenseInfo()?.activationId;
+      } catch (_) {
+        // The classified error below is retained for the recovery UI.
+      }
+    }
+    if (activationId == null || activationId.isEmpty) {
+      await TelemetryService().logStructured(
+        event: 'sync_activation_recovery_failed',
+        level: LogLevel.error,
+        metadata: {
+          'has_access_token':
+              (_ref.read(apiClientProvider).jwtToken?.isNotEmpty ?? false),
+          'has_refresh_token':
+              _ref.read(authServiceProvider).getRefreshToken()?.isNotEmpty ??
+                  false,
+        },
+      );
+      state = state.copyWith(
+        status: SyncStatus.error,
+        lastError:
+            'active_device_activation_required: Cihaz aktivasyonu veya lisansı gerekli.',
+      );
       return;
     }
 
     state = state.copyWith(status: SyncStatus.syncing);
-
     try {
       String? companyPatchError;
       // Sync pending settings if any before main sync
@@ -206,6 +240,7 @@ class SyncNotifier extends StateNotifier<SyncState>
         _ref.invalidate(orderRepositoryProvider);
         _ref.invalidate(ordersControllerProvider);
         _ref.invalidate(salesControllerProvider);
+        _ref.invalidate(salesHistoryControllerProvider);
         _ref.invalidate(customersControllerProvider);
         _ref.invalidate(allProductsProvider);
         _ref.invalidate(allCustomersProvider);
@@ -258,6 +293,11 @@ class SyncNotifier extends StateNotifier<SyncState>
         status: SyncStatus.error,
         lastError: e.toString(),
       );
+    } finally {
+      if (_syncRequestedWhileRunning) {
+        _syncRequestedWhileRunning = false;
+        unawaited(Future<void>.microtask(triggerSync));
+      }
     }
   }
 

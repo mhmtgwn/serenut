@@ -1,7 +1,7 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, clearAuthSession, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
 import { escapeHtml } from '/shared/js/formatters.js';
-import { loadModule } from './module-runtime.js?v=20260721-authfix4';
+import { loadModule } from './module-runtime.js?v=20260728-company-commercial2';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -26,6 +26,7 @@ const navIconPaths = {
   'team-management': 'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2 M9.5 10a3 3 0 100-6 3 3 0 000 6z M17 11a3 3 0 000-6',
   'billing-center': 'M4 6h16v12H4z M4 10h16 M8 15h3',
   'support-center': 'M4 5h16v12H8l-4 3z M8 9h8m-8 4h5',
+  'system-diagnostics': 'M4 12h4l2-6 4 12 2-6h6 M5 20h14',
   'platform-overview': 'M4 19V9m5 10V5m5 14v-7m5 7V3',
   'platform-companies': 'M3 20h18M5 20V8l7-4 7 4v12M9 11h2m2 0h2M9 15h2m2 0h2',
   'platform-billing': 'M12 3v18m5-14H9.5a3.5 3.5 0 000 7H14a3 3 0 010 6H6',

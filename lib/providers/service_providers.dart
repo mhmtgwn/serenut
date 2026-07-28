@@ -1,6 +1,7 @@
 // lib/providers/service_providers.dart
 // Serenut OS — Central Service Locator Providers
 
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/i_backup_service.dart';
@@ -33,6 +34,7 @@ import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/domain/services/audit_log_service.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 
@@ -152,6 +154,27 @@ final remoteConfigServiceProvider = Provider<RemoteConfigService>((ref) {
 final telemetryUploadServiceProvider = Provider<TelemetryUploadService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return TelemetryUploadService(apiClient);
+});
+
+/// Yerel warning/error/critical olaylarını SQLite tamponuna alır ve periyodik
+/// olarak SaaS telemetri deposuna gönderir. İnternet yokken kayıtlar silinmez.
+final telemetryBridgeProvider = Provider<void>((ref) {
+  final uploader = ref.watch(telemetryUploadServiceProvider);
+  final telemetry = TelemetryService();
+  telemetry.onOperationalEvent = (event) => uploader.recordMetric(
+        'operational_event',
+        1,
+        metadata: event.toJson(),
+      );
+  final timer = Timer.periodic(
+    const Duration(minutes: 1),
+    (_) => unawaited(uploader.uploadMetricsBatch()),
+  );
+  unawaited(uploader.uploadMetricsBatch());
+  ref.onDispose(() {
+    timer.cancel();
+    telemetry.onOperationalEvent = null;
+  });
 });
 
 /// Provides LogCollectionService instance.

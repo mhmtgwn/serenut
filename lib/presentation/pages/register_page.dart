@@ -58,7 +58,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   String? _selectedCity;
   String? _selectedDistrict;
-  String? _selectedType;
   String? _logoPath; // null = varsayılan Serenut logosu
 
   Map<String, List<String>> _cityMap = {};
@@ -68,19 +67,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   bool _saving = false;
   String? _error;
-
-  static const _businessTypes = [
-    'Market',
-    'Kafe',
-    'Restoran',
-    'Kuruyemişçi',
-    'Pastane',
-    'Büfe',
-    'Kasap',
-    'Manav',
-    'Eczane',
-    'Diğer',
-  ];
 
   @override
   void initState() {
@@ -199,7 +185,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         final profile = BusinessProfile(
           name: _bizNameCtrl.text.trim(),
           ownerName: _ownerNameCtrl.text.trim(),
-          type: _selectedType ?? '',
+          type: '',
           phone: _phoneCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
           taxNumber: _taxNoCtrl.text.trim(),
@@ -223,7 +209,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
           businessCity: _selectedCity ?? '',
           businessDistrict: _selectedDistrict ?? '',
-          businessType: _selectedType ?? '',
+          businessType: '',
           createdAt: DateTime.now(),
         ));
 
@@ -569,48 +555,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
           const SizedBox(height: 16),
 
-          // ── İşletme türü ──
-          _SectionCard(
-            title: 'İşletme Türü',
-            icon: Icons.category_rounded,
-            subtitle: 'Opsiyonel — stok şablonu için kullanılır',
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _businessTypes.map((type) {
-                  final sel = _selectedType == type;
-                  return GestureDetector(
-                    onTap: () =>
-                        setState(() => _selectedType = sel ? null : type),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: sel ? POSColors.green : POSColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: sel ? POSColors.green : POSColors.border,
-                        ),
-                      ),
-                      child: Text(
-                        type,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: sel ? Colors.white : POSColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
           // ── Logo ──
           _SectionCard(
             title: 'Logo',
@@ -790,7 +734,7 @@ class _SectionCard extends StatelessWidget {
         border: Border.all(color: POSColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1020,7 +964,7 @@ class _GreenButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: POSColors.green.withOpacity(0.25),
+                color: POSColors.green.withValues(alpha: 0.25),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
@@ -1061,7 +1005,7 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: POSColors.redLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: POSColors.red.withOpacity(0.2)),
+        border: Border.all(color: POSColors.red.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

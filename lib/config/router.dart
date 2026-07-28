@@ -7,8 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/domain/services/access_manager.dart';
 import 'package:serenutos/presentation/pages/onboarding/onboarding_wizard_page.dart';
 import 'package:serenutos/presentation/pages/onboarding/bootstrap_loading_view.dart';
 import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
@@ -51,7 +49,6 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 /// Navigation routes
 class AppRoutes {
   static const login = '/login';
-  static const loginSub = '/login/sub';
   static const onboarding =
       '/onboarding'; // Onboarding wizard — tek giriş noktası
   static const activation = '/onboarding'; // Eski alias
@@ -109,14 +106,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final onLogin = state.matchedLocation == AppRoutes.login;
       final onLoginForm = state.matchedLocation == '/login/form';
-      final onLoginSub = state.matchedLocation == AppRoutes.loginSub;
       final onRegister = state.matchedLocation.startsWith('/register');
       final onOnboarding = state.matchedLocation.startsWith('/onboarding');
-      final onPaywall = state.matchedLocation == AppRoutes.paywall;
-      final onOperationalError = state.matchedLocation == '/operational-error';
-      final onLicenseRecovery = state.matchedLocation == AppRoutes.license;
-      final onAuthScreen =
-          onLogin || onLoginForm || onLoginSub || onRegister || onOnboarding;
+      final onAuthScreen = onLogin || onLoginForm || onRegister || onOnboarding;
 
       if (!loggedIn) {
         if (!onAuthScreen) return AppRoutes.login;
@@ -127,21 +119,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         return AppRoutes.home;
       }
 
-      final accessStatus = ref
-          .read(accessManagerProvider)
-          .checkAccess(currentUser: ref.read(currentUserProvider));
-
-      if (accessStatus == AccessStatus.paywall) {
-        if (onPaywall || onLicenseRecovery) return null;
-        return AppRoutes.paywall;
-      }
-
-      if (accessStatus == AccessStatus.restrictedOperation) {
-        if (onOperationalError) return null;
-        return '/operational-error';
-      }
-
-      if (onPaywall || onOperationalError) {
+      // Lisans durumu, giriş yapmış kullanıcıyı uygulamanın dışına atmaz.
+      // Kullanıcı normal arayüzü salt okunur görür; domain yazma kapıları
+      // lisans gerektiren işlemleri reddetmeye devam eder.
+      if (state.matchedLocation == AppRoutes.paywall ||
+          state.matchedLocation == '/operational-error') {
         return AppRoutes.home;
       }
 
@@ -160,13 +142,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login/form',
         name: 'login-form',
         builder: (context, state) => const LoginFormPage(),
-      ),
-
-      // ── Personel Girişi (PIN-based)
-      GoRoute(
-        path: AppRoutes.loginSub,
-        name: 'login-sub',
-        builder: (context, state) => const SubUserLoginPage(),
       ),
 
       // ── Hesap Oluştur (2 adımlı kayıt)

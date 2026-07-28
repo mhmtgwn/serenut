@@ -2,7 +2,6 @@
 // Serenut OS — Sync Local Idempotency & Queue RBAC Acceptance Criteria Test
 
 import dotenv from 'dotenv';
-import path from 'path';
 
 // Force environment variables setup
 dotenv.config();

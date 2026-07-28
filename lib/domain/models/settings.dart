@@ -39,7 +39,7 @@ class Settings {
 
   // SMS ayarları
   final bool smsEnabled;
-  final String? smsProvider; // 'twilio', 'local', etc.
+  final String? smsProvider; // 'sim'
   final String? smsApiKey;
   final String? smsTemplate;
 

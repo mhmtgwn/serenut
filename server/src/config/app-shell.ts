@@ -69,6 +69,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     moduleTab: 'support'
   },
   {
+    id: 'system-diagnostics',
+    label: 'Sistem ve Loglar',
+    section: 'operations',
+    href: '/app/#system-diagnostics',
+    description: 'Cihaz, senkronizasyon ve uygulama hatalarını inceleyin.',
+    module: 'portal',
+    moduleTab: 'diagnostics',
+    roles: ['owner', 'admin', 'manager']
+  },
+  {
     id: 'platform-overview',
     label: 'Genel Bakış',
     section: 'platform',

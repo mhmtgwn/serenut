@@ -527,9 +527,8 @@ class CustomerDetailsPage extends ConsumerWidget {
 
   void _confirmDelete(
       BuildContext context, WidgetRef ref, CustomerEntity customer) {
-    requireAdminAccess(context,
-        title: 'Müşteri Silme Yetkisi',
-        requirePin: true, onGranted: (approvedByUserId, approvedByUserName) {
+    requireAdminAccess(context, title: 'Müşteri Silme Yetkisi',
+        onGranted: (approvedByUserId, approvedByUserName) {
       showDialog(
         context: context,
         builder: (context) {

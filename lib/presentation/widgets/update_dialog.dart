@@ -234,8 +234,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: info.isForceUpdate
-                    ? Colors.red.withOpacity(0.15)
-                    : Colors.blue.withOpacity(0.15),
+                    ? Colors.red.withValues(alpha: 0.15)
+                    : Colors.blue.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -292,9 +292,9 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: const Row(
                   children: [
@@ -487,7 +487,7 @@ class _AnimatedProgressBar extends StatelessWidget {
         height: 12,
         child: LinearProgressIndicator(
           value: value,
-          backgroundColor: Colors.grey.withOpacity(0.2),
+          backgroundColor: Colors.grey.withValues(alpha: 0.2),
           valueColor: AlwaysStoppedAnimation<Color>(
             value < 0.5
                 ? Colors.blue

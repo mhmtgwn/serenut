@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from './auth.middleware';
 import { logger } from '../config/logger';
 
 interface LimiterOptions {
+  scope: string;
   windowMs: number;
   max: number;
   error: string;
@@ -38,7 +39,11 @@ export function createRedisLimiter(options: LimiterOptions) {
     // exhaust each other's allowance.
     const route = `${req.baseUrl || ''}${req.path || req.originalUrl}`;
     const identity = options.key?.(req) ?? ip;
-    const key = `rl:${req.method}:${route}:${identity}`;
+    // A route can have layered limiters (for example the global auth limiter
+    // plus the stricter signup limiter). Each layer needs its own counter;
+    // sharing a key made one registration attempt increment the same counter
+    // twice and triggered the five-attempt signup limit after only 3 submits.
+    const key = `rl:${options.scope}:${req.method}:${route}:${identity}`;
 
     try {
       const current = await redisClient.incr(key);
@@ -70,6 +75,7 @@ export function createRedisLimiter(options: LimiterOptions) {
 
 // ── GENEL API RATE LİMİTER ────────────────────────────────────────────────────
 export const generalApiLimiter = createRedisLimiter({
+  scope: 'general',
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5000,
   error: 'rate_limit_exceeded',
@@ -81,6 +87,7 @@ export const generalApiLimiter = createRedisLimiter({
 
 // ── KİMLİK DOĞRULAMA LİMİTER ─────────────────────────────────────────────────
 export const authLimiter = createRedisLimiter({
+  scope: 'auth',
   windowMs: 5 * 60 * 1000,
   max: process.env.NODE_ENV === 'production' ? 30 : 200,
   error: 'too_many_auth_attempts',
@@ -89,6 +96,7 @@ export const authLimiter = createRedisLimiter({
 
 // ── LİSANS AKTİVASYON LİMİTER ────────────────────────────────────────────────
 export const licenseLimiter = createRedisLimiter({
+  scope: 'license',
   windowMs: 60 * 60 * 1000,
   max: 20,
   error: 'license_rate_limit_exceeded',
@@ -97,14 +105,16 @@ export const licenseLimiter = createRedisLimiter({
 
 // ── PORTAL KAYIT LİMİTER ─────────────────────────────────────────────────────
 export const signupLimiter = createRedisLimiter({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
+  scope: 'signup',
+  windowMs: 10 * 60 * 1000,
+  max: 10,
   error: 'signup_rate_limit_exceeded',
   message: 'Bu IP adresinden çok fazla kayıt denemesi yapıldı.'
 });
 
 // ── BİLDİRİM / SMS LİMİTER ───────────────────────────────────────────────────
 export const smsLimiter = createRedisLimiter({
+  scope: 'sms',
   windowMs: 60 * 1000,
   max: 3,
   error: 'sms_rate_limit_exceeded',
@@ -113,6 +123,7 @@ export const smsLimiter = createRedisLimiter({
 
 // ── ŞİFRE SIFIRLAMA LİMİTER ──────────────────────────────────────────────────
 export const passwordResetLimiter = createRedisLimiter({
+  scope: 'password-reset',
   windowMs: 15 * 60 * 1000,
   max: 5,
   error: 'too_many_reset_attempts',
@@ -121,6 +132,7 @@ export const passwordResetLimiter = createRedisLimiter({
 
 // ── SENKRONİZASYON (SYNC) LİMİTER ────────────────────────────────────────────
 export const syncLimiter = createRedisLimiter({
+  scope: 'sync',
   windowMs: 60 * 1000,
   // Sync is a durable background protocol. Keying by reverse-proxy IP caused
   // unrelated tenants to share one quota and receive false 429 responses.
@@ -136,6 +148,7 @@ export const syncLimiter = createRedisLimiter({
 
 // ── WEBHOOK LİMİTER ──────────────────────────────────────────────────────────
 export const webhookLimiter = createRedisLimiter({
+  scope: 'webhook',
   windowMs: 60 * 1000,
   max: 60,
   error: 'webhook_rate_limit_exceeded',

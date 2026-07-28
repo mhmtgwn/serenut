@@ -119,6 +119,7 @@ async function testRateLimiting() {
   };
 
   const limiter = createRedisLimiter({
+    scope: 'security-verification',
     windowMs: 60000,
     max: 2,
     error: 'rate_limit_exceeded',

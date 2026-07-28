@@ -101,7 +101,6 @@ class _BackupManagePageState extends ConsumerState<BackupManagePage> {
     requirePermissionAccess(context,
         permission: Permission.settingsDatabase,
         title: 'Yedek Geri Yükleme Yetkisi',
-        requirePin: true,
         onGranted: (approvedByUserId, approvedByUserName) async {
       setState(() => _isLoading = true);
       try {

@@ -18,65 +18,11 @@ void main() {
       databaseManager = DatabaseManager();
       db = await databaseManager.getDatabase();
 
-      // Clean setup of required tables
-      await db.execute('DROP TABLE IF EXISTS customers');
-      await db.execute('DROP TABLE IF EXISTS products');
-      await db.execute('DROP TABLE IF EXISTS sales');
-      await db.execute('DROP TABLE IF EXISTS financial_transactions');
-
-      await db.execute('''
-        CREATE TABLE customers (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          email TEXT,
-          phone TEXT,
-          balance REAL NOT NULL DEFAULT 0,
-          is_active INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE products (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT,
-          price REAL NOT NULL,
-          quantity INTEGER NOT NULL,
-          category TEXT NOT NULL,
-          sku TEXT UNIQUE,
-          is_active INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE sales (
-          id TEXT PRIMARY KEY,
-          customer_id TEXT NOT NULL,
-          total_amount REAL NOT NULL,
-          paid_amount REAL NOT NULL DEFAULT 0,
-          payment_method TEXT,
-          status TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE financial_transactions (
-          id TEXT PRIMARY KEY,
-          type TEXT NOT NULL,
-          customer_id TEXT NOT NULL,
-          amount REAL NOT NULL,
-          paid_amount REAL NOT NULL DEFAULT 0,
-          debt_amount REAL NOT NULL DEFAULT 0,
-          reference_id TEXT,
-          created_at TEXT NOT NULL
-        )
-      ''');
+      // Clean test data without dropping schema triggers
+      await db.delete('financial_transactions');
+      await db.delete('sales');
+      await db.delete('products');
+      await db.delete('customers');
 
       final gateway = DbGatewayImpl(databaseManager);
       searchRepo = SqliteGlobalSearchRepository(gateway);

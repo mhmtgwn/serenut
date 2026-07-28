@@ -65,6 +65,7 @@ class MockAuthService implements AuthService {
   bool failWithAuthError = false;
   bool refreshCalled = false;
   bool sessionExpiredTriggered = false;
+  String? jwtToken = 'jwt_token';
 
   @override
   Future<AuthUser?> getCurrentUser() async {
@@ -79,7 +80,7 @@ class MockAuthService implements AuthService {
   }
 
   @override
-  String? getJwtToken() => 'jwt_token';
+  String? getJwtToken() => jwtToken;
 
   @override
   Future<bool> refreshToken() async {
@@ -88,8 +89,10 @@ class MockAuthService implements AuthService {
       throw const ApiException('Network timeout or host lookup failed');
     }
     if (failWithAuthError) {
-      return false; // Permanent auth failure
+      jwtToken = null;
+      throw const ApiException('Unauthorized', statusCode: 401);
     }
+    jwtToken = 'jwt_token';
     return true;
   }
 
@@ -161,12 +164,13 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 30));
       expect(wsManager.isConnected, true);
 
+      authService.jwtToken = null;
       authService.failWithNetworkError = true;
 
       // Trigger a disconnect to schedule a reconnect
       wsManager.disconnect();
 
-      // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 150ms for it to run.
+      // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 220ms for it to run.
       await Future.delayed(const Duration(milliseconds: 220));
 
       expect(authService.refreshCalled, true);
@@ -177,7 +181,7 @@ void main() {
       authService.failWithNetworkError = false;
       authService.refreshCalled = false;
 
-      // Reconnect is scheduled (attempt 2: delay = 150ms). Wait 200ms for it to run.
+      // Reconnect is scheduled (attempt 2: delay = 150ms). Wait for it to run.
       await Future.delayed(const Duration(milliseconds: 350));
       expect(authService.refreshCalled, true);
       expect(wsManager.isConnected, true);
@@ -192,12 +196,13 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 30));
       expect(wsManager.isConnected, true);
 
+      authService.jwtToken = null;
       authService.failWithAuthError = true;
 
       // Trigger a disconnect
       wsManager.disconnect();
 
-      // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 150ms for it to run.
+      // Reconnect is scheduled (attempt 1: delay = 100ms). Wait 220ms for it to run.
       await Future.delayed(const Duration(milliseconds: 220));
 
       expect(authService.refreshCalled, true);
@@ -215,6 +220,7 @@ void main() {
       expect(wsManager.isConnected, true);
 
       // Trigger disconnect to schedule reconnect timer (attempt 1: delay = 100ms)
+      authService.jwtToken = null;
       authService.failWithNetworkError = true;
       authService.refreshCalled = false;
       wsManager.disconnect();

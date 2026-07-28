@@ -20,22 +20,6 @@ extension SettingsPageDialogs on _SettingsPageState {
         settings.businessCity.isEmpty ? null : settings.businessCity;
     String? localDistrict =
         settings.businessDistrict.isEmpty ? null : settings.businessDistrict;
-    String? localType =
-        settings.businessType.isEmpty ? null : settings.businessType;
-
-    const businessTypes = [
-      'Market',
-      'Kafe',
-      'Restoran',
-      'Kuruyemişçi',
-      'Pastane',
-      'Büfe',
-      'Kasap',
-      'Manav',
-      'Eczane',
-      'Diğer',
-    ];
-
     // DÜZELTME: Controller'lar push dönünce dispose ediliyor
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -232,19 +216,6 @@ extension SettingsPageDialogs on _SettingsPageState {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      _buildFormDropdown<String>(
-                        label: 'İşletme Türü',
-                        icon: Icons.category_rounded,
-                        value: localType,
-                        items: businessTypes
-                            .map((t) =>
-                                DropdownMenuItem(value: t, child: Text(t)))
-                            .toList(),
-                        onChanged: (v) => setModalState(() {
-                          localType = v;
-                        }),
-                      ),
-                      const SizedBox(height: 12),
                       _buildFormTextField(
                         controller: addressCtrl,
                         label: 'Detaylı İşletme Adresi',
@@ -268,7 +239,7 @@ extension SettingsPageDialogs on _SettingsPageState {
                                 : emailCtrl.text.trim(),
                             businessCity: localCity ?? '',
                             businessDistrict: localDistrict ?? '',
-                            businessType: localType ?? '',
+                            businessType: '',
                           );
                           await _updateSettingField(updated);
                           if (context.mounted) Navigator.pop(context);

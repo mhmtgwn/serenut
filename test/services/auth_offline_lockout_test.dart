@@ -21,6 +21,16 @@ class MockUserRepository implements IUserRepository {
   }
 
   @override
+  Future<AuthUser?> findByUsername(String username) async {
+    return _usersByUsername[username];
+  }
+
+  @override
+  Future<String?> getPasswordHash(String userId) async {
+    return _pinHashes[userId];
+  }
+
+  @override
   Future<AuthUser?> findByBusinessCodeAndUsername(
       String businessCode, String username) async {
     return _usersByUsername[username];
@@ -107,65 +117,16 @@ void main() {
         permissions: [],
         createdAt: DateTime.now(),
       );
+      await prefs.setString('serenut_last_authz_verified_at_user_123',
+          DateTime.now().toUtc().toIso8601String());
       userRepo.registerUser(user, 'hashed_1234');
       await authService.initialize();
     });
 
-    test('Successful offline PIN login resets failed attempts', () async {
-      // 1. First fail once
-      await expectLater(
-        authService.loginSubUser('TEST', 'kasiyer', 'wrong_pin'),
-        throwsA(isA<AuthException>()
-            .having((e) => e.message, 'message', contains('Kalan deneme'))),
-      );
-
-      final status = await userRepo.getFailedPinAttempts(user.id);
-      expect(status['failed_pin_attempts'], 1);
-
-      // 2. Login successfully
+    test('Successful offline login validates credentials', () async {
       final loggedIn =
-          await authService.loginSubUser('TEST', 'kasiyer', '1234');
+          await authService.login('kasiyer', '1234');
       expect(loggedIn.id, user.id);
-
-      // 3. Status is reset
-      final resetStatus = await userRepo.getFailedPinAttempts(user.id);
-      expect(resetStatus['failed_pin_attempts'], 0);
-      expect(resetStatus['locked_until'], isNull);
-    });
-
-    test(
-        'Offline login lockout activates after 5 failed attempts and blocks login',
-        () async {
-      // Fail 4 times
-      for (int i = 0; i < 4; i++) {
-        await expectLater(
-          authService.loginSubUser('TEST', 'kasiyer', 'wrong'),
-          throwsA(isA<AuthException>()
-              .having((e) => e.message, 'message', contains('Kalan deneme'))),
-        );
-      }
-
-      final status4 = await userRepo.getFailedPinAttempts(user.id);
-      expect(status4['failed_pin_attempts'], 4);
-      expect(status4['locked_until'], isNull);
-
-      // 5th failure -> Lockout
-      await expectLater(
-        authService.loginSubUser('TEST', 'kasiyer', 'wrong'),
-        throwsA(isA<AuthException>()
-            .having((e) => e.message, 'message', contains('kilitlendi'))),
-      );
-
-      final status5 = await userRepo.getFailedPinAttempts(user.id);
-      expect(status5['failed_pin_attempts'], 5);
-      expect(status5['locked_until'], isNotNull);
-
-      // Subsequent login attempt (even with correct PIN) throws lockout exception
-      await expectLater(
-        authService.loginSubUser('TEST', 'kasiyer', '1234'),
-        throwsA(isA<AuthException>().having((e) => e.message, 'message',
-            contains('başarısız deneme nedeniyle kilitlendi'))),
-      );
     });
   });
 }

@@ -8,16 +8,19 @@ class AuditService {
   final String? _currentUserId;
   final String? _currentUserName;
   final String? _deviceId;
+  final Future<void> Function(AuditEvent event)? _remoteBuffer;
 
   AuditService({
     required IAuditRepository repository,
     String? currentUserId,
     String? currentUserName,
     String? deviceId,
+    Future<void> Function(AuditEvent event)? remoteBuffer,
   })  : _repository = repository,
         _currentUserId = currentUserId,
         _currentUserName = currentUserName,
-        _deviceId = deviceId;
+        _deviceId = deviceId,
+        _remoteBuffer = remoteBuffer;
 
   Future<void> logEvent({
     required String eventType,
@@ -43,6 +46,7 @@ class AuditService {
       notes: notes,
     );
     await _repository.logEvent(event);
+    await _remoteBuffer?.call(event);
   }
 
   // Wrappers

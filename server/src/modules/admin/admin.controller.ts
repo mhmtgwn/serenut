@@ -271,14 +271,24 @@ router.get('/subscriptions', async (_req: AuthenticatedRequest, res: Response) =
 });
 
 router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
-  const { name, tax_number, tax_office, phone, email, address } = req.body;
+  const { name, tax_number, tax_office, phone, email, address, admin_name, admin_email, admin_password } = req.body;
   if (!name || !tax_number) {
     return res.status(400).json({ error: 'missing_fields' });
   }
+  if (admin_email && !admin_password) {
+    return res.status(400).json({ error: 'missing_admin_password', message: 'Admin kullanıcı oluşturmak için şifre zorunludur.' });
+  }
+  if (admin_password && admin_password.length < 8) {
+    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
+  }
 
   const id = `comp-${Date.now()}`;
+  const client = await pgPool.connect();
   try {
-    await runBypassingRLS(
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+    await client.query(
       `INSERT INTO companies (id, name, tax_number, tax_office, phone, email, address, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')`,
       [id, name, tax_number, tax_office || null, phone || null, email || null, address || null]
@@ -286,13 +296,12 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
 
     const defaultStoreId = `store-${crypto.randomUUID()}`;
     const defaultBranchId = `br-${crypto.randomUUID()}`;
-    await runBypassingRLS(
+    await client.query(
       `INSERT INTO stores (id, company_id, name, address) VALUES ($1, $2, 'Merkez Şube', $3)`,
       [defaultStoreId, id, address || null]
     );
-    await runBypassingRLS(
-      `INSERT INTO branches (id, company_id, store_id, name, address)
-       VALUES ($1, $2, $3, 'Merkez Şube', $4)`,
+    await client.query(
+      `INSERT INTO branches (id, company_id, store_id, name, address) VALUES ($1, $2, $3, 'Merkez Şube', $4)`,
       [defaultBranchId, id, defaultStoreId, address || null]
     );
 
@@ -302,7 +311,7 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days trial
 
-    await runBypassingRLS(
+    await client.query(
       `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [licenseId, id, licenseKey, 'trial', 2, 'active', expiresAt]
@@ -310,26 +319,58 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
 
     const entitlementId = `ent-${Date.now()}`;
     const subscriptionId = `sub-${Date.now()}`;
-    await runBypassingRLS(
+    await client.query(
       `INSERT INTO subscriptions (id, company_id, plan_id, status, current_period_start, current_period_end)
        VALUES ($1, $2, 'plan-free', 'trialing', NOW(), $3) ON CONFLICT (id) DO NOTHING`,
       [subscriptionId, id, expiresAt]
     );
-    await runBypassingRLS(
+    await client.query(
       `INSERT INTO license_entitlements (id, company_id, subscription_id, plan_id, status, device_limit, store_limit, valid_from, valid_until, license_key)
        VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), $4, $5)`,
       [entitlementId, id, subscriptionId, expiresAt, licenseKey]
     );
 
-    await writeAdminAudit(req.user!.id, 'CREATE_COMPANY', 'companies', id, null, { name, tax_number });
+    // Optional: Create admin user for the company if email+password provided
+    let createdUserId: string | null = null;
+    if (admin_email && admin_password) {
+      const normalizedEmail = String(admin_email).trim().toLowerCase();
+      const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+      if (existingUser.rowCount && existingUser.rowCount > 0) {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({ error: 'email_exists', message: 'Bu e-posta adresi zaten kullanılıyor.' });
+      }
+      const passwordHash = await AuthService.hashPassword(admin_password);
+      const userId = `usr-${crypto.randomUUID()}`;
+      await client.query(
+        `INSERT INTO users (id, company_id, name, email, password_hash, is_active, is_email_verified)
+         VALUES ($1, $2, $3, $4, $5, TRUE, TRUE)`,
+        [userId, id, admin_name || name, normalizedEmail, passwordHash]
+      );
+      // Assign owner role
+      const ownerRole = await client.query(`SELECT id FROM roles WHERE name = 'owner' AND company_id = $1 LIMIT 1`, [id]);
+      if (ownerRole.rowCount && ownerRole.rowCount > 0) {
+        await client.query(
+          `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [userId, ownerRole.rows[0].id]
+        );
+      }
+      createdUserId = userId;
+    }
 
-    return res.status(201).json({ success: true, company_id: id, license_key: licenseKey });
+    await client.query('COMMIT');
+    await writeAdminAudit(req.user!.id, 'CREATE_COMPANY', 'companies', id, null, { name, tax_number, admin_email: admin_email || null });
+
+    return res.status(201).json({ success: true, company_id: id, license_key: licenseKey, user_id: createdUserId });
   } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Create company error:', err);
     if (err.message?.includes('unique_tax_number') || err.message?.includes('tax_number')) {
       return res.status(400).json({ error: 'duplicate_tax_number', message: 'Bu vergi numarası zaten sistemde kayıtlı.' });
     }
     return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -358,6 +399,27 @@ router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Firma sahibine şifre sıfırlama linki gönder
+router.post('/companies/:id/send-reset-password', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const company = await runBypassingRLS('SELECT * FROM companies WHERE id = $1', [req.params.id]);
+    if (company.rows.length === 0) {
+      return res.status(404).json({ error: 'company_not_found' });
+    }
+    // Firmanın sahibi/yönetici kullanıcısını bul (en eski aktif kullanıcı veya belirtilen e-posta)
+    const targetEmail = req.body.email || company.rows[0].email;
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'no_email', message: 'Firmaya ait e-posta adresi bulunamadı.' });
+    }
+    await AuthService.forgotPassword(targetEmail);
+    await writeAdminAudit(req.user!.id, 'SEND_RESET_PASSWORD_LINK', 'companies', req.params.id, null, { email: targetEmail }, req.ip);
+    return res.json({ success: true, message: `${targetEmail} adresine şifre sıfırlama linki gönderildi.` });
+  } catch (err: any) {
+    logger.error('Send reset password for company failed:', err);
+    return res.status(500).json({ error: 'server_error', message: 'Link gönderilemedi.' });
   }
 });
 

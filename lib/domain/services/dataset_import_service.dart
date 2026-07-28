@@ -16,6 +16,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 class ParsedCatalogData {
   final List<Map<String, dynamic>> products;
@@ -548,6 +549,7 @@ class DatasetImportService {
             final chunk =
                 products.sublist(i, min(i + chunkLimit, totalProducts));
             final batch = txn.batch();
+            final mutatedProductIds = <String>[];
 
             for (final prodMap in chunk) {
               final barcode = prodMap['barcode'] as String;
@@ -606,6 +608,7 @@ class DatasetImportService {
                     'updated_at': DateTime.now().toIso8601String(),
                     'image_url': finalImageUrl,
                   });
+                  mutatedProductIds.add(barcode);
                   importedCount++;
                 }
               } else {
@@ -650,12 +653,33 @@ class DatasetImportService {
                     where: 'id = ?',
                     whereArgs: [barcode],
                   );
+                  mutatedProductIds.add(barcode);
                   importedCount++;
                 }
               }
             }
 
             await batch.commit(noResult: true);
+            if (mutatedProductIds.isNotEmpty) {
+              final placeholders =
+                  List.filled(mutatedProductIds.length, '?').join(',');
+              final mutatedRows = await txn.query(
+                'products',
+                where: 'id IN ($placeholders)',
+                whereArgs: mutatedProductIds,
+              );
+              for (final row in mutatedRows) {
+                final id = row['id']?.toString();
+                if (id == null || id.isEmpty) continue;
+                await SyncOutboxV4.enqueue(
+                  txn,
+                  entityType: 'product',
+                  entityId: id,
+                  operation: 'UPSERT',
+                  payload: Map<String, dynamic>.from(row),
+                );
+              }
+            }
             updatePeakRss();
 
             // Yield to let the UI refresh
@@ -672,7 +696,7 @@ class DatasetImportService {
             );
           }
 
-          // Deactivate missing products if enabled
+          // Deactivate missing products if enabled and enqueue sync mutations
           if (strategy.deactivateMissing) {
             final excelBarcodes =
                 products.map((p) => p['barcode'] as String).toList();
@@ -682,6 +706,11 @@ class DatasetImportService {
                 final subList = excelBarcodes.sublist(
                     k, min(k + sqliteParamLimit, excelBarcodes.length));
                 final placeholders = List.filled(subList.length, '?').join(',');
+                final affectedRows = await txn.query(
+                  'products',
+                  where: 'id NOT IN ($placeholders) AND is_active = 1',
+                  whereArgs: subList,
+                );
                 await txn.update(
                   'products',
                   {
@@ -691,6 +720,23 @@ class DatasetImportService {
                   where: 'id NOT IN ($placeholders) AND is_active = 1',
                   whereArgs: subList,
                 );
+                for (final row in affectedRows) {
+                  final id = row['id']?.toString();
+                  if (id != null && id.isNotEmpty) {
+                    await SyncOutboxV4.enqueue(
+                      txn,
+                      entityType: 'product',
+                      entityId: id,
+                      operation: 'UPSERT',
+                      payload: {
+                        ...Map<String, dynamic>.from(row),
+                        'is_active': 0,
+                        'is_synced': 0,
+                        'updated_at': DateTime.now().toIso8601String(),
+                      },
+                    );
+                  }
+                }
               }
             }
           }

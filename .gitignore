@@ -11,6 +11,9 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+scripts/*_temp.txt
+serenut_key*
+old_vps_key*
 
 # IntelliJ related
 *.iml

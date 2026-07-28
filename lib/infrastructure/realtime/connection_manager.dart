@@ -224,7 +224,7 @@ class ConnectionManager {
         if (token == null) {
           _record('ws_refresh_rejected', level: LogLevel.warning);
           _setStatus(RealtimeStatus.disconnected);
-          _scheduleReconnect();
+          authService.triggerSessionExpired();
           return;
         }
 
@@ -235,10 +235,16 @@ class ConnectionManager {
         connect();
       } catch (e) {
         _record('ws_refresh_exception', level: LogLevel.warning, error: e);
-        // Temporary network / connection error (timeout, SocketException, offline)
-        // Keep attempting reconnection. We do not abort the reconnect loop.
-        _setStatus(RealtimeStatus.disconnected);
-        _scheduleReconnect();
+        if (e is ApiException &&
+            (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
+          _setStatus(RealtimeStatus.disconnected);
+          authService.triggerSessionExpired();
+        } else {
+          // Temporary network / connection error (timeout, SocketException, offline)
+          // Keep attempting reconnection. We do not abort the reconnect loop.
+          _setStatus(RealtimeStatus.disconnected);
+          _scheduleReconnect();
+        }
       }
     });
   }

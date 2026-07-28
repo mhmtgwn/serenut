@@ -230,37 +230,56 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<void> updateStatus(String orderId, String status) async {
-    final updateMap = <String, dynamic>{
-      'status': status,
-      'updated_at': DateTime.now().toIso8601String(),
-      'is_synced': 0,
-    };
-    if (status == 'delivered') {
-      updateMap['actual_delivery_date'] = DateTime.now().toIso8601String();
-    }
-    final count = await _executor.update(
-      'orders',
-      updateMap,
-      where: 'id = ? AND status != ?',
-      whereArgs: [orderId, status],
-    );
-
-    if (count == 0) {
+    await _gateway.transaction(() async {
       final existing = await _executor.query(
         'orders',
-        columns: ['status'],
         where: 'id = ?',
         whereArgs: [orderId],
         limit: 1,
       );
-      if (existing.isEmpty) {
-        throw Exception('Sipariş bulunamadı.');
-      }
-      if (existing.first['status'] == status) {
-        return; // Idempotent success (already in target status)
-      }
-      throw Exception('Geçersiz sipariş durumu geçişi.');
-    }
+      if (existing.isEmpty) throw Exception('Sipariş bulunamadı.');
+      if (existing.first['status'] == status) return;
+
+      final now = DateTime.now().toIso8601String();
+      final updateMap = <String, dynamic>{
+        'status': status,
+        'updated_at': now,
+        'is_synced': 0,
+      };
+      if (status == 'delivered') updateMap['actual_delivery_date'] = now;
+
+      final count = await _executor.update(
+        'orders',
+        updateMap,
+        where: 'id = ? AND status != ?',
+        whereArgs: [orderId, status],
+      );
+      if (count != 1) throw Exception('Geçersiz sipariş durumu geçişi.');
+
+      // A status transition is a replicated domain mutation, just like create
+      // and edit. Keep the row write and its complete aggregate payload in the
+      // same transaction so another device can materialize it immediately.
+      final updatedRows = await _executor.query(
+        'orders',
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+      final itemRows = await _executor.query(
+        'order_items',
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+      );
+      final payload = Map<String, dynamic>.from(updatedRows.single)
+        ..['items'] = itemRows;
+      await SyncOutboxV4.enqueue(
+        _executor,
+        entityType: 'order',
+        entityId: orderId,
+        operation: 'UPSERT',
+        payload: payload,
+      );
+    });
   }
 
   @override

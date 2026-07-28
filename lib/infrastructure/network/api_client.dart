@@ -36,6 +36,9 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
+  /// Wire-contract version, deliberately independent from the local SQLite
+  /// schema. The server validates this only for Sync V4 endpoints.
+  static const int syncProtocolVersion = 5;
   final http.Client _client;
   final EnvironmentConfig _config;
   String? _jwtToken;
@@ -68,7 +71,7 @@ class ApiClient {
     final Map<String, String> headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'x-schema-version': '1',
+      'x-sync-protocol-version': '$syncProtocolVersion',
     };
 
     if (_jwtToken != null) {
@@ -196,8 +199,11 @@ class ApiClient {
       }
 
       if (!apiResponse.isSuccess) {
+        final message = response.statusCode == 426
+            ? 'Uygulama güncellemesi gerekli: sunucu daha yeni bir senkronizasyon protokolü istiyor.'
+            : 'HTTP Request failed with status code ${response.statusCode}';
         throw ApiException(
-          'HTTP Request failed with status code ${response.statusCode}',
+          message,
           statusCode: response.statusCode,
           responseBody: response.body,
         );

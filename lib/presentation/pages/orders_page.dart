@@ -13,6 +13,7 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
+import 'package:serenutos/presentation/widgets/pos_filter_bar.dart';
 
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 
@@ -95,7 +96,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   bool _isSearching = false;
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
-  bool _showFilters = false;
   Map<String, int> _statusCounts = {
     'all': 0,
     'created': 0,
@@ -189,107 +189,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     _refreshCounts();
   }
 
-  String _statusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'created':
-        return 'Yeni';
-      case 'preparing':
-        return 'Hazırlanıyor';
-      case 'ready':
-        return 'Hazır';
-      case 'delivered':
-        return 'Teslim Edildi';
-      case 'cancelled':
-        return 'İptal';
-      default:
-        return 'Tümü';
-    }
-  }
-
-  Widget _buildFilterRow(
-    BuildContext context, {
-    required String label,
-    required int count,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required Color statusColor,
-    required IconData icon,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? statusColor.withValues(alpha: 0.05)
-            : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected ? statusColor : const Color(0xFFE2E8F0),
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                // Colored left bar indicator
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Status icon
-                Icon(
-                  icon,
-                  color: isSelected ? statusColor : const Color(0xFF64748B),
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                // Status label
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? statusColor : const Color(0xFF334155),
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const Spacer(),
-                // Item count badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? statusColor.withValues(alpha: 0.15)
-                        : const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: isSelected ? statusColor : const Color(0xFF475569),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersControllerProvider);
@@ -329,182 +228,58 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
           showRefresh: true,
           onRefresh: () =>
               ref.read(ordersControllerProvider.notifier).refresh(),
-          filterWidget: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              InkWell(
-                onTap: () => setState(() => _showFilters = !_showFilters),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _kSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.filter_list_rounded,
-                          size: 16, color: _kGreenDark),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _statusFilter == 'all'
-                              ? 'Durum: Tümü (${counts['all']})'
-                              : 'Durum: ${_statusLabel(_statusFilter)} (${counts[_statusFilter]})',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _kText,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        _showFilters
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: _kTextSecondary,
-                      ),
-                    ],
-                  ),
-                ),
+          filterWidget: PosFilterBar(
+            padding: EdgeInsets.zero,
+            selectedId: _statusFilter,
+            onSelected: (newFilter) {
+              setState(() => _statusFilter = newFilter);
+              ref
+                  .read(ordersControllerProvider.notifier)
+                  .applyFilter(newFilter);
+              _refreshCounts();
+            },
+            items: [
+              PosFilterChipData(
+                id: 'all',
+                label: 'Tümü',
+                count: counts['all'] ?? 0,
+                icon: Icons.grid_view_rounded,
+                color: const Color(0xFF64748B),
               ),
-              AnimatedCrossFade(
-                firstChild: const SizedBox.shrink(),
-                secondChild: Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _kBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      _buildFilterRow(
-                        context,
-                        label: 'Tümü',
-                        count: counts['all'] ?? 0,
-                        isSelected: _statusFilter == 'all',
-                        onTap: () {
-                          setState(() {
-                            _statusFilter = 'all';
-                            _showFilters = false;
-                          });
-                          ref
-                              .read(ordersControllerProvider.notifier)
-                              .applyFilter('all');
-                          _refreshCounts();
-                        },
-                        statusColor: const Color(0xFF64748B),
-                        icon: Icons.grid_view_rounded,
-                      ),
-                      _buildFilterRow(
-                        context,
-                        label: 'Yeni',
-                        count: counts['created'] ?? 0,
-                        isSelected: _statusFilter == 'created',
-                        onTap: () {
-                          setState(() {
-                            _statusFilter = 'created';
-                            _showFilters = false;
-                          });
-                          ref
-                              .read(ordersControllerProvider.notifier)
-                              .applyFilter('created');
-                          _refreshCounts();
-                        },
-                        statusColor: const Color(0xFF3B82F6),
-                        icon: Icons.fiber_new_rounded,
-                      ),
-                      _buildFilterRow(
-                        context,
-                        label: 'Hazırlanıyor',
-                        count: counts['preparing'] ?? 0,
-                        isSelected: _statusFilter == 'preparing',
-                        onTap: () {
-                          setState(() {
-                            _statusFilter = 'preparing';
-                            _showFilters = false;
-                          });
-                          ref
-                              .read(ordersControllerProvider.notifier)
-                              .applyFilter('preparing');
-                          _refreshCounts();
-                        },
-                        statusColor: const Color(0xFFFF9500),
-                        icon: Icons.soup_kitchen_rounded,
-                      ),
-                      _buildFilterRow(
-                        context,
-                        label: 'Hazır',
-                        count: counts['ready'] ?? 0,
-                        isSelected: _statusFilter == 'ready',
-                        onTap: () {
-                          setState(() {
-                            _statusFilter = 'ready';
-                            _showFilters = false;
-                          });
-                          ref
-                              .read(ordersControllerProvider.notifier)
-                              .applyFilter('ready');
-                          _refreshCounts();
-                        },
-                        statusColor: const Color(0xFF10B981),
-                        icon: Icons.check_circle_outline_rounded,
-                      ),
-                      _buildFilterRow(
-                        context,
-                        label: 'Teslim Edildi',
-                        count: counts['delivered'] ?? 0,
-                        isSelected: _statusFilter == 'delivered',
-                        onTap: () {
-                          setState(() {
-                            _statusFilter = 'delivered';
-                            _showFilters = false;
-                          });
-                          ref
-                              .read(ordersControllerProvider.notifier)
-                              .applyFilter('delivered');
-                          _refreshCounts();
-                        },
-                        statusColor: const Color(0xFF6366F1),
-                        icon: Icons.local_shipping_rounded,
-                      ),
-                      _buildFilterRow(
-                        context,
-                        label: 'İptal',
-                        count: counts['cancelled'] ?? 0,
-                        isSelected: _statusFilter == 'cancelled',
-                        onTap: () {
-                          setState(() {
-                            _statusFilter = 'cancelled';
-                            _showFilters = false;
-                          });
-                          ref
-                              .read(ordersControllerProvider.notifier)
-                              .applyFilter('cancelled');
-                          _refreshCounts();
-                        },
-                        statusColor: const Color(0xFFEF4444),
-                        icon: Icons.cancel_rounded,
-                      ),
-                    ],
-                  ),
-                ),
-                crossFadeState: _showFilters
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 200),
+              PosFilterChipData(
+                id: 'created',
+                label: 'Yeni',
+                count: counts['created'] ?? 0,
+                icon: Icons.fiber_new_rounded,
+                color: const Color(0xFF3B82F6),
+              ),
+              PosFilterChipData(
+                id: 'preparing',
+                label: 'Hazırlanıyor',
+                count: counts['preparing'] ?? 0,
+                icon: Icons.soup_kitchen_rounded,
+                color: const Color(0xFFFF9500),
+              ),
+              PosFilterChipData(
+                id: 'ready',
+                label: 'Hazır',
+                count: counts['ready'] ?? 0,
+                icon: Icons.check_circle_outline_rounded,
+                color: const Color(0xFF10B981),
+              ),
+              PosFilterChipData(
+                id: 'delivered',
+                label: 'Teslim Edildi',
+                count: counts['delivered'] ?? 0,
+                icon: Icons.local_shipping_rounded,
+                color: const Color(0xFF6366F1),
+              ),
+              PosFilterChipData(
+                id: 'cancelled',
+                label: 'İptal',
+                count: counts['cancelled'] ?? 0,
+                icon: Icons.cancel_rounded,
+                color: const Color(0xFFEF4444),
               ),
             ],
           ),

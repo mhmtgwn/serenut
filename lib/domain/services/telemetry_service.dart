@@ -140,6 +140,10 @@ class TelemetryService {
   /// ```
   Future<void> Function(TelemetryEvent)? onCriticalEvent;
 
+  /// Warning ve üzerindeki operasyonel olayları dayanıklı uzak kuyruğa aktarır.
+  /// Yerel JSONL kaydı her durumda ana kayıt olmaya devam eder.
+  Future<void> Function(TelemetryEvent)? onOperationalEvent;
+
   Future<File> _getLogFile() async {
     if (_logFile != null) return _logFile!;
     try {
@@ -182,6 +186,15 @@ class TelemetryService {
       }
     } catch (_) {
       // Suppress telemetry errors to prevent cascading failures in production
+    }
+
+    if (telemetryEvent.level.index >= LogLevel.warning.index &&
+        onOperationalEvent != null) {
+      try {
+        await onOperationalEvent!(telemetryEvent);
+      } catch (_) {
+        // Uzak kuyruk hatası aktif işlemi veya yerel loglamayı durduramaz.
+      }
     }
 
     // CRITICAL events: fire optional remote push handler (Sentry-ready hook)

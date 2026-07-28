@@ -6,6 +6,7 @@ import { incrementLicenseValidation } from '../../utils/telemetry';
 
 const router = Router();
 const licenseRateLimit = createRedisLimiter({
+  scope: 'license-route',
   windowMs: 60 * 1000,
   max: 20,
   error: 'license_rate_limit_exceeded',

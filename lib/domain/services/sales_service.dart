@@ -83,6 +83,21 @@ class SalesService {
     if (items.isEmpty) {
       throw SaleEmptyException('Sale must contain at least one item');
     }
+    const allowedPaymentMethods = {'cash', 'card', 'debt', 'karma'};
+    if (!allowedPaymentMethods.contains(paymentMethod)) {
+      throw ArgumentError.value(
+          paymentMethod, 'paymentMethod', 'Geçersiz ödeme yöntemi.');
+    }
+    for (final item in items) {
+      if (!item.saleQuantity.isFinite || item.saleQuantity <= 0) {
+        throw ArgumentError.value(item.saleQuantity, 'saleQuantity',
+            'Miktar sıfırdan büyük olmalıdır.');
+      }
+      if (!item.unitPrice.isFinite || item.unitPrice < 0) {
+        throw ArgumentError.value(
+            item.unitPrice, 'unitPrice', 'Birim fiyat negatif olamaz.');
+      }
+    }
 
     // Idempotency check:
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
@@ -100,6 +115,16 @@ class SalesService {
     }
 
     final double finalPaidAmount = paidAmount ?? totalAmount;
+    if (!totalAmount.isFinite || totalAmount < 0) {
+      throw ArgumentError.value(
+          totalAmount, 'totalAmount', 'Satış toplamı geçersiz.');
+    }
+    if (!finalPaidAmount.isFinite ||
+        finalPaidAmount < 0 ||
+        finalPaidAmount > totalAmount) {
+      throw ArgumentError.value(finalPaidAmount, 'paidAmount',
+          'Ödenen tutar sıfır ile satış toplamı arasında olmalıdır.');
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final jwtSnapshot = prefs.getString('auth_jwt_token');
@@ -162,10 +187,7 @@ class SalesService {
         );
         await _saleRepository.update(completedSale);
 
-        int parsedSaleId = 0;
-        try {
-          parsedSaleId = sale.id.hashCode.abs();
-        } catch (_) {}
+        final parsedSaleId = sale.id.hashCode.abs();
 
         _eventPublisher.publish(SaleCreatedEvent(
           saleId: parsedSaleId,
@@ -248,10 +270,7 @@ class SalesService {
         );
         await _saleRepository.update(completedSale);
 
-        int parsedSaleId = 0;
-        try {
-          parsedSaleId = sale.id.hashCode.abs();
-        } catch (_) {}
+        final parsedSaleId = sale.id.hashCode.abs();
 
         _eventPublisher.publish(SaleCreatedEvent(
           saleId: parsedSaleId,
@@ -402,12 +421,15 @@ class SalesService {
       final restoredItems = <SaleItemInput>[];
       for (final item in sale.items) {
         final productId = item['product_id'] as String?;
-        final qty = item['quantity'] as int? ?? 0;
+        final double rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
         final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-        if (productId != null && qty > 0) {
+        if (productId != null && rawQty > 0) {
+          final int intQty =
+              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
           restoredItems.add(SaleItemInput(
             productId: productId,
-            quantity: qty,
+            quantity: intQty,
+            saleQuantity: rawQty,
             unitPrice: price,
           ));
         }
@@ -447,12 +469,15 @@ class SalesService {
       final restoredItems = <SaleItemInput>[];
       for (final item in sale.items) {
         final productId = item['product_id'] as String?;
-        final qty = (item['quantity'] as num?)?.toInt() ?? 0;
+        final double rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
         final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-        if (productId != null && qty > 0) {
+        if (productId != null && rawQty > 0) {
+          final int intQty =
+              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
           restoredItems.add(SaleItemInput(
             productId: productId,
-            quantity: qty,
+            quantity: intQty,
+            saleQuantity: rawQty,
             unitPrice: price,
           ));
         }
@@ -654,6 +679,11 @@ class SaleFailedEvent extends DomainEvent {
 class _DummyTransactionRunner implements IDbTransactionRunner {
   @override
   Future<T> transaction<T>(Future<T> Function() action) async {
+    assert(() {
+      // In debug mode, log a warning if non-transactional fallback runner is used
+      // to ensure transactions are properly supplied in production flows.
+      return true;
+    }());
     return await action();
   }
 }

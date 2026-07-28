@@ -11,7 +11,7 @@ async function setup() {
   console.log('🔄 Setting up database for Trial Test...');
   const client = await pgPool.connect();
   try {
-    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;');
   } finally {
     client.release();
   }

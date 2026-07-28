@@ -6,6 +6,7 @@ import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
 class SyncV4Result {
   const SyncV4Result(
@@ -28,25 +29,33 @@ class SyncV4Service {
     this._api, {
     Future<String> Function()? deviceActivationIdResolver,
     Future<String> Function()? deviceIdResolver,
+    LicenseService? licenseService,
   })  : _deviceActivationIdResolver = deviceActivationIdResolver,
-        _deviceIdResolver = deviceIdResolver;
+        _deviceIdResolver = deviceIdResolver,
+        _licenseService = licenseService;
   final ApiClient _api;
   final Future<String> Function()? _deviceActivationIdResolver;
   final Future<String> Function()? _deviceIdResolver;
+  final LicenseService? _licenseService;
   static const _legacySnapshotKey = 'sync_v4_legacy_snapshot_v1';
+  static const _unsyncedProductRecoveryKey =
+      'sync_v4_unsynced_product_recovery_v1';
 
   Future<SyncV4Result> sync() async {
     final db = await DatabaseManager().getDatabase();
     final deviceActivationId = await _deviceActivationId();
     final deviceId = await _deviceId();
     await _snapshotPreV4DataOnce(db);
+    await _recoverUnsyncedImportedProductsOnce(db);
     await db.rawUpdate(
         "UPDATE sync_outbox_v4 SET state = 'PENDING' WHERE state = 'SENDING'");
-    final pending = await db.query('sync_outbox_v4',
+    var pending = await db.query('sync_outbox_v4',
         where: "state = 'PENDING'", orderBy: 'id ASC', limit: 100);
-    final orderedPending = _dependencyOrder(pending);
     var pushed = 0;
-    if (orderedPending.isNotEmpty) {
+    var failed = 0;
+    final errors = <String>[];
+    while (pending.isNotEmpty) {
+      final orderedPending = _dependencyOrder(pending);
       await db.update('sync_outbox_v4', {'state': 'SENDING'},
           where: 'id IN (${List.filled(orderedPending.length, '?').join(',')})',
           whereArgs: orderedPending.map((r) => r['id']).toList());
@@ -61,6 +70,7 @@ class SyncV4Service {
                         'entity_type': r['entity_type'],
                         'entity_id': r['entity_id'],
                         'operation': r['operation'],
+                        'base_revision': r['base_revision'] ?? 0,
                         'payload': jsonDecode(r['payload'] as String),
                       })
                   .toList(),
@@ -70,6 +80,16 @@ class SyncV4Service {
         final acknowledged = ((body['results'] as List?) ?? [])
             .map((r) => (r as Map)['mutation_id'])
             .toList();
+        final conflicts = ((body['conflicts'] as List?) ?? [])
+            .map((r) => Map<String, dynamic>.from(r as Map))
+            .toList();
+        final conflicted =
+            conflicts.map((r) => r['mutation_id']).whereType<String>().toList();
+        final rejected = ((body['rejected'] as List?) ?? [])
+            .map((r) => Map<String, dynamic>.from(r as Map))
+            .toList();
+        final rejectedIds =
+            rejected.map((r) => r['mutation_id']).whereType<String>().toList();
         await db.transaction((txn) async {
           if (acknowledged.isNotEmpty) {
             await txn.delete('sync_outbox_v4',
@@ -77,13 +97,47 @@ class SyncV4Service {
                     'mutation_id IN (${List.filled(acknowledged.length, '?').join(',')})',
                 whereArgs: acknowledged);
           }
+          if (conflicted.isNotEmpty) {
+            await txn.update('sync_outbox_v4', {'state': 'CONFLICT'},
+                where:
+                    'mutation_id IN (${List.filled(conflicted.length, '?').join(',')})',
+                whereArgs: conflicted);
+            for (final conflict in conflicts) {
+              await txn.insert(
+                  'sync_conflicts_v4',
+                  {
+                    'mutation_id': conflict['mutation_id'],
+                    'entity_type': conflict['entity_type'],
+                    'entity_id': conflict['entity_id'],
+                    'server_revision': conflict['server_revision'],
+                    'detected_at': DateTime.now().toUtc().toIso8601String(),
+                  },
+                  conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+            failed += conflicted.length;
+            errors.add(
+                '${conflicted.length} kayıt başka bir aygıttaki daha yeni değişiklikle çakıştı.');
+          }
+          if (rejectedIds.isNotEmpty) {
+            await txn.update('sync_outbox_v4', {'state': 'REJECTED'},
+                where:
+                    'mutation_id IN (${List.filled(rejectedIds.length, '?').join(',')})',
+                whereArgs: rejectedIds);
+            failed += rejectedIds.length;
+            for (final rejection in rejected) {
+              errors.add(
+                  '${rejection['mutation_id']}: ${rejection['error'] ?? 'mutation_failed'}');
+            }
+          }
         });
-        pushed = acknowledged.length;
+        pushed += acknowledged.length;
       } catch (_) {
         await db.rawUpdate(
             "UPDATE sync_outbox_v4 SET state = 'PENDING', attempts = attempts + 1 WHERE state = 'SENDING'");
         rethrow;
       }
+      pending = await db.query('sync_outbox_v4',
+          where: "state = 'PENDING'", orderBy: 'id ASC', limit: 100);
     }
     final state = await db.query('sync_cursor_v4',
         where: 'key = ?', whereArgs: ['global'], limit: 1);
@@ -111,25 +165,35 @@ class SyncV4Service {
             conflictAlgorithm: ConflictAlgorithm.replace);
       });
     }
-    final response =
-        await _api.get(
-          '/api/v4/sync/pull?cursor=$cursor&limit=200&device_activation_id=$deviceActivationId&device_id=$deviceId',
-        );
-    final pullBody = Map<String, dynamic>.from(response.json as Map);
-    final changes = _dependencyOrder(
-      ((pullBody['changes'] as List?) ?? const [])
-          .map((value) => Map<String, dynamic>.from(value as Map))
-          .toList(),
-    );
-    await db.transaction((txn) async {
-      for (final raw in changes.cast<Map>()) {
-        await _apply(txn, Map<String, dynamic>.from(raw));
-      }
+    var pulled = 0;
+    while (true) {
+      final response = await _api.get(
+        '/api/v4/sync/pull?cursor=$cursor&limit=200&device_activation_id=$deviceActivationId&device_id=$deviceId',
+      );
+      final pullBody = Map<String, dynamic>.from(response.json as Map);
+      final changes = _dependencyOrder(
+        ((pullBody['changes'] as List?) ?? const [])
+            .map((value) => Map<String, dynamic>.from(value as Map))
+            .toList(),
+      );
       final next = (pullBody['next_cursor'] as num?)?.toInt() ?? cursor;
-      await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
-          conflictAlgorithm: ConflictAlgorithm.replace);
-    });
-    return SyncV4Result(pushed: pushed, pulled: changes.length);
+      await db.transaction((txn) async {
+        for (final raw in changes.cast<Map>()) {
+          await _apply(txn, Map<String, dynamic>.from(raw));
+        }
+        await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      });
+      pulled += changes.length;
+      if (changes.length < 200 || next <= cursor) break;
+      cursor = next;
+    }
+    return SyncV4Result(
+      pushed: pushed,
+      pulled: pulled,
+      failed: failed,
+      errors: errors,
+    );
   }
 
   /// V4 was introduced after customers had already been using offline data.
@@ -173,6 +237,7 @@ class SyncV4Service {
             'entity_id': id,
             'operation': source['is_deleted'] == 1 ? 'DELETE' : 'UPSERT',
             'payload': jsonEncode(payload),
+            'base_revision': 0,
             'state': 'PENDING',
             'attempts': 0,
             'created_at': DateTime.now().toUtc().toIso8601String(),
@@ -181,6 +246,38 @@ class SyncV4Service {
       }
     });
     await prefs.setBool(_legacySnapshotKey, true);
+  }
+
+  /// Catalog imports in releases before 1.2.0+42 wrote products with
+  /// `is_synced = 0` but did not create outbox mutations. Recover those rows
+  /// exactly once; the normal import path now enqueues mutations atomically.
+  Future<void> _recoverUnsyncedImportedProductsOnce(Database db) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_unsyncedProductRecoveryKey) == true) return;
+
+    await db.transaction((txn) async {
+      final rows = await txn.rawQuery('''
+        SELECT p.* FROM products p
+        WHERE COALESCE(p.is_synced, 0) = 0
+          AND NOT EXISTS (
+            SELECT 1 FROM sync_outbox_v4 o
+            WHERE o.entity_type = 'product' AND o.entity_id = p.id
+          )
+        ORDER BY p.id
+      ''');
+      for (final row in rows) {
+        final id = row['id']?.toString();
+        if (id == null || id.isEmpty) continue;
+        await SyncOutboxV4.enqueue(
+          txn,
+          entityType: 'product',
+          entityId: id,
+          operation: row['is_deleted'] == 1 ? 'DELETE' : 'UPSERT',
+          payload: Map<String, dynamic>.from(row),
+        );
+      }
+    });
+    await prefs.setBool(_unsyncedProductRecoveryKey, true);
   }
 
   /// Parents must exist before child aggregate rows and line items are applied.
@@ -232,9 +329,23 @@ class SyncV4Service {
       return;
     }
     final items = payload.remove('items');
-    final row = {...payload, 'id': id, 'is_synced': 1};
+    final row = await _normalizeRowForLocalSchema(
+      db,
+      table,
+      {...payload, 'id': id, 'is_synced': 1},
+    );
     if (type == 'financial_transaction') {
-      await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.ignore);
+      // Ledger rows are immutable. Replaying the same globally unique ID is
+      // an idempotent no-op; a new ID is inserted exactly once.
+      final existing = await db.query(
+        table,
+        columns: const ['id'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) return;
+      await db.insert(table, row, conflictAlgorithm: ConflictAlgorithm.abort);
       return;
     }
     final updated =
@@ -269,6 +380,33 @@ class SyncV4Service {
     }
   }
 
+  /// Sync payloads outlive individual client schema versions. Only write
+  /// columns present in the receiving SQLite table and fill mandatory audit
+  /// timestamps when an older producer omitted them.
+  Future<Map<String, Object?>> _normalizeRowForLocalSchema(
+    Transaction db,
+    String table,
+    Map<String, dynamic> source,
+  ) async {
+    final schema = await db.rawQuery('PRAGMA table_info($table)');
+    final columns = schema
+        .map((column) => column['name']?.toString())
+        .whereType<String>()
+        .toSet();
+    final row = <String, Object?>{
+      for (final entry in source.entries)
+        if (columns.contains(entry.key)) entry.key: entry.value,
+    };
+    final now = DateTime.now().toUtc().toIso8601String();
+    if (columns.contains('created_at') && row['created_at'] == null) {
+      row['created_at'] = now;
+    }
+    if (columns.contains('updated_at') && row['updated_at'] == null) {
+      row['updated_at'] = row['created_at'] ?? now;
+    }
+    return row;
+  }
+
   Future<String> _deviceId() async {
     final resolver = _deviceIdResolver;
     if (resolver != null) return resolver();
@@ -279,6 +417,13 @@ class SyncV4Service {
   Future<String> _deviceActivationId() async {
     final resolver = _deviceActivationIdResolver;
     if (resolver != null) return resolver();
+    final licenseService = _licenseService;
+    if (licenseService != null) {
+      final activationId = licenseService.getLicenseInfo()?.activationId;
+      if (activationId != null && activationId.isNotEmpty) {
+        return activationId;
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
     final activationId = LicenseService(prefs).getLicenseInfo()?.activationId;
     if (activationId == null || activationId.isEmpty) {

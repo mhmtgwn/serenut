@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/providers/sync_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -488,8 +489,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
     if (confirmed != true || !mounted) return;
 
-    requireAdminAccess(context,
-        title: 'Sıfırlama Yetkisi', requirePin: true, requireConfirm: true,
+    requireAdminAccess(context, title: 'Sıfırlama Yetkisi',
         onGranted: (approvedByUserId, approvedByUserName) async {
       // Show loading
       showDialog(
@@ -524,15 +524,24 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                 await txn.rawDelete('DELETE FROM sale_items');
                 // 2. Satışlar
                 await txn.rawDelete('DELETE FROM sales');
-                // 3. Siparişler
+                // 3. Sipariş kalemleri (orders'dan önce — FK kısıtlaması)
+                await txn.rawDelete('DELETE FROM order_items');
+                try {
+                  await txn.rawDelete('DELETE FROM customer_order_items');
+                } catch (_) {}
+                // 4. Siparişler
                 await txn.rawDelete('DELETE FROM orders');
                 // 5. Ürünler
                 await txn.rawDelete('DELETE FROM products');
-                // 4. Finansal işlemler (borç/tahsilat)
+                // 6. Finansal işlemler (borç/tahsilat)
                 await txn.rawDelete('DELETE FROM financial_transactions');
-                // 6. Müşteriler — peşin müşteri (id='' veya id='default') korunur
+                // 7. Müşteriler — peşin müşteri (id='' veya id='default') korunur
                 await txn.rawDelete(
                     "DELETE FROM customers WHERE id != '' AND id != 'default'");
+
+                // 8. Atomik olarak yerel outbox ve cursor'ı temizle (sunucuya bayat mutation gitmesini engeller)
+                await txn.rawDelete('DELETE FROM sync_outbox_v4');
+                await txn.rawDelete('DELETE FROM sync_cursor_v4');
               } finally {
                 // Disable ledger bypass flag to restore immutability
                 await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
@@ -565,6 +574,10 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           // Dashboard ve derived provider'lar (satış/sipariş toplamlarını gösterir)
           ref.invalidate(dashboardProvider);
           ref.read(productCategoriesStateProvider.notifier).state = [];
+
+          // Senkronizasyon provider'ını invalidate et ve temiz bootstrap çekimini başlat
+          ref.invalidate(syncProvider);
+          ref.read(syncProvider.notifier).triggerSync();
 
           if (mounted) Navigator.pop(context);
           if (mounted) {
@@ -706,7 +719,6 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
     requireAdminAccess(
       context,
       title: 'Yedekleme Yönetimi',
-      requirePin: true,
       onGranted: (approvedByUserId, approvedByUserName) {
         Navigator.of(context).push(
           MaterialPageRoute(

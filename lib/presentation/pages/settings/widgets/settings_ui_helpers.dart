@@ -44,7 +44,7 @@ extension SettingsPageUiHelpers on _SettingsPageState {
         border: Border.all(color: _kBorderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.015),
+            color: Colors.black.withValues(alpha: 0.015),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -195,7 +195,7 @@ extension SettingsPageUiHelpers on _SettingsPageState {
                   return Chip(
                     label: Text(p.toString(),
                         style: const TextStyle(fontSize: 12)),
-                    backgroundColor: _kGreen.withOpacity(0.1),
+                    backgroundColor: _kGreen.withValues(alpha: 0.1),
                     side: BorderSide.none,
                     labelStyle: const TextStyle(
                         color: _kGreen, fontWeight: FontWeight.w600),

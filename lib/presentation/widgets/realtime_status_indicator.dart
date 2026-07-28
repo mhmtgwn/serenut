@@ -20,57 +20,35 @@ class RealtimeStatusIndicator extends ConsumerWidget {
 
     if (compact) {
       final Color dotColor;
-      final String label;
+      final String tooltipText;
 
       switch (status) {
         case RealtimeStatus.connected:
-          return const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _BreathingDot(),
-              SizedBox(width: 6),
-              Text(
-                'Canlı',
-                style: TextStyle(
-                  color: Color(0xFF16A34A),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+          return const Tooltip(
+            message: 'Canlı Bağlantı',
+            child: _BreathingDot(),
           );
         case RealtimeStatus.connecting:
         case RealtimeStatus.reconnecting:
           dotColor = const Color(0xFFEAB308);
-          label = 'Yeniden Bağlanılıyor...';
+          tooltipText = 'Sunucuyla bağlantı kesildi. Yeniden bağlanılıyor...';
           break;
         case RealtimeStatus.disconnected:
           dotColor = const Color(0xFFEF4444);
-          label = 'Bağlantı Kesildi';
+          tooltipText = 'Bağlantı Kesildi';
           break;
       }
 
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: dotColor,
-            ),
+      return Tooltip(
+        message: tooltipText,
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: dotColor,
           ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: dotColor,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+        ),
       );
     }
 
@@ -161,7 +139,7 @@ class _BreathingDotState extends State<_BreathingDot>
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF16A34A)
-                    .withOpacity(0.2 + 0.6 * _controller.value),
+                    .withValues(alpha: 0.2 + 0.6 * _controller.value),
                 blurRadius: 4 + 6 * _controller.value,
                 spreadRadius: 1 + 2 * _controller.value,
               ),

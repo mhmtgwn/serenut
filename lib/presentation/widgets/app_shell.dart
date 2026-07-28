@@ -10,6 +10,7 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/realtime/realtime_provider.dart';
+import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -31,7 +32,6 @@ class AppShell extends ConsumerWidget {
     // Automatically manage real-time WebSocket connection and auto-sync topics
     ref.watch(realtimeAutoSyncProvider);
     ref.listen(isAuthenticatedProvider, (previous, next) {
-
       if (next) {
         ref.read(connectionManagerProvider).connect();
       } else {
@@ -41,7 +41,6 @@ class AppShell extends ConsumerWidget {
 
     final shellIndex = navigationShell.currentIndex;
     final currentUser = ref.watch(currentUserProvider);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(activeShellIndexProvider) != shellIndex) {
         ref.read(activeShellIndexProvider.notifier).state = shellIndex;
@@ -93,7 +92,20 @@ class AppShell extends ConsumerWidget {
     );
 
     return Scaffold(
-      body: navigationShell,
+      body: Stack(
+        children: [
+          Positioned.fill(child: navigationShell),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 6,
+            child: SafeArea(
+              top: false,
+              child: TrialBannerWidget(),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: _PosNavBar(
         items: navItems,
         activeIndex: activeIndex,

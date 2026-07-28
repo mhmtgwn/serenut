@@ -11,6 +11,7 @@ export async function runMigrations(pool: Pool): Promise<void> {
     console.log('🔒 Acquiring database migration lock...');
     await client.query('SELECT pg_advisory_lock(7429185)');
     console.log('🔄 Running database migrations...');
+    await client.query('SET search_path TO public');
     
     // Create schema_migrations table if not exists
     await client.query(`
@@ -72,20 +73,15 @@ export async function runMigrations(pool: Pool): Promise<void> {
       } else {
         console.log(`🔄 Applying database migration version ${migration.version} (${migration.file})...`);
 
-        if (migration.version === 12) {
-          // Version 12 contains CREATE INDEX CONCURRENTLY which PostgreSQL prohibits running inside a transaction block
+        await client.query('BEGIN');
+        try {
+          await client.query('SET search_path TO public');
           await client.query(normalizedSql);
           await client.query('INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)', [migration.version, fileChecksum]);
-        } else {
-          await client.query('BEGIN');
-          try {
-            await client.query(normalizedSql);
-            await client.query('INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)', [migration.version, fileChecksum]);
-            await client.query('COMMIT');
-          } catch (execErr) {
-            await client.query('ROLLBACK');
-            throw execErr;
-          }
+          await client.query('COMMIT');
+        } catch (execErr) {
+          await client.query('ROLLBACK');
+          throw execErr;
         }
         console.log(`✅ Migration version ${migration.version} (${migration.file}) applied successfully.`);
       }
