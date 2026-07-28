@@ -10,7 +10,7 @@ async function setup() {
   console.log('🔄 Setting up database for Support SLA Test...');
   const client = await pgPool.connect();
   try {
-    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;');
   } finally {
     client.release();
   }
@@ -40,6 +40,7 @@ async function run() {
     console.log('🎫 Creating high priority support ticket (2h SLA expected)...');
     const ticketHigh = await SupportService.createTicket({
       companyId: 'support-comp',
+      requesterUserId: 'support-user',
       subject: 'High Priority Issue',
       body: 'High priority description',
       priority: 'P1'
@@ -56,6 +57,7 @@ async function run() {
     console.log('🎫 Creating medium priority support ticket (6h SLA expected)...');
     const ticketMed = await SupportService.createTicket({
       companyId: 'support-comp',
+      requesterUserId: 'support-user',
       subject: 'Medium Priority Issue',
       body: 'Medium description',
       priority: 'P2'
@@ -72,6 +74,7 @@ async function run() {
     console.log('🎫 Creating low priority support ticket (24h SLA expected)...');
     const ticketLow = await SupportService.createTicket({
       companyId: 'support-comp',
+      requesterUserId: 'support-user',
       subject: 'Low Priority Issue',
       body: 'Low description',
       priority: 'P3'

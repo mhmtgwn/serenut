@@ -12,12 +12,39 @@ import { getActiveWebSocketCount } from '../analytics/analytics.ws';
 import { loadIyzicoConfig, IyzicoService } from '../billing/iyzico.service';
 import { logger } from '../../config/logger';
 import { encryptSecret } from '../../crypto_helper';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
 // Apply auth and sysadmin validation globally
 router.use(authenticateUser);
 router.use(requireRole('sysadmin'));
+
+// Maskelenmiş Winston kayıtlarını yalnız platform sysadmin'ine salt-okunur sunar.
+// Dosya adı kullanıcı girdisinden oluşturulmaz; path traversal mümkün değildir.
+router.get('/server-logs', async (req: AuthenticatedRequest, res: Response) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+  const level = String(req.query.level || 'error').toLowerCase();
+  const filename = level === 'all' ? 'combined.log' : 'error.log';
+  const logPath = path.join(process.cwd(), 'logs', filename);
+  try {
+    if (!fs.existsSync(logPath)) return res.json([]);
+    const lines = fs.readFileSync(logPath, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-limit)
+      .reverse();
+    const records = lines.map((line) => {
+      try { return JSON.parse(line); }
+      catch { return { timestamp: null, level, message: line }; }
+    });
+    return res.json(records);
+  } catch (error) {
+    logger.error('Server log query failed:', error);
+    return res.status(500).json({ error: 'server_log_query_failed' });
+  }
+});
 
 // Helper to run database queries bypassing RLS for sysadmin
 async function runBypassingRLS(sql: string, params: any[] = []) {
@@ -126,8 +153,9 @@ router.get('/companies', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const list = await runBypassingRLS(`
       SELECT c.*, 
-             (SELECT COUNT(*) FROM stores s WHERE s.company_id = c.id) as store_count,
-             (SELECT COUNT(*) FROM devices d WHERE d.company_id = c.id) as device_count,
+             (SELECT COUNT(*) FROM branches b WHERE b.company_id = c.id AND b.is_active = TRUE) as store_count,
+             (SELECT COUNT(*) FROM device_activations da
+              WHERE da.company_id = c.id AND da.status = 'active') as device_count,
              (SELECT expires_at FROM licenses l WHERE l.company_id = c.id ORDER BY expires_at DESC LIMIT 1) as license_expires_at
       FROM companies c 
       ORDER BY c.created_at DESC
@@ -145,11 +173,28 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
       return res.status(404).json({ error: 'company_not_found' });
     }
 
-    const stores = await runBypassingRLS('SELECT * FROM stores WHERE company_id = $1', [req.params.id]);
+    const stores = await runBypassingRLS(
+      `SELECT id, store_id, name, address, phone, is_active,
+              CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status,
+              created_at, updated_at
+       FROM branches WHERE company_id = $1 ORDER BY name`,
+      [req.params.id]);
     const devices = await runBypassingRLS('SELECT * FROM devices WHERE company_id = $1', [req.params.id]);
-    const licenses = await runBypassingRLS('SELECT * FROM licenses WHERE company_id = $1', [req.params.id]);
+    const licenses = await runBypassingRLS(
+      `SELECT le.*, p.name AS plan_name FROM license_entitlements le
+       LEFT JOIN plans p ON p.id = le.plan_id
+       WHERE le.company_id = $1 ORDER BY le.created_at DESC`, [req.params.id]);
     const users = await runBypassingRLS('SELECT id, name, email, is_active, created_at FROM users WHERE company_id = $1', [req.params.id]);
     const invoices = await runBypassingRLS('SELECT * FROM invoices WHERE company_id = $1 ORDER BY due_at DESC', [req.params.id]);
+    const subscriptions = await runBypassingRLS(
+      `SELECT s.*, p.name AS plan_name, p.price AS list_price, p.currency,
+              p.device_limit AS plan_device_limit, p.store_limit AS plan_store_limit,
+              p.user_limit AS plan_user_limit
+       FROM subscriptions s JOIN plans p ON p.id = s.plan_id
+       WHERE s.company_id = $1 ORDER BY s.current_period_start DESC`, [req.params.id]);
+    const packageOverride = await runBypassingRLS(
+      `SELECT o.*, p.name AS base_plan_name FROM subscription_overrides o
+       JOIN plans p ON p.id = o.base_plan_id WHERE o.company_id = $1`, [req.params.id]);
 
     return res.json({
       company: company.rows[0],
@@ -158,10 +203,53 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
       licenses: licenses.rows,
       users: users.rows,
       invoices: invoices.rows,
+      subscriptions: subscriptions.rows,
+      package_override: packageOverride.rows[0] || null,
     });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
   }
+});
+
+router.put('/companies/:id/package-override', async (req: AuthenticatedRequest, res: Response) => {
+  const { base_plan_id, custom_price, billing_interval, user_limit, store_limit,
+          device_limit, feature_overrides, valid_from, valid_until, auto_renew, reason } = req.body;
+  if (!base_plan_id || !valid_from || !valid_until || !reason?.trim()) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Temel plan, geçerlilik tarihleri ve gerekçe zorunludur.' });
+  }
+  if (new Date(valid_until) <= new Date(valid_from)) {
+    return res.status(400).json({ error: 'invalid_period', message: 'Geçersiz paket dönemi.' });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const company = await client.query('SELECT id FROM companies WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!company.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'company_not_found' }); }
+    const plan = await client.query('SELECT id FROM plans WHERE id=$1 AND is_active=TRUE', [base_plan_id]);
+    if (!plan.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'plan_not_found' }); }
+    const result = await client.query(
+      `INSERT INTO subscription_overrides
+       (id,company_id,base_plan_id,custom_price,billing_interval,user_limit,store_limit,device_limit,
+        feature_overrides,valid_from,valid_until,auto_renew,reason,is_active,created_by,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE,$14,NOW())
+       ON CONFLICT (company_id) DO UPDATE SET base_plan_id=EXCLUDED.base_plan_id,
+        custom_price=EXCLUDED.custom_price,billing_interval=EXCLUDED.billing_interval,
+        user_limit=EXCLUDED.user_limit,store_limit=EXCLUDED.store_limit,device_limit=EXCLUDED.device_limit,
+        feature_overrides=EXCLUDED.feature_overrides,valid_from=EXCLUDED.valid_from,
+        valid_until=EXCLUDED.valid_until,auto_renew=EXCLUDED.auto_renew,reason=EXCLUDED.reason,
+        is_active=TRUE,created_by=EXCLUDED.created_by,updated_at=NOW() RETURNING *`,
+      [`ovr-${crypto.randomUUID()}`,req.params.id,base_plan_id,custom_price??null,billing_interval||null,
+       user_limit??null,store_limit??null,device_limit??null,feature_overrides||{},valid_from,valid_until,
+       Boolean(auto_renew),reason.trim(),req.user!.id]);
+    await client.query('COMMIT');
+    await writeAdminAudit(req.user!.id,'UPSERT_COMPANY_PACKAGE_OVERRIDE','companies',req.params.id,null,
+      {base_plan_id,custom_price,user_limit,store_limit,device_limit,valid_from,valid_until,reason});
+    return res.json({package_override:result.rows[0]});
+  } catch (err) {
+    await client.query('ROLLBACK'); logger.error('Company package override failed:',err);
+    return res.status(500).json({error:'server_error'});
+  } finally { client.release(); }
 });
 
 router.get('/subscriptions', async (_req: AuthenticatedRequest, res: Response) => {
@@ -194,6 +282,18 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
       `INSERT INTO companies (id, name, tax_number, tax_office, phone, email, address, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')`,
       [id, name, tax_number, tax_office || null, phone || null, email || null, address || null]
+    );
+
+    const defaultStoreId = `store-${crypto.randomUUID()}`;
+    const defaultBranchId = `br-${crypto.randomUUID()}`;
+    await runBypassingRLS(
+      `INSERT INTO stores (id, company_id, name, address) VALUES ($1, $2, 'Merkez Şube', $3)`,
+      [defaultStoreId, id, address || null]
+    );
+    await runBypassingRLS(
+      `INSERT INTO branches (id, company_id, store_id, name, address)
+       VALUES ($1, $2, $3, 'Merkez Şube', $4)`,
+      [defaultBranchId, id, defaultStoreId, address || null]
     );
 
     // Auto generate seed plans and trial license for the new company
@@ -277,9 +377,9 @@ router.get('/licenses', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
-  const { company_id, tier, allowed_devices_count, expires_in_days } = req.body;
-  if (!company_id || !tier) {
-    return res.status(400).json({ error: 'missing_fields', message: 'company_id ve tier alanları zorunludur.' });
+  const { company_id, tier, allowed_devices_count, expires_in_days, reason } = req.body;
+  if (!company_id || !tier || !reason?.trim()) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Firma, paket ve manuel lisans gerekçesi zorunludur.' });
   }
 
   const days = expires_in_days ? parseInt(expires_in_days, 10) : 365;
@@ -348,7 +448,7 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
       client.release();
     }
 
-    await writeAdminAudit(req.user!.id, 'CREATE_LICENSE', 'licenses', id, null, { licenseKey, tier, company_id }, req.ip);
+    await writeAdminAudit(req.user!.id, 'CREATE_MANUAL_LICENSE_EXCEPTION', 'licenses', id, null, { licenseKey, tier, company_id, reason: reason.trim() }, req.ip);
 
     return res.status(201).json({ success: true, license_id: id, license_key: licenseKey });
   } catch (err) {
@@ -504,11 +604,13 @@ router.post('/licenses/:id/revoke', async (req: AuthenticatedRequest, res: Respo
 router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const list = await runBypassingRLS(`
-      SELECT d.*, c.name as company_name, s.name as store_name 
-      FROM devices d 
-      JOIN companies c ON d.company_id = c.id 
-      LEFT JOIN stores s ON d.store_id = s.id 
-      ORDER BY d.last_active_at DESC NULLS LAST
+      SELECT da.id, da.company_id, da.device_hash,
+             da.device_name AS name, da.platform, da.status,
+             da.activated_at, da.last_seen_at AS last_active_at,
+             c.name AS company_name, NULL::text AS store_name
+      FROM device_activations da
+      JOIN companies c ON da.company_id = c.id
+      ORDER BY da.last_seen_at DESC NULLS LAST
     `);
     
     // Add real-time online status helper (active in last 5 minutes)
@@ -1634,6 +1736,25 @@ router.post('/incidents/:id/resolve', async (req: AuthenticatedRequest, res: Res
 });
 
 // ── 23. GUVENLIK MERKEZI (Security Ban & Logouts) ─────────────────────────────
+router.get('/security/admin-users', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const users = await runBypassingRLS(`
+      SELECT u.id, u.name, u.email, u.is_active, u.last_login_at, u.updated_at,
+             COALESCE(ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.id IS NOT NULL), '{}') AS roles
+      FROM users u
+      JOIN user_roles ur ON ur.user_id = u.id
+      JOIN roles r ON r.id = ur.role_id
+      WHERE r.name = 'sysadmin'
+      GROUP BY u.id, u.name, u.email, u.is_active, u.last_login_at, u.updated_at
+      ORDER BY u.name, u.email
+    `);
+    return res.json(users.rows);
+  } catch (err) {
+    logger.error('Admin security user list failed:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 router.post('/security/ban-ip', async (req: AuthenticatedRequest, res: Response) => {
   const { ip, reason } = req.body;
 

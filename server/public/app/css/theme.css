@@ -169,3 +169,120 @@ body{background:var(--ui-canvas);color:var(--ui-ink)}
   .admin-welcome,
   .company-detail-head{align-items:flex-start;flex-direction:column}
 }
+
+.company-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.company-tabs .company-tab.active{border-color:var(--ui-green)!important;background:#e9f6ef!important;color:var(--ui-green)!important}
+.company-tab-panel{min-width:0;padding:20px;border:1px solid var(--ui-line);border-radius:11px;background:#fff}
+.company-tab-panel .admin-form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:900px){.company-tab-panel .admin-form-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.company-tab-panel{padding:14px}.company-tab-panel .admin-form-grid{grid-template-columns:1fr}}
+
+/* Shared authenticated shell theme.
+   Admin is the visual baseline; roles only change content, never layout rhythm. */
+:root{
+  --shell-sidebar-width:236px;
+  --shell-sidebar-bg:#151b18;
+  --shell-sidebar-padding:22px 14px;
+  --shell-main-padding-y:28px;
+  --shell-main-padding-x:34px;
+  --shell-header-min-height:92px;
+  --shell-nav-height:39px;
+  --shell-nav-padding-y:8px;
+  --shell-nav-padding-x:12px;
+  --shell-nav-gap:10px;
+  --shell-nav-radius:7px;
+  --shell-nav-font-size:.88rem;
+  --shell-panel-gap:18px
+}
+.customer-shell .shell-layout,
+.sysadmin-shell .shell-layout{grid-template-columns:var(--shell-sidebar-width) minmax(0,1fr)}
+.customer-shell .shell-sidebar,
+.sysadmin-shell .shell-sidebar{
+  padding:var(--shell-sidebar-padding);
+  background:var(--shell-sidebar-bg);
+  border:0;
+  color:#fff
+}
+.customer-shell .sidebar-brand,
+.customer-shell .sidebar-user-name,
+.sysadmin-shell .sidebar-brand,
+.sysadmin-shell .sidebar-user-name{color:#fff}
+.customer-shell .sidebar-brand,
+.sysadmin-shell .sidebar-brand{font-size:inherit;letter-spacing:inherit}
+.customer-shell .sidebar-brand:before,
+.sysadmin-shell .sidebar-brand:before{
+  width:32px;
+  height:32px;
+  margin-right:9px;
+  border-radius:9px;
+  background:var(--ui-green);
+  font-size:.9rem
+}
+.customer-shell .sidebar-tenant,
+.customer-shell .sidebar-user-role,
+.sysadmin-shell .sidebar-tenant,
+.sysadmin-shell .sidebar-user-role{color:#9eaaa4;font-size:inherit}
+.customer-shell .nav-section-label,
+.sysadmin-shell .nav-section-label{display:block;color:#748079}
+.customer-shell .sidebar-nav,
+.sysadmin-shell .sidebar-nav{gap:3px;margin-top:0}
+.customer-shell .nav-link,
+.sysadmin-shell .nav-link{
+  grid-template-columns:22px 1fr;
+  gap:var(--shell-nav-gap);
+  min-height:var(--shell-nav-height);
+  padding:var(--shell-nav-padding-y) var(--shell-nav-padding-x);
+  border-radius:var(--shell-nav-radius);
+  color:#cbd4cf;
+  font-size:var(--shell-nav-font-size);
+  font-weight:600
+}
+.customer-shell .nav-link .nav-icon,
+.sysadmin-shell .nav-link .nav-icon{width:19px;height:19px;stroke-width:1.7}
+.customer-shell .nav-link:hover,
+.sysadmin-shell .nav-link:hover{color:#fff;background:#26302b}
+.customer-shell .nav-link.active,
+.sysadmin-shell .nav-link.active{color:#fff;background:var(--ui-green);box-shadow:none}
+.customer-shell .sidebar-bottom,
+.sysadmin-shell .sidebar-bottom{padding-top:16px;border-color:#303a35}
+.customer-shell .sidebar-bottom .btn,
+.sysadmin-shell .sidebar-bottom .btn{
+  min-height:40px;
+  border-color:#3c4741!important;
+  border-radius:8px!important;
+  background:transparent!important;
+  color:#fff!important;
+  font-size:inherit
+}
+.customer-shell .shell-main,
+.sysadmin-shell .shell-main{
+  padding:var(--shell-main-padding-y) var(--shell-main-padding-x);
+  gap:var(--shell-panel-gap)
+}
+.customer-shell .shell-header,
+.sysadmin-shell .shell-header{
+  min-height:var(--shell-header-min-height);
+  margin:calc(var(--shell-main-padding-y) * -1) calc(var(--shell-main-padding-x) * -1) 0;
+  padding:20px var(--shell-main-padding-x)
+}
+.customer-shell .shell-title,
+.sysadmin-shell .shell-title{font-size:1.8rem}
+.customer-shell .shell-copy,
+.sysadmin-shell .shell-copy{font-size:.88rem}
+.customer-shell .embed-panel>.module-panel-head,
+.sysadmin-shell .embed-panel>.module-panel-head{margin-bottom:18px;padding:20px 22px}
+
+@media(max-width:1080px){
+  .customer-shell .shell-layout,
+  .sysadmin-shell .shell-layout{grid-template-columns:minmax(0,1fr)}
+  .customer-shell .shell-main,
+  .sysadmin-shell .shell-main{width:100%;min-width:0;padding:18px 14px}
+  .customer-shell .shell-header,
+  .sysadmin-shell .shell-header{min-height:auto;margin:-18px -14px 0;padding:16px 14px}
+}
+@media(max-width:650px){
+  .customer-shell .embed-panel>.module-panel-head,
+  .sysadmin-shell .embed-panel>.module-panel-head{padding:15px}
+  .customer-shell .shell-title,
+  .sysadmin-shell .shell-title{font-size:1.45rem}
+}

@@ -99,16 +99,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
-    id: 'platform-subscriptions',
-    label: 'Abonelikler',
-    section: 'platform',
-    href: '/app/#platform-subscriptions',
-    description: 'Deneme, aktif ve sona eren abonelikleri izleyin.',
-    module: 'admin',
-    moduleTab: 'subscriptions',
-    roles: ['sysadmin']
-  },
-  {
     id: 'platform-plans',
     label: 'Planlar',
     section: 'platform',
@@ -116,16 +106,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     description: 'Satış planlarını, limitleri ve fiyatları yönetin.',
     module: 'admin',
     moduleTab: 'plans',
-    roles: ['sysadmin']
-  },
-  {
-    id: 'platform-licenses',
-    label: 'Lisanslar',
-    section: 'platform',
-    href: '/app/#platform-licenses',
-    description: 'Şirket lisanslarını üretin, yenileyin ve askıya alın.',
-    module: 'admin',
-    moduleTab: 'licenses',
     roles: ['sysadmin']
   },
   {
@@ -146,6 +126,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     description: 'Telemetri, güvenlik ve olay yönetimi.',
     module: 'admin',
     moduleTab: 'health',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-security',
+    label: 'Güvenlik ve Loglar',
+    section: 'platform',
+    href: '/app/#platform-security',
+    description: 'Admin şifreleri, güvenlik işlemleri ve sistem kayıtları.',
+    module: 'admin',
+    moduleTab: 'security',
     roles: ['sysadmin']
   },
   {
@@ -172,7 +162,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
 
 export function filterNavByEntitlements(roles: string[] = [], permissions: string[] = []) {
   if (roles.includes('sysadmin')) {
-    return APP_NAV_ITEMS.filter((item) => item.roles?.includes('sysadmin'));
+    return APP_NAV_ITEMS.filter((item) => item.roles?.includes('sysadmin') || item.id === 'account-settings');
   }
   return APP_NAV_ITEMS.filter((item) => {
     const rolePass = !item.roles || item.roles.some((role) => roles.includes(role));

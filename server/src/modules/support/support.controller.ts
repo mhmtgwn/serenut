@@ -12,27 +12,40 @@ import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.mi
 import { SupportService } from './support.service';
 import { createError } from '../../config/error-codes';
 import { pgPool } from '../../config/database';
-import crypto from 'crypto';
 
 const router = Router();
 
-// Public route for landing page contact form
-router.post('/public-contact', async (req, res) => {
-  const { name, email, phone, subject, message } = req.body;
+// Unauthenticated intake is deliberately kept outside the tenant ticket table.
+router.post('/guest-requests', async (req, res) => {
+  const { name, email, phone, company_name, customer_claim, category, subject, message } = req.body;
   if (!name || !email || !subject || !message) {
     return res.status(400).json({ error: 'missing_fields', message: 'Lütfen tüm zorunlu alanları doldurun.' });
   }
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'invalid_email', message: 'Geçerli bir e-posta adresi girin.' });
+  }
+  if (String(name).trim().length > 200 || String(subject).trim().length > 500 || String(message).trim().length > 10000) {
+    return res.status(400).json({ error: 'invalid_length', message: 'Başvuru alanlarından biri izin verilen uzunluğu aşıyor.' });
+  }
   try {
-    const id = `contact-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    await pgPool.query(
-      `INSERT INTO public_contact_messages (id, name, email, phone, subject, message)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, String(name).trim(), String(email).trim().toLowerCase(), phone ? String(phone).trim() : null, String(subject).trim(), String(message).trim()]
-    );
-    return res.status(201).json({ success: true, message: 'Mesajınız alındı. Destek ekibimiz sizinle iletişime geçecek.' });
+    const request = await SupportService.createGuestRequest({
+      name: String(name).trim(), email: normalizedEmail,
+      phone: phone ? String(phone).trim() : undefined,
+      companyName: company_name ? String(company_name).trim() : undefined,
+      customerClaim: customer_claim, category,
+      subject: String(subject).trim(), message: String(message).trim(),
+    });
+    return res.status(201).json({
+      request,
+      message: `Başvurunuz alındı. Takip numaranız: ${request.referenceCode}`,
+    });
   } catch (err) {
-    console.error('Public contact persistence error:', err);
-    return res.status(500).json({ error: 'server_error', message: 'Mesajınız kaydedilemedi.' });
+    if (err instanceof Error && (err.message.includes('Invalid support category') || err.message.includes('Invalid customer claim'))) {
+      return res.status(400).json({ error: 'invalid_request_type', message: 'Başvuru türü veya kategori geçersiz.' });
+    }
+    console.error('Guest support persistence error:', err);
+    return res.status(500).json({ error: 'server_error', message: 'Başvurunuz kaydedilemedi.' });
   }
 });
 
@@ -66,7 +79,7 @@ router.use(authenticateUser);
  *         description: Validation error
  */
 router.post('/tickets', async (req: AuthenticatedRequest, res: Response) => {
-  const { subject, body, priority, logs } = req.body;
+  const { subject, body, priority, category, logs } = req.body;
 
   if (!subject || subject.trim().length === 0) {
     return res.status(400).json({
@@ -82,15 +95,17 @@ router.post('/tickets', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const ticket = await SupportService.createTicket({
       companyId: req.user!.company_id,
+      requesterUserId: req.user!.id,
       subject: subject.trim(),
       body: body ?? undefined,
       priority: priority ?? 'P3',
+      category: category ?? 'technical',
       logsSnapshot: logs ?? undefined,
     });
 
     return res.status(201).json({ ticket });
   } catch (err: any) {
-    if (err.message.includes('Invalid priority')) {
+    if (err.message.includes('Invalid priority') || err.message.includes('Invalid support category')) {
       return res.status(400).json({
         error: { code: 'VALIDATION', message: 'Geçersiz öncelik seviyesi. P1, P2, P3 veya P4 olmalıdır.' },
       });
@@ -129,8 +144,8 @@ router.get('/tickets', async (req: AuthenticatedRequest, res: Response) => {
   const { status, priority, page, limit } = req.query;
 
   // Sysadmin sees ALL tickets; regular users see only their company's tickets
-  const isAdmin = req.user!.roles?.includes('sysadmin') || req.user!.roles?.includes('admin');
-  const companyIdFilter = isAdmin ? undefined : req.user!.company_id;
+  const isSysadmin = req.user!.roles?.includes('sysadmin');
+  const companyIdFilter = isSysadmin ? undefined : req.user!.company_id;
 
   try {
     const result = await SupportService.listTickets({
@@ -148,6 +163,18 @@ router.get('/tickets', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+router.get('/guest-requests', async (req: AuthenticatedRequest, res: Response) => {
+  const isSysadmin = req.user!.roles?.includes('sysadmin');
+  if (!isSysadmin) return res.status(403).json(createError('AUTH005'));
+  try {
+    const requests = await SupportService.listGuestRequests(Number(req.query.limit) || 100);
+    return res.json({ requests });
+  } catch (err) {
+    console.error('List guest support requests error:', err);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Misafir başvuruları listelenemedi.' } });
+  }
+});
+
 /**
  * @swagger
  * /support/tickets/{id}:
@@ -159,7 +186,7 @@ router.get('/tickets', async (req: AuthenticatedRequest, res: Response) => {
  */
 router.get('/tickets/:id', async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const isAdmin = req.user!.roles?.includes('sysadmin') || req.user!.roles?.includes('admin');
+  const isAdmin = req.user!.roles?.includes('sysadmin');
 
   try {
     const client = await pgPool.connect();
@@ -208,6 +235,10 @@ router.patch('/tickets/:id/status', async (req: AuthenticatedRequest, res: Respo
   const { id } = req.params;
   const { status } = req.body;
 
+  if (!req.user!.roles?.includes('sysadmin')) {
+    return res.status(403).json(createError('AUTH005'));
+  }
+
   if (!status) {
     return res.status(400).json({
       error: { code: 'VALIDATION', message: 'Yeni durum belirtilmelidir.' },
@@ -248,7 +279,7 @@ router.patch('/tickets/:id/status', async (req: AuthenticatedRequest, res: Respo
  *       - BearerAuth: []
  */
 router.post('/tickets/:id/pin', async (req: AuthenticatedRequest, res: Response) => {
-  const isAdmin = req.user!.roles?.includes('sysadmin') || req.user!.roles?.includes('admin');
+  const isAdmin = req.user!.roles?.includes('sysadmin');
   if (!isAdmin) {
     return res.status(403).json(createError('AUTH005'));
   }

@@ -19,6 +19,7 @@ const emailDeliveryEnabled = process.env.EMAIL_DELIVERY_ENABLED === 'true';
 const emailVerificationRequired =
   emailDeliveryEnabled && process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
 
+
 if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && !emailDeliveryEnabled) {
   logger.warn(
     'REQUIRE_EMAIL_VERIFICATION was requested while EMAIL_DELIVERY_ENABLED is false; verification remains disabled.'
@@ -99,67 +100,6 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
 
 /**
  * @swagger
- * /auth/login/sub:
- *   post:
- *     summary: Sub-user login (cashier, manager, staff) using business_code + username + PIN
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [business_code, username, pin]
- *             properties:
- *               business_code: { type: string, example: "SRNTT-7X9K" }
- *               username: { type: string, example: "ahmet_kasiyer" }
- *               pin: { type: string, example: "1234" }
- *     responses:
- *       200:
- *         description: Login successful
- *       401:
- *         description: Invalid credentials
- *       429:
- *         description: Too many attempts
- */
-router.post('/login/sub', authLimiter, async (req: Request, res: Response) => {
-  const { business_code, username, pin } = req.body;
-  if (!business_code || !username || !pin) {
-    return res.status(400).json({ error: { code: 'VALIDATION', message: 'İşletme kodu, kullanıcı adı ve PIN zorunludur.' } });
-  }
-
-  const ipAddress = req.ip || req.socket.remoteAddress || undefined;
-  const userAgent = req.headers['user-agent'] || undefined;
-
-  try {
-    const result = await AuthService.loginSubUser(business_code, username, pin, ipAddress, userAgent);
-
-    RealtimeBroadcastService.publishEvent(result.user.company_id, 'UserLoggedIn', {
-      userId: result.user.id,
-      name: result.user.name,
-    }).catch(() => {});
-
-    return res.json(result);
-  } catch (err: any) {
-    if (err.message === 'invalid_credentials') {
-      return res.status(401).json(createError('AUTH001'));
-    }
-    if (err.message === 'user_suspended') {
-      return res.status(403).json(createError('AUTH003'));
-    }
-    if (err.message === 'account_locked') {
-      return res.status(429).json(createError('AUTH004'));
-    }
-    if (err.message === 'business_code_not_found') {
-      return res.status(401).json({ error: { code: 'AUTH001', message: 'İşletme kodu, kullanıcı adı veya PIN hatalı.' } });
-    }
-    console.error('Sub-user login error:', err);
-    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Giriş işlemi esnasında bir hata oluştu.' } });
-  }
-});
-
-/**
- * @swagger
  * /auth/refresh:
  *   post:
  *     summary: Refresh access token
@@ -178,7 +118,7 @@ router.post('/login/sub', authLimiter, async (req: Request, res: Response) => {
  *         description: New accessToken issued
  *       401:
  *         description: AUTH002 — Invalid or expired refresh token
- */
+ * */
 router.post('/refresh', async (req: Request, res: Response) => {
   const { refresh_token } = req.body;
   if (!refresh_token) {
@@ -201,7 +141,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
 });
 
 router.post('/logout', async (req: Request, res: Response) => {
-  const { refresh_token } = req.body;
+  const { refresh_token } = req.body ?? {};
   const authHeader = req.headers.authorization;
   const accessToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined;
 
@@ -233,18 +173,15 @@ router.post('/session-bootstrap', authenticateUser, async (req: AuthenticatedReq
   const user = req.user!;
   const { device_hash, device_name, fingerprint } = req.body ?? {};
   try {
-    const subscriptionResult = await pgPool.query(
-      `SELECT id, status, trial_started_at, trial_ends_at, current_period_start,
-              current_period_end, grace_hours_override
-       FROM subscriptions
-       WHERE company_id = $1
-       ORDER BY created_at DESC LIMIT 1`,
-      [user.company_id]
-    );
     const entitlementResult = await pgPool.query(
       `SELECT license_key FROM license_entitlements
        WHERE company_id = $1 AND status IN ('trial', 'active')
        ORDER BY valid_until DESC LIMIT 1`,
+      [user.company_id]
+    );
+    const companyResult = await pgPool.query(
+      `SELECT id, name, owner_name, phone, email, tax_number, city, district, address
+       FROM companies WHERE id = $1 LIMIT 1`,
       [user.company_id]
     );
 
@@ -264,9 +201,22 @@ router.post('/session-bootstrap', authenticateUser, async (req: AuthenticatedReq
       );
     }
 
+    // Device activation starts a new tenant's trial and writes trial_ends_at.
+    // Read the subscription afterwards so the client never caches the stale
+    // pre-activation `trialing + trial_ends_at: null` snapshot.
+    const subscriptionResult = await pgPool.query(
+      `SELECT id, status, trial_started_at, trial_ends_at, current_period_start,
+              current_period_end, grace_hours_override
+       FROM subscriptions
+       WHERE company_id = $1
+       ORDER BY current_period_start DESC, id DESC LIMIT 1`,
+      [user.company_id]
+    );
+
     return res.json({
       user: { id: user.id, company_id: user.company_id, roles: user.roles, permissions: user.permissions },
       subscription: subscriptionResult.rows[0] ?? null,
+      company: companyResult.rows[0] ?? null,
       license_key: entitlementResult.rows[0]?.license_key ?? null,
       activation,
     });
@@ -289,6 +239,9 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
 
   if (!old_password || !new_password) {
     return res.status(400).json({ error: 'missing_passwords', message: 'Eski ve yeni şifre belirtilmelidir.' });
+  }
+  if (typeof new_password !== 'string' || new_password.length < 8) {
+    return res.status(400).json({ error: 'weak_password', message: 'Yeni şifre en az 8 karakter olmalıdır.' });
   }
 
   try {
@@ -415,9 +368,21 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     const companyId = `comp-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     await client.query(
       `INSERT INTO companies (id, name, owner_name, tax_number, tax_office, phone, email, city, district, address, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'trial')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active')`,
       [companyId, company_name, name, normalizedTaxNumber, tax_office || null, phone || null, normalizedEmail,
         city || null, district || null, address || null]
+    );
+
+    const defaultStoreId = `store-${crypto.randomUUID()}`;
+    const defaultBranchId = `br-${crypto.randomUUID()}`;
+    await client.query(
+      `INSERT INTO stores (id, company_id, name, address) VALUES ($1, $2, 'Merkez Şube', $3)`,
+      [defaultStoreId, companyId, address || null]
+    );
+    await client.query(
+      `INSERT INTO branches (id, company_id, store_id, name, address)
+       VALUES ($1, $2, $3, 'Merkez Şube', $4)`,
+      [defaultBranchId, companyId, defaultStoreId, address || null]
     );
 
     // Create owner user

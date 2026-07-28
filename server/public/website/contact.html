@@ -40,7 +40,7 @@
       <div class="container">
         <div class="eyebrow">İletişim</div>
         <h1 class="page-title">Satış, mimari ve kurulum akışı için bize yazın.</h1>
-        <p class="page-copy">Bu yüzey destek paneli değildir. Public ürün ve başlangıç iletişim alanıdır. Kullanıcı destek talepleri uygulama içindeki destek modülünden yönetilir.</p>
+        <p class="page-copy">Kayıtlı müşteriler panelden doğrudan destek talebi açabilir. Hesabınıza erişemiyorsanız veya henüz müşterimiz değilseniz buradan ön destek başvurusu oluşturabilirsiniz.</p>
       </div>
     </section>
 
@@ -48,14 +48,17 @@
       <div class="container contact-grid">
         <article class="feature-card">
           <div class="eyebrow">Doğrudan iletişim</div>
-          <h3>Satış ve kurulum ekibi</h3>
-          <p>Ürün seçimi, kurulum ve geçiş planı için formu doldurun. Mevcut müşteriler destek taleplerini uygulamadaki Destek Merkezi üzerinden açabilir.</p>
+          <h3>Ön destek ve iletişim</h3>
+          <p>Bu formdan gelen kayıtlar doğrulanmamış başvuru olarak işlenir. Kayıtlı müşteriler daha hızlı destek için paneldeki Destek Merkezi'ni kullanmalıdır.</p>
         </article>
         <form class="feature-card contact-form" id="contact-form">
           <label>Ad Soyad<input id="contact-name" required autocomplete="name"></label>
           <label>E-posta<input id="contact-email" type="email" required autocomplete="email"></label>
           <label>Telefon<input id="contact-phone" type="tel" autocomplete="tel"></label>
-          <label>Konu<select id="contact-subject" required><option value="Satış görüşmesi">Satış görüşmesi</option><option value="Kurulum ve geçiş">Kurulum ve geçiş</option><option value="İş ortaklığı">İş ortaklığı</option></select></label>
+          <label>Firma adı<input id="contact-company" autocomplete="organization"></label>
+          <label>Müşteri durumu<select id="contact-customer-claim" required><option value="not_registered">Kayıtlı müşteri değilim</option><option value="cannot_login">Müşteriyim, giriş yapamıyorum</option><option value="unsure">Emin değilim</option></select></label>
+          <label>Kategori<select id="contact-category" required><option value="sales">Satış ve kurulum</option><option value="account">Hesap ve giriş</option><option value="technical">Teknik sorun</option><option value="license">Lisans</option><option value="billing">Ödeme</option><option value="other">Diğer</option></select></label>
+          <label class="full">Konu<input id="contact-subject" required maxlength="500"></label>
           <label class="full">Mesaj<textarea id="contact-message" rows="5" required></textarea></label>
           <div class="form-status full" id="contact-status" role="status" aria-live="polite"></div>
           <button class="btn btn-primary full" type="submit">Mesajı Gönder</button>
@@ -76,7 +79,7 @@
     </section>
   </main>
 
-  <script src="js/website.js?v=20260722-headerfix1"></script>
+  <script src="js/website.js?v=20260728-support-intake1"></script>
 </body>
 </html>
 

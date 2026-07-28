@@ -149,7 +149,7 @@ document.getElementById('contact-form')?.addEventListener('submit', async (event
   const status = document.getElementById('contact-status');
   button.disabled = true; button.textContent = 'Gönderiliyor…'; status.textContent = '';
   try {
-    const response = await fetch('/api/v1/support/public-contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('contact-name').value.trim(), email: document.getElementById('contact-email').value.trim(), phone: document.getElementById('contact-phone').value.trim(), subject: document.getElementById('contact-subject').value, message: document.getElementById('contact-message').value.trim() }) });
+    const response = await fetch('/api/v1/support/guest-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('contact-name').value.trim(), email: document.getElementById('contact-email').value.trim(), phone: document.getElementById('contact-phone').value.trim(), company_name: document.getElementById('contact-company').value.trim(), customer_claim: document.getElementById('contact-customer-claim').value, category: document.getElementById('contact-category').value, subject: document.getElementById('contact-subject').value.trim(), message: document.getElementById('contact-message').value.trim() }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Mesaj gönderilemedi.');
     status.className = 'form-status full success'; status.textContent = data.message || 'Mesajınız iletildi.'; form.reset();

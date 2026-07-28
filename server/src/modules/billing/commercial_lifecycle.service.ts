@@ -39,8 +39,17 @@ export class CommercialLifecycleService {
 
     // 1. Load plan limits (single source of truth)
     const planRes = await client.query(
-      'SELECT id, name, device_limit, store_limit, trial_days, price, currency FROM plans WHERE id = $1',
-      [planId]
+      `SELECT p.id, p.name, COALESCE(o.device_limit,p.device_limit) AS device_limit,
+              COALESCE(o.store_limit,p.store_limit) AS store_limit,
+              COALESCE(o.user_limit,p.user_limit) AS user_limit,
+              COALESCE(o.custom_price,p.price) AS price, p.currency, p.trial_days,
+              COALESCE(o.billing_interval,p.billing_interval) AS effective_billing_interval,
+              COALESCE(p.features,'{}'::jsonb)||COALESCE(o.feature_overrides,'{}'::jsonb) AS features
+       FROM plans p LEFT JOIN subscription_overrides o ON o.company_id=$2
+        AND o.base_plan_id=p.id AND o.is_active=TRUE
+        AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
+       WHERE p.id=$1`,
+      [planId, companyId]
     );
     if (planRes.rows.length === 0) {
       throw new Error(`plan_not_found: ${planId}`);
@@ -49,7 +58,7 @@ export class CommercialLifecycleService {
 
     const now = params.periodStart ?? new Date();
     const periodEnd = new Date(now);
-    if (params.billingPeriod === 'yearly') {
+    if ((params.billingPeriod ?? plan.effective_billing_interval) === 'yearly') {
       periodEnd.setFullYear(periodEnd.getFullYear() + 1);
     } else {
       periodEnd.setMonth(periodEnd.getMonth() + 1);

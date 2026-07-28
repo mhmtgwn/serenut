@@ -46,15 +46,20 @@ export class SupportService {
    */
   static async createTicket(params: {
     companyId: string;
+    requesterUserId: string;
     subject: string;
     body?: string;
     priority?: string;
+    category?: string;
     logsSnapshot?: string;
   }): Promise<any> {
-    const { companyId, subject, body, priority = 'P3', logsSnapshot } = params;
+    const { companyId, requesterUserId, subject, body, priority = 'P3', category = 'technical', logsSnapshot } = params;
 
     if (!['P1', 'P2', 'P3', 'P4'].includes(priority)) {
       throw new Error('Invalid priority. Must be P1, P2, P3, or P4.');
+    }
+    if (!['technical', 'license', 'billing', 'account', 'usage', 'other'].includes(category)) {
+      throw new Error('Invalid support category.');
     }
 
     const id = `TK-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
@@ -65,10 +70,11 @@ export class SupportService {
       await client.query("SET LOCAL app.bypass_rls = 'true'");
       const res = await client.query(
         `INSERT INTO support_tickets
-           (id, company_id, subject, body, priority, status, logs_snapshot, sla_deadline_at)
-         VALUES ($1, $2, $3, $4, $5, 'open', $6, $7)
+           (id, company_id, requester_user_id, subject, body, priority, category,
+            status, logs_snapshot, sla_deadline_at, intake_channel)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $9, 'customer_portal')
          RETURNING *`,
-        [id, companyId, subject, body ?? null, priority, logsSnapshot ?? null, slaDeadlineAt]
+        [id, companyId, requesterUserId, subject, body ?? null, priority, category, logsSnapshot ?? null, slaDeadlineAt]
       );
 
       logger.info(`Support ticket created: ${id} | Priority: ${priority} | Company: ${companyId}`);
@@ -152,15 +158,15 @@ export class SupportService {
     let idx = 1;
 
     if (companyId) {
-      conditions.push(`company_id = $${idx++}`);
+      conditions.push(`t.company_id = $${idx++}`);
       values.push(companyId);
     }
     if (status) {
-      conditions.push(`status = $${idx++}`);
+      conditions.push(`t.status = $${idx++}`);
       values.push(status);
     }
     if (priority) {
-      conditions.push(`priority = $${idx++}`);
+      conditions.push(`t.priority = $${idx++}`);
       values.push(priority);
     }
 
@@ -171,18 +177,20 @@ export class SupportService {
       await client.query("SET LOCAL app.bypass_rls = 'true'");
       const [dataRes, countRes] = await Promise.all([
         client.query(
-          `SELECT id, company_id, subject, priority, status, assigned_to,
-                  sla_deadline_at, resolved_at, closed_at, created_at, updated_at
-           FROM support_tickets
+          `SELECT t.id, t.company_id, t.requester_user_id, t.subject, t.category,
+                  t.priority, t.status, t.assigned_to, c.name AS company_name,
+                  t.sla_deadline_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at
+           FROM support_tickets t
+           LEFT JOIN companies c ON c.id = t.company_id
            ${where}
            ORDER BY
-             CASE priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END,
-             created_at DESC
+             CASE t.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END,
+             t.created_at DESC
            LIMIT $${idx++} OFFSET $${idx++}`,
           [...values, limit, offset]
         ),
         client.query(
-          `SELECT COUNT(*) as total FROM support_tickets ${where}`,
+          `SELECT COUNT(*) as total FROM support_tickets t ${where}`,
           values
         ),
       ]);
@@ -194,6 +202,53 @@ export class SupportService {
     } finally {
       client.release();
     }
+  }
+
+  static async createGuestRequest(params: {
+    name: string;
+    email: string;
+    phone?: string;
+    companyName?: string;
+    customerClaim?: string;
+    category?: string;
+    subject: string;
+    message: string;
+  }): Promise<{ id: string; referenceCode: string; status: string }> {
+    const category = params.category ?? 'other';
+    const customerClaim = params.customerClaim ?? 'not_registered';
+    if (!['technical', 'license', 'billing', 'account', 'usage', 'sales', 'other'].includes(category)) {
+      throw new Error('Invalid support category.');
+    }
+    if (!['not_registered', 'cannot_login', 'unsure'].includes(customerClaim)) {
+      throw new Error('Invalid customer claim.');
+    }
+
+    const id = `GUEST-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const referenceCode = `SRN-${new Date().getUTCFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    await pgPool.query(
+      `INSERT INTO guest_support_requests
+         (id, reference_code, name, email, phone, company_name, customer_claim,
+          category, subject, message, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unverified')`,
+      [id, referenceCode, params.name, params.email, params.phone ?? null,
+       params.companyName ?? null, customerClaim, category, params.subject, params.message]
+    );
+    logger.info('Guest support request created', { id, referenceCode, category });
+    return { id, referenceCode, status: 'unverified' };
+  }
+
+  static async listGuestRequests(limit = 100): Promise<any[]> {
+    const result = await pgPool.query(
+      `SELECT id, reference_code, name, email, phone, company_name, customer_claim,
+              category, subject, status, matched_company_id, converted_ticket_id,
+              created_at, updated_at
+       FROM guest_support_requests
+       ORDER BY CASE status WHEN 'unverified' THEN 1 WHEN 'under_review' THEN 2 ELSE 3 END,
+                created_at DESC
+       LIMIT $1`,
+      [Math.min(Math.max(limit, 1), 100)]
+    );
+    return result.rows;
   }
 
   /**

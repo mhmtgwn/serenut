@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { logger } from '../../config/logger';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -73,7 +74,7 @@ async function writeTenantAudit(companyId: string, userId: string, action: strin
 router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const stores = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM stores WHERE company_id = $1', [user.company_id]);
+    const stores = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM branches WHERE company_id = $1 AND is_active = TRUE', [user.company_id]);
     const devices = await runWithTenantContext(user.company_id, "SELECT COUNT(*) FROM device_activations WHERE company_id = $1 AND status = 'active'", [user.company_id]);
     const licenses = await runWithTenantContext(user.company_id, 'SELECT id, plan_id as tier, status, valid_until as expires_at, license_key, device_limit as allowed_devices_count FROM license_entitlements WHERE company_id = $1 ORDER BY valid_until DESC', [user.company_id]);
     const invoices = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM invoices WHERE status = \'unpaid\' AND company_id = $1', [user.company_id]);
@@ -124,7 +125,12 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/stores', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const list = await runWithTenantContext(user.company_id, 'SELECT * FROM stores WHERE company_id = $1 ORDER BY name ASC', [user.company_id]);
+    const list = await runWithTenantContext(user.company_id,
+      `SELECT id, store_id, name, address, phone, is_active,
+              CASE WHEN is_active THEN 'active' ELSE 'inactive' END AS status,
+              created_at, updated_at
+       FROM branches WHERE company_id = $1 ORDER BY name ASC`,
+      [user.company_id]);
     return res.json(list.rows);
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
@@ -138,19 +144,29 @@ router.post('/stores', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(400).json({ error: 'missing_name' });
   }
 
-  const id = `store-${Date.now()}`;
+  const storeId = `store-${crypto.randomUUID()}`;
+  const branchId = `br-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+  const client = await pgPool.connect();
   try {
-    await runWithTenantContext(
-      user.company_id,
-      'INSERT INTO stores (id, company_id, name, address) VALUES ($1, $2, $3, $4)',
-      [id, user.company_id, name, address || null]
-    );
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    await client.query('INSERT INTO stores (id, company_id, name, address) VALUES ($1, $2, $3, $4)',
+      [storeId, user.company_id, name.trim(), address || null]);
+    await client.query(
+      `INSERT INTO branches (id, company_id, store_id, name, address)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [branchId, user.company_id, storeId, name.trim(), address || null]);
+    await client.query('COMMIT');
 
-    await writeTenantAudit(user.company_id, user.id, 'CREATE_STORE', 'stores', id, null, { name });
+    await writeTenantAudit(user.company_id, user.id, 'CREATE_BRANCH', 'branches', branchId, null, { name });
 
-    return res.status(201).json({ success: true, store_id: id });
-  } catch (err) {
+    return res.status(201).json({ success: true, branch_id: branchId, store_id: storeId });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') return res.status(409).json({ error: 'duplicate_branch' });
     return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -215,12 +231,14 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const limitResult = await runWithTenantContext(
       user.company_id,
-      `SELECT p.user_limit, COUNT(u.id)::int AS current_users
+      `SELECT COALESCE(o.user_limit,p.user_limit) AS user_limit, COUNT(u.id)::int AS current_users
        FROM subscriptions s
        JOIN plans p ON p.id = s.plan_id
+       LEFT JOIN subscription_overrides o ON o.company_id=s.company_id AND o.base_plan_id=s.plan_id
+        AND o.is_active=TRUE AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
        LEFT JOIN users u ON u.company_id = s.company_id AND u.is_active = true
        WHERE s.company_id = $1
-       GROUP BY p.user_limit
+       GROUP BY COALESCE(o.user_limit,p.user_limit)
        ORDER BY MAX(s.current_period_start) DESC LIMIT 1`,
       [user.company_id]
     );

@@ -83,6 +83,24 @@ router.get('/plans', async (req, res: Response) => {
   }
 });
 
+router.get('/effective-plans', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await runBypassingRLS(
+      `SELECT p.*, COALESCE(o.custom_price,p.price) AS price,
+              COALESCE(o.billing_interval,p.billing_interval) AS billing_interval,
+              COALESCE(o.device_limit,p.device_limit) AS device_limit,
+              COALESCE(o.store_limit,p.store_limit) AS store_limit,
+              COALESCE(o.user_limit,p.user_limit) AS user_limit,
+              COALESCE(p.features,'{}'::jsonb)||COALESCE(o.feature_overrides,'{}'::jsonb) AS features,
+              (o.id IS NOT NULL) AS is_company_specific
+       FROM plans p LEFT JOIN subscription_overrides o ON o.company_id=$1
+        AND o.base_plan_id=p.id AND o.is_active=TRUE
+        AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
+       WHERE p.is_active=TRUE ORDER BY COALESCE(o.custom_price,p.price)`, [req.user!.company_id]);
+    return res.json(result.rows);
+  } catch (err) { return res.status(500).json({error:'server_error'}); }
+});
+
 // ── BANK ACCOUNTS (Platform-level — sysadmin manages, all authenticated read) ──
 
 /**
@@ -203,7 +221,13 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-    const planRes = await client.query('SELECT * FROM plans WHERE id = $1', [plan_id]);
+    const planRes = await client.query(
+      `SELECT p.*,o.custom_price,COALESCE(o.custom_price,p.price) AS effective_price,
+              COALESCE(o.billing_interval,p.billing_interval) AS effective_billing_interval
+       FROM plans p LEFT JOIN subscription_overrides o ON o.company_id=$2
+        AND o.base_plan_id=p.id AND o.is_active=TRUE
+        AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
+       WHERE p.id=$1`, [plan_id,user.company_id]);
     if (planRes.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'plan_not_found' });
@@ -219,15 +243,16 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
 
     const now = new Date();
     const periodEnd = new Date(now);
-    if (billing_period === 'yearly') {
+    const effectiveBillingPeriod = plan.effective_billing_interval || billing_period;
+    if (effectiveBillingPeriod === 'yearly') {
       periodEnd.setFullYear(periodEnd.getFullYear() + 1);
     } else {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
     // Calculate price based on billing_period
-    let price = Number(plan.price);
-    if (billing_period === 'yearly') {
+    let price = Number(plan.effective_price);
+    if (effectiveBillingPeriod === 'yearly' && !plan.custom_price) {
       price = price * 12 * 0.85; // 15% discount
     }
     const finalPriceStr = price.toFixed(2);
@@ -238,7 +263,7 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     await client.query(
       `INSERT INTO invoices (id, company_id, amount, status, due_at, invoice_number, billing_details)
        VALUES ($1,$2,$3,'pending',$4,$5,$6)`,
-      [invoiceId, user.company_id, price, periodEnd, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: billing_period || 'monthly' })]
+      [invoiceId, user.company_id, price, periodEnd, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: effectiveBillingPeriod })]
     );
 
     // Generate unique reference code: SRNTT-YYYYMMDD-XXXX
@@ -483,9 +508,10 @@ router.post('/reactivate', authenticateUser, async (req: AuthenticatedRequest, r
   }
 });
 
-router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { plan_id, billing_period } = req.body;
+  const plan_id = req.body.plan_id || req.body.planId || req.body.selected_plan_id;
+  const billing_period = req.body.billing_period || req.body.billingPeriod || 'monthly';
 
   if (!plan_id) {
     return res.status(400).json({ error: 'missing_plan_id' });
@@ -500,15 +526,22 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
 
   try {
     // 1. Verify plan exists
-    const planRes = await runBypassingRLS('SELECT * FROM plans WHERE id = $1', [plan_id]);
+    const planRes = await runBypassingRLS(
+      `SELECT p.*, o.custom_price, COALESCE(o.custom_price,p.price) AS effective_price,
+              COALESCE(o.billing_interval,p.billing_interval) AS effective_billing_interval
+       FROM plans p LEFT JOIN subscription_overrides o ON o.company_id=$2
+        AND o.base_plan_id=p.id AND o.is_active=TRUE
+        AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
+       WHERE p.id=$1`, [plan_id,user.company_id]);
     if (planRes.rows.length === 0) {
       return res.status(404).json({ error: 'plan_not_found' });
     }
     const plan = planRes.rows[0];
 
     // Calculate price on server side
-    let price = Number(plan.price);
-    if (billing_period === 'yearly') {
+    const effectiveBillingPeriod = plan.effective_billing_interval || billing_period;
+    let price = Number(plan.effective_price);
+    if (effectiveBillingPeriod === 'yearly' && !plan.custom_price) {
       price = price * 12 * 0.85; // 15% yearly discount
     }
     const finalPriceStr = price.toFixed(2);
@@ -523,7 +556,7 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
     await runBypassingRLS(
       `INSERT INTO invoices (id, company_id, amount, status, due_at, invoice_number, billing_details)
        VALUES ($1,$2,$3,'pending',NOW(),$4,$5)`,
-      [invoiceId, user.company_id, price, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: billing_period || 'monthly' })]
+      [invoiceId, user.company_id, price, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: effectiveBillingPeriod })]
     );
 
     const protocol = req.protocol || 'https';
@@ -591,7 +624,10 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
     logger.error('Subscribe setup failed:', err);
     return res.status(500).json({ error: 'server_error' });
   }
-});
+};
+
+router.post('/subscribe', authenticateUser, subscribeHandler);
+router.post('/checkout', authenticateUser, subscribeHandler);
 
 /**
  * @openapi
