@@ -230,7 +230,7 @@ void main() {
       );
 
       expect(capturedUrl, contains('platform=android'));
-      expect(capturedUrl, contains('device_id=device-abc'));
+      expect(capturedUrl, contains('device_activation_id=device-abc'));
       expect(capturedUrl, contains('channel=stable'));
     });
   });
