@@ -13,6 +13,7 @@ void main() {
 
     // Simulate Hash Matching
     final hashService = HashValidationService();
+    expect(hashService, isNotNull);
     // Use an example map to test sort logic
     final mapLocal = {'c': 3, 'a': 1, 'b': 2, 'd': null};
     final mapServer = {'a': 1, 'b': 2, 'c': 3, 'd': null};

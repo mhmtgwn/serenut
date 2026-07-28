@@ -57,6 +57,7 @@ const testFiles = [
   'ac_license.test.ts',
   'ac_billing.test.ts',
   'ac_sync.test.ts',
+  'sync_v4_domain_materialization.test.ts',
   'ac_support.test.ts',
   'ac_monitoring.test.ts',
   'ac_e2e_launch.test.ts',

@@ -13,6 +13,9 @@ import 'package:uuid/uuid.dart';
 
 class BackupService implements IBackupService {
   static const String _lastBackupKey = 'last_backup_date';
+  final SharedPreferences? _prefs;
+
+  BackupService({SharedPreferences? prefs}) : _prefs = prefs;
 
   /// Performs database backup using VACUUM INTO or WAL Checkpoint
   /// Returns the absolute path of the backup file if successful
@@ -62,8 +65,8 @@ class BackupService implements IBackupService {
         await dbFile.copy(backupPath);
       }
 
-      // Save timestamp
-      final prefs = await SharedPreferences.getInstance();
+      // Save timestamp via injected SharedPreferences or fallback instance
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
       final now = DateTime.now();
       await prefs.setString(_lastBackupKey, now.toIso8601String());
       await prefs.setString('last_backup_date', now.toIso8601String());

@@ -113,14 +113,14 @@ router.post('/validate', licenseRateLimit, async (req: Request, res: Response) =
 
 // --- Sprint 3: POS Heartbeat Route ---
 router.post('/heartbeat', licenseRateLimit, async (req: Request, res: Response) => {
-  const { license_key, device_hash, fingerprint } = req.body;
+  const { license_key, device_hash, device_activation_id, fingerprint } = req.body;
   if (!license_key || !device_hash) {
     incrementLicenseValidation(false);
     return res.status(400).json({ error: 'missing_fields', message: 'Lisans anahtarı ve cihaz imzası zorunludur.' });
   }
 
   try {
-    const result = await LicenseService.heartbeat(license_key, device_hash, fingerprint);
+    const result = await LicenseService.heartbeat(license_key, device_hash, device_activation_id, fingerprint);
     incrementLicenseValidation(true);
     return res.json(result);
   } catch (err: any) {
@@ -147,6 +147,29 @@ router.post('/heartbeat', licenseRateLimit, async (req: Request, res: Response) 
 
 // --- Sprint 3: Protected Admin Routes ---
 router.use(authenticateUser);
+
+// Presence is deliberately separate from license validation: clients update
+// their online state frequently without reissuing a signed license token.
+router.post('/device-presence', async (req: AuthenticatedRequest, res: Response) => {
+  const { device_activation_id, platform, current_version, channel } = req.body;
+  if (!device_activation_id) {
+    return res.status(400).json({ error: 'missing_device_activation_id' });
+  }
+  try {
+    await LicenseService.reportPresence(req.user!.company_id, device_activation_id, {
+      platform,
+      currentVersion: current_version,
+      channel,
+    });
+    return res.json({ success: true });
+  } catch (err: any) {
+    if (err.message === 'invalid_device_activation') {
+      return res.status(403).json({ error: 'invalid_device_activation' });
+    }
+    console.error('Device presence error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
 
 // GET /licenses/status (Admin/Owner get details)
 router.get('/status', async (req: AuthenticatedRequest, res: Response) => {

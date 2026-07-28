@@ -236,23 +236,12 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
     const deviceCheck = storeId
       ? await client.query(
-          `SELECT COUNT(*) as count FROM devices
-           WHERE company_id = $1 AND store_id = $2 AND status = 'active'`,
-          [user.company_id, storeId]
+          `SELECT COUNT(*) as count FROM device_activations
+           WHERE company_id = $1 AND status = 'active'`,
+          [user.company_id]
         )
       : { rows: [{ count: '0' }] };
-    // Also check device_licenses for this branch's devices
-    // For now, check if any device is linked to a license in this company
-    const licCheck = storeId
-      ? await client.query(
-          `SELECT COUNT(*) as count
-           FROM device_licenses dl
-           JOIN devices d ON d.id = dl.device_id
-           JOIN licenses l ON l.id = dl.license_id
-           WHERE l.company_id = $1 AND d.store_id = $2`,
-          [user.company_id, storeId]
-        )
-      : { rows: [{ count: '0' }] };
+    const licCheck = { rows: [{ count: '0' }] };
 
     if (parseInt(deviceCheck.rows[0].count, 10) > 0 ||
         parseInt(licCheck.rows[0].count, 10) > 0) {

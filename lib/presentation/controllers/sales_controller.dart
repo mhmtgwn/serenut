@@ -116,6 +116,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     required String paymentMethod,
     double? paidAmount,
     String? idempotencyKey,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     await future;
     SaleEntity? created;
@@ -132,6 +133,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           paidAmount: paidAmount,
           idempotencyKey: idempotencyKey,
           createdBy: cashierName,
+          terminalMetadata: terminalMetadata,
         );
         if (created != null) {
           try {
@@ -231,13 +233,17 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     required String saleId,
     required double amount,
     required String method,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     await future;
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final sale = await _saleRepository.findById(saleId);
       await _salesService.recordPayment(
-          saleId: saleId, amount: amount, method: method);
+          saleId: saleId,
+          amount: amount,
+          method: method,
+          terminalMetadata: terminalMetadata);
 
       try {
         final auditService = await ref.read(auditServiceProvider.future);

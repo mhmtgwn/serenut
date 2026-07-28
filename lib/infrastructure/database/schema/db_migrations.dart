@@ -618,6 +618,21 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 34) {
+          await txn.execute('''CREATE TABLE IF NOT EXISTS terminal_payment_intents (
+            id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+            terminal_transaction_id TEXT NOT NULL UNIQUE, amount REAL NOT NULL,
+            currency TEXT NOT NULL, authorization_code TEXT, state TEXT NOT NULL,
+            context_type TEXT NOT NULL, context_id TEXT, error_message TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''');
+          await txn.execute(
+              'CREATE INDEX IF NOT EXISTS idx_terminal_payment_intents_state ON terminal_payment_intents(state, updated_at)');
+          await txn.insert('app_migration_history', {
+            'version': 34,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

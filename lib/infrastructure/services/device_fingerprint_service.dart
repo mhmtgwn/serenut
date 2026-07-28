@@ -10,6 +10,10 @@ import '../../domain/models/device_fingerprint.dart';
 import '../../domain/services/device_manager.dart';
 
 class DeviceFingerprintService {
+  static const _installationIdKey = 'serenut_installation_id';
+  static const _installDateKey = 'serenut_install_date';
+  static const _legacyInstallationIdKey = 'nutopiano_installation_id';
+  static const _legacyInstallDateKey = 'nutopiano_install_date';
   final SharedPreferences _prefs;
   final DeviceManager _deviceManager;
 
@@ -17,21 +21,29 @@ class DeviceFingerprintService {
 
   /// Get or create installation date
   String getInstallDate() {
-    String? date = _prefs.getString('nutopiano_install_date');
+    String? date = _prefs.getString(_installDateKey);
+    if (date == null || date.isEmpty) {
+      date = _prefs.getString(_legacyInstallDateKey);
+    }
     if (date == null || date.isEmpty) {
       date = DateTime.now().toIso8601String();
-      _prefs.setString('nutopiano_install_date', date);
     }
+    _prefs.setString(_installDateKey, date);
+    _prefs.remove(_legacyInstallDateKey);
     return date;
   }
 
   /// Get or create installation ID
   String getInstallationId() {
-    String? id = _prefs.getString('nutopiano_installation_id');
+    String? id = _prefs.getString(_installationIdKey);
+    if (id == null || id.isEmpty) {
+      id = _prefs.getString(_legacyInstallationIdKey);
+    }
     if (id == null || id.isEmpty) {
       id = const Uuid().v4();
-      _prefs.setString('nutopiano_installation_id', id);
     }
+    _prefs.setString(_installationIdKey, id);
+    _prefs.remove(_legacyInstallationIdKey);
     return id;
   }
 

@@ -28,17 +28,15 @@ class MockJob extends SchedulerJob {
     }
   }
 }
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late SharedPreferences prefs;
   late CentralBackgroundScheduler scheduler;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    prefs = await SharedPreferences.getInstance();
-    scheduler = CentralBackgroundScheduler(prefs);
+    scheduler = CentralBackgroundScheduler();
   });
+
 
   group('CentralBackgroundScheduler Tests', () {
     test('registerJob registers a job and runs it on tick', () async {

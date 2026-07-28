@@ -8,6 +8,7 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/services/sales_service.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/config/utils.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 class SaleDetailsPage extends ConsumerWidget {
   final String saleId;
@@ -738,20 +739,68 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
           onPressed: () async {
             if (!(_formKey.currentState?.validate() ?? false)) return;
             final amount = double.parse(amtCtrl.text);
-            Navigator.pop(context);
-            await ref
-                .read(salesControllerProvider.notifier)
-                .recordPartialPayment(
-                    saleId: widget.sale.id, amount: amount, method: method);
-            ref.invalidate(saleDetailProvider(widget.sale.id));
-            if (widget.parentContext.mounted) {
-              ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-                SnackBar(
+            AuthorizedCardPayment? cardPayment;
+            if (method == 'card') {
+              try {
+                cardPayment = await ref
+                    .read(physicalCardPaymentServiceProvider)
+                    .authorize(
+                      amount: amount,
+                      idempotencyKey:
+                          'sale-partial-${widget.sale.id}-${DateTime.now().microsecondsSinceEpoch}',
+                      contextType: 'sale_partial_payment',
+                      contextId: widget.sale.id,
+                    );
+              } catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Kart işlemi onaylanmadı: $error'),
+                    backgroundColor: Colors.red,
+                  ));
+                }
+                return;
+              }
+            }
+            if (!mounted) return;
+            try {
+              await ref
+                  .read(salesControllerProvider.notifier)
+                  .recordPartialPayment(
+                    saleId: widget.sale.id,
+                    amount: amount,
+                    method: method,
+                    terminalMetadata: cardPayment?.ledgerMetadata,
+                  );
+              if (cardPayment != null) {
+                await ref
+                    .read(physicalCardPaymentServiceProvider)
+                    .markLocalCommit(cardPayment, contextId: widget.sale.id);
+              }
+              ref.invalidate(saleDetailProvider(widget.sale.id));
+              if (!mounted) return;
+              Navigator.pop(context);
+              if (widget.parentContext.mounted) {
+                ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+                  SnackBar(
+                    content:
+                        Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            } catch (error) {
+              if (cardPayment != null) {
+                await ref
+                    .read(physicalCardPaymentServiceProvider)
+                    .markUnreconciled(cardPayment, error);
+              }
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content:
-                      Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+                      Text('Ödeme kaydedilemedi; mutabakat gerekiyor: $error'),
+                  backgroundColor: Colors.red,
+                ));
+              }
             }
           },
           style: ElevatedButton.styleFrom(

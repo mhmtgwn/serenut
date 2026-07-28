@@ -2,7 +2,6 @@
 // Serenut OS — Central Background Scheduler (Sprint 4)
 
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 enum JobPriority { high, medium, low }
@@ -24,7 +23,7 @@ class CentralBackgroundScheduler {
   bool _isNetworkAvailable = true;
   double _batteryLevel = 100.0; // Fallback helper
 
-  CentralBackgroundScheduler(SharedPreferences prefs);
+  CentralBackgroundScheduler();
 
   void registerJob(SchedulerJob job) {
     _jobs.add(job);

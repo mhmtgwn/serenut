@@ -18,6 +18,7 @@ import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/config/theme.dart';
@@ -181,6 +182,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         'accept_marketing': _acceptMarketing,
       });
       final registration = response.json as Map<String, dynamic>;
+      final verificationRequired =
+          registration['email_verification_required'] as bool? ?? false;
+      if (!verificationRequired) {
+        await ref.read(authServiceProvider).login(
+              _emailCtrl.text.trim().toLowerCase(),
+              _passwordCtrl.text,
+            );
+      }
 
       // The server transaction above is the source of truth. Local profile
       // caching must not turn a successful cloud registration into a false
@@ -225,8 +234,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       }
 
       if (!mounted) return;
-      final verificationRequired =
-          registration['email_verification_required'] as bool? ?? false;
       await showDialog<void>(
         context: context,
         barrierDismissible: false,

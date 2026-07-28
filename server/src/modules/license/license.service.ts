@@ -6,6 +6,7 @@ export interface LicenseActivationResult {
   status: string;
   license_info: {
     merchant_id: string;
+    activation_id: string;
     device_id: string;
     device_token_version: number;
     expiry_date: string;
@@ -137,10 +138,10 @@ export class LicenseService {
 
         const newDevActId = `dact-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         const insertRes = await client.query(
-          `INSERT INTO device_activations (id, entitlement_id, company_id, device_hash, device_name, status, activated_at, last_seen_at) 
-           VALUES ($1, $2, $3, $4, $5, 'active', NOW(), NOW())
+        `INSERT INTO device_activations (id, entitlement_id, company_id, device_hash, device_name, platform, status, activated_at, last_seen_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW(), NOW())
            RETURNING id, device_token_version`,
-          [newDevActId, entitlement.id, entitlement.company_id, deviceHash, deviceName]
+          [newDevActId, entitlement.id, entitlement.company_id, deviceHash, deviceName, fingerprint?.platform || 'unknown']
         );
         deviceId = insertRes.rows[0].id;
         deviceTokenVersion = insertRes.rows[0].device_token_version;
@@ -151,7 +152,7 @@ export class LicenseService {
         deviceId = devRes.rows[0].id;
         // Update last seen
         await client.query(
-          'UPDATE device_activations SET last_seen_at = NOW() WHERE id = $1',
+          'UPDATE device_activations SET last_seen_at = NOW(), updated_at = NOW() WHERE id = $1',
           [deviceId]
         );
         
@@ -215,6 +216,7 @@ export class LicenseService {
 
       // 4. Build device-specific signed license payload (alphabetical keys for canonical json)
       const licenseInfo = {
+        activation_id: deviceId,
         device_id: deviceHash,
         device_token_version: deviceTokenVersion,
         expiry_date: new Date(entitlement.valid_until).toISOString(),
@@ -279,7 +281,12 @@ export class LicenseService {
   }
 
   // --- Sprint 3: POS Heartbeat Route ---
-  public static async heartbeat(licenseKey: string, deviceHash: string, fingerprint?: any): Promise<any> {
+  public static async heartbeat(
+    licenseKey: string,
+    deviceHash: string,
+    activationId?: string,
+    fingerprint?: any
+  ): Promise<any> {
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
@@ -288,8 +295,11 @@ export class LicenseService {
                 da.id as device_id, da.status as device_status, da.device_token_version
          FROM license_entitlements le
          JOIN device_activations da ON le.id = da.entitlement_id
-         WHERE le.license_key = $1 AND da.device_hash = $2 FOR UPDATE`,
-        [licenseKey, deviceHash]
+         WHERE le.license_key = $1
+           AND da.device_hash = $2
+           AND ($3::varchar IS NULL OR da.id = $3)
+         FOR UPDATE`,
+        [licenseKey, deviceHash, activationId || null]
       );
 
       if (res.rows.length === 0) {
@@ -317,7 +327,7 @@ export class LicenseService {
 
       // Update last active timestamp
       await client.query(
-        'UPDATE device_activations SET last_seen_at = CURRENT_TIMESTAMP WHERE id = $1',
+        'UPDATE device_activations SET last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
         [info.device_id]
       );
 
@@ -325,6 +335,7 @@ export class LicenseService {
 
       // Return device-specific signed license payload (matching activation format)
       const licenseInfo = {
+        activation_id: info.device_id,
         device_id: deviceHash,
         device_token_version: info.device_token_version,
         expiry_date: new Date(info.expires_at).toISOString(),
@@ -342,6 +353,59 @@ export class LicenseService {
         license_info: licenseInfo,
         signature
       };
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Lightweight online-presence endpoint. License validation remains a signed,
+   * infrequent operation; presence is authenticated and only updates the
+   * canonical activation and its runtime state.
+   */
+  public static async reportPresence(
+    companyId: string,
+    activationId: string,
+    runtime?: { platform?: string; currentVersion?: string; channel?: string }
+  ): Promise<void> {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      const activation = await client.query(
+        `SELECT id FROM device_activations
+         WHERE id = $1 AND company_id = $2 AND status = 'active'
+         FOR UPDATE`,
+        [activationId, companyId]
+      );
+      if (activation.rows.length === 0) {
+        throw new Error('invalid_device_activation');
+      }
+
+      await client.query(
+        `UPDATE device_activations
+         SET last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [activationId]
+      );
+
+      if (runtime?.platform && runtime.currentVersion) {
+        await client.query(
+          `INSERT INTO device_runtime_state (
+             device_activation_id, company_id, platform, current_version, channel, last_reported_at, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (device_activation_id) DO UPDATE SET
+             platform = EXCLUDED.platform,
+             current_version = EXCLUDED.current_version,
+             channel = EXCLUDED.channel,
+             last_reported_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP`,
+          [activationId, companyId, runtime.platform, runtime.currentVersion, runtime.channel || 'stable']
+        );
+      }
+      await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       throw err;

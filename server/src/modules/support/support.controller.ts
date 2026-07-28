@@ -159,16 +159,26 @@ router.get('/tickets', async (req: AuthenticatedRequest, res: Response) => {
  */
 router.get('/tickets/:id', async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
+  const isAdmin = req.user!.roles?.includes('sysadmin') || req.user!.roles?.includes('admin');
 
   try {
-    const { tickets } = await SupportService.listTickets({ companyId: req.user!.company_id });
-    const ticket = tickets.find((t: any) => t.id === id);
+    const client = await pgPool.connect();
+    try {
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+      const query = isAdmin
+        ? 'SELECT * FROM support_tickets WHERE id = $1'
+        : 'SELECT * FROM support_tickets WHERE id = $1 AND company_id = $2';
+      const params = isAdmin ? [id] : [id, req.user!.company_id];
+      const result = await client.query(query, params);
 
-    if (!ticket) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
+      }
+
+      return res.json({ ticket: result.rows[0] });
+    } finally {
+      client.release();
     }
-
-    return res.json({ ticket });
   } catch (err: any) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Talep getirilemedi.' } });
   }

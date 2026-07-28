@@ -71,7 +71,7 @@ class FakeInventoryService extends InventoryService {
         );
 
   @override
-  Future<void> restoreStock(List<SaleItemInput> items) async {}
+  Future<void> increaseStock(List<SaleItemInput> items) async {}
 }
 
 class FakePaymentService extends PaymentService {
@@ -90,6 +90,7 @@ class FakePaymentService extends PaymentService {
     required String method,
     required double currentPaidAmount,
     required double totalAmount,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     // No-op
   }

@@ -131,6 +131,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     required double amount,
     required String method,
     String? notes,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     final paymentService = await ref.read(paymentServiceProvider.future);
     await paymentService.recordCollection(
@@ -138,6 +139,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       amount: amount,
       method: method,
       notes: notes,
+      terminalMetadata: terminalMetadata,
     );
     try {
       final auditService = await ref.read(auditServiceProvider.future);

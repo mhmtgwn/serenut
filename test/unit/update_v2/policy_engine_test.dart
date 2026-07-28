@@ -85,7 +85,7 @@ void main() {
     });
 
     test('Fails with UPD-005 when CPU architecture is unsupported', () async {
-      final unsupportedRules = const ReleaseRules(
+      const unsupportedRules = ReleaseRules(
         isMandatory: false,
         allowRollback: true,
         minFreeDiskMb: 300,

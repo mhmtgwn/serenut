@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 const _kGreen = Color(0xFF16A34A);
 const _kGreenDark = Color(0xFF15803D);
@@ -34,7 +35,8 @@ class CollectionPage extends ConsumerStatefulWidget {
   ConsumerState<CollectionPage> createState() => _CollectionPageState();
 }
 
-final collectionCustomerDetailProvider = FutureProvider.family<CustomerEntity?, String>((ref, id) async {
+final collectionCustomerDetailProvider =
+    FutureProvider.family<CustomerEntity?, String>((ref, id) async {
   final repo = await ref.watch(customerRepositoryProvider.future);
   return repo.findById(id);
 });
@@ -76,7 +78,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final customerAsync = ref.watch(collectionCustomerDetailProvider(widget.customerId));
+    final customerAsync =
+        ref.watch(collectionCustomerDetailProvider(widget.customerId));
 
     return customerAsync.when(
       loading: () => const Scaffold(
@@ -635,7 +638,16 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
 
+    AuthorizedCardPayment? cardPayment;
     try {
+      if (_selectedMethod == 'card') {
+        cardPayment =
+            await ref.read(physicalCardPaymentServiceProvider).authorize(
+                  amount: _enteredAmount,
+                  idempotencyKey:
+                      'collection-${widget.customerId}-${DateTime.now().microsecondsSinceEpoch}',
+                );
+      }
       await ref
           .read(collectionCustomersControllerProvider.notifier)
           .recordCollection(
@@ -645,7 +657,14 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             notes: _noteController.text.trim().isEmpty
                 ? null
                 : _noteController.text.trim(),
+            terminalMetadata: cardPayment?.ledgerMetadata,
           );
+      if (cardPayment != null) {
+        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
+              cardPayment,
+              contextId: 'collection-${widget.customerId}',
+            );
+      }
 
       // Get the settings and the updated customer (which now has updated balance)
       final settings = ref.read(settingsNotifierProvider).value;
@@ -694,6 +713,11 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         );
       }
     } catch (e) {
+      if (cardPayment != null) {
+        await ref
+            .read(physicalCardPaymentServiceProvider)
+            .markUnreconciled(cardPayment, e);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

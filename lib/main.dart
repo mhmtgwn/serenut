@@ -171,6 +171,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _updateCheckTimer?.cancel();
+    // Temiz kapanışı kaydet — lock dosyası silindi, sonraki başlatmada
+    // yanlış crash tespiti yapılmaz.
+    ref.read(crashRecoveryManagerProvider).markAppCleanShutdown();
     super.dispose();
   }
 
@@ -178,6 +181,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_checkForLiveUpdate());
+    }
+    // Uygulama arka plandan tamamen kaldırılıyorsa temiz kapanışı işaretle
+    if (state == AppLifecycleState.detached) {
+      ref.read(crashRecoveryManagerProvider).markAppCleanShutdown();
     }
   }
 
@@ -318,7 +325,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           releaseManager: ref.read(releaseManagerServiceProvider),
           platform: Platform.isAndroid ? 'android' : 'windows',
           jwtToken: ref.read(authServiceProvider).getJwtToken(),
-          deviceId: null,
+          deviceId: ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
         );
       } finally {
         _updateDialogVisible = false;

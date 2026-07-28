@@ -75,6 +75,7 @@ class SalesService {
     double? paidAmount,
     String? idempotencyKey,
     String? createdBy,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     _checkSecurityGate();
     final stopwatch = Stopwatch()..start();
@@ -143,6 +144,7 @@ class SalesService {
           totalAmount: totalAmount,
           paidAmount: finalPaidAmount,
           paymentMethod: paymentMethod,
+          terminalMetadata: terminalMetadata,
         );
         await _inventoryService.decreaseStock(items);
 
@@ -301,6 +303,7 @@ class SalesService {
     required String saleId,
     required double amount,
     required String method,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     _checkSecurityGate();
     final sale = await _saleRepository.findById(saleId);
@@ -334,6 +337,7 @@ class SalesService {
         method: method,
         currentPaidAmount: sale.paidAmount,
         totalAmount: sale.totalAmount,
+        terminalMetadata: terminalMetadata,
       );
 
       if (_dataIntegrityService != null) {
@@ -365,6 +369,7 @@ class SalesService {
         method: method,
         currentPaidAmount: sale.paidAmount,
         totalAmount: sale.totalAmount,
+        terminalMetadata: terminalMetadata,
       );
 
       if (_dataIntegrityService != null) {

@@ -17,7 +17,6 @@ void main() {
   databaseFactory = databaseFactoryFfi;
 
   group('Dashboard Service & SQLite Engine Integration Tests', () {
-    late DatabaseManager databaseManager;
     late Database db;
     late IProductRepository productRepo;
     late ICustomerRepository customerRepo;

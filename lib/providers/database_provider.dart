@@ -1,7 +1,5 @@
 // lib/providers/database_provider.dart
-// PHASE 0 Day 4 - Database Riverpod Provider
-// Provides SQLite database and repositories for Phase 6 integration
-// Generated: 21 Jun 2026
+// Serenut OS — Database Riverpod Provider
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
@@ -15,7 +13,6 @@ import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 /// Database Provider
 /// ============================================================
 
-/// Get SQLite database instance
 ///
 /// Usage:
 /// ```dart

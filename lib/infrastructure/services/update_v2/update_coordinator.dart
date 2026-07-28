@@ -1,7 +1,6 @@
 // lib/infrastructure/services/update_v2/update_coordinator.dart
 // Serenut Platform — Client Update Coordinator Orchestrator
 
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/models/update_v2/release_manifest.dart';
 import 'package:serenutos/domain/services/update_v2/policy_engine.dart';
 import 'package:serenutos/infrastructure/services/update_v2/update_lock_provider.dart';

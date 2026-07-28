@@ -1,7 +1,6 @@
 // test/unit/update_v2/fsm_timeout_retry_test.dart
 // Serenut Platform — FSM State Timeout and Auto-Retry Unit Tests
 
-import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/update_v2/update_context.dart';
 import 'package:serenutos/domain/services/update_v2/update_state_machine.dart';

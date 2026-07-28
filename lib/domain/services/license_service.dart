@@ -4,8 +4,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/models/license_model.dart';
+import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -13,6 +13,10 @@ import 'package:pointycastle/export.dart';
 
 class LicenseInfo {
   final String merchantId;
+
+  /// Canonical server-side activation. [deviceId] remains the local
+  /// installation hash used for cryptographic device binding.
+  final String? activationId;
 
   /// V2: device-specific binding. V1 legacy tokens may contain null (treated as wildcard grace period).
   final String? deviceId;
@@ -28,6 +32,7 @@ class LicenseInfo {
 
   LicenseInfo({
     required this.merchantId,
+    this.activationId,
     this.deviceId,
     this.allowedDevices,
     required this.expiryDate,
@@ -57,6 +62,7 @@ class LicenseInfo {
 
     return LicenseInfo(
       merchantId: (json['merchant_id'] ?? json['merchantId']) as String? ?? '',
+      activationId: json['activation_id'] as String?,
       deviceId: json['device_id'] as String?,
       allowedDevices: legacyDevices,
       expiryDate:
@@ -71,6 +77,7 @@ class LicenseInfo {
 
   Map<String, dynamic> toJson() => {
         'merchant_id': merchantId,
+        if (activationId != null) 'activation_id': activationId,
         if (deviceId != null) 'device_id': deviceId,
         if (allowedDevices != null) 'allowed_devices': allowedDevices,
         'expiry_date': expiryDate.toIso8601String(),
@@ -85,7 +92,6 @@ class LicenseInfo {
 class LicenseService {
   final SharedPreferences _prefs;
   static const String _licenseTokenKey = 'license_token';
-  static const String _deviceUuidKey = 'device_uuid';
   static const String _lastSystemTimeKey = 'last_system_time';
   static const String _maxTimestampSeenKey = 'max_timestamp_seen';
 
@@ -111,6 +117,11 @@ class LicenseService {
         _rsaExponent = rsaExponent;
 
   SharedPreferences get prefs => _prefs;
+
+  /// A release without this public key cannot validate server-issued device
+  /// tokens. Treat that as a build/configuration fault, never as an expired
+  /// customer license or a silently disabled sync session.
+  bool get hasVerificationKey => _rsaModulus.trim().isNotEmpty;
 
   Future<Database> _getDb() => DatabaseManager().getDatabase();
 
@@ -158,12 +169,7 @@ class LicenseService {
 
   /// Ensure local device has a persistent unique hardware ID
   String getDeviceUuid() {
-    String? deviceUuid = _prefs.getString(_deviceUuidKey);
-    if (deviceUuid == null || deviceUuid.isEmpty) {
-      deviceUuid = const Uuid().v4();
-      _prefs.setString(_deviceUuidKey, deviceUuid);
-    }
-    return deviceUuid;
+    return DeviceManager.resolveDeviceId(_prefs);
   }
 
   /// Validates a license token string cryptographically and verifies if local device matches.
@@ -193,6 +199,7 @@ class LicenseService {
       final Map<String, dynamic> payloadMap;
       if (info.tokenVersion >= 2) {
         payloadMap = {
+          if (info.activationId != null) 'activation_id': info.activationId,
           'device_id': info.deviceId,
           'device_token_version': info.deviceTokenVersion,
           'expiry_date': info.expiryDate.toIso8601String(),
@@ -507,6 +514,7 @@ class LicenseService {
   }
 
   Timer? _heartbeatTimer;
+  Timer? _presenceTimer;
 
   /// Starts periodic heartbeat checks.
   void startHeartbeat(ApiClient apiClient) {
@@ -516,12 +524,23 @@ class LicenseService {
     });
     Future.delayed(
         const Duration(seconds: 5), () => performHeartbeatCheck(apiClient));
+
+    // License validation remains infrequent. Presence is lightweight and keeps
+    // the portal's online state aligned with the active device.
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+      await reportDevicePresence(apiClient);
+    });
+    Future.delayed(
+        const Duration(seconds: 8), () => reportDevicePresence(apiClient));
   }
 
   /// Cancels periodic heartbeat checks.
   void stopHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
   }
 
   /// Perform remote heartbeat validation check
@@ -536,6 +555,8 @@ class LicenseService {
         body: {
           'license_key': licenseKey,
           'device_hash': getDeviceUuid(),
+          if (getLicenseInfo()?.activationId != null)
+            'device_activation_id': getLicenseInfo()!.activationId,
         },
       );
 
@@ -548,6 +569,8 @@ class LicenseService {
           final Map<String, dynamic> localTokenMap = {
             'merchant_id':
                 licenseInfo['merchant_id'] ?? licenseInfo['merchantId'],
+            if (licenseInfo.containsKey('activation_id'))
+              'activation_id': licenseInfo['activation_id'],
             if (licenseInfo.containsKey('device_id'))
               'device_id': licenseInfo['device_id']
             else
@@ -573,31 +596,21 @@ class LicenseService {
     return false;
   }
 
-  /// Sync license from server bootstrap and perform heartbeat validation
-  Future<bool> syncLicenseFromServer(ApiClient apiClient) async {
+  /// Reports only online presence. Network failures never revoke the cached
+  /// offline license; server-side activation authorization remains authoritative.
+  Future<bool> reportDevicePresence(ApiClient apiClient) async {
+    final activationId = getLicenseInfo()?.activationId;
+    if (activationId == null || activationId.isEmpty) return false;
     try {
-      final response =
-          await apiClient.send('GET', '/api/v4/sync/bootstrap/license-config');
-      debugPrint(
-          '[LicenseSync] GET /sync/bootstrap/license-config → ${response.statusCode}');
-      if (response.isSuccess) {
-        final payload = response.json;
-        final data = payload['data'] as Map<String, dynamic>?;
-        if (data != null && data.containsKey('license_key')) {
-          final licenseKey = data['license_key'] as String?;
-          if (licenseKey != null && licenseKey.isNotEmpty) {
-            debugPrint(
-                '[LicenseSync] license_key alındı: ${licenseKey.substring(0, licenseKey.length > 8 ? 8 : licenseKey.length)}...');
-            await _prefs.setString('activated_license_key', licenseKey);
-            final result = await performHeartbeatCheck(apiClient);
-            debugPrint('[LicenseSync] Heartbeat sonucu: $result');
-            return result;
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Sync license from server failed: $e');
+      final response = await apiClient.send(
+        'POST',
+        '/api/v1/licenses/device-presence',
+        body: {'device_activation_id': activationId},
+      );
+      return response.isSuccess;
+    } catch (_) {
+      return false;
     }
-    return false;
   }
+
 }

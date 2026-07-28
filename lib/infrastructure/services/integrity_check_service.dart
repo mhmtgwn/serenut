@@ -115,8 +115,8 @@ class IntegrityCheckService {
       }
 
       // Verify essential configuration exists in SQLite settings (single source of truth)
-      final dbForPin = await DatabaseManager().getDatabase();
-      final pinRows = await dbForPin.query('settings',
+      final diagnosticsDb = await DatabaseManager().getDatabase();
+      final pinRows = await diagnosticsDb.query('settings',
           columns: ['admin_pin_code'], limit: 1);
       final adminPin = pinRows.isNotEmpty
           ? pinRows.first['admin_pin_code'] as String?

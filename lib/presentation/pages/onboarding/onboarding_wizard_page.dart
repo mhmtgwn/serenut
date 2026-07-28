@@ -20,12 +20,8 @@ import 'package:serenutos/presentation/pages/onboarding/license_activation_flow.
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/domain/models/auth_user.dart';
-import 'package:serenutos/domain/models/permission.dart';
-import 'package:serenutos/domain/services/auth_service.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'package:uuid/uuid.dart'; // Admin ID için benzersiz UUID üretimi
 import 'package:serenutos/domain/models/industry_template.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_product_repository.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -181,6 +177,34 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     final dbManager = DatabaseManager();
     final gateway = DbGatewayImpl(dbManager);
 
+    // The server owns account, tenant and device entitlement creation.  Do this
+    // before persisting a local business so a failed registration cannot leave a
+    // device that looks configured but has no tenant to sync with.
+    final rawPassword = state.admin.password.isNotEmpty
+        ? state.admin.password
+        : state.admin.pin;
+    final apiClient = ref.read(apiClientProvider);
+    final registration = await apiClient.post('/auth/register', {
+      'company_name': state.business.businessName,
+      'name': state.admin.adminFullName,
+      'email': state.admin.username,
+      'password': rawPassword,
+      'phone': state.business.phone,
+    });
+    if (!registration.isSuccess) {
+      throw Exception(
+        registration.json['error']?['message'] ?? 'Sunucu kayıt hatası.',
+      );
+    }
+
+    // Login establishes the authenticated session, subscription cache and the
+    // canonical device activation through /auth/session-bootstrap.
+    await ref.read(authServiceProvider).login(
+          state.admin.username,
+          rawPassword,
+        );
+    debugPrint('Onboarding: Sunucu kaydı ve cihaz aktivasyonu başarılı');
+
     // 1. Admin kimlik bilgilerini kaydet
     // PIN: SQLite settings tablosuna yaz (tek kaynak)
     final pinHash = _hashPin(state.admin.pin);
@@ -196,22 +220,6 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     await prefs.setString('admin_username', state.admin.username);
     await prefs.setString('admin_full_name', state.admin.adminFullName);
     // Güvenlik Düzeltmesi: admin_password_hash SharedPreferences'a SHA-256 olarak kaydedilmez.
-    // AuthService üzerinden bcrypt/scrypt ile SQLite'a kaydediliyor.
-
-    // Create admin user in SQLite database to support logins
-    final authService = ref.read(authServiceProvider);
-    final adminUser = AuthUser(
-      id: const Uuid().v4(), // Benzersiz ID — hardcode 'admin' kaldırıldı
-      name: state.admin.adminFullName,
-      email: state.admin.username,
-      role: UserRole.admin,
-      permissions: AuthService.getPermissionsForRole(UserRole.admin),
-      createdAt: DateTime.now(),
-    );
-    final rawPassword = state.admin.password.isNotEmpty
-        ? state.admin.password
-        : state.admin.pin;
-    await authService.createUser(adminUser, rawPassword, pin: state.admin.pin);
 
     // 2. İşletme profilini DB'ye kaydet
     final profileRepo = SqliteBusinessProfileRepository(gateway);
@@ -250,9 +258,6 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       createdAt: DateTime.now(),
     ));
 
-    // Mark company patch as pending so it gets synced to the server on initial sync
-    await prefs.setBool('serenut_pending_company_patch', true);
-
     // 4. Sektör şablonundaki ürünleri SQLite'a tohumla (seed)
     final template =
         IndustryTemplateRegistry.getTemplate(state.business.businessType);
@@ -272,44 +277,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       }
     }
 
-    // 5. Backend'e de kaydol (opsiyonel — network yoksa silent fail)
-    // Bu kaynak doğruluk noktasını backend'de de oluşturur
-    try {
-      final apiClient = ref.read(apiClientProvider);
-      final rawPassword = state.admin.password.isNotEmpty
-          ? state.admin.password
-          : state.admin.pin;
-      final res = await apiClient.post('/auth/register', {
-        'company_name': state.business.businessName,
-        'name': state.admin.adminFullName,
-        'email': state.admin.username,
-        'password': rawPassword,
-        'phone': state.business.phone,
-      });
-      if (res.isSuccess) {
-        final data = res.json;
-        await prefs.setString(
-            'auth_jwt_token', data['access_token'] as String? ?? '');
-        await prefs.setString(
-            'auth_refresh_token', data['refresh_token'] as String? ?? '');
-        debugPrint('Onboarding: Backend kayıt başarılı ✓');
-      } else {
-        throw Exception(
-            res.json['error']?['message'] ?? 'Sunucu kayıt hatası.');
-      }
-    } catch (e) {
-      // Split-brain oluşmasını engellemek için işlem yarıda kesiliyor.
-      debugPrint('Onboarding: Backend kayıt başarısız: $e');
-      final messenger = ScaffoldMessenger.of(context);
-      if (context.mounted) {
-        messenger.showSnackBar(SnackBar(
-            content: Text(
-                'Kayıt başarısız: $e. İnternet bağlantınızı kontrol edin.')));
-      }
-      return;
-    }
-
-    // 6. Onboarding tamamlandı
+    // 5. Onboarding tamamlandı
     await _persistence.markCompleted();
   }
 

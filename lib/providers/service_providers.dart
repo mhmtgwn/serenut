@@ -49,7 +49,8 @@ final printerServiceProvider = Provider<IPrinterService>((ref) {
 
 /// Provides IBackupService instance.
 final backupServiceProvider = Provider<IBackupService>((ref) {
-  return BackupService();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return BackupService(prefs: prefs);
 });
 
 /// Provides IHashService instance.
@@ -132,8 +133,7 @@ final integrityCheckServiceProvider = Provider<IntegrityCheckService>((ref) {
 /// Provides CentralBackgroundScheduler instance.
 final centralBackgroundSchedulerProvider =
     Provider<CentralBackgroundScheduler>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return CentralBackgroundScheduler(prefs);
+  return CentralBackgroundScheduler();
 });
 
 /// Provides RollbackManager instance.

@@ -2,7 +2,6 @@
 // Serenut Platform — Client Update State Context
 
 import 'package:serenutos/domain/models/update_v2/release_manifest.dart';
-import 'package:serenutos/domain/models/update_v2/update_telemetry_event.dart';
 import 'package:serenutos/domain/services/update_v2/policy_engine.dart';
 import 'package:serenutos/infrastructure/services/update_v2/update_trigger_manager.dart';
 

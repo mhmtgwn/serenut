@@ -19,6 +19,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart'
     show paymentServiceProvider;
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/payment_terminal_provider.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
@@ -607,6 +608,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   Future<void> _submitOrder() async {
     setState(() => _isSubmitting = true);
 
+    AuthorizedCardPayment? cardPayment;
     try {
       final itemsList = _cart.entries
           .map((e) => {
@@ -646,6 +648,18 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       } else if (_paymentMethod == 'karma') {
         finalPaid = _karmaCash + _karmaCard;
       }
+      final cardAmount = _paymentMethod == 'card'
+          ? _totalAmount
+          : _paymentMethod == 'karma'
+              ? _karmaCard
+              : 0.0;
+      if (cardAmount > 0) {
+        cardPayment =
+            await ref.read(physicalCardPaymentServiceProvider).authorize(
+                  amount: cardAmount,
+                  idempotencyKey: 'order-card-$orderId',
+                );
+      }
       if (isEdit) {
         // Save Order to Local Database
         await ref.read(ordersControllerProvider.notifier).updateOrder(newOrder);
@@ -669,7 +683,14 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           totalAmount: _totalAmount,
           paidAmount: finalPaid,
           paymentMethod: _paymentMethod,
+          terminalMetadata: cardPayment?.ledgerMetadata,
         );
+      }
+      if (cardPayment != null) {
+        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
+              cardPayment,
+              contextId: newOrder.id,
+            );
       }
 
       // Refresh customers state so updated balance displays on screens
@@ -752,6 +773,11 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         );
       }
     } catch (e) {
+      if (cardPayment != null) {
+        await ref
+            .read(physicalCardPaymentServiceProvider)
+            .markUnreconciled(cardPayment, e);
+      }
       setState(() => _isSubmitting = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

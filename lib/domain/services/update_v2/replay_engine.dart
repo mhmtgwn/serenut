@@ -1,7 +1,6 @@
 // lib/domain/services/update_v2/replay_engine.dart
 // Serenut Platform — FSM Crash Recovery Replay Engine
 
-import 'package:serenutos/domain/models/update_v2/journal_record.dart';
 import 'package:serenutos/infrastructure/services/update_v2/journal_reader.dart';
 
 class ReplayResult {

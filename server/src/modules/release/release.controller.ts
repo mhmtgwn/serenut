@@ -8,6 +8,17 @@ import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middl
 
 const router = Router();
 
+async function requireActiveDeviceActivation(companyId: string, activationId: string): Promise<void> {
+  const activation = await pgPool.query(
+    `SELECT id FROM device_activations
+     WHERE id = $1 AND company_id = $2 AND status = 'active'`,
+    [activationId, companyId]
+  );
+  if (activation.rows.length === 0) {
+    throw new Error('invalid_device_activation');
+  }
+}
+
 // ── MULTER STORAGE SETUP ────────────────────────────────────────────────────
 const RELEASES_BASE_DIR = process.env.RELEASES_DIR || '/var/www/serenut-api/releases';
 const ALLOWED_EXTENSIONS = ['.apk', '.aab', '.exe', '.msix'];
@@ -327,7 +338,7 @@ router.get('/check', async (req: Request, res: Response) => {
 router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { releaseId } = req.params;
-  const deviceId = req.query.device_id as string;
+  const activationId = req.query.device_activation_id as string | undefined;
 
   try {
     // Fetch release info
@@ -351,6 +362,14 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
       return res.status(403).json({ error: 'no_active_license' });
     }
 
+    if (activationId) {
+      try {
+        await requireActiveDeviceActivation(user.company_id, activationId);
+      } catch (err: any) {
+        return res.status(403).json({ error: err.message });
+      }
+    }
+
     // Verify file exists on disk
     if (!release.file_path || !fs.existsSync(release.file_path)) {
       return res.status(503).json({ error: 'file_not_available', message: 'Dosya sunucuda bulunamadı.' });
@@ -359,9 +378,9 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
     // Log download start
     const logId = `dl-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     pgPool.query(
-      `INSERT INTO update_download_logs (id, release_id, device_id, company_id, status)
+      `INSERT INTO device_update_downloads (id, release_id, device_activation_id, company_id, status)
        VALUES ($1, $2, $3, $4, 'started')`,
-      [logId, releaseId, deviceId || null, user.company_id]
+      [logId, releaseId, activationId || null, user.company_id]
     ).catch(() => {});
 
     const ext = path.extname(release.file_path);
@@ -404,7 +423,7 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
     stream.on('end', () => {
       // Mark download as completed
       pgPool.query(
-        "UPDATE update_download_logs SET status = 'completed', completed_at = NOW() WHERE id = $1",
+        "UPDATE device_update_downloads SET status = 'completed', completed_at = NOW() WHERE id = $1",
         [logId]
       ).catch(() => {});
     });
@@ -412,7 +431,7 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
     stream.on('error', (err) => {
       console.error('File stream error:', err);
       pgPool.query(
-        "UPDATE update_download_logs SET status = 'failed', error_message = $1 WHERE id = $2",
+        "UPDATE device_update_downloads SET status = 'failed', error_message = $1 WHERE id = $2",
         [err.message, logId]
       ).catch(() => {});
     });
@@ -425,24 +444,35 @@ router.get('/download/:releaseId', authenticateUser, async (req: AuthenticatedRe
 // ── 3. REPORT DEVICE VERSION (Called on app startup) ────────────────────────
 router.post('/report-version', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { device_id, platform, current_version, channel } = req.body;
+  const { device_activation_id, platform, current_version, channel } = req.body;
 
-  if (!device_id || !platform || !current_version) {
+  if (!device_activation_id || !platform || !current_version) {
     return res.status(400).json({ error: 'missing_fields' });
   }
 
   try {
+    await requireActiveDeviceActivation(user.company_id, device_activation_id);
     await pgPool.query(`
-      INSERT INTO device_app_versions (device_id, company_id, platform, current_version, channel, last_reported_at)
+      INSERT INTO device_runtime_state (device_activation_id, company_id, platform, current_version, channel, last_reported_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, NOW())
-      ON CONFLICT (device_id) DO UPDATE SET
+      ON CONFLICT (device_activation_id) DO UPDATE SET
+        platform = EXCLUDED.platform,
         current_version = EXCLUDED.current_version,
         channel = EXCLUDED.channel,
-        last_reported_at = NOW()
-    `, [device_id, user.company_id, platform, current_version, channel || 'stable']);
+        last_reported_at = NOW(),
+        updated_at = NOW()
+    `, [device_activation_id, user.company_id, platform, current_version, channel || 'stable']);
+
+    await pgPool.query(
+      'UPDATE device_activations SET last_seen_at = NOW(), updated_at = NOW() WHERE id = $1',
+      [device_activation_id]
+    );
 
     return res.json({ success: true });
   } catch (err) {
+    if ((err as Error).message === 'invalid_device_activation') {
+      return res.status(403).json({ error: 'invalid_device_activation' });
+    }
     console.error('Report version error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
@@ -458,8 +488,10 @@ router.post('/confirm-download', authenticateUser, async (req: AuthenticatedRequ
   try {
     const newStatus = verified ? 'verified' : 'verification_failed';
     await pgPool.query(
-      'UPDATE update_download_logs SET status = $1 WHERE id = $2',
-      [newStatus, log_id]
+      `UPDATE device_update_downloads
+       SET status = $1
+       WHERE id = $2 AND company_id = $3`,
+      [newStatus, log_id, req.user!.company_id]
     );
     return res.json({ success: true });
   } catch (err) {
@@ -569,8 +601,8 @@ router.get('/list', authenticateUser, requireRole('sysadmin'), async (req: Authe
     const list = await runBypassingRLS(`
       SELECT av.*,
              u.name as published_by_name,
-             (SELECT COUNT(*) FROM update_download_logs dl WHERE dl.release_id = av.id) as total_downloads,
-             (SELECT COUNT(*) FROM update_download_logs dl WHERE dl.release_id = av.id AND dl.status = 'verified') as verified_installs
+             (SELECT COUNT(*) FROM device_update_downloads dl WHERE dl.release_id = av.id) as total_downloads,
+             (SELECT COUNT(*) FROM device_update_downloads dl WHERE dl.release_id = av.id AND dl.status = 'verified') as verified_installs
       FROM app_versions av
       LEFT JOIN users u ON av.published_by = u.id
       ORDER BY av.created_at DESC
@@ -644,14 +676,14 @@ router.get('/:id/stats', authenticateUser, requireRole('sysadmin'), async (req: 
         COUNT(*) FILTER (WHERE status = 'verified') as verified,
         COUNT(*) FILTER (WHERE status = 'failed') as failed,
         COUNT(*) FILTER (WHERE status = 'verification_failed') as verification_failed
-      FROM update_download_logs
+      FROM device_update_downloads
       WHERE release_id = $1
     `, [req.params.id]);
 
     const deviceStats = await runBypassingRLS(`
-      SELECT dl.device_id, d.name as device_name, c.name as company_name, dl.status, dl.started_at, dl.completed_at
-      FROM update_download_logs dl
-      LEFT JOIN devices d ON dl.device_id = d.id
+      SELECT dl.device_activation_id, activation.device_name, c.name as company_name, dl.status, dl.started_at, dl.completed_at
+      FROM device_update_downloads dl
+      LEFT JOIN device_activations activation ON dl.device_activation_id = activation.id
       LEFT JOIN companies c ON dl.company_id = c.id
       WHERE dl.release_id = $1
       ORDER BY dl.started_at DESC
@@ -707,13 +739,13 @@ router.get('/monitor', authenticateUser, requireRole('sysadmin'), async (req: Au
 
     // Count devices per version status
     const deviceVersions = await runBypassingRLS(`
-      SELECT dav.platform, dav.current_version, dav.channel,
+      SELECT runtime.platform, runtime.current_version, runtime.channel,
              COUNT(*) as device_count,
              c.name as company_name
-      FROM device_app_versions dav
-      JOIN companies c ON dav.company_id = c.id
-      GROUP BY dav.platform, dav.current_version, dav.channel, c.name
-      ORDER BY dav.platform, device_count DESC
+      FROM device_runtime_state runtime
+      JOIN companies c ON runtime.company_id = c.id
+      GROUP BY runtime.platform, runtime.current_version, runtime.channel, c.name
+      ORDER BY runtime.platform, device_count DESC
     `);
 
     const totalDevices = deviceVersions.rows.reduce((sum: number, r: any) => sum + parseInt(r.device_count, 10), 0);
@@ -731,10 +763,10 @@ router.get('/monitor', authenticateUser, requireRole('sysadmin'), async (req: Au
     }
 
     const failedDownloads = await runBypassingRLS(
-      "SELECT COUNT(*) FROM update_download_logs WHERE status = 'failed' AND started_at >= NOW() - INTERVAL '7 days'"
+      "SELECT COUNT(*) FROM device_update_downloads WHERE status = 'failed' AND started_at >= NOW() - INTERVAL '7 days'"
     );
     const totalDownloads = await runBypassingRLS(
-      "SELECT COUNT(*) FROM update_download_logs WHERE started_at >= NOW() - INTERVAL '7 days'"
+      "SELECT COUNT(*) FROM device_update_downloads WHERE started_at >= NOW() - INTERVAL '7 days'"
     );
 
     const failCount = parseInt(failedDownloads.rows[0].count, 10);

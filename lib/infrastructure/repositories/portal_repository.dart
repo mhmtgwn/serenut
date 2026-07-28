@@ -109,18 +109,15 @@ class TicketMessage {
 
 class PortalRepository {
   final ApiClient _apiClient;
-  final EnvironmentConfig _config;
-
   PortalRepository({
     ApiClient? apiClient,
     EnvironmentConfig? config,
-  })  : _apiClient = apiClient ?? ApiClient(),
-        _config = config ?? EnvironmentConfig.current;
+  }) : _apiClient = apiClient ?? ApiClient();
 
   /// Fetch dashboard metrics
   Future<PortalDashboardSummary> getDashboard() async {
     final response = await _apiClient.get(
-      '${_config.releaseEndpoint.replaceAll('releases', 'portal')}/dashboard',
+      '/api/v1/portal/dashboard',
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return PortalDashboardSummary.fromJson(
@@ -130,7 +127,7 @@ class PortalRepository {
   /// List terminals/devices
   Future<List<PortalDevice>> getDevices() async {
     final response = await _apiClient.get(
-      '${_config.releaseEndpoint.replaceAll('releases', 'portal')}/devices',
+      '/api/v1/portal/devices',
     );
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => PortalDevice.fromJson(item)).toList();
@@ -139,7 +136,7 @@ class PortalRepository {
   /// List support tickets
   Future<List<SupportTicket>> getTickets() async {
     final response = await _apiClient.get(
-      '${_config.releaseEndpoint.replaceAll('releases', 'portal')}/tickets',
+      '/api/v1/portal/tickets',
     );
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => SupportTicket.fromJson(item)).toList();
@@ -148,7 +145,7 @@ class PortalRepository {
   /// Get message thread for support ticket
   Future<List<TicketMessage>> getTicketMessages(String ticketId) async {
     final response = await _apiClient.get(
-      '${_config.releaseEndpoint.replaceAll('releases', 'portal')}/tickets/$ticketId/messages',
+      '/api/v1/portal/tickets/$ticketId/messages',
     );
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => TicketMessage.fromJson(item)).toList();
@@ -157,26 +154,22 @@ class PortalRepository {
   /// Reply to a support ticket
   Future<void> replyTicket(String ticketId, String message) async {
     await _apiClient.post(
-      '${_config.releaseEndpoint.replaceAll('releases', 'portal')}/tickets/$ticketId/reply',
+      '/api/v1/portal/tickets/$ticketId/reply',
       {
         'message': message,
       },
     );
   }
 
-  /// Fetch system telemetry health status (CPU, RAM, DB wait lists, Gateway statuses)
+  /// Operational telemetry is a separate authenticated module, not a portal
+  /// sub-route. Keep this explicit so route ownership cannot drift silently.
   Future<Map<String, dynamic>> getTelemetryHealth() async {
-    final response = await _apiClient.get(
-      '${_config.releaseEndpoint.replaceAll('releases', 'telemetry')}/health-status',
-    );
+    final response = await _apiClient.get('/api/v1/telemetry/health-status');
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  /// Fetch scopes of audit trail events
   Future<List<Map<String, dynamic>>> getAuditLogs() async {
-    final response = await _apiClient.get(
-      '${_config.releaseEndpoint.replaceAll('releases', 'telemetry')}/audit-logs',
-    );
+    final response = await _apiClient.get('/api/v1/telemetry/audit-logs');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => Map<String, dynamic>.from(item)).toList();
   }

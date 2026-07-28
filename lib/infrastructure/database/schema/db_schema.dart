@@ -471,6 +471,29 @@ class DatabaseSchema {
         metadata TEXT
       )
     ''');
+
+    // A terminal may approve a card before the local sale transaction can be
+    // committed. Keep that evidence durably so an operator can reconcile it
+    // after a crash instead of blindly charging the card again.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS terminal_payment_intents (
+        id TEXT PRIMARY KEY,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        terminal_transaction_id TEXT NOT NULL UNIQUE,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL,
+        authorization_code TEXT,
+        state TEXT NOT NULL,
+        context_type TEXT NOT NULL,
+        context_id TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_terminal_payment_intents_state ON terminal_payment_intents(state, updated_at)',
+    );
   }
 
   static Future<void> createAuditLogsTable(Database db) async {

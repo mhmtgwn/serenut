@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { LicenseService } from '../license/license.service';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { authLimiter, passwordResetLimiter, signupLimiter } from '../../middleware/rate-limit.middleware';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
@@ -221,6 +222,65 @@ router.post('/logout', async (req: Request, res: Response) => {
     }
   }
   return res.json({ success: true });
+});
+
+/**
+ * Idempotent post-login recovery contract. A client may retry this request
+ * after any interrupted register/login flow without creating another device
+ * activation or changing the entitlement state.
+ */
+router.post('/session-bootstrap', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { device_hash, device_name, fingerprint } = req.body ?? {};
+  try {
+    const subscriptionResult = await pgPool.query(
+      `SELECT id, status, trial_started_at, trial_ends_at, current_period_start,
+              current_period_end, grace_hours_override
+       FROM subscriptions
+       WHERE company_id = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [user.company_id]
+    );
+    const entitlementResult = await pgPool.query(
+      `SELECT license_key FROM license_entitlements
+       WHERE company_id = $1 AND status IN ('trial', 'active')
+       ORDER BY valid_until DESC LIMIT 1`,
+      [user.company_id]
+    );
+
+    let activation: unknown = null;
+    if (device_hash) {
+      if (typeof device_hash !== 'string' || device_hash.length > 255) {
+        return res.status(400).json({ error: 'invalid_device_hash' });
+      }
+      activation = await LicenseService.autoActivate(
+        user.company_id,
+        device_hash,
+        typeof device_name === 'string' && device_name.trim().length > 0
+          ? device_name.trim()
+          : `Serenut cihazı ${device_hash.slice(0, 8)}`,
+        undefined,
+        fingerprint
+      );
+    }
+
+    return res.json({
+      user: { id: user.id, company_id: user.company_id, roles: user.roles, permissions: user.permissions },
+      subscription: subscriptionResult.rows[0] ?? null,
+      license_key: entitlementResult.rows[0]?.license_key ?? null,
+      activation,
+    });
+  } catch (err: any) {
+    const known = new Set([
+      'no_license_found', 'license_expired', 'device_blocked',
+      'device_limit_exceeded', 'hardware_tampered_limit_exceeded'
+    ]);
+    if (known.has(err.message)) {
+      return res.status(409).json({ error: err.message });
+    }
+    logger.error('Session bootstrap error:', err);
+    return res.status(500).json({ error: 'session_bootstrap_failed' });
+  }
 });
 
 router.post('/change-password', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {

@@ -208,6 +208,19 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
       [licenseId, id, licenseKey, 'trial', 2, 'active', expiresAt]
     );
 
+    const entitlementId = `ent-${Date.now()}`;
+    const subscriptionId = `sub-${Date.now()}`;
+    await runBypassingRLS(
+      `INSERT INTO subscriptions (id, company_id, plan_id, status, current_period_start, current_period_end)
+       VALUES ($1, $2, 'plan-free', 'trialing', NOW(), $3) ON CONFLICT (id) DO NOTHING`,
+      [subscriptionId, id, expiresAt]
+    );
+    await runBypassingRLS(
+      `INSERT INTO license_entitlements (id, company_id, subscription_id, plan_id, status, device_limit, store_limit, valid_from, valid_until, license_key)
+       VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), $4, $5)`,
+      [entitlementId, id, subscriptionId, expiresAt, licenseKey]
+    );
+
     await writeAdminAudit(req.user!.id, 'CREATE_COMPANY', 'companies', id, null, { name, tax_number });
 
     return res.status(201).json({ success: true, company_id: id, license_key: licenseKey });

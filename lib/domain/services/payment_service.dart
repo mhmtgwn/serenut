@@ -43,6 +43,7 @@ class PaymentService {
     required double totalAmount,
     required double paidAmount,
     required String paymentMethod,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     if (await _isDuplicateTransaction(saleId, 'sale')) {
       return; // Idempotency check: Already processed
@@ -79,22 +80,18 @@ class PaymentService {
         debtAmount: debt > 0 ? debt : 0,
         date: DateTime.now(),
         referenceId: saleId,
+        metadata: terminalMetadata,
       ),
     );
 
     if (paidAmount > 0) {
-      int parsedPaymentId = 0;
-      try {
-        parsedPaymentId =
-            int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
-      } catch (e) {
-        debugPrint('[PaymentService] ID parse hatası: $e');
-      }
-
+      // NOT: DomainEvent.aggregateId eski legacy int alanıdır ve hiçbir listener
+      // tarafından kullanılmıyor. Gerçek UUID'ler metadata içinde taşınıyor.
       _eventPublisher.publish(PaymentRecordedEvent(
-        paymentId: parsedPaymentId,
-        customerId: 0, // aggregate field compatibility
+        paymentId: 0,
+        customerId: 0,
         amount: paidAmount,
+        metadata: {'customer_uuid': customerId, 'sale_id': saleId},
       ));
     }
   }
@@ -108,6 +105,7 @@ class PaymentService {
     required String method,
     required double currentPaidAmount,
     required double totalAmount,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     final newPaidAmount = currentPaidAmount + amount;
     // DÜZELTME: .abs() kaldırıldı — fazla ödeme (overpayment) borç olarak kayıt edilmemeliydi.
@@ -128,22 +126,25 @@ class PaymentService {
         debtAmount: remainingDebt,
         date: DateTime.now(),
         referenceId: saleId,
-        metadata: overpayment > 0 ? {'overpayment': overpayment} : null,
+        metadata: {
+          if (overpayment > 0) 'overpayment': overpayment,
+          ...?terminalMetadata,
+        }.isEmpty
+            ? null
+            : {
+                if (overpayment > 0) 'overpayment': overpayment,
+                ...?terminalMetadata,
+              },
       ),
     );
 
-    int parsedPaymentId = 0;
-    try {
-      parsedPaymentId =
-          int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
-    } catch (e) {
-      debugPrint('[PaymentService] ID parse hatası (partial): $e');
-    }
-
+    // NOT: DomainEvent.aggregateId eski legacy int alanıdır ve hiçbir listener
+    // tarafından kullanılmıyor. Gerçek UUID'ler metadata içinde taşınıyor.
     _eventPublisher.publish(PaymentRecordedEvent(
-      paymentId: parsedPaymentId,
+      paymentId: 0,
       customerId: 0,
       amount: amount,
+      metadata: {'customer_uuid': customerId, 'sale_id': saleId},
     ));
   }
 
@@ -234,6 +235,7 @@ class PaymentService {
     required double amount,
     required String method,
     String? notes,
+    Map<String, dynamic>? terminalMetadata,
   }) async {
     final transactionId = _generateTxId('trans-coll');
     await _transactionRepository.create(
@@ -245,22 +247,25 @@ class PaymentService {
         paidAmount: amount,
         debtAmount: 0,
         date: DateTime.now(),
-        metadata: notes != null ? {'notes': notes} : null,
+        metadata: {
+          if (notes != null) 'notes': notes,
+          ...?terminalMetadata,
+        }.isEmpty
+            ? null
+            : {
+                if (notes != null) 'notes': notes,
+                ...?terminalMetadata,
+              },
       ),
     );
 
-    int parsedPaymentId = 0;
-    try {
-      parsedPaymentId =
-          int.parse(transactionId.replaceAll(RegExp(r'[^0-9]'), ''));
-    } catch (e) {
-      debugPrint('[PaymentService] ID parse hatası (collection): $e');
-    }
-
+    // NOT: DomainEvent.aggregateId eski legacy int alanıdır ve hiçbir listener
+    // tarafından kullanılmıyor. Gerçek UUID'ler metadata içinde taşınıyor.
     _eventPublisher.publish(PaymentRecordedEvent(
-      paymentId: parsedPaymentId,
+      paymentId: 0,
       customerId: 0,
       amount: amount,
+      metadata: {'customer_uuid': customerId},
     ));
 
     // Fetch updated customer to compute remaining debt for the domain event

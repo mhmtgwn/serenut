@@ -204,8 +204,14 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const devicesRes = await pgPool.query(
-      `SELECT id, device_hash, name, status, last_active_at, created_at
-       FROM devices WHERE company_id = $1 ORDER BY created_at DESC`,
+      `SELECT activation.id, activation.device_hash, activation.device_name AS name,
+              activation.platform, activation.status, activation.last_seen_at,
+              activation.activated_at AS created_at, runtime.current_version,
+              runtime.channel, runtime.last_reported_at
+       FROM device_activations activation
+       LEFT JOIN device_runtime_state runtime ON runtime.device_activation_id = activation.id
+       WHERE activation.company_id = $1
+       ORDER BY activation.last_seen_at DESC NULLS LAST, activation.activated_at DESC`,
       [user.company_id]
     );
     return res.json(devicesRes.rows);

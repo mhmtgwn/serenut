@@ -1,10 +1,8 @@
 // test/unit/update_v2/journal_writer_test.dart
 // Serenut Platform — Journal Writer & Reader Unit Tests
 
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:serenutos/domain/models/update_v2/journal_record.dart';
 import 'package:serenutos/infrastructure/services/update_v2/journal_writer.dart';
 import 'package:serenutos/infrastructure/services/update_v2/journal_reader.dart';
 

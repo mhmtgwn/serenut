@@ -105,8 +105,12 @@ async function runUatSuite() {
 
     // 6. Test Billing Scheduler Queuing
     try {
-      // Check BullMQ definitions mock
-      report('UAT-06: BullMQ Billing Scheduler Cascade Queues', true);
+      const { getBillingQueue } = require('../workers/billing.scheduler');
+      const { getNotificationQueue } = require('../workers/notification.worker');
+      const billingQueue = getBillingQueue();
+      const notificationQueue = getNotificationQueue();
+      const isValid = billingQueue !== null && notificationQueue !== null;
+      report('UAT-06: BullMQ Billing Scheduler Cascade Queues', isValid);
     } catch (_) {
       report('UAT-06: BullMQ Billing Scheduler Cascade Queues', false);
     }

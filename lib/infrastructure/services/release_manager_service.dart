@@ -149,7 +149,7 @@ class ReleaseManagerService {
         'current_version': currentVersion,
         'platform': platform,
         'channel': _config.releaseChannel,
-        if (deviceId != null) 'device_id': deviceId,
+        if (deviceId != null) 'device_activation_id': deviceId,
         if (companyId != null) 'company_id': companyId,
       };
 
@@ -233,10 +233,10 @@ class ReleaseManagerService {
       final origin =
           '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
       fullUrl =
-          '$origin$downloadPath${deviceId != null ? "?device_id=$deviceId" : ""}';
+          '$origin$downloadPath${deviceId != null ? "?device_activation_id=$deviceId" : ""}';
     } else {
       fullUrl = '${_config.apiBaseUrl}${_config.releaseEndpoint}$downloadPath'
-          '${deviceId != null ? "?device_id=$deviceId" : ""}';
+          '${deviceId != null ? "?device_activation_id=$deviceId" : ""}';
     }
 
     final request = http.Request('GET', Uri.parse(fullUrl));
@@ -413,7 +413,7 @@ class ReleaseManagerService {
               'Authorization': 'Bearer $jwtToken',
             },
             body: jsonEncode({
-              'device_id': deviceId,
+              'device_activation_id': deviceId,
               'platform': platform,
               'current_version': currentVersion,
               'channel': _config.releaseChannel,

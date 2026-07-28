@@ -34,9 +34,6 @@ class MockUserRepository implements IUserRepository {
   Future<void> updateLastLogin(String userId) async {}
 
   @override
-  Future<void> createUser(AuthUser user, String passwordHash) async {}
-
-  @override
   Future<void> updatePasswordHash(String userId, String newHash) async {}
 
   @override
@@ -104,7 +101,7 @@ void main() {
           return const ApiResponse(
             statusCode: 200,
             body:
-                '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
+                '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "company_id": "company-test", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
             headers: {},
           );
         }
@@ -130,13 +127,39 @@ void main() {
           prefs.getString('auth_jwt_token'), startsWith('jwt_mock_admin_id_'));
     });
 
+    test('Rejects online login when server denies device activation', () async {
+      apiClient.mockHandler = (request) {
+        if (request.url.path.contains('/auth/login')) {
+          return const ApiResponse(
+            statusCode: 200,
+            body:
+                '{"access_token":"jwt_mock","refresh_token":"refresh","user":{"id":"admin_id","company_id":"company-test","name":"Admin User","email":"admin@serenut.com","role":"admin"}}',
+            headers: {},
+          );
+        }
+        if (request.url.path.contains('/auth/session-bootstrap')) {
+          return const ApiResponse(
+            statusCode: 409,
+            body: '{"error":"device_limit_exceeded"}',
+            headers: {},
+          );
+        }
+        return const ApiResponse(statusCode: 404, body: '{}', headers: {});
+      };
+
+      await expectLater(
+        authService.login('admin@serenut.com', 'admin123'),
+        throwsA(isA<AuthException>()),
+      );
+    });
+
     test('Clears JWT token on logout', () async {
       apiClient.mockHandler = (request) {
         if (request.url.path.contains('/auth/login')) {
           return const ApiResponse(
             statusCode: 200,
             body:
-                '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
+                '{"access_token": "jwt_mock_admin_id_xyz", "refresh_token": "mock_refresh", "user": {"id": "admin_id", "company_id": "company-test", "name": "Admin User", "email": "admin@serenut.com", "role": "admin"}}',
             headers: {},
           );
         }
@@ -194,7 +217,7 @@ void main() {
         return const ApiResponse(
           statusCode: 200,
           body:
-              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid", "name": "Test User", "email": "test@serenut.com", "role": "unknown_role_typo"}}',
+              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid", "company_id": "company-test", "name": "Test User", "email": "test@serenut.com", "role": "unknown_role_typo"}}',
           headers: {},
         );
       };
@@ -209,7 +232,7 @@ void main() {
         return const ApiResponse(
           statusCode: 200,
           body:
-              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid1", "name": "Owner User", "email": "owner@serenut.com", "role": "owner"}}',
+              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid1", "company_id": "company-test", "name": "Owner User", "email": "owner@serenut.com", "role": "owner"}}',
           headers: {},
         );
       };
@@ -222,7 +245,7 @@ void main() {
         return const ApiResponse(
           statusCode: 200,
           body:
-              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid2", "name": "Sysadmin User", "email": "sysadmin@serenut.com", "role": "sysadmin"}}',
+              '{"access_token": "mock_jwt", "refresh_token": "mock_refresh", "user": {"id": "uid2", "company_id": "company-test", "name": "Sysadmin User", "email": "sysadmin@serenut.com", "role": "sysadmin"}}',
           headers: {},
         );
       };

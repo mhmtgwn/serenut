@@ -33,7 +33,7 @@ void main() {
       );
 
       final labelIp = settings.labelPrinterIp ?? '';
-      final labelPort = settings.labelPrinterPort ?? 9100;
+      final labelPort = settings.labelPrinterPort;
 
       // Simulate copyWith logic in our updated pages
       final labelSettings = settings.copyWith(

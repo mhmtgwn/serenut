@@ -44,32 +44,18 @@ class SqliteSaleRepository implements ISaleRepository {
 
   @override
   Future<List<SaleEntity>> findAll() async {
-    List<Map<String, dynamic>> rows;
-    try {
-      rows = await _executor.query('sales',
-          where: 'is_deleted = 0 OR is_deleted IS NULL');
-    } catch (_) {
-      rows = await _executor.query('sales');
-    }
+    final rows = await _executor.query('sales',
+        where: 'is_deleted = 0 OR is_deleted IS NULL');
     return _enrichSales(rows);
   }
 
   @override
   Future<SaleEntity?> findByIdempotencyKey(String key) async {
-    List<Map<String, dynamic>> rows;
-    try {
-      rows = await _executor.query(
-        'sales',
-        where: 'idempotency_key = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
-        whereArgs: [key],
-      );
-    } catch (_) {
-      rows = await _executor.query(
-        'sales',
-        where: 'idempotency_key = ?',
-        whereArgs: [key],
-      );
-    }
+    final rows = await _executor.query(
+      'sales',
+      where: 'idempotency_key = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+      whereArgs: [key],
+    );
     if (rows.isEmpty) return null;
 
     final sale = SaleEntity.fromMap(rows.first);
@@ -85,20 +71,11 @@ class SqliteSaleRepository implements ISaleRepository {
 
   @override
   Future<SaleEntity?> findById(dynamic id) async {
-    List<Map<String, dynamic>> rows;
-    try {
-      rows = await _executor.query(
-        'sales',
-        where: 'id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
-        whereArgs: [id],
-      );
-    } catch (_) {
-      rows = await _executor.query(
-        'sales',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-    }
+    final rows = await _executor.query(
+      'sales',
+      where: 'id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+      whereArgs: [id],
+    );
     if (rows.isEmpty) return null;
 
     final sale = SaleEntity.fromMap(rows.first);

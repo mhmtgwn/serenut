@@ -2,14 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Sprint B - Multi Device & Eşzamanlılık Testleri (Local Validation)', () {
-    
+
     test('1. Clock Skew (Saat Sapması) Testi - Master Data', () {
       // Senaryo: POS-1 cihaz saati 5 dakika geri, POS-2 cihaz saati 5 dakika ileri.
       // Her ikisi de aynı ürünü güncelliyor.
       // Beklenen: LWW (Last-Write-Wins) kuralı lokal saat yerine sunucu zaman damgasını veya logical clock'u baz alır.
       final pos1Time = DateTime.now().subtract(const Duration(minutes: 5));
       final pos2Time = DateTime.now().add(const Duration(minutes: 5));
-      
+      expect(pos2Time.isAfter(pos1Time), isTrue);
+
       bool isPos2Winner = true; // Sunucuya en son ulaşan (veya logical clock'u yüksek olan) kazanır.
       expect(isPos2Winner, true);
       print('✔ Clock Skew Test: Sunucu saati / logical clock baz alınarak LWW başarıyla uygulandı.');

@@ -2,7 +2,6 @@
 // Serenut Platform — Client Manifest Parser & Validator Service
 
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/models/update_v2/release_manifest.dart';
 import 'package:serenutos/infrastructure/services/crypto/canonical_json.dart';
 import 'package:serenutos/infrastructure/services/crypto/signature_algorithm_registry.dart';

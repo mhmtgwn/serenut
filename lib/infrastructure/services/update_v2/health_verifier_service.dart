@@ -8,6 +8,10 @@ abstract class SqliteHealthCheck {
   Future<bool> verifyIntegrity();
 }
 
+abstract class SqliteWalHealthCheck {
+  Future<bool> verifyWalJournal();
+}
+
 abstract class NetworkHealthCheck {
   Future<bool> verifyVpsConnection();
 }
@@ -18,14 +22,17 @@ abstract class UiHealthCheck {
 
 class HealthVerifierService {
   final SqliteHealthCheck _sqliteCheck;
+  final SqliteWalHealthCheck? _walCheck;
   final NetworkHealthCheck _networkCheck;
   final UiHealthCheck _uiCheck;
 
   HealthVerifierService({
     required SqliteHealthCheck sqliteCheck,
+    SqliteWalHealthCheck? walCheck,
     required NetworkHealthCheck networkCheck,
     required UiHealthCheck uiCheck,
   })  : _sqliteCheck = sqliteCheck,
+        _walCheck = walCheck,
         _networkCheck = networkCheck,
         _uiCheck = uiCheck;
 
@@ -40,32 +47,43 @@ class HealthVerifierService {
     try {
       final sqlitePassed = await _sqliteCheck.verifyIntegrity();
       if (sqlitePassed) passedSteps++;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[HealthVerifier] Step 1 SQLite Integrity failed: $e');
+    }
 
     // Step 2: SQLite Write-Ahead Logging (WAL) Check
     totalSteps++;
     try {
-      final sqlitePassed = await _sqliteCheck.verifyIntegrity();
-      if (sqlitePassed) passedSteps++;
-    } catch (_) {}
+      final walPassed = _walCheck != null
+          ? await _walCheck!.verifyWalJournal()
+          : await _sqliteCheck.verifyIntegrity();
+      if (walPassed) passedSteps++;
+    } catch (e) {
+      debugPrint('[HealthVerifier] Step 2 SQLite WAL check failed: $e');
+    }
 
     // Step 3: VPS Server WebSocket Connection Check
     totalSteps++;
     try {
       final vpsPassed = await _networkCheck.verifyVpsConnection();
       if (vpsPassed) passedSteps++;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[HealthVerifier] Step 3 Network check failed: $e');
+    }
 
     // Step 4: UI Engine Response Initialization
     totalSteps++;
     try {
       final uiPassed = await _uiCheck.verifyUiInitialized();
       if (uiPassed) passedSteps++;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[HealthVerifier] Step 4 UI check failed: $e');
+    }
 
     if (totalSteps == 0) return true;
     final double score = passedSteps / totalSteps;
-    debugPrint('[HealthVerifier] Completed 5-step check. Score: $score (Passed: $passedSteps/$totalSteps)');
+    debugPrint(
+        '[HealthVerifier] Completed 5-step check. Score: $score (Passed: $passedSteps/$totalSteps)');
 
     return score >= 0.95;
   }

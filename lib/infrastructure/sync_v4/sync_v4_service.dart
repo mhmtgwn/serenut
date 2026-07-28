@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/domain/services/device_manager.dart';
+import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 
@@ -22,13 +24,20 @@ class SyncV4Result {
 /// Crash-safe, cursor based replication. WebSocket is deliberately optional:
 /// correctness comes from this pull loop, not from a live connection.
 class SyncV4Service {
-  SyncV4Service(this._api);
+  SyncV4Service(
+    this._api, {
+    Future<String> Function()? deviceActivationIdResolver,
+    Future<String> Function()? deviceIdResolver,
+  })  : _deviceActivationIdResolver = deviceActivationIdResolver,
+        _deviceIdResolver = deviceIdResolver;
   final ApiClient _api;
-  static const _deviceKey = 'sync_v4_device_id';
+  final Future<String> Function()? _deviceActivationIdResolver;
+  final Future<String> Function()? _deviceIdResolver;
   static const _legacySnapshotKey = 'sync_v4_legacy_snapshot_v1';
 
   Future<SyncV4Result> sync() async {
     final db = await DatabaseManager().getDatabase();
+    final deviceActivationId = await _deviceActivationId();
     final deviceId = await _deviceId();
     await _snapshotPreV4DataOnce(db);
     await db.rawUpdate(
@@ -44,6 +53,7 @@ class SyncV4Service {
       try {
         final response = await _api.send('POST', '/api/v4/sync/push',
             body: {
+              'device_activation_id': deviceActivationId,
               'device_id': deviceId,
               'mutations': orderedPending
                   .map((r) => {
@@ -77,9 +87,34 @@ class SyncV4Service {
     }
     final state = await db.query('sync_cursor_v4',
         where: 'key = ?', whereArgs: ['global'], limit: 1);
-    final cursor = state.isEmpty ? 0 : (state.first['cursor'] as num).toInt();
+    var cursor = state.isEmpty ? 0 : (state.first['cursor'] as num).toInt();
+
+    // A fresh installation cannot reconstruct a tenant from a change log that
+    // started after the tenant's original records were created. Hydrate from
+    // the server's canonical domain snapshot once, then continue cursor pulls.
+    if (state.isEmpty) {
+      final bootstrap = await _api.get(
+        '/api/v4/sync/bootstrap?device_activation_id=$deviceActivationId&device_id=$deviceId',
+      );
+      final bootstrapBody = Map<String, dynamic>.from(bootstrap.json as Map);
+      final snapshot = _dependencyOrder(
+        ((bootstrapBody['changes'] as List?) ?? const [])
+            .map((value) => Map<String, dynamic>.from(value as Map))
+            .toList(),
+      );
+      await db.transaction((txn) async {
+        for (final raw in snapshot) {
+          await _apply(txn, raw);
+        }
+        cursor = (bootstrapBody['next_cursor'] as num?)?.toInt() ?? 0;
+        await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': cursor},
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      });
+    }
     final response =
-        await _api.get('/api/v4/sync/pull?cursor=$cursor&limit=200');
+        await _api.get(
+          '/api/v4/sync/pull?cursor=$cursor&limit=200&device_activation_id=$deviceActivationId&device_id=$deviceId',
+        );
     final pullBody = Map<String, dynamic>.from(response.json as Map);
     final changes = _dependencyOrder(
       ((pullBody['changes'] as List?) ?? const [])
@@ -235,13 +270,20 @@ class SyncV4Service {
   }
 
   Future<String> _deviceId() async {
+    final resolver = _deviceIdResolver;
+    if (resolver != null) return resolver();
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_deviceKey) ?? await _createDeviceId(prefs);
+    return DeviceManager.resolveDeviceId(prefs);
   }
 
-  Future<String> _createDeviceId(SharedPreferences prefs) async {
-    final id = const Uuid().v4();
-    await prefs.setString(_deviceKey, id);
-    return id;
+  Future<String> _deviceActivationId() async {
+    final resolver = _deviceActivationIdResolver;
+    if (resolver != null) return resolver();
+    final prefs = await SharedPreferences.getInstance();
+    final activationId = LicenseService(prefs).getLicenseInfo()?.activationId;
+    if (activationId == null || activationId.isEmpty) {
+      throw StateError('active_device_activation_required');
+    }
+    return activationId;
   }
 }

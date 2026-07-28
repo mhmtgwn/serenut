@@ -188,7 +188,6 @@ void main() {
     test(
         'DataIntegrityService explainCustomerBalance calculations are mathematically correct',
         () async {
-      final gateway = DbGatewayImpl.raw(db);
       final integrityService = DataIntegrityService(
         customerRepository: sqliteCustomerRepo,
         transactionRepository: sqliteTransactionRepo,

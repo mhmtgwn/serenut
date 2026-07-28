@@ -2,7 +2,8 @@
 // PHASE 0 Day 3 - Repository Dependency Injection
 // Riverpod providers for repository access
 // Generated: 21 Jun 2026
-// Strategy: Mock implementation (Phase 1) → Real SQLite (Phase 6+)
+// Production repositories are SQLite-first. Cross-device replication is owned
+// exclusively by Sync V4's transactional outbox and cursor pull loop.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -13,10 +14,6 @@ import 'package:serenutos/infrastructure/repositories/sqlite_report_repository.d
 import 'package:serenutos/domain/services/report_service.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
 import 'package:serenutos/domain/services/dashboard_service.dart';
-import 'package:serenutos/infrastructure/datasources/remote_data_sources.dart';
-import 'package:serenutos/infrastructure/repositories/cloud_adaptive_product_repository.dart';
-import 'package:serenutos/infrastructure/repositories/cloud_adaptive_customer_repository.dart';
-import 'package:serenutos/infrastructure/repositories/cloud_adaptive_sale_repository.dart';
 import 'package:serenutos/domain/services/customer_search_service.dart';
 
 // ── Late Sprint Imports (Sprint 7, 8, 9, 10) ──
@@ -32,38 +29,16 @@ import 'package:serenutos/providers/service_providers.dart';
 // Riverpod Providers
 // ════════════════════════════════════════════════════════════
 
-// ── Remote Data Source Providers ──
-final productRemoteDataSourceProvider =
-    Provider<ProductRemoteDataSource>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return CloudProductRemoteDataSource(apiClient);
-});
-
-final customerRemoteDataSourceProvider =
-    Provider<CustomerRemoteDataSource>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return CloudCustomerRemoteDataSource(apiClient);
-});
-
-final salesRemoteDataSourceProvider = Provider<SalesRemoteDataSource>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return CloudSalesRemoteDataSource(apiClient);
-});
-
 // ── Repository Providers ──
 final productRepositoryProvider =
     FutureProvider<IProductRepository>((ref) async {
-  final localRepo = SqliteProductRepository(
+  return SqliteProductRepository(
       ref.watch(dbGatewayProvider), ref.watch(datasetLoaderServiceProvider));
-  final remoteDS = ref.watch(productRemoteDataSourceProvider);
-  return CloudAdaptiveProductRepository(localRepo, remoteDS);
 });
 
 final customerRepositoryProvider =
     FutureProvider<ICustomerRepository>((ref) async {
-  final localRepo = SqliteCustomerRepository(ref.watch(dbGatewayProvider));
-  final remoteDS = ref.watch(customerRemoteDataSourceProvider);
-  return CloudAdaptiveCustomerRepository(localRepo, remoteDS);
+  return SqliteCustomerRepository(ref.watch(dbGatewayProvider));
 });
 
 final customerSearchServiceProvider =
@@ -73,9 +48,7 @@ final customerSearchServiceProvider =
 });
 
 final saleRepositoryProvider = FutureProvider<ISaleRepository>((ref) async {
-  final localRepo = SqliteSaleRepository(ref.watch(dbGatewayProvider));
-  final remoteDS = ref.watch(salesRemoteDataSourceProvider);
-  return CloudAdaptiveSaleRepository(localRepo, remoteDS);
+  return SqliteSaleRepository(ref.watch(dbGatewayProvider));
 });
 
 final financialTransactionRepositoryProvider =

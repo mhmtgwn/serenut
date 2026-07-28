@@ -4,7 +4,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:serenutos/domain/models/update_v2/journal_record.dart';
 
 abstract class JournalWriter {

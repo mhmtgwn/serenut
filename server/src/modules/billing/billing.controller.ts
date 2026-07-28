@@ -402,7 +402,7 @@ router.put('/plans/:id', authenticateUser, requireRole('sysadmin'), async (req: 
  * @openapi
  * /api/v1/billing/subscribe:
  *   post:
- *     summary: Start a mockup Stripe/iyzico checkout session
+ *     summary: Start an Iyzico checkout session
  *     security:
  *       - BearerAuth: []
  */

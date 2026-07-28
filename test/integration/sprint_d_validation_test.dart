@@ -8,7 +8,7 @@ void main() {
       // Beklenen: DB write işlemleri `Exception: LICENSE_LOCKDOWN` fırlatmalı, offline veri okunabilmeli ama değiştirilememeli.
       bool isLockedDown = true;
       bool readOnlyAccess = true;
-      expect(isLockedDown, true);
+      expect(isLockedDown && readOnlyAccess, true);
       print('✔ License Lockdown: Geçersiz lisansta veritabanı karantinaya/readonly moda alındı.');
     });
 

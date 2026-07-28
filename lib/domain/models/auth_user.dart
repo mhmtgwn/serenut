@@ -19,7 +19,7 @@ class AuthUser {
 
   const AuthUser({
     required this.id,
-    this.companyId = 'TEST_COMPANY',
+    this.companyId = '',
     required this.name,
     required this.email,
     this.username,
@@ -60,7 +60,7 @@ class AuthUser {
   /// Deserialization from SharedPreferences
   factory AuthUser.fromMap(Map<String, dynamic> map) => AuthUser(
         id: map['id'] as String,
-        companyId: map['companyId'] as String? ?? 'TEST_COMPANY',
+        companyId: map['companyId'] as String? ?? '',
         name: map['name'] as String,
         email: map['email'] as String? ?? '',
         username: map['username'] as String?,

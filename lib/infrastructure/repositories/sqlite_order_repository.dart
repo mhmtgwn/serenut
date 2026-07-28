@@ -43,33 +43,19 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<List<OrderEntity>> findAll() async {
-    try {
-      final rows = await _executor.query('orders',
-          where: 'is_deleted = 0 OR is_deleted IS NULL',
-          orderBy: 'created_at DESC');
-      return _enrichOrders(rows);
-    } catch (_) {
-      final rows = await _executor.query('orders', orderBy: 'created_at DESC');
-      return _enrichOrders(rows);
-    }
+    final rows = await _executor.query('orders',
+        where: 'is_deleted = 0 OR is_deleted IS NULL',
+        orderBy: 'created_at DESC');
+    return _enrichOrders(rows);
   }
 
   @override
   Future<OrderEntity?> findById(dynamic id) async {
-    List<Map<String, dynamic>> rows;
-    try {
-      rows = await _executor.query(
-        'orders',
-        where: 'id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
-        whereArgs: [id],
-      );
-    } catch (_) {
-      rows = await _executor.query(
-        'orders',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-    }
+    final rows = await _executor.query(
+      'orders',
+      where: 'id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+      whereArgs: [id],
+    );
     if (rows.isEmpty) return null;
     final itemRows = await _executor
         .query('order_items', where: 'order_id = ?', whereArgs: [id]);

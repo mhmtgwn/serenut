@@ -5,6 +5,7 @@
 
 import { pgPool } from '../../config/database';
 import { logger } from '../../config/logger';
+import { enqueueNotification } from '../../workers/notification.worker';
 
 async function runBypassingRLS(sql: string, params: any[] = []) {
   const client = await pgPool.connect();
@@ -44,8 +45,8 @@ export async function executeBillingCron(): Promise<void> {
         logger.info(`Suspending auto-cancelled subscription for company: ${sub.company_id}`);
         await suspendSubscription(sub.company_id, sub.id);
       } else {
-        // Attempt simulated payment renewal
-        const paymentSuccess = await simulateMockupPayment(sub.company_id, parseFloat(sub.price));
+        // Attempt subscription payment renewal via saved card token or gateway
+        const paymentSuccess = await processSubscriptionRenewal(sub.company_id, sub.id, parseFloat(sub.price));
         
         if (paymentSuccess) {
           logger.info(`Successfully renewed subscription for company: ${sub.company_id}`);
@@ -100,11 +101,14 @@ export async function executeBillingCron(): Promise<void> {
               WHERE id = $2
             `, [graceUntil, sub.id]);
 
-            // Log warning/incident via SMS gateway logs mock
-            await graceClient.query(`
-              INSERT INTO sms_logs (id, company_id, phone, message, status)
-              VALUES ($1, $2, 'sys', 'Abonelik yenileme ödemeniz başarısız oldu. Son 7 gün tolerans süreniz.', 'sent')
-            `, [`sms-${Date.now()}-${Math.floor(Math.random()*1000)}`, sub.company_id]);
+            // Enqueue notification for billing failure alert via BullMQ worker
+            await enqueueNotification({
+              notification_id: `billing-renewal-${sub.id}-${Date.now()}`,
+              company_id: sub.company_id,
+              channel: 'sms',
+              recipient: 'tenant_admin',
+              body: 'Abonelik yenileme ödemeniz başarısız oldu. Son 7 gün tolerans süreniz başladı.'
+            });
 
             await graceClient.query('COMMIT');
           } catch (txnErr) {
@@ -164,18 +168,29 @@ async function suspendSubscription(companyId: string, subscriptionId: string) {
   }
 }
 
-// Mock payment helper
-async function simulateMockupPayment(companyId: string, amount: number): Promise<boolean> {
-  if (process.env.NODE_ENV === 'production') {
-    // In production, mockup automatic recurring payment fails since real charging is not implemented yet
-    logger.warn(`Billing renewal blocked: Mock payment is disabled in production for company ${companyId}`);
+// Real payment renewal helper
+async function processSubscriptionRenewal(companyId: string, subscriptionId: string, amount: number): Promise<boolean> {
+  const client = await pgPool.connect();
+  try {
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const cardTokenRes = await client.query(
+      `SELECT card_token FROM payment_methods WHERE company_id = $1 AND is_default = true LIMIT 1`,
+      [companyId]
+    );
+
+    if (cardTokenRes.rows.length === 0) {
+      logger.warn(`Billing renewal skipped: No valid default payment method found for company ${companyId}`);
+      return false;
+    }
+
+    // The configured gateway has no verified saved-card/recurring contract.
+    // Fail closed into grace period rather than simulating a successful renewal.
+    logger.warn(`Billing renewal requires a verified recurring gateway for company ${companyId}`);
     return false;
+  } catch (err: any) {
+    logger.error(`Subscription renewal charge failed for company ${companyId}: ${err.message}`);
+    return false;
+  } finally {
+    client.release();
   }
-  // If company tax number ends in 9, simulate payment failure for verification tests
-  const res = await runBypassingRLS('SELECT tax_number FROM companies WHERE id = $1', [companyId]);
-  if (res.rows.length > 0) {
-    const tax = res.rows[0].tax_number;
-    if (tax.endsWith('9')) return false;
-  }
-  return true;
 }

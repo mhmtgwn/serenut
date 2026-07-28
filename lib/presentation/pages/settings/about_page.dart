@@ -144,7 +144,7 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         releaseManager: ref.read(releaseManagerServiceProvider),
         platform: Platform.isAndroid ? 'android' : 'windows',
         jwtToken: ref.read(authServiceProvider).getJwtToken(),
-        deviceId: null,
+        deviceId: ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
       );
     } catch (error) {
       if (mounted) setState(() => _lastResult = 'Kontrol başarısız: $error');

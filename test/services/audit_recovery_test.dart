@@ -15,7 +15,6 @@ void main() {
   databaseFactory = databaseFactoryFfi;
 
   group('Audit Center & Recovery Center Integration Tests', () {
-    late Database db;
     late DatabaseManager databaseManager;
     late SqliteAuditRepository auditRepo;
     late SqliteRecoveryRepository recoveryRepo;
@@ -25,7 +24,7 @@ void main() {
     setUp(() async {
       DatabaseManager.overrideDatabasePath = inMemoryDatabasePath;
       databaseManager = DatabaseManager();
-      db = await databaseManager.getDatabase();
+      await databaseManager.getDatabase();
 
       auditRepo = SqliteAuditRepository(databaseManager);
       recoveryRepo = SqliteRecoveryRepository(databaseManager);

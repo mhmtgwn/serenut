@@ -50,7 +50,12 @@ class TrialManager {
     _prefs.setInt(_lastClockKey, nowMs);
 
     final sub = _getCache();
-    if (sub == null) {
+    final verifiedAt = _prefs.getInt(_verifiedAtKey);
+    final maxCacheAge = const Duration(days: 30).inMilliseconds;
+    if (sub == null ||
+        verifiedAt == null ||
+        verifiedAt > nowMs ||
+        nowMs - verifiedAt > maxCacheAge) {
       return EntitlementState.unknown;
     }
 
@@ -91,14 +96,6 @@ class TrialManager {
   String getSubscriptionStatus() {
     final sub = _getCache();
     return sub?['status'] as String? ?? 'unknown';
-  }
-
-  bool _wasRecentlyVerified() {
-    final verifiedAt = _prefs.getInt(_verifiedAtKey);
-    if (verifiedAt == null) return true; // Default to trusting cached dates if set
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    return now >= verifiedAt &&
-        now - verifiedAt <= const Duration(days: 30).inMilliseconds;
   }
 
   /// Returns true ONLY if subscription is in trial status ('trialing' or 'trial')
@@ -181,8 +178,4 @@ class TrialManager {
     return null;
   }
 
-  // No-op for backwards compatibility during transition
-  void setDbCallbacks({required dynamic loader, required dynamic saver}) {}
-  Future<void> startTrial(DateTime startDate) async {}
-  Future<void> initTrialIfNeeded() async {}
 }

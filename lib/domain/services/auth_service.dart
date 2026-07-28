@@ -112,6 +112,10 @@ class AuthService {
           final token = data['access_token'] as String;
           final refreshToken = data['refresh_token'] as String;
           final userMap = data['user'] as Map<String, dynamic>;
+          final companyId = userMap['company_id'] as String?;
+          if (companyId == null || companyId.trim().isEmpty) {
+            throw AuthException('Sunucu oturumunda şirket kimliği eksik. Giriş reddedildi.');
+          }
 
           await _prefs.setString('auth_jwt_token', token);
           await _prefs.setString('auth_refresh_token', refreshToken);
@@ -135,7 +139,7 @@ class AuthService {
 
           final user = AuthUser(
             id: userMap['id'] as String,
-            companyId: userMap['company_id'] as String? ?? 'TEST_COMPANY',
+            companyId: companyId,
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
@@ -148,25 +152,7 @@ class AuthService {
                     DateTime.now(),
           );
 
-          // PHASE 3: Device Lifecycle - Auto Activate
-          try {
-            if (!kIsWeb) {
-              // The signed license token, its heartbeat and device activation
-              // must all refer to the same durable device identity.
-              final deviceId = _licenseService?.getDeviceUuid() ??
-                  _deviceManager.getDeviceId();
-              final deviceName = 'POS Cihazı - $deviceId';
-              final activation =
-                  await _apiClient!.post('/licenses/auto-activate', {
-                'device_hash': deviceId,
-                'device_name': deviceName,
-              });
-              await _cacheLicenseActivation(activation.json);
-            }
-          } catch (e) {
-            debugPrint(
-                'Auto-activation failed, device might already be active or limit reached: $e');
-          }
+          await _bootstrapAuthenticatedSession();
 
           // Cache credentials in local sqlite for offline login
           try {
@@ -187,6 +173,7 @@ class AuthService {
           return user;
         }
       } catch (e) {
+        if (e is AuthException) rethrow;
         if (e is ApiException) {
           if (e.statusCode == 400 ||
               e.statusCode == 401 ||
@@ -259,15 +246,79 @@ class AuthService {
     throw AuthException('Kullanıcı adı veya şifre hatalı.');
   }
 
-  Future<void> _cacheLicenseActivation(dynamic responseJson) async {
+  Future<void> _bootstrapAuthenticatedSession() async {
+    if (_apiClient == null) return;
+    final body = <String, dynamic>{};
+    if (!kIsWeb) {
+      final deviceId = _licenseService?.getDeviceUuid() ??
+          _deviceManager.getDeviceId();
+      body['device_hash'] = deviceId;
+      body['device_name'] = 'POS Cihazı - $deviceId';
+    }
+    try {
+      final response = await _apiClient!.post('/auth/session-bootstrap', body);
+      if (!response.isSuccess) {
+        final payload = response.json;
+        final error = payload is Map<String, dynamic>
+            ? payload['error']
+            : null;
+        final message = error is Map<String, dynamic>
+            ? error['message']?.toString()
+            : payload is Map<String, dynamic>
+                ? payload['message']?.toString()
+                : null;
+        throw AuthException(
+          message ?? 'Cihaz aktivasyonu veya lisans doğrulaması reddedildi.',
+        );
+      }
+      final payload = response.json as Map<String, dynamic>;
+      final subscription = payload['subscription'] as Map<String, dynamic>?;
+      if (subscription != null) {
+        await TrialManager(_prefs).cacheSubscription(subscription);
+      }
+      await _cacheLicenseActivation(
+        payload['activation'],
+        licenseKey: payload['license_key'] as String?,
+      );
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      if (e is ApiException && (e.statusCode == 403 || e.statusCode == 409)) {
+        String message = 'Cihaz aktivasyonu veya lisans doğrulaması reddedildi.';
+        final body = e.responseBody;
+        if (body != null) {
+          try {
+            final payload = jsonDecode(body) as Map<String, dynamic>;
+            final error = payload['error'];
+            message = error is Map<String, dynamic>
+                ? error['message']?.toString() ?? message
+                : payload['message']?.toString() ?? error?.toString() ?? message;
+          } catch (_) {}
+        }
+        throw AuthException(message);
+      }
+      // Login remains usable offline, but bootstrap state is explicitly retried
+      // by the next authenticated session/sync recovery attempt.
+      debugPrint('Session bootstrap failed: $e');
+    }
+  }
+
+  Future<void> _cacheLicenseActivation(dynamic responseJson, {String? licenseKey}) async {
     final licenseService = _licenseService;
     if (licenseService == null || responseJson is! Map<String, dynamic>) return;
+    if (!licenseService.hasVerificationKey) {
+      throw AuthException(
+        'Bu uygulama sürümü lisans doğrulama anahtarı olmadan derlenmiş. '
+        'Güvenli güncelleme paketi yüklenmelidir.',
+      );
+    }
     final licenseInfo = responseJson['license_info'] as Map<String, dynamic>?;
     final signature = responseJson['signature'] as String?;
     if (licenseInfo == null || signature == null || signature.isEmpty) return;
 
     final tokenMap = <String, dynamic>{
       'merchant_id': licenseInfo['merchant_id'],
+      if (licenseInfo.containsKey('activation_id'))
+        'activation_id': licenseInfo['activation_id'],
       'device_id': licenseInfo['device_id'],
       'device_token_version': licenseInfo['device_token_version'] ?? 1,
       'expiry_date': licenseInfo['expiry_date'],
@@ -277,11 +328,11 @@ class AuthService {
       'signature': signature,
     };
     final token = base64.encode(utf8.encode(jsonEncode(tokenMap)));
-    final saved = await licenseService.saveLicenseToken(token);
-    if (saved && _apiClient != null) {
-      // Fetch and persist the canonical key, then validate the signed token via
-      // heartbeat so offline startup has a complete license cache.
-      await licenseService.syncLicenseFromServer(_apiClient!);
+    final saved = await licenseService.saveLicenseToken(token, licenseKey);
+    if (!saved) {
+      throw AuthException('Sunucunun lisans imzası doğrulanamadı.');
+    }
+    if (_apiClient != null) {
       licenseService.startHeartbeat(_apiClient!);
     }
   }
@@ -309,6 +360,10 @@ class AuthService {
           final refreshToken =
               (data['refresh_token'] ?? data['refreshToken']) as String;
           final userMap = data['user'] as Map<String, dynamic>;
+          final companyId = userMap['company_id'] as String?;
+          if (companyId == null || companyId.trim().isEmpty) {
+            throw AuthException('Sunucu oturumunda şirket kimliği eksik. Giriş reddedildi.');
+          }
 
           await _prefs.setString('auth_jwt_token', token);
           await _prefs.setString('auth_refresh_token', refreshToken);
@@ -329,7 +384,7 @@ class AuthService {
 
           final user = AuthUser(
             id: userMap['id'] as String,
-            companyId: userMap['company_id'] as String? ?? 'TEST_COMPANY',
+            companyId: companyId,
             name: userMap['name'] as String,
             email: userMap['email'] as String? ?? '',
             role: role,
@@ -339,6 +394,8 @@ class AuthService {
                 getPermissionsForRole(role),
             createdAt: DateTime.now(),
           );
+
+          await _bootstrapAuthenticatedSession();
 
           // Cache credentials in local sqlite for offline login
           try {
@@ -370,6 +427,7 @@ class AuthService {
           return user;
         }
       } catch (e) {
+        if (e is AuthException) rethrow;
         if (e is ApiException) {
           if (e.statusCode == 400 ||
               e.statusCode == 401 ||
@@ -701,9 +759,10 @@ class AuthService {
           await trialManager.cacheSubscription(subscription);
         }
 
-        if (_licenseService != null) {
-          await _licenseService!.syncLicenseFromServer(_apiClient!);
-        }
+        // Refresh follows the same server-owned entitlement and device
+        // activation contract as login.  The retired module bootstrap endpoint
+        // could silently return no license and leave a stale activation cached.
+        await _bootstrapAuthenticatedSession();
 
         return true;
       }

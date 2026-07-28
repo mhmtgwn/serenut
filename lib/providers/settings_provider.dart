@@ -1,15 +1,16 @@
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
+import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/controllers/sales_flow_controller.dart'
+    show sharedPreferencesProvider;
 
 /// Riverpod provider for Settings Repository
 final settingsRepositoryProvider =
@@ -124,7 +125,8 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
       final repo = await ref.read(settingsRepositoryProvider.future);
       await repo.updateSettings(settings);
 
-      final prefs = await SharedPreferences.getInstance();
+      // SharedPreferences'i DI üzerinden al (test edilebilirlik için)
+      final prefs = ref.read(sharedPreferencesProvider);
       await prefs.setBool('serenut_pending_company_patch', true);
 
       // Sync company profile with backend (fire-and-forget/non-blocking)

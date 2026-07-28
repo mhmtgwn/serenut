@@ -105,6 +105,16 @@ class SyncNotifier extends StateNotifier<SyncState>
     if (service == null) return;
     if (state.status == SyncStatus.syncing) return;
 
+    // A fresh or offline-only installation has no server activation yet. Its
+    // outbox remains durable, but repeatedly attempting an authorized push
+    // would create a misleading error every 30 seconds.
+    final activationId =
+        _ref.read(licenseServiceProvider).getLicenseInfo()?.activationId;
+    if (activationId == null || activationId.isEmpty) {
+      state = state.copyWith(status: SyncStatus.idle, lastError: null);
+      return;
+    }
+
     state = state.copyWith(status: SyncStatus.syncing);
 
     try {

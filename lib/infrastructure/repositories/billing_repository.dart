@@ -1,7 +1,6 @@
 // lib/infrastructure/repositories/billing_repository.dart
 // Serenut Platform — Billing & Subscription Repository (Sprint 8)
-// Client side interface for plan management, mockup paywall checkout and invoices list.
-// Created: 04 Jul 2026
+// Client side interface for plan management, paywall checkout and invoices list.
 
 import 'dart:convert';
 import 'package:serenutos/config/environment.dart';
@@ -61,46 +60,64 @@ class InvoiceEntry {
       );
 }
 
+class CheckoutSession {
+  final String invoiceId;
+  final String token;
+  final String checkoutFormContent;
+
+  const CheckoutSession({
+    required this.invoiceId,
+    required this.token,
+    required this.checkoutFormContent,
+  });
+
+  factory CheckoutSession.fromJson(Map<String, dynamic> json) => CheckoutSession(
+        invoiceId: json['invoiceId'] as String? ?? '',
+        token: json['token'] as String? ?? '',
+        checkoutFormContent: json['checkoutFormContent'] as String? ?? '',
+      );
+}
+
 class BillingRepository {
   final ApiClient _apiClient;
-  final EnvironmentConfig _config;
-
   BillingRepository({
     ApiClient? apiClient,
     EnvironmentConfig? config,
-  })  : _apiClient = apiClient ?? ApiClient(),
-        _config = config ?? EnvironmentConfig.current;
+  }) : _apiClient = apiClient ?? ApiClient();
 
   /// Fetch list of subscription tiers
   Future<List<BillingPlan>> getPlans() async {
-    final response = await _apiClient.get(
-        '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/plans');
+    final response = await _apiClient.get('/api/v1/billing/plans');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => BillingPlan.fromJson(item)).toList();
   }
 
-  /// Start paywall checkout flow. Returns checkout portal URL.
-  Future<String> startSubscription(String planId) async {
+  /// Starts a real provider checkout session; callers render the returned
+  /// provider form instead of inventing a browser URL.
+  Future<CheckoutSession> startSubscription(String planId,
+      {String billingPeriod = 'monthly'}) async {
     final response = await _apiClient.post(
-      '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/subscribe',
-      {'plan_id': planId},
+      '/api/v1/billing/subscribe',
+      {'plan_id': planId, 'billing_period': billingPeriod},
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return data['checkoutUrl'] as String;
+    final session = CheckoutSession.fromJson(data);
+    if (session.invoiceId.isEmpty || session.token.isEmpty ||
+        session.checkoutFormContent.isEmpty) {
+      throw const FormatException('Geçersiz ödeme sağlayıcı oturumu yanıtı.');
+    }
+    return session;
   }
 
   /// Fetch history of invoices
   Future<List<InvoiceEntry>> getInvoices() async {
-    final response = await _apiClient.get(
-        '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/invoices');
+    final response = await _apiClient.get('/api/v1/billing/invoices');
     final list = jsonDecode(response.body) as List<dynamic>;
     return list.map((item) => InvoiceEntry.fromJson(item)).toList();
   }
 
   /// Request auto-renewal cancel at period end
   Future<void> cancelSubscription() async {
-    await _apiClient.post(
-        '${_config.releaseEndpoint.replaceAll('releases', 'billing')}/cancel',
-        {});
+    await _apiClient.post('/api/v1/billing/cancel', {});
   }
 }

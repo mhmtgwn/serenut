@@ -23,15 +23,10 @@ final auditLoggerProvider = Provider<AuditLogger>((ref) {
   return AuditLogger(DatabaseManager());
 });
 
-final syncQueueProvider = Provider<OperationQueueService>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return OperationQueueService(prefs);
-});
+// NOT: syncQueueProvider ve reconciliationProvider kaldırıldı.
+// Bu provider'lar hiçbir yerde ref.watch/read edilmiyordu (dead code).
+// Gerçek senkronizasyon sync_outbox_v4 SQLite outbox’u üzerinden yürüyür.
 
-final reconciliationProvider = Provider<PaymentReconciliationService>((ref) {
-  final logger = ref.watch(auditLoggerProvider);
-  return PaymentReconciliationService(logger);
-});
 
 enum SalesFlowStatus {
   idle,

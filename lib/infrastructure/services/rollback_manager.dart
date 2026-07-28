@@ -1,10 +1,9 @@
-// lib/infrastructure/services/rollback_manager.dart
-// Serenut OS — Safe Update Installation & Rollback Manager (Sprint 6)
-
 import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:serenutos/infrastructure/database/database_provider.dart';
+
 
 class SystemSpecCheckResult {
   final bool hasRequiredSpace;
@@ -160,7 +159,6 @@ class RollbackManager {
   }
 
   Future<String> getDatabasesPath() async {
-    final appSupportDir = await getApplicationSupportDirectory();
-    return join(appSupportDir.path, 'databases');
+    return DatabaseManager().getDatabasesPath();
   }
 }

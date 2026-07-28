@@ -47,18 +47,28 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
         WHERE created_at >= CURRENT_DATE AND is_deleted = FALSE
       `);
 
-      // 2. Weekly metrics
+      // 2. Weekly metrics & previous week comparison
       const weekRes = await client.query(`
         SELECT COALESCE(SUM(total_amount), 0) as revenue
         FROM sales
         WHERE created_at >= NOW() - INTERVAL '7 days' AND is_deleted = FALSE
       `);
+      const prevWeekRes = await client.query(`
+        SELECT COALESCE(SUM(total_amount), 0) as revenue
+        FROM sales
+        WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days' AND is_deleted = FALSE
+      `);
 
-      // 3. Monthly metrics
+      // 3. Monthly metrics & previous month comparison
       const monthRes = await client.query(`
         SELECT COALESCE(SUM(total_amount), 0) as revenue
         FROM sales
         WHERE created_at >= NOW() - INTERVAL '30 days' AND is_deleted = FALSE
+      `);
+      const prevMonthRes = await client.query(`
+        SELECT COALESCE(SUM(total_amount), 0) as revenue
+        FROM sales
+        WHERE created_at >= NOW() - INTERVAL '60 days' AND created_at < NOW() - INTERVAL '30 days' AND is_deleted = FALSE
       `);
 
       // 4. Top selling product
@@ -119,6 +129,18 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
       const todayOrders = parseInt(todayRes.rows[0].orders, 10);
       const avgBasket = todayOrders > 0 ? Math.round(todayRevenue / todayOrders) : 0;
 
+      const currWeekRev = parseFloat(weekRes.rows[0].revenue);
+      const prevWeekRev = parseFloat(prevWeekRes.rows[0].revenue);
+      const weekGrowth = prevWeekRev > 0
+        ? Math.round(((currWeekRev - prevWeekRev) / prevWeekRev) * 100)
+        : (currWeekRev > 0 ? 100 : 0);
+
+      const currMonthRev = parseFloat(monthRes.rows[0].revenue);
+      const prevMonthRev = parseFloat(prevMonthRes.rows[0].revenue);
+      const monthGrowth = prevMonthRev > 0
+        ? Math.round(((currMonthRev - prevMonthRev) / prevMonthRev) * 100)
+        : (currMonthRev > 0 ? 100 : 0);
+
       return {
         today: {
           revenue: todayRevenue,
@@ -126,12 +148,12 @@ router.get('/dashboard', authenticateUser, async (req: AuthenticatedRequest, res
           avgBasket
         },
         week: {
-          revenue: parseFloat(weekRes.rows[0].revenue),
-          growth_pct: 0 // TODO: Geçmiş hafta ile karşılaştırma algoritması eklenecek
+          revenue: currWeekRev,
+          growth_pct: weekGrowth
         },
         month: {
-          revenue: parseFloat(monthRes.rows[0].revenue),
-          growth_pct: 0 // TODO: Geçmiş ay ile karşılaştırma algoritması eklenecek
+          revenue: currMonthRev,
+          growth_pct: monthGrowth
         },
         topProduct: topProdRes.rows.length > 0 ? {
           name: topProdRes.rows[0].name,

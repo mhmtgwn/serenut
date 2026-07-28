@@ -12,6 +12,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/presentation/controllers/sales_flow_controller.dart'
+    show sharedPreferencesProvider;
 
 class DatasetVersion {
   final String version;
@@ -157,8 +159,8 @@ class DatasetLoaderService {
   }
 }
 
-// Riverpod Provider definitions for dependency injection
+// Riverpod Provider definitions for dependency injection.
+// main.dart overrides this provider with a fully initialized instance on app boot.
 final datasetLoaderServiceProvider = Provider<DatasetLoaderService>((ref) {
-  throw UnimplementedError(
-      'Must override datasetLoaderServiceProvider in ProviderScope');
+  return DatasetLoaderService(ref.watch(sharedPreferencesProvider));
 });
