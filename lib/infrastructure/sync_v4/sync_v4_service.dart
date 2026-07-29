@@ -8,6 +8,16 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 
+int _syncInt(Object? value, [int fallback = 0]) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? fallback;
+}
+
+double _syncDouble(Object? value, [double fallback = 0]) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? fallback;
+}
+
 class SyncV4Result {
   const SyncV4Result(
       {required this.pushed,
@@ -141,7 +151,7 @@ class SyncV4Service {
     }
     final state = await db.query('sync_cursor_v4',
         where: 'key = ?', whereArgs: ['global'], limit: 1);
-    var cursor = state.isEmpty ? 0 : (state.first['cursor'] as num).toInt();
+    var cursor = state.isEmpty ? 0 : _syncInt(state.first['cursor']);
 
     // A fresh installation cannot reconstruct a tenant from a change log that
     // started after the tenant's original records were created. Hydrate from
@@ -160,7 +170,7 @@ class SyncV4Service {
         for (final raw in snapshot) {
           await _apply(txn, raw);
         }
-        cursor = (bootstrapBody['next_cursor'] as num?)?.toInt() ?? 0;
+        cursor = _syncInt(bootstrapBody['next_cursor']);
         await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': cursor},
             conflictAlgorithm: ConflictAlgorithm.replace);
       });
@@ -176,7 +186,7 @@ class SyncV4Service {
             .map((value) => Map<String, dynamic>.from(value as Map))
             .toList(),
       );
-      final next = (pullBody['next_cursor'] as num?)?.toInt() ?? cursor;
+      final next = _syncInt(pullBody['next_cursor'], cursor);
       await db.transaction((txn) async {
         for (final raw in changes.cast<Map>()) {
           await _apply(txn, Map<String, dynamic>.from(raw));
@@ -361,8 +371,8 @@ class SyncV4Service {
         final source = Map<String, dynamic>.from(items[index] as Map);
         final productId = source['product_id']?.toString();
         if (productId == null || productId.isEmpty) continue;
-        final quantity = (source['quantity'] as num?)?.toDouble() ?? 0;
-        final unitPrice = (source['unit_price'] as num?)?.toDouble() ?? 0;
+        final quantity = _syncDouble(source['quantity']);
+        final unitPrice = _syncDouble(source['unit_price']);
         await db.insert(
             itemTable,
             {
