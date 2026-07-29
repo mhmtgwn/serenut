@@ -121,4 +121,38 @@ class SqliteAuditRepository implements IAuditRepository {
 
     return results.map((r) => AuditEvent.fromMap(r)).toList();
   }
+
+  @override
+  Future<bool> verifyIntegrity() async {
+    final db = await _dbManager.getDatabase();
+    final rows = await db.query(
+      'audit_events',
+      where: "record_hash IS NOT NULL AND record_hash != ''",
+      orderBy: 'timestamp ASC, id ASC',
+    );
+    String? expectedPreviousHash;
+    for (final row in rows) {
+      final event = AuditEvent.fromMap(row);
+      if (event.previousHash != expectedPreviousHash) return false;
+      final payload = <String, dynamic>{
+        'id': event.id,
+        'event_type': event.eventType,
+        'entity_type': event.entityType,
+        'entity_id': event.entityId,
+        'user_id': event.userId,
+        'user_name': event.userName,
+        'old_value': event.oldValue,
+        'new_value': event.newValue,
+        'timestamp': event.timestamp.toUtc().toIso8601String(),
+        'device_id': event.deviceId,
+        'notes': event.notes,
+        'previous_hash': event.previousHash,
+      };
+      final calculated =
+          sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+      if (calculated != event.recordHash) return false;
+      expectedPreviousHash = event.recordHash;
+    }
+    return true;
+  }
 }

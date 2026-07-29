@@ -13,4 +13,5 @@ abstract class IAuditRepository {
     int? offset,
   });
   Future<List<AuditEvent>> search(String query);
+  Future<bool> verifyIntegrity();
 }

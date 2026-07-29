@@ -21,6 +21,7 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
   DateTimeRange? _selectedDateRange;
   List<AuditEvent> _events = [];
   bool _isLoading = false;
+  bool? _integrityVerified;
 
   final List<String> _eventTypes = [
     'Tümü',
@@ -52,6 +53,7 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
     setState(() => _isLoading = true);
     try {
       final repo = ref.read(auditRepositoryProvider);
+      final integrityVerified = await repo.verifyIntegrity();
       List<AuditEvent> loadedEvents;
 
       if (_searchQuery.isNotEmpty) {
@@ -66,6 +68,7 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
 
       setState(() {
         _events = loadedEvents;
+        _integrityVerified = integrityVerified;
       });
     } catch (_) {
       // Fail-safe
@@ -131,6 +134,38 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
       ),
       body: Column(
         children: [
+          Container(
+            width: double.infinity,
+            color: _integrityVerified == false
+                ? const Color(0xFF7F1D1D)
+                : const Color(0xFF064E3B),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            child: Row(
+              children: [
+                Icon(
+                  _integrityVerified == false
+                      ? Icons.gpp_bad_rounded
+                      : Icons.verified_user_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _integrityVerified == null
+                        ? 'İşlem kayıtlarının bütünlüğü denetleniyor…'
+                        : _integrityVerified!
+                            ? 'İşlem zinciri doğrulandı • kullanıcı, cihaz, zaman ve değişiklik kanıtı korunuyor'
+                            : 'Uyarı: işlem kayıt zincirinin bütünlüğü doğrulanamadı',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Filter Panel
           Container(
             padding: const EdgeInsets.all(16),
@@ -445,6 +480,8 @@ class _AuditCenterPageState extends ConsumerState<AuditCenterPage> {
                 _detailField('Varlık Tipi', event.entityType),
                 _detailField('Varlık ID', event.entityId ?? '-'),
                 _detailField('Cihaz UUID', event.deviceId ?? '-'),
+                _detailField('Önceki Kayıt Özeti', event.previousHash ?? '-'),
+                _detailField('Kayıt Kanıtı (SHA-256)', event.recordHash ?? '-'),
                 _detailField('Açıklama/Not', event.notes ?? '-'),
                 const Divider(color: Color(0xFF334155), height: 24),
                 if (event.oldValue != null) ...[
