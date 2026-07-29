@@ -72,19 +72,22 @@ function computeFileSha256(filePath: string): Promise<string> {
 
 // Helper: sign the computed SHA-256 hash using RSA Private Key
 function signReleaseFile(sha256Hash: string): string {
-  let privateKey = process.env.RELEASE_RSA_PRIVATE_KEY || process.env.RSA_PRIVATE_KEY;
+  let privateKey = (process.env.RELEASE_RSA_PRIVATE_KEY || '').trim();
 
   if (!privateKey) {
+    const configuredKeyPath = (process.env.RELEASE_RSA_PRIVATE_KEY_FILE || '').trim();
     const possiblePaths = [
-      '/var/www/serenut-api/.rsa-private.pem',
-      '/var/www/serenut/server/.rsa-private.pem',
-      path.join(process.cwd(), '.rsa-private.pem'),
-      path.join(__dirname, '../../../.rsa-private.pem')
-    ];
+      configuredKeyPath,
+      '/run/secrets/serenut_release_private_key',
+      '/var/www/serenut-api/.release-private.pem',
+      path.join(process.cwd(), '.release-private.pem'),
+      path.join(__dirname, '../../../.release-private.pem')
+    ].filter(Boolean);
+
     for (const p of possiblePaths) {
       if (fs.existsSync(p)) {
         try {
-          privateKey = fs.readFileSync(p, 'utf8');
+          privateKey = fs.readFileSync(p, 'utf8').trim();
           if (privateKey) break;
         } catch (_) {}
       }
@@ -92,7 +95,9 @@ function signReleaseFile(sha256Hash: string): string {
   }
 
   if (!privateKey) {
-    throw new Error('RELEASE_RSA_PRIVATE_KEY is not defined in environment or key file.');
+    throw new Error(
+      'RELEASE_RSA_PRIVATE_KEY or RELEASE_RSA_PRIVATE_KEY_FILE must contain a release signing key.'
+    );
   }
 
   const formattedKey = privateKey.replace(/\\n/g, '\n');

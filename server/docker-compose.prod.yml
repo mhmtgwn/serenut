@@ -19,10 +19,13 @@ services:
     container_name: serenut-backend
     restart: unless-stopped
     env_file: .env.production
+    environment:
+      RELEASE_RSA_PRIVATE_KEY_FILE: /run/secrets/serenut_release_private_key
     volumes:
       - ./public:/app/public
       - ./logs:/app/logs
       - ./releases:/var/www/serenut-api/releases
+      - ./.release-private.pem:/run/secrets/serenut_release_private_key:ro
     ports:
       # Yalnızca localhost'a bağla — Nginx dışarıya açar
       - "127.0.0.1:3000:3000"
