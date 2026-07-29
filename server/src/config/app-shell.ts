@@ -139,6 +139,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
+    id: 'platform-maintenance',
+    label: 'Sunucu Bakımı',
+    section: 'platform',
+    href: '/app/#platform-maintenance',
+    description: 'Disk kullanımını inceleyin ve güvenli bakım görevlerini çalıştırın.',
+    module: 'admin',
+    moduleTab: 'maintenance',
+    roles: ['sysadmin']
+  },
+  {
     id: 'platform-security',
     label: 'Güvenlik ve Loglar',
     section: 'platform',

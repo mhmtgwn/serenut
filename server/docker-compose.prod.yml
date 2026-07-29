@@ -21,11 +21,14 @@ services:
     env_file: .env.production
     environment:
       RELEASE_RSA_PRIVATE_KEY_FILE: /run/secrets/serenut_release_private_key
+      MAINTENANCE_AGENT_URL: http://maintenance-agent:3070
+      MAINTENANCE_AGENT_TOKEN_FILE: /run/secrets/maintenance_agent_token
     volumes:
       - ./public:/app/public
       - ./logs:/app/logs
       - ./releases:/var/www/serenut-api/releases
       - ./.release-private.pem:/run/secrets/serenut_release_private_key:ro
+      - ./.maintenance-token:/run/secrets/maintenance_agent_token:ro
     ports:
       # Yalnızca localhost'a bağla — Nginx dışarıya açar
       - "127.0.0.1:3000:3000"
@@ -38,6 +41,8 @@ services:
         condition: service_healthy
       postfix:
         condition: service_started
+      maintenance-agent:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
@@ -47,6 +52,7 @@ services:
     networks:
       - serenut-db-redis
       - serenut-external
+      - serenut-maintenance
     deploy:
       resources:
         limits:
@@ -57,6 +63,45 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  # Host bakım yetkisini ana API'den ayıran, komut kabul etmeyen allowlist servisi.
+  maintenance-agent:
+    build:
+      context: ./maintenance-agent
+      dockerfile: Dockerfile
+    image: serenut-maintenance-agent:latest
+    container_name: serenut-maintenance-agent
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./releases:/data/releases
+      - ./logs:/data/logs
+      - ./.maintenance-token:/run/secrets/maintenance_agent_token:ro
+    networks:
+      - serenut-maintenance
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3070/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
 
   # ── PostgreSQL 15 ─────────────────────────────────────────────────────────────
   db:
@@ -153,6 +198,9 @@ networks:
     internal: true   # Keep DB and Redis fully isolated from external internet
   serenut-external:
     driver: bridge   # Allows backend to reach outbound endpoints like Iyzico/SMS APIs
+  serenut-maintenance:
+    driver: bridge
+    internal: true
 
 # ── Kalıcı Veri Hacimleri ─────────────────────────────────────────────────────
 volumes:

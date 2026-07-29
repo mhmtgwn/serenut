@@ -20,6 +20,10 @@ import {
   normalizeCrashDiagnostic,
   normalizeServerDiagnostic,
 } from './diagnostics';
+import {
+  callMaintenanceAgent,
+  validateMaintenanceTasks,
+} from './maintenance-agent.client';
 
 const router = Router();
 
@@ -68,6 +72,94 @@ router.get('/server-logs', async (req: AuthenticatedRequest, res: Response) => {
   } catch (error) {
     logger.error('Server log query failed:', error);
     return res.status(500).json({ error: 'server_log_query_failed' });
+  }
+});
+
+router.get('/maintenance/preview', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const [preview, history] = await Promise.all([
+      callMaintenanceAgent('/preview'),
+      runBypassingRLS(
+        `SELECT al.id, al.action, al.new_value, al.ip_address, al.created_at,
+                u.name AS user_name, u.email AS user_email
+           FROM audit_logs al
+           LEFT JOIN users u ON u.id = al.user_id
+          WHERE al.action IN ('SERVER_MAINTENANCE_COMPLETED', 'SERVER_MAINTENANCE_FAILED')
+          ORDER BY al.created_at DESC
+          LIMIT 20`,
+      ),
+    ]);
+    return res.json({ ...preview, history: history.rows });
+  } catch (error: any) {
+    logger.error('Maintenance preview failed', { error: error?.message });
+    return res.status(503).json({
+      error: 'maintenance_service_unavailable',
+      message: 'Sunucu bakım servisine ulaşılamıyor.',
+    });
+  }
+});
+
+router.post('/maintenance/cleanup', async (req: AuthenticatedRequest, res: Response) => {
+  const submittedTasks = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
+  const tasks = validateMaintenanceTasks(submittedTasks);
+  if (req.body?.confirmation !== 'SUNUCUYU TEMIZLE') {
+    return res.status(400).json({
+      error: 'maintenance_confirmation_required',
+      message: 'Onay metni doğru girilmedi.',
+    });
+  }
+  if (!tasks.length || tasks.length !== new Set(submittedTasks.map(String)).size) {
+    return res.status(400).json({
+      error: 'invalid_maintenance_tasks',
+      message: 'En az bir geçerli bakım görevi seçilmelidir.',
+    });
+  }
+
+  try {
+    const result = await callMaintenanceAgent('/cleanup', {
+      method: 'POST',
+      body: { tasks },
+    });
+    const auditResults = Object.fromEntries(
+      Object.entries(result.results || {}).map(([task, taskResult]: [string, any]) => [task, {
+        reclaimedBytes: Number(taskResult?.reclaimedBytes || 0),
+        removedCount: Array.isArray(taskResult?.removed) ? taskResult.removed.length : 0,
+        removed: Array.isArray(taskResult?.removed) ? taskResult.removed.slice(0, 100) : [],
+      }]),
+    );
+    await writeAdminAudit(
+      req.user!.id,
+      'SERVER_MAINTENANCE_COMPLETED',
+      'system_maintenance',
+      `maintenance-${Date.now()}`,
+      null,
+      {
+        tasks,
+        reclaimedBytes: result.reclaimedBytes,
+        completedAt: result.completedAt,
+        results: auditResults,
+      },
+      req.ip,
+    );
+    return res.json(result);
+  } catch (error: any) {
+    logger.error('Server maintenance failed', { error: error?.message, tasks });
+    await writeAdminAudit(
+      req.user!.id,
+      'SERVER_MAINTENANCE_FAILED',
+      'system_maintenance',
+      `maintenance-${Date.now()}`,
+      null,
+      { tasks, error: error?.message || 'maintenance_failed' },
+      req.ip,
+    );
+    const status = error?.status === 409 ? 409 : 503;
+    return res.status(status).json({
+      error: status === 409 ? 'maintenance_already_running' : 'maintenance_service_unavailable',
+      message: status === 409
+        ? 'Başka bir bakım işlemi halen çalışıyor.'
+        : 'Bakım işlemi tamamlanamadı. Hata kaydı denetim günlüğüne yazıldı.',
+    });
   }
 });
 
