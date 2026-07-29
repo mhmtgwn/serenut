@@ -32,11 +32,11 @@ class HomePage extends ConsumerWidget {
                 final wide = constraints.maxWidth >= 900;
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(wide ? 28 : 16, 16,
-                      wide ? 28 : 16, 96),
+                  padding: EdgeInsets.fromLTRB(
+                      wide ? 28 : 16, 16, wide ? 28 : 16, 96),
                   children: [
-                    _DashboardHeader(onReports: () =>
-                        context.push(AppRoutes.reports)),
+                    _DashboardHeader(
+                        onReports: () => context.push(AppRoutes.reports)),
                     const SizedBox(height: 10),
                     const RealtimeStatusIndicator(compact: false),
                     const SizedBox(height: 16),
@@ -55,8 +55,7 @@ class HomePage extends ConsumerWidget {
                           const SizedBox(width: 16),
                           Expanded(
                             flex: 2,
-                            child: _TopProductsCard(
-                                products: data.topProducts),
+                            child: _TopProductsCard(products: data.topProducts),
                           ),
                         ],
                       )
@@ -135,14 +134,34 @@ class _KpiGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'tr_TR', symbol: '₺');
     final items = [
-      ('Bugünkü satış', currency.format(summary.todayRevenue),
-       '${summary.totalSalesToday} işlem', Icons.point_of_sale_rounded, POSColors.green),
-      ('Tahsilat', currency.format(summary.todayCollected),
-       'Bugün alınan', Icons.payments_rounded, POSColors.blue),
-      ('Vadeli satış', currency.format(summary.todayDebt),
-       'Bugünkü açık', Icons.schedule_rounded, POSColors.orange),
-      ('Toplam alacak', currency.format(summary.totalReceivables),
-       'Müşteri bakiyeleri', Icons.account_balance_wallet_rounded, POSColors.red),
+      (
+        'Bugünkü satış',
+        currency.format(summary.todayRevenue),
+        '${summary.totalSalesToday} işlem',
+        Icons.point_of_sale_rounded,
+        POSColors.green
+      ),
+      (
+        'Tahsilat',
+        currency.format(summary.todayCollected),
+        'Bugün alınan',
+        Icons.payments_rounded,
+        POSColors.blue
+      ),
+      (
+        'Vadeli satış',
+        currency.format(summary.todayDebt),
+        'Bugünkü açık',
+        Icons.schedule_rounded,
+        POSColors.orange
+      ),
+      (
+        'Toplam alacak',
+        currency.format(summary.totalReceivables),
+        'Müşteri bakiyeleri',
+        Icons.account_balance_wallet_rounded,
+        POSColors.red
+      ),
     ];
     return LayoutBuilder(builder: (context, constraints) {
       final columns = constraints.maxWidth >= 900 ? 4 : 2;
@@ -168,8 +187,12 @@ class _KpiGrid extends StatelessWidget {
 }
 
 class _KpiCard extends StatelessWidget {
-  const _KpiCard({required this.label, required this.value, required this.detail,
-    required this.icon, required this.color});
+  const _KpiCard(
+      {required this.label,
+      required this.value,
+      required this.detail,
+      required this.icon,
+      required this.color});
   final String label;
   final String value;
   final String detail;
@@ -187,13 +210,22 @@ class _KpiCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon, color: color, size: 21),
           const SizedBox(height: 12),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
-          Text(label, style: const TextStyle(fontSize: 12,
-              fontWeight: FontWeight.w700, color: POSColors.text)),
-          Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: POSColors.textSecondary)),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: POSColors.text)),
+          Text(detail,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 10, color: POSColors.textSecondary)),
         ]),
       );
 }
@@ -204,7 +236,8 @@ class _AttentionStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(children: [
-        Expanded(child: _AttentionTile(
+        Expanded(
+            child: _AttentionTile(
           icon: Icons.pending_actions_rounded,
           label: 'Bekleyen sipariş',
           value: '${data.summary.pendingOrdersCount}',
@@ -212,7 +245,8 @@ class _AttentionStrip extends StatelessWidget {
           onTap: () => context.go(AppRoutes.orders),
         )),
         const SizedBox(width: 10),
-        Expanded(child: _AttentionTile(
+        Expanded(
+            child: _AttentionTile(
           icon: Icons.inventory_2_outlined,
           label: 'Kritik stok',
           value: '${data.lowStockProducts.length}',
@@ -223,8 +257,12 @@ class _AttentionStrip extends StatelessWidget {
 }
 
 class _AttentionTile extends StatelessWidget {
-  const _AttentionTile({required this.icon, required this.label,
-    required this.value, required this.color, required this.onTap});
+  const _AttentionTile(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color,
+      required this.onTap});
   final IconData icon;
   final String label;
   final String value;
@@ -243,11 +281,14 @@ class _AttentionTile extends StatelessWidget {
             child: Row(children: [
               Icon(icon, color: color),
               const SizedBox(width: 10),
-              Expanded(child: Text(label, maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700))),
-              Text(value, style: TextStyle(fontSize: 20,
-                  color: color, fontWeight: FontWeight.w900)),
+              Expanded(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700))),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 20, color: color, fontWeight: FontWeight.w900)),
             ]),
           ),
         ),
@@ -269,34 +310,48 @@ class _TrendCard extends StatelessWidget {
               : LineChart(LineChartData(
                   minY: 0,
                   borderData: FlBorderData(show: false),
-                  gridData: const FlGridData(show: true, drawVerticalLine: false),
+                  gridData:
+                      const FlGridData(show: true, drawVerticalLine: false),
                   titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
-                        if (index < 0 || index >= points.length) return const SizedBox();
+                        if (index < 0 || index >= points.length) {
+                          return const SizedBox();
+                        }
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: Text(DateFormat('E', 'tr_TR').format(points[index].date),
+                          child: Text(
+                              DateFormat('E', 'tr_TR')
+                                  .format(points[index].date),
                               style: const TextStyle(fontSize: 10)),
                         );
                       },
                     )),
                   ),
-                  lineBarsData: [LineChartBarData(
-                    isCurved: true,
-                    color: POSColors.green,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(show: true,
-                        color: POSColors.green.withValues(alpha: .1)),
-                    spots: [for (var i = 0; i < points.length; i++)
-                      FlSpot(i.toDouble(), points[i].revenue)],
-                  )],
+                  lineBarsData: [
+                    LineChartBarData(
+                      isCurved: true,
+                      color: POSColors.green,
+                      barWidth: 3,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                          show: true,
+                          color: POSColors.green.withValues(alpha: .1)),
+                      spots: [
+                        for (var i = 0; i < points.length; i++)
+                          FlSpot(i.toDouble(), points[i].revenue)
+                      ],
+                    )
+                  ],
                 )),
         ),
       );
@@ -312,19 +367,27 @@ class _TopProductsCard extends StatelessWidget {
         subtitle: 'Son 30 gün',
         child: products.isEmpty
             ? const SizedBox(height: 160, child: _EmptyData())
-            : Column(children: products.take(5).map((product) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(radius: 15,
-                    backgroundColor: POSColors.greenLight,
-                    child: Text('${product.rank}', style: const TextStyle(
-                      color: POSColors.greenDark, fontWeight: FontWeight.w800))),
-                  title: Text(product.productName, maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-                  subtitle: Text(product.category),
-                  trailing: Text('${product.totalSold} adet',
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
-                )).toList()),
+            : Column(
+                children: products
+                    .take(5)
+                    .map((product) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                              radius: 15,
+                              backgroundColor: POSColors.greenLight,
+                              child: Text('${product.rank}',
+                                  style: const TextStyle(
+                                      color: POSColors.greenDark,
+                                      fontWeight: FontWeight.w800))),
+                          title: Text(product.productName,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(product.category),
+                          trailing: Text('${product.totalSold} adet',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w800)),
+                        ))
+                    .toList()),
       );
 }
 
@@ -338,19 +401,29 @@ class _CategoryCard extends StatelessWidget {
         subtitle: 'Son 30 günlük ciro payı',
         child: items.isEmpty
             ? const SizedBox(height: 140, child: _EmptyData())
-            : Column(children: items.take(5).map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(children: [
-                    Row(children: [
-                      Expanded(child: Text(item.category,
-                        style: const TextStyle(fontWeight: FontWeight.w700))),
-                      Text('%${item.percentage.toStringAsFixed(0)}'),
-                    ]),
-                    const SizedBox(height: 5),
-                    LinearProgressIndicator(value: (item.percentage / 100).clamp(0, 1),
-                      minHeight: 6, borderRadius: BorderRadius.circular(8)),
-                  ]),
-                )).toList()),
+            : Column(
+                children: items
+                    .take(5)
+                    .map((item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(children: [
+                            Row(children: [
+                              Expanded(
+                                  child: Text(item.category,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700))),
+                              Text('%${item.percentage.toStringAsFixed(0)}'),
+                            ]),
+                            const SizedBox(height: 5),
+                            LinearProgressIndicator(
+                                value: (item.percentage / 100)
+                                    .clamp(0.0, 1.0)
+                                    .toDouble(),
+                                minHeight: 6,
+                                borderRadius: BorderRadius.circular(8)),
+                          ]),
+                        ))
+                    .toList()),
       );
 }
 
@@ -366,21 +439,29 @@ class _RecentSalesCard extends StatelessWidget {
       subtitle: 'En yeni tamamlanan işlemler',
       child: sales.isEmpty
           ? const SizedBox(height: 140, child: _EmptyData())
-          : Column(children: sales.take(5).map((sale) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.receipt_outlined, color: POSColors.green),
-                title: Text(currency.format(sale.totalAmount),
-                  style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text(DateFormat('dd.MM HH:mm').format(sale.createdAt)),
-                trailing: Text(sale.paymentMethod.toString()),
-              )).toList()),
+          : Column(
+              children: sales
+                  .take(5)
+                  .map((sale) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.receipt_outlined,
+                            color: POSColors.green),
+                        title: Text(currency.format(sale.totalAmount),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: Text(
+                            DateFormat('dd.MM HH:mm').format(sale.createdAt)),
+                        trailing: Text(sale.paymentMethod.toString()),
+                      ))
+                  .toList()),
     );
   }
 }
 
 class _Panel extends StatelessWidget {
-  const _Panel({required this.title, required this.subtitle, required this.child});
+  const _Panel(
+      {required this.title, required this.subtitle, required this.child});
   final String title;
   final String subtitle;
   final Widget child;
@@ -388,14 +469,19 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: POSColors.border)),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: POSColors.border)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 16,
-              fontWeight: FontWeight.w900, color: POSColors.text)),
-          Text(subtitle, style: const TextStyle(fontSize: 11,
-              color: POSColors.textSecondary)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: POSColors.text)),
+          Text(subtitle,
+              style: const TextStyle(
+                  fontSize: 11, color: POSColors.textSecondary)),
           const SizedBox(height: 16),
           child,
         ]),
@@ -405,8 +491,9 @@ class _Panel extends StatelessWidget {
 class _EmptyData extends StatelessWidget {
   const _EmptyData();
   @override
-  Widget build(BuildContext context) => const Center(child: Text('Henüz veri yok',
-      style: TextStyle(color: POSColors.textSecondary)));
+  Widget build(BuildContext context) => const Center(
+      child: Text('Henüz veri yok',
+          style: TextStyle(color: POSColors.textSecondary)));
 }
 
 class _DashboardError extends StatelessWidget {
@@ -416,15 +503,21 @@ class _DashboardError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [SizedBox(height: MediaQuery.sizeOf(context).height * .7,
-          child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline_rounded, size: 48, color: POSColors.red),
-            const SizedBox(height: 12),
-            const Text('Ana sayfa verileri alınamadı'),
-            const SizedBox(height: 6),
-            Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Tekrar dene')),
-          ])))],
+        children: [
+          SizedBox(
+              height: MediaQuery.sizeOf(context).height * .7,
+              child: Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 48, color: POSColors.red),
+                const SizedBox(height: 12),
+                const Text('Ana sayfa verileri alınamadı'),
+                const SizedBox(height: 6),
+                Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 12),
+                FilledButton(
+                    onPressed: onRetry, child: const Text('Tekrar dene')),
+              ])))
+        ],
       );
 }

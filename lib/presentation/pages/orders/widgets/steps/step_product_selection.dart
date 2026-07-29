@@ -469,14 +469,12 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                   ChoiceChip(
                     label: const Text('Stokta'),
                     selected: stock == 'in_stock',
-                    onSelected: (_) =>
-                        setSheetState(() => stock = 'in_stock'),
+                    onSelected: (_) => setSheetState(() => stock = 'in_stock'),
                   ),
                   ChoiceChip(
                     label: const Text('Kritik'),
                     selected: stock == 'critical',
-                    onSelected: (_) =>
-                        setSheetState(() => stock = 'critical'),
+                    onSelected: (_) => setSheetState(() => stock = 'critical'),
                   ),
                 ],
               ),
@@ -489,16 +487,19 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                   DropdownMenuItem(
                       value: 'best_selling', child: Text('En çok satanlar')),
                   DropdownMenuItem(
-                      value: 'price_asc', child: Text('Fiyat: düşükten yükseğe')),
+                      value: 'price_asc',
+                      child: Text('Fiyat: düşükten yükseğe')),
                   DropdownMenuItem(
-                      value: 'price_desc', child: Text('Fiyat: yüksekten düşüğe')),
+                      value: 'price_desc',
+                      child: Text('Fiyat: yüksekten düşüğe')),
                 ],
                 onChanged: (value) => setSheetState(() => sort = value),
               ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () {
-                  ref.read(ordersProductStockFilterProvider.notifier).state = stock;
+                  ref.read(ordersProductStockFilterProvider.notifier).state =
+                      stock;
                   ref.read(ordersProductSortProvider.notifier).state = sort;
                   Navigator.pop(context);
                 },

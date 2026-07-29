@@ -888,6 +888,9 @@ class InMemoryOrderRepository implements IOrderRepository {
   Future<List<OrderEntity>> findFiltered({
     String? searchQuery,
     String? status,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
     int limit = 25,
     int offset = 0,
   }) async {
@@ -899,19 +902,34 @@ class InMemoryOrderRepository implements IOrderRepository {
       final matchesSearch = searchQuery == null ||
           searchQuery.isEmpty ||
           o.id.toLowerCase().contains(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
+      final matchesFrom = dateFrom == null || !o.createdAt.isBefore(dateFrom);
+      final matchesTo = dateTo == null || o.createdAt.isBefore(dateTo);
+      final matchesOverdue = !overdueOnly || o.isOverdue;
+      return matchesStatus &&
+          matchesSearch &&
+          matchesFrom &&
+          matchesTo &&
+          matchesOverdue;
     }).toList();
     if (offset >= list.length) return [];
     return list.skip(offset).take(limit).toList();
   }
 
   @override
-  Future<Map<String, int>> getStatusCounts({String? searchQuery}) async {
+  Future<Map<String, int>> getStatusCounts({
+    String? searchQuery,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
+  }) async {
     final filtered = InMemoryDb.orders
         .where((o) =>
             searchQuery == null ||
             searchQuery.isEmpty ||
             o.id.toLowerCase().contains(searchQuery.toLowerCase()))
+        .where((o) => dateFrom == null || !o.createdAt.isBefore(dateFrom))
+        .where((o) => dateTo == null || o.createdAt.isBefore(dateTo))
+        .where((o) => !overdueOnly || o.isOverdue)
         .toList();
 
     final counts = <String, int>{

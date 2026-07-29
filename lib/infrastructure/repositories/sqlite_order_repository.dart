@@ -300,6 +300,9 @@ class SqliteOrderRepository implements IOrderRepository {
   Future<List<OrderEntity>> findFiltered({
     String? searchQuery,
     String? status,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
     int limit = 25,
     int offset = 0,
   }) async {
@@ -316,8 +319,23 @@ class SqliteOrderRepository implements IOrderRepository {
 
     final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
     if (hasSearch) {
-      conditions.add('id LIKE ?');
-      args.add('%$searchQuery%');
+      conditions.add('(id LIKE ? OR customer_id IN '
+          '(SELECT id FROM customers WHERE name LIKE ? OR phone LIKE ?))');
+      args.addAll(['%$searchQuery%', '%$searchQuery%', '%$searchQuery%']);
+    }
+    if (dateFrom != null) {
+      conditions.add('created_at >= ?');
+      args.add(dateFrom.toIso8601String());
+    }
+    if (dateTo != null) {
+      conditions.add('created_at < ?');
+      args.add(dateTo.toIso8601String());
+    }
+    if (overdueOnly) {
+      conditions.add('expected_delivery_date IS NOT NULL');
+      conditions.add('expected_delivery_date < ?');
+      conditions.add("status NOT IN ('delivered', 'cancelled')");
+      args.add(DateTime.now().toIso8601String());
     }
 
     final where = conditions.join(' AND ');
@@ -331,14 +349,34 @@ class SqliteOrderRepository implements IOrderRepository {
   }
 
   @override
-  Future<Map<String, int>> getStatusCounts({String? searchQuery}) async {
+  Future<Map<String, int>> getStatusCounts({
+    String? searchQuery,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
+  }) async {
     final conditions = <String>['(is_deleted = 0 OR is_deleted IS NULL)'];
     final args = <dynamic>[];
 
     final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
     if (hasSearch) {
-      conditions.add('id LIKE ?');
-      args.add('%$searchQuery%');
+      conditions.add('(id LIKE ? OR customer_id IN '
+          '(SELECT id FROM customers WHERE name LIKE ? OR phone LIKE ?))');
+      args.addAll(['%$searchQuery%', '%$searchQuery%', '%$searchQuery%']);
+    }
+    if (dateFrom != null) {
+      conditions.add('created_at >= ?');
+      args.add(dateFrom.toIso8601String());
+    }
+    if (dateTo != null) {
+      conditions.add('created_at < ?');
+      args.add(dateTo.toIso8601String());
+    }
+    if (overdueOnly) {
+      conditions.add('expected_delivery_date IS NOT NULL');
+      conditions.add('expected_delivery_date < ?');
+      conditions.add("status NOT IN ('delivered', 'cancelled')");
+      args.add(DateTime.now().toIso8601String());
     }
 
     final where = conditions.join(' AND ');

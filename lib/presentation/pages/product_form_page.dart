@@ -619,7 +619,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
-  Future<void> _pickProductImage([ImageSource source = ImageSource.gallery]) async {
+  Future<void> _pickProductImage(
+      [ImageSource source = ImageSource.gallery]) async {
     final picked = await ImagePicker().pickImage(
       source: source,
       imageQuality: 85,

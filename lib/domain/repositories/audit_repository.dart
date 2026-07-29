@@ -1,4 +1,4 @@
-﻿// lib/domain/repositories/audit_repository.dart
+// lib/domain/repositories/audit_repository.dart
 import 'package:serenutos/domain/models/audit_event.dart';
 
 abstract class IAuditRepository {

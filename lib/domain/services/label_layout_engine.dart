@@ -81,13 +81,6 @@ class LabelLayoutEngine {
     return bytes;
   }
 
-  static String _formatQty(double qty) {
-    if (qty == qty.toInt()) {
-      return qty.toInt().toString();
-    }
-    return qty.toStringAsFixed(3); // Standard weight representation (grams)
-  }
-
   // Converts text to CP857 (Turkish) bytes safely
   static List<int> _textToBytes(String text) {
     final List<int> bytes = [];

@@ -761,14 +761,17 @@ class DatabaseMigrations {
           });
         }
         if (oldVersion < 42) {
-          final columns = (await txn.rawQuery('PRAGMA table_info(audit_events)'))
-              .map((row) => row['name']?.toString())
-              .toSet();
+          final columns =
+              (await txn.rawQuery('PRAGMA table_info(audit_events)'))
+                  .map((row) => row['name']?.toString())
+                  .toSet();
           if (!columns.contains('previous_hash')) {
-            await txn.execute('ALTER TABLE audit_events ADD COLUMN previous_hash TEXT');
+            await txn.execute(
+                'ALTER TABLE audit_events ADD COLUMN previous_hash TEXT');
           }
           if (!columns.contains('record_hash')) {
-            await txn.execute('ALTER TABLE audit_events ADD COLUMN record_hash TEXT');
+            await txn.execute(
+                'ALTER TABLE audit_events ADD COLUMN record_hash TEXT');
           }
           await txn.execute(
               'CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_events_record_hash ON audit_events(record_hash) WHERE record_hash IS NOT NULL');

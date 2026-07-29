@@ -200,13 +200,21 @@ abstract class IOrderRepository implements BaseRepository<OrderEntity> {
   Future<List<OrderEntity>> findFiltered({
     String? searchQuery,
     String? status,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
     int limit = 25,
     int offset = 0,
   });
 
   /// Returns the count of orders per status key.
   /// Keys: 'all', 'created', 'preparing', 'ready', 'delivered', 'cancelled'.
-  Future<Map<String, int>> getStatusCounts({String? searchQuery});
+  Future<Map<String, int>> getStatusCounts({
+    String? searchQuery,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
+  });
 }
 
 /// Settings repository interface

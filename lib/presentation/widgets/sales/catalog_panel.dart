@@ -344,14 +344,12 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                   ChoiceChip(
                     label: const Text('Stokta'),
                     selected: stock == 'in_stock',
-                    onSelected: (_) =>
-                        setSheetState(() => stock = 'in_stock'),
+                    onSelected: (_) => setSheetState(() => stock = 'in_stock'),
                   ),
                   ChoiceChip(
                     label: const Text('Kritik stok'),
                     selected: stock == 'critical',
-                    onSelected: (_) =>
-                        setSheetState(() => stock = 'critical'),
+                    onSelected: (_) => setSheetState(() => stock = 'critical'),
                   ),
                 ],
               ),
@@ -364,16 +362,19 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                   DropdownMenuItem(
                       value: 'best_selling', child: Text('En çok satanlar')),
                   DropdownMenuItem(
-                      value: 'price_asc', child: Text('Fiyat: düşükten yükseğe')),
+                      value: 'price_asc',
+                      child: Text('Fiyat: düşükten yükseğe')),
                   DropdownMenuItem(
-                      value: 'price_desc', child: Text('Fiyat: yüksekten düşüğe')),
+                      value: 'price_desc',
+                      child: Text('Fiyat: yüksekten düşüğe')),
                 ],
                 onChanged: (value) => setSheetState(() => sort = value),
               ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () {
-                  ref.read(salesProductStockFilterProvider.notifier).state = stock;
+                  ref.read(salesProductStockFilterProvider.notifier).state =
+                      stock;
                   ref.read(salesProductSortProvider.notifier).state = sort;
                   Navigator.pop(context);
                 },

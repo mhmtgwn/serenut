@@ -64,7 +64,8 @@ class AuditEvent {
         'record_hash': recordHash,
       };
 
-  AuditEvent copyWithHashes({String? previousHash, required String recordHash}) {
+  AuditEvent copyWithHashes(
+      {String? previousHash, required String recordHash}) {
     return AuditEvent(
       id: id,
       eventType: eventType,

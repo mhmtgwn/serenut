@@ -24,6 +24,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   bool _hasMore = true;
   String? _statusFilter;
   String? _searchQuery;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+  bool _overdueOnly = false;
 
   bool get hasMore => _hasMore;
 
@@ -35,6 +38,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     final firstPage = await _repository.findFiltered(
       status: _statusFilter,
       searchQuery: _searchQuery,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      overdueOnly: _overdueOnly,
       limit: _kPageSize,
       offset: 0,
     );
@@ -53,6 +59,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     state = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
+          dateFrom: _dateFrom,
+          dateTo: _dateTo,
+          overdueOnly: _overdueOnly,
           limit: _kPageSize,
           offset: 0,
         ));
@@ -68,11 +77,25 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     state = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
+          dateFrom: _dateFrom,
+          dateTo: _dateTo,
+          overdueOnly: _overdueOnly,
           limit: _kPageSize,
           offset: 0,
         ));
     _offset = state.valueOrNull?.length ?? 0;
     _hasMore = (_offset == _kPageSize);
+  }
+
+  Future<void> applyAdvancedFilter({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool overdueOnly = false,
+  }) async {
+    _dateFrom = dateFrom;
+    _dateTo = dateTo;
+    _overdueOnly = overdueOnly;
+    await refresh();
   }
 
   // ── Pagination ──────────────────────────────────────────────────────────────
@@ -83,6 +106,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     final next = await _repository.findFiltered(
       status: _statusFilter,
       searchQuery: _searchQuery,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      overdueOnly: _overdueOnly,
       limit: _kPageSize,
       offset: _offset,
     );
@@ -94,7 +120,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   // ── Status counts (for sidebar badges) ────────────────────────────────────
 
   Future<Map<String, int>> getStatusCounts() async {
-    return _repository.getStatusCounts(searchQuery: _searchQuery);
+    return _repository.getStatusCounts(
+      searchQuery: _searchQuery,
+      dateFrom: _dateFrom,
+      dateTo: _dateTo,
+      overdueOnly: _overdueOnly,
+    );
   }
 
   // ── Refresh ────────────────────────────────────────────────────────────────
@@ -106,6 +137,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     state = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
+          dateFrom: _dateFrom,
+          dateTo: _dateTo,
+          overdueOnly: _overdueOnly,
           limit: _kPageSize,
           offset: 0,
         ));

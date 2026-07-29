@@ -21,9 +21,8 @@ class SqliteAuditRepository implements IAuditRepository {
         orderBy: 'timestamp DESC, id DESC',
         limit: 1,
       );
-      final previousHash = previous.isEmpty
-          ? null
-          : previous.first['record_hash']?.toString();
+      final previousHash =
+          previous.isEmpty ? null : previous.first['record_hash']?.toString();
       final payload = <String, dynamic>{
         'id': event.id,
         'event_type': event.eventType,
@@ -38,7 +37,8 @@ class SqliteAuditRepository implements IAuditRepository {
         'notes': event.notes,
         'previous_hash': previousHash,
       };
-      final recordHash = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+      final recordHash =
+          sha256.convert(utf8.encode(jsonEncode(payload))).toString();
       final chained = event.copyWithHashes(
         previousHash: previousHash,
         recordHash: recordHash,

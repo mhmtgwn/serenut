@@ -9,9 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/config/theme.dart';
@@ -40,6 +41,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false;
+  bool _isLabelSelectionMode = false;
+  final Set<String> _selectedLabelProductIds = <String>{};
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -139,6 +142,51 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     }
   }
 
+  void _toggleLabelSelection(ProductEntity product) {
+    setState(() {
+      if (!_selectedLabelProductIds.add(product.id)) {
+        _selectedLabelProductIds.remove(product.id);
+      }
+    });
+  }
+
+  void _closeLabelSelection() {
+    setState(() {
+      _isLabelSelectionMode = false;
+      _selectedLabelProductIds.clear();
+    });
+  }
+
+  void _queueShelfLabels(List<ProductEntity> visibleProducts) {
+    final settings = ref.read(settingsNotifierProvider).valueOrNull;
+    if (settings == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Yazıcı ayarları henüz hazır değil.')),
+      );
+      return;
+    }
+    final selected = visibleProducts
+        .where((product) => _selectedLabelProductIds.contains(product.id))
+        .toList(growable: false);
+    if (selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Etiket basılacak ürünleri seçin.')),
+      );
+      return;
+    }
+    final printer = ref.read(printerServiceProvider);
+    printer.enqueue(
+      '${selected.length} raf etiketi',
+      () => printer.printShelfLabels(selected, settings),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content:
+              Text('${selected.length} etiket yazdırma kuyruğuna alındı.')),
+    );
+    _closeLabelSelection();
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredProductsVal = ref.watch(filteredProductsProvider);
@@ -158,6 +206,20 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         setState(() {});
       },
       actions: [
+        IconButton(
+          tooltip: _isLabelSelectionMode
+              ? 'Etiket seçimini kapat'
+              : 'Raf etiketi bas',
+          onPressed: _isLabelSelectionMode
+              ? _closeLabelSelection
+              : () => setState(() => _isLabelSelectionMode = true),
+          icon: Icon(
+            _isLabelSelectionMode
+                ? Icons.close_rounded
+                : Icons.label_outline_rounded,
+            color: _isLabelSelectionMode ? _kRed : _kTextSecondary,
+          ),
+        ),
         Semantics(
           label: selectedCategory == null
               ? 'Kategori filtresi'
@@ -232,6 +294,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                         );
                       }
                       final product = products[index];
+                      final isSelected =
+                          _selectedLabelProductIds.contains(product.id);
                       final isLowStock = product.quantity <= product.minStock;
                       final isOutOfStock = product.quantity <= 0;
 
@@ -263,14 +327,30 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
-                            onTap: () => context.push(
-                                '/products/edit/${product.id}',
-                                extra: product),
+                            onLongPress: () {
+                              if (!_isLabelSelectionMode) {
+                                setState(() => _isLabelSelectionMode = true);
+                              }
+                              _toggleLabelSelection(product);
+                            },
+                            onTap: () => _isLabelSelectionMode
+                                ? _toggleLabelSelection(product)
+                                : context.push('/products/edit/${product.id}',
+                                    extra: product),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 12),
                               child: Row(
                                 children: [
+                                  if (_isLabelSelectionMode) ...[
+                                    Checkbox(
+                                      value: isSelected,
+                                      activeColor: _kGreen,
+                                      onChanged: (_) =>
+                                          _toggleLabelSelection(product),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
                                   // Sol: Ürün görseli/kategori ikonu çerçevesi (Premium square design)
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
@@ -312,26 +392,24 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                                         const SizedBox(height: 4),
                                         if (product.brand.isNotEmpty)
                                           Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 5,
-                                                      vertical: 1.5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF1F5F9),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                                border:
-                                                    Border.all(color: _kBorder),
-                                              ),
-                                              child: Text(
-                                                product.category,
-                                                style: const TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: _kTextSecondary,
-                                                ),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F5F9),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border:
+                                                  Border.all(color: _kBorder),
+                                            ),
+                                            child: Text(
+                                              product.category,
+                                              style: const TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: _kTextSecondary,
                                               ),
                                             ),
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -412,12 +490,19 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_products',
-        onPressed: () => context.push('/products/add'),
+        onPressed: _isLabelSelectionMode
+            ? () => filteredProductsVal.whenData(_queueShelfLabels)
+            : () => context.push('/products/add'),
         backgroundColor: _kGreen,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_box_rounded),
-        label: const Text('Yeni Ürün',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        icon: Icon(_isLabelSelectionMode
+            ? Icons.print_rounded
+            : Icons.add_box_rounded),
+        label: Text(
+            _isLabelSelectionMode
+                ? 'Etiket Bas (${_selectedLabelProductIds.length})'
+                : 'Yeni Ürün',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -597,50 +682,6 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     if (!mounted || result == null) return;
     ref.read(productCategoryFilterProvider.notifier).state =
         result == allCategories ? null : result;
-  }
-
-  void _confirmDelete(BuildContext context, ProductEntity product) {
-    requireAdminAccess(
-      context,
-      title: 'Ürün Silme Yetkisi',
-      onGranted: (approvedByUserId, approvedByUserName) {
-        showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              title: const Text('Ürünü Sil'),
-              content: Text(
-                  '"${product.name}" ürününü silmek istediğinize emin misiniz?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('İptal'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kRed,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    ref.read(productsControllerProvider.notifier).deleteProduct(
-                          product.id,
-                          approvedByUserId: approvedByUserId,
-                          approvedByUserName: approvedByUserName,
-                        );
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Sil'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   IconData _getCategoryIcon(String category) {

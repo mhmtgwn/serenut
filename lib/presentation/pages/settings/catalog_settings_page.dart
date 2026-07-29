@@ -61,7 +61,8 @@ class CatalogSettingsPage extends ConsumerWidget {
                             child: Icon(Icons.category_rounded,
                                 color: POSColors.greenDark),
                           ),
-                          title: Text(category['name']?.toString() ?? 'Kategori'),
+                          title:
+                              Text(category['name']?.toString() ?? 'Kategori'),
                           subtitle: Text(
                             'KDV %${category['rate'] ?? 0} • ${category['unit'] ?? 'adet'}',
                           ),
@@ -101,7 +102,8 @@ class CatalogSettingsPage extends ConsumerWidget {
         .trim()
         .split(RegExp(r'\s+'))
         .where((part) => part.isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
         .join(' ');
   }
 
@@ -118,7 +120,8 @@ class CatalogSettingsPage extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(original == null ? 'Kategori ekle' : 'Kategoriyi düzenle'),
+          title:
+              Text(original == null ? 'Kategori ekle' : 'Kategoriyi düzenle'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -131,18 +134,21 @@ class CatalogSettingsPage extends ConsumerWidget {
               TextField(
                 controller: vat,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Varsayılan KDV (%)'),
+                decoration:
+                    const InputDecoration(labelText: 'Varsayılan KDV (%)'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: unit,
-                decoration: const InputDecoration(labelText: 'Varsayılan birim'),
+                decoration:
+                    const InputDecoration(labelText: 'Varsayılan birim'),
                 items: const [
                   DropdownMenuItem(value: 'adet', child: Text('Adet')),
                   DropdownMenuItem(value: 'paket', child: Text('Paket')),
                   DropdownMenuItem(value: 'kutu', child: Text('Kutu')),
                   DropdownMenuItem(value: 'litre', child: Text('Litre')),
-                  DropdownMenuItem(value: 'kg', child: Text('Kilogram / Tartı')),
+                  DropdownMenuItem(
+                      value: 'kg', child: Text('Kilogram / Tartı')),
                 ],
                 onChanged: (value) =>
                     setDialogState(() => unit = value ?? 'adet'),
@@ -167,7 +173,8 @@ class CatalogSettingsPage extends ConsumerWidget {
     final rate = int.tryParse(vat.text.trim());
     if (newName.isEmpty || rate == null || rate < 0 || rate > 100) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kategori adı ve KDV oranını kontrol edin.')),
+        const SnackBar(
+            content: Text('Kategori adı ve KDV oranını kontrol edin.')),
       );
       return;
     }
