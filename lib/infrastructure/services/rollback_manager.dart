@@ -1,9 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
-
 
 class SystemSpecCheckResult {
   final bool hasRequiredSpace;
@@ -26,6 +27,38 @@ class SystemSpecCheckResult {
 }
 
 class RollbackManager {
+  Future<ProcessResult?> _runWithTimeout(
+    String executable,
+    List<String> arguments,
+  ) async {
+    final process = await Process.start(
+      executable,
+      arguments,
+      runInShell: Platform.isWindows,
+    );
+    final stdoutFuture = process.stdout.transform(utf8.decoder).join();
+    final stderrFuture = process.stderr.transform(utf8.decoder).join();
+
+    try {
+      final exitCode =
+          await process.exitCode.timeout(const Duration(seconds: 6));
+      return ProcessResult(
+        process.pid,
+        exitCode,
+        await stdoutFuture,
+        await stderrFuture,
+      );
+    } on TimeoutException {
+      process.kill();
+      await process.exitCode
+          .timeout(const Duration(seconds: 2))
+          .catchError((_) => -1);
+      debugPrint(
+          '[RollbackManager] System check timed out: $executable ${arguments.join(' ')}');
+      return null;
+    }
+  }
+
   /// Run diagnostic specs checks before launching updates setup
   Future<SystemSpecCheckResult> verifyInstallationSpecs() async {
     bool hasSpace = true;
@@ -40,9 +73,13 @@ class RollbackManager {
     // 2. Check Disk Space (Requesting min 300MB)
     try {
       if (Platform.isWindows) {
-        final res = await Process.run('powershell',
-            ['-Command', '(Get-Volume -DriveLetter C).SizeRemaining']);
-        if (res.exitCode == 0) {
+        final res = await _runWithTimeout('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '(Get-Volume -DriveLetter C).SizeRemaining'
+        ]);
+        if (res != null && res.exitCode == 0) {
           final bytes = int.tryParse(res.stdout.toString().trim()) ?? 0;
           freeGb = bytes / (1024 * 1024 * 1024);
           if (freeGb < 0.3) {
@@ -61,17 +98,18 @@ class RollbackManager {
     // 3. Check RAM memory limits (Requesting min 2GB for POS cache buffers)
     try {
       if (Platform.isWindows) {
-        final res = await Process.run(
-            'wmic', ['computersystem', 'get', 'TotalPhysicalMemory']);
-        if (res.exitCode == 0) {
-          final lines = res.stdout.toString().split('\n');
-          if (lines.length > 1) {
-            final rawBytes = int.tryParse(lines[1].trim()) ?? 0;
-            final double ramGb = rawBytes / (1024 * 1024 * 1024);
-            if (ramGb < 2.0) {
-              hasRam = false;
-              issues.add('Yetersiz RAM kapasitesi. En az 2GB RAM gereklidir.');
-            }
+        final res = await _runWithTimeout('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory'
+        ]);
+        if (res != null && res.exitCode == 0) {
+          final rawBytes = int.tryParse(res.stdout.toString().trim()) ?? 0;
+          final double ramGb = rawBytes / (1024 * 1024 * 1024);
+          if (ramGb < 2.0) {
+            hasRam = false;
+            issues.add('Yetersiz RAM kapasitesi. En az 2GB RAM gereklidir.');
           }
         }
       }
@@ -89,8 +127,11 @@ class RollbackManager {
   }
 
   /// Backup current running binary and local configuration
-  Future<bool> backupCurrentVersion() async {
+  Future<bool> backupCurrentVersion({
+    bool Function()? isCancelled,
+  }) async {
     try {
+      if (isCancelled?.call() ?? false) return false;
       final appDir = await getApplicationSupportDirectory();
       final backupDir = Directory(join(appDir.path, 'update_backups'))
         ..createSync(recursive: true);
@@ -102,6 +143,7 @@ class RollbackManager {
           final targetBackup =
               File(join(backupDir.path, 'serenut_running.exe.bak'));
           await currentExe.copy(targetBackup.path);
+          if (isCancelled?.call() ?? false) return false;
         }
       }
 
@@ -111,6 +153,7 @@ class RollbackManager {
       if (await dbFile.exists()) {
         final targetDbBackup = File(join(backupDir.path, 'serenut_pos.db.bak'));
         await dbFile.copy(targetDbBackup.path);
+        if (isCancelled?.call() ?? false) return false;
       }
 
       debugPrint(

@@ -104,11 +104,60 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       `);
     }
 
+    const fileStat = await fs.promises.stat(resolvedPath);
+    const fileSize = fileStat.size;
+    const rangeHeader = req.headers.range;
+    let start = 0;
+    let end = fileSize - 1;
+    let statusCode = 200;
+
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    if (rangeHeader) {
+      const match = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader.trim());
+      if (!match) {
+        res.setHeader('Content-Range', `bytes */${fileSize}`);
+        return res.status(416).end();
+      }
+
+      start = Number.parseInt(match[1], 10);
+      end = match[2] ? Number.parseInt(match[2], 10) : fileSize - 1;
+      if (start >= fileSize || end < start) {
+        res.setHeader('Content-Range', `bytes */${fileSize}`);
+        return res.status(416).end();
+      }
+      end = Math.min(end, fileSize - 1);
+      statusCode = 206;
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    }
+
+    const contentLength = end - start + 1;
+    res.status(statusCode);
+    res.setHeader('Content-Length', contentLength);
+    res.setHeader(
+      'Content-Type',
+      platform === 'windows'
+        ? 'application/vnd.microsoft.portable-executable'
+        : 'application/vnd.android.package-archive'
+    );
+
     const ext = path.extname(resolvedPath);
     const filename = `serenut-${versionCode}-${platform}${ext}`;
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    const stream = fs.createReadStream(resolvedPath);
+    if (req.method === 'HEAD') {
+      return res.end();
+    }
+
+    const stream = fs.createReadStream(resolvedPath, { start, end });
+    stream.on('error', (streamError) => {
+      console.error('Public download stream error:', streamError);
+      if (!res.headersSent) {
+        res.status(500).end();
+      } else {
+        res.destroy(streamError);
+      }
+    });
     stream.pipe(res);
   } catch (err) {
     console.error('Public download error:', err);

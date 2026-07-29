@@ -90,6 +90,46 @@ class DownloadProgress {
   });
 }
 
+class DownloadCancelledException implements Exception {
+  const DownloadCancelledException();
+
+  @override
+  String toString() =>
+      'Güncelleme indirmesi kullanıcı tarafından iptal edildi.';
+}
+
+class DownloadCancellationToken {
+  bool _isCancelled = false;
+  final Set<void Function()> _listeners = {};
+
+  bool get isCancelled => _isCancelled;
+
+  void cancel() {
+    if (_isCancelled) return;
+    _isCancelled = true;
+    for (final listener in List<void Function()>.from(_listeners)) {
+      listener();
+    }
+    _listeners.clear();
+  }
+
+  void throwIfCancelled() {
+    if (_isCancelled) throw const DownloadCancelledException();
+  }
+
+  void _addListener(void Function() listener) {
+    if (_isCancelled) {
+      listener();
+      return;
+    }
+    _listeners.add(listener);
+  }
+
+  void _removeListener(void Function() listener) {
+    _listeners.remove(listener);
+  }
+}
+
 /// Possible outcomes of an OTA install attempt.
 enum InstallResult {
   success,
@@ -194,7 +234,9 @@ class ReleaseManagerService {
     required String platform,
     String? jwtToken,
     String? deviceId,
+    DownloadCancellationToken? cancellationToken,
   }) async* {
+    cancellationToken?.throwIfCancelled();
     final downloadPath = updateInfo.downloadUrl!;
     final totalBytes = updateInfo.fileSizeBytes;
     final ext = platform == 'android' ? '.apk' : '.exe';
@@ -252,41 +294,66 @@ class ReleaseManagerService {
           '[ReleaseManager] Resuming OTA download from offset: $existingLength bytes');
     }
 
-    final streamedResponse = await _httpClient.send(request);
-    final isPartial = streamedResponse.statusCode == 206;
+    final downloadClient = http.Client();
+    void cancelRequest() => downloadClient.close();
+    cancellationToken?._addListener(cancelRequest);
+    IOSink? iosink;
+    int downloaded = 0;
 
-    if (streamedResponse.statusCode != 200 &&
-        streamedResponse.statusCode != 206) {
-      throw Exception(
-          '[ReleaseManager] Download failed: ${streamedResponse.statusCode}');
-    }
+    try {
+      final streamedResponse = await downloadClient
+          .send(request)
+          .timeout(const Duration(seconds: 30));
+      cancellationToken?.throwIfCancelled();
+      final isPartial = streamedResponse.statusCode == 206;
 
-    final int startByte = isPartial ? existingLength : 0;
-    if (!isPartial && existingLength > 0) {
-      // Server did not support range or returned full payload, clear old tmp file
-      if (await tmpFile.exists()) {
-        await tmpFile.delete();
+      if (streamedResponse.statusCode != 200 &&
+          streamedResponse.statusCode != 206) {
+        throw Exception(
+            '[ReleaseManager] Download failed: ${streamedResponse.statusCode}');
       }
+
+      final int startByte = isPartial ? existingLength : 0;
+      if (!isPartial && existingLength > 0) {
+        // Server did not support range or returned full payload, clear old tmp file
+        if (await tmpFile.exists()) {
+          await tmpFile.delete();
+        }
+      }
+
+      iosink =
+          tmpFile.openWrite(mode: isPartial ? FileMode.append : FileMode.write);
+      downloaded = startByte;
+
+      await for (final chunk in streamedResponse.stream) {
+        cancellationToken?.throwIfCancelled();
+        iosink.add(chunk);
+        downloaded += chunk.length;
+        final pct = (totalBytes != null && totalBytes > 0)
+            ? downloaded / totalBytes
+            : 0.0;
+        yield DownloadProgress(
+          bytesDownloaded: downloaded,
+          totalBytes: totalBytes,
+          percentage: pct.clamp(0.0, 1.0),
+        );
+      }
+      cancellationToken?.throwIfCancelled();
+      await iosink.flush();
+      await iosink.close();
+      iosink = null;
+    } catch (error) {
+      if (cancellationToken?.isCancelled ?? false) {
+        throw const DownloadCancelledException();
+      }
+      rethrow;
+    } finally {
+      if (iosink != null) {
+        await iosink.close();
+      }
+      cancellationToken?._removeListener(cancelRequest);
+      downloadClient.close();
     }
-
-    final iosink =
-        tmpFile.openWrite(mode: isPartial ? FileMode.append : FileMode.write);
-    int downloaded = startByte;
-
-    await for (final chunk in streamedResponse.stream) {
-      iosink.add(chunk);
-      downloaded += chunk.length;
-      final pct = (totalBytes != null && totalBytes > 0)
-          ? downloaded / totalBytes
-          : 0.0;
-      yield DownloadProgress(
-        bytesDownloaded: downloaded,
-        totalBytes: totalBytes,
-        percentage: pct.clamp(0.0, 1.0),
-      );
-    }
-
-    await iosink.close();
 
     // Rename tmp file to final file
     if (await targetFile.exists()) {
@@ -320,7 +387,8 @@ class ReleaseManagerService {
     if (signature.isNotEmpty && _rsaModulus.isNotEmpty) {
       try {
         final signatureBytes = base64.decode(signature.trim());
-        final payloadBytes = utf8.encode(actualHash); // Signed data is file hash
+        final payloadBytes =
+            utf8.encode(actualHash); // Signed data is file hash
 
         final modulus = BigInt.parse(_rsaModulus);
         final publicExponent = BigInt.parse(_rsaExponent);
@@ -333,8 +401,7 @@ class ReleaseManagerService {
         final verified = verifier.verifySignature(payloadBytes, rsaSignature);
         debugPrint('[ReleaseManager] RSA signature verify match=$verified');
       } catch (e) {
-        debugPrint(
-            '[ReleaseManager] RSA signature verification warning: $e');
+        debugPrint('[ReleaseManager] RSA signature verification warning: $e');
       }
     } else {
       debugPrint(
@@ -361,7 +428,8 @@ class ReleaseManagerService {
       try {
         debugPrint('[ReleaseManager] Launching Windows installer: $path');
         final currentExe = Platform.resolvedExecutable;
-        final batchFile = File('${file.parent.path}\\serenut_update_runner.bat');
+        final batchFile =
+            File('${file.parent.path}\\serenut_update_runner.bat');
         final batchContent = '@echo off\r\n'
             'timeout /t 2 /nobreak >nul\r\n'
             'start /wait "" "$path" /SILENT /SP- /NOCANCEL\r\n'
