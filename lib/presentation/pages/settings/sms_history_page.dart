@@ -3,16 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/infrastructure/repositories/notification_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/config/theme.dart';
 
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kRed = Color(0xFFDC2626);
-const _kAmber = Color(0xFFD97706);
-const _kBlue = Color(0xFF2563EB);
-const _kBorder = Color(0xFFE2E8F0);
-const _kSurface = Color(0xFFF8FAFC);
-const _kText = Color(0xFF0F172A);
-const _kMuted = Color(0xFF64748B);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kRed = POSColors.red;
+const _kAmber = POSColors.amberDark;
+const _kBlue = POSColors.blue;
+const _kBorder = POSColors.border;
+const _kSurface = POSColors.surface;
+const _kText = POSColors.text;
+const _kMuted = POSColors.textSecondary;
 
 class SmsHistoryPage extends ConsumerStatefulWidget {
   const SmsHistoryPage({super.key});
@@ -46,7 +47,7 @@ class _SmsHistoryPageState extends ConsumerState<SmsHistoryPage> {
     return Scaffold(
       backgroundColor: _kSurface,
       appBar: AppBar(
-        backgroundColor: _kSurface,
+        backgroundColor: POSColors.card,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: const Column(

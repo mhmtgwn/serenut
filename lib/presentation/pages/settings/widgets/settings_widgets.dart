@@ -1,20 +1,20 @@
 // lib/presentation/pages/settings/widgets/settings_widgets.dart
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
 // ── Design Theme Sabitleri ───────────────────────────────────────────────────
-const kBgColor =
-    Color(0xFFFAFAFC); // Sophisticated off-white / light slate grey
-const kCardBg = Colors.white;
-const kBorderColor = Color(0xFFF0F0F3); // Faint, subtle border
-const kTextPrimary =
-    Color(0xFF1E293B); // Slate-900: softer and cleaner than raw black
-const kTextSecondary = Color(0xFF64748B); // Slate-500: elegant subtitle color
-const kGreen = Color(0xFF10B981); // Emerald Green
-const kBlue = Color(0xFF3B82F6); // Modern Blue
-const kOrange = Color(0xFFF59E0B); // Modern Amber
+const kBgColor = POSColors.surface;
+const kCardBg = POSColors.card;
+const kBorderColor = POSColors.border;
+const kTextPrimary = POSColors.text;
+const kTextSecondary = POSColors.textSecondary;
+const kGreen = POSColors.green;
+const kBlue = POSColors.blue;
+const kOrange = POSColors.amber;
 const kPurple = Color(0xFF8B5CF6); // Modern Violet
-const kPink = Color(0xFFEF4444); // Modern Rose/Red
-const kGray = Color(0xFF94A3B8); // Cool Slate Grey
+const kPink = POSColors.red;
+const kGray = POSColors.textDisabled;
 const kTeal = Color(0xFF0D9488); // Deep Teal
 
 // ── iOS Bölücü Çizgisi ────────────────────────────────────────────────────────
@@ -49,39 +49,53 @@ class FullScreenSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-          0xFFF2F2F7), // _kBgColor matching the main settings screen
+      backgroundColor: POSColors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: POSColors.card,
+        elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
           title,
-          style: const TextStyle(
-            color: Color(0xFF000000), // _kTextPrimary
-            fontWeight: FontWeight.bold,
-            fontSize: 17,
-          ),
+          style: Theme.of(context).textTheme.titleLarge,
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded,
-              color: kGreen), // _kGreen close button
+          icon: const Icon(Icons.close_rounded, color: kGreen),
           onPressed: () => Navigator.pop(context),
         ),
         actions: actions,
       ),
       body: SafeArea(
-        child: useScrollView
-            ? SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: child,
-              )
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: child,
-              ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            child: useScrollView
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: child,
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: child,
+                  ),
+          ),
+        ),
       ),
+    );
+  }
+}
+
+class SettingsSurface extends StatelessWidget {
+  const SettingsSurface({super.key, required this.child, this.padding});
+
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerenutSurface(
+      padding: padding ?? const EdgeInsets.all(AppSpacing.md),
+      child: child,
     );
   }
 }

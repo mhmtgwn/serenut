@@ -40,18 +40,11 @@ extension SettingsPageUiHelpers on _SettingsPageState {
     return Container(
       decoration: BoxDecoration(
         color: _kCardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.md),
         border: Border.all(color: _kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.015),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: children,
@@ -134,10 +127,10 @@ extension SettingsPageUiHelpers on _SettingsPageState {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9), // Neutral light grey
-        borderRadius: BorderRadius.circular(10),
+        color: POSColors.greenLight,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
       ),
-      child: Icon(icon, color: _kTextSecondary, size: 18),
+      child: Icon(icon, color: POSColors.green, size: 18),
     );
   }
 

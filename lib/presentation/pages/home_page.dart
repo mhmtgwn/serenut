@@ -20,6 +20,7 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
 const _kBgColor = POSColors.surface;
@@ -122,100 +123,65 @@ class HomePage extends ConsumerWidget {
             ? settings.businessName
             : 'İyi Çalışmalar';
 
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return SerenutSectionHeader(
+      eyebrow: 'GÜNLÜK ÖZET',
+      title: titleText,
+      description: dateFormatted,
+      trailing: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
             children: [
-              const Text(
-                'GÜNLÜK ÖZET',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: _kTextSecondary,
-                  letterSpacing: 1.0,
+              IconButton(
+                icon: const Icon(Icons.notifications_none_rounded,
+                    color: Color(0xFF475569), size: 24),
+                tooltip: 'Bildirimler',
+                onPressed: () => _showNotifications(
+                  context,
+                  data,
+                  canViewInventory: canViewInventory,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                titleText,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _kTextDark,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                dateFormatted,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Flexible(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded,
-                        color: Color(0xFF475569), size: 24),
-                    tooltip: 'Bildirimler',
-                    onPressed: () => _showNotifications(
-                      context,
-                      data,
-                      canViewInventory: canViewInventory,
+              if (canViewInventory && data.lowStockProducts.isNotEmpty)
+                Positioned(
+                  right: 12,
+                  top: 12,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  if (canViewInventory && data.lowStockProducts.isNotEmpty)
-                    Positioned(
-                      right: 12,
-                      top: 12,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.search_rounded,
-                    color: Color(0xFF475569), size: 24),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const GlobalSearchPage(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 4),
-              if (currentUser != null &&
-                  (currentUser.role == UserRole.owner ||
-                      currentUser.role == UserRole.admin ||
-                      currentUser.hasPermission(Permission.settingsView.value)))
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined,
-                      color: Color(0xFF475569), size: 24),
-                  onPressed: () => context.push(AppRoutes.settings),
                 ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.search_rounded,
+                color: Color(0xFF475569), size: 24),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const GlobalSearchPage(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+          if (currentUser != null &&
+              (currentUser.role == UserRole.owner ||
+                  currentUser.role == UserRole.admin ||
+                  currentUser.hasPermission(Permission.settingsView.value)))
+            IconButton(
+              icon: const Icon(Icons.settings_outlined,
+                  color: Color(0xFF475569), size: 24),
+              onPressed: () => context.push(AppRoutes.settings),
+            ),
+        ],
+      ),
     );
   }
 

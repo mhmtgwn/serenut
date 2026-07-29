@@ -29,6 +29,7 @@ import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/license_page.dart'
     show LicenseManagementPage;
+import 'package:serenutos/config/theme.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
@@ -38,17 +39,17 @@ part 'settings/widgets/system_config_section.dart';
 part 'settings/widgets/settings_ui_helpers.dart';
 part 'settings/widgets/settings_dialogs.dart';
 
-const _kBgColor = Color(0xFFF8FAFC);
-const _kCardBg = Colors.white;
-const _kBorderColor = Color(0xFFE2E8F0);
-const _kTextPrimary = Color(0xFF0F172A);
-const _kTextSecondary = Color(0xFF64748B);
-const _kGreen = Color(0xFF16A34A);
-const _kBlue = Color(0xFF3B82F6); // Modern Blue
-const _kOrange = Color(0xFFF59E0B); // Modern Amber
+const _kBgColor = POSColors.surface;
+const _kCardBg = POSColors.card;
+const _kBorderColor = POSColors.border;
+const _kTextPrimary = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
+const _kGreen = POSColors.green;
+const _kBlue = POSColors.blue; // Grafik ve bilgi vurgusu
+const _kOrange = POSColors.amber;
 const _kPurple = Color(0xFF8B5CF6); // Modern Violet
-const _kPink = Color(0xFFEF4444); // Modern Rose/Red
-const _kGray = Color(0xFF94A3B8); // Cool Slate Grey
+const _kPink = POSColors.red;
+const _kGray = POSColors.textDisabled;
 const _kTeal = Color(0xFF0D9488); // Deep Teal
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -327,15 +328,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       height: 42,
       decoration: BoxDecoration(
         color: _kCardBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
         border: Border.all(color: _kBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.015),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: TextField(
         controller: _searchController,

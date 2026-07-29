@@ -2,6 +2,7 @@
 // Modern, horizontal scrollable filter pills for Serenut OS
 
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
 
 class PosFilterChipData {
   final String id;
@@ -42,7 +43,7 @@ class PosFilterBar extends StatelessWidget {
       child: Row(
         children: items.map((item) {
           final isSelected = item.id == selectedId;
-          final chipColor = item.color ?? const Color(0xFF16A34A);
+          final chipColor = item.color ?? POSColors.green;
 
           return Padding(
             padding: const EdgeInsets.only(right: 8.0),
@@ -50,7 +51,7 @@ class PosFilterBar extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => onSelected(item.id),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadii.sm),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
@@ -58,25 +59,12 @@ class PosFilterBar extends StatelessWidget {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? chipColor
-                        : const Color(0xFFF1F5F9), // Light slate
-                    borderRadius: BorderRadius.circular(20),
+                    color: isSelected ? chipColor : POSColors.card,
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                     border: Border.all(
-                      color: isSelected
-                          ? chipColor
-                          : const Color(0xFFE2E8F0),
+                      color: isSelected ? chipColor : POSColors.border,
                       width: 1,
                     ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: chipColor.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -85,7 +73,9 @@ class PosFilterBar extends StatelessWidget {
                         Icon(
                           item.icon,
                           size: 15,
-                          color: isSelected ? Colors.white : const Color(0xFF64748B),
+                          color: isSelected
+                              ? Colors.white
+                              : POSColors.textSecondary,
                         ),
                         const SizedBox(width: 6),
                       ],
@@ -95,7 +85,7 @@ class PosFilterBar extends StatelessWidget {
                           fontSize: 13,
                           fontWeight:
                               isSelected ? FontWeight.bold : FontWeight.w600,
-                          color: isSelected ? Colors.white : const Color(0xFF334155),
+                          color: isSelected ? Colors.white : POSColors.text,
                         ),
                       ),
                       if (item.count != null) ...[
@@ -108,7 +98,7 @@ class PosFilterBar extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? Colors.white.withValues(alpha: 0.25)
-                                : const Color(0xFFCBD5E1),
+                                : POSColors.greenLight,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -118,7 +108,7 @@ class PosFilterBar extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF1E293B),
+                                  : POSColors.greenDark,
                             ),
                           ),
                         ),
