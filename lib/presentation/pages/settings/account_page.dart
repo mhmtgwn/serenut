@@ -5,6 +5,9 @@ import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
+import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
 class AccountPage extends ConsumerWidget {
   const AccountPage({super.key});
@@ -15,46 +18,36 @@ class AccountPage extends ConsumerWidget {
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Hesabım'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _ProfileCard(user: user),
-              const SizedBox(height: 16),
-              _AccountAction(
-                icon: Icons.switch_account_rounded,
-                title: 'Kullanıcı değiştir',
-                subtitle: 'Başka bir çalışan hesabıyla giriş yapın',
-                onTap: () async {
-                  await ref.read(authNotifierProvider.notifier).logout();
-                  if (context.mounted) context.go(AppRoutes.login);
-                },
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: () async {
-                  await ref.read(authNotifierProvider.notifier).logout();
-                  if (context.mounted) context.go(AppRoutes.login);
-                },
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('Oturumu kapat'),
-              ),
-            ],
+    return FullScreenSettingsPage(
+      title: 'Hesabım',
+      useScrollView: false,
+      child: ListView(
+        children: [
+          _ProfileCard(user: user),
+          const SizedBox(height: 16),
+          _AccountAction(
+            icon: Icons.switch_account_rounded,
+            title: 'Kullanıcı değiştir',
+            subtitle: 'Başka bir çalışan hesabıyla giriş yapın',
+            onTap: () async {
+              await ref.read(authNotifierProvider.notifier).logout();
+              if (context.mounted) context.go(AppRoutes.login);
+            },
           ),
-        ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: POSColors.red,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: () async {
+              await ref.read(authNotifierProvider.notifier).logout();
+              if (context.mounted) context.go(AppRoutes.login);
+            },
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Oturumu kapat'),
+          ),
+        ],
       ),
     );
   }
@@ -67,16 +60,15 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
+    return SerenutSurface(
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             CircleAvatar(
               radius: 32,
-              backgroundColor: const Color(0xFF16A34A),
+              backgroundColor: POSColors.green,
               child: Text(
                 user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
                 style: const TextStyle(
@@ -89,7 +81,8 @@ class _ProfileCard extends StatelessWidget {
             Text(user.name,
                 style:
                     const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-            Text(user.email, style: const TextStyle(color: Color(0xFF64748B))),
+            Text(user.email,
+                style: const TextStyle(color: POSColors.textSecondary)),
             const SizedBox(height: 12),
             Chip(label: Text(_roleLabel(user.role))),
             const Divider(height: 28),
@@ -107,7 +100,7 @@ class _ProfileCard extends StatelessWidget {
                     ListTile(
                       dense: true,
                       leading: const Icon(Icons.check_circle_outline_rounded,
-                          color: Color(0xFF16A34A)),
+                          color: POSColors.green),
                       title: Text(permission),
                     ),
               ],
@@ -137,9 +130,9 @@ class _AccountAction extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
-      color: Colors.white,
+      color: POSColors.card,
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF16A34A)),
+        leading: Icon(icon, color: POSColors.green),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right_rounded),

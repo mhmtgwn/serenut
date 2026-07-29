@@ -146,17 +146,9 @@ class _PosNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: POSColors.navBackground,
-        border:
-            const Border(top: BorderSide(color: POSColors.border, width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: POSColors.text.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        border: Border(top: BorderSide(color: POSColors.border, width: 1)),
       ),
       child: SafeArea(
         top: false,

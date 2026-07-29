@@ -9,18 +9,19 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/config/theme.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor = Color(0xFFF8FAFC);
-const _kCardBg = Colors.white;
-const _kBorderColor = Color(0xFFE2E8F0);
-const _kTextPrimary = Color(0xFF0F172A);
-const _kTextSecondary = Color(0xFF64748B);
-const _kGreen = Color(0xFF10B981);
-const _kRed = Color(0xFFEF4444);
-const _kAmber = Color(0xFFF59E0B);
-const _kBlue = Color(0xFF3B82F6);
-const _kGray = Color(0xFF94A3B8);
+const _kBgColor = POSColors.surface;
+const _kCardBg = POSColors.card;
+const _kBorderColor = POSColors.border;
+const _kTextPrimary = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
+const _kGreen = POSColors.green;
+const _kRed = POSColors.red;
+const _kAmber = POSColors.amber;
+const _kBlue = POSColors.blue;
+const _kGray = POSColors.textDisabled;
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -49,8 +50,8 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
     return Scaffold(
       backgroundColor: _kBgColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: POSColors.card,
+        elevation: 0,
         title: const Text(
           'Yazıcı Kuyruğu',
           style: TextStyle(
@@ -442,15 +443,8 @@ class _PrintJobCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: _kCardBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadii.md),
         border: Border.all(color: style.borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),

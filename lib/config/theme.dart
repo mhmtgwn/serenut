@@ -258,7 +258,7 @@ class AppTheme {
       // ── InputDecoration ──────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: POSColors.surface,
+        fillColor: POSColors.card,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm + 4,

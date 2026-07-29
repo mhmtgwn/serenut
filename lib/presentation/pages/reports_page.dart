@@ -203,14 +203,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     final isOnline = token != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: POSColors.surface,
       appBar: AppBar(
         title: const Text('Raporlar & Analitik'),
         backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        foregroundColor: POSColors.text,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Color(0xFF16A34A)),
+        iconTheme: const IconThemeData(color: POSColors.green),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(96),
           child: Column(
@@ -223,9 +223,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
               // Tab Bar (Real-time Cloud tabs are hidden if offline)
               TabBar(
                 controller: _tabController,
-                labelColor: const Color(0xFF16A34A),
-                unselectedLabelColor: const Color(0xFF64748B),
-                indicatorColor: const Color(0xFF16A34A),
+                labelColor: POSColors.green,
+                unselectedLabelColor: POSColors.textSecondary,
+                indicatorColor: POSColors.green,
                 indicatorWeight: 2,
                 isScrollable: true,
                 tabs: [

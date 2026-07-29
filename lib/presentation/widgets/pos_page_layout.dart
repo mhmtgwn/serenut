@@ -8,6 +8,7 @@ import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
 /// POS Standart Üst Bar (Header) Bileşeni
 class PosHeader extends StatelessWidget {
@@ -47,60 +48,56 @@ class PosHeader extends StatelessWidget {
     return Material(
       color: POSColors.card,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm + 4,
-          AppSpacing.md,
-          AppSpacing.sm + 4,
+        padding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.sizeOf(context).width >= 900
+              ? AppSpacing.lg
+              : AppSpacing.md,
+          vertical: AppSpacing.md,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Title & Actions Row — Always Stable & Clean
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                if (actions != null) ...actions!,
-                if (showRefresh && onRefresh != null)
-                  IconButton(
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                    onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh_rounded, size: 22),
-                    tooltip: 'Yenile',
-                  ),
-                if (showStatusIndicator) ...[
-                  const RealtimeStatusIndicator(compact: true),
-                  const SizedBox(width: 4),
-                ],
-                if (showSettings)
-                  IconButton(
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.settings_outlined, size: 22),
-                    tooltip: 'Ayarlar',
-                    onPressed: () => requirePermissionAccess(
-                      context,
-                      permission: Permission.settingsView,
-                      title: 'Ayarlar Yetkisi',
-                      onGranted: (_, __) => context.push(AppRoutes.settings),
+            SerenutSectionHeader(
+              eyebrow: 'SERENUT OS',
+              title: title,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (actions != null) ...actions!,
+                  if (showRefresh && onRefresh != null)
+                    IconButton(
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(),
+                      onPressed: onRefresh,
+                      icon: const Icon(Icons.refresh_rounded, size: 22),
+                      tooltip: 'Yenile',
                     ),
-                  ),
-              ],
+                  if (showStatusIndicator) ...[
+                    const RealtimeStatusIndicator(compact: true),
+                    const SizedBox(width: 4),
+                  ],
+                  if (showSettings)
+                    IconButton(
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.settings_outlined, size: 22),
+                      tooltip: 'Ayarlar',
+                      onPressed: () => requirePermissionAccess(
+                        context,
+                        permission: Permission.settingsView,
+                        title: 'Ayarlar Yetkisi',
+                        onGranted: (_, __) => context.push(AppRoutes.settings),
+                      ),
+                    ),
+                ],
+              ),
             ),
 
             // Inline Search Bar (Zero-Click Mode & 1-Tap Clear)
             if (hasSearch || isSearching) ...[
               const SizedBox(height: 10),
-              SizedBox(
-                height: 44,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
                 child: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: searchController ?? TextEditingController(),
                   builder: (context, value, _) {
@@ -139,7 +136,7 @@ class PosHeader extends StatelessWidget {
 
             // Filter Widget Row
             if (filterWidget != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               filterWidget!,
             ],
           ],
@@ -203,7 +200,12 @@ class PosPageLayout extends StatelessWidget {
             ),
             const Divider(height: 1),
             const RealtimeStatusIndicator(compact: false),
-            Expanded(child: body),
+            Expanded(
+              child: ColoredBox(
+                color: POSColors.surface,
+                child: body,
+              ),
+            ),
           ],
         ),
       ),
