@@ -104,6 +104,27 @@ jobs:
           flutter build apk --release
           --dart-define-from-file=config/signing_public_keys.json
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
+      - name: Verify production Android signing certificate
+        if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          EXPECTED_CERT_SHA256: 3806945a82a023a36a91ddcce3ff350d3695da41503b254452375313bd221493
+        run: |
+          actual_cert_sha256="$(
+            keytool -exportcert -rfc \
+              -keystore android/app/serenut-release.jks \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" |
+            openssl x509 -noout -fingerprint -sha256 |
+            cut -d= -f2 |
+            tr -d ':' |
+            tr '[:upper:]' '[:lower:]'
+          )"
+          if [ "$actual_cert_sha256" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::Android release certificate mismatch: $actual_cert_sha256"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
         with:
