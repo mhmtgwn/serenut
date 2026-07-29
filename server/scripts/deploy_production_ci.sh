@@ -4,6 +4,17 @@ set -eu
 cd "$(dirname "$0")/.."
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
+# The maintenance agent is isolated from the public network and accepts only
+# allowlisted jobs authenticated with this root-owned shared token.
+if [ ! -s .maintenance-token ]; then
+  umask 077
+  head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > .maintenance-token
+fi
+
+PUBLISH_LOCK="releases/.publishing"
+mkdir -p releases
+touch "$PUBLISH_LOCK"
+
 rollback_available=0
 if docker image inspect serenut-backend:latest >/dev/null 2>&1; then
   docker tag serenut-backend:latest serenut-backend:rollback
@@ -20,6 +31,7 @@ rollback() {
 cleanup() {
   status=$?
   trap - EXIT HUP INT TERM
+  rm -f "$PUBLISH_LOCK"
   if [ "$status" -ne 0 ]; then
     rollback
   fi
@@ -27,7 +39,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-$COMPOSE build backend
+$COMPOSE build backend maintenance-agent
 $COMPOSE run --rm backend node dist/scripts/run-migrations.js
 
 # SCP writes incoming artifacts as the SSH user while the API runs as the
@@ -44,4 +56,5 @@ $COMPOSE exec -T backend node dist/scripts/publish-release.js batch "$1" \
   /var/www/serenut-api/releases/_incoming/android/app-release.apk \
   /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe false
 curl --fail https://api.serenut.com/api/v1/updates/latest-metadata
+rm -f "$PUBLISH_LOCK"
 trap - EXIT HUP INT TERM

@@ -37,9 +37,13 @@ async function run() {
   assert.doesNotMatch(publicSources, /embed=1|auth-modal-iframe/, 'iframe authentication must stay removed');
 
   const runtime = fs.readFileSync(path.join(projectRoot, 'public/app/js/module-runtime.js'), 'utf8');
-  for (const loader of ['platform-companies', 'platform-health', 'platform-security']) {
+  for (const loader of ['platform-companies', 'platform-health', 'platform-maintenance', 'platform-security']) {
     assert.match(runtime, new RegExp(`'${loader}': async`), `${loader} loader must be registered`);
   }
+  const adminController = fs.readFileSync(path.join(projectRoot, 'src/modules/admin/admin.controller.ts'), 'utf8');
+  assert.match(adminController, /\/maintenance\/preview/, 'maintenance preview endpoint must exist');
+  assert.match(adminController, /\/maintenance\/cleanup/, 'maintenance cleanup endpoint must exist');
+  assert.match(adminController, /SUNUCUYU TEMIZLE/, 'maintenance cleanup must require an explicit confirmation phrase');
 
   const appSource = fs.readFileSync(path.join(projectRoot, 'public/app/js/app.js'), 'utf8');
   assert.doesNotMatch(appSource, /module:\s*isSysadmin\s*\?/, 'frontend must preserve backend module kinds');
@@ -57,6 +61,7 @@ async function run() {
   assert.ok(ownerHome.some((item) => item.id === 'workspace-home' && item.module === 'home'));
   const sysadminNav = filterNavByEntitlements(['sysadmin'], []);
   assert.ok(sysadminNav.some((item) => item.id === 'platform-overview' && item.module === 'admin'));
+  assert.ok(sysadminNav.some((item) => item.id === 'platform-maintenance' && item.module === 'admin'));
 
   console.log('Web route contract passed.');
 }

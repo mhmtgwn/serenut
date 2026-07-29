@@ -3,6 +3,18 @@ import { escapeHtml as esc, formatCurrency as money, formatDate as date, transla
 
 const badge = v => `<span class="status-badge status-${esc(String(v || 'unknown').toLowerCase())}">${esc(v || '—')}</span>`;
 const metric = (label, value) => `<article class="metric-card"><span>${esc(label)}</span><strong>${esc(value)}</strong></article>`;
+const fileSize = value => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const unit = Math.min(Math.floor(Math.log(amount) / Math.log(1024)), units.length - 1);
+  return `${(amount / (1024 ** unit)).toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
+};
+const jsonObject = value => {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch (_) { return {}; }
+};
 
 // Tarayıcı ve işletim sistemi bilgisini user-agent string'inden çıkar
 function parseUA(ua) {
@@ -318,6 +330,52 @@ Admin kullanıcı oluşturuldu: ${adminEmail}`;notice(msg);await loaders['platfo
     const [d,incidents]=await Promise.all([apiFetch('/admin/dashboard'),apiFetch('/admin/incidents')]);
     const s=d.system||{};
     set(`<div class="metrics-grid">${metric('PostgreSQL',s.database||'—')}${metric('Redis',s.redis||'—')}${metric('CPU',`${s.cpuUsage||0}%`)}${metric('RAM',`${s.ramUsage||0}%`)}${metric('Disk',`${s.diskUsage||0}%`)}</div><h3 class="content-title">Sistem Olayları</h3>${table([{label:'Önem',render:r=>badge(r.severity)},{label:'Başlık',key:'title'},{label:'Şirket',key:'company_name'},{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Durum',render:r=>badge(r.status)}],incidents)}`);
+  },
+  'platform-maintenance': async () => {
+    const preview=await apiFetch('/admin/maintenance/preview');
+    const tasks=preview.tasks||{};
+    const taskDefinitions=[
+      ['docker_build_cache','Docker Derleme Önbelleği','Kullanılmayan build katmanlarını kaldırır. Bir sonraki dağıtım daha uzun sürebilir.'],
+      ['dangling_images','Sahipsiz Docker İmajları','Hiçbir etiketi ve çalışan konteyner bağlantısı olmayan imajları kaldırır.'],
+      ['stopped_containers','Durdurulmuş Konteynerler','Çalışmayan eski konteynerleri kaldırır; aktif servisler ve veri volume’ları korunur.'],
+      ['old_releases','Eski Uygulama Sürümleri','Android ve Windows için en yeni iki paketi korur, daha eski kararlı paketleri kaldırır.'],
+      ['temporary_releases','Geçici Yayın Dosyaları','Yayın klasöründe en az iki saattir bekleyen APK ve EXE kopyalarını kaldırır.'],
+      ['archived_logs','Arşivlenmiş Loglar','Yedi günden eski döndürülmüş logları kaldırır; aktif hata loglarına dokunmaz.'],
+    ];
+    const candidateFiles=[...(tasks.old_releases?.files||[]),...(tasks.temporary_releases?.files||[]),...(tasks.archived_logs?.files||[])];
+    const history=Array.isArray(preview.history)?preview.history:[];
+    set(`<div class="metrics-grid">${metric('Disk Kullanımı',`${preview.disk?.usedPercent||0}%`)}${metric('Boş Alan',fileSize(preview.disk?.freeBytes))}${metric('Temizlenebilir',fileSize(taskDefinitions.reduce((sum,[id])=>sum+Number(tasks[id]?.candidateBytes||0),0)))}${metric('Bakım Servisi',preview.running?'Çalışıyor':preview.releasePublishInProgress?'Yayın bekleniyor':'Hazır')}</div>
+      <div class="maintenance-protection"><strong>Korunan veriler</strong><span>Veritabanı ve hesaplar</span><span>Satış, sipariş, ürün ve müşteriler</span><span>Aktif uygulama logları</span><span>Her platformun son iki sürümü</span></div>
+      <section class="maintenance-panel">
+        <div class="section-heading"><div><h3>Temizlik Önizlemesi</h3><p>Yalnızca aşağıdaki önceden tanımlı görevler çalıştırılabilir. Genel komut veya dosya yolu girilemez.</p></div><button class="btn btn-secondary btn-sm" id="maintenance-refresh">Yenile</button></div>
+        <div class="maintenance-task-grid">${taskDefinitions.map(([id,label,description])=>`<label class="maintenance-task ${Number(tasks[id]?.candidateCount||0)===0?'maintenance-task-empty':''}"><input type="checkbox" name="maintenance-task" value="${id}" ${Number(tasks[id]?.candidateCount||0)>0?'checked':''}><span><strong>${esc(label)}</strong><small>${esc(description)}</small><b>${esc(tasks[id]?.candidateCount||0)} öğe · ${esc(fileSize(tasks[id]?.candidateBytes))}</b></span></label>`).join('')}</div>
+        <details class="maintenance-files"><summary>Silinecek dosyaları göster (${candidateFiles.length})</summary>${candidateFiles.length?`<ul>${candidateFiles.slice(0,100).map(file=>`<li><code>${esc(file.path)}</code><span>${esc(fileSize(file.size))}</span></li>`).join('')}</ul>`:'<div class="state-panel">Silinecek yayın veya log dosyası bulunamadı.</div>'}</details>
+        <div class="maintenance-confirm"><label>İşlemi onaylamak için <code>SUNUCUYU TEMIZLE</code> yazın<input id="maintenance-confirmation" autocomplete="off" placeholder="SUNUCUYU TEMIZLE"></label><button class="btn btn-primary" id="maintenance-run" disabled>Seçilenleri Temizle</button></div>
+        <div id="maintenance-result"></div>
+      </section>
+      <div class="section-heading spaced"><div><h3>Bakım Geçmişi</h3><p>Başarılı ve başarısız işlemler denetim kaydında saklanır.</p></div></div>
+      ${table([{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Yönetici',render:r=>esc(r.user_name||r.user_email||'Sistem')},{label:'Sonuç',render:r=>badge(r.action==='SERVER_MAINTENANCE_COMPLETED'?'Başarılı':'Başarısız')},{label:'Açılan Alan',render:r=>esc(fileSize(jsonObject(r.new_value).reclaimedBytes))},{label:'IP',render:r=>esc(r.ip_address||'—')}],history)}`);
+    const confirmation=document.getElementById('maintenance-confirmation');
+    const runButton=document.getElementById('maintenance-run');
+    const updateButton=()=>{const selected=document.querySelectorAll('input[name="maintenance-task"]:checked').length;runButton.disabled=confirmation.value.trim()!=='SUNUCUYU TEMIZLE'||selected===0;};
+    confirmation.oninput=updateButton;
+    document.querySelectorAll('input[name="maintenance-task"]').forEach(input=>input.onchange=updateButton);
+    document.getElementById('maintenance-refresh').onclick=()=>loaders['platform-maintenance']();
+    runButton.onclick=async()=>{
+      const selected=[...document.querySelectorAll('input[name="maintenance-task"]:checked')].map(input=>input.value);
+      runButton.disabled=true;runButton.innerText='Temizleniyor…';
+      document.getElementById('maintenance-result').innerHTML='<div class="attention-strip">Bakım görevi çalışıyor. Bu sayfayı kapatmayın.</div>';
+      try{
+        const result=await apiFetch('/admin/maintenance/cleanup',{method:'POST',body:{tasks:selected,confirmation:confirmation.value.trim()}});
+        window._maintenanceLastResult=`Bakım tamamlandı. ${fileSize(result.reclaimedBytes)} alan açıldı.`;
+        await loaders['platform-maintenance']();
+        const resultBox=document.getElementById('maintenance-result');
+        if(resultBox)resultBox.innerHTML=`<div class="state-panel"><strong>${esc(window._maintenanceLastResult)}</strong></div>`;
+      }catch(error){
+        document.getElementById('maintenance-result').innerHTML=`<div class="state-panel state-error"><strong>Bakım tamamlanamadı</strong><p>${esc(error.message)}</p></div>`;
+        runButton.disabled=false;runButton.innerText='Seçilenleri Temizle';
+      }
+    };
   },
   'platform-security': async () => {
     const filters={
