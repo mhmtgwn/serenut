@@ -110,7 +110,7 @@ class TrialBannerWidget extends ConsumerWidget {
         subtitle:
             'Ticari lisansınızın bitmesine ${licStatus.daysLeft} gün kaldı.',
         actionLabel: 'Yenile',
-        onAction: () => context.push(AppRoutes.license),
+        onAction: () => context.push(AppRoutes.about),
         isCritical: isLow,
       );
     }
@@ -124,7 +124,7 @@ class TrialBannerWidget extends ConsumerWidget {
         title: 'Deneme Sürümü Aktif',
         subtitle: 'Deneme sürenizin bitmesine ${licStatus.daysLeft} gün kaldı.',
         actionLabel: 'Lisans Gir',
-        onAction: () => context.push(AppRoutes.license),
+        onAction: () => context.push(AppRoutes.about),
         isCritical: false,
       );
     }
@@ -181,7 +181,7 @@ class TrialBannerWidget extends ConsumerWidget {
             : 'Lisansınızın dolmasına ${licStatus.daysLeft} gün kaldı',
         subtitle: 'Kesintisiz kullanım için lisansı yenileyin.',
         actionLabel: 'Yenile',
-        onAction: () => context.push(AppRoutes.license),
+        onAction: () => context.push(AppRoutes.about),
         isCritical: urgency,
       );
     }

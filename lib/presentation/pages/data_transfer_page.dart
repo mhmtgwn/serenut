@@ -37,22 +37,22 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
+import 'package:serenutos/config/theme.dart';
 part 'data_transfer/import_progress_dialog.dart';
 part 'data_transfer/export_progress_dialog.dart';
 part 'data_transfer/contact_import_page.dart';
 
 // ── Design Theme Sabitleri ───────────────────────────────────────────────────
-const _kBgColor = Color(0xFFF2F2F7);
-const _kCardBg = Colors.white;
-const _kBorderColor = Color(0xFFE5E5EA);
-const _kTextPrimary = Color(0xFF000000);
-const _kTextSecondary = Color(0xFF8E8E93);
-const _kGreen = Color(0xFF34C759);
-const _kBlue = Color(0xFF007AFF);
-const _kOrange = Color(0xFFFF9500);
-const _kPink = Color(0xFFFF2D55);
-const _kTeal = Color(0xFF5856D6);
-const _kTealLight = Color(0xFF00C7BE);
+const _kCardBg = POSColors.card;
+const _kBorderColor = POSColors.border;
+const _kTextPrimary = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
+const _kGreen = POSColors.green;
+const _kBlue = POSColors.blue;
+const _kOrange = POSColors.amber;
+const _kPink = POSColors.red;
+const _kTeal = POSColors.greenDark;
+const _kTealLight = POSColors.greenMid;
 
 enum DataManagementMode { transfer, backup, dangerous }
 
@@ -100,117 +100,98 @@ class DataTransferPage extends ConsumerStatefulWidget {
 class _DataTransferPageState extends ConsumerState<DataTransferPage> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kBgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          widget.mode.title,
-          style: const TextStyle(
-            color: _kTextPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 17,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _kGreen),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            // Giriş Banner'ı
-            _buildIntroBanner(),
+    return FullScreenSettingsPage(
+      title: widget.mode.title,
+      useScrollView: false,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
+          // Giriş Banner'ı
+          _buildIntroBanner(),
+          const SizedBox(height: 20),
+
+          if (widget.mode == DataManagementMode.transfer) ...[
+            // GRUP 1: İÇE AKTARMA SEÇENEKLERİ
+            _buildSectionHeader('İÇE AKTARMA SEÇENEKLERİ'),
+            _buildRoundedCard([
+              _buildTransferRow(
+                title: 'Ürün Kataloğu İçe Aktar (.zip / .xlsx)',
+                subtitle:
+                    'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',
+                icon: Icons.upload_file_rounded,
+                color: _kGreen,
+                onTap: () => _handleImportZipCatalog(context),
+              ),
+              const _Divider(),
+              _buildTransferRow(
+                title: 'Rehberden Müşteri Aktar',
+                subtitle: 'Cihazdaki kişileri müşteri olarak içeri yükler.',
+                icon: Icons.contact_phone_rounded,
+                color: _kBlue,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      fullscreenDialog: true,
+                      builder: (context) => const ContactImportPage(),
+                    ),
+                  );
+                },
+              ),
+            ]),
             const SizedBox(height: 20),
 
-            if (widget.mode == DataManagementMode.transfer) ...[
-              // GRUP 1: İÇE AKTARMA SEÇENEKLERİ
-              _buildSectionHeader('İÇE AKTARMA SEÇENEKLERİ'),
-              _buildRoundedCard([
-                _buildTransferRow(
-                  title: 'Ürün Kataloğu İçe Aktar (.zip / .xlsx)',
-                  subtitle:
-                      'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',
-                  icon: Icons.upload_file_rounded,
-                  color: _kGreen,
-                  onTap: () => _handleImportZipCatalog(context),
-                ),
-                const _Divider(),
-                _buildTransferRow(
-                  title: 'Rehberden Müşteri Aktar',
-                  subtitle: 'Cihazdaki kişileri müşteri olarak içeri yükler.',
-                  icon: Icons.contact_phone_rounded,
-                  color: _kBlue,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        fullscreenDialog: true,
-                        builder: (context) => const ContactImportPage(),
-                      ),
-                    );
-                  },
-                ),
-              ]),
-              const SizedBox(height: 20),
-
-              // GRUP 2: DIŞARI AKTARMA & YEDEKLEME SEÇENEKLERİ
-              _buildSectionHeader('DIŞARI AKTARMA & YEDEKLEME'),
-              _buildRoundedCard([
-                _buildTransferRow(
-                  title: 'Ürün Kataloğu Dışarı Aktar (.zip)',
-                  subtitle:
-                      'Mevcut kataloğu Excel tablosu ve görsellerle yedekler.',
-                  icon: Icons.download_rounded,
-                  color: _kTealLight,
-                  onTap: () => _handleExportZipCatalog(context),
-                ),
-              ]),
-            ],
-            if (widget.mode == DataManagementMode.backup) ...[
-              _buildSectionHeader('YEDEKLEME VE GERİ YÜKLEME'),
-              _buildRoundedCard([
-                _buildTransferRow(
-                  title: 'Yedekleme ve Geri Yükleme',
-                  subtitle: 'Uygulama veritabanını yedekler veya geri yükler.',
-                  icon: Icons.backup_rounded,
-                  color: _kOrange,
-                  onTap: () => _showBackupRestoreSheet(),
-                ),
-              ]),
-              const SizedBox(height: 20),
-            ],
-
-            if (widget.mode == DataManagementMode.dangerous) ...[
-              _buildSectionHeader('GERİ ALINAMAYAN İŞLEMLER'),
-              _buildRoundedCard([
-                _buildTransferRow(
-                  title: 'Tüm Ürün Kataloğunu Temizle',
-                  subtitle:
-                      'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
-                  icon: Icons.delete_sweep_rounded,
-                  color: _kPink,
-                  onTap: () => _clearAllProducts(),
-                ),
-                const _Divider(),
-                _buildTransferRow(
-                  title: 'Tüm Verileri Sıfırla (Fabrika Ayarları)',
-                  subtitle:
-                      'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
-                  icon: Icons.phonelink_erase_rounded,
-                  color: _kPink,
-                  onTap: () => _resetAllUserData(),
-                ),
-              ]),
-            ],
-            const SizedBox(height: 32),
+            // GRUP 2: DIŞARI AKTARMA & YEDEKLEME SEÇENEKLERİ
+            _buildSectionHeader('DIŞARI AKTARMA & YEDEKLEME'),
+            _buildRoundedCard([
+              _buildTransferRow(
+                title: 'Ürün Kataloğu Dışarı Aktar (.zip)',
+                subtitle:
+                    'Mevcut kataloğu Excel tablosu ve görsellerle yedekler.',
+                icon: Icons.download_rounded,
+                color: _kTealLight,
+                onTap: () => _handleExportZipCatalog(context),
+              ),
+            ]),
           ],
-        ),
+          if (widget.mode == DataManagementMode.backup) ...[
+            _buildSectionHeader('YEDEKLEME VE GERİ YÜKLEME'),
+            _buildRoundedCard([
+              _buildTransferRow(
+                title: 'Yedekleme ve Geri Yükleme',
+                subtitle: 'Uygulama veritabanını yedekler veya geri yükler.',
+                icon: Icons.backup_rounded,
+                color: _kOrange,
+                onTap: () => _showBackupRestoreSheet(),
+              ),
+            ]),
+            const SizedBox(height: 20),
+          ],
+
+          if (widget.mode == DataManagementMode.dangerous) ...[
+            _buildSectionHeader('GERİ ALINAMAYAN İŞLEMLER'),
+            _buildRoundedCard([
+              _buildTransferRow(
+                title: 'Tüm Ürün Kataloğunu Temizle',
+                subtitle:
+                    'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
+                icon: Icons.delete_sweep_rounded,
+                color: _kPink,
+                onTap: () => _clearAllProducts(),
+              ),
+              const _Divider(),
+              _buildTransferRow(
+                title: 'Tüm Verileri Sıfırla (Fabrika Ayarları)',
+                subtitle:
+                    'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
+                icon: Icons.phonelink_erase_rounded,
+                color: _kPink,
+                onTap: () => _resetAllUserData(),
+              ),
+            ]),
+          ],
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }

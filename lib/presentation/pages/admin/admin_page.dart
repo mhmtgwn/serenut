@@ -200,7 +200,7 @@ class AdminPage extends ConsumerWidget {
               color: licStatus.status == 'valid' ? _kGreen : _kRed,
               title: 'Lisans Yönetimi',
               subtitle: _buildLicenseSubtitle(licStatus),
-              onTap: () => context.push(AppRoutes.license),
+              onTap: () => context.push(AppRoutes.about),
             ),
             const _Divider(),
             _AdminTile(
