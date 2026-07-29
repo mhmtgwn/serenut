@@ -145,7 +145,7 @@ class LoginPage extends ConsumerWidget {
                 // ── Alt bağlantı ──
                 TextButton(
                   onPressed: () async {
-                    final uri = Uri.parse('https://serenut.com/portal/#reset');
+                    final uri = Uri.parse('https://serenut.com/forgot-password');
                     if (await canLaunchUrl(uri)) {
                       await launchUrl(uri,
                           mode: LaunchMode.externalApplication);

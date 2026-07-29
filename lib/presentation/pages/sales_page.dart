@@ -178,6 +178,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
         matched = results.first;
       }
     }
+    if (!mounted) return;
 
     if (matched != null) {
       ref.read(salesFlowProvider.notifier).addToCart(matched);
@@ -235,6 +236,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
         final prod = flowState.cartProducts[entry.key]!;
         return SaleItemInput(
           productId: prod.id,
+          productName: prod.name,
           quantity: entry.value,
           saleQuantity:
               prod.isWeighed ? entry.value / 1000.0 : entry.value.toDouble(),
@@ -362,21 +364,27 @@ class _SalesPageState extends ConsumerState<SalesPage> {
           ),
         );
         return {
-          'product_id': prod.name,
+          'product_id': item['product_id'],
+          'product_name': item['product_name'] ?? prod.name,
+          'barcode': prod.id,
           'quantity': item['quantity'],
           'unit_price': item['unit_price'],
         };
       }).toList();
 
-      ref.read(printerServiceProvider).enqueue(
-            'Satış Fişi #${sale.id.toShortId}',
-            () => ref.read(printerServiceProvider).printSaleReceipt(
-                  sale,
-                  receiptItems,
-                  customer.id.isNotEmpty ? customer : null,
-                  settings,
-                ),
-          );
+      final copies = settings.printCopies.clamp(1, 10);
+      for (var copy = 1; copy <= copies; copy++) {
+        final suffix = copies > 1 ? ' ($copy/$copies)' : '';
+        ref.read(printerServiceProvider).enqueue(
+              'Satış Fişi #${sale.id.toShortId}$suffix',
+              () => ref.read(printerServiceProvider).printSaleReceipt(
+                    sale,
+                    receiptItems,
+                    customer.id.isNotEmpty ? customer : null,
+                    settings,
+                  ),
+            );
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

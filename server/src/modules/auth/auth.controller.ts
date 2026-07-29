@@ -574,7 +574,7 @@ router.get('/verify-email', async (req: Request, res: Response) => {
       [result.rows[0].user_id]
     );
     await client.query('COMMIT');
-    return res.redirect(302, '/app/#login?verified=1');
+    return res.redirect(302, '/login?verified=1');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     logger.error('Email verification failed', err);

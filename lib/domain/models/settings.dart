@@ -33,6 +33,15 @@ class Settings {
   final bool printProductDetails;
   final bool printBarcode;
   final int printCopies;
+  final bool printLogo;
+  final bool printCustomerBalance;
+  final String receiptFont;
+  final String receiptTextSize;
+  final String receiptItemLayout;
+  final String receiptFooterText;
+  final int receiptFeedLines;
+  final bool autoCutReceipt;
+  final bool openCashDrawer;
 
   // KDV kategorileri (JSON string)
   final String vatCategories; // JSON: [{"name":"Normal","rate":18}, ...]
@@ -92,6 +101,15 @@ class Settings {
     this.printProductDetails = true,
     this.printBarcode = true,
     this.printCopies = 1,
+    this.printLogo = true,
+    this.printCustomerBalance = true,
+    this.receiptFont = 'a',
+    this.receiptTextSize = 'normal',
+    this.receiptItemLayout = 'auto',
+    this.receiptFooterText = 'Bizi tercih ettiğiniz için teşekkür ederiz!',
+    this.receiptFeedLines = 2,
+    this.autoCutReceipt = true,
+    this.openCashDrawer = true,
     this.vatCategories = '[]',
     this.smsEnabled = false,
     this.smsProvider,
@@ -153,6 +171,16 @@ class Settings {
       printProductDetails: (map['print_product_details'] as int?) == 1,
       printBarcode: (map['print_barcode'] as int?) == 1,
       printCopies: (map['print_copies'] as int?) ?? 1,
+      printLogo: (map['print_logo'] as int? ?? 1) == 1,
+      printCustomerBalance: (map['print_customer_balance'] as int? ?? 1) == 1,
+      receiptFont: map['receipt_font'] as String? ?? 'a',
+      receiptTextSize: map['receipt_text_size'] as String? ?? 'normal',
+      receiptItemLayout: map['receipt_item_layout'] as String? ?? 'auto',
+      receiptFooterText: map['receipt_footer_text'] as String? ??
+          'Bizi tercih ettiğiniz için teşekkür ederiz!',
+      receiptFeedLines: (map['receipt_feed_lines'] as int?) ?? 2,
+      autoCutReceipt: (map['auto_cut_receipt'] as int? ?? 1) == 1,
+      openCashDrawer: (map['open_cash_drawer'] as int? ?? 1) == 1,
       vatCategories: map['vat_categories'] as String? ?? '[]',
       smsEnabled: (map['sms_enabled'] as int?) == 1,
       smsProvider: map['sms_provider'] as String?,
@@ -216,6 +244,15 @@ class Settings {
       'print_product_details': printProductDetails ? 1 : 0,
       'print_barcode': printBarcode ? 1 : 0,
       'print_copies': printCopies,
+      'print_logo': printLogo ? 1 : 0,
+      'print_customer_balance': printCustomerBalance ? 1 : 0,
+      'receipt_font': receiptFont,
+      'receipt_text_size': receiptTextSize,
+      'receipt_item_layout': receiptItemLayout,
+      'receipt_footer_text': receiptFooterText,
+      'receipt_feed_lines': receiptFeedLines,
+      'auto_cut_receipt': autoCutReceipt ? 1 : 0,
+      'open_cash_drawer': openCashDrawer ? 1 : 0,
       'vat_categories': vatCategories,
       'sms_enabled': smsEnabled ? 1 : 0,
       'sms_provider': smsProvider,
@@ -271,6 +308,15 @@ class Settings {
     bool? printProductDetails,
     bool? printBarcode,
     int? printCopies,
+    bool? printLogo,
+    bool? printCustomerBalance,
+    String? receiptFont,
+    String? receiptTextSize,
+    String? receiptItemLayout,
+    String? receiptFooterText,
+    int? receiptFeedLines,
+    bool? autoCutReceipt,
+    bool? openCashDrawer,
     String? vatCategories,
     bool? smsEnabled,
     String? smsProvider,
@@ -321,6 +367,15 @@ class Settings {
       printProductDetails: printProductDetails ?? this.printProductDetails,
       printBarcode: printBarcode ?? this.printBarcode,
       printCopies: printCopies ?? this.printCopies,
+      printLogo: printLogo ?? this.printLogo,
+      printCustomerBalance: printCustomerBalance ?? this.printCustomerBalance,
+      receiptFont: receiptFont ?? this.receiptFont,
+      receiptTextSize: receiptTextSize ?? this.receiptTextSize,
+      receiptItemLayout: receiptItemLayout ?? this.receiptItemLayout,
+      receiptFooterText: receiptFooterText ?? this.receiptFooterText,
+      receiptFeedLines: receiptFeedLines ?? this.receiptFeedLines,
+      autoCutReceipt: autoCutReceipt ?? this.autoCutReceipt,
+      openCashDrawer: openCashDrawer ?? this.openCashDrawer,
       vatCategories: vatCategories ?? this.vatCategories,
       smsEnabled: smsEnabled ?? this.smsEnabled,
       smsProvider: smsProvider ?? this.smsProvider,

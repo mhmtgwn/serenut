@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -22,10 +24,12 @@ class SyncV4Result {
   const SyncV4Result(
       {required this.pushed,
       required this.pulled,
+      this.reconciled = 0,
       this.failed = 0,
       this.errors = const []});
   final int pushed;
   final int pulled;
+  final int reconciled;
   final int failed;
   final List<String> errors;
   int get synced => pushed;
@@ -50,9 +54,18 @@ class SyncV4Service {
   static const _legacySnapshotKey = 'sync_v4_legacy_snapshot_v1';
   static const _unsyncedProductRecoveryKey =
       'sync_v4_unsynced_product_recovery_v1';
+  static const _companyVersionKey = 'sync_v4_company_version';
+  static const _companySyncedAtKey = 'sync_v4_company_synced_at';
 
   Future<SyncV4Result> sync() async {
     final db = await DatabaseManager().getDatabase();
+    var companyChanged = false;
+    try {
+      companyChanged = await _syncCompanyProfile(db);
+    } catch (_) {
+      // Company profile synchronization is retried on the next cycle and must
+      // not prevent transactional sales/inventory replication.
+    }
     final deviceActivationId = await _deviceActivationId();
     final deviceId = await _deviceId();
     await _snapshotPreV4DataOnce(db);
@@ -152,7 +165,8 @@ class SyncV4Service {
     final state = await db.query('sync_cursor_v4',
         where: 'key = ?', whereArgs: ['global'], limit: 1);
     var cursor = state.isEmpty ? 0 : _syncInt(state.first['cursor']);
-    var pulled = 0;
+    var pulled = companyChanged ? 1 : 0;
+    var reconciled = 0;
 
     // A fresh installation cannot reconstruct a tenant from a change log that
     // started after the tenant's original records were created. Hydrate from
@@ -194,6 +208,7 @@ class SyncV4Service {
         for (final raw in changes.cast<Map>()) {
           await _apply(txn, Map<String, dynamic>.from(raw));
         }
+        reconciled += await _reconcileCustomerBalances(txn);
         await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': next},
             conflictAlgorithm: ConflictAlgorithm.replace);
       });
@@ -204,9 +219,130 @@ class SyncV4Service {
     return SyncV4Result(
       pushed: pushed,
       pulled: pulled,
+      reconciled: reconciled,
       failed: failed,
       errors: errors,
     );
+  }
+
+  Future<bool> _syncCompanyProfile(Database db) async {
+    final response = await _api.get('/api/v1/company');
+    final remote = Map<String, dynamic>.from(response.json as Map);
+    final rows = await db.query('settings', limit: 1);
+    if (rows.isEmpty) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    final knownVersion = prefs.getInt(_companyVersionKey);
+    final lastSyncedAt =
+        DateTime.tryParse(prefs.getString(_companySyncedAtKey) ?? '');
+    final localUpdatedAt =
+        DateTime.tryParse(rows.first['updated_at']?.toString() ?? '');
+    final remoteUpdatedAt =
+        DateTime.tryParse(remote['updated_at']?.toString() ?? '');
+    final remoteVersion = _syncInt(remote['version']);
+
+    final localChanged = knownVersion != null &&
+        localUpdatedAt != null &&
+        lastSyncedAt != null &&
+        localUpdatedAt.isAfter(lastSyncedAt);
+    final remoteChanged = knownVersion != null && remoteVersion > knownVersion;
+
+    Map<String, dynamic> canonical = remote;
+    if (localChanged &&
+        (!remoteChanged ||
+            remoteUpdatedAt == null ||
+            localUpdatedAt.isAfter(remoteUpdatedAt))) {
+      final local = rows.first;
+      final logo = await _portableLogo(local['business_logo']?.toString());
+      final patch = await _api.send('PATCH', '/api/v1/company', body: {
+        'expected_version': remoteVersion,
+        'name': local['business_name'],
+        'address': local['business_address'],
+        'phone': local['business_phone'],
+        'email': local['business_email'],
+        'tax_number': local['business_tax_id'],
+        'owner_name': local['owner_name'],
+        'type': local['business_type'],
+        'city': local['business_city'],
+        'district': local['business_district'],
+        'currency': local['currency'],
+        'logo_url': logo,
+      });
+      canonical = Map<String, dynamic>.from(patch.json as Map);
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.update(
+      'settings',
+      {
+        'business_name': canonical['name'] ?? '',
+        'business_phone': canonical['phone'] ?? '',
+        'business_address': canonical['address'] ?? '',
+        'business_tax_id': canonical['tax_number'],
+        'business_logo': canonical['logo_url'],
+        'owner_name': canonical['owner_name'] ?? '',
+        'business_email': canonical['email'],
+        'business_city': canonical['city'] ?? '',
+        'business_district': canonical['district'] ?? '',
+        'business_type': canonical['type'] ?? '',
+        'currency': canonical['currency'] ?? '₺',
+        'updated_at': canonical['updated_at']?.toString() ?? now,
+      },
+      where: 'id = ?',
+      whereArgs: [rows.first['id']],
+    );
+    await prefs.setInt(_companyVersionKey, _syncInt(canonical['version']));
+    await prefs.setString(
+        _companySyncedAtKey, canonical['updated_at']?.toString() ?? now);
+    return localChanged || remoteChanged || knownVersion == null;
+  }
+
+  Future<String?> _portableLogo(String? value) async {
+    if (value == null || value.trim().isEmpty) return null;
+    if (value.startsWith('data:') ||
+        value.startsWith('http://') ||
+        value.startsWith('https://')) {
+      return value;
+    }
+    final file = File(value);
+    if (!await file.exists()) return null;
+    final decoded = img.decodeImage(await file.readAsBytes());
+    if (decoded == null) return null;
+    final resized =
+        decoded.width > 320 ? img.copyResize(decoded, width: 320) : decoded;
+    return 'data:image/jpeg;base64,${base64Encode(img.encodeJpg(resized, quality: 72))}';
+  }
+
+  /// A customer balance is a ledger projection, not replicated business data.
+  /// Rebuilding it makes bootstrap, retries and out-of-order snapshots converge.
+  Future<int> _reconcileCustomerBalances(Transaction db) async {
+    return db.rawUpdate('''
+      UPDATE customers
+         SET balance = COALESCE((
+           SELECT SUM(CASE
+             WHEN ft.type IN ('sale', 'manual_debt') THEN -ft.debt_amount
+             WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+             WHEN ft.type = 'cancellation' THEN ft.debt_amount
+             WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+             ELSE 0
+           END)
+             FROM financial_transactions ft
+            WHERE ft.customer_id = customers.id
+              AND COALESCE(ft.is_deleted, 0) = 0
+         ), 0)
+       WHERE ABS(balance - COALESCE((
+           SELECT SUM(CASE
+             WHEN ft.type IN ('sale', 'manual_debt') THEN -ft.debt_amount
+             WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+             WHEN ft.type = 'cancellation' THEN ft.debt_amount
+             WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+             ELSE 0
+           END)
+             FROM financial_transactions ft
+            WHERE ft.customer_id = customers.id
+              AND COALESCE(ft.is_deleted, 0) = 0
+         ), 0)) > 0.000001
+    ''');
   }
 
   /// V4 was introduced after customers had already been using offline data.
@@ -347,6 +483,11 @@ class SyncV4Service {
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
+    if (type == 'customer') {
+      // Server balance is a cache and uses the opposite sign convention.
+      // The immutable local ledger is the sole source for this projection.
+      row.remove('balance');
+    }
     if (type == 'financial_transaction') {
       // Ledger rows are immutable. Replaying the same globally unique ID is
       // an idempotent no-op; a new ID is inserted exactly once.
@@ -382,6 +523,7 @@ class SyncV4Service {
               'id': source['id'] ?? 'sync-$id-$productId-$index',
               parentColumn: id,
               'product_id': productId,
+              'product_name': source['product_name'],
               'quantity': quantity,
               'unit_price': unitPrice,
               if (type == 'sale') 'subtotal': quantity * unitPrice,

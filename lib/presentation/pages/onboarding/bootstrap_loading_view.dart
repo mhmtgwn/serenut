@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/service_providers.dart';
 import '../../../providers/audit_provider.dart';
+import '../../widgets/branded_splash_screen.dart';
 
 class BootstrapLoadingView extends ConsumerStatefulWidget {
   final VoidCallback onCompleted;
@@ -53,8 +54,6 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
           _isSyncing = false;
           _progress = 100.0;
         });
-        // Introduce a slight delay for smooth visual transition
-        await Future.delayed(const Duration(milliseconds: 800));
         widget.onCompleted();
       }
     } catch (e, st) {
@@ -83,157 +82,12 @@ class _BootstrapLoadingViewState extends ConsumerState<BootstrapLoadingView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.surface,
-              theme.colorScheme.surface.withAlpha(200),
-            ],
-          ),
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 450),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 32.0, vertical: 40.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Loading Animation Header
-                      if (_errorMsg == null)
-                        const SizedBox(
-                          width: 80,
-                          height: 80,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 6,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.green),
-                          ),
-                        )
-                      else
-                        const Icon(
-                          Icons.error_outline,
-                          color: Colors.redAccent,
-                          size: 80,
-                        ),
-                      const SizedBox(height: 32),
-
-                      Text(
-                        _errorMsg == null
-                            ? 'Sistem Hazırlanıyor'
-                            : 'Bağlantı Hatası',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-
-                      Text(
-                        _errorMsg == null
-                            ? 'Lütfen bekleyin, Serenut OS ilk kurulum verileri senkronize ediliyor.'
-                            : 'Sunucuya bağlanırken bir hata oluştu. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color:
-                              theme.textTheme.bodyMedium?.color?.withAlpha(180),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 32),
-
-                      if (_errorMsg == null) ...[
-                        // Progress Bar & Percentage Indicators
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: _progress / 100,
-                            minHeight: 12,
-                            backgroundColor:
-                                theme.colorScheme.primary.withAlpha(40),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                theme.colorScheme.primary),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _statusText,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(
-                              '%${_progress.toStringAsFixed(0)}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        // Error Details Box
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withAlpha(20),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: Colors.redAccent.withAlpha(60)),
-                          ),
-                          child: Text(
-                            _errorMsg!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.redAccent,
-                              fontFamily: 'monospace',
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        // Retry Button
-                        ElevatedButton.icon(
-                          onPressed: _startSync,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Tekrar Dene'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: theme.colorScheme.onPrimary,
-                            minimumSize: const Size(double.infinity, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return BrandedSplashScreen(
+      status: 'İlk kurulum hazırlanıyor',
+      detail: _statusText,
+      progress: _errorMsg == null ? _progress / 100 : null,
+      error: _errorMsg,
+      onRetry: _errorMsg == null ? null : _startSync,
     );
   }
 }

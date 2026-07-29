@@ -7,12 +7,7 @@ import 'package:serenutos/config/router.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
-
-// ── POS Tema Renkleri ──────────────────────────────────────────────────────────
-const _kText = Color(0xFF0F172A);
-const _kTextSecondary = Color(0xFF64748B);
-const _kBorder = Color(0xFFE2E8F0);
-const _kSurface = Color(0xFFF8FAFC);
+import 'package:serenutos/config/theme.dart';
 
 /// POS Standart Üst Bar (Header) Bileşeni
 class PosHeader extends StatelessWidget {
@@ -49,116 +44,106 @@ class PosHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasSearch = onSearchChanged != null || searchController != null;
 
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Title & Actions Row — Always Stable & Clean
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: _kText,
+    return Material(
+      color: POSColors.card,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm + 4,
+          AppSpacing.md,
+          AppSpacing.sm + 4,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Title & Actions Row — Always Stable & Clean
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
-              ),
-              if (actions != null) ...actions!,
-              if (showRefresh && onRefresh != null)
-                IconButton(
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded,
-                      color: _kTextSecondary, size: 22),
-                  tooltip: 'Yenile',
-                ),
-              if (showStatusIndicator) ...[
-                const RealtimeStatusIndicator(compact: true),
-                const SizedBox(width: 4),
-              ],
-              if (showSettings)
-                IconButton(
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.settings_outlined,
-                      color: _kTextSecondary, size: 22),
-                  tooltip: 'Ayarlar',
-                  onPressed: () => requirePermissionAccess(
-                    context,
-                    permission: Permission.settingsView,
-                    title: 'Ayarlar Yetkisi',
-                    onGranted: (_, __) => context.push(AppRoutes.settings),
+                if (actions != null) ...actions!,
+                if (showRefresh && onRefresh != null)
+                  IconButton(
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    onPressed: onRefresh,
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    tooltip: 'Yenile',
                   ),
-                ),
-            ],
-          ),
-
-          // Inline Search Bar (Zero-Click Mode & 1-Tap Clear)
-          if (hasSearch || isSearching) ...[
-            const SizedBox(height: 10),
-            Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: searchController ?? TextEditingController(),
-                builder: (context, value, _) {
-                  final isNotEmpty = value.text.isNotEmpty;
-
-                  return TextField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      hintText: searchHint ?? 'Ara...',
-                      hintStyle: const TextStyle(
-                          color: _kTextSecondary, fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded,
-                          color: _kTextSecondary, size: 18),
-                      suffixIcon: isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.cancel_rounded,
-                                  size: 18, color: _kTextSecondary),
-                              onPressed: () {
-                                if (searchController != null) {
-                                  searchController!.clear();
-                                }
-                                if (onSearchChanged != null) {
-                                  onSearchChanged!('');
-                                }
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10, horizontal: 12),
+                if (showStatusIndicator) ...[
+                  const RealtimeStatusIndicator(compact: true),
+                  const SizedBox(width: 4),
+                ],
+                if (showSettings)
+                  IconButton(
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.settings_outlined, size: 22),
+                    tooltip: 'Ayarlar',
+                    onPressed: () => requirePermissionAccess(
+                      context,
+                      permission: Permission.settingsView,
+                      title: 'Ayarlar Yetkisi',
+                      onGranted: (_, __) => context.push(AppRoutes.settings),
                     ),
-                    style: const TextStyle(
-                        color: _kText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600),
-                    onChanged: onSearchChanged,
-                  );
-                },
-              ),
+                  ),
+              ],
             ),
-          ],
 
-          // Filter Widget Row
-          if (filterWidget != null) ...[
-            const SizedBox(height: 8),
-            filterWidget!,
+            // Inline Search Bar (Zero-Click Mode & 1-Tap Clear)
+            if (hasSearch || isSearching) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 44,
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: searchController ?? TextEditingController(),
+                  builder: (context, value, _) {
+                    final isNotEmpty = value.text.isNotEmpty;
+
+                    return TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: searchHint ?? 'Ara...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                        suffixIcon: isNotEmpty
+                            ? IconButton(
+                                icon:
+                                    const Icon(Icons.cancel_rounded, size: 18),
+                                onPressed: () {
+                                  if (searchController != null) {
+                                    searchController!.clear();
+                                  }
+                                  if (onSearchChanged != null) {
+                                    onSearchChanged!('');
+                                  }
+                                },
+                              )
+                            : null,
+                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: POSColors.text,
+                            fontWeight: FontWeight.w600,
+                          ),
+                      onChanged: onSearchChanged,
+                    );
+                  },
+                ),
+              ),
+            ],
+
+            // Filter Widget Row
+            if (filterWidget != null) ...[
+              const SizedBox(height: 8),
+              filterWidget!,
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -200,7 +185,6 @@ class PosPageLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kSurface,
       body: SafeArea(
         child: Column(
           children: [
@@ -217,7 +201,7 @@ class PosPageLayout extends StatelessWidget {
               showRefresh: showRefresh,
               onRefresh: onRefresh,
             ),
-            const Divider(height: 1, color: _kBorder),
+            const Divider(height: 1),
             const RealtimeStatusIndicator(compact: false),
             Expanded(child: body),
           ],

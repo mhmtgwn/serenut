@@ -81,11 +81,7 @@ export function clearAuthSession() {
 
 export function clearAuthToken() {
   clearAuthSession();
-  if (window.location.pathname.startsWith('/app')) {
-    window.location.href = '/app/';
-  } else {
-    window.location.href = '/app/';
-  }
+  window.location.replace('/login?error=session_expired');
 }
 
 /**

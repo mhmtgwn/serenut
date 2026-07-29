@@ -317,7 +317,7 @@ class SqliteProductRepository implements IProductRepository {
         final original = await findById(productId);
         if (original != null) {
           final newQty = original.quantity - quantity;
-          await _executor.insert('products', {
+          final payload = {
             'id': original.id,
             'name': original.name,
             'barcode': original.id,
@@ -330,6 +330,16 @@ class SqliteProductRepository implements IProductRepository {
             'is_synced': 0,
             'created_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
+          };
+          await _gateway.transaction(() async {
+            await _executor.insert('products', payload);
+            await SyncOutboxV4.enqueue(
+              _executor,
+              entityType: 'product',
+              entityId: productId,
+              operation: 'UPSERT',
+              payload: payload,
+            );
           });
           return;
         }
@@ -361,7 +371,7 @@ class SqliteProductRepository implements IProductRepository {
         final original = await findById(productId);
         if (original != null) {
           final newQty = original.quantity + quantity;
-          await _executor.insert('products', {
+          final payload = {
             'id': original.id,
             'name': original.name,
             'barcode': original.id,
@@ -374,6 +384,16 @@ class SqliteProductRepository implements IProductRepository {
             'is_synced': 0,
             'created_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
+          };
+          await _gateway.transaction(() async {
+            await _executor.insert('products', payload);
+            await SyncOutboxV4.enqueue(
+              _executor,
+              entityType: 'product',
+              entityId: productId,
+              operation: 'UPSERT',
+              payload: payload,
+            );
           });
           return;
         }

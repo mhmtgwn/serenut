@@ -35,6 +35,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serenutos/presentation/pages/force_update_page.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
+import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -265,6 +266,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     _triggerAutoBackup();
   }
 
+  void _retryStartupChecks() {
+    setState(() {
+      _integrityError = null;
+      _checkingIntegrity = true;
+      _checkingVersion = true;
+    });
+    unawaited(_runIntegrityDiagnostics());
+  }
+
   void _triggerAutoBackup() {
     ref.read(backupServiceProvider).autoBackupIfNeeded().catchError((e) {
       debugPrint('Otomatik yedekleme hatası: $e');
@@ -272,12 +282,17 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _checkVersion() async {
-    await VersionChecker.getAppVersion();
-    final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
-    final required = await checker.checkForceUpdateRequired();
-    final info = await checker.getVersionInfo();
-    if (info != null) {
-      if (required) {
+    VersionCheckResult? info;
+    var required = false;
+    try {
+      await VersionChecker.getAppVersion();
+      final checker = VersionChecker(apiClient: ref.read(apiClientProvider));
+      required = await checker
+          .checkForceUpdateRequired()
+          .timeout(const Duration(seconds: 12));
+      info =
+          await checker.getVersionInfo().timeout(const Duration(seconds: 12));
+      if (info != null && required) {
         _latestVersion = info.latestVersion;
         _releaseNotes = info.releaseNotes;
         _downloadUrl = info.downloadUrl;
@@ -285,13 +300,18 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         _signature = info.signature;
         _fileSizeBytes = info.fileSizeBytes;
       }
+    } catch (error) {
+      // Güncelleme servisine ulaşılamaması çevrimdışı kullanımı engellemez.
+      debugPrint('Startup version check skipped: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _forceUpdateRequired = required;
+          _checkingVersion = false;
+        });
+      }
     }
-    if (mounted) {
-      setState(() {
-        _forceUpdateRequired = required;
-        _checkingVersion = false;
-      });
-    }
+
     if (!required && info != null) {
       await _offerOptionalUpdate(info);
     }
@@ -373,17 +393,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Sistem bütünlüğü kontrol ediliyor...'),
-              ],
-            ),
-          ),
+        home: const BrandedSplashScreen(
+          status: 'Sistem kontrol ediliyor',
+          detail: 'Verileriniz ve yarım kalan işlemler güvenle hazırlanıyor.',
         ),
       );
     }
@@ -393,44 +405,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 80, color: Colors.redAccent),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Veritabanı Bütünlük Hatası!',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Sistem otomatik kurtarmayı denedi ancak başarılı olamadı. Lütfen teknik destek ekibiyle iletişime geçin.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.redAccent.withAlpha(60)),
-                    ),
-                    child: Text(
-                      _integrityError!,
-                      style: const TextStyle(
-                          fontFamily: 'monospace', fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        home: BrandedSplashScreen(
+          status: 'Sistem kontrol ediliyor',
+          error: _integrityError!,
+          onRetry: _retryStartupChecks,
         ),
       );
     }
@@ -440,10 +418,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
+        home: const BrandedSplashScreen(
+          status: 'Uygulama hazırlanıyor',
+          detail: 'Sürüm ve güvenlik kontrolleri tamamlanıyor.',
         ),
       );
     }

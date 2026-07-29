@@ -613,6 +613,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       final itemsList = _cart.entries
           .map((e) => {
                 'product_id': e.key.id,
+                'product_name': e.key.name,
                 'quantity': e.value,
                 'unit_price': e.key.price,
                 'tax': e.key.vat ?? 0.0,

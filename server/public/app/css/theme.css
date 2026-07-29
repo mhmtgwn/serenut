@@ -323,3 +323,14 @@ body{background:var(--ui-canvas);color:var(--ui-ink)}
 .ticket-reply-form label,.ticket-status-form label{display:grid;gap:6px;font-size:.76rem;font-weight:700;color:var(--ui-muted)}
 .ticket-reply-form textarea{min-height:100px}
 @media(max-width:760px){.ticket-detail-head{display:grid}.ticket-meta-grid{grid-template-columns:1fr 1fr}.ticket-reply-form,.ticket-status-form{grid-template-columns:1fr}.ticket-message{max-width:100%}}
+
+/* Final brand assets: intentionally last in the cascade. */
+.sidebar-brand:before{
+  content:"";
+  background:transparent url("/shared/assets/logo-color.svg") center/contain no-repeat!important;
+  box-shadow:none!important;
+}
+.customer-shell .sidebar-brand:before,
+.sysadmin-shell .sidebar-brand:before{
+  background-image:url("/shared/assets/logo-white.svg")!important
+}

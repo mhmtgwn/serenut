@@ -74,33 +74,67 @@ extension SettingsPageDialogs on _SettingsPageState {
                                 ),
                                 child: selectedLogoPath != null &&
                                         selectedLogoPath!.isNotEmpty &&
-                                        (kIsWeb ||
+                                        (selectedLogoPath!
+                                                .startsWith('data:image/') ||
+                                            selectedLogoPath!
+                                                .startsWith('http://') ||
+                                            selectedLogoPath!
+                                                .startsWith('https://') ||
+                                            kIsWeb ||
                                             File(selectedLogoPath!)
                                                 .existsSync())
                                     ? ClipOval(
-                                        child: kIsWeb
-                                            ? Image.network(
-                                                selectedLogoPath!,
+                                        child: selectedLogoPath!
+                                                .startsWith('data:image/')
+                                            ? Image.memory(
+                                                base64Decode(selectedLogoPath!
+                                                    .split(',')
+                                                    .last),
                                                 width: 86,
                                                 height: 86,
                                                 fit: BoxFit.cover,
                                               )
-                                            : Image.file(
-                                                File(selectedLogoPath!),
-                                                width: 86,
-                                                height: 86,
-                                                fit: BoxFit.cover,
-                                              ),
+                                            : kIsWeb ||
+                                                    selectedLogoPath!
+                                                        .startsWith(
+                                                            'http://') ||
+                                                    selectedLogoPath!
+                                                        .startsWith('https://')
+                                                ? Image.network(
+                                                    selectedLogoPath!,
+                                                    width: 86,
+                                                    height: 86,
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : Image.file(
+                                                    File(selectedLogoPath!),
+                                                    width: 86,
+                                                    height: 86,
+                                                    fit: BoxFit.cover,
+                                                  ),
                                       )
-                                    : const Icon(
-                                        Icons.add_photo_alternate_rounded,
-                                        color: _kGreen,
-                                        size: 36,
+                                    : Padding(
+                                        padding: const EdgeInsets.all(10),
+                                        child: Image.asset(
+                                          'assets/logo.png',
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                            Icons.storefront_rounded,
+                                            color: _kGreen,
+                                            size: 36,
+                                          ),
+                                        ),
                                       ),
                               ),
                               if (selectedLogoPath != null &&
                                   selectedLogoPath!.isNotEmpty &&
-                                  (kIsWeb ||
+                                  (selectedLogoPath!
+                                          .startsWith('data:image/') ||
+                                      selectedLogoPath!.startsWith('http://') ||
+                                      selectedLogoPath!
+                                          .startsWith('https://') ||
+                                      kIsWeb ||
                                       File(selectedLogoPath!).existsSync()))
                                 Positioned(
                                   right: 0,
@@ -359,6 +393,162 @@ extension SettingsPageDialogs on _SettingsPageState {
         child: const Text('Kaydet'),
       ),
     );
+  }
+
+  void _showReceiptSettings(Settings settings) {
+    var paperWidth = settings.paperWidth;
+    var font = settings.receiptFont;
+    var textSize = settings.receiptTextSize;
+    var itemLayout = settings.receiptItemLayout;
+    var printLogo = settings.printLogo;
+    var printBalance = settings.printCustomerBalance;
+    var printQr = settings.printQRCode;
+    var printBarcode = settings.printBarcode;
+    var autoCut = settings.autoCutReceipt;
+    var openDrawer = settings.openCashDrawer;
+    var feedLines = settings.receiptFeedLines.clamp(0, 8);
+    var copies = settings.printCopies.clamp(1, 10);
+    final footerCtrl = TextEditingController(text: settings.receiptFooterText);
+
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (context) =>
+              StatefulBuilder(builder: (context, setModalState) {
+            Widget toggle(
+                    String title, bool value, ValueChanged<bool> onChanged) =>
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(title),
+                  value: value,
+                  activeColor: _kGreen,
+                  onChanged: onChanged,
+                );
+            return FullScreenSettingsPage(
+              title: 'Fiş Tasarımı',
+              child: SingleChildScrollView(
+                child: Column(children: [
+                  _buildFormDropdown<int>(
+                    label: 'Kağıt genişliği',
+                    icon: Icons.straighten_rounded,
+                    value: paperWidth,
+                    items: const [
+                      DropdownMenuItem(value: 58, child: Text('58 mm')),
+                      DropdownMenuItem(value: 80, child: Text('80 mm')),
+                    ],
+                    onChanged: (v) => setModalState(() => paperWidth = v ?? 80),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFormDropdown<String>(
+                    label: 'Yazı tipi',
+                    icon: Icons.font_download_outlined,
+                    value: font,
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'a', child: Text('Font A (standart)')),
+                      DropdownMenuItem(value: 'b', child: Text('Font B (dar)')),
+                    ],
+                    onChanged: (v) => setModalState(() => font = v ?? 'a'),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFormDropdown<String>(
+                    label: 'Yazı boyutu',
+                    icon: Icons.format_size_rounded,
+                    value: textSize,
+                    items: const [
+                      DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                      DropdownMenuItem(value: 'large', child: Text('Büyük')),
+                    ],
+                    onChanged: (v) =>
+                        setModalState(() => textSize = v ?? 'normal'),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFormDropdown<String>(
+                    label: 'Ürün satırı',
+                    icon: Icons.view_stream_outlined,
+                    value: itemLayout,
+                    items: const [
+                      DropdownMenuItem(value: 'auto', child: Text('Otomatik')),
+                      DropdownMenuItem(
+                          value: 'single', child: Text('Tek satır')),
+                      DropdownMenuItem(
+                          value: 'double', child: Text('İki satır')),
+                    ],
+                    onChanged: (v) =>
+                        setModalState(() => itemLayout = v ?? 'auto'),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFormTextField(
+                    controller: footerCtrl,
+                    label: 'Fiş sonu mesajı',
+                    icon: Icons.notes_rounded,
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: Text('Alt boş satır: $feedLines')),
+                    IconButton(
+                        onPressed: feedLines > 0
+                            ? () => setModalState(() => feedLines--)
+                            : null,
+                        icon: const Icon(Icons.remove_circle_outline)),
+                    IconButton(
+                        onPressed: feedLines < 8
+                            ? () => setModalState(() => feedLines++)
+                            : null,
+                        icon: const Icon(Icons.add_circle_outline)),
+                  ]),
+                  Row(children: [
+                    Expanded(child: Text('Kopya sayısı: $copies')),
+                    IconButton(
+                        onPressed: copies > 1
+                            ? () => setModalState(() => copies--)
+                            : null,
+                        icon: const Icon(Icons.remove_circle_outline)),
+                    IconButton(
+                        onPressed: copies < 10
+                            ? () => setModalState(() => copies++)
+                            : null,
+                        icon: const Icon(Icons.add_circle_outline)),
+                  ]),
+                  toggle('İşletme logosunu yazdır', printLogo,
+                      (v) => setModalState(() => printLogo = v)),
+                  toggle('Müşteri bakiyesini yazdır', printBalance,
+                      (v) => setModalState(() => printBalance = v)),
+                  toggle('QR kod yazdır', printQr,
+                      (v) => setModalState(() => printQr = v)),
+                  toggle('Ürün barkodu yazdır', printBarcode,
+                      (v) => setModalState(() => printBarcode = v)),
+                  toggle('Fiş sonunda otomatik kes', autoCut,
+                      (v) => setModalState(() => autoCut = v)),
+                  toggle('Nakit satışta çekmeceyi aç', openDrawer,
+                      (v) => setModalState(() => openDrawer = v)),
+                  const SizedBox(height: 16),
+                  _buildModalSaveButton(onTap: () async {
+                    await _updateSettingField(settings.copyWith(
+                      paperWidth: paperWidth,
+                      receiptFont: font,
+                      receiptTextSize: textSize,
+                      receiptItemLayout: itemLayout,
+                      receiptFooterText: footerCtrl.text.trim(),
+                      receiptFeedLines: feedLines,
+                      printCopies: copies,
+                      printLogo: printLogo,
+                      printCustomerBalance: printBalance,
+                      printQRCode: printQr,
+                      printBarcode: printBarcode,
+                      autoCutReceipt: autoCut,
+                      openCashDrawer: openDrawer,
+                    ));
+                    if (context.mounted) Navigator.pop(context);
+                  }),
+                  const SizedBox(height: 24),
+                ]),
+              ),
+            );
+          }),
+        ))
+        .whenComplete(footerCtrl.dispose);
   }
 }
 

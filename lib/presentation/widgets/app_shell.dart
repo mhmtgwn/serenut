@@ -160,18 +160,25 @@ class _PosNavBar extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: items.asMap().entries.map((entry) {
-              return _NavBarItem(
-                item: entry.value,
-                isActive: entry.key == activeIndex,
-                onTap: () => onTap(entry.key),
-              );
-            }).toList(),
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 360;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: items.asMap().entries.map((entry) {
+                  return Expanded(
+                    child: _NavBarItem(
+                      item: entry.value,
+                      isActive: entry.key == activeIndex,
+                      compact: compact,
+                      onTap: () => onTap(entry.key),
+                    ),
+                  );
+                }).toList(),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -199,11 +206,13 @@ class _NavItem {
 class _NavBarItem extends StatelessWidget {
   final _NavItem item;
   final bool isActive;
+  final bool compact;
   final VoidCallback onTap;
 
   const _NavBarItem({
     required this.item,
     required this.isActive,
+    required this.compact,
     required this.onTap,
   });
 
@@ -215,40 +224,53 @@ class _NavBarItem extends StatelessWidget {
       label: item.label,
       child: Tooltip(
         message: item.label,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-            decoration: BoxDecoration(
-              color: isActive ? _kGreenLight : Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
               borderRadius: BorderRadius.circular(AppRadii.sm),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: Icon(
-                    isActive ? item.activeIcon : item.icon,
-                    key: ValueKey(isActive),
-                    color: isActive ? _kGreen : _kInactive,
-                    size: 22,
-                  ),
+              child: AnimatedContainer(
+                width: double.infinity,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 2 : 4,
+                  vertical: 7,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    color: isActive ? _kGreen : _kInactive,
-                    letterSpacing: isActive ? 0.2 : 0,
-                  ),
+                decoration: BoxDecoration(
+                  color: isActive ? _kGreenLight : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
                 ),
-              ],
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        isActive ? item.activeIcon : item.icon,
+                        key: ValueKey(isActive),
+                        color: isActive ? _kGreen : _kInactive,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact ? 9 : 10,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w500,
+                        color: isActive ? _kGreen : _kInactive,
+                        letterSpacing: isActive ? 0.1 : 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

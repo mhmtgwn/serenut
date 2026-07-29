@@ -664,7 +664,7 @@ router.post('/iyzico/callback', async (req: Request, res: Response) => {
     );
     if (tokenInfoRes.rows.length === 0) {
       logger.warn(`Iyzico callback rejected: no pending invoice for token ${String(token).slice(0, 8)}…`);
-      return res.redirect('/app/#billing-center?payment=invalid');
+      return res.redirect('/app/?payment=invalid#billing-center');
     }
     
     const invoice = tokenInfoRes.rows[0];

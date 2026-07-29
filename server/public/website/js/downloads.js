@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="eyebrow">Aktivasyon</div>
         <h3>Aktivasyon Akışı</h3>
         <p>Kurulum sonrası lisans, cihaz ve tenant bağlantısı uygulama içindeki cihaz/lisans modülünden yapılır.</p>
-        <a class="btn btn-secondary" href="/app/">Uygulamaya Gir</a>
+        <a class="btn btn-secondary" href="/login">Uygulamaya Gir</a>
       </article>
     `;
   }

@@ -123,13 +123,13 @@ export async function applyDomainMutation(
       const deleted = payload.is_deleted === 1 || payload.is_deleted === true;
       await client.query(
         `INSERT INTO customers (id, company_id, name, email, phone, balance, credit_limit, status, is_deleted, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10::timestamptz,NOW()),NOW())
+         VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,COALESCE($9::timestamptz,NOW()),NOW())
          ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, email=EXCLUDED.email, phone=EXCLUDED.phone,
-           balance=EXCLUDED.balance, credit_limit=EXCLUDED.credit_limit, status=EXCLUDED.status,
+           credit_limit=EXCLUDED.credit_limit, status=EXCLUDED.status,
            is_deleted=EXCLUDED.is_deleted, deleted_at=CASE WHEN EXCLUDED.is_deleted THEN NOW() ELSE NULL END,
            updated_at=NOW() WHERE customers.company_id=EXCLUDED.company_id`,
         [id, companyId, name, stringValue(payload, "email") || null, stringValue(payload, "phone") || null,
-          numberValue(payload, "balance"), numberValue(payload, "credit_limit"),
+          numberValue(payload, "credit_limit"),
           deleted ? "inactive" : stringValue(payload, "status", "active"), deleted,
           stringValue(payload, "created_at") || null],
       );
@@ -172,9 +172,10 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
     const quantity = numberValue(row, "quantity");
     const unitPrice = numberValue(row, "unit_price", numberValue(row, "price"));
     await client.query(
-      `INSERT INTO sale_items (id, sale_id, product_id, quantity, unit_price, subtotal, company_id, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()))`,
-      [stringValue(row, "id", `sync-${id}-${index}`), id, productId, quantity, unitPrice,
+      `INSERT INTO sale_items (id, sale_id, product_id, product_name, quantity, unit_price, subtotal, company_id, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9::timestamptz,NOW()))`,
+      [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
+        stringValue(row, "product_name") || null, quantity, unitPrice,
         numberValue(row, "subtotal", quantity * unitPrice), companyId, stringValue(row, "created_at") || null],
     );
   }
@@ -205,9 +206,10 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
     const productId = stringValue(row, "product_id");
     if (!productId) throw new Error("invalid_mutation");
     await client.query(
-      `INSERT INTO customer_order_items (id, order_id, product_id, quantity, unit_price, company_id, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()))`,
-      [stringValue(row, "id", `sync-${id}-${index}`), id, productId, numberValue(row, "quantity"),
+      `INSERT INTO customer_order_items (id, order_id, product_id, product_name, quantity, unit_price, company_id, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8::timestamptz,NOW()))`,
+      [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
+        stringValue(row, "product_name") || null, numberValue(row, "quantity"),
         numberValue(row, "unit_price"), companyId, stringValue(row, "created_at") || null],
     );
   }
@@ -580,6 +582,7 @@ router.get("/bootstrap", async (req, res) => {
       sale_id: row.sale_id,
       order_id: row.order_id,
       product_id: row.product_id,
+      product_name: row.product_name,
       quantity: row.quantity,
       unit_price: row.unit_price,
       subtotal: row.subtotal,

@@ -10,10 +10,11 @@ class POSColors {
   POSColors._();
 
   // ── Ana Renk: Yeşil ──────────────────────────────────────
-  static const green = Color(0xFF16A34A);
-  static const greenDark = Color(0xFF15803D);
-  static const greenLight = Color(0xFFDCFCE7);
-  static const greenMid = Color(0xFF22C55E);
+  // serenut.com tasarım tokenlarıyla birebir aynı marka yeşilleri.
+  static const green = Color(0xFF11875D);
+  static const greenDark = Color(0xFF086B48);
+  static const greenLight = Color(0xFFE9F6EF);
+  static const greenMid = Color(0xFF18A06D);
 
   // ── Vurgu: Sarı / Amber ──────────────────────────────────
   static const amber = Color(0xFFE8BD3F);
@@ -21,16 +22,16 @@ class POSColors {
   static const amberLight = Color(0xFFFFF8DC);
 
   // ── Yüzey ────────────────────────────────────────────────
-  static const surface = Color(0xFFF8FAFC); // Arka plan
+  static const surface = Color(0xFFF5F7F5); // Arka plan
   static const card = Color(0xFFFFFFFF); // Kart zemini
-  static const border = Color(0xFFE2E8F0); // Çerçeve
-  static const surfaceMuted = Color(0xFFF1F5F9);
-  static const darkSurface = Color(0xFF0F172A);
+  static const border = Color(0xFFDFE6E1); // Çerçeve
+  static const surfaceMuted = Color(0xFFF0F4F1);
+  static const darkSurface = Color(0xFF19231F);
 
   // ── Metin ────────────────────────────────────────────────
-  static const text = Color(0xFF0F172A); // Ana metin
-  static const textSecondary = Color(0xFF64748B); // İkincil metin
-  static const textDisabled = Color(0xFF94A3B8); // Devre dışı
+  static const text = Color(0xFF19231F); // Ana metin
+  static const textSecondary = Color(0xFF617069); // İkincil metin
+  static const textDisabled = Color(0xFF91A098); // Devre dışı
 
   // ── Durum ────────────────────────────────────────────────
   static const red = Color(0xFFDC2626);
@@ -41,7 +42,7 @@ class POSColors {
   static const blueLight = Color(0xFFDBEAFE);
 
   // ── Navigasyon ───────────────────────────────────────────
-  static const navInactive = Color(0xFF64748B);
+  static const navInactive = Color(0xFF617069);
   static const navBackground = Color(0xFFFFFFFF);
 
   // ── Gölge ────────────────────────────────────────────────
@@ -74,12 +75,19 @@ class AppRadii {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get light {
-    final baseTextTheme = GoogleFonts.interTextTheme();
-    TextStyle? heading(TextStyle? style) => GoogleFonts.outfit(
-          textStyle: style,
-          letterSpacing: -0.25,
-        );
+  static ThemeData get light => build();
+
+  /// [useGoogleFonts] test ve tamamen çevrimdışı çalışma senaryolarında
+  /// ağ tabanlı font çözümlemesini devre dışı bırakmak için kullanılabilir.
+  static ThemeData build({bool useGoogleFonts = true}) {
+    final baseTextTheme =
+        useGoogleFonts ? GoogleFonts.interTextTheme() : const TextTheme();
+    TextStyle? heading(TextStyle? style) => useGoogleFonts
+        ? GoogleFonts.outfit(
+            textStyle: style,
+            letterSpacing: -0.25,
+          )
+        : style?.copyWith(letterSpacing: -0.25);
 
     return ThemeData(
       useMaterial3: true,
@@ -187,6 +195,27 @@ class AppTheme {
           backgroundColor: POSColors.green,
           foregroundColor: Colors.white,
           disabledBackgroundColor: POSColors.border,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 4,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9),
+          ),
+          textStyle: baseTextTheme.labelLarge?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          elevation: 0,
+          backgroundColor: POSColors.green,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: POSColors.border,
+          disabledForegroundColor: POSColors.textDisabled,
+          minimumSize: const Size(0, 44),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg,
             vertical: AppSpacing.sm + 4,
@@ -399,6 +428,42 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
           side: const BorderSide(color: POSColors.border),
+        ),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: POSColors.darkSurface,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+        ),
+        textStyle: baseTextTheme.bodySmall?.copyWith(color: Colors.white),
+        waitDuration: const Duration(milliseconds: 500),
+      ),
+      badgeTheme: const BadgeThemeData(
+        backgroundColor: POSColors.red,
+        textColor: Colors.white,
+      ),
+      expansionTileTheme: const ExpansionTileThemeData(
+        textColor: POSColors.text,
+        collapsedTextColor: POSColors.text,
+        iconColor: POSColors.green,
+        collapsedIconColor: POSColors.textSecondary,
+        backgroundColor: POSColors.card,
+        collapsedBackgroundColor: POSColors.card,
+        shape: Border(bottom: BorderSide(color: POSColors.border)),
+        collapsedShape: Border(bottom: BorderSide(color: POSColors.border)),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: POSColors.navBackground,
+        indicatorColor: POSColors.greenLight,
+        selectedIconTheme: const IconThemeData(color: POSColors.green),
+        unselectedIconTheme: const IconThemeData(color: POSColors.navInactive),
+        selectedLabelTextStyle: baseTextTheme.labelMedium?.copyWith(
+          color: POSColors.green,
+          fontWeight: FontWeight.w700,
+        ),
+        unselectedLabelTextStyle: baseTextTheme.labelMedium?.copyWith(
+          color: POSColors.navInactive,
+          fontWeight: FontWeight.w600,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(

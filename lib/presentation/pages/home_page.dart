@@ -19,12 +19,13 @@ import 'package:serenutos/presentation/pages/global_search_page.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
+import 'package:serenutos/config/theme.dart';
 
 // ── POS Tema Renkleri ─────────────────────────────────────────────────────────
-const _kBgColor = Color(0xFFF8FAFC);
-const _kTextDark = Color(0xFF0F172A);
-const _kTextSecondary = Color(0xFF64748B);
-const _kBorderColor = Color(0xFFF1F5F9);
+const _kBgColor = POSColors.surface;
+const _kTextDark = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
+const _kBorderColor = POSColors.border;
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -38,7 +39,7 @@ class HomePage extends ConsumerWidget {
         child: dashboardAsync.when(
           loading: () => const Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+              valueColor: AlwaysStoppedAnimation<Color>(POSColors.green),
             ),
           ),
           error: (err, _) => _ErrorView(
@@ -47,7 +48,7 @@ class HomePage extends ConsumerWidget {
           ),
           data: (data) {
             return RefreshIndicator(
-              color: const Color(0xFF10B981),
+              color: POSColors.green,
               onRefresh: () async {
                 ref.invalidate(dashboardProvider);
                 ref.invalidate(customersControllerProvider);
@@ -158,58 +159,61 @@ class HomePage extends ConsumerWidget {
             ],
           ),
         ),
-        Row(
-          children: [
-            Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded,
-                      color: Color(0xFF475569), size: 24),
-                  tooltip: 'Bildirimler',
-                  onPressed: () => _showNotifications(
-                    context,
-                    data,
-                    canViewInventory: canViewInventory,
-                  ),
-                ),
-                if (canViewInventory && data.lowStockProducts.isNotEmpty)
-                  Positioned(
-                    right: 12,
-                    top: 12,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                      ),
+        Flexible(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none_rounded,
+                        color: Color(0xFF475569), size: 24),
+                    tooltip: 'Bildirimler',
+                    onPressed: () => _showNotifications(
+                      context,
+                      data,
+                      canViewInventory: canViewInventory,
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.search_rounded,
-                  color: Color(0xFF475569), size: 24),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const GlobalSearchPage(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: 4),
-            if (currentUser != null &&
-                (currentUser.role == UserRole.owner ||
-                    currentUser.role == UserRole.admin ||
-                    currentUser.hasPermission(Permission.settingsView.value)))
-              IconButton(
-                icon: const Icon(Icons.settings_outlined,
-                    color: Color(0xFF475569), size: 24),
-                onPressed: () => context.push(AppRoutes.settings),
+                  if (canViewInventory && data.lowStockProducts.isNotEmpty)
+                    Positioned(
+                      right: 12,
+                      top: 12,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.search_rounded,
+                    color: Color(0xFF475569), size: 24),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const GlobalSearchPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 4),
+              if (currentUser != null &&
+                  (currentUser.role == UserRole.owner ||
+                      currentUser.role == UserRole.admin ||
+                      currentUser.hasPermission(Permission.settingsView.value)))
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined,
+                      color: Color(0xFF475569), size: 24),
+                  onPressed: () => context.push(AppRoutes.settings),
+                ),
+            ],
+          ),
         ),
       ],
     );
@@ -523,7 +527,7 @@ class HomePage extends ConsumerWidget {
                           dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: const Color(0xFF10B981).withOpacity(0.08),
+                            color: POSColors.green.withValues(alpha: 0.08),
                           ),
                         ),
                       ],
@@ -734,7 +738,7 @@ class HomePage extends ConsumerWidget {
                 final badgeBgColor = [
                   const Color(0xFFFEF3C7),
                   const Color(0xFFF1F5F9),
-                  const Color(0xFFFEF3C7).withOpacity(0.5),
+                  const Color(0xFFFEF3C7).withValues(alpha: 0.5),
                 ][e.key % 3];
 
                 return Column(
@@ -824,16 +828,17 @@ class _EmptyCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 36, color: color.withOpacity(0.5)),
+          Icon(icon, size: 36, color: color.withValues(alpha: 0.5)),
           const SizedBox(height: 8),
           Text(message,
-              style: TextStyle(color: color.withOpacity(0.7), fontSize: 13)),
+              style:
+                  TextStyle(color: color.withValues(alpha: 0.7), fontSize: 13)),
         ],
       ),
     );

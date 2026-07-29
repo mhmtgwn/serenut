@@ -3,163 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Serenut OS</title>
+  <title>Serenut OS | Yönetim Paneli</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/shared/css/tokens.css">
   <link rel="stylesheet" href="/shared/css/base.css">
   <link rel="stylesheet" href="/shared/css/components.css">
   <link rel="stylesheet" href="/shared/css/utilities.css">
-  <link rel="stylesheet" href="/app/css/app.css?v=20260729-stability1">
-  <link rel="stylesheet" href="/app/css/theme.css?v=20260729-stability1">
+  <link rel="stylesheet" href="/app/css/app.css?v=20260729-release50">
+  <link rel="stylesheet" href="/app/css/theme.css?v=20260729-release50">
 </head>
 <body>
-  <div id="auth-view" class="auth-layout">
-    <section class="auth-hero">
-      <div class="auth-hero-inner">
-        <a href="/" class="hero-brand">Serenut OS</a>
-        <h1 class="hero-title">İşletmeniz burada başlar.</h1>
-        <p class="hero-copy">Firmanızı, ekibinizi, cihazlarınızı ve aboneliğinizi tek, anlaşılır panelden yönetin.</p>
-        <div class="hero-points">
-          <div class="hero-point">30 gün ücretsiz tam erişim</div>
-          <div class="hero-point">Windows ve Android cihaz yönetimi</div>
-          <div class="hero-point">Güvenli kullanıcı ve rol yetkileri</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="auth-card-wrap">
-      <div class="auth-card card">
-        <div class="auth-card-head">
-          <div>
-            <div class="auth-eyebrow">Giriş</div>
-            <h2 class="auth-heading">Hesabınıza giriş yapın</h2>
-          </div>
-          <button class="ghost-link" id="open-register" type="button">Kayıt Ol</button>
-        </div>
-
-        <form id="login-form">
-          <div class="form-group">
-            <label class="form-label" for="login-email">E-posta</label>
-            <input type="email" id="login-email" required placeholder="sysadmin@serenut.com" autocomplete="email">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="login-password">Şifre</label>
-            <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
-          </div>
-          <div class="auth-row">
-            <button class="ghost-link" id="open-reset" type="button">Şifremi unuttum</button>
-          </div>
-          <div class="auth-status text-sm text-red" id="login-status"></div>
-          <button class="btn btn-primary w-full" id="btn-login" type="submit">Giriş Yap</button>
-        </form>
-      </div>
-    </section>
-  </div>
-
-  <div class="modal-layer app-hidden" id="register-layer">
-    <div class="modal-panel card">
-      <div class="modal-head">
-        <div>
-          <div class="auth-eyebrow">Kayıt</div>
-          <h2 class="auth-heading">Firma hesabı oluştur</h2>
-        </div>
-        <button class="modal-close" id="close-register" type="button">×</button>
-      </div>
-      <aside class="registration-intro">
-        <span class="registration-step">30 gün ücretsiz</span>
-        <h3>Plan seçmeden başlayın.</h3>
-        <p>Hesabınızı oluşturun, e-postanızı doğrulayın ve ilk cihazınızı bağladığınız gün denemeniz başlasın.</p>
-        <ul>
-          <li>Kredi kartı gerekmez</li>
-          <li>Windows ve Android erişimi</li>
-          <li>Tüm temel özellikler açık</li>
-        </ul>
-      </aside>
-      <form class="registration-fields" id="register-form">
-        <div class="form-group">
-          <label class="form-label" for="register-company">Firma Ünvanı</label>
-          <input type="text" id="register-company" required placeholder="Serenut Gıda A.Ş.">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-name">Yetkili Ad Soyad</label>
-          <input type="text" id="register-name" required placeholder="Ahmet Yılmaz">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-email">E-posta</label>
-          <input type="email" id="register-email" required placeholder="iletisim@firma.com" autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-phone">Telefon</label>
-          <input type="tel" id="register-phone" placeholder="0505 000 00 00">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-tax-number">TC veya VKN</label>
-          <input type="text" id="register-tax-number" inputmode="numeric" maxlength="11" placeholder="10 veya 11 hane" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-tax-office">Vergi Dairesi</label>
-          <input type="text" id="register-tax-office" placeholder="İsteğe bağlı">
-        </div>
-        <div class="form-group form-row-two">
-          <div><label class="form-label" for="register-city">İl</label><input type="text" id="register-city" placeholder="İstanbul"></div>
-          <div><label class="form-label" for="register-district">İlçe</label><input type="text" id="register-district" placeholder="Kadıköy"></div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-address">Firma Adresi</label>
-          <textarea id="register-address" rows="2" placeholder="İsteğe bağlı"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="register-password">Şifre</label>
-          <input type="password" id="register-password" minlength="8" required placeholder="En az 8 karakter" autocomplete="new-password">
-        </div>
-        <div class="legal-consents">
-          <label><input type="checkbox" id="accept-terms" required> <a href="/terms.html" target="_blank">Üyelik koşullarını</a> kabul ediyorum.</label>
-          <label><input type="checkbox" id="accept-privacy" required> <a href="/privacy.html" target="_blank">Gizlilik politikasını</a> kabul ediyorum.</label>
-          <label><input type="checkbox" id="accept-kvkk" required> <a href="/kvkk.html" target="_blank">KVKK aydınlatma metnini</a> okudum.</label>
-          <label><input type="checkbox" id="accept-marketing"> Kampanya ve ürün duyuruları almak istiyorum.</label>
-        </div>
-        <div class="auth-status text-sm text-red" id="register-status"></div>
-        <button class="btn btn-primary w-full" id="btn-register" type="submit">Hesap Oluştur</button>
-      </form>
-    </div>
-  </div>
-
-  <div class="modal-layer app-hidden" id="reset-layer">
-    <div class="modal-panel card">
-      <div class="modal-head">
-        <div>
-          <div class="auth-eyebrow">Şifre</div>
-          <h2 class="auth-heading">Şifre sıfırlama</h2>
-        </div>
-        <button class="modal-close" id="close-reset" type="button">×</button>
-      </div>
-      <form id="reset-form">
-        <div class="form-group">
-          <label class="form-label" for="reset-email">E-posta</label>
-          <input type="email" id="reset-email" placeholder="orn@firma.com" autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="reset-password">Yeni Şifre</label>
-          <input type="password" id="reset-password" minlength="8" placeholder="En az 8 karakter" autocomplete="new-password">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="reset-password-confirm">Yeni Şifre Tekrarı</label>
-          <input type="password" id="reset-password-confirm" minlength="8" placeholder="Şifre tekrar" autocomplete="new-password">
-        </div>
-        <div class="auth-status text-sm" id="reset-status"></div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary w-full" id="btn-request-reset" type="button">Link Gönder</button>
-          <button class="btn btn-primary w-full" id="btn-apply-reset" type="submit">Şifreyi Güncelle</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="shell-view" class="shell-layout app-hidden">
+  <div id="shell-view" class="shell-layout">
     <aside class="shell-sidebar">
       <div class="sidebar-top">
         <a href="/" class="sidebar-brand">Serenut OS</a>
-        <div class="sidebar-tenant" id="tenant-name">Tenant</div>
+        <div class="sidebar-tenant" id="tenant-name">Firma</div>
       </div>
       <nav id="app-nav" class="sidebar-nav"></nav>
       <div class="sidebar-bottom">
@@ -214,6 +72,6 @@
     </main>
   </div>
 
-  <script type="module" src="/app/js/app.js?v=20260729-stability1"></script>
+  <script type="module" src="/app/js/app.js?v=20260729-release50"></script>
 </body>
 </html>

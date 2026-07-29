@@ -1,16 +1,11 @@
-import { setAuthToken, setRefreshToken, clearAuthToken, clearAuthSession, apiFetch } from '/shared/js/api-client.js';
+import { clearAuthSession, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
 import { escapeHtml } from '/shared/js/formatters.js';
-import { loadModule } from './module-runtime.js?v=20260729-stability1';
+import { loadModule } from './module-runtime.js?v=20260729-release50';
 
-const authView = document.getElementById('auth-view');
-const shellView = document.getElementById('shell-view');
-const registerLayer = document.getElementById('register-layer');
-const resetLayer = document.getElementById('reset-layer');
-const embedPanel = document.getElementById('embed-panel');
 const overviewGrid = document.getElementById('overview-grid');
 const modulePanel = document.getElementById('module-panel');
-const embedContent = document.getElementById('embed-content');
+const embedPanel = document.getElementById('embed-panel');
 
 let navigationItems = [];
 let selectedModuleId = 'home';
@@ -19,82 +14,17 @@ let realtimeReconnectTimer = null;
 let realtimeRefreshTimer = null;
 let realtimeCompanyId = '';
 
-const navIconPaths = {
-  'workspace-home': 'M4 11l8-7 8 7v9H4z M9 20v-6h6v6',
-  'company-dashboard': 'M4 20V8l8-4 8 4v12 M8 12h2m4 0h2M8 16h2m4 0h2',
-  'sales-operations': 'M4 6h16v12H4z M8 10h8m-8 4h5',
-  'team-management': 'M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2 M9.5 10a3 3 0 100-6 3 3 0 000 6z M17 11a3 3 0 000-6',
-  'billing-center': 'M4 6h16v12H4z M4 10h16 M8 15h3',
-  'support-center': 'M4 5h16v12H8l-4 3z M8 9h8m-8 4h5',
-  'system-diagnostics': 'M4 12h4l2-6 4 12 2-6h6 M5 20h14',
-  'platform-overview': 'M4 19V9m5 10V5m5 14v-7m5 7V3',
-  'platform-companies': 'M3 20h18M5 20V8l7-4 7 4v12M9 11h2m2 0h2M9 15h2m2 0h2',
-  'platform-billing': 'M12 3v18m5-14H9.5a3.5 3.5 0 000 7H14a3 3 0 010 6H6',
-  'platform-subscriptions': 'M4 7h16v13H4z M8 3h8v4 M8 12h8m-8 4h5',
-  'platform-plans': 'M4 5h16v14H4z M8 9h8m-8 4h8',
-  'platform-licenses': 'M5 4h14v16H5z M9 8h6m-6 4h6m-6 4h3',
-  'platform-releases': 'M12 3v12m0 0 5-5m-5 5-5-5M5 21h14',
-  'platform-health': 'M3 12h4l2-6 4 12 2-6h6',
-  'platform-support': 'M4 5h16v12H8l-4 3z M8 9h8m-8 4h5',
-  'account-settings': 'M4 7h8m4 0h4 M14 5v4 M4 12h16 M4 17h4m4 0h8 M10 15v4'
-};
-const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
+const navIcon = () => '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"></path></svg>';
 
 function initApp() {
-  const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1' || window.self !== window.top;
-  if (isEmbed) document.body.classList.add('embed-mode');
-  bindEvents();
-
-  if (isAuthenticated()) {
-    bootShell();
+  if (!isAuthenticated()) {
+    window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.hash)}`);
     return;
   }
 
-  showAuth();
-  handleInitialIntent();
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-}
-
-function bindEvents() {
-  document.getElementById('open-register')?.addEventListener('click', () => openLayer('register'));
-  document.getElementById('open-reset')?.addEventListener('click', () => openLayer('reset'));
-  document.getElementById('close-register')?.addEventListener('click', closeLayers);
-  document.getElementById('close-reset')?.addEventListener('click', closeLayers);
-  
-  document.getElementById('login-form')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    handleLogin();
-  });
-  document.getElementById('register-form')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    handleRegister();
-  });
-  document.getElementById('reset-form')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const hasResetToken = Boolean(new URLSearchParams(window.location.search).get('token'));
-    if (hasResetToken) {
-      applyReset();
-    } else {
-      requestReset();
-    }
-  });
-
-  document.getElementById('btn-login')?.addEventListener('click', (e) => {
-    if (e.target.type !== 'submit') handleLogin();
-  });
-  document.getElementById('btn-register')?.addEventListener('click', (e) => {
-    if (e.target.type !== 'submit') handleRegister();
-  });
-  document.getElementById('btn-request-reset')?.addEventListener('click', requestReset);
-  document.getElementById('btn-apply-reset')?.addEventListener('click', applyReset);
   document.getElementById('btn-logout')?.addEventListener('click', () => {
-    clearAuthToken();
-    showAuth();
+    clearAuthSession();
+    window.location.replace('/login');
   });
   document.getElementById('btn-home')?.addEventListener('click', () => selectModule('home'));
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => document.body.classList.toggle('sidebar-open'));
@@ -109,314 +39,14 @@ function bindEvents() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') document.body.classList.remove('sidebar-open');
   });
-  window.addEventListener('hashchange', handleInitialIntent);
+
+  bootShell();
 }
 
-function getErrorMessage(data, fallback = 'Bir hata oluştu.') {
-  if (typeof data === 'string') return data;
-  if (data?.error?.message) return data.error.message;
-  if (typeof data?.error === 'string') return data.error;
-  if (data?.message) return data.message;
-  return fallback;
-}
-
-function updateUrlPath(path) {
-  if (document.body.classList.contains('embed-mode')) return;
-  if (window.location.pathname !== path) {
-    window.history.pushState({}, '', path);
-  }
-}
-
-function handleInitialIntent() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('verified') === '1') {
-    const statusEl = document.getElementById('login-status');
-    if (statusEl) {
-      statusEl.className = 'auth-status text-sm text-green';
-      statusEl.innerText = 'E-posta adresiniz başarıyla doğrulandı. Hesabınıza giriş yapabilirsiniz.';
-    }
-  }
-
-  if (params.get('token')) {
-    openLayer('reset');
-    return;
-  }
-
-  const pathname = window.location.pathname.toLowerCase();
-  if (pathname.includes('/register') || pathname.includes('/signup') || window.location.hash.startsWith('#register')) {
-    openLayer('register');
-  } else {
-    closeLayers();
-    if (!isAuthenticated() && !document.body.classList.contains('embed-mode')) {
-      if (pathname.includes('/register') || pathname.includes('/signup')) {
-        updateUrlPath('/register');
-      } else {
-        updateUrlPath('/login');
-      }
-    }
-  }
-}
-
-function openLayer(type) {
-  closeLayers();
-  if (type === 'register') {
-    registerLayer?.classList.remove('app-hidden');
-    updateUrlPath('/register');
-    return;
-  }
-  const hasResetToken = Boolean(new URLSearchParams(window.location.search).get('token'));
-  document.getElementById('reset-email')?.closest('.form-group')?.classList.toggle('app-hidden', hasResetToken);
-  document.getElementById('btn-request-reset')?.classList.toggle('app-hidden', hasResetToken);
-  document.getElementById('reset-password')?.closest('.form-group')?.classList.toggle('app-hidden', !hasResetToken);
-  document.getElementById('reset-password-confirm')?.closest('.form-group')?.classList.toggle('app-hidden', !hasResetToken);
-  document.getElementById('btn-apply-reset')?.classList.toggle('app-hidden', !hasResetToken);
-  resetLayer?.classList.remove('app-hidden');
-}
-
-function closeLayers() {
-  registerLayer?.classList.add('app-hidden');
-  resetLayer?.classList.add('app-hidden');
-  if (!isAuthenticated() && !document.body.classList.contains('embed-mode')) {
-    const pathname = window.location.pathname.toLowerCase();
-    if (!pathname.includes('/login')) {
-      updateUrlPath('/login');
-    }
-  }
-}
-
-function showAuth() {
-  authView?.classList.remove('app-hidden');
-  shellView?.classList.add('app-hidden');
-  closeLayers();
-  updateUrlPath('/login');
-}
-
-function showShell() {
-  authView?.classList.add('app-hidden');
-  shellView?.classList.remove('app-hidden');
-  closeLayers();
-  updateUrlPath('/app');
-}
-
-async function handleLogin() {
-  const statusEl = document.getElementById('login-status');
-  statusEl.className = 'auth-status text-sm text-red';
-  statusEl.innerText = '';
-
-  try {
-    const res = await fetch('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: document.getElementById('login-email').value.trim(),
-        password: document.getElementById('login-password').value
-      })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      if (data?.error?.code === 'EMAIL_NOT_VERIFIED') {
-        const email = document.getElementById('login-email').value.trim();
-        statusEl.innerText = `${data.error.message} `;
-        const resend = document.createElement('button');
-        resend.type = 'button';
-        resend.className = 'ghost-link';
-        resend.innerText = 'Bağlantıyı yeniden gönder';
-        resend.addEventListener('click', () => resendVerification(email, resend));
-        statusEl.appendChild(resend);
-        return;
-      }
-      throw new Error(getErrorMessage(data, 'Giriş başarısız.'));
-    }
-    setAuthToken(data.access_token);
-    setRefreshToken(data.refresh_token);
-    setUserProfile(data.user);
-
-    const isIframe = window.self !== window.top;
-    if (document.body.classList.contains('embed-mode') || isIframe) {
-      try {
-        window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, window.location.origin);
-      } catch (_) {}
-      return;
-    }
-    await bootShell();
-  } catch (error) {
-    statusEl.innerText = error.message;
-  }
-}
-
-async function handleRegister() {
-  const statusEl = document.getElementById('register-status');
-  statusEl.className = 'auth-status text-sm text-red';
-  statusEl.innerText = '';
-
-  const companyName = document.getElementById('register-company').value.trim();
-  const name = document.getElementById('register-name').value.trim();
-  const email = document.getElementById('register-email').value.trim();
-  const phone = document.getElementById('register-phone').value.trim();
-  const rawTax = document.getElementById('register-tax-number').value.trim();
-  const cleanTax = rawTax.replace(/\D/g, '');
-  const taxOffice = document.getElementById('register-tax-office').value.trim();
-  const city = document.getElementById('register-city').value.trim();
-  const district = document.getElementById('register-district').value.trim();
-  const address = document.getElementById('register-address').value.trim();
-  const password = document.getElementById('register-password').value;
-  const acceptTerms = document.getElementById('accept-terms').checked;
-  const acceptPrivacy = document.getElementById('accept-privacy').checked;
-  const acceptKvkk = document.getElementById('accept-kvkk').checked;
-  const acceptMarketing = document.getElementById('accept-marketing').checked;
-
-  if (!companyName || !name || !email || !password || !rawTax) {
-    statusEl.innerText = 'Firma adı, ad soyad, e-posta, şifre ve TC/VKN zorunludur.';
-    return;
-  }
-  if (![10, 11].includes(cleanTax.length)) {
-    statusEl.innerText = 'TC Kimlik No 11 haneli, Vergi Kimlik No (VKN) 10 haneli olmalıdır.';
-    return;
-  }
-  if (password.length < 8) {
-    statusEl.innerText = 'Şifre en az 8 karakter olmalıdır.';
-    return;
-  }
-  if (!acceptTerms || !acceptPrivacy || !acceptKvkk) {
-    statusEl.innerText = 'Devam etmek için Üyelik Koşullarını, Gizlilik Politikasını ve KVKK Metnini onaylamalısınız.';
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/v1/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        company_name: companyName,
-        name: name,
-        email: email,
-        phone: phone,
-        tax_number: rawTax,
-        tax_office: taxOffice,
-        city: city,
-        district: district,
-        address: address,
-        accept_terms: acceptTerms,
-        accept_privacy: acceptPrivacy,
-        accept_kvkk: acceptKvkk,
-        accept_marketing: acceptMarketing,
-        password: password
-      })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(getErrorMessage(data, 'Kayıt oluşturulamadı.'));
-    if (data.access_token) {
-      setAuthToken(data.access_token);
-      setRefreshToken(data.refresh_token);
-      if (data.user) setUserProfile(data.user);
-
-      const isIframe = window.self !== window.top;
-      if (document.body.classList.contains('embed-mode') || isIframe) {
-        try {
-          window.parent.postMessage({ type: 'serenut-authenticated', token: data.access_token, user: data.user }, window.location.origin);
-        } catch (_) {}
-        return;
-      }
-
-      closeLayers();
-      await bootShell();
-      return;
-    }
-    statusEl.className = 'auth-status text-sm text-green';
-    statusEl.innerText = data.message || 'Hesabınız başarıyla oluşturuldu.';
-    const registerButton = document.getElementById('btn-register');
-    const loginButton = registerButton.cloneNode(true);
-    loginButton.disabled = false;
-    loginButton.type = 'button';
-    loginButton.innerText = 'Giriş Ekranına Dön';
-    loginButton.addEventListener('click', closeLayers);
-    registerButton.replaceWith(loginButton);
-  } catch (error) {
-    statusEl.innerText = error.message;
-  }
-}
-
-async function resendVerification(email, button) {
-  button.disabled = true;
-  try {
-    const res = await fetch('/api/v1/auth/resend-verification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json().catch(() => ({}));
-    button.innerText = res.ok ? (data.message || 'Gönderildi') : 'Gönderilemedi';
-  } catch (_) {
-    button.innerText = 'Gönderilemedi';
-  }
-}
-
-async function requestReset() {
-  const statusEl = document.getElementById('reset-status');
-  statusEl.className = 'auth-status text-sm';
-
-  try {
-    const res = await fetch('/api/v1/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: document.getElementById('reset-email').value.trim() })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(getErrorMessage(data, 'Link gönderilemedi.'));
-    statusEl.classList.add('text-green');
-    statusEl.innerText = data.message || 'Sıfırlama linki gönderildi.';
-  } catch (error) {
-    statusEl.classList.add('text-red');
-    statusEl.innerText = error.message;
-  }
-}
-
-async function applyReset() {
-  const statusEl = document.getElementById('reset-status');
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  const newPassword = document.getElementById('reset-password').value;
-  const confirmPassword = document.getElementById('reset-password-confirm').value;
-
-  statusEl.className = 'auth-status text-sm';
-
-  if (!token) {
-    statusEl.classList.add('text-red');
-    statusEl.innerText = 'Geçerli reset token bulunamadı.';
-    return;
-  }
-
-  if (newPassword !== confirmPassword) {
-    statusEl.classList.add('text-red');
-    statusEl.innerText = 'Şifreler eşleşmiyor.';
-    return;
-  }
-  if (newPassword.length < 8) {
-    statusEl.classList.add('text-red');
-    statusEl.innerText = 'Yeni şifre en az 8 karakter olmalıdır.';
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/v1/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, newPassword })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(getErrorMessage(data, 'Şifre güncellenemedi.'));
-    history.replaceState({}, '', '/app/');
-    statusEl.classList.add('text-green');
-    statusEl.innerText = data.message || 'Şifreniz güncellendi.';
-    const applyButton = document.getElementById('btn-apply-reset');
-    const loginButton = applyButton.cloneNode(true);
-    loginButton.innerText = 'Giriş Ekranına Dön';
-    loginButton.addEventListener('click', closeLayers);
-    applyButton.replaceWith(loginButton);
-  } catch (error) {
-    statusEl.classList.add('text-red');
-    statusEl.innerText = error.message;
-  }
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
 }
 
 async function bootShell() {
@@ -425,17 +55,11 @@ async function bootShell() {
     const bootstrap = await apiFetch('/app/bootstrap');
     setUserProfile(me);
     renderShell(bootstrap);
-    showShell();
     startRealtime();
   } catch (error) {
-    if (error?.status === 403) {
-      clearAuthSession();
-      const status = document.getElementById('login-status');
-      if (status) {
-        status.innerText = error.message || 'Web yönetim portalına erişim yetkiniz bulunmuyor.';
-      }
-    }
-    showAuth();
+    clearAuthSession();
+    const reason = error?.status === 403 ? 'portal_access_denied' : 'session_expired';
+    window.location.replace(`/login?error=${reason}`);
   }
 }
 
@@ -459,11 +83,9 @@ function renderShell(bootstrap) {
   document.getElementById('workspace-note').innerText = bootstrap.workspaces?.platform
     ? 'Bu kullanıcı hem platform hem firma modüllerine erişebilir.'
     : 'Bu kullanıcı firma modülleri ile sınırlandırılmıştır.';
-
   document.getElementById('role-chips').innerHTML = (bootstrap.user?.roles || [])
     .map((role) => `<span class="role-chip">${escapeHtml(role)}</span>`)
     .join('');
-
   document.getElementById('company-meta').innerHTML = `
     <div><strong>Şirket:</strong> ${escapeHtml(bootstrap.company?.name || '—')}</div>
     <div><strong>Kod:</strong> ${escapeHtml(bootstrap.company?.business_code || '—')}</div>
@@ -477,26 +99,18 @@ function renderShell(bootstrap) {
 
 function renderNav(items) {
   const nav = document.getElementById('app-nav');
-  const labels = {
-    overview: 'Genel',
-    operations: 'Operasyon',
-    commerce: 'Ticari',
-    platform: 'Yönetim',
-    account: 'Hesap'
-  };
-  const sections = ['overview', 'operations', 'commerce', 'platform', 'account'];
-
+  const labels = { overview: 'Genel', operations: 'Operasyon', commerce: 'Ticari', platform: 'Yönetim', account: 'Hesap' };
   nav.innerHTML = '';
-  sections.forEach((section) => {
+
+  ['overview', 'operations', 'commerce', 'platform', 'account'].forEach((section) => {
     const sectionItems = items.filter((item) => item.section === section);
     if (!sectionItems.length) return;
-
     nav.insertAdjacentHTML('beforeend', `<div class="nav-section-label">${labels[section]}</div>`);
     sectionItems.forEach((item) => {
       nav.insertAdjacentHTML('beforeend', `
         <a class="nav-link" href="${item.href}" data-module-id="${item.id}">
-          ${navIcon(item.id)}<span>${item.label}</span>
-          <span class="nav-link-desc">${item.description}</span>
+          ${navIcon()}<span>${escapeHtml(item.label)}</span>
+          <span class="nav-link-desc">${escapeHtml(item.description)}</span>
         </a>
       `);
     });
@@ -514,12 +128,11 @@ function renderModuleCards(items) {
   const grid = document.getElementById('module-grid');
   grid.innerHTML = items.map((item) => `
     <article class="module-card">
-      <div class="module-card-icon">${navIcon(item.id)}</div><h3>${item.label}</h3>
-      <p>${item.description}</p>
+      <div class="module-card-icon">${navIcon()}</div><h3>${escapeHtml(item.label)}</h3>
+      <p>${escapeHtml(item.description)}</p>
       <button class="btn btn-primary btn-sm" data-module-id="${item.id}">Modülü Aç</button>
     </article>
   `).join('');
-
   grid.querySelectorAll('[data-module-id]').forEach((button) => {
     button.addEventListener('click', () => selectModule(button.getAttribute('data-module-id')));
   });
@@ -527,10 +140,7 @@ function renderModuleCards(items) {
 
 function resolveInitialModule(bootstrap) {
   const hashId = window.location.hash.replace('#', '').trim();
-  if (hashId && navigationItems.some((item) => item.id === hashId)) {
-    return hashId;
-  }
-
+  if (hashId && navigationItems.some((item) => item.id === hashId)) return hashId;
   const landing = navigationItems.find((item) => item.href === bootstrap.landing_route);
   return landing?.id || navigationItems[0]?.id || 'home';
 }
@@ -540,7 +150,6 @@ async function selectModule(moduleId) {
   selectedModuleId = activeId;
   document.body.classList.remove('sidebar-open');
   const item = navigationItems.find((entry) => entry.id === activeId);
-
   document.querySelectorAll('.nav-link').forEach((link) => {
     link.classList.toggle('active', link.getAttribute('data-module-id') === activeId);
   });
@@ -558,21 +167,21 @@ async function selectModule(moduleId) {
   document.getElementById('embed-title').innerText = item.label;
   document.getElementById('embed-description').innerText = item.description;
   await loadModule(item);
-
   overviewGrid.classList.add('app-hidden');
   modulePanel.classList.add('app-hidden');
   embedPanel.classList.remove('app-hidden');
   window.location.hash = item.id;
 }
 
-async function startRealtime() {
+function startRealtime() {
   if (realtimeSocket?.readyState === WebSocket.OPEN || !isAuthenticated()) return;
   clearTimeout(realtimeReconnectTimer);
+  const token = sessionStorage.getItem('app_token') || localStorage.getItem('app_token');
+  if (!token) return;
 
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${scheme}://${window.location.host}/api/v1/realtime/live?token=${encodeURIComponent(token)}&reconnectCount=0`;
   try {
-    const issued = await apiFetch('/realtime/ticket', { method: 'POST', body: {} });
-    const url = `${scheme}://${window.location.host}/api/v1/realtime/live?ticket=${encodeURIComponent(issued.ticket)}&reconnectCount=0`;
     realtimeSocket = new WebSocket(url);
     realtimeSocket.onopen = () => {
       if (!realtimeCompanyId) return;
@@ -582,8 +191,7 @@ async function startRealtime() {
     realtimeSocket.onmessage = (event) => {
       let message;
       try { message = JSON.parse(event.data); } catch (_) { return; }
-      if (!message?.type) return;
-      scheduleModuleRefresh(message.type);
+      if (message?.type) scheduleModuleRefresh(message.type);
     };
     realtimeSocket.onclose = () => {
       realtimeSocket = null;

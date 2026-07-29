@@ -14,18 +14,15 @@ import 'package:serenutos/domain/services/incident_repository.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/services/sync_replay_engine.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
-import 'package:serenutos/providers/database_provider.dart';
-import 'package:serenutos/infrastructure/network/api_client.dart';
-
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
+import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
 
 // ── Sync Status ───────────────────────────────────────────────────────────────
 enum SyncStatus { idle, syncing, success, error }
@@ -153,87 +150,20 @@ class SyncNotifier extends StateNotifier<SyncState>
 
     state = state.copyWith(status: SyncStatus.syncing);
     try {
-      String? companyPatchError;
-      // Sync pending settings if any before main sync
-      SharedPreferences? prefs;
-      try {
-        prefs = await SharedPreferences.getInstance();
-        if (prefs.getBool('serenut_pending_company_patch') == true) {
-          final repo = await _ref.read(settingsRepositoryProvider.future);
-          final settings = await repo.getSettings();
-          final gateway = _ref.read(dbGatewayProvider);
-          final profileRows = await gateway.query('business_profile', limit: 1);
-          int expectedVersion = 1;
-          if (profileRows.isNotEmpty) {
-            expectedVersion = profileRows.first['version'] as int? ?? 1;
-          }
-
-          final apiClient = _ref.read(apiClientProvider);
-          final response = await apiClient.send(
-            'PATCH',
-            '/api/v1/company',
-            body: {
-              'expected_version': expectedVersion,
-              'name': settings.businessName,
-              'phone': settings.businessPhone,
-              'address': settings.businessAddress,
-              'owner_name': settings.ownerName,
-              'type': settings.businessType,
-              'city': settings.businessCity,
-              'district': settings.businessDistrict,
-              'currency': settings.currency,
-              'logo_url': settings.businessLogo,
-            },
-          );
-          if (response.isSuccess) {
-            final updatedMap = response.json as Map<String, dynamic>;
-            final newVersion =
-                updatedMap['version'] as int? ?? (expectedVersion + 1);
-            await gateway.update(
-              'business_profile',
-              {
-                'name': updatedMap['name'] ?? settings.businessName,
-                'owner_name': updatedMap['owner_name'] ?? settings.ownerName,
-                'type': updatedMap['type'] ?? settings.businessType,
-                'phone': updatedMap['phone'] ?? settings.businessPhone,
-                'email': updatedMap['email'] ?? '',
-                'tax_number': updatedMap['tax_number'] ?? '',
-                'city': updatedMap['city'] ?? settings.businessCity,
-                'district': updatedMap['district'] ?? settings.businessDistrict,
-                'currency': updatedMap['currency'] ?? settings.currency,
-                'version': newVersion,
-                'updated_at': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [1],
-            );
-            await prefs.setBool('serenut_pending_company_patch', false);
-          }
-        }
-      } on ApiException catch (e) {
-        if (e.statusCode == 409 && prefs != null) {
-          // Retrying an unchanged version-conflicting patch can never succeed.
-          // Preserve local settings and require a fresh user edit to queue again.
-          await prefs.setBool('serenut_pending_company_patch', false);
-          companyPatchError =
-              'Şirket bilgileri başka bir cihazda değiştirildi. Yerel bilgiler korundu; yeniden göndermek için ayarları gözden geçirip kaydedin.';
-          debugPrint('[Sync] ⚠️ Company patch version conflict: 409 returned.');
-        }
-      } catch (e) {
-        companyPatchError = 'Şirket bilgileri senkronize edilemedi: $e';
-      }
-
       final db = kIsWeb ? null : await DatabaseManager().getDatabase();
       final machine = SyncStateMachine(db: db);
       _machine = machine;
 
       final result = await service.sync();
+      await SmsCloudOutbox(_ref.read(apiClientProvider)).flush();
 
       // Repository consumers keep their own AsyncNotifier caches. Rebuild them
       // after either a local push or a remote pull so open screens immediately
       // show changes made on another device.
       // FIX: also invalidate when pull-only data arrives (no local push pending)
-      if (result.synced > 0 || result.pulled > 0) {
+      if (result.synced > 0 || result.pulled > 0 || result.reconciled > 0) {
+        _ref.invalidate(settingsProvider);
+        _ref.invalidate(settingsNotifierProvider);
         _ref.invalidate(productRepositoryProvider);
         _ref.invalidate(customerRepositoryProvider);
         _ref.invalidate(saleRepositoryProvider);
@@ -261,7 +191,7 @@ class SyncNotifier extends StateNotifier<SyncState>
         await authService.checkCurrentUserSessionOnline();
       } catch (_) {}
 
-      if (result.success && companyPatchError == null) {
+      if (result.success) {
         state = state.copyWith(
           status: SyncStatus.success,
           lastSyncedCount: result.synced,
@@ -282,8 +212,8 @@ class SyncNotifier extends StateNotifier<SyncState>
         );
         state = state.copyWith(
           status: SyncStatus.error,
-          lastError: companyPatchError ??
-              (result.errors.isNotEmpty ? result.errors.first : 'Sync failed'),
+          lastError:
+              result.errors.isNotEmpty ? result.errors.first : 'Sync failed',
         );
       }
     } catch (e, st) {

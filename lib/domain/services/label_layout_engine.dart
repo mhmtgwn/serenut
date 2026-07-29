@@ -34,7 +34,7 @@ class LabelLayoutEngine {
 
     // Align Left for details
     bytes.addAll(alignLeft);
-    bytes.addAll(_textToBytes('Miktar: ${_formatQty(model.weight)} kg\n'));
+    bytes.addAll(_textToBytes('Miktar: ${_formatQty(model.weight)}\n'));
     bytes.addAll(_textToBytes('Fiyat: ₺${model.price.toStringAsFixed(2)}\n'));
     bytes.addAll(_textToBytes(
         'Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(model.timestamp)}\n'));

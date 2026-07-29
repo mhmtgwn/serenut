@@ -4,7 +4,6 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_settings_repository.dart';
 import 'package:serenutos/providers/database_provider.dart';
-import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:sqflite/sqflite.dart' show ConflictAlgorithm;
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart'
@@ -137,71 +136,11 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               previous.currency != settings.currency;
       await repo.updateSettings(settings);
 
-      final prefs = ref.read(sharedPreferencesProvider);
+      // Tenant-wide profile fields are picked up by SyncV4. Keeping this write
+      // local-first also lets image files be resized and converted into a
+      // portable logo before they are sent to the company profile endpoint.
       if (companyProfileChanged) {
-        await prefs.setBool('serenut_pending_company_patch', true);
-
-        // Only tenant-wide business fields are sent to the company endpoint.
-        // Printer, SIM, hardware and UI preferences remain device-local.
-        try {
-          final gateway = ref.read(dbGatewayProvider);
-          final profileRows = await gateway.query('business_profile', limit: 1);
-          int expectedVersion = 1;
-          if (profileRows.isNotEmpty) {
-            expectedVersion = profileRows.first['version'] as int? ?? 1;
-          }
-
-          final apiClient = ref.read(apiClientProvider);
-          final response = await apiClient.send(
-            'PATCH',
-            '/api/v1/company',
-            body: {
-              'expected_version': expectedVersion,
-              'name': settings.businessName,
-              'phone': settings.businessPhone,
-              'address': settings.businessAddress,
-              'owner_name': settings.ownerName,
-              'type': settings.businessType,
-              'city': settings.businessCity,
-              'district': settings.businessDistrict,
-              'currency': settings.currency,
-              'logo_url': settings.businessLogo,
-            },
-          );
-          if (response.isSuccess) {
-            final updatedMap = response.json as Map<String, dynamic>;
-            final newVersion =
-                updatedMap['version'] as int? ?? (expectedVersion + 1);
-            await gateway.update(
-              'business_profile',
-              {
-                'name': updatedMap['name'] ?? settings.businessName,
-                'owner_name': updatedMap['owner_name'] ?? settings.ownerName,
-                'type': updatedMap['type'] ?? settings.businessType,
-                'phone': updatedMap['phone'] ?? settings.businessPhone,
-                'email': updatedMap['email'] ?? '',
-                'tax_number': updatedMap['tax_number'] ?? '',
-                'city': updatedMap['city'] ?? settings.businessCity,
-                'district': updatedMap['district'] ?? settings.businessDistrict,
-                'currency': updatedMap['currency'] ?? settings.currency,
-                'version': newVersion,
-                'updated_at': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [1],
-            );
-            await prefs.setBool('serenut_pending_company_patch', false);
-          }
-        } on ApiException catch (e) {
-          if (e.statusCode == 409) {
-            await prefs.setBool('serenut_pending_company_patch', false);
-            debugPrint(
-                '[Settings] ⚠️ Company patch version conflict: 409 returned. Re-syncing latest company profile...');
-            await syncCompanyFromServer();
-          }
-        } catch (e) {
-          debugPrint('⚠️ Central business profile sync failed: $e');
-        }
+        debugPrint('[Settings] Company profile queued for SyncV4.');
       }
 
       // Reload settings to update state
