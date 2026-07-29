@@ -60,11 +60,29 @@ class IntegrityCheckService {
       final List<Map<String, dynamic>> fkRes =
           await db.rawQuery('PRAGMA foreign_key_check');
       if (fkRes.isNotEmpty) {
-        dbHealthy = false;
+        final affectedTables = fkRes
+            .map((row) => row['table']?.toString() ?? 'unknown')
+            .toSet()
+            .toList()
+          ..sort();
         issues.add(
-            'Foreign key integrity anomalies detected: ${fkRes.length} row violations');
+            'Foreign key synchronization anomalies detected: ${fkRes.length} '
+            'row violations (${affectedTables.join(", ")})');
         logBuffer.writeln(
-            '❌ DB Foreign Key Check: FAIL (${fkRes.length} violations)');
+            '⚠️ DB Foreign Key Check: WARNING (${fkRes.length} violations in '
+            '${affectedTables.join(", ")}). Startup remains available; sync '
+            'can materialize missing parent records.');
+        try {
+          await TelemetryService().logStructured(
+            event: 'database_foreign_key_anomaly',
+            level: LogLevel.warning,
+            metadata: {
+              'violation_count': fkRes.length,
+              'tables': affectedTables,
+              'timestamp': DateTime.now().toUtc().toIso8601String(),
+            },
+          );
+        } catch (_) {}
       } else {
         logBuffer.writeln('✅ DB Foreign Key Check: PASS');
       }

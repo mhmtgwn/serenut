@@ -289,16 +289,44 @@ class DatabaseManager {
           }
         },
         onOpen: (db) async {
-          // Sprint C - SQLite Corruption & Integrity Audit
+          // Physical SQLite corruption is fatal. Referential anomalies are
+          // handled separately because legacy/sync data can temporarily arrive
+          // before its parent record and must not lock the entire application.
           final integrity = await db.rawQuery('PRAGMA integrity_check;');
           if (integrity.first.values.first != 'ok') {
             throw Exception(
-                'SQLite integrity check failed: \${integrity.first.values.first}');
+                'SQLite integrity check failed: ${integrity.first.values.first}');
           }
+
+          // Older databases can contain anonymous sales before the system
+          // customer was introduced. Materialize it before checking relations.
+          final now = DateTime.now().toUtc().toIso8601String();
+          await db.insert(
+            'customers',
+            {
+              'id': '',
+              'name': 'Peşin Müşteri',
+              'email': '',
+              'phone': '',
+              'balance': 0.0,
+              'status': 'active',
+              'created_at': now,
+              'updated_at': now,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+
           final fkCheck = await db.rawQuery('PRAGMA foreign_key_check;');
           if (fkCheck.isNotEmpty) {
-            throw Exception(
-                'SQLite foreign key check failed for \${fkCheck.length} constraints.');
+            final affectedTables = fkCheck
+                .map((row) => row['table']?.toString() ?? 'unknown')
+                .toSet()
+                .join(',');
+            debugPrint(
+              '[DatabaseManager] ⚠️ ${fkCheck.length} legacy/sync foreign-key '
+              'anomalies detected in: $affectedTables. Startup will continue '
+              'so synchronization can materialize the missing parent records.',
+            );
           }
         },
       );
