@@ -578,7 +578,10 @@ router.get("/bootstrap", async (req, res) => {
     const change = (entity_type: string, row: Record<string, unknown>, items?: Array<Record<string, unknown>>) => ({
       entity_type,
       entity_id: String(row.id),
-      operation: row.is_deleted === true ? "DELETE" : "UPSERT",
+      // Bootstrap is a complete snapshot, not an incremental event stream.
+      // Soft-deleted parents must be materialized locally so historical order
+      // and sale items can still satisfy their foreign-key references.
+      operation: "UPSERT",
       payload: items ? { ...localPayload(entity_type, row), items } : localPayload(entity_type, row),
     });
     const changes = [

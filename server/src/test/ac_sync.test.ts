@@ -233,6 +233,82 @@ async function run() {
     fail('healthy mutation after a rejected peer was not materialized.');
   }
 
+  const historicalAggregate = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      mutations: [
+        {
+          mutation_id: '55555555-5555-4555-8555-555555555555',
+          entity_type: 'customer',
+          entity_id: 'historical-customer',
+          operation: 'UPSERT',
+          base_revision: 0,
+          payload: { name: 'Tarihsel Müşteri' },
+        },
+        {
+          mutation_id: '66666666-6666-4666-8666-666666666666',
+          entity_type: 'order',
+          entity_id: 'historical-order',
+          operation: 'UPSERT',
+          base_revision: 0,
+          payload: {
+            customer_id: 'historical-customer',
+            status: 'completed',
+            total_amount: 42.5,
+            items: [{
+              id: 'historical-order-item',
+              product_id: productMutation.entity_id,
+              quantity: 1,
+              unit_price: 42.5,
+            }],
+          },
+        },
+      ],
+    });
+  if (historicalAggregate.status !== 200 || historicalAggregate.body.results?.length !== 2) {
+    fail(`historical order fixture was not materialized through sync: ${historicalAggregate.status}`);
+  }
+
+  const deletedProduct = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      mutations: [{
+        mutation_id: '77777777-7777-4777-8777-777777777777',
+        entity_type: 'product',
+        entity_id: productMutation.entity_id,
+        operation: 'DELETE',
+        base_revision: pushed.body.results[0].revision,
+        payload: {},
+      }],
+    });
+  if (deletedProduct.status !== 200 || deletedProduct.body.results?.length !== 1) {
+    fail(`historical product tombstone was not accepted: ${deletedProduct.status}`);
+  }
+
+  const bootstrap = await request(app)
+    .get(`/api/v4/sync/bootstrap?device_activation_id=${activationB}&device_id=${installationB}`)
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader);
+  const productSnapshot = (bootstrap.body.changes ?? []).find((change: any) =>
+    change.entity_type === 'product' && change.entity_id === productMutation.entity_id,
+  );
+  const orderSnapshot = (bootstrap.body.changes ?? []).find((change: any) =>
+    change.entity_type === 'order' && change.entity_id === 'historical-order',
+  );
+  if (bootstrap.status !== 200 || productSnapshot?.operation !== 'UPSERT' ||
+      productSnapshot?.payload?.is_deleted !== 1 ||
+      orderSnapshot?.payload?.items?.[0]?.product_id !== productMutation.entity_id) {
+    fail(`bootstrap did not preserve a deleted product referenced by history: ${bootstrap.status} ${JSON.stringify(bootstrap.body)}`);
+  }
+
   console.log('✔ Sync V4 HTTP: push, retry, pull, conflict and poison-batch isolation passed.');
 }
 
