@@ -18,9 +18,9 @@ if [ ! -s .maintenance-token ]; then
   trap - EXIT HUP INT TERM
 fi
 
-# Backend image runs as Alpine's node user (UID/GID 1000); the agent runs as
-# root. Keep the token unreadable to every other host/container user.
-chown 1000:1000 .maintenance-token
-chmod 600 .maintenance-token
+# Backend image runs as UID 1000. The hardened agent has no DAC override
+# capability, so it reads through its root group. No other user gets access.
+chown 1000:0 .maintenance-token
+chmod 640 .maintenance-token
 test -f .maintenance-token
 test -s .maintenance-token
