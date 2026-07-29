@@ -248,7 +248,11 @@ async function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && req.url === '/health') return respond(res, 200, { status: 'ok' });
+    if (req.method === 'GET' && req.url === '/health') {
+      return safeToken()
+        ? respond(res, 200, { status: 'ok' })
+        : respond(res, 503, { status: 'token_unavailable' });
+    }
     if (!authorized(req)) return respond(res, 401, { error: 'unauthorized' });
     if (req.method === 'GET' && req.url === '/preview') return respond(res, 200, await buildPreview());
     if (req.method === 'POST' && req.url === '/cleanup') {
