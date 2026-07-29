@@ -30,10 +30,9 @@ import 'package:serenutos/presentation/pages/sales_history_page.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
-import 'package:serenutos/presentation/pages/license_page.dart'
-    show LicenseManagementPage;
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_import_wizard_page.dart';
+import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/domain/models/permission.dart'
     show UserRole, Permission;
 import 'package:serenutos/presentation/pages/finance_hub_page.dart';
@@ -60,8 +59,8 @@ class AppRoutes {
   static const reports = '/reports';
   static const orders = '/orders';
   static const settings = '/settings';
+  static const about = '/settings/about';
   static const catalogImportWizard = '/settings/catalog-import';
-  static const license = '/settings/license';
   static const admin = '/admin';
   static const finance = '/finance';
   static const hardware = '/hardware';
@@ -216,15 +215,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         redirect: (context, state) =>
             _roleOrPermissionRedirect(context, Permission.settingsDatabase),
       ),
+      GoRoute(
+        path: AppRoutes.about,
+        name: 'about',
+        builder: (context, state) => const AboutPage(),
+        redirect: (context, state) =>
+            _roleOrPermissionRedirect(context, Permission.settingsView),
+      ),
 
       // ── Phase 4-6 New Free Routes ─────────────────────────────────────
-      GoRoute(
-        path: AppRoutes.license,
-        name: 'license',
-        builder: (context, state) => const LicenseManagementPage(),
-        redirect: (context, state) =>
-            _roleOrPermissionRedirect(context, Permission.settingsLicense),
-      ),
       GoRoute(
         path: AppRoutes.admin,
         name: 'admin',

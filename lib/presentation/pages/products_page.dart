@@ -24,7 +24,6 @@ const _kAmber = POSColors.amber;
 const _kAmberLight = POSColors.amberLight;
 const _kRed = POSColors.red;
 const _kRedLight = POSColors.redLight;
-const _kSurface = POSColors.surface;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
 const _kBorder = POSColors.border;
@@ -40,7 +39,6 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false;
-  bool _showFilters = false;
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -157,138 +155,32 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         ref.read(productSearchQueryProvider.notifier).state = val;
         setState(() {});
       },
-      filterWidget: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            onTap: () => setState(() => _showFilters = !_showFilters),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _kSurface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _kBorder),
+      actions: [
+        Semantics(
+          label: selectedCategory == null
+              ? 'Kategori filtresi'
+              : 'Kategori filtresi: $selectedCategory',
+          button: true,
+          child: Badge(
+            isLabelVisible: selectedCategory != null,
+            backgroundColor: _kAmber,
+            smallSize: 8,
+            child: IconButton(
+              tooltip: selectedCategory == null
+                  ? 'Kategori filtresi'
+                  : 'Kategori: $selectedCategory',
+              onPressed: () => _showCategoryFilterSheet(
+                categoriesVal,
+                selectedCategory,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.filter_list_rounded,
-                      size: 18, color: _kGreenDark),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      selectedCategory == null
-                          ? 'Kategori: Tümü'
-                          : 'Kategori: $selectedCategory',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: _kText,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    _showFilters
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 18,
-                    color: _kTextSecondary,
-                  ),
-                ],
+              icon: Icon(
+                Icons.filter_list_rounded,
+                color: selectedCategory == null ? _kTextSecondary : _kGreen,
               ),
             ),
           ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _kBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Text(
-                          'Kategori Seçin',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: _kText,
-                          ),
-                        ),
-                      ),
-                      if (selectedCategory != null)
-                        TextButton(
-                          onPressed: () {
-                            ref
-                                .read(productCategoryFilterProvider.notifier)
-                                .state = null;
-                            setState(() => _showFilters = false);
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: _kGreen,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Temizle',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Column(
-                    children: List.generate(categoriesVal.length + 1, (index) {
-                      final isAll = index == 0;
-                      final catName = isAll ? 'Tümü' : categoriesVal[index - 1];
-                      final isSelected = isAll
-                          ? selectedCategory == null
-                          : selectedCategory == catName;
-                      final icon = isAll
-                          ? Icons.grid_view_rounded
-                          : _getCategoryIcon(catName);
-
-                      return _buildCategoryListRow(
-                        context,
-                        label: catName,
-                        icon: icon,
-                        isSelected: isSelected,
-                        onTap: () {
-                          ref
-                              .read(productCategoryFilterProvider.notifier)
-                              .state = isAll ? null : catName;
-                          setState(() => _showFilters = false);
-                        },
-                      );
-                    }),
-                  ),
-                ],
-              ),
-            ),
-            crossFadeState: _showFilters
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
-        ],
-      ),
+        ),
+      ],
       body: filteredProductsVal.when(
         loading: () => const Center(
           child: CircularProgressIndicator(
@@ -596,6 +488,135 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     );
   }
 
+  Future<void> _showCategoryFilterSheet(
+    List<String> categories,
+    String? selectedCategory,
+  ) async {
+    const allCategories = '__all_categories__';
+    var pendingCategory = selectedCategory ?? allCategories;
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: .68,
+          minChildSize: .42,
+          maxChildSize: .92,
+          expand: false,
+          builder: (context, scrollController) {
+            return StatefulBuilder(
+              builder: (context, setSheetState) {
+                return Material(
+                  color: POSColors.card,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadii.lg),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                          AppSpacing.sm,
+                          AppSpacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Kategori Filtresi',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Kapat',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(),
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
+                          itemCount: categories.length + 1,
+                          itemBuilder: (context, index) {
+                            final isAll = index == 0;
+                            final category =
+                                isAll ? allCategories : categories[index - 1];
+                            return RadioListTile<String>(
+                              value: category,
+                              groupValue: pendingCategory,
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setSheetState(() => pendingCategory = value);
+                              },
+                              secondary: Icon(
+                                isAll
+                                    ? Icons.grid_view_rounded
+                                    : _getCategoryIcon(category),
+                                color: pendingCategory == category
+                                    ? POSColors.green
+                                    : POSColors.textSecondary,
+                              ),
+                              title: Text(isAll ? 'Tüm Kategoriler' : category),
+                            );
+                          },
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: const BoxDecoration(
+                          color: POSColors.card,
+                          border: Border(
+                            top: BorderSide(color: POSColors.border),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, allCategories),
+                                child: const Text('Temizle'),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => Navigator.pop(
+                                  context,
+                                  pendingCategory,
+                                ),
+                                child: const Text('Uygula'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted || result == null) return;
+    ref.read(productCategoryFilterProvider.notifier).state =
+        result == allCategories ? null : result;
+  }
+
   void _confirmDelete(BuildContext context, ProductEntity product) {
     requireAdminAccess(
       context,
@@ -637,61 +658,6 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildCategoryListRow(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2.5),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSelected ? _kGreen : const Color(0xFFE2E8F0),
-          width: isSelected ? 1.5 : 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected ? _kGreen : const Color(0xFF64748B),
-                  size: 18,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? _kGreenDark : const Color(0xFF334155),
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                const Spacer(),
-                if (isSelected)
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: _kGreen,
-                    size: 16,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 

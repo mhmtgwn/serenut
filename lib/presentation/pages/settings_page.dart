@@ -27,8 +27,6 @@ import 'package:serenutos/presentation/pages/operations_center_page.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
-import 'package:serenutos/presentation/pages/license_page.dart'
-    show LicenseManagementPage;
 import 'package:serenutos/config/theme.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
@@ -361,26 +359,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  // ── License Subtitle Helper ───────────────────────────────────────────────
-  String _buildLicenseSubtitleFromRef() {
-    try {
-      final licenseService = ref.read(licenseServiceProvider);
-      final status = licenseService.checkLicenseStatus();
-      final info = licenseService.getLicenseInfo();
-      final days = licenseService.getRemainingDays();
-      if (status == 'valid' && info != null) {
-        return '${info.tier.name} — $days gün kaldı';
-      } else if (status == 'expired') {
-        return '❌ Süresi Doldu';
-      } else if (status == 'tampered') {
-        return '🚨 Saat manipülasyonu';
-      }
-      return '⚠️ Lisans bulunamadı';
-    } catch (_) {
-      return 'Lisans durumu bilinmiyor';
-    }
-  }
-
   // ── Gruplanmış Ayarlar Menüsü ────────────────────────────────────────────────
   List<Widget> _buildGroupedSettings(Settings settings, AuthUser? currentUser) {
     final List<Widget> groups = [];
@@ -554,23 +532,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         icon: Icons.admin_panel_settings_rounded,
         color: _kPurple,
         onTap: () => context.push(AppRoutes.admin),
-      ));
-    }
-
-    if (_hasPermission(currentUser, Permission.settingsLicense) &&
-        _matchesQuery(
-            'lisans', 'license', 'abonelik', 'tier', 'plan', 'cihaz')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(_buildCategoryRow(
-        title: 'Lisans Yönetimi',
-        subtitle: _buildLicenseSubtitleFromRef(),
-        icon: Icons.verified_rounded,
-        color: _kGreen,
-        onTap: () => _runGuardedAction(Permission.settingsLicense, () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const LicenseManagementPage()),
-          );
-        }, title: 'Lisans Yönetimi'),
       ));
     }
 

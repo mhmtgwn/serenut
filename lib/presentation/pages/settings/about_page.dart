@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
+import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
 class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
@@ -29,80 +32,143 @@ class _AboutPageState extends ConsumerState<AboutPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Uygulama Hakkında'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Card(
-                elevation: 0,
-                color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+    final licenseService = ref.watch(licenseServiceProvider);
+    final licenseInfo = licenseService.getLicenseInfo();
+    final licenseStatus = licenseService.checkLicenseStatus();
+    final remainingDays = licenseService.getRemainingDays();
+
+    return FullScreenSettingsPage(
+      title: 'Uygulama Hakkında',
+      useScrollView: false,
+      child: ListView(
+        children: [
+          SerenutSurface(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              children: [
+                const Icon(Icons.storefront_rounded,
+                    size: 52, color: POSColors.green),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Serenut OS',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Sürüm ${VersionChecker.currentVersion}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (_lastResult != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _lastResult!,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SerenutSurface(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _licenseColor(licenseStatus).withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                  ),
+                  child: Icon(
+                    Icons.verified_user_outlined,
+                    color: _licenseColor(licenseStatus),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.storefront_rounded,
-                          size: 56, color: Color(0xFF16A34A)),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Serenut OS',
-                        style: TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
                       Text(
-                        'Sürüm ${VersionChecker.currentVersion}',
-                        style: const TextStyle(color: Color(0xFF64748B)),
+                        'Lisans Durumu',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      if (_lastResult != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          _lastResult!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFF64748B)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        _licenseDescription(
+                          licenseStatus,
+                          licenseInfo?.tier.name,
+                          remainingDays,
                         ),
-                      ],
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                elevation: 0,
-                color: Colors.white,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: const Icon(Icons.system_update_rounded,
-                      color: Color(0xFF3B82F6)),
-                  title: const Text(
-                    'Güncellemeleri denetle',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: const Text(
-                    'Kararlı kanaldaki en son sürümü kontrol eder.',
-                  ),
-                  trailing: _checking
-                      ? const SizedBox.square(
-                          dimension: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.chevron_right_rounded),
-                  onTap: _checking ? null : _checkForUpdate,
+                SerenutStatusBadge(
+                  label: _licenseLabel(licenseStatus),
+                  color: _licenseColor(licenseStatus),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          SerenutSurface(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(AppSpacing.md),
+              leading: const Icon(
+                Icons.system_update_rounded,
+                color: POSColors.green,
+              ),
+              title: const Text(
+                'Güncellemeleri denetle',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text(
+                'Kararlı kanaldaki en son sürümü kontrol eder.',
+              ),
+              trailing: _checking
+                  ? const SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.chevron_right_rounded),
+              onTap: _checking ? null : _checkForUpdate,
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  String _licenseLabel(String status) => switch (status) {
+        'valid' || 'active' => 'Aktif',
+        'trial' => 'Deneme',
+        'expired' => 'Süresi doldu',
+        'tampered' => 'Güvenlik uyarısı',
+        _ => 'Bulunamadı',
+      };
+
+  Color _licenseColor(String status) => switch (status) {
+        'valid' || 'active' => POSColors.green,
+        'trial' => POSColors.blue,
+        'expired' || 'tampered' => POSColors.red,
+        _ => POSColors.amberDark,
+      };
+
+  String _licenseDescription(String status, String? tier, int days) {
+    return switch (status) {
+      'valid' ||
+      'active' =>
+        '${tier ?? 'Standart'} paket • $days gün kullanım süresi kaldı.',
+      'trial' => 'Deneme kullanımı aktif • $days gün kaldı.',
+      'expired' => 'Lisans süresi dolmuş. Destek ekibiyle iletişime geçin.',
+      'tampered' => 'Cihaz saat bütünlüğü doğrulanamadı.',
+      _ => 'Bu cihazda doğrulanmış lisans bilgisi bulunamadı.',
+    };
   }
 
   Future<void> _checkForUpdate() async {
@@ -144,7 +210,8 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         releaseManager: ref.read(releaseManagerServiceProvider),
         platform: Platform.isAndroid ? 'android' : 'windows',
         jwtToken: ref.read(authServiceProvider).getJwtToken(),
-        deviceId: ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
+        deviceId:
+            ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
       );
     } catch (error) {
       if (mounted) setState(() => _lastResult = 'Kontrol başarısız: $error');

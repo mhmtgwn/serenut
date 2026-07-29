@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
 
 void main() {
@@ -53,5 +55,55 @@ void main() {
     expect(decoration.color, POSColors.card);
     expect(decoration.borderRadius, BorderRadius.circular(AppRadii.md));
     expect(decoration.boxShadow, isNull);
+  });
+
+  testWidgets('mobile POS header keeps search and filter collapsed',
+      (tester) async {
+    var searching = false;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.build(useGoogleFonts: false),
+          home: StatefulBuilder(
+            builder: (context, setState) => MediaQuery(
+              data: const MediaQueryData(size: Size(336, 640)),
+              child: Scaffold(
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 336,
+                    child: PosHeader(
+                      title: 'Ürünler',
+                      isSearching: searching,
+                      onSearchToggled: (value) =>
+                          setState(() => searching = value),
+                      searchController: TextEditingController(),
+                      searchHint: 'Ürün ara',
+                      onSearchChanged: (_) {},
+                      filterWidget: const Text('Kategori filtresi'),
+                      showSettings: false,
+                      showStatusIndicator: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('SERENUT OS'), findsNothing);
+    expect(find.text('Ürün ara'), findsNothing);
+    expect(find.text('Kategori filtresi'), findsNothing);
+    expect(find.byTooltip('Ara ve filtrele'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Ara ve filtrele'));
+    await tester.pump();
+
+    expect(find.text('Ürün ara'), findsOneWidget);
+    expect(find.text('Kategori filtresi'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

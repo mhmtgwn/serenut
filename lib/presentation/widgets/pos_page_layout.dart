@@ -47,101 +47,194 @@ class PosHeader extends StatelessWidget {
 
     return Material(
       color: POSColors.card,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: MediaQuery.sizeOf(context).width >= 900
-              ? AppSpacing.lg
-              : AppSpacing.md,
-          vertical: AppSpacing.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SerenutSectionHeader(
-              eyebrow: 'SERENUT OS',
-              title: title,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (actions != null) ...actions!,
-                  if (showRefresh && onRefresh != null)
-                    IconButton(
-                      padding: const EdgeInsets.all(6),
-                      constraints: const BoxConstraints(),
-                      onPressed: onRefresh,
-                      icon: const Icon(Icons.refresh_rounded, size: 22),
-                      tooltip: 'Yenile',
-                    ),
-                  if (showStatusIndicator) ...[
-                    const RealtimeStatusIndicator(compact: true),
-                    const SizedBox(width: 4),
-                  ],
-                  if (showSettings)
-                    IconButton(
-                      padding: const EdgeInsets.all(6),
-                      constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.settings_outlined, size: 22),
-                      tooltip: 'Ayarlar',
-                      onPressed: () => requirePermissionAccess(
-                        context,
-                        permission: Permission.settingsView,
-                        title: 'Ayarlar Yetkisi',
-                        onGranted: (_, __) => context.push(AppRoutes.settings),
-                      ),
-                    ),
-                ],
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 600;
+          return Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? AppSpacing.md : AppSpacing.lg,
+              vertical: compact ? AppSpacing.sm : AppSpacing.md,
             ),
-
-            // Inline Search Bar (Zero-Click Mode & 1-Tap Clear)
-            if (hasSearch || isSearching) ...[
-              const SizedBox(height: 10),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: searchController ?? TextEditingController(),
-                  builder: (context, value, _) {
-                    final isNotEmpty = value.text.isNotEmpty;
-
-                    return TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: searchHint ?? 'Ara...',
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                        suffixIcon: isNotEmpty
-                            ? IconButton(
-                                icon:
-                                    const Icon(Icons.cancel_rounded, size: 18),
-                                onPressed: () {
-                                  if (searchController != null) {
-                                    searchController!.clear();
-                                  }
-                                  if (onSearchChanged != null) {
-                                    onSearchChanged!('');
-                                  }
-                                },
-                              )
-                            : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (compact)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                       ),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: POSColors.text,
-                            fontWeight: FontWeight.w600,
+                      if (actions != null) ...actions!,
+                      if (hasSearch)
+                        IconButton(
+                          tooltip:
+                              isSearching ? 'Aramayı kapat' : 'Ara ve filtrele',
+                          onPressed: () => onSearchToggled?.call(!isSearching),
+                          icon: Icon(
+                            isSearching
+                                ? Icons.close_rounded
+                                : Icons.search_rounded,
                           ),
-                      onChanged: onSearchChanged,
-                    );
-                  },
-                ),
-              ),
-            ],
+                        ),
+                      if (showRefresh && onRefresh != null)
+                        IconButton(
+                          onPressed: onRefresh,
+                          icon: const Icon(Icons.refresh_rounded),
+                          tooltip: 'Yenile',
+                        ),
+                      if (showStatusIndicator) ...[
+                        const RealtimeStatusIndicator(compact: true),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
+                      if (showSettings)
+                        IconButton(
+                          icon: const Icon(Icons.settings_outlined),
+                          tooltip: 'Ayarlar',
+                          onPressed: () => requirePermissionAccess(
+                            context,
+                            permission: Permission.settingsView,
+                            title: 'Ayarlar Yetkisi',
+                            onGranted: (_, __) =>
+                                context.push(AppRoutes.settings),
+                          ),
+                        ),
+                    ],
+                  )
+                else
+                  SerenutSectionHeader(
+                    eyebrow: 'SERENUT OS',
+                    title: title,
+                    trailing: _HeaderActions(
+                      actions: actions,
+                      hasSearch: hasSearch,
+                      isSearching: isSearching,
+                      onSearchToggled: onSearchToggled,
+                      showRefresh: showRefresh,
+                      onRefresh: onRefresh,
+                      showStatusIndicator: showStatusIndicator,
+                      showSettings: showSettings,
+                    ),
+                  ),
 
-            // Filter Widget Row
-            if (filterWidget != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              filterWidget!,
-            ],
-          ],
-        ),
+                // Mobilde arama ve filtre içerik alanını kaplamaz; kullanıcı
+                // arama ikonuna dokunduğunda birlikte açılır.
+                if (isSearching) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable:
+                          searchController ?? TextEditingController(),
+                      builder: (context, value, _) {
+                        final isNotEmpty = value.text.isNotEmpty;
+
+                        return TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            hintText: searchHint ?? 'Ara...',
+                            prefixIcon:
+                                const Icon(Icons.search_rounded, size: 18),
+                            suffixIcon: isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.cancel_rounded,
+                                        size: 18),
+                                    onPressed: () {
+                                      if (searchController != null) {
+                                        searchController!.clear();
+                                      }
+                                      if (onSearchChanged != null) {
+                                        onSearchChanged!('');
+                                      }
+                                    },
+                                  )
+                                : null,
+                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: POSColors.text,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                          onChanged: onSearchChanged,
+                        );
+                      },
+                    ),
+                  ),
+                  if (filterWidget != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    filterWidget!,
+                  ],
+                ],
+              ],
+            ),
+          );
+        },
       ),
+    );
+  }
+}
+
+class _HeaderActions extends StatelessWidget {
+  const _HeaderActions({
+    required this.actions,
+    required this.hasSearch,
+    required this.isSearching,
+    required this.onSearchToggled,
+    required this.showRefresh,
+    required this.onRefresh,
+    required this.showStatusIndicator,
+    required this.showSettings,
+  });
+
+  final List<Widget>? actions;
+  final bool hasSearch;
+  final bool isSearching;
+  final ValueChanged<bool>? onSearchToggled;
+  final bool showRefresh;
+  final VoidCallback? onRefresh;
+  final bool showStatusIndicator;
+  final bool showSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (actions != null) ...actions!,
+        if (hasSearch)
+          IconButton(
+            tooltip: isSearching ? 'Aramayı kapat' : 'Ara ve filtrele',
+            onPressed: () => onSearchToggled?.call(!isSearching),
+            icon: Icon(
+              isSearching ? Icons.close_rounded : Icons.search_rounded,
+            ),
+          ),
+        if (showRefresh && onRefresh != null)
+          IconButton(
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Yenile',
+          ),
+        if (showStatusIndicator) ...[
+          const RealtimeStatusIndicator(compact: true),
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        if (showSettings)
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Ayarlar',
+            onPressed: () => requirePermissionAccess(
+              context,
+              permission: Permission.settingsView,
+              title: 'Ayarlar Yetkisi',
+              onGranted: (_, __) => context.push(AppRoutes.settings),
+            ),
+          ),
+      ],
     );
   }
 }
