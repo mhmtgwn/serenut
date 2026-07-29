@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { LicenseService } from './license.service';
 import { authenticateUser, requireRole, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { createRedisLimiter } from '../../middleware/rate-limit.middleware';
+import { createRedisLimiter, devicePresenceLimiter } from '../../middleware/rate-limit.middleware';
 import { incrementLicenseValidation } from '../../utils/telemetry';
+import { logger } from '../../config/logger';
 
 const router = Router();
 const licenseRateLimit = createRedisLimiter({
@@ -49,7 +50,7 @@ router.post('/activate', licenseRateLimit, async (req: Request, res: Response) =
     if (err.message === 'hardware_tampered_limit_exceeded') {
       return res.status(403).json({ error: 'hardware_tampered_limit_exceeded', message: 'Cihaz donanım değişikliği limiti aşılmıştır.' });
     }
-    console.error('Activation error:', err);
+    logger.error('Activation error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Lisans aktivasyonu esnasında hata oluştu.' });
   }
 });
@@ -88,7 +89,7 @@ router.post('/auto-activate', licenseRateLimit, async (req: Request, res: Respon
     if (err.message === 'hardware_tampered_limit_exceeded') {
       return res.status(403).json({ error: 'hardware_tampered_limit_exceeded', message: 'Cihaz donanım değişikliği limiti aşılmıştır.' });
     }
-    console.error('Auto Activation error:', err);
+    logger.error('Auto Activation error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Lisans aktivasyonu esnasında hata oluştu.' });
   }
 });
@@ -107,7 +108,7 @@ router.post('/validate', licenseRateLimit, async (req: Request, res: Response) =
     return res.json({ valid: isValid });
   } catch (err) {
     incrementLicenseValidation(false);
-    console.error('Validation error:', err);
+    logger.error('Validation error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -141,7 +142,7 @@ router.post('/heartbeat', licenseRateLimit, async (req: Request, res: Response) 
     if (err.message === 'hardware_tampered_limit_exceeded') {
       return res.status(403).json({ error: 'hardware_tampered_limit_exceeded', message: 'Cihaz donanım değişikliği limiti aşılmıştır.' });
     }
-    console.error('Heartbeat error:', err);
+    logger.error('Heartbeat error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -151,7 +152,7 @@ router.use(authenticateUser);
 
 // Presence is deliberately separate from license validation: clients update
 // their online state frequently without reissuing a signed license token.
-router.post('/device-presence', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/device-presence', devicePresenceLimiter, async (req: AuthenticatedRequest, res: Response) => {
   const { device_activation_id, platform, current_version, channel } = req.body;
   if (!device_activation_id) {
     return res.status(400).json({ error: 'missing_device_activation_id' });
@@ -167,7 +168,7 @@ router.post('/device-presence', async (req: AuthenticatedRequest, res: Response)
     if (err.message === 'invalid_device_activation') {
       return res.status(403).json({ error: 'invalid_device_activation' });
     }
-    console.error('Device presence error:', err);
+    logger.error('Device presence error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -190,7 +191,7 @@ router.get('/status', async (req: AuthenticatedRequest, res: Response) => {
     if (err.message === 'invalid_license_key') {
       return res.status(404).json({ error: 'invalid_license_key' });
     }
-    console.error('Fetch status error:', err);
+    logger.error('Fetch status error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -227,7 +228,7 @@ router.post('/renew', requireRole('owner'), async (req: AuthenticatedRequest, re
     if (err.message === 'invalid_license_key') {
       return res.status(404).json({ error: 'invalid_license_key' });
     }
-    console.error('Renew error:', err);
+    logger.error('Renew error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -246,7 +247,7 @@ router.post('/revoke', requireRole('sysadmin'), async (req: AuthenticatedRequest
     if (err.message === 'invalid_license_key') {
       return res.status(404).json({ error: 'invalid_license_key' });
     }
-    console.error('Revoke error:', err);
+    logger.error('Revoke error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });

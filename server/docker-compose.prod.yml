@@ -106,7 +106,7 @@ services:
       --appendonly yes
       --appendfsync everysec
       --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
     volumes:
       - redis-data:/data
     healthcheck:

@@ -121,11 +121,19 @@ void main() {
     late MockEventDispatcher eventDispatcher;
     late ReconnectManager reconnectManager;
     late ConnectionManager connectionManager;
+    late ApiClient apiClient;
 
     setUp(() {
       wsManager = MockWebSocketManager();
       authService = MockAuthService();
       eventDispatcher = MockEventDispatcher();
+      apiClient = ApiClient()
+        ..setJwtToken('jwt_token')
+        ..mockHandler = (_) => const ApiResponse(
+              statusCode: 201,
+              body: '{"ticket":"one-time-ticket","expires_in_seconds":60}',
+              headers: {},
+            );
 
       // Use slightly longer delays for Windows timer resolution safety
       reconnectManager = ReconnectManager(
@@ -139,6 +147,7 @@ void main() {
         reconnectManager: reconnectManager,
         eventDispatcher: eventDispatcher,
         authService: authService,
+        apiClient: apiClient,
         wsBaseUrl: 'ws://localhost:4000/api/v1/realtime/live',
         onStatusChanged: (_) {},
       );
@@ -147,6 +156,7 @@ void main() {
     tearDown(() {
       connectionManager.dispose();
       wsManager.dispose();
+      apiClient.dispose();
     });
 
     test('Normal Connect flow succeeds', () async {

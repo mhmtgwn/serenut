@@ -89,11 +89,11 @@ void main() {
       final mockClient = MockClient((request) async {
         final body = jsonDecode(request.body);
         expect(body['message'], 'Hello, troubleshooting completed');
-        expect(request.url.path, endsWith('/tickets/tkt-123/reply'));
+        expect(request.url.path, endsWith('/support/tickets/tkt-123/messages'));
 
         return http.Response(
           jsonEncode({'success': true}),
-          200,
+          201,
           headers: {'content-type': 'application/json'},
         );
       });

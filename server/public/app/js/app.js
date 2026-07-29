@@ -1,7 +1,7 @@
 import { setAuthToken, setRefreshToken, clearAuthToken, clearAuthSession, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
 import { escapeHtml } from '/shared/js/formatters.js';
-import { loadModule } from './module-runtime.js?v=20260728-company-commercial2';
+import { loadModule } from './module-runtime.js?v=20260729-stability1';
 
 const authView = document.getElementById('auth-view');
 const shellView = document.getElementById('shell-view');
@@ -36,7 +36,7 @@ const navIconPaths = {
   'platform-releases': 'M12 3v12m0 0 5-5m-5 5-5-5M5 21h14',
   'platform-health': 'M3 12h4l2-6 4 12 2-6h6',
   'platform-support': 'M4 5h16v12H8l-4 3z M8 9h8m-8 4h5',
-  'account-settings': 'M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2 3.46-.08-.02a1.7 1.7 0 00-1.8.22l-.45.26a1.7 1.7 0 00-.8 1.63V22h-4v-.09a1.7 1.7 0 00-.8-1.63l-.45-.26a1.7 1.7 0 00-1.8-.22l-.08.02-2-3.46.06-.06A1.7 1.7 0 005 15v-.52a1.7 1.7 0 00-1.14-1.6L3.8 12.85v-4l.08-.02A1.7 1.7 0 005 7.23v-.52a1.7 1.7 0 00-.34-1.88l-.06-.06 2-3.46.08.02a1.7 1.7 0 001.8-.22l.45-.26A1.7 1.7 0 009.73-.58V-.67h4v.09a1.7 1.7 0 00.8 1.63l.45.26a1.7 1.7 0 001.8.22l.08-.02 2 3.46-.06.06a1.7 1.7 0 00-.34 1.88v.52a1.7 1.7 0 001.14 1.6l.08.02v4l-.08.02A1.7 1.7 0 0019.4 15z'
+  'account-settings': 'M4 7h8m4 0h4 M14 5v4 M4 12h16 M4 17h4m4 0h8 M10 15v4'
 };
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${navIconPaths[id] || navIconPaths['workspace-home']}"></path></svg>`;
 
@@ -565,15 +565,14 @@ async function selectModule(moduleId) {
   window.location.hash = item.id;
 }
 
-function startRealtime() {
+async function startRealtime() {
   if (realtimeSocket?.readyState === WebSocket.OPEN || !isAuthenticated()) return;
   clearTimeout(realtimeReconnectTimer);
-  const token = sessionStorage.getItem('app_token');
-  if (!token) return;
 
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${scheme}://${window.location.host}/api/v1/realtime/live?token=${encodeURIComponent(token)}&reconnectCount=0`;
   try {
+    const issued = await apiFetch('/realtime/ticket', { method: 'POST', body: {} });
+    const url = `${scheme}://${window.location.host}/api/v1/realtime/live?ticket=${encodeURIComponent(issued.ticket)}&reconnectCount=0`;
     realtimeSocket = new WebSocket(url);
     realtimeSocket.onopen = () => {
       if (!realtimeCompanyId) return;

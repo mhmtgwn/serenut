@@ -1,13 +1,14 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import url from 'url';
-import { AuthService } from '../auth/auth.service';
 import { pgPool } from '../../config/database';
 import { logger } from '../../config/logger';
 import { ConnectionRegistry, ConnectionMetadata } from './connection-registry';
 import { TopicManager } from './topic-manager';
 import { writeAuditLog } from '../analytics/telemetry.controller';
 import { eventBroker } from './event-broker';
+import { consumeRealtimeTicket } from './realtime-ticket.service';
+import { AuthService } from '../auth/auth.service';
 
 let wss: WebSocketServer;
 
@@ -120,11 +121,12 @@ export function initRealtimeWebSocket(server: Server) {
 
     if (pathname === '/api/v1/realtime/live' || pathname === '/realtime/live') {
       const query = url.parse(request.url || '', true).query;
-      const token = query.token as string;
+      const ticket = query.ticket as string;
       const clientReconnects = parseInt((query.reconnectCount as string) || '0', 10);
 
-      if (!token) {
-        logger.warn('WS Upgrade failed: Missing token');
+      const legacyTestToken = process.env.NODE_ENV === 'test' ? query.token : undefined;
+      if (!ticket && !legacyTestToken) {
+        logger.warn('WS Upgrade failed: Missing one-time ticket');
         authErrors++;
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
@@ -132,16 +134,17 @@ export function initRealtimeWebSocket(server: Server) {
       }
 
       try {
-        const isBlacklisted = await AuthService.isTokenBlacklisted(token);
-        if (isBlacklisted) {
-          logger.warn('WS Upgrade failed: Token blacklisted');
+        let user = ticket ? await consumeRealtimeTicket(ticket) : null;
+        if (!user && legacyTestToken) {
+          user = AuthService.verifyAccessToken(String(legacyTestToken));
+        }
+        if (!user) {
+          logger.warn('WS Upgrade failed: Invalid or expired one-time ticket');
           authErrors++;
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
-
-        const user = AuthService.verifyAccessToken(token);
 
         // Tenant Validation: Check active company in DB
         const companyRes = await pgPool.query(

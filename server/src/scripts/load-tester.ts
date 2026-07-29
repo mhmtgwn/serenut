@@ -5,9 +5,8 @@ import http from 'http';
 import express from 'express';
 import { initRealtimeWebSocket } from '../modules/realtime/realtime.ws';
 import { RealtimeBroadcastService } from '../modules/realtime/broadcast.service';
+import { issueRealtimeTicket } from '../modules/realtime/realtime-ticket.service';
 import WebSocket from 'ws';
-
-const jwt = require('jsonwebtoken');
 
 async function runLoadTest() {
   console.log('⚡ STARTING REALTIME WEBSOCKET & REST LOAD TEST SIMULATOR...');
@@ -24,23 +23,16 @@ async function runLoadTest() {
   server.listen(port, async () => {
     console.log(`📡 Load Test Server running on port ${port}`);
 
-    const jwtSecret = process.env.JWT_SECRET || 'test_jwt_secret_must_be_32_characters_minimum';
     const companyId = 'serenut_cloud';
-    
-    // Generate valid JWT token
-    const token = jwt.sign({
-      jti: 'load-test-jti',
+
+    const realtimeUser = {
       id: 'user-load-tester',
       name: 'Load Tester Agent',
       email: 'load@tester.com',
       company_id: companyId,
       roles: ['owner'],
       permissions: ['sales:view', 'orders:view']
-    }, jwtSecret, {
-      expiresIn: '1h',
-      issuer: 'serenut.com',
-      audience: 'serenut-pos'
-    });
+    };
 
     const clientCount = 50; // Simulate 50 concurrent WebSocket cashier Terminals
     const clients: WebSocket[] = [];
@@ -51,9 +43,10 @@ async function runLoadTest() {
     console.log(`🔌 Spawning ${clientCount} concurrent WebSocket client connections...`);
 
     // Connect clients
-    const connectPromises = Array.from({ length: clientCount }).map((_, index) => {
+    const connectPromises = Array.from({ length: clientCount }).map(async (_, index) => {
+      const { ticket } = await issueRealtimeTicket(realtimeUser);
       return new Promise<void>((resolve, reject) => {
-        const wsUrl = `ws://localhost:${port}/api/v1/realtime/live?token=${token}`;
+        const wsUrl = `ws://localhost:${port}/api/v1/realtime/live?ticket=${encodeURIComponent(ticket)}`;
         const ws = new WebSocket(wsUrl);
 
         ws.on('open', () => {

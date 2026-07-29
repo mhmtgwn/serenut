@@ -36,7 +36,6 @@ const optionalEnv = [
   'SMS_API_KEY',
   'SMTP_API_KEY',
   'RSA_PRIVATE_KEY',
-  'RELEASE_RSA_PRIVATE_KEY',
   'APP_SECRET',
 ];
 optionalEnv.forEach(key => {
@@ -44,6 +43,11 @@ optionalEnv.forEach(key => {
     console.warn(`⚠️ Warning: Optional operational key ${key} is not set. Related features may fallback to insecure defaults or fail.`);
   }
 });
+if (!process.env.RELEASE_RSA_PRIVATE_KEY && !process.env.RELEASE_RSA_PRIVATE_KEY_FILE) {
+  console.warn(
+    '⚠️ Warning: Release signing key is not configured through an environment value or mounted file.',
+  );
+}
 
 
 import express, { Request, Response, NextFunction } from 'express';
@@ -51,6 +55,7 @@ import cors from 'cors';
 import * as Sentry from '@sentry/node';
 
 import http from 'http';
+import crypto from 'crypto';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJSDoc from 'swagger-jsdoc';
@@ -87,6 +92,7 @@ import orderRouter from './modules/order/order.controller';
 import remoteConfigRouter from './modules/remote-config/remote-config.controller';
 import logsRouter from './modules/logs/logs.controller';
 import healthRouter from './modules/health/health.controller';
+import realtimeRouter from './modules/realtime/realtime.controller';
 
 // BullMQ Workers
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
@@ -368,6 +374,7 @@ app.use('/api/v1/notifications', notificationRouter);
 app.use('/api/v1/remote-config', remoteConfigRouter);
 app.use('/api/v1/logs', logsRouter);
 app.use('/api/v1/health', healthRouter);
+app.use('/api/v1/realtime', realtimeRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/app', appRouter);
 app.use('/api/v1/admin', adminRouter);
@@ -572,8 +579,17 @@ if (process.env.SENTRY_DSN) {
 
 // ── GLOBAL ERROR HANDLER ─────────────────────────────────────────────────────
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-  console.error('Unhandled error details:', err);
-  logger.error('Unhandled error:', { error: err.message, stack: err.stack, url: req.originalUrl });
+  const correlationId = String(req.headers['x-correlation-id'] || crypto.randomUUID());
+  logger.error('Unhandled request error', {
+    error: err?.message || String(err),
+    stack: err?.stack,
+    route: req.originalUrl,
+    method: req.method,
+    correlation_id: correlationId,
+    company_id: (req as any).user?.company_id,
+    user_id: (req as any).user?.id,
+  });
+  res.setHeader('X-Correlation-Id', correlationId);
 
   // CORS hataları özel mesaj
   if (err.message && err.message.startsWith('CORS')) {
@@ -586,6 +602,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
 
   res.status(err.status || 500).json({
     error: 'server_error',
+    correlation_id: correlationId,
     message: process.env.NODE_ENV === 'production' ? 'Beklenmedik bir hata oluştu.' : err.message,
   });
 });

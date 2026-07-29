@@ -93,7 +93,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     if (err.message === 'account_locked') {
       return res.status(429).json(createError('AUTH004'));
     }
-    console.error('Login error:', err);
+    logger.error('Login error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Giriş işlemi esnasında bir hata oluştu.' } });
   }
 });
@@ -135,7 +135,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     if (err.message === 'invalid_refresh_token' || err.message === 'refresh_token_expired') {
       return res.status(401).json(createError('AUTH002'));
     }
-    console.error('Refresh token error:', err);
+    logger.error('Refresh token error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Oturum yenileme esnasında hata oluştu.' } });
   }
 });
@@ -251,7 +251,7 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
     if (err.message === 'invalid_old_password') {
       return res.status(400).json({ error: 'invalid_old_password', message: 'Eski şifre hatalı.' });
     }
-    console.error('Change password error:', err);
+    logger.error('Change password error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -294,7 +294,7 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
     }
     return res.json({ success: true, message: 'Şifreniz başarıyla güncellendi.' });
   } catch (err) {
-    console.error('Reset password error:', err);
+    logger.error('Reset password error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -536,7 +536,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('Register error:', err);
+    logger.error('Register error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Kayıt işlemi sırasında bir hata oluştu.' });
   } finally {
     client.release();

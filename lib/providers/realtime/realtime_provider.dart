@@ -42,6 +42,7 @@ final connectionManagerProvider = Provider<ConnectionManager>((ref) {
   final reconnectManager = ref.watch(reconnectManagerProvider);
   final eventDispatcher = ref.watch(eventDispatcherProvider);
   final authService = ref.watch(authServiceProvider);
+  final apiClient = ref.watch(apiClientProvider);
   final notifier = ref.read(connectionStateProvider.notifier);
   final telemetryUpload = ref.watch(telemetryUploadServiceProvider);
 
@@ -50,6 +51,7 @@ final connectionManagerProvider = Provider<ConnectionManager>((ref) {
     reconnectManager: reconnectManager,
     eventDispatcher: eventDispatcher,
     authService: authService,
+    apiClient: apiClient,
     wsBaseUrl: EnvironmentConfig.current.wsBaseUrl,
     onStatusChanged: (status) {
       notifier.updateStatus(status);

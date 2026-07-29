@@ -28,18 +28,34 @@ router.use(authenticateUser);
 router.use(requireRole('sysadmin'));
 
 function readServerLogFile(level: string, limit: number): Array<Record<string, any>> {
-  const filename = level === 'all' ? 'combined.log' : 'error.log';
-  const logPath = path.join(process.cwd(), 'logs', filename);
-  if (!fs.existsSync(logPath)) return [];
-  return fs.readFileSync(logPath, 'utf8')
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .slice(-limit)
-    .reverse()
-    .map((line) => {
-      try { return JSON.parse(line); }
-      catch { return { timestamp: null, level, message: line }; }
-    });
+  const filenames = level === 'all'
+    ? ['combined.log', 'exceptions.log', 'rejections.log']
+    : ['error.log', 'exceptions.log', 'rejections.log'];
+  const records = filenames.flatMap((filename) => {
+    const logPath = path.join(process.cwd(), 'logs', filename);
+    if (!fs.existsSync(logPath)) return [];
+    return fs.readFileSync(logPath, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-limit)
+      .reverse()
+      .map((line) => {
+        try {
+          const record = JSON.parse(line);
+          return { ...record, log_file: filename };
+        } catch {
+          return { timestamp: null, level, message: line, log_file: filename };
+        }
+      });
+  });
+  return records
+    .sort((left, right) => {
+      const leftTime = Date.parse(String(left.timestamp || left.time || ''));
+      const rightTime = Date.parse(String(right.timestamp || right.time || ''));
+      return (Number.isFinite(rightTime) ? rightTime : 0)
+        - (Number.isFinite(leftTime) ? leftTime : 0);
+    })
+    .slice(0, limit);
 }
 
 // Maskelenmiş Winston kayıtlarını yalnız platform sysadmin'ine salt-okunur sunar.
@@ -1011,59 +1027,6 @@ router.get('/sms/stats', async (req: AuthenticatedRequest, res: Response) => {
       },
       logs: logs.rows
     });
-  } catch (err) {
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-// ── 9. TICKETS (SUPPORT DESK) ────────────────────────────────────────────────
-router.get('/tickets', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const list = await runBypassingRLS(`
-      SELECT t.*, c.name as company_name 
-      FROM support_tickets t 
-      JOIN companies c ON t.company_id = c.id 
-      ORDER BY t.created_at DESC
-    `);
-    return res.json(list.rows);
-  } catch (err) {
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-router.get('/tickets/:id/messages', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const messages = await runBypassingRLS(
-      'SELECT * FROM support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC',
-      [req.params.id]
-    );
-    return res.json(messages.rows);
-  } catch (err) {
-    return res.status(500).json({ error: 'server_error' });
-  }
-});
-
-router.post('/tickets/:id/reply', async (req: AuthenticatedRequest, res: Response) => {
-  const { message } = req.body;
-  if (!message) {
-    return res.status(400).json({ error: 'missing_message' });
-  }
-
-  const id = `msg-${Date.now()}`;
-  try {
-    await runBypassingRLS(
-      `INSERT INTO support_ticket_messages (id, ticket_id, sender_id, sender_name, message)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, req.params.id, req.user!.id, 'Serenut Destek', message]
-    );
-
-    // Update ticket status to replied
-    await runBypassingRLS(
-      "UPDATE support_tickets SET status = 'replied', updated_at = NOW() WHERE id = $1",
-      [req.params.id]
-    );
-
-    return res.status(201).json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
   }

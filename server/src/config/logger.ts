@@ -96,5 +96,19 @@ export const logger = winston.createLogger({
       filename: path.join(process.cwd(), 'logs/combined.log') 
     }),
     new SentryTransport({ level: 'error' })
-  ]
+  ],
+  exceptionHandlers: [
+    new winston.transports.File({
+      filename: path.join(process.cwd(), 'logs/exceptions.log'),
+    }),
+  ],
+  rejectionHandlers: [
+    new winston.transports.File({
+      filename: path.join(process.cwd(), 'logs/rejections.log'),
+    }),
+  ],
+  // A rejected async request must be recorded and returned as an error; it
+  // must not terminate the whole API process. Fatal native/process failures
+  // remain visible to Docker's health/restart policy.
+  exitOnError: false,
 });

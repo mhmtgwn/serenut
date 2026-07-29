@@ -75,9 +75,10 @@ class SupportTicket {
 
   factory SupportTicket.fromJson(Map<String, dynamic> json) => SupportTicket(
         id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        description: json['description'] as String? ?? '',
-        priority: json['priority'] as String? ?? 'medium',
+        title: json['subject'] as String? ?? json['title'] as String? ?? '',
+        description:
+            json['body'] as String? ?? json['description'] as String? ?? '',
+        priority: json['priority'] as String? ?? 'P3',
         status: json['status'] as String? ?? 'open',
         createdAt: json['created_at'] as String? ?? '',
       );
@@ -136,25 +137,27 @@ class PortalRepository {
   /// List support tickets
   Future<List<SupportTicket>> getTickets() async {
     final response = await _apiClient.get(
-      '/api/v1/portal/tickets',
+      '/api/v1/support/tickets',
     );
-    final list = jsonDecode(response.body) as List<dynamic>;
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = payload['tickets'] as List<dynamic>? ?? const [];
     return list.map((item) => SupportTicket.fromJson(item)).toList();
   }
 
   /// Get message thread for support ticket
   Future<List<TicketMessage>> getTicketMessages(String ticketId) async {
     final response = await _apiClient.get(
-      '/api/v1/portal/tickets/$ticketId/messages',
+      '/api/v1/support/tickets/$ticketId',
     );
-    final list = jsonDecode(response.body) as List<dynamic>;
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = payload['messages'] as List<dynamic>? ?? const [];
     return list.map((item) => TicketMessage.fromJson(item)).toList();
   }
 
   /// Reply to a support ticket
   Future<void> replyTicket(String ticketId, String message) async {
     await _apiClient.post(
-      '/api/v1/portal/tickets/$ticketId/reply',
+      '/api/v1/support/tickets/$ticketId/messages',
       {
         'message': message,
       },
