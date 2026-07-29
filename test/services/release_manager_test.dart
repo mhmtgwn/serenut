@@ -363,4 +363,42 @@ void main() {
       expect(p3.percentage, 1.0);
     });
   });
+
+  group('DownloadCancellationToken', () {
+    test('throws after cancellation', () {
+      final token = DownloadCancellationToken();
+      token.cancel();
+
+      expect(
+        token.throwIfCancelled,
+        throwsA(isA<DownloadCancelledException>()),
+      );
+    });
+
+    test('pre-cancelled download exits before opening a network request',
+        () async {
+      final token = DownloadCancellationToken()..cancel();
+      final service = ReleaseManagerService(config: testConfig);
+      const update = UpdateInfo(
+        hasUpdate: true,
+        isForceUpdate: false,
+        latestVersion: '1.2.0+45',
+        downloadUrl: 'http://127.0.0.1:1/never-called',
+        fileSizeBytes: 1024,
+        channel: 'stable',
+      );
+
+      expect(
+        service
+            .downloadUpdate(
+              updateInfo: update,
+              platform: 'windows',
+              cancellationToken: token,
+            )
+            .drain<void>(),
+        throwsA(isA<DownloadCancelledException>()),
+      );
+      service.dispose();
+    });
+  });
 }

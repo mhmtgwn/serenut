@@ -65,6 +65,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
   double _progress = 0.0;
   String _progressText = '';
   String? _errorMessage;
+  bool _cancelRequested = false;
+  DownloadCancellationToken? _downloadCancellation;
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
@@ -82,11 +84,23 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
 
   @override
   void dispose() {
+    _downloadCancellation?.cancel();
     _animController.dispose();
     super.dispose();
   }
 
+  void _cancelUpdate() {
+    if (_cancelRequested) return;
+    _cancelRequested = true;
+    _downloadCancellation?.cancel();
+    if (mounted) {
+      Navigator.of(context).pop(false);
+    }
+  }
+
   Future<void> _startDownload() async {
+    _cancelRequested = false;
+    _downloadCancellation = DownloadCancellationToken();
     setState(() {
       _state = _DialogState.verifying;
       _progress = 0.0;
@@ -95,6 +109,7 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
 
     final rollback = ref.read(rollbackManagerProvider);
     final specResult = await rollback.verifyInstallationSpecs();
+    if (_cancelRequested || !mounted) return;
     if (!specResult.isAllPass) {
       setState(() {
         _state = _DialogState.error;
@@ -107,7 +122,10 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
     setState(() {
       _progressText = 'Mevcut sürüm yedekleniyor...';
     });
-    final backupSuccess = await rollback.backupCurrentVersion();
+    final backupSuccess = await rollback.backupCurrentVersion(
+      isCancelled: () => _cancelRequested,
+    );
+    if (_cancelRequested || !mounted) return;
     if (!backupSuccess) {
       setState(() {
         _state = _DialogState.error;
@@ -132,6 +150,7 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
         platform: widget.platform,
         jwtToken: widget.jwtToken,
         deviceId: widget.deviceId,
+        cancellationToken: _downloadCancellation,
       )) {
         if (!mounted) return;
         final totalMB = progress.totalBytes != null
@@ -204,6 +223,8 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
           });
         }
       }
+    } on DownloadCancelledException {
+      return;
     } catch (e) {
       if (!mounted) return;
       // Trigger automated rollback on unexpected exceptions during setup
@@ -356,9 +377,7 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
             _AnimatedProgressBar(value: _progress),
             const SizedBox(height: 12),
             Text(
-              _state == _DialogState.verifying
-                  ? '🔐 SHA-256 doğrulanıyor...'
-                  : _progressText,
+              _progressText,
               style: const TextStyle(fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -438,6 +457,15 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
 
       case _DialogState.downloading:
       case _DialogState.verifying:
+        return [
+          TextButton.icon(
+            onPressed: _cancelUpdate,
+            icon: const Icon(Icons.close_rounded),
+            label: const Text('İptal Et'),
+          ),
+          const SizedBox(width: 4),
+        ];
+
       case _DialogState.done:
         return [
           const Padding(
