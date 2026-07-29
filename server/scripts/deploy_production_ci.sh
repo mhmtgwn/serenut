@@ -5,11 +5,8 @@ cd "$(dirname "$0")/.."
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
 # The maintenance agent is isolated from the public network and accepts only
-# allowlisted jobs authenticated with this root-owned shared token.
-if [ ! -s .maintenance-token ]; then
-  umask 077
-  head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > .maintenance-token
-fi
+# allowlisted jobs authenticated with a root-owned shared token.
+sh scripts/ensure_maintenance_token.sh
 
 PUBLISH_LOCK="releases/.publishing"
 mkdir -p releases
