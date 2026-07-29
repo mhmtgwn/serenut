@@ -5,12 +5,13 @@
 [Setup]
 AppId={{5E22B005-9B28-4DE3-BB10-388C838F5F2B}
 AppName=Serenut OS
-AppVersion=1.2.0+45
+AppVersion=1.2.0+53
 AppPublisher=Serenut OS Software Technologies A.Ş.
 AppPublisherURL=https://serenut.com/
 AppSupportURL=https://serenut.com/faq.html
 AppUpdatesURL=https://serenut.com/release-notes.html
-DefaultDirName={userappdata}\SerenutOS
+DefaultDirName={autopf}\Serenut OS
+UsePreviousAppDir=no
 DisableDirPage=yes
 DefaultGroupName=Serenut OS
 DisableProgramGroupPage=yes
@@ -20,7 +21,10 @@ SetupIconFile=..\..\windows\runner\resources\app_icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0
 AppMutex=SerenutOS_App_Mutex
 CloseApplications=yes
 CloseApplicationsFilter=*serenutos.exe*
@@ -44,9 +48,8 @@ Name: "{group}\Serenut OS"; Filename: "{app}\serenutos.exe"
 Name: "{autodesktop}\Serenut OS"; Filename: "{app}\serenutos.exe"; Tasks: desktopicon
 
 [Run]
-; vc_redist requires elevation even though Serenut OS is a per-user install.
-; An already running installation necessarily has its runtime dependencies, so
-; never launch the elevated redistributable during an in-app update.
+; The installer already runs elevated because application files live under
+; Program Files. Skip the redistributable when it is already installed.
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Microsoft Visual C++ çalışma zamanı kuruluyor..."; Flags: waituntilterminated; Check: NeedsVCRuntime
 Filename: "{app}\serenutos.exe"; Description: "{cm:LaunchProgram,Serenut OS}"; Flags: nowait postinstall skipifsilent
 
@@ -55,13 +58,6 @@ function NeedsVCRuntime: Boolean;
 var
   Installed: Cardinal;
 begin
-  { Updating an existing per-user installation must remain elevation-free. }
-  if FileExists(ExpandConstant('{app}\serenutos.exe')) then
-  begin
-    Result := False;
-    exit;
-  end;
-
   { Avoid launching the redistributable when the x64 runtime is already present. }
   Result := not (
     RegQueryDWordValue(

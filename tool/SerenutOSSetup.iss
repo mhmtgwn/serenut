@@ -5,11 +5,11 @@
 ; ============================================================
 
 #define MyAppName "Serenut OS"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.0+53"
 #define MyAppPublisher "Serenut Software Technologies"
 #define MyAppURL "https://serenut.com"
 #define MyAppExeName "serenutos.exe"
-#define MyAppId "{{A3B4C5D6-E7F8-4901-ABCD-EF1234567890}"
+#define MyAppId "{{5E22B005-9B28-4DE3-BB10-388C838F5F2B}"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -20,7 +20,8 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={userappdata}\SerenutOS
+DefaultDirName={autopf}\Serenut OS
+UsePreviousAppDir=no
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 CloseApplications=yes
@@ -37,7 +38,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Privacy / UAC
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
 ; Sign installer
 ; SignTool=signtool sign /n "Serenut" /t "http://timestamp.digicert.com" $f
 

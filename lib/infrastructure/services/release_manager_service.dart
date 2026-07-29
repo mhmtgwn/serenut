@@ -434,7 +434,9 @@ class ReleaseManagerService {
         final batchContent = '@echo off\r\n'
             'timeout /t 2 /nobreak >nul\r\n'
             'start /wait "" "$path" /SILENT /SP- /NOCANCEL\r\n'
-            'if exist "$currentExe" (\r\n'
+            'if exist "%ProgramFiles%\\Serenut OS\\serenutos.exe" (\r\n'
+            '    start "" "%ProgramFiles%\\Serenut OS\\serenutos.exe"\r\n'
+            ') else if exist "$currentExe" (\r\n'
             '    start "" "$currentExe"\r\n'
             ')\r\n'
             'del "%~f0"\r\n';
