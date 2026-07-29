@@ -277,7 +277,7 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
     const gateway = await client.query(
       `UPDATE company_sms_gateways g SET last_poll_at = NOW()
        FROM device_activations d
-       WHERE g.company_id = $1 AND g.device_activation_id = d.id AND d.device_hash = $2
+       WHERE g.company_id = $1::varchar AND g.device_activation_id = d.id AND d.device_hash = $2::varchar
        RETURNING g.device_activation_id`,
       [user.company_id, deviceId]
     );
@@ -296,7 +296,7 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
     );
     await client.query(
       `UPDATE notification_queue SET status = 'failed', error_message = 'sms_gateway_timeout', gateway_updated_at = NOW()
-       WHERE company_id = $1 AND channel = 'sms' AND status IN ('queued','pending','retrying')
+          WHERE company_id = $1::varchar AND channel = 'sms' AND status IN ('queued','pending','retrying')
          AND created_at < NOW() - INTERVAL '24 hours'`,
       [user.company_id]
     );
@@ -307,10 +307,10 @@ router.post('/sms-gateway/poll', async (req: AuthenticatedRequest, res: Response
          WHERE company_id = $1 AND channel = 'sms' AND status IN ('queued','pending','retrying')
            AND COALESCE(scheduled_at, created_at) <= NOW()
            AND created_at >= NOW() - INTERVAL '24 hours'
-         ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT $3
+          ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT $3::integer
        )
        UPDATE notification_queue q
-       SET status = 'delivered_to_device', gateway_device_id = $2,
+        SET status = 'delivered_to_device', gateway_device_id = $2::varchar,
            gateway_claimed_at = NOW(), gateway_updated_at = NOW()
        FROM selected WHERE q.id = selected.id
        RETURNING q.id, q.recipient, q.body, q.client_message_id, q.created_at`,
@@ -334,22 +334,33 @@ router.post('/sms-gateway/messages/:id/result', async (req: AuthenticatedRequest
   if (!['sending', 'sent', 'failed'].includes(status)) {
     return res.status(400).json({ error: 'invalid_status' });
   }
-  const result = await runWithTenantContext(
-    user.company_id,
-    `UPDATE notification_queue q SET status = $1, error_message = $2,
-       delivered_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE delivered_at END,
-       gateway_updated_at = NOW()
-     WHERE q.id = $3 AND q.company_id = $4 AND q.channel = 'sms'
-       AND EXISTS (
-         SELECT 1 FROM company_sms_gateways g
-         JOIN device_activations d ON d.id = g.device_activation_id
-         WHERE g.company_id = $4 AND d.device_hash = $5 AND q.gateway_device_id = g.device_activation_id
-       )
-     RETURNING q.id, q.status`,
-    [status, req.body.error_message || null, req.params.id, user.company_id, deviceId]
-  );
-  if (result.rows.length === 0) return res.status(404).json({ error: 'message_not_found' });
-  return res.json(result.rows[0]);
+  try {
+    const result = await runWithTenantContext(
+      user.company_id,
+      `UPDATE notification_queue q SET status = $1::varchar, error_message = $2::text,
+         delivered_at = CASE WHEN $1::varchar = 'sent' THEN NOW() ELSE delivered_at END,
+         gateway_updated_at = NOW()
+       WHERE q.id = $3::varchar AND q.company_id = $4::varchar AND q.channel = 'sms'
+         AND EXISTS (
+           SELECT 1 FROM company_sms_gateways g
+           JOIN device_activations d ON d.id = g.device_activation_id
+           WHERE g.company_id = $4::varchar
+             AND d.device_hash = $5::varchar
+             AND q.gateway_device_id = g.device_activation_id
+         )
+       RETURNING q.id, q.status`,
+      [status, req.body.error_message || null, req.params.id, user.company_id, deviceId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'message_not_found' });
+    return res.json(result.rows[0]);
+  } catch (err) {
+    logger.error('SMS gateway result update failed', {
+      error: err instanceof Error ? err.message : String(err),
+      message_id: req.params.id,
+      company_id: user.company_id,
+    });
+    return res.status(500).json({ error: 'server_error' });
+  }
 });
 
 

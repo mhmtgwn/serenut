@@ -47,13 +47,23 @@ export class SupportService {
   static async createTicket(params: {
     companyId: string;
     requesterUserId: string;
+    requesterName?: string;
     subject: string;
     body?: string;
     priority?: string;
     category?: string;
     logsSnapshot?: string;
   }): Promise<any> {
-    const { companyId, requesterUserId, subject, body, priority = 'P3', category = 'technical', logsSnapshot } = params;
+    const {
+      companyId,
+      requesterUserId,
+      requesterName = 'Müşteri',
+      subject,
+      body,
+      priority = 'P3',
+      category = 'technical',
+      logsSnapshot,
+    } = params;
 
     if (!['P1', 'P2', 'P3', 'P4'].includes(priority)) {
       throw new Error('Invalid priority. Must be P1, P2, P3, or P4.');
@@ -67,6 +77,7 @@ export class SupportService {
 
     const client = await pgPool.connect();
     try {
+      await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
       const res = await client.query(
         `INSERT INTO support_tickets
@@ -76,9 +87,25 @@ export class SupportService {
          RETURNING *`,
         [id, companyId, requesterUserId, subject, body ?? null, priority, category, logsSnapshot ?? null, slaDeadlineAt]
       );
+      await client.query(
+        `INSERT INTO support_ticket_messages
+           (id, ticket_id, sender_id, sender_name, message)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          `MSG-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`,
+          id,
+          requesterUserId,
+          requesterName,
+          body || subject,
+        ],
+      );
+      await client.query('COMMIT');
 
       logger.info(`Support ticket created: ${id} | Priority: ${priority} | Company: ${companyId}`);
       return res.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
     } finally {
       client.release();
     }
@@ -107,25 +134,19 @@ export class SupportService {
       const ticket = res.rows[0];
       assertTicketTransition(ticket.status, toStatus, ticketId);
 
-      const now = new Date();
-      const updates: string[] = [`status = '${toStatus}'`, `updated_at = CURRENT_TIMESTAMP`];
-
-      if (toStatus === 'resolved') {
-        updates.push(`resolved_at = '${now.toISOString()}'`);
-      }
-      if (toStatus === 'closed') {
-        updates.push(`closed_at = '${now.toISOString()}'`);
-      }
-      if (toStatus === 'in_progress' && ticket.status === 'open') {
-        // Assign to sysadmin if provided
-        if (performedBy) {
-          updates.push(`assigned_to = '${performedBy}'`);
-        }
-      }
-
       await client.query(
-        `UPDATE support_tickets SET ${updates.join(', ')} WHERE id = $1`,
-        [ticketId]
+        `UPDATE support_tickets
+            SET status = $2,
+                assigned_to = CASE
+                  WHEN $2 = 'in_progress' AND status = 'open' AND $3::varchar IS NOT NULL
+                    THEN $3::varchar
+                  ELSE assigned_to
+                END,
+                resolved_at = CASE WHEN $2 = 'resolved' THEN NOW() ELSE resolved_at END,
+                closed_at = CASE WHEN $2 = 'closed' THEN NOW() ELSE closed_at END,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [ticketId, toStatus, performedBy || null]
       );
 
       await client.query('COMMIT');
@@ -174,9 +195,9 @@ export class SupportService {
 
     const client = await pgPool.connect();
     try {
+      await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
-      const [dataRes, countRes] = await Promise.all([
-        client.query(
+      const dataRes = await client.query(
           `SELECT t.id, t.company_id, t.requester_user_id, t.subject, t.category,
                   t.priority, t.status, t.assigned_to, c.name AS company_name,
                   t.sla_deadline_at, t.resolved_at, t.closed_at, t.created_at, t.updated_at
@@ -188,17 +209,113 @@ export class SupportService {
              t.created_at DESC
            LIMIT $${idx++} OFFSET $${idx++}`,
           [...values, limit, offset]
-        ),
-        client.query(
+        );
+      const countRes = await client.query(
           `SELECT COUNT(*) as total FROM support_tickets t ${where}`,
           values
-        ),
-      ]);
+        );
+      await client.query('COMMIT');
 
       return {
         tickets: dataRes.rows,
         total: parseInt(countRes.rows[0].total, 10),
       };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getTicket(
+    ticketId: string,
+    companyId?: string,
+  ): Promise<{ ticket: any; messages: any[] }> {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+      const params = companyId ? [ticketId, companyId] : [ticketId];
+      const result = await client.query(
+        `SELECT t.*, c.name AS company_name
+           FROM support_tickets t
+           LEFT JOIN companies c ON c.id = t.company_id
+          WHERE t.id = $1 ${companyId ? 'AND t.company_id = $2' : ''}`,
+        params,
+      );
+      if (result.rows.length === 0) throw new Error(`Ticket ${ticketId} not found`);
+      const messages = await client.query(
+        `SELECT id, ticket_id, sender_id, sender_name, message, created_at
+           FROM support_ticket_messages
+          WHERE ticket_id = $1
+          ORDER BY created_at ASC`,
+        [ticketId],
+      );
+      await client.query('COMMIT');
+      return { ticket: result.rows[0], messages: messages.rows };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async addMessage(params: {
+    ticketId: string;
+    companyId?: string;
+    senderId: string;
+    senderName: string;
+    message: string;
+    isSysadmin: boolean;
+  }): Promise<any> {
+    const message = params.message.trim();
+    if (!message || message.length > 10000) throw new Error('Invalid support message');
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+      const ticketResult = await client.query(
+        `SELECT id, status, company_id FROM support_tickets
+          WHERE id = $1 ${params.isSysadmin ? '' : 'AND company_id = $2'}
+          FOR UPDATE`,
+        params.isSysadmin ? [params.ticketId] : [params.ticketId, params.companyId],
+      );
+      if (ticketResult.rows.length === 0) throw new Error(`Ticket ${params.ticketId} not found`);
+      const ticket = ticketResult.rows[0];
+      if (ticket.status === 'closed') throw new Error('Ticket is closed');
+
+      const id = `MSG-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+      const inserted = await client.query(
+        `INSERT INTO support_ticket_messages
+           (id, ticket_id, sender_id, sender_name, message)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, ticket_id, sender_id, sender_name, message, created_at`,
+        [id, params.ticketId, params.senderId, params.senderName, message],
+      );
+
+      let nextStatus = ticket.status;
+      if (params.isSysadmin && ticket.status === 'open') nextStatus = 'in_progress';
+      if (!params.isSysadmin && ['pending_customer', 'resolved'].includes(ticket.status)) {
+        nextStatus = 'in_progress';
+      }
+      await client.query(
+        `UPDATE support_tickets
+            SET status = $2,
+                assigned_to = CASE
+                  WHEN $3::boolean AND assigned_to IS NULL THEN $4::varchar
+                  ELSE assigned_to
+                END,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [params.ticketId, nextStatus, params.isSysadmin, params.senderId],
+      );
+      await client.query('COMMIT');
+      return inserted.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
     } finally {
       client.release();
     }
@@ -249,22 +366,6 @@ export class SupportService {
       [Math.min(Math.max(limit, 1), 100)]
     );
     return result.rows;
-  }
-
-  /**
-   * Generates a one-time 8-digit remote support PIN for a ticket.
-   * Used by sysadmin to initiate remote assistance session.
-   */
-  static async generateSupportPin(ticketId: string): Promise<string> {
-    const pin = Math.floor(10000000 + Math.random() * 90000000).toString();
-
-    await pgPool.query(
-      `UPDATE support_tickets SET support_pin = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [pin, ticketId]
-    );
-
-    logger.info(`Support PIN generated for ticket ${ticketId}`);
-    return pin;
   }
 
   /**

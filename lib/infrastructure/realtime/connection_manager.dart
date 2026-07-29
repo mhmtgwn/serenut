@@ -19,6 +19,7 @@ class ConnectionManager {
   final ReconnectManager reconnectManager;
   final EventDispatcher eventDispatcher;
   final AuthService authService;
+  final ApiClient apiClient;
   final String wsBaseUrl;
   final void Function(RealtimeStatus status) onStatusChanged;
   final TelemetryUploadService? telemetryUpload;
@@ -42,6 +43,7 @@ class ConnectionManager {
     required this.reconnectManager,
     required this.eventDispatcher,
     required this.authService,
+    required this.apiClient,
     required this.wsBaseUrl,
     required this.onStatusChanged,
     this.telemetryUpload,
@@ -97,24 +99,27 @@ class ConnectionManager {
         return;
       }
 
-      String? token = authService.getJwtToken();
-      if (token == null) {
+      if (authService.getJwtToken() == null) {
         _record('ws_auth_token_unavailable', level: LogLevel.error);
         final refreshed = await authService.refreshToken();
-        if (refreshed) {
-          token = authService.getJwtToken();
-        }
+        if (!refreshed) authService.triggerSessionExpired();
       }
 
-      if (token == null) {
+      if (authService.getJwtToken() == null) {
         _setStatus(RealtimeStatus.disconnected);
         authService.triggerSessionExpired();
         return;
       }
 
+      final ticketResponse = await apiClient.post('/realtime/ticket', const {});
+      final ticketJson = ticketResponse.json as Map<String, dynamic>;
+      final ticket = ticketJson['ticket']?.toString();
+      if (ticket == null || ticket.isEmpty) {
+        throw const ApiException('Realtime ticket is missing');
+      }
       final uri = Uri.parse(wsBaseUrl);
       final wsUrlWithParams = uri.replace(queryParameters: {
-        'token': token,
+        'ticket': ticket,
         'reconnectCount': reconnectManager.attempts.toString(),
       }).toString();
 

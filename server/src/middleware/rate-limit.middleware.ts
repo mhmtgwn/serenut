@@ -100,7 +100,21 @@ export const licenseLimiter = createRedisLimiter({
   windowMs: 60 * 60 * 1000,
   max: 20,
   error: 'license_rate_limit_exceeded',
-  message: 'Çok fazla lisans aktivasyon denemesi yapıldı. 1 saat bekleyin.'
+  message: 'Çok fazla lisans aktivasyon denemesi yapıldı. 1 saat bekleyin.',
+  skip: (req) => req.path === '/device-presence',
+});
+
+export const devicePresenceLimiter = createRedisLimiter({
+  scope: 'device-presence',
+  windowMs: 5 * 60 * 1000,
+  max: 180,
+  error: 'device_presence_rate_limit_exceeded',
+  message: 'Cihaz durum bildirimi çok sık gönderiliyor. Kısa süre sonra tekrar deneyin.',
+  key: (req) => {
+    const companyId = (req as AuthenticatedRequest).user?.company_id || 'unknown';
+    const deviceId = String(req.body?.device_activation_id || 'unknown');
+    return `${companyId}:${deviceId}`;
+  },
 });
 
 // ── PORTAL KAYIT LİMİTER ─────────────────────────────────────────────────────

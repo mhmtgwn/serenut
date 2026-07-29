@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+set -eu
+
+cd "$(dirname "$0")/.."
+COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
+
+rollback_available=0
+if docker image inspect serenut-backend:latest >/dev/null 2>&1; then
+  docker tag serenut-backend:latest serenut-backend:rollback
+  rollback_available=1
+fi
+
+rollback() {
+  if [ "$rollback_available" = "1" ]; then
+    echo "Health check failed; restoring previous backend image."
+    docker tag serenut-backend:rollback serenut-backend:latest
+    $COMPOSE up -d backend
+  fi
+}
+cleanup() {
+  status=$?
+  trap - EXIT HUP INT TERM
+  if [ "$status" -ne 0 ]; then
+    rollback
+  fi
+  exit "$status"
+}
+trap cleanup EXIT HUP INT TERM
+
+$COMPOSE build backend
+$COMPOSE run --rm backend node dist/scripts/run-migrations.js
+
+# SCP writes incoming artifacts as the SSH user while the API runs as the
+# container's non-root node user. Normalize the shared volume before publish.
+$COMPOSE run --rm --user root backend sh -c \
+  'mkdir -p /var/www/serenut-api/releases/_incoming/android /var/www/serenut-api/releases/_incoming/windows /var/www/serenut-api/releases/android/stable /var/www/serenut-api/releases/windows/stable && chown -R node:node /var/www/serenut-api/releases'
+
+$COMPOSE up -d --remove-orphans
+if ! curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/ready; then
+  exit 1
+fi
+
+$COMPOSE exec -T backend node dist/scripts/publish-release.js batch "$1" \
+  /var/www/serenut-api/releases/_incoming/android/app-release.apk \
+  /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe false
+curl --fail https://api.serenut.com/api/v1/updates/latest-metadata
+trap - EXIT HUP INT TERM

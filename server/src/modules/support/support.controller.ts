@@ -11,7 +11,7 @@ import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { SupportService } from './support.service';
 import { createError } from '../../config/error-codes';
-import { pgPool } from '../../config/database';
+import { logger } from '../../config/logger';
 
 const router = Router();
 
@@ -44,7 +44,7 @@ router.post('/guest-requests', async (req, res) => {
     if (err instanceof Error && (err.message.includes('Invalid support category') || err.message.includes('Invalid customer claim'))) {
       return res.status(400).json({ error: 'invalid_request_type', message: 'Başvuru türü veya kategori geçersiz.' });
     }
-    console.error('Guest support persistence error:', err);
+    logger.error('Guest support persistence error:', err);
     return res.status(500).json({ error: 'server_error', message: 'Başvurunuz kaydedilemedi.' });
   }
 });
@@ -96,6 +96,7 @@ router.post('/tickets', async (req: AuthenticatedRequest, res: Response) => {
     const ticket = await SupportService.createTicket({
       companyId: req.user!.company_id,
       requesterUserId: req.user!.id,
+      requesterName: req.user!.name,
       subject: subject.trim(),
       body: body ?? undefined,
       priority: priority ?? 'P3',
@@ -110,7 +111,7 @@ router.post('/tickets', async (req: AuthenticatedRequest, res: Response) => {
         error: { code: 'VALIDATION', message: 'Geçersiz öncelik seviyesi. P1, P2, P3 veya P4 olmalıdır.' },
       });
     }
-    console.error('Create ticket error:', err);
+    logger.error('Create ticket error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Destek talebi oluşturulamadı.' } });
   }
 });
@@ -158,7 +159,7 @@ router.get('/tickets', async (req: AuthenticatedRequest, res: Response) => {
 
     return res.json(result);
   } catch (err: any) {
-    console.error('List tickets error:', err);
+    logger.error('List tickets error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Destek talepleri listelenemedi.' } });
   }
 });
@@ -170,7 +171,7 @@ router.get('/guest-requests', async (req: AuthenticatedRequest, res: Response) =
     const requests = await SupportService.listGuestRequests(Number(req.query.limit) || 100);
     return res.json({ requests });
   } catch (err) {
-    console.error('List guest support requests error:', err);
+    logger.error('List guest support requests error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Misafir başvuruları listelenemedi.' } });
   }
 });
@@ -189,25 +190,44 @@ router.get('/tickets/:id', async (req: AuthenticatedRequest, res: Response) => {
   const isAdmin = req.user!.roles?.includes('sysadmin');
 
   try {
-    const client = await pgPool.connect();
-    try {
-      await client.query("SET LOCAL app.bypass_rls = 'true'");
-      const query = isAdmin
-        ? 'SELECT * FROM support_tickets WHERE id = $1'
-        : 'SELECT * FROM support_tickets WHERE id = $1 AND company_id = $2';
-      const params = isAdmin ? [id] : [id, req.user!.company_id];
-      const result = await client.query(query, params);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
-      }
-
-      return res.json({ ticket: result.rows[0] });
-    } finally {
-      client.release();
-    }
+    return res.json(await SupportService.getTicket(
+      id,
+      isAdmin ? undefined : req.user!.company_id,
+    ));
   } catch (err: any) {
+    if (err.message.includes('not found')) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
+    }
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Talep getirilemedi.' } });
+  }
+});
+
+router.post('/tickets/:id/messages', async (req: AuthenticatedRequest, res: Response) => {
+  const message = String(req.body?.message || '').trim();
+  if (!message || message.length > 10000) {
+    return res.status(400).json({
+      error: { code: 'VALIDATION', message: 'Yanıt 1 ile 10.000 karakter arasında olmalıdır.' },
+    });
+  }
+  const isSysadmin = req.user!.roles?.includes('sysadmin');
+  try {
+    const created = await SupportService.addMessage({
+      ticketId: req.params.id,
+      companyId: isSysadmin ? undefined : req.user!.company_id,
+      senderId: req.user!.id,
+      senderName: isSysadmin ? 'Serenut Destek' : req.user!.name,
+      message,
+      isSysadmin,
+    });
+    return res.status(201).json({ message: created });
+  } catch (err: any) {
+    if (err.message.includes('not found')) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
+    }
+    if (err.message.includes('closed')) {
+      return res.status(409).json({ error: { code: 'TICKET_CLOSED', message: 'Kapalı talebe yanıt eklenemez.' } });
+    }
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Yanıt kaydedilemedi.' } });
   }
 });
 
@@ -264,33 +284,8 @@ router.patch('/tickets/:id/status', async (req: AuthenticatedRequest, res: Respo
     if (err.message.includes('not found')) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Destek talebi bulunamadı.' } });
     }
-    console.error('Ticket transition error:', err);
+    logger.error('Ticket transition error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Durum güncellenemedi.' } });
-  }
-});
-
-/**
- * @swagger
- * /support/tickets/{id}/pin:
- *   post:
- *     summary: Generate one-time remote support PIN (sysadmin only)
- *     tags: [Support]
- *     security:
- *       - BearerAuth: []
- */
-router.post('/tickets/:id/pin', async (req: AuthenticatedRequest, res: Response) => {
-  const isAdmin = req.user!.roles?.includes('sysadmin');
-  if (!isAdmin) {
-    return res.status(403).json(createError('AUTH005'));
-  }
-
-  const { id } = req.params;
-
-  try {
-    const pin = await SupportService.generateSupportPin(id);
-    return res.json({ pin, ticketId: id });
-  } catch (err: any) {
-    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'PIN oluşturulamadı.' } });
   }
 });
 

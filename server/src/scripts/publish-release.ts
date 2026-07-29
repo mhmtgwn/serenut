@@ -14,10 +14,22 @@ async function sha256(filePath: string): Promise<string> {
 }
 
 function loadReleaseSigningKey(): crypto.KeyObject {
-  const values = [
+  const values: string[] = [
     process.env.RELEASE_RSA_PRIVATE_KEY,
     process.env.RSA_PRIVATE_KEY,
   ].filter((value): value is string => Boolean(value));
+  const keyPaths = [
+    process.env.RELEASE_RSA_PRIVATE_KEY_FILE,
+    '/run/secrets/serenut_release_private_key',
+    path.join(process.cwd(), '.release-private.pem'),
+  ].filter((value): value is string => Boolean(value));
+  for (const keyPath of keyPaths) {
+    try {
+      if (fs.existsSync(keyPath)) values.push(fs.readFileSync(keyPath, 'utf8'));
+    } catch (_) {
+      // Try the remaining configured sources before reporting one clear error.
+    }
+  }
   let lastError: unknown;
 
   for (const value of values) {
@@ -45,7 +57,9 @@ function loadReleaseSigningKey(): crypto.KeyObject {
   }
 
   if (values.length === 0) {
-    throw new Error('RELEASE_RSA_PRIVATE_KEY or RSA_PRIVATE_KEY is required');
+    throw new Error(
+      'RELEASE_RSA_PRIVATE_KEY, RSA_PRIVATE_KEY, or RELEASE_RSA_PRIVATE_KEY_FILE is required',
+    );
   }
   throw new Error(
       `Release signing key could not be decoded as PEM, base64 PEM, or JWK: ${
@@ -53,65 +67,186 @@ function loadReleaseSigningKey(): crypto.KeyObject {
       }`);
 }
 
-async function main() {
-  const [platform, versionCode, incomingPath, mandatoryArg] = process.argv.slice(2);
-  if (!['android', 'windows'].includes(platform) || !versionCode || !incomingPath) {
-    throw new Error('Usage: publish-release <android|windows> <version> <file>');
-  }
+type ReleasePlatform = 'android' | 'windows';
+type PreparedRelease = {
+  platform: ReleasePlatform;
+  versionCode: string;
+  temporaryPath: string;
+  finalPath: string;
+  hash: string;
+  signature: string;
+  size: number;
+  reusedExistingFile: boolean;
+  isMandatory: boolean;
+};
 
-  const privateKey = loadReleaseSigningKey();
+async function prepareRelease(
+  platform: ReleasePlatform,
+  versionCode: string,
+  incomingPath: string,
+  privateKey: crypto.KeyObject,
+  isMandatory: boolean,
+): Promise<PreparedRelease> {
   if (!fs.existsSync(incomingPath)) throw new Error(`Release file not found: ${incomingPath}`);
-
   const ext = path.extname(incomingPath).toLowerCase();
   const expectedExt = platform === 'android' ? '.apk' : '.exe';
   if (ext !== expectedExt) throw new Error(`Expected ${expectedExt}, received ${ext}`);
 
-  const releaseDir = path.join(process.env.RELEASES_DIR || '/var/www/serenut-api/releases', platform, 'stable');
+  const releaseDir = path.join(
+    process.env.RELEASES_DIR || '/var/www/serenut-api/releases',
+    platform,
+    'stable',
+  );
   fs.mkdirSync(releaseDir, { recursive: true });
   const finalPath = path.join(releaseDir, `SerenutOS-${versionCode}${ext}`);
-  fs.copyFileSync(incomingPath, finalPath);
+  const temporaryPath = path.join(
+    releaseDir,
+    `.${path.basename(finalPath)}.${process.pid}.${Date.now()}.tmp`,
+  );
 
-  const hash = await sha256(finalPath);
-  const signer = crypto.createSign('SHA256');
-  signer.update(hash);
-  signer.end();
-  const signature = signer.sign(privateKey, 'base64');
-  const size = fs.statSync(finalPath).size;
-  const id = `rel-${platform}-${versionCode.replace(/[^a-zA-Z0-9]/g, '-')}`;
-  const notes = `Serenut OS ${versionCode}: WebSocket bağlantı kararlılığı, tekil yeniden bağlanma yönetimi ve güvenli müşteri deneyimi telemetry kayıtları.`;
-  const isMandatory = mandatoryArg === 'true';
+  try {
+    fs.copyFileSync(incomingPath, temporaryPath, fs.constants.COPYFILE_EXCL);
+    const hash = await sha256(temporaryPath);
+    const signer = crypto.createSign('SHA256');
+    signer.update(hash);
+    signer.end();
+    const signature = signer.sign(privateKey, 'base64');
+    const size = fs.statSync(temporaryPath).size;
+    let reusedExistingFile = false;
+    if (fs.existsSync(finalPath)) {
+      const existingHash = await sha256(finalPath);
+      if (existingHash !== hash) {
+        throw new Error(`Release ${platform} ${versionCode} already exists with different content`);
+      }
+      fs.unlinkSync(temporaryPath);
+      reusedExistingFile = true;
+    }
+    return {
+      platform,
+      versionCode,
+      temporaryPath,
+      finalPath,
+      hash,
+      signature,
+      size,
+      reusedExistingFile,
+      isMandatory,
+    };
+  } catch (error) {
+    if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+    throw error;
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const privateKey = loadReleaseSigningKey();
+  const inputs: Array<{
+    platform: ReleasePlatform;
+    versionCode: string;
+    incomingPath: string;
+    isMandatory: boolean;
+  }> = args[0] === 'batch'
+    ? [
+        { platform: 'android', versionCode: args[1], incomingPath: args[2], isMandatory: args[4] === 'true' },
+        { platform: 'windows', versionCode: args[1], incomingPath: args[3], isMandatory: args[4] === 'true' },
+      ]
+    : [{
+        platform: args[0] as ReleasePlatform,
+        versionCode: args[1],
+        incomingPath: args[2],
+        isMandatory: args[3] === 'true',
+      }];
+  if (inputs.some((input) =>
+    !['android', 'windows'].includes(input.platform)
+    || !input.versionCode
+    || !input.incomingPath
+  )) {
+    throw new Error(
+      'Usage: publish-release <android|windows> <version> <file> [mandatory] '
+      + 'or publish-release batch <version> <android-file> <windows-file> [mandatory]',
+    );
+  }
+
+  const prepared: PreparedRelease[] = [];
+  try {
+    for (const input of inputs) {
+      prepared.push(await prepareRelease(
+        input.platform,
+        input.versionCode,
+        input.incomingPath,
+        privateKey,
+        input.isMandatory,
+      ));
+    }
+  } catch (error) {
+    for (const release of prepared) {
+      if (fs.existsSync(release.temporaryPath)) fs.unlinkSync(release.temporaryPath);
+    }
+    throw error;
+  }
 
   const client = await pgPool.connect();
+  const movedNewFiles: PreparedRelease[] = [];
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
-    await client.query(`
-      INSERT INTO app_versions (
-        id, version_code, platform, channel, download_url, file_path,
-        sha256_hash, signature, digital_signature, file_size_bytes,
-        is_mandatory, min_required_version, release_notes, status,
-        rollout_percentage, created_at, updated_at
-      ) VALUES ($1, $2, $3, 'stable', $4, $5, $6, $7, $7, $8,
-                $10, NULL, $9, 'active', 100, NOW(), NOW())
-      ON CONFLICT (version_code, platform, channel) DO UPDATE SET
-        download_url = EXCLUDED.download_url,
-        file_path = EXCLUDED.file_path,
-        sha256_hash = EXCLUDED.sha256_hash,
-        signature = EXCLUDED.signature,
-        digital_signature = EXCLUDED.digital_signature,
-        file_size_bytes = EXCLUDED.file_size_bytes,
-        release_notes = EXCLUDED.release_notes,
-        is_mandatory = EXCLUDED.is_mandatory,
-        status = 'active', rollout_percentage = 100, updated_at = NOW()
-    `, [
-      id, versionCode, platform,
-      `/api/v1/updates/download/${platform}/latest`, finalPath,
-      hash, signature, size, notes, isMandatory
-    ]);
+    for (const release of prepared) {
+      const id = `rel-${release.platform}-${release.versionCode.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const notes = `Serenut OS ${release.versionCode}: güvenli canlı bağlantı, kalıcı senkronizasyon tanılama ve kararlı güncelleme altyapısı.`;
+      await client.query(`
+        INSERT INTO app_versions (
+          id, version_code, platform, channel, download_url, file_path,
+          sha256_hash, signature, digital_signature, file_size_bytes,
+          is_mandatory, min_required_version, release_notes, status,
+          rollout_percentage, created_at, updated_at
+        ) VALUES ($1, $2, $3, 'stable', $4, $5, $6, $7, $7, $8,
+                  $10, NULL, $9, 'active', 100, NOW(), NOW())
+        ON CONFLICT (version_code, platform, channel) DO UPDATE SET
+          download_url = EXCLUDED.download_url,
+          file_path = EXCLUDED.file_path,
+          sha256_hash = EXCLUDED.sha256_hash,
+          signature = EXCLUDED.signature,
+          digital_signature = EXCLUDED.digital_signature,
+          file_size_bytes = EXCLUDED.file_size_bytes,
+          release_notes = EXCLUDED.release_notes,
+          is_mandatory = EXCLUDED.is_mandatory,
+          status = 'active', rollout_percentage = 100, updated_at = NOW()
+      `, [
+        id,
+        release.versionCode,
+        release.platform,
+        `/api/v1/updates/download/${release.platform}/latest`,
+        release.finalPath,
+        release.hash,
+        release.signature,
+        release.size,
+        notes,
+        release.isMandatory,
+      ]);
+    }
+    for (const release of prepared) {
+      if (!release.reusedExistingFile) {
+        fs.renameSync(release.temporaryPath, release.finalPath);
+        movedNewFiles.push(release);
+      }
+    }
     await client.query('COMMIT');
-    console.log(JSON.stringify({ platform, versionCode, finalPath, sha256: hash, size }));
+    console.log(JSON.stringify(prepared.map((release) => ({
+      platform: release.platform,
+      versionCode: release.versionCode,
+      finalPath: release.finalPath,
+      sha256: release.hash,
+      size: release.size,
+    }))));
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
+    for (const release of movedNewFiles) {
+      if (fs.existsSync(release.finalPath)) fs.unlinkSync(release.finalPath);
+    }
+    for (const release of prepared) {
+      if (fs.existsSync(release.temporaryPath)) fs.unlinkSync(release.temporaryPath);
+    }
     throw error;
   } finally {
     client.release();

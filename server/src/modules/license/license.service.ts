@@ -1,6 +1,7 @@
 import { pgPool } from '../../config/database';
 import { signPayload } from '../../crypto_helper';
 import crypto from 'crypto';
+import { logger } from '../../config/logger';
 
 export interface LicenseActivationResult {
   status: string;
@@ -273,12 +274,12 @@ export class LicenseService {
           await trialClient.query('COMMIT');
         } catch (trialErr) {
           await trialClient.query('ROLLBACK');
-          console.error('[LicenseService] Trial start update failed:', trialErr);
+          logger.error('[LicenseService] Trial start update failed:', trialErr);
         } finally {
           trialClient.release();
         }
       } catch (trialConnErr) {
-        console.error('[LicenseService] Trial connection error:', trialConnErr);
+        logger.error('[LicenseService] Trial connection error:', trialConnErr);
       }
 
       // 4. Build device-specific signed license payload (alphabetical keys for canonical json)

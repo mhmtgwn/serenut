@@ -345,7 +345,7 @@ router.post('/:id/refund', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
-    console.error('Refund error:', err);
+    logger.error('Refund error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'İade işlemi gerçekleştirilemedi.' } });
   } finally {
     client.release();

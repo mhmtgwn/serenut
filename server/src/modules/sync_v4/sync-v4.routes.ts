@@ -4,6 +4,7 @@ import { pgPool } from "../../config/database";
 import { syncLimiter } from "../../middleware/rate-limit.middleware";
 import { requireActiveEntitlement } from "../../middleware/auth.middleware";
 import { RealtimeBroadcastService } from "../realtime/broadcast.service";
+import { logger } from "../../config/logger";
 import type { PoolClient } from "pg";
 
 const router = Router();
@@ -420,6 +421,19 @@ router.post("/push", async (req, res) => {
       } catch (mutationError: any) {
         await client.query("ROLLBACK TO SAVEPOINT sync_mutation");
         await client.query("RELEASE SAVEPOINT sync_mutation");
+        logger.error("Sync mutation rejected", {
+          error: mutationError?.message || "mutation_failed",
+          correlation_id: req.headers["x-correlation-id"],
+          company_id: user.company_id,
+          device_id: deviceInstallationId,
+          device_activation_id: deviceActivationId,
+          mutation_id:
+            mutation && typeof mutation.mutation_id === "string"
+              ? mutation.mutation_id
+              : null,
+          entity_type: mutation?.entity_type,
+          entity_id: mutation?.entity_id,
+        });
         rejected.push({
           mutation_id:
             mutation && typeof mutation.mutation_id === "string"
@@ -431,18 +445,38 @@ router.post("/push", async (req, res) => {
     }
     await client.query("COMMIT");
     for (const notification of notifications) {
-      await RealtimeBroadcastService.publishEvent(
-        user.company_id,
-        notification.type,
-        {
+      try {
+        await RealtimeBroadcastService.publishEvent(
+          user.company_id,
+          notification.type,
+          {
+            entity_id: notification.entityId,
+            revision: notification.revision,
+          },
+        );
+      } catch (broadcastError: any) {
+        logger.error("Sync committed but realtime notification failed", {
+          error: broadcastError?.message || "realtime_publish_failed",
+          correlation_id: req.headers["x-correlation-id"],
+          company_id: user.company_id,
+          device_id: deviceInstallationId,
           entity_id: notification.entityId,
+          event_type: notification.type,
           revision: notification.revision,
-        },
-      );
+        });
+      }
     }
     return res.json({ results, conflicts, rejected });
   } catch (error: any) {
     await client.query("ROLLBACK");
+    logger.error("Sync push failed", {
+      error: error?.message || "sync_push_failed",
+      stack: error?.stack,
+      correlation_id: req.headers["x-correlation-id"],
+      company_id: user.company_id,
+      device_id: req.body?.device_id,
+      device_activation_id: req.body?.device_activation_id,
+    });
     return res
       .status(error.message === "invalid_mutation" ? 400 : error.message === "invalid_device_activation" ? 403 : 500)
       .json({ error: error.message });
@@ -460,6 +494,13 @@ router.get("/pull", async (req, res) => {
       req.query.device_id,
     );
   } catch (error: any) {
+    logger.warn("Sync pull rejected: inactive or mismatched device", {
+      error: error?.message,
+      correlation_id: req.headers["x-correlation-id"],
+      company_id: user.company_id,
+      device_id: req.query.device_id,
+      device_activation_id: req.query.device_activation_id,
+    });
     return res.status(403).json({ error: error.message });
   }
   const cursor = Math.max(
@@ -499,6 +540,13 @@ router.get("/bootstrap", async (req, res) => {
       req.query.device_id,
     );
   } catch (error: any) {
+    logger.warn("Sync bootstrap rejected: inactive or mismatched device", {
+      error: error?.message,
+      correlation_id: req.headers["x-correlation-id"],
+      company_id: user.company_id,
+      device_id: req.query.device_id,
+      device_activation_id: req.query.device_activation_id,
+    });
     return res.status(403).json({ error: error.message });
   }
   const client = await pgPool.connect();
@@ -594,6 +642,14 @@ router.get("/bootstrap", async (req, res) => {
     return res.json({ changes, next_cursor: Number(revision.rows[0].cursor) });
   } catch (error: any) {
     await client.query("ROLLBACK");
+    logger.error("Sync bootstrap failed", {
+      error: error?.message || "sync_bootstrap_failed",
+      stack: error?.stack,
+      correlation_id: req.headers["x-correlation-id"],
+      company_id: user.company_id,
+      device_id: req.query.device_id,
+      device_activation_id: req.query.device_activation_id,
+    });
     return res.status(500).json({ error: "sync_bootstrap_failed" });
   } finally {
     client.release();

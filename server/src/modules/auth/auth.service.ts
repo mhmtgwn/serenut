@@ -525,7 +525,7 @@ export class AuthService {
         await redisClient.setEx(`bl:${decoded.jti}`, 900, '1');
       }
     } catch (err) {
-      console.error('Failed to blacklist token:', err);
+      logger.error('Failed to blacklist token:', err);
     }
   }
 
