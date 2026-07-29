@@ -41,6 +41,7 @@ jobs:
             cd server
             sh scripts/ensure_maintenance_token.sh
             docker compose -f docker-compose.prod.yml --env-file .env.production build backend maintenance-agent
+            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate maintenance-agent
             docker compose -f docker-compose.prod.yml --env-file .env.production run --rm backend node dist/scripts/run-migrations.js
             # A previous failed compose run can leave the stopped production
             # container behind. Remove only that named container so compose can
