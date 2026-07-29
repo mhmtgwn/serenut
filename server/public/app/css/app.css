@@ -440,17 +440,49 @@ td small { display:block;color:#64748b;margin-top:3px; }
 .permission-option input { grid-row:1 / span 2;margin-top:3px; }
 .permission-option span { font-weight:700;font-size:.82rem;color:#1e293b; }
 .permission-option small { color:#64748b;line-height:1.35; }
+.diagnostic-panel { padding:20px;border:1px solid #dfe6e1;border-radius:16px;background:#fff; }
+.diagnostic-filters { display:grid;grid-template-columns:repeat(4,minmax(130px,1fr)) minmax(240px,2fr) auto;gap:12px;align-items:end;margin:18px 0 8px; }
+.diagnostic-filters label { display:grid;gap:6px;color:#475569;font-size:.76rem;font-weight:700; }
+.diagnostic-filters input,.diagnostic-filters select { min-width:0; }
+.diagnostic-result-note { margin:8px 0 18px;color:#64748b;font-size:.78rem; }
+.diagnostic-list { display:grid;gap:12px; }
+.diagnostic-event { padding:16px 18px;border:1px solid #dfe6e1;border-left:5px solid #64748b;border-radius:12px;background:#fff; }
+.diagnostic-event.diagnostic-critical { border-left-color:#991b1b;background:#fffafa; }
+.diagnostic-event.diagnostic-error { border-left-color:#dc2626; }
+.diagnostic-event.diagnostic-warning { border-left-color:#d97706;background:#fffdf7; }
+.diagnostic-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px; }
+.diagnostic-head time { color:#64748b;font-size:.78rem;white-space:nowrap; }
+.diagnostic-badges { display:flex;flex-wrap:wrap;gap:6px; }
+.diagnostic-event h4 { margin:0 0 6px;color:#17211c;font-size:1rem; }
+.diagnostic-explanation { margin:0 0 10px;color:#334155;line-height:1.55; }
+.diagnostic-context { margin:4px 0;color:#64748b;font-size:.8rem;overflow-wrap:anywhere; }
+.diagnostic-details { margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px; }
+.diagnostic-details summary { color:#0b714d;font-size:.82rem;font-weight:750;cursor:pointer; }
+.diagnostic-details > div { margin-top:12px; }
+.diagnostic-details p { margin:4px 0;color:#475569; }
+.diagnostic-details pre { margin:5px 0 0;padding:12px;max-height:320px;overflow:auto;border-radius:8px;background:#f5f7f5;color:#26352e;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere; }
+.diagnostic-action { padding:10px 12px;border-radius:8px;background:#ecfdf5;color:#065f46; }
+.status-critical,.status-error,.status-server { background:#fee2e2;color:#991b1b; }
+.status-warning { background:#fef3c7;color:#92400e; }
+.status-client { background:#dbeafe;color:#1e40af; }
+.status-crash { background:#ede9fe;color:#5b21b6; }
 @media (max-width:1080px) {
   .app-menu-toggle { display:inline-flex; }
   .shell-sidebar { position:fixed;inset:0 auto 0 0;width:min(86vw,320px);z-index:50;transform:translateX(-105%);transition:transform .2s ease;box-shadow:20px 0 50px rgba(15,23,42,.2);overflow:auto; }
   .sidebar-open .shell-sidebar { transform:translateX(0); }
   .metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .inline-form,.support-form,.permission-grid { grid-template-columns:1fr 1fr; }
+  .diagnostic-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .diagnostic-search { grid-column:1 / -1; }
 }
 @media (max-width:560px) {
   .metrics-grid,.inline-form,.support-form,.plan-grid,.permission-grid { grid-template-columns:1fr; }
   .toolbar,.payment-form { align-items:stretch;flex-direction:column; }
   .shell-header { align-items:flex-start; }
+  .diagnostic-panel { padding:14px; }
+  .diagnostic-filters { grid-template-columns:1fr; }
+  .diagnostic-search { grid-column:auto; }
+  .diagnostic-head { align-items:flex-start;flex-direction:column; }
 }
 
 /* Final cascade: professional Serenut palette */

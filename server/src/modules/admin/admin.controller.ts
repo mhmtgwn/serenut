@@ -14,6 +14,12 @@ import { logger } from '../../config/logger';
 import { encryptSecret } from '../../crypto_helper';
 import fs from 'fs';
 import path from 'path';
+import {
+  DiagnosticRecord,
+  normalizeClientDiagnostic,
+  normalizeCrashDiagnostic,
+  normalizeServerDiagnostic,
+} from './diagnostics';
 
 const router = Router();
 
@@ -21,28 +27,144 @@ const router = Router();
 router.use(authenticateUser);
 router.use(requireRole('sysadmin'));
 
+function readServerLogFile(level: string, limit: number): Array<Record<string, any>> {
+  const filename = level === 'all' ? 'combined.log' : 'error.log';
+  const logPath = path.join(process.cwd(), 'logs', filename);
+  if (!fs.existsSync(logPath)) return [];
+  return fs.readFileSync(logPath, 'utf8')
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .slice(-limit)
+    .reverse()
+    .map((line) => {
+      try { return JSON.parse(line); }
+      catch { return { timestamp: null, level, message: line }; }
+    });
+}
+
 // Maskelenmiş Winston kayıtlarını yalnız platform sysadmin'ine salt-okunur sunar.
 // Dosya adı kullanıcı girdisinden oluşturulmaz; path traversal mümkün değildir.
 router.get('/server-logs', async (req: AuthenticatedRequest, res: Response) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
   const level = String(req.query.level || 'error').toLowerCase();
-  const filename = level === 'all' ? 'combined.log' : 'error.log';
-  const logPath = path.join(process.cwd(), 'logs', filename);
   try {
-    if (!fs.existsSync(logPath)) return res.json([]);
-    const lines = fs.readFileSync(logPath, 'utf8')
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .slice(-limit)
-      .reverse();
-    const records = lines.map((line) => {
-      try { return JSON.parse(line); }
-      catch { return { timestamp: null, level, message: line }; }
-    });
-    return res.json(records);
+    return res.json(readServerLogFile(level, limit));
   } catch (error) {
     logger.error('Server log query failed:', error);
     return res.status(500).json({ error: 'server_log_query_failed' });
+  }
+});
+
+router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
+  const source = ['all', 'server', 'client', 'crash'].includes(String(req.query.source))
+    ? String(req.query.source)
+    : 'all';
+  const severity = ['all', 'critical', 'error', 'warning'].includes(String(req.query.severity))
+    ? String(req.query.severity)
+    : 'error';
+  const hours = Math.min(Math.max(Number(req.query.hours) || 168, 1), 24 * 90);
+  const companyId = String(req.query.company_id || '').trim();
+  const search = String(req.query.search || '').trim().slice(0, 200);
+
+  try {
+    const records: DiagnosticRecord[] = [];
+    if (source === 'all' || source === 'client') {
+      const clientEvents = await runBypassingRLS(
+        `SELECT e.id, e.company_id, c.name AS company_name, e.user_id,
+                u.name AS user_name, e.metric_name, e.occurred_at, e.received_at,
+                e.metadata, e.ip_address, e.user_agent
+           FROM client_telemetry_events e
+           LEFT JOIN companies c ON c.id = e.company_id
+           LEFT JOIN users u ON u.id = e.user_id
+          WHERE e.occurred_at >= NOW() - ($1::text || ' hours')::interval
+            AND ($2 = '' OR e.company_id = $2)
+            AND (
+              $3 = ''
+              OR e.metric_name ILIKE '%' || $3 || '%'
+              OR e.metadata::text ILIKE '%' || $3 || '%'
+              OR COALESCE(c.name, '') ILIKE '%' || $3 || '%'
+              OR COALESCE(u.name, '') ILIKE '%' || $3 || '%'
+            )
+            AND (
+              $4 = 'all'
+              OR ($4 = 'warning' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('WARNING', 'WARN'))
+              OR ($4 = 'error' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('ERROR', 'CRITICAL', 'FATAL'))
+              OR ($4 = 'critical' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('CRITICAL', 'FATAL'))
+            )
+          ORDER BY e.occurred_at DESC
+          LIMIT $5`,
+        [hours, companyId, search, severity, limit],
+      );
+      records.push(...clientEvents.rows.map(normalizeClientDiagnostic));
+    }
+
+    if (source === 'all' || source === 'crash') {
+      const crashEvents = await runBypassingRLS(
+        `SELECT cl.*, c.name AS company_name, d.name AS device_name
+           FROM crash_logs cl
+           LEFT JOIN companies c ON c.id = cl.company_id
+           LEFT JOIN devices d ON d.id = cl.device_id
+          WHERE cl.created_at >= NOW() - ($1::text || ' hours')::interval
+            AND ($2 = '' OR cl.company_id = $2)
+            AND (
+              $3 = ''
+              OR cl.error_message ILIKE '%' || $3 || '%'
+              OR COALESCE(cl.stack_trace, '') ILIKE '%' || $3 || '%'
+              OR COALESCE(c.name, '') ILIKE '%' || $3 || '%'
+            )
+          ORDER BY cl.created_at DESC
+          LIMIT $4`,
+        [hours, companyId, search, limit],
+      );
+      const normalizedCrashes = crashEvents.rows.map(normalizeCrashDiagnostic)
+        .filter((event) => severity === 'all'
+          || severity === 'critical'
+          || (severity === 'error' && event.severity === 'critical'));
+      records.push(...normalizedCrashes);
+    }
+
+    if (source === 'all' || source === 'server') {
+      const fileLevel = severity === 'all' || severity === 'warning' ? 'all' : 'error';
+      const serverEvents = readServerLogFile(fileLevel, Math.min(limit * 5, 1000))
+        .map(normalizeServerDiagnostic)
+        .filter((event) => {
+          const occurredAt = Date.parse(event.occurred_at || '');
+          if (Number.isFinite(occurredAt) && occurredAt < Date.now() - hours * 60 * 60 * 1000) return false;
+          if (severity === 'critical' && event.severity !== 'critical') return false;
+          if (severity === 'error' && !['error', 'critical'].includes(event.severity)) return false;
+          if (severity === 'warning' && event.severity !== 'warning') return false;
+          if (!search) return true;
+          const searchable = [
+            event.title,
+            event.message,
+            event.context,
+            event.correlation_id,
+            event.company_name,
+          ].filter(Boolean).join(' ').toLowerCase();
+          return searchable.includes(search.toLowerCase());
+        });
+      records.push(...serverEvents);
+    }
+
+    const ordered = records
+      .sort((a, b) => Date.parse(b.occurred_at || '') - Date.parse(a.occurred_at || ''))
+      .slice(0, limit);
+    return res.json({
+      summary: {
+        total: ordered.length,
+        critical: ordered.filter((item) => item.severity === 'critical').length,
+        error: ordered.filter((item) => item.severity === 'error').length,
+        warning: ordered.filter((item) => item.severity === 'warning').length,
+        client: ordered.filter((item) => item.source === 'client').length,
+        server: ordered.filter((item) => item.source === 'server').length,
+      },
+      filters: { source, severity, hours, company_id: companyId, search },
+      events: ordered,
+    });
+  } catch (error) {
+    logger.error('Admin diagnostics query failed:', error);
+    return res.status(500).json({ error: 'diagnostics_query_failed' });
   }
 });
 

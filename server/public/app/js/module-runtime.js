@@ -38,6 +38,45 @@ function table(columns, rows) {
 function set(html) { document.getElementById('embed-content').innerHTML = html; }
 function notice(message) { window.alert(message); }
 
+function diagnosticEvent(event) {
+  const severity = String(event.severity || 'error').toLowerCase();
+  const metadata = event.metadata && Object.keys(event.metadata).length
+    ? JSON.stringify(event.metadata, null, 2)
+    : '';
+  const identity = [
+    event.company_name || event.company_id,
+    event.user_name || event.user_id,
+    event.device_name || event.device_id,
+  ].filter(Boolean).join(' · ');
+  const environment = [
+    event.platform,
+    event.app_version ? `v${event.app_version}` : '',
+    event.ip_address,
+  ].filter(Boolean).join(' · ');
+  const trace = [
+    event.context ? `Bağlam: ${event.context}` : '',
+    event.correlation_id ? `İzleme: ${event.correlation_id}` : '',
+  ].filter(Boolean).join(' · ');
+  return `<article class="diagnostic-event diagnostic-${esc(severity)}">
+    <div class="diagnostic-head">
+      <div class="diagnostic-badges">${badge(severity)}${badge(event.source || 'unknown')}</div>
+      <time>${esc(date(event.occurred_at))}</time>
+    </div>
+    <h4>${esc(event.title || 'Tanılama kaydı')}</h4>
+    <p class="diagnostic-explanation">${esc(event.explanation || event.message || 'Açıklama bulunamadı.')}</p>
+    ${identity ? `<p class="diagnostic-context"><strong>Hesap:</strong> ${esc(identity)}</p>` : ''}
+    ${environment ? `<p class="diagnostic-context"><strong>Ortam:</strong> ${esc(environment)}</p>` : ''}
+    ${trace ? `<p class="diagnostic-context"><strong>İz:</strong> ${esc(trace)}</p>` : ''}
+    <details class="diagnostic-details">
+      <summary>Teknik ayrıntı ve çözüm önerisi</summary>
+      <div class="diagnostic-action"><strong>Önerilen işlem</strong><p>${esc(event.suggested_action || 'Kaydın bağlamını ve ilişkili işlemleri inceleyin.')}</p></div>
+      <div><strong>Ham mesaj</strong><pre>${esc(event.message || '—')}</pre></div>
+      ${event.stack_trace ? `<div><strong>Stack trace</strong><pre>${esc(event.stack_trace)}</pre></div>` : ''}
+      ${metadata ? `<div><strong>Maskelenmiş ek veri</strong><pre>${esc(metadata)}</pre></div>` : ''}
+    </details>
+  </article>`;
+}
+
 function companyDetailView(d,plans) {
   const c=d.company||{}, subscription=d.subscriptions?.[0], override=d.package_override;
   const from=(override?.valid_from||new Date().toISOString()).slice(0,10);
@@ -171,7 +210,10 @@ const loaders = {
   'platform-overview': async () => {
     const [d,companies,transfers]=await Promise.all([apiFetch('/admin/dashboard/commercial'),apiFetch('/admin/companies'),apiFetch('/billing/admin/pending-transfers')]);const s=d.summary||{};const subs=d.subscriptions||{};
     const recent=[...companies].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,6);
-    set(`<div class="admin-welcome"><div><span>CANLI DURUM</span><h3>Bugün kontrol etmeniz gerekenler</h3><p>Bekleyen ödemeler ve yaklaşan lisans süreleri tek bakışta.</p></div><button class="btn btn-primary admin-jump" data-target="platform-billing">${esc(s.pendingTransfers||0)} havaleyi incele</button></div><div class="metrics-grid admin-primary-metrics">${metric('Toplam Firma',s.totalCustomers||0)}${metric('Aktif Abonelik',subs.active||0)}${metric('Denemedeki Firma',s.trialUsers||0)}${metric('30 Günlük Tahsilat',money(s.monthlyRevenue||0))}</div><div class="admin-columns"><section><div class="section-heading"><h3>Bekleyen Havaleler</h3><button class="text-action admin-jump" data-target="platform-billing">Tümünü gör</button></div>${table([{label:'Firma',render:r=>esc(r.company_name||r.company_id)},{label:'Tutar',render:r=>esc(money(r.amount))},{label:'Tarih',render:r=>esc(date(r.created_at))}],transfers.slice(0,5))}</section><section><div class="section-heading"><h3>Son Firmalar</h3><button class="text-action admin-jump" data-target="platform-companies">Tümünü gör</button></div>${table([{label:'Firma',key:'name'},{label:'Durum',render:r=>badge(r.status)},{label:'Kayıt',render:r=>esc(date(r.created_at))}],recent)}</section></div><div cl  'platform-companies': async () => {
+    set(`<div class="admin-welcome"><div><span>CANLI DURUM</span><h3>Bugün kontrol etmeniz gerekenler</h3><p>Bekleyen ödemeler ve yaklaşan lisans süreleri tek bakışta.</p></div><button class="btn btn-primary admin-jump" data-target="platform-billing">${esc(s.pendingTransfers||0)} havaleyi incele</button></div><div class="metrics-grid admin-primary-metrics">${metric('Toplam Firma',s.totalCustomers||0)}${metric('Aktif Abonelik',subs.active||0)}${metric('Denemedeki Firma',s.trialUsers||0)}${metric('30 Günlük Tahsilat',money(s.monthlyRevenue||0))}</div><div class="admin-columns"><section><div class="section-heading"><h3>Bekleyen Havaleler</h3><button class="text-action admin-jump" data-target="platform-billing">Tümünü gör</button></div>${table([{label:'Firma',render:r=>esc(r.company_name||r.company_id)},{label:'Tutar',render:r=>esc(money(r.amount))},{label:'Tarih',render:r=>esc(date(r.created_at))}],transfers.slice(0,5))}</section><section><div class="section-heading"><h3>Son Firmalar</h3><button class="text-action admin-jump" data-target="platform-companies">Tümünü gör</button></div>${table([{label:'Firma',key:'name'},{label:'Durum',render:r=>badge(r.status)},{label:'Kayıt',render:r=>esc(date(r.created_at))}],recent)}</section></div><div class="attention-strip"><strong>${esc(s.noLicense||0)}</strong><span>lisansı olmayan firma</span><strong>${esc(s.expiringLicenses||0)}</strong><span>7 gün içinde bitecek lisans</span></div>`);
+    document.querySelectorAll('.admin-jump').forEach(b=>b.onclick=()=>document.querySelector(`[data-module-id="${CSS.escape(b.dataset.target)}"]`)?.click());
+  },
+  'platform-companies': async () => {
     const rows=await apiFetch('/admin/companies');set(`<div class="metrics-grid">${metric('Toplam Firma',rows.length)}${metric('Aktif',rows.filter(x=>x.status==='active').length)}${metric('Askıda',rows.filter(x=>x.status==='suspended').length)}</div><details class="admin-create-panel"><summary>Yeni firma oluştur</summary><form class="admin-form-grid" id="create-company"><label>Firma ünvanı<input id="company-name" required placeholder="Örn. Serenut Gıda"></label><label>TC / VKN<input id="company-tax" required placeholder="10 veya 11 hane"></label><label>E-posta<input id="company-email" type="email" placeholder="firma@ornek.com"></label><label>Telefon<input id="company-phone" placeholder="05xx xxx xx xx"></label><label>Vergi Dairesi<input id="company-tax-office" placeholder="İsteğe bağlı"></label><hr style="grid-column:1/-1;border:0;border-top:1px solid #dfe6e1;margin:4px 0"><label style="grid-column:1/-1;color:#0b714d;font-size:.72rem;letter-spacing:.06em">ADMİN KULLANICI (İsteğe bağlı)</label><label>Yönetici Ad Soyad<input id="company-admin-name" placeholder="Ahmet Yılmaz"></label><label>Yönetici E-posta<input id="company-admin-email" type="email" placeholder="ahmet@firma.com"></label><label>Geçici Şifre<input id="company-admin-pw" type="password" minlength="8" placeholder="En az 8 karakter"></label><label>Geçici Şifre Tekrar<input id="company-admin-pw2" type="password" minlength="8" placeholder="Şifre tekrarı"></label><button class="btn btn-primary">Firmayı Oluştur</button></form></details>${table([{label:'Firma',key:'name'},{label:'TC / VKN',key:'tax_number'},{label:'İletişim',render:r=>esc(r.email||r.phone||'—')},{label:'Şube',key:'store_count'},{label:'Cihaz',key:'device_count'},{label:'Durum',render:r=>badge(r.status)},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm company-detail" data-id="${esc(r.id)}">Detay</button> <button class="btn btn-secondary btn-sm company-toggle" data-id="${esc(r.id)}" data-status="${esc(r.status)}">${r.status==='active'?'Askıya Al':'Aktifleştir'}</button>`}],rows)}`);
     document.getElementById('create-company').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;
       const adminPw=document.getElementById('company-admin-pw').value;
@@ -254,18 +296,58 @@ Admin kullanıcı oluşturuldu: ${adminEmail}`;notice(msg);await loaders['platfo
   },
 
   'platform-health': async () => {
-    const [d,incidents]=await Prom  'platform-security': async () => {
-    const currentLevel = (window._securityLogLevel) || 'error';
-    const [me,admins,auditLogs,serverLogs]=await Promise.all([apiFetch('/users/me'),apiFetch('/admin/security/admin-users'),apiFetch('/admin/audit-logs'),apiFetch(`/admin/server-logs?level=${currentLevel}&limit=500`)]);
-    const adminOptions=admins.map(user=>`<option value="${esc(user.id)}">${esc(user.name)} — ${esc(user.email)}</option>`).join('');
-    set(`<div class="metrics-grid">${metric('Sistem Admini',admins.length)}${metric('Audit Kayıdı',auditLogs.length)}${metric('Hata Kayıdı',serverLogs.length)}${metric('Aktif Hesap',admins.filter(x=>x.is_active).length)}</div><div class="admin-columns"><section><div class="section-heading"><div><h3>Kendi Şifremi Değiştir</h3><p>${esc(me.email)} hesabının şifresini güvenli biçimde değiştirir ve aktif oturumları kapatır.</p></div></div><form class="admin-form-grid" id="admin-change-password"><label>Mevcut şifre<input id="admin-current-password" type="password" autocomplete="current-password" required></label><label>Yeni şifre<input id="admin-new-password" type="password" minlength="8" autocomplete="new-password" required></label><label>Yeni şifre tekrar<input id="admin-confirm-password" type="password" minlength="8" autocomplete="new-password" required></label><button class="btn btn-primary" type="submit">Şifremi Değiştir</button></form></section><section><div class="section-heading"><div><h3>Admin Şifresi Sıfırla</h3><p>Seçilen sistem adminine yeni şifre atar, kilidi kaldırır ve mevcut tokenları geçersizleştirir.</p></div></div><form class="admin-form-grid" id="admin-reset-password"><label>Sistem admini<select id="reset-admin-id" required><option value="">Admin seçin</option>${adminOptions}</select></label><label>Yeni şifre<input id="reset-admin-password" type="password" minlength="8" autocomplete="new-password" required></label><label>Yeni şifre tekrar<input id="reset-admin-confirm" type="password" minlength="8" autocomplete="new-password" required></label><button class="btn btn-primary" type="submit">Admin Şifresini Sıfırla</button></form></section></div><div class="section-heading spaced"><div><h3>Admin Hesapları</h3><p>Sistem sahibi rolüne sahip hesaplar.</p></div></div>${table([{label:'Admin',render:r=>`${esc(r.name)}<small>${esc(r.email)}</small>`},{label:'Son giriş',render:r=>esc(date(r.last_login_at))},{label:'Güncelleme',render:r=>esc(date(r.updated_at))},{label:'Durum',render:r=>badge(r.is_active?'active':'inactive')}],admins)}<div class="section-heading spaced"><div><h3>Audit Logları</h3><p>Platformda yapılan son kritik işlemler.</p></div></div>${table([{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Kullanıcı',render:r=>esc(r.user_name||r.user_id||'Sistem')},{label:'İşlem',key:'action'},{label:'Varlık',render:r=>esc(r.entity||r.entity_type||'—')},{label:'Kayıt',render:r=>esc(r.entity_id||'—')},{label:'IP',render:r=>esc(r.ip_address||'—')}],auditLogs)}<div class="section-heading spaced"><div><h3>Sunucu Logları</h3><p>Hata ayıklama için sunucu logları. Filtreleyin veya araştırın.</p></div><div style="display:flex;align-items:center;gap:10px"><select id="log-level-filter" style="min-width:110px"><option value="error" ${currentLevel==='error'?'selected':''}>Yalnız Hata</option><option value="all" ${currentLevel==='all'?'selected':''}>Tüm Loglar</option></select><input id="log-search" placeholder="Ara..." style="min-width:180px"><button class="btn btn-secondary btn-sm" id="btn-refresh-logs">Yenile</button></div></div><div id="log-table-wrap">${table([{label:'Tarih',render:r=>esc(date(r.timestamp||r.time))},{label:'Seviye',render:r=>badge(r.level)},{label:'Mesaj',render:r=>{const msg=typeof r.message==='string'?r.message:JSON.stringify(r.message||r);const stack=r.stack||r.trace||r.error;return stack?`<details><summary style="cursor:pointer">${esc(msg.slice(0,120))}</summary><pre style="white-space:pre-wrap;word-break:break-all;font-size:.74rem;margin-top:8px;padding:10px;background:#f5f7f5;border-radius:6px;overflow:auto">${esc(String(stack))}</pre></details>`:esc(msg.slice(0,200));}}],serverLogs)}</div>`);
-    document.getElementById('admin-change-password').onsubmit=async e=>{e.preventDefault();const b=e.submitter;const next=document.getElementById('admin-new-password').value;if(next!==document.getElementById('admin-confirm-password').value){notice('Yeni şifreler eşleşmiyor.');return;}b.disabled=true;try{await apiFetch('/auth/change-password',{method:'POST',body:{old_password:document.getElementById('admin-current-password').value,new_password:next}});notice('Şifreniz değiştirildi. Yeni şifrenizle tekrar giriş yapın.');window.location.reload();}catch(x){notice(x.message||'Şifre değiştirilemedi.');b.disabled=false}};
-    document.getElementById('admin-reset-password').onsubmit=async e=>{e.preventDefault();const b=e.submitter;const userId=document.getElementById('reset-admin-id').value;const next=document.getElementById('reset-admin-password').value;if(next!==document.getElementById('reset-admin-confirm').value){notice('Yeni şifreler eşleşmiyor.');return;}if(!confirm('Seçilen sistem admininin şifresi değiştirilecek ve mevcut oturumları geçersiz olacaktır. Devam edilsin mi?'))return;b.disabled=true;try{await apiFetch(`/admin/security/users/${encodeURIComponent(userId)}/reset-password`,{method:'POST',body:{new_password:next}});notice('Admin şifresi sıfırlandı.');await loaders['platform-security']();}catch(x){notice(x.message||'Admin şifresi sıfırlanamadı.');b.disabled=false}};
-    document.getElementById('log-level-filter').onchange=async()=>{window._securityLogLevel=document.getElementById('log-level-filter').value;await loaders['platform-security']();};
-    document.getElementById('btn-refresh-logs').onclick=async()=>await loaders['platform-security']();
-    document.getElementById('log-search').oninput=e=>{const q=e.target.value.toLowerCase();document.querySelectorAll('#log-table-wrap tbody tr').forEach(row=>{row.style.display=row.textContent.toLowerCase().includes(q)?'':'none';});};
+    const [d,incidents]=await Promise.all([apiFetch('/admin/dashboard'),apiFetch('/admin/incidents')]);
+    const s=d.system||{};
+    set(`<div class="metrics-grid">${metric('PostgreSQL',s.database||'—')}${metric('Redis',s.redis||'—')}${metric('CPU',`${s.cpuUsage||0}%`)}${metric('RAM',`${s.ramUsage||0}%`)}${metric('Disk',`${s.diskUsage||0}%`)}</div><h3 class="content-title">Sistem Olayları</h3>${table([{label:'Önem',render:r=>badge(r.severity)},{label:'Başlık',key:'title'},{label:'Şirket',key:'company_name'},{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Durum',render:r=>badge(r.status)}],incidents)}`);
   },
-onst userId=document.getElementById('reset-admin-id').value;const next=document.getElementById('reset-admin-password').value;if(next!==document.getElementById('reset-admin-confirm').value){notice('Yeni şifreler eşleşmiyor.');return;}if(!confirm('Seçilen sistem admininin şifresi değiştirilecek ve mevcut oturumları geçersiz olacaktır. Devam edilsin mi?'))return;b.disabled=true;try{await apiFetch(`/admin/security/users/${encodeURIComponent(userId)}/reset-password`,{method:'POST',body:{new_password:next}});notice('Admin şifresi sıfırlandı.');await loaders['platform-security']();}catch(x){notice(x.message||'Admin şifresi sıfırlanamadı.');b.disabled=false}};
+  'platform-security': async () => {
+    const filters={
+      severity:window._diagnosticSeverity||'error',
+      source:window._diagnosticSource||'all',
+      hours:window._diagnosticHours||'168',
+      company:window._diagnosticCompany||'',
+      search:window._diagnosticSearch||''
+    };
+    const params=new URLSearchParams({severity:filters.severity,source:filters.source,hours:filters.hours,limit:'300'});
+    if(filters.company)params.set('company_id',filters.company);
+    if(filters.search)params.set('search',filters.search);
+    const [admins,auditLogs,companies,diagnostics]=await Promise.all([
+      apiFetch('/admin/security/admin-users'),
+      apiFetch('/admin/audit-logs'),
+      apiFetch('/admin/companies'),
+      apiFetch(`/admin/diagnostics?${params.toString()}`)
+    ]);
+    const summary=diagnostics.summary||{};
+    const companyOptions=companies.map(company=>`<option value="${esc(company.id)}" ${filters.company===String(company.id)?'selected':''}>${esc(company.name)}</option>`).join('');
+    const events=Array.isArray(diagnostics.events)?diagnostics.events:[];
+    set(`<div class="metrics-grid">${metric('Kritik',summary.critical||0)}${metric('Hata',summary.error||0)}${metric('Uyarı',summary.warning||0)}${metric('Gösterilen Kayıt',summary.total||0)}</div>
+      <section class="diagnostic-panel">
+        <div class="section-heading"><div><h3>Hata Ayıklama ve Tanılama</h3><p>Sunucu, Windows ve Android kayıtlarını tek zaman akışında gösterir. Hassas bilgiler otomatik maskelenir.</p></div><button class="btn btn-secondary btn-sm" id="diagnostic-refresh">Yenile</button></div>
+        <form class="diagnostic-filters" id="diagnostic-filters">
+          <label>Önem<select id="diagnostic-severity"><option value="error" ${filters.severity==='error'?'selected':''}>Hata + kritik</option><option value="critical" ${filters.severity==='critical'?'selected':''}>Yalnız kritik</option><option value="warning" ${filters.severity==='warning'?'selected':''}>Uyarı</option><option value="all" ${filters.severity==='all'?'selected':''}>Tümü</option></select></label>
+          <label>Kaynak<select id="diagnostic-source"><option value="all" ${filters.source==='all'?'selected':''}>Tüm kaynaklar</option><option value="client" ${filters.source==='client'?'selected':''}>Windows / Android</option><option value="server" ${filters.source==='server'?'selected':''}>Sunucu</option><option value="crash" ${filters.source==='crash'?'selected':''}>Çökme kayıtları</option></select></label>
+          <label>Dönem<select id="diagnostic-hours"><option value="24" ${filters.hours==='24'?'selected':''}>Son 24 saat</option><option value="168" ${filters.hours==='168'?'selected':''}>Son 7 gün</option><option value="720" ${filters.hours==='720'?'selected':''}>Son 30 gün</option><option value="2160" ${filters.hours==='2160'?'selected':''}>Son 90 gün</option></select></label>
+          <label>Firma<select id="diagnostic-company"><option value="">Tüm firmalar</option>${companyOptions}</select></label>
+          <label class="diagnostic-search">Ara<input id="diagnostic-search" value="${esc(filters.search)}" placeholder="Hata, kullanıcı, cihaz, correlation ID…"></label>
+          <button class="btn btn-primary" type="submit">Uygula</button>
+        </form>
+        <p class="diagnostic-result-note">Bu sayaçlar seçili filtreye uyan ve ekranda gösterilen kayıtları ifade eder.</p>
+        <div class="diagnostic-list">${events.length?events.map(diagnosticEvent).join(''):'<div class="state-panel">Seçili filtrelerde tanılama kaydı bulunamadı.</div>'}</div>
+      </section>
+      <div class="section-heading spaced"><div><h3>Admin Hesapları</h3><p>Sistem sahibi rolüne sahip hesaplar.</p></div></div>
+      ${table([{label:'Admin',render:r=>`${esc(r.name)}<small>${esc(r.email)}</small>`},{label:'Son giriş',render:r=>esc(date(r.last_login_at))},{label:'Güncelleme',render:r=>esc(date(r.updated_at))},{label:'Durum',render:r=>badge(r.is_active?'active':'inactive')}],admins)}
+      <div class="section-heading spaced"><div><h3>Denetim Kayıtları</h3><p>Kim, ne zaman, hangi yönetim işlemini yaptı?</p></div></div>
+      ${table([{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Kullanıcı',render:r=>esc(r.user_name||r.user_id||'Sistem')},{label:'İşlem',key:'action'},{label:'Varlık',render:r=>esc(r.entity||r.entity_type||'—')},{label:'Kayıt',render:r=>esc(r.entity_id||'—')},{label:'IP',render:r=>esc(r.ip_address||'—')}],auditLogs)}`);
+    const reload=async()=>{
+      window._diagnosticSeverity=document.getElementById('diagnostic-severity').value;
+      window._diagnosticSource=document.getElementById('diagnostic-source').value;
+      window._diagnosticHours=document.getElementById('diagnostic-hours').value;
+      window._diagnosticCompany=document.getElementById('diagnostic-company').value;
+      window._diagnosticSearch=document.getElementById('diagnostic-search').value.trim();
+      await loaders['platform-security']();
+    };
+    document.getElementById('diagnostic-filters').onsubmit=async event=>{event.preventDefault();await reload();};
+    document.getElementById('diagnostic-refresh').onclick=async()=>await reload();
   },
   'platform-support': async () => {
     const [result,guestResult]=await Promise.all([apiFetch('/support/tickets'),apiFetch('/support/guest-requests')]);const tickets=result.tickets||[];const guests=guestResult.requests||[];set(`<div class="metrics-grid">${metric('Kayıtlı Talep',tickets.length)}${metric('Açık',tickets.filter(x=>!['closed','resolved'].includes(x.status)).length)}${metric('Doğrulanmamış',guests.filter(x=>x.status==='unverified').length)}${metric('Acil',tickets.filter(x=>x.priority==='P1').length)}</div><div class="section-heading spaced"><div><h3>Kayıtlı Firma Talepleri</h3><p>Firma ve kullanıcı hesabına bağlı destek talepleri.</p></div></div>${table([{label:'No',render:r=>esc(r.id)},{label:'Firma',render:r=>esc(r.company_name||'—')},{label:'Kategori',render:r=>badge(r.category||'technical')},{label:'Konu',key:'subject'},{label:'Öncelik',render:r=>badge(r.priority)},{label:'Güncelleme',render:r=>esc(date(r.updated_at))},{label:'Durum',render:r=>badge(r.status)}],tickets)}<div class="section-heading spaced"><div><h3>Doğrulanmamış Başvurular</h3><p>Hesapla eşleşmeyen kişilerden gelen ön destek başvuruları; müşteri talebi olarak kabul edilmeden önce doğrulanmalıdır.</p></div></div>${table([{label:'Takip No',key:'reference_code'},{label:'Başvuran',render:r=>`${esc(r.name)}<small>${esc(r.email)}</small>`},{label:'Müşteri durumu',render:r=>badge(r.customer_claim)},{label:'Kategori',render:r=>badge(r.category)},{label:'Konu',key:'subject'},{label:'Tarih',render:r=>esc(date(r.created_at))},{label:'Durum',render:r=>badge(r.status)}],guests)}`);
