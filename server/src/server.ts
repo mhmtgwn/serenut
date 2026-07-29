@@ -304,7 +304,11 @@ app.get(['/login', '/login.html', '/signup', '/signup.html', '/register', '/regi
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
 
 // Automatically redirect /app (without trailing slash) to /app/ to avoid relative asset path resolution errors
-app.get('/app', (req, res) => {
+// Express'in varsayılan non-strict routing davranışında `/app` rotası `/app/`
+// isteğini de eşleştirir. Slash'li isteği tekrar kendisine yönlendirmek sonsuz
+// 301 döngüsü oluşturur; yalnız gerçekten slash'siz URL'yi yönlendir.
+app.get('/app', (req, res, next) => {
+  if (req.path === '/app/') return next();
   res.redirect(301, '/app/');
 });
 
