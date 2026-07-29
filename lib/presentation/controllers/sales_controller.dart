@@ -316,6 +316,8 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
   int _offset = 0;
   bool _hasMore = true;
   String? _searchQuery;
+  String? _paymentMethod;
+  String? _status;
 
   bool get hasMore => _hasMore;
 
@@ -326,6 +328,8 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
     _hasMore = true;
     final page = await _repository.findFiltered(
       searchQuery: _searchQuery,
+      paymentMethod: _paymentMethod,
+      status: _status,
       limit: _kSalesHistoryPageSize,
       offset: 0,
     );
@@ -341,6 +345,8 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.findFiltered(
           searchQuery: _searchQuery,
+          paymentMethod: _paymentMethod,
+          status: _status,
           limit: _kSalesHistoryPageSize,
           offset: 0,
         ));
@@ -348,11 +354,22 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
     _hasMore = (_offset == _kSalesHistoryPageSize);
   }
 
+  Future<void> applyFilters({
+    String? paymentMethod,
+    String? status,
+  }) async {
+    _paymentMethod = paymentMethod;
+    _status = status;
+    await refresh();
+  }
+
   Future<void> loadNextPage() async {
     if (!_hasMore) return;
     final current = state.valueOrNull ?? [];
     final next = await _repository.findFiltered(
       searchQuery: _searchQuery,
+      paymentMethod: _paymentMethod,
+      status: _status,
       limit: _kSalesHistoryPageSize,
       offset: _offset,
     );
@@ -367,6 +384,8 @@ class SalesHistoryController extends AsyncNotifier<List<SaleEntity>> {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _repository.findFiltered(
           searchQuery: _searchQuery,
+          paymentMethod: _paymentMethod,
+          status: _status,
           limit: _kSalesHistoryPageSize,
           offset: 0,
         ));

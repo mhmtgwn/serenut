@@ -32,6 +32,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false;
+  String _balanceFilter = 'all';
 
   @override
   void initState() {
@@ -69,8 +70,6 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
         ref.read(customerSearchQueryProvider.notifier).state = val;
         setState(() {});
       },
-      showRefresh: true,
-      onRefresh: () => ref.read(customersControllerProvider.notifier).refresh(),
       body: customersAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(
@@ -80,7 +79,13 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           child: Text('Müşteriler yüklenirken hata oluştu: $err'),
         ),
         data: (customersList) {
-          if (customersList.isEmpty) {
+          final visibleCustomers = customersList.where((customer) {
+            if (_balanceFilter == 'debt') return customer.balance < 0;
+            if (_balanceFilter == 'credit') return customer.balance > 0;
+            if (_balanceFilter == 'clear') return customer.balance == 0;
+            return true;
+          }).toList();
+          if (visibleCustomers.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -98,156 +103,181 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           return Column(
             children: [
               _buildSummaryBar(customersList),
+              SizedBox(
+                height: 46,
+                child: ListView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _balanceChip('Tümü', 'all'),
+                    _balanceChip('Borçlu', 'debt'),
+                    _balanceChip('Alacaklı', 'credit'),
+                    _balanceChip('Bakiyesi yok', 'clear'),
+                  ],
+                ),
+              ),
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: customersList.length + (hasMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == customersList.length) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation(_kGreen),
+                child: RefreshIndicator(
+                  onRefresh: () =>
+                      ref.read(customersControllerProvider.notifier).refresh(),
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: visibleCustomers.length + (hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == visibleCustomers.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation(_kGreen),
+                            ),
+                          ),
+                        );
+                      }
+                      final customer = visibleCustomers[index];
+                      final isDebt = customer.balance < 0;
+                      final absBalance = customer.balance.abs();
+
+                      return GestureDetector(
+                        onTap: () =>
+                            context.push('/customers/detail/${customer.id}'),
+                        child: Card(
+                          color: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: _kBorder),
+                          ),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor:
+                                      isDebt ? _kRedLight : _kGreenLight,
+                                  child: Text(
+                                    customer.name.isNotEmpty
+                                        ? customer.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: isDebt ? _kRed : _kGreenDark,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        customer.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: _kText),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      if (customer.phone.isNotEmpty)
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.phone_rounded,
+                                                size: 13,
+                                                color: _kTextSecondary),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                customer.phone,
+                                                style: const TextStyle(
+                                                    color: _kTextSecondary,
+                                                    fontSize: 12),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      if (customer.email.isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.email_rounded,
+                                                size: 13,
+                                                color: _kTextSecondary),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                customer.email,
+                                                style: const TextStyle(
+                                                    color: _kTextSecondary,
+                                                    fontSize: 12),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isDebt ? _kRedLight : _kGreenLight,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            isDebt ? 'Vadeli Borç' : 'Alacak',
+                                            style: TextStyle(
+                                                fontSize: 10,
+                                                color: isDebt
+                                                    ? _kRed
+                                                    : _kGreenDark,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '₺${absBalance.toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 16,
+                                              color:
+                                                  isDebt ? _kRed : _kGreenDark,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Icon(Icons.chevron_right_rounded,
+                                        color: _kTextSecondary, size: 18),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
-                    }
-                    final customer = customersList[index];
-                    final isDebt = customer.balance < 0;
-                    final absBalance = customer.balance.abs();
-
-                    return GestureDetector(
-                      onTap: () =>
-                          context.push('/customers/detail/${customer.id}'),
-                      child: Card(
-                        color: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: const BorderSide(color: _kBorder),
-                        ),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor:
-                                    isDebt ? _kRedLight : _kGreenLight,
-                                child: Text(
-                                  customer.name.isNotEmpty
-                                      ? customer.name[0].toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                    color: isDebt ? _kRed : _kGreenDark,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      customer.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                          color: _kText),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    if (customer.phone.isNotEmpty)
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.phone_rounded,
-                                              size: 13, color: _kTextSecondary),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              customer.phone,
-                                              style: const TextStyle(
-                                                  color: _kTextSecondary,
-                                                  fontSize: 12),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    if (customer.email.isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.email_rounded,
-                                              size: 13, color: _kTextSecondary),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              customer.email,
-                                              style: const TextStyle(
-                                                  color: _kTextSecondary,
-                                                  fontSize: 12),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isDebt ? _kRedLight : _kGreenLight,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          isDebt ? 'Vadeli Borç' : 'Alacak',
-                                          style: TextStyle(
-                                              fontSize: 10,
-                                              color:
-                                                  isDebt ? _kRed : _kGreenDark,
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '₺${absBalance.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 16,
-                                            color: isDebt ? _kRed : _kGreenDark,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Icon(Icons.chevron_right_rounded,
-                                      color: _kTextSecondary, size: 18),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                    },
+                  ),
                 ),
               ),
             ],
@@ -262,6 +292,17 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('Yeni Müşteri',
             style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _balanceChip(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: _balanceFilter == value,
+        onSelected: (_) => setState(() => _balanceFilter = value),
       ),
     );
   }
@@ -282,9 +323,9 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
         children: [
           Expanded(
             child: _SummaryChip(
-              label: 'Toplam Borç',
+              label: '$debtorCount borçlu',
               value: '₺${totalDebt.toStringAsFixed(2)}',
-              count: '$debtorCount borçlu',
+              count: '',
               color: _kRed,
               bg: _kRedLight,
               icon: Icons.arrow_downward_rounded,
@@ -293,9 +334,9 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           const SizedBox(width: 8),
           Expanded(
             child: _SummaryChip(
-              label: 'Alacaklar',
+              label: 'Alacak',
               value: '₺${totalCredit.toStringAsFixed(2)}',
-              count: '${customers.length} toplam',
+              count: '',
               color: _kGreenDark,
               bg: _kGreenLight,
               icon: Icons.arrow_upward_rounded,
@@ -352,9 +393,10 @@ class _SummaryChip extends StatelessWidget {
                         fontSize: 14,
                         color: color,
                         fontWeight: FontWeight.w900)),
-                Text(count,
-                    style: TextStyle(
-                        fontSize: 10, color: color.withValues(alpha: 0.7))),
+                if (count.isNotEmpty)
+                  Text(count,
+                      style: TextStyle(
+                          fontSize: 10, color: color.withValues(alpha: 0.7))),
               ],
             ),
           ),

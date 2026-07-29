@@ -11,6 +11,8 @@ class AuditEvent {
   final DateTime timestamp;
   final String? deviceId;
   final String? notes;
+  final String? previousHash;
+  final String? recordHash;
 
   AuditEvent({
     required this.id,
@@ -24,6 +26,8 @@ class AuditEvent {
     required this.timestamp,
     this.deviceId,
     this.notes,
+    this.previousHash,
+    this.recordHash,
   });
 
   factory AuditEvent.fromMap(Map<String, dynamic> map) {
@@ -39,6 +43,8 @@ class AuditEvent {
       timestamp: DateTime.parse(map['timestamp'] as String),
       deviceId: map['device_id'] as String?,
       notes: map['notes'] as String?,
+      previousHash: map['previous_hash'] as String?,
+      recordHash: map['record_hash'] as String?,
     );
   }
 
@@ -54,5 +60,25 @@ class AuditEvent {
         'timestamp': timestamp.toIso8601String(),
         'device_id': deviceId,
         'notes': notes,
+        'previous_hash': previousHash,
+        'record_hash': recordHash,
       };
+
+  AuditEvent copyWithHashes({String? previousHash, required String recordHash}) {
+    return AuditEvent(
+      id: id,
+      eventType: eventType,
+      entityType: entityType,
+      entityId: entityId,
+      userId: userId,
+      userName: userName,
+      oldValue: oldValue,
+      newValue: newValue,
+      timestamp: timestamp,
+      deviceId: deviceId,
+      notes: notes,
+      previousHash: previousHash,
+      recordHash: recordHash,
+    );
+  }
 }

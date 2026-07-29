@@ -81,6 +81,12 @@ abstract class IPrinterService implements Listenable {
     Settings settings,
   );
 
+  Future<void> printShelfLabels(
+    List<ProductEntity> products,
+    Settings settings, {
+    int copies = 1,
+  });
+
   /// Prints a diagnostics self-test receipt
   Future<void> printDiagnosticsTest(Settings settings, int paperWidth);
 

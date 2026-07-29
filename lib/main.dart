@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -375,7 +376,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             channel: 'stable',
           ),
           releaseManager: ref.read(releaseManagerServiceProvider),
-          platform: Platform.isAndroid ? 'android' : 'windows',
+          platform: AppPlatform.releaseKey,
           jwtToken: ref.read(authServiceProvider).getJwtToken(),
           deviceId:
               ref.read(licenseServiceProvider).getLicenseInfo()?.activationId,
@@ -437,7 +438,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               : 'Kritik güvenlik ve performans güncellemeleri içerir.',
           downloadUrl: _downloadUrl.isNotEmpty
               ? _downloadUrl
-              : 'https://serenut.com/api/v1/updates/download/android/latest',
+              : 'https://serenut.com/api/v1/updates/download/${AppPlatform.releaseKey}/latest',
           sha256Hash: _sha256Hash,
           signature: _signature,
           fileSizeBytes: _fileSizeBytes,

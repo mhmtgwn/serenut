@@ -3,6 +3,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 
 class SqliteAuditRepository implements IAuditRepository {
   final DatabaseManager _dbManager;
@@ -10,13 +12,44 @@ class SqliteAuditRepository implements IAuditRepository {
   SqliteAuditRepository(this._dbManager);
 
   @override
-  Future<void> logEvent(AuditEvent event) async {
+  Future<AuditEvent> logEvent(AuditEvent event) async {
     final db = await _dbManager.getDatabase();
-    await db.insert(
-      'audit_events',
-      event.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    return db.transaction((txn) async {
+      final previous = await txn.query(
+        'audit_events',
+        columns: ['record_hash'],
+        orderBy: 'timestamp DESC, id DESC',
+        limit: 1,
+      );
+      final previousHash = previous.isEmpty
+          ? null
+          : previous.first['record_hash']?.toString();
+      final payload = <String, dynamic>{
+        'id': event.id,
+        'event_type': event.eventType,
+        'entity_type': event.entityType,
+        'entity_id': event.entityId,
+        'user_id': event.userId,
+        'user_name': event.userName,
+        'old_value': event.oldValue,
+        'new_value': event.newValue,
+        'timestamp': event.timestamp.toUtc().toIso8601String(),
+        'device_id': event.deviceId,
+        'notes': event.notes,
+        'previous_hash': previousHash,
+      };
+      final recordHash = sha256.convert(utf8.encode(jsonEncode(payload))).toString();
+      final chained = event.copyWithHashes(
+        previousHash: previousHash,
+        recordHash: recordHash,
+      );
+      await txn.insert(
+        'audit_events',
+        chained.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.abort,
+      );
+      return chained;
+    });
   }
 
   @override

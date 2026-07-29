@@ -30,7 +30,8 @@ class SmsSettingsSheet extends ConsumerStatefulWidget {
   ConsumerState<SmsSettingsSheet> createState() => _SmsSettingsSheetState();
 }
 
-class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
+class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   late List<Map<String, dynamic>> listTemplates;
   late final TextEditingController minAmountCtrl;
@@ -44,12 +45,14 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
   // SIM SMS Specific States
   List<Map<String, dynamic>> simCards = [];
   bool hasPermissions = false;
+  bool checkingPermissions = true;
   int? selectedSubscriptionId;
   List<SmsLogEntry> interruptedLogs = [];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     listTemplates = _parseFlexibleSmsTemplates(widget.settings.smsTemplate);
     smsEnabled = widget.settings.smsEnabled;
     selectedProvider = 'sim';
@@ -74,10 +77,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     minAmountCtrl.dispose();
     ageDaysCtrl.dispose();
     limitCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissionsAndLoadSims();
+    }
   }
 
   Future<void> _loadInterruptedLogs() async {
@@ -166,11 +177,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
   }
 
   Future<void> _checkPermissionsAndLoadSims() async {
+    if (mounted) setState(() => checkingPermissions = true);
     final smsService = ref.read(smsServiceProvider);
     final granted = await smsService.hasSimPermissions();
     if (mounted) {
       setState(() {
         hasPermissions = granted;
+        checkingPermissions = false;
       });
     }
     if (granted) {
@@ -201,16 +214,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
   }
 
   Future<void> _requestPermissions() async {
+    setState(() => checkingPermissions = true);
     final smsService = ref.read(smsServiceProvider);
-    final granted = await smsService.requestSimPermissions();
-    if (mounted) {
-      setState(() {
-        hasPermissions = granted;
-      });
-    }
-    if (granted) {
-      _checkPermissionsAndLoadSims();
-    }
+    await smsService.requestSimPermissions();
+    await _checkPermissionsAndLoadSims();
   }
 
   List<Map<String, dynamic>> _parseFlexibleSmsTemplates(String? templateStr) {
@@ -1037,21 +1044,29 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          hasPermissions
-                              ? Icons.check_circle_outline_rounded
-                              : Icons.warning_amber_rounded,
-                          color: hasPermissions
-                              ? POSColors.greenDark
-                              : POSColors.amberDark,
-                          size: 24,
-                        ),
+                        if (checkingPermissions)
+                          const SizedBox.square(
+                            dimension: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          Icon(
+                            hasPermissions
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.warning_amber_rounded,
+                            color: hasPermissions
+                                ? POSColors.greenDark
+                                : POSColors.amberDark,
+                            size: 24,
+                          ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: Text(
-                            hasPermissions
-                                ? 'SMS İzinleri Tanımlı (Gönderime Hazır)'
-                                : 'SMS gönderebilmek için SMS ve Telefon izinleri gereklidir.',
+                            checkingPermissions
+                                ? 'İzin durumu kontrol ediliyor…'
+                                : hasPermissions
+                                    ? 'SMS İzinleri Tanımlı (Gönderime Hazır)'
+                                    : 'SMS gönderebilmek için SMS ve Telefon izinleri gereklidir.',
                             style: TextStyle(
                               color: hasPermissions
                                   ? POSColors.greenDark
@@ -1061,7 +1076,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet> {
                             ),
                           ),
                         ),
-                        if (!hasPermissions)
+                        if (!hasPermissions && !checkingPermissions)
                           TextButton(
                             onPressed: _requestPermissions,
                             child: const Text('İzin Ver',

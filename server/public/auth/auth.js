@@ -1,11 +1,24 @@
-import { setAuthToken, setRefreshToken } from '/shared/js/api-client.js';
-import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
+import { clearAuthSession, getAuthToken, setAuthToken, setRefreshToken } from '/shared/js/api-client.js';
+import { setUserProfile } from '/shared/js/auth.js';
 
 const page = document.body.dataset.authPage;
 const status = document.getElementById('status');
 
-if (isAuthenticated() && page !== 'reset-password') {
-  window.location.replace('/app/');
+validateExistingSession();
+
+async function validateExistingSession() {
+  const token = getAuthToken();
+  if (!token || page === 'reset-password') return;
+  try {
+    const response = await fetch('/api/v1/users/me', {
+      headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    if (response.ok) {
+      window.location.replace('/app/?flow=panel');
+      return;
+    }
+  } catch (_) {}
+  clearAuthSession();
 }
 
 const message = (text, success = false) => {
@@ -44,7 +57,7 @@ document.getElementById('login-form')?.addEventListener('submit', async (event) 
     setRefreshToken(data.refresh_token);
     setUserProfile(data.user);
     const next = new URLSearchParams(window.location.search).get('next');
-    window.location.replace(next?.startsWith('/app') ? next : '/app/');
+    window.location.replace(next?.startsWith('/app') ? next : '/app/?flow=panel');
   } catch (error) {
     message(error.message);
     if (error.data?.error?.code === 'EMAIL_NOT_VERIFIED') {
@@ -102,7 +115,7 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
       setAuthToken(data.access_token);
       setRefreshToken(data.refresh_token);
       if (data.user) setUserProfile(data.user);
-      window.location.replace('/app/');
+      window.location.replace('/app/?flow=panel');
       return;
     }
 

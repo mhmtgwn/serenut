@@ -139,6 +139,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
     final filteredProductsVal = ref.watch(salesProductsControllerProvider);
     final categoriesVal = ref.watch(productCategoriesProvider);
     final selectedCategory = ref.watch(salesProductCategoryFilterProvider);
+    final stockFilter = ref.watch(salesProductStockFilterProvider);
+    final sortBy = ref.watch(salesProductSortProvider);
 
     return Column(
       children: [
@@ -155,6 +157,14 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
           showSettings: false,
           showStatusIndicator: false,
           actions: [
+            Badge(
+              isLabelVisible: stockFilter != null || sortBy != null,
+              child: IconButton(
+                tooltip: 'Ürün filtreleri',
+                onPressed: _showProductFilters,
+                icon: const Icon(Icons.tune_rounded),
+              ),
+            ),
             // Barkod tarama ikonu - Kamera
             IconButton(
               padding: const EdgeInsets.all(6),
@@ -304,6 +314,75 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showProductFilters() async {
+    var stock = ref.read(salesProductStockFilterProvider);
+    var sort = ref.read(salesProductSortProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Ürünleri filtrele',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Tüm stoklar'),
+                    selected: stock == null,
+                    onSelected: (_) => setSheetState(() => stock = null),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Stokta'),
+                    selected: stock == 'in_stock',
+                    onSelected: (_) =>
+                        setSheetState(() => stock = 'in_stock'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Kritik stok'),
+                    selected: stock == 'critical',
+                    onSelected: (_) =>
+                        setSheetState(() => stock = 'critical'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: sort,
+                decoration: const InputDecoration(labelText: 'Sıralama'),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Ürün adına göre')),
+                  DropdownMenuItem(
+                      value: 'best_selling', child: Text('En çok satanlar')),
+                  DropdownMenuItem(
+                      value: 'price_asc', child: Text('Fiyat: düşükten yükseğe')),
+                  DropdownMenuItem(
+                      value: 'price_desc', child: Text('Fiyat: yüksekten düşüğe')),
+                ],
+                onChanged: (value) => setSheetState(() => sort = value),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () {
+                  ref.read(salesProductStockFilterProvider.notifier).state = stock;
+                  ref.read(salesProductSortProvider.notifier).state = sort;
+                  Navigator.pop(context);
+                },
+                child: const Text('Uygula'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

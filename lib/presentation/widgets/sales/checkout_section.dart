@@ -11,6 +11,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:uuid/uuid.dart';
 
 part 'checkout/karma_fields.dart';
@@ -135,6 +136,8 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
   @override
   Widget build(BuildContext context) {
     final isKarma = widget.paymentMethod == 'karma';
+    final hasPos =
+        ref.watch(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
 
     return Container(
       decoration: const BoxDecoration(
@@ -162,7 +165,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
             ],
 
             // ── ÖDEME BUTONLARI ─────────────────────────────────────────────
-            _buildPaymentButtons(isKarma),
+            _buildPaymentButtons(isKarma, hasPos: hasPos),
           ],
         ),
       ),
@@ -550,7 +553,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
 
   // ── Ödeme Butonları ────────────────────────────────────────────────────────
 
-  Widget _buildPaymentButtons(bool isKarma) {
+  Widget _buildPaymentButtons(bool isKarma, {required bool hasPos}) {
     final disabled = widget.isSubmitting || widget.total <= 0;
     final debtDisabled = disabled || widget.selectedCustomer == null;
 
@@ -609,11 +612,13 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
         // KART
         Expanded(
           child: _PayButton(
-            label: 'KART',
-            sublabel: '₺${widget.total.toStringAsFixed(2)}',
+            label: hasPos ? 'KART' : 'POS YOK',
+            sublabel: hasPos
+                ? '₺${widget.total.toStringAsFixed(2)}'
+                : 'Cihaz tanımla',
             icon: Icons.credit_card_rounded,
             color: _kBlue,
-            disabled: disabled,
+            disabled: disabled || !hasPos,
             height: 64,
             onTap: () => _handlePayment('card'),
           ),

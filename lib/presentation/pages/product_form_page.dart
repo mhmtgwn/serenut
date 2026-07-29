@@ -3,6 +3,7 @@
 // UX Redesign v3: Full-screen form, Shopify admin style, no dialogs
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +13,12 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/product_image.dart';
+import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -49,6 +55,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final TextEditingController _minStockCtrl;
   late final TextEditingController _vatCtrl;
   late final TextEditingController _barcodeCtrl;
+  late final TextEditingController _brandCtrl;
+  late final TextEditingController _shelfCodeCtrl;
+  String _unit = 'adet';
+  String? _imageUrl;
 
   String? _selectedCategory;
   bool _isSaving = false;
@@ -63,10 +73,13 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _descCtrl = TextEditingController(text: p?.description ?? '');
     _priceCtrl = TextEditingController(
         text: p != null ? p.price.toStringAsFixed(2) : '');
-    _purchasePriceCtrl = TextEditingController(text: '');
+    _purchasePriceCtrl = TextEditingController(
+        text: p != null && p.purchasePrice > 0
+            ? p.purchasePrice.toStringAsFixed(2)
+            : '');
     _qtyCtrl =
         TextEditingController(text: p != null ? p.quantity.toString() : '');
-    _minStockCtrl = TextEditingController(text: '');
+    _minStockCtrl = TextEditingController(text: p?.minStock.toString() ?? '5');
     _vatCtrl = TextEditingController(text: p?.vat?.toString() ?? '18');
     final barcodeText = p != null
         ? (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
@@ -75,10 +88,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             : p.id)
         : '';
     _barcodeCtrl = TextEditingController(text: barcodeText);
+    _brandCtrl = TextEditingController(text: p?.brand ?? '');
+    _shelfCodeCtrl = TextEditingController(text: p?.shelfCode ?? '');
+    _unit = p?.unit ?? (p?.isWeighed == true ? 'kg' : 'adet');
     _saleType = p?.saleType ?? 'piece';
     _minimumWeightCtrl =
         TextEditingController(text: (p?.minimumWeightGrams ?? 20).toString());
     _selectedCategory = p?.category;
+    _imageUrl = p?.imageUrl;
   }
 
   @override
@@ -91,6 +108,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _minStockCtrl.dispose();
     _vatCtrl.dispose();
     _barcodeCtrl.dispose();
+    _brandCtrl.dispose();
+    _shelfCodeCtrl.dispose();
     _minimumWeightCtrl.dispose();
     super.dispose();
   }
@@ -123,11 +142,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         name: _nameCtrl.text.trim(),
         description: _descCtrl.text.trim(),
         price: double.parse(_priceCtrl.text.trim().replaceAll(',', '.')),
+        purchasePrice: double.tryParse(
+                _purchasePriceCtrl.text.trim().replaceAll(',', '.')) ??
+            0,
         quantity: int.parse(_qtyCtrl.text.trim()),
+        minStock: int.tryParse(_minStockCtrl.text.trim()) ?? 5,
+        brand: _brandCtrl.text.trim(),
+        unit: _saleType == 'weighed' ? 'kg' : _unit,
+        shelfCode: _shelfCodeCtrl.text.trim(),
         category: _selectedCategory!,
         vat: int.tryParse(_vatCtrl.text.trim()) ?? 18,
         saleType: _saleType,
         minimumWeightGrams: int.tryParse(_minimumWeightCtrl.text.trim()) ?? 20,
+        imageUrl: _imageUrl,
       );
       final notifier = ref.read(productsControllerProvider.notifier);
       if (widget.isEditing) {
@@ -273,6 +300,41 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            _buildSection(children: [
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: ProductImage(
+                      imageUrl: _imageUrl,
+                      barcode: _barcodeCtrl.text.trim(),
+                      size: 82,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _chooseProductImageSource,
+                          icon: const Icon(Icons.add_a_photo_rounded),
+                          label: Text(_imageUrl == null
+                              ? 'Ürün fotoğrafı ekle'
+                              : 'Fotoğrafı değiştir'),
+                        ),
+                        if (_imageUrl != null)
+                          TextButton(
+                            onPressed: () => setState(() => _imageUrl = null),
+                            child: const Text('Fotoğrafı kaldır'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ]),
+            const SizedBox(height: 16),
             // ── Bölüm 1: Temel Bilgiler ────────────────────────────────────
             _buildSectionHeader(
                 icon: Icons.inventory_2_rounded,
@@ -299,6 +361,47 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               const SizedBox(height: 12),
               // ── Kategori ───────────────────────────────────────────────────
               _buildCategoryField(allCategories, parsedVatCategories),
+              const SizedBox(height: 12),
+              _buildField(
+                controller: _brandCtrl,
+                label: 'Marka',
+                icon: Icons.verified_rounded,
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _saleType == 'weighed' ? 'kg' : _unit,
+                      decoration: InputDecoration(
+                        labelText: 'Birim',
+                        prefixIcon: const Icon(Icons.straighten_rounded),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'adet', child: Text('Adet')),
+                        DropdownMenuItem(value: 'paket', child: Text('Paket')),
+                        DropdownMenuItem(value: 'kutu', child: Text('Kutu')),
+                        DropdownMenuItem(value: 'litre', child: Text('Litre')),
+                        DropdownMenuItem(value: 'kg', child: Text('Kilogram')),
+                      ],
+                      onChanged: _saleType == 'weighed'
+                          ? null
+                          : (value) => setState(() => _unit = value ?? 'adet'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                      controller: _shelfCodeCtrl,
+                      label: 'Raf Kodu',
+                      icon: Icons.shelves,
+                    ),
+                  ),
+                ],
+              ),
             ]),
             const SizedBox(height: 16),
 
@@ -460,11 +563,21 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildField(
+                    child: TextFormField(
                       controller: _barcodeCtrl,
-                      label: 'Barkod',
-                      icon: Icons.qr_code_rounded,
-                      keyboardType: TextInputType.text,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: 'Barkod',
+                        prefixIcon: const Icon(Icons.qr_code_rounded),
+                        suffixIcon: IconButton(
+                          tooltip: 'Kamerayla barkod okut',
+                          onPressed: _scanBarcode,
+                          icon: const Icon(Icons.qr_code_scanner_rounded),
+                        ),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
                 ],
@@ -503,6 +616,61 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _pickProductImage([ImageSource source = ImageSource.gallery]) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+    if (picked == null) return;
+    final documents = await getApplicationDocumentsDirectory();
+    final images = Directory(path.join(documents.path, 'product_images'));
+    await images.create(recursive: true);
+    final extension = path.extension(picked.path).isEmpty
+        ? '.jpg'
+        : path.extension(picked.path);
+    final target = path.join(
+      images.path,
+      '${widget.existingProduct?.id ?? const Uuid().v4()}$extension',
+    );
+    await File(picked.path).copy(target);
+    ProductImage.clearCache();
+    if (mounted) setState(() => _imageUrl = target);
+  }
+
+  Future<void> _chooseProductImageSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            if (Platform.isAndroid || Platform.isIOS)
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded),
+                title: const Text('Kamerayla çek'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Galeriden veya dosyadan seç'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) await _pickProductImage(source);
+  }
+
+  Future<void> _scanBarcode() async {
+    await BarcodeScannerDialog.show(
+      context,
+      onBarcodeScanned: (barcode) {
+        if (mounted) setState(() => _barcodeCtrl.text = barcode.trim());
+      },
     );
   }
 
@@ -607,6 +775,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   if (match.isNotEmpty && match['rate'] != null) {
                     _vatCtrl.text = match['rate'].toString();
                   }
+                  _applyCategoryDefaults(match);
                 });
               }
             } else {
@@ -622,6 +791,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   if (match.isNotEmpty && match['rate'] != null) {
                     _vatCtrl.text = match['rate'].toString();
                   }
+                  _applyCategoryDefaults(match);
                 }
               });
             }
@@ -631,6 +801,15 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         ),
       ],
     );
+  }
+
+  void _applyCategoryDefaults(Map<String, dynamic> category) {
+    final defaultUnit = category['unit']?.toString();
+    if (defaultUnit == null || defaultUnit.isEmpty) return;
+    _unit = defaultUnit;
+    if (defaultUnit == 'kg') {
+      _saleType = 'weighed';
+    }
   }
 
   Future<String?> _showNewCategorySheet() async {

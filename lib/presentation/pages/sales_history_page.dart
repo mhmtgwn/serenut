@@ -33,6 +33,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  String? _paymentFilter;
+  String? _statusFilter;
 
   @override
   void initState() {
@@ -132,6 +134,27 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             ),
           ),
           const Divider(height: 1, color: _kBorder),
+          SizedBox(
+            height: 48,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              scrollDirection: Axis.horizontal,
+              children: [
+                _filterChip(
+                    'Tümü',
+                    _paymentFilter == null && _statusFilter == null,
+                    () => _applyFilters(null, null)),
+                _filterChip('Nakit', _paymentFilter == 'cash',
+                    () => _applyFilters('cash', null)),
+                _filterChip('Kart', _paymentFilter == 'card',
+                    () => _applyFilters('card', null)),
+                _filterChip('Vadeli', _paymentFilter == 'debt',
+                    () => _applyFilters('debt', null)),
+                _filterChip('İptal', _statusFilter == 'cancelled',
+                    () => _applyFilters(null, 'cancelled')),
+              ],
+            ),
+          ),
 
           // Sales List
           Expanded(
@@ -170,203 +193,212 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                   );
                 }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredSales.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == filteredSales.length) {
-                      final hasMore = ref
-                          .read(salesHistoryControllerProvider.notifier)
-                          .hasMore;
-                      if (!hasMore) return const SizedBox.shrink();
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    final sale = filteredSales[index];
-                    final customerName =
-                        customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
-                    final dateStr = DateFormat('dd.MM.yyyy HH:mm', 'tr_TR')
-                        .format(sale.createdAt);
+                return RefreshIndicator(
+                  onRefresh: () => ref
+                      .read(salesHistoryControllerProvider.notifier)
+                      .refresh(),
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredSales.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == filteredSales.length) {
+                        final hasMore = ref
+                            .read(salesHistoryControllerProvider.notifier)
+                            .hasMore;
+                        if (!hasMore) return const SizedBox.shrink();
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final sale = filteredSales[index];
+                      final customerName =
+                          customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
+                      final dateStr = DateFormat('dd.MM.yyyy HH:mm', 'tr_TR')
+                          .format(sale.createdAt);
 
-                    // Color and labels for payments
-                    final paymentLabel = {
-                          'cash': 'Nakit',
-                          'nakit': 'Nakit',
-                          'card': 'Kart',
-                          'kart': 'Kart',
-                          'debt': 'Vadeli',
-                          'vadeli': 'Vadeli',
-                          'mixed': 'Karma',
-                          'karma': 'Karma',
-                        }[sale.paymentMethod.toLowerCase()] ??
-                        sale.paymentMethod;
+                      // Color and labels for payments
+                      final paymentLabel = {
+                            'cash': 'Nakit',
+                            'nakit': 'Nakit',
+                            'card': 'Kart',
+                            'kart': 'Kart',
+                            'debt': 'Vadeli',
+                            'vadeli': 'Vadeli',
+                            'mixed': 'Karma',
+                            'karma': 'Karma',
+                          }[sale.paymentMethod.toLowerCase()] ??
+                          sale.paymentMethod;
 
-                    final paymentColor = {
-                          'cash': _kGreen,
-                          'nakit': _kGreen,
-                          'card': _kBlue,
-                          'kart': _kBlue,
-                          'debt': _kOrange,
-                          'vadeli': _kOrange,
-                          'mixed': _kGreenDark,
-                          'karma': _kGreenDark,
-                        }[sale.paymentMethod.toLowerCase()] ??
-                        _kTextSecondary;
+                      final paymentColor = {
+                            'cash': _kGreen,
+                            'nakit': _kGreen,
+                            'card': _kBlue,
+                            'kart': _kBlue,
+                            'debt': _kOrange,
+                            'vadeli': _kOrange,
+                            'mixed': _kGreenDark,
+                            'karma': _kGreenDark,
+                          }[sale.paymentMethod.toLowerCase()] ??
+                          _kTextSecondary;
 
-                    final paymentBg = {
-                          'cash': _kGreenLight,
-                          'nakit': _kGreenLight,
-                          'card': _kBlueLight,
-                          'kart': _kBlueLight,
-                          'debt': _kOrangeLight,
-                          'vadeli': _kOrangeLight,
-                          'mixed': _kGreenLight,
-                          'karma': _kGreenLight,
-                        }[sale.paymentMethod.toLowerCase()] ??
-                        _kSurface;
+                      final paymentBg = {
+                            'cash': _kGreenLight,
+                            'nakit': _kGreenLight,
+                            'card': _kBlueLight,
+                            'kart': _kBlueLight,
+                            'debt': _kOrangeLight,
+                            'vadeli': _kOrangeLight,
+                            'mixed': _kGreenLight,
+                            'karma': _kGreenLight,
+                          }[sale.paymentMethod.toLowerCase()] ??
+                          _kSurface;
 
-                    final isCancelled = sale.status == 'cancelled';
+                      final isCancelled = sale.status == 'cancelled';
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _kBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: InkWell(
-                        onTap: () => context.push('/sales/detail/${sale.id}'),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              // Icon
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isCancelled ? _kRedLight : _kGreenLight,
-                                  shape: BoxShape.circle,
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _kBorder),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: InkWell(
+                          onTap: () => context.push('/sales/detail/${sale.id}'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: [
+                                // Icon
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        isCancelled ? _kRedLight : _kGreenLight,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    isCancelled
+                                        ? Icons.cancel_rounded
+                                        : Icons.receipt_long_rounded,
+                                    color: isCancelled ? _kRed : _kGreen,
+                                    size: 20,
+                                  ),
                                 ),
-                                child: Icon(
-                                  isCancelled
-                                      ? Icons.cancel_rounded
-                                      : Icons.receipt_long_rounded,
-                                  color: isCancelled ? _kRed : _kGreen,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
+                                const SizedBox(width: 12),
 
-                              // Details
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          '#${sale.id.toShortId}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            color: _kText,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        if (isCancelled) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: _kRedLight,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
+                                // Details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            '#${sale.id.toShortId}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              color: _kText,
+                                              fontSize: 13,
                                             ),
-                                            child: const Text(
-                                              'İPTAL',
-                                              style: TextStyle(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.w800,
-                                                color: _kRed,
+                                          ),
+                                          if (isCancelled) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: _kRedLight,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: const Text(
+                                                'İPTAL',
+                                                style: TextStyle(
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: _kRed,
+                                                ),
                                               ),
                                             ),
-                                          ),
+                                          ],
                                         ],
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        customerName,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: _kTextSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        dateStr,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[400],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Payment info & amount
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
                                     Text(
-                                      customerName,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: _kTextSecondary,
-                                        fontWeight: FontWeight.w500,
+                                      '₺${sale.totalAmount.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                        color: isCancelled ? _kRed : _kText,
+                                        decoration: isCancelled
+                                            ? TextDecoration.lineThrough
+                                            : null,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      dateStr,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey[400],
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: paymentBg,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        paymentLabel,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: paymentColor,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-
-                              // Payment info & amount
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '₺${sale.totalAmount.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 15,
-                                      color: isCancelled ? _kRed : _kText,
-                                      decoration: isCancelled
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: paymentBg,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      paymentLabel,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: paymentColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -374,5 +406,27 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         ],
       ),
     );
+  }
+
+  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+      ),
+    );
+  }
+
+  void _applyFilters(String? paymentMethod, String? status) {
+    setState(() {
+      _paymentFilter = paymentMethod;
+      _statusFilter = status;
+    });
+    ref.read(salesHistoryControllerProvider.notifier).applyFilters(
+          paymentMethod: paymentMethod,
+          status: status,
+        );
   }
 }

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  filterNavByEntitlements,
+  resolveLandingModuleId,
+  resolveLandingRoute,
+} from '../config/app-shell';
 
 const projectRoot = path.resolve(__dirname, '../..');
 
@@ -35,6 +40,23 @@ async function run() {
   for (const loader of ['platform-companies', 'platform-health', 'platform-security']) {
     assert.match(runtime, new RegExp(`'${loader}': async`), `${loader} loader must be registered`);
   }
+
+  const appSource = fs.readFileSync(path.join(projectRoot, 'public/app/js/app.js'), 'utf8');
+  assert.doesNotMatch(appSource, /module:\s*isSysadmin\s*\?/, 'frontend must preserve backend module kinds');
+  assert.match(appSource, /item\.module === 'home'/, 'home must be a first-class shell view');
+  assert.match(appSource, /landing_module_id/, 'frontend must use the canonical landing module id');
+  assert.match(appHtml, /id="boot-state"/, 'application shell must expose a non-empty loading state');
+
+  assert.equal(resolveLandingModuleId(['sysadmin'], []), 'platform-overview');
+  assert.equal(resolveLandingModuleId(['owner'], ['billing:view']), 'billing-center');
+  assert.equal(resolveLandingModuleId(['owner'], ['devices:view']), 'company-dashboard');
+  assert.equal(resolveLandingModuleId(['owner'], []), 'workspace-home');
+  assert.equal(resolveLandingRoute(['owner'], []), '/app/#home');
+
+  const ownerHome = filterNavByEntitlements(['owner'], []);
+  assert.ok(ownerHome.some((item) => item.id === 'workspace-home' && item.module === 'home'));
+  const sysadminNav = filterNavByEntitlements(['sysadmin'], []);
+  assert.ok(sysadminNav.some((item) => item.id === 'platform-overview' && item.module === 'admin'));
 
   console.log('Web route contract passed.');
 }

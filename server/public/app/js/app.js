@@ -1,11 +1,11 @@
 import { clearAuthSession, apiFetch } from '/shared/js/api-client.js';
 import { isAuthenticated, setUserProfile } from '/shared/js/auth.js';
 import { escapeHtml } from '/shared/js/formatters.js';
-import { loadModule } from './module-runtime.js?v=20260729-release50';
 
 const overviewGrid = document.getElementById('overview-grid');
 const modulePanel = document.getElementById('module-panel');
 const embedPanel = document.getElementById('embed-panel');
+document.body.dataset.bootStage = 'script-ready';
 
 let navigationItems = [];
 let selectedModuleId = 'home';
@@ -17,8 +17,9 @@ let realtimeCompanyId = '';
 const navIcon = () => '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"></path></svg>';
 
 function initApp() {
+  document.body.dataset.bootStage = 'initializing';
   if (!isAuthenticated()) {
-    window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.hash)}`);
+    window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`);
     return;
   }
 
@@ -50,26 +51,48 @@ if (document.readyState === 'loading') {
 }
 
 async function bootShell() {
+  document.body.dataset.bootStage = 'loading-profile';
+  setBootState('loading');
   try {
     const me = await apiFetch('/users/me');
+    document.body.dataset.bootStage = 'loading-workspace';
     const bootstrap = await apiFetch('/app/bootstrap');
+    document.body.dataset.bootStage = 'rendering';
     setUserProfile(me);
     renderShell(bootstrap);
     startRealtime();
   } catch (error) {
-    clearAuthSession();
-    const reason = error?.status === 403 ? 'portal_access_denied' : 'session_expired';
-    window.location.replace(`/login?error=${reason}`);
+    if (error?.status === 401 || error?.status === 403) {
+      clearAuthSession();
+      const reason = error.status === 403 ? 'portal_access_denied' : 'session_expired';
+      window.location.replace(`/login?error=${reason}`);
+      return;
+    }
+    setBootState('error', error?.message || 'Panel verileri yüklenemedi.');
+  }
+}
+
+function setBootState(state, detail = '') {
+  const panel = document.getElementById('boot-state');
+  const retry = document.getElementById('boot-retry');
+  document.body.classList.toggle('app-booting', state !== 'ready');
+  document.body.dataset.bootStage = state;
+  panel?.classList.toggle('app-hidden', state === 'ready');
+  retry?.classList.toggle('app-hidden', state !== 'error');
+  if (state === 'error') {
+    document.getElementById('boot-state-title').innerText = 'Çalışma alanı yüklenemedi';
+    document.getElementById('boot-state-copy').innerText = detail;
+    retry.onclick = bootShell;
   }
 }
 
 function renderShell(bootstrap) {
   realtimeCompanyId = bootstrap.company?.id || bootstrap.user?.company_id || '';
   const isSysadmin = (bootstrap.user?.roles || []).includes('sysadmin');
-  navigationItems = (bootstrap.navigation || []).map((item) => ({
-    ...item,
-    module: isSysadmin ? 'admin' : 'customer'
-  }));
+  navigationItems = normalizeNavigation(bootstrap.navigation);
+  if (!navigationItems.length) {
+    throw new Error('Bu hesap için kullanılabilir bir panel alanı bulunamadı.');
+  }
   document.body.classList.toggle('sysadmin-shell', isSysadmin);
   document.body.classList.toggle('customer-shell', !isSysadmin);
 
@@ -95,6 +118,16 @@ function renderShell(bootstrap) {
   renderNav(navigationItems);
   renderModuleCards(navigationItems);
   selectModule(resolveInitialModule(bootstrap));
+  setBootState('ready');
+}
+
+function normalizeNavigation(navigation) {
+  if (!Array.isArray(navigation)) return [];
+  const validModules = new Set(['home', 'portal', 'admin']);
+  return navigation.filter((item) =>
+    item && typeof item.id === 'string' && typeof item.label === 'string' &&
+    typeof item.href === 'string' && validModules.has(item.module)
+  );
 }
 
 function renderNav(items) {
@@ -140,9 +173,14 @@ function renderModuleCards(items) {
 
 function resolveInitialModule(bootstrap) {
   const hashId = window.location.hash.replace('#', '').trim();
-  if (hashId && navigationItems.some((item) => item.id === hashId)) return hashId;
-  const landing = navigationItems.find((item) => item.href === bootstrap.landing_route);
-  return landing?.id || navigationItems[0]?.id || 'home';
+  const requested = hashId && navigationItems.find((item) =>
+    item.id === hashId || item.href.split('#')[1] === hashId
+  );
+  if (requested) return requested.id;
+  const landing = navigationItems.find((item) =>
+    item.id === bootstrap.landing_module_id || item.href === bootstrap.landing_route
+  );
+  return landing?.id || navigationItems.find((item) => item.module === 'home')?.id || navigationItems[0].id;
 }
 
 async function selectModule(moduleId) {
@@ -154,18 +192,26 @@ async function selectModule(moduleId) {
     link.classList.toggle('active', link.getAttribute('data-module-id') === activeId);
   });
 
-  if (!item || activeId === 'home' || item.module === 'home') {
+  if (!item) {
+    const fallback = navigationItems.find((entry) => entry.module === 'home') || navigationItems[0];
+    if (fallback && fallback.id !== activeId) return selectModule(fallback.id);
+    setBootState('error', 'İstenen panel alanı bulunamadı.');
+    return;
+  }
+
+  if (item.module === 'home') {
     document.querySelector('.shell-title').innerText = 'Çalışma Alanı';
     overviewGrid.classList.remove('app-hidden');
     modulePanel.classList.remove('app-hidden');
     embedPanel.classList.add('app-hidden');
-    window.location.hash = 'home';
+    window.location.hash = item.href.split('#')[1] || item.id;
     return;
   }
 
   document.querySelector('.shell-title').innerText = item.label;
   document.getElementById('embed-title').innerText = item.label;
   document.getElementById('embed-description').innerText = item.description;
+  const { loadModule } = await import('./module-runtime.js?v=20260729-panel-flow2');
   await loadModule(item);
   overviewGrid.classList.add('app-hidden');
   modulePanel.classList.add('app-hidden');

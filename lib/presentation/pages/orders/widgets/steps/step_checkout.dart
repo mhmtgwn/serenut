@@ -43,56 +43,68 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         const Divider(color: _kBorder),
         const SizedBox(height: 16),
         // Printer Receipt / Labels checkbox options
-        Row(
-          children: [
-            Checkbox(
-              value: _printReceipt,
-              activeColor: _kGreen,
-              onChanged: (val) {
-                if (val != null) updateState(() => _printReceipt = val);
-              },
+        Container(
+          decoration: BoxDecoration(
+            color: _printReceipt ? _kGreenLight : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _printReceipt ? _kGreen.withValues(alpha: .3) : _kBorder,
             ),
-            const Text(
-              'Fiş Yazdır',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
-            ),
-            if (_printReceipt) ...[
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => updateState(() {
-                  if (_printCopies > 1) _printCopies--;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: _kBorder),
-                      borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.remove,
-                      size: 12, color: _kTextSecondary),
+          ),
+          child: Column(
+            children: [
+              SwitchListTile.adaptive(
+                dense: true,
+                value: _printReceipt,
+                activeColor: _kGreen,
+                secondary: Icon(
+                  _printReceipt
+                      ? Icons.print_rounded
+                      : Icons.print_disabled_rounded,
+                  color: _printReceipt ? _kGreen : _kTextSecondary,
                 ),
-              ),
-              const SizedBox(width: 6),
-              _InlineCopyCountField(
-                value: _printCopies,
-                onChanged: (val) => updateState(() => _printCopies = val),
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => updateState(() => _printCopies++),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: _kBorder),
-                      borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.add, size: 12, color: _kGreen),
+                title: const Text(
+                  'Sipariş fişini yazdır',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
+                subtitle: Text(
+                  _printReceipt ? 'Yazdırma açık' : 'Yazdırma kapalı',
+                  style: const TextStyle(fontSize: 11, color: _kTextSecondary),
+                ),
+                onChanged: (value) => updateState(() => _printReceipt = value),
               ),
-              const SizedBox(width: 4),
-              const Text('Kopya',
-                  style: TextStyle(fontSize: 11, color: _kTextSecondary)),
+              if (_printReceipt)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: Row(
+                    children: [
+                      const Text('Kopya sayısı',
+                          style:
+                              TextStyle(fontSize: 11, color: _kTextSecondary)),
+                      const Spacer(),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _printCopies > 1
+                            ? () => updateState(() => _printCopies--)
+                            : null,
+                        icon: const Icon(Icons.remove_rounded, size: 18),
+                      ),
+                      _InlineCopyCountField(
+                        value: _printCopies,
+                        onChanged: (value) =>
+                            updateState(() => _printCopies = value),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => updateState(() => _printCopies++),
+                        icon: const Icon(Icons.add_rounded,
+                            size: 18, color: _kGreen),
+                      ),
+                    ],
+                  ),
+                ),
             ],
-          ],
+          ),
         ),
         Row(
           children: [
@@ -416,6 +428,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
   }
 
   Widget _buildPaymentSelectionGrid() {
+    final hasPos =
+        ref.watch(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
     final methods = [
       {
         'id': 'cash',
@@ -423,12 +437,13 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         'icon': Icons.money_rounded,
         'color': _kGreen
       },
-      {
-        'id': 'card',
-        'label': 'Kredi Kartı',
-        'icon': Icons.credit_card_rounded,
-        'color': Colors.blue
-      },
+      if (hasPos)
+        {
+          'id': 'card',
+          'label': 'Kredi Kartı',
+          'icon': Icons.credit_card_rounded,
+          'color': Colors.blue
+        },
       if (_selectedCustomer != null)
         {
           'id': 'debt',

@@ -160,9 +160,9 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
 
     await runWithTenantContext(
       user.company_id,
-      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, scheduled_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, user.company_id, channel, recipient, title || null, finalBody, parsedScheduledAt]
+      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, scheduled_at, created_by_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, user.company_id, channel, recipient, title || null, finalBody, parsedScheduledAt, user.id]
     );
 
     return res.status(201).json({ success: true, queue_id: id });
@@ -192,8 +192,8 @@ router.post('/sync-local', async (req: AuthenticatedRequest, res: Response) => {
 
     const result = await runWithTenantContext(
       user.company_id,
-      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, error_message, created_at, delivered_at, client_message_id)
-       VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, error_message, created_at, delivered_at, client_message_id, created_by_user_id)
+       VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (company_id, client_message_id)
        WHERE client_message_id IS NOT NULL
        DO NOTHING
@@ -209,6 +209,7 @@ router.post('/sync-local', async (req: AuthenticatedRequest, res: Response) => {
         parsedCreatedAt,
         status === 'sent' ? new Date() : null,
         client_message_id || null,
+        user.id,
       ]
     );
 
@@ -375,7 +376,8 @@ router.get('/queue', requireSmsHistoryAccess, async (req: AuthenticatedRequest, 
   try {
     const history = await runWithTenantContext(
       user.company_id,
-      'SELECT id, channel, recipient, title, body, status, retry_count, error_message, delivered_at, created_at FROM notification_queue ORDER BY created_at DESC LIMIT 100'
+      'SELECT id, channel, recipient, title, body, status, retry_count, error_message, delivered_at, created_at FROM notification_queue WHERE created_by_user_id = $1 ORDER BY created_at DESC LIMIT 100',
+      [user.id]
     );
     return res.json(history.rows);
   } catch (err) {
@@ -547,9 +549,9 @@ router.post('/campaign', enforceCampaignAbuseLimit, requirePermission('notificat
         const id = `notif-camp-${Date.now()}-${Math.floor(Math.random()*10000)}`;
 
         await client.query(`
-          INSERT INTO notification_queue (id, company_id, channel, recipient, title, body)
-          VALUES ($1, $2, $3, $4, $5, $6)
-        `, [id, user.company_id, channel, recipientAddr, templateTitle || null, resolvedBody]);
+          INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, created_by_user_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [id, user.company_id, channel, recipientAddr, templateTitle || null, resolvedBody, user.id]);
 
         queuedCount++;
       }

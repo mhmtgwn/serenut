@@ -35,7 +35,12 @@ class DatabaseSchema {
         name TEXT NOT NULL,
         description TEXT,
         price REAL NOT NULL,
+        purchase_price REAL NOT NULL DEFAULT 0,
         quantity INTEGER NOT NULL,
+        min_stock INTEGER NOT NULL DEFAULT 5,
+        brand TEXT NOT NULL DEFAULT '',
+        unit TEXT NOT NULL DEFAULT 'adet',
+        shelf_code TEXT NOT NULL DEFAULT '',
         category TEXT NOT NULL,
         sku TEXT UNIQUE,
         vat INTEGER,
@@ -452,7 +457,9 @@ class DatabaseSchema {
         new_value TEXT,
         timestamp TEXT NOT NULL,
         device_id TEXT,
-        notes TEXT
+        notes TEXT,
+        previous_hash TEXT,
+        record_hash TEXT NOT NULL
       )
     ''');
     await db.execute(

@@ -102,15 +102,20 @@ export async function applyDomainMutation(
       if (!name) throw new Error("invalid_mutation");
       const deleted = payload.is_deleted === 1 || payload.is_deleted === true;
       await client.query(
-        `INSERT INTO products (id, company_id, name, description, price, quantity, category, sku, vat, image_path, status, is_deleted, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13::timestamptz,NOW()),NOW())
+        `INSERT INTO products (id, company_id, name, description, price, purchase_price, quantity, min_stock, brand, unit, shelf_code, category, sku, vat, image_path, status, is_deleted, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,COALESCE($18::timestamptz,NOW()),NOW())
          ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description,
-           price=EXCLUDED.price, quantity=EXCLUDED.quantity, category=EXCLUDED.category, sku=EXCLUDED.sku,
+           price=EXCLUDED.price, purchase_price=EXCLUDED.purchase_price, quantity=EXCLUDED.quantity,
+           min_stock=EXCLUDED.min_stock, brand=EXCLUDED.brand, unit=EXCLUDED.unit,
+           shelf_code=EXCLUDED.shelf_code, category=EXCLUDED.category, sku=EXCLUDED.sku,
            vat=EXCLUDED.vat, image_path=EXCLUDED.image_path, status=EXCLUDED.status,
            is_deleted=EXCLUDED.is_deleted, deleted_at=CASE WHEN EXCLUDED.is_deleted THEN NOW() ELSE NULL END,
            updated_at=NOW() WHERE products.company_id=EXCLUDED.company_id`,
         [id, companyId, name, stringValue(payload, "description"), numberValue(payload, "price"),
-          numberValue(payload, "quantity"), stringValue(payload, "category", "Genel"),
+          numberValue(payload, "purchase_price"), numberValue(payload, "quantity"),
+          numberValue(payload, "min_stock", 5), stringValue(payload, "brand"),
+          stringValue(payload, "unit", "adet"), stringValue(payload, "shelf_code"),
+          stringValue(payload, "category", "Genel"),
           stringValue(payload, "sku", id), Number.isFinite(Number(payload.vat)) ? Number(payload.vat) : null,
           stringValue(payload, "image_url") || null, deleted ? "inactive" : stringValue(payload, "status", "active"),
           deleted, stringValue(payload, "created_at") || null],
@@ -595,7 +600,9 @@ router.get("/bootstrap", async (req, res) => {
       switch (entityType) {
         case "product":
           return { id: row.id, name: row.name, description: row.description ?? "", price: row.price,
-            quantity: row.quantity, category: row.category ?? "Genel", sku: row.sku ?? row.id, vat: row.vat,
+            purchase_price: row.purchase_price ?? 0, quantity: row.quantity, min_stock: row.min_stock ?? 5,
+            brand: row.brand ?? "", unit: row.unit ?? "adet", shelf_code: row.shelf_code ?? "",
+            category: row.category ?? "Genel", sku: row.sku ?? row.id, vat: row.vat,
             is_active: row.status === "active" && !deleted ? 1 : 0, is_deleted: deleted,
             deleted_at: row.deleted_at, deleted_by: row.deleted_by, created_at: row.created_at,
             updated_at: row.updated_at, image_url: row.image_path ?? "" };

@@ -51,6 +51,34 @@ router.post('/upload', async (req: AuthenticatedRequest, res: Response) => {
         JSON.stringify(metadata), req.ip || null,
         String(req.headers['user-agent'] || 'unknown').slice(0, 500)
       ]);
+
+      if (name === 'audit_event' && typeof metadata.record_hash === 'string') {
+        await client.query(`
+          INSERT INTO audit_logs
+            (id, company_id, user_id, user_name, action, entity_type,
+             entity_id, old_values, new_values, ip_address, user_agent,
+             device_id, previous_hash, record_hash, created_at)
+          VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          ON CONFLICT DO NOTHING
+        `, [
+          String(metadata.id || `audit-${Date.now()}`),
+          user.company_id,
+          user.id,
+          String(user.name || metadata.user_name || 'Kullanıcı').slice(0, 150),
+          String(metadata.event_type || 'unknown').slice(0, 150),
+          String(metadata.entity_type || 'unknown').slice(0, 120),
+          metadata.entity_id ? String(metadata.entity_id).slice(0, 255) : null,
+          metadata.old_value ? JSON.stringify(metadata.old_value) : null,
+          metadata.new_value ? JSON.stringify(metadata.new_value) : null,
+          req.ip || null,
+          String(req.headers['user-agent'] || 'unknown').slice(0, 500),
+          metadata.device_id ? String(metadata.device_id).slice(0, 255) : null,
+          metadata.previous_hash ? String(metadata.previous_hash).slice(0, 64) : null,
+          String(metadata.record_hash).slice(0, 64),
+          occurredAt.toISOString(),
+        ]);
+      }
     }
     await client.query('COMMIT');
     return res.json({ success: true, accepted: metrics.length });

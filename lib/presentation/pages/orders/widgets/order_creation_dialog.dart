@@ -20,6 +20,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart'
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
+import 'package:serenutos/providers/hardware_config_provider.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
@@ -56,6 +57,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   CustomerEntity? _selectedCustomer;
   String _customerQuery = '';
   Timer? _customerSearchDebounce;
+  final _customerSearchController = TextEditingController();
+  final _customerSearchFocusNode = FocusNode();
   final ScrollController _customerScrollController = ScrollController();
   bool _isAddingCustomer = false;
   final _addCustomerFormKey = GlobalKey<FormState>();
@@ -300,6 +303,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     _productScrollController.dispose();
     _customerScrollController.dispose();
     _customerSearchDebounce?.cancel();
+    _customerSearchController.dispose();
+    _customerSearchFocusNode.dispose();
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _newCustNameController.dispose();
     _newCustPhoneController.dispose();

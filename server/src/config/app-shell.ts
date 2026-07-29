@@ -182,8 +182,13 @@ export function filterNavByEntitlements(roles: string[] = [], permissions: strin
 }
 
 export function resolveLandingRoute(roles: string[] = [], permissions: string[] = []) {
-  if (roles.includes('sysadmin')) return '/app/#platform-overview';
-  if (permissions.includes('billing:view')) return '/app/#billing-center';
-  if (permissions.includes('devices:view')) return '/app/#company-dashboard';
-  return '/app/#home';
+  const landingId = resolveLandingModuleId(roles, permissions);
+  return APP_NAV_ITEMS.find((item) => item.id === landingId)?.href || '/app/#home';
+}
+
+export function resolveLandingModuleId(roles: string[] = [], permissions: string[] = []) {
+  if (roles.includes('sysadmin')) return 'platform-overview';
+  if (permissions.includes('billing:view')) return 'billing-center';
+  if (permissions.includes('devices:view')) return 'company-dashboard';
+  return 'workspace-home';
 }

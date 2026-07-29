@@ -1,6 +1,6 @@
 // lib/domain/services/version_checker.dart
-import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/config/environment.dart';
 
@@ -91,7 +91,7 @@ class VersionChecker {
 
   static const int currentSchemaVersion = 36;
 
-  String get _platform => Platform.isAndroid ? 'android' : 'windows';
+  String get _platform => AppPlatform.releaseKey;
 
   /// Check version from backend and decide if a force update is required
   Future<bool> checkForceUpdateRequired() async {

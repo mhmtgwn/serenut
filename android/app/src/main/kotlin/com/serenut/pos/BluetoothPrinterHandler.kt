@@ -12,7 +12,12 @@ import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
+import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
 import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.android.print.sdk.PrinterInstance
 import com.android.print.sdk.PrinterConstants
 import com.android.print.sdk.PrinterConstants.Command
@@ -43,6 +48,34 @@ class BluetoothPrinterHandler(private val context: Context) : MethodChannel.Meth
     private var hasRegDisconnectReceiver = false
     private val filter = IntentFilter()
     private var currentMac: String? = null
+    private var discoveryCallback: MethodChannel.Result? = null
+    private val discoveredDevices = linkedMapOf<String, Map<String, String>>()
+    private var discoveryReceiverRegistered = false
+
+    private val discoveryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(
+                            BluetoothDevice.EXTRA_DEVICE,
+                            BluetoothDevice::class.java
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+                    if (device != null && hasBluetoothConnectPermission()) {
+                        discoveredDevices[device.address] = mapOf(
+                            "name" to (device.name ?: "İsimsiz cihaz"),
+                            "address" to device.address
+                        )
+                    }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> finishDiscovery()
+            }
+        }
+    }
     
     private val handler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
@@ -145,6 +178,16 @@ class BluetoothPrinterHandler(private val context: Context) : MethodChannel.Meth
     
     // Cleanup metodu
     fun cleanup() {
+        bluetoothAdapter?.cancelDiscovery()
+        if (discoveryReceiverRegistered) {
+            try {
+                context.unregisterReceiver(discoveryReceiver)
+            } catch (_: Exception) {
+            }
+            discoveryReceiverRegistered = false
+        }
+        discoveryCallback?.success(discoveredDevices.values.toList())
+        discoveryCallback = null
         try {
             if (hasRegDisconnectReceiver) {
                 context.unregisterReceiver(disconnectReceiver)
@@ -238,9 +281,97 @@ class BluetoothPrinterHandler(private val context: Context) : MethodChannel.Meth
     }
     
     private fun scanDevices(result: MethodChannel.Result) {
-        // Scanning requires runtime permissions and is complex
-        // For now, just return paired devices
-        getPairedDevices(result)
+        val adapter = bluetoothAdapter
+        if (adapter == null || !adapter.isEnabled) {
+            result.error("BLUETOOTH_DISABLED", "Bluetooth açık değil.", null)
+            return
+        }
+        if (!hasBluetoothPermissions()) {
+            val activity = context as? Activity
+            if (activity != null) {
+                val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+                } else {
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+                ActivityCompat.requestPermissions(activity, permissions, 4102)
+            }
+            result.error(
+                "BLUETOOTH_PERMISSION_REQUIRED",
+                "Bluetooth cihazlarını bulmak için izin verip tekrar deneyin.",
+                null
+            )
+            return
+        }
+        if (discoveryCallback != null) {
+            result.error("SCAN_IN_PROGRESS", "Bluetooth taraması zaten devam ediyor.", null)
+            return
+        }
+
+        discoveredDevices.clear()
+        adapter.bondedDevices?.forEach { device ->
+            discoveredDevices[device.address] = mapOf(
+                "name" to (device.name ?: "İsimsiz cihaz"),
+                "address" to device.address
+            )
+        }
+        discoveryCallback = result
+        val discoveryFilter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+        ContextCompat.registerReceiver(
+            context,
+            discoveryReceiver,
+            discoveryFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        discoveryReceiverRegistered = true
+        adapter.cancelDiscovery()
+        if (!adapter.startDiscovery()) {
+            finishDiscovery()
+            return
+        }
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (discoveryCallback != null) {
+                adapter.cancelDiscovery()
+                finishDiscovery()
+            }
+        }, 12000)
+    }
+
+    private fun hasBluetoothConnectPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasBluetoothPermissions(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_SCAN
+            ) == PackageManager.PERMISSION_GRANTED && hasBluetoothConnectPermission()
+        } else {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun finishDiscovery() {
+        if (discoveryReceiverRegistered) {
+            try {
+                context.unregisterReceiver(discoveryReceiver)
+            } catch (_: Exception) {
+            }
+            discoveryReceiverRegistered = false
+        }
+        discoveryCallback?.success(discoveredDevices.values.toList())
+        discoveryCallback = null
     }
     
     private fun connectToDevice(address: String, result: MethodChannel.Result) {

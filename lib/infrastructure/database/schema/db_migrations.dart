@@ -742,6 +742,63 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 41) {
+          final columns = (await txn.rawQuery('PRAGMA table_info(products)'))
+              .map((row) => row['name']?.toString())
+              .toSet();
+          if (!columns.contains('purchase_price')) {
+            await txn.execute(
+                'ALTER TABLE products ADD COLUMN purchase_price REAL NOT NULL DEFAULT 0');
+          }
+          if (!columns.contains('min_stock')) {
+            await txn.execute(
+                'ALTER TABLE products ADD COLUMN min_stock INTEGER NOT NULL DEFAULT 5');
+          }
+          await txn.insert('app_migration_history', {
+            'version': 41,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 42) {
+          final columns = (await txn.rawQuery('PRAGMA table_info(audit_events)'))
+              .map((row) => row['name']?.toString())
+              .toSet();
+          if (!columns.contains('previous_hash')) {
+            await txn.execute('ALTER TABLE audit_events ADD COLUMN previous_hash TEXT');
+          }
+          if (!columns.contains('record_hash')) {
+            await txn.execute('ALTER TABLE audit_events ADD COLUMN record_hash TEXT');
+          }
+          await txn.execute(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_events_record_hash ON audit_events(record_hash) WHERE record_hash IS NOT NULL');
+          await txn.insert('app_migration_history', {
+            'version': 42,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 43) {
+          final columns = (await txn.rawQuery('PRAGMA table_info(products)'))
+              .map((row) => row['name']?.toString())
+              .toSet();
+          const additions = <String, String>{
+            'brand': "TEXT NOT NULL DEFAULT ''",
+            'unit': "TEXT NOT NULL DEFAULT 'adet'",
+            'shelf_code': "TEXT NOT NULL DEFAULT ''",
+          };
+          for (final addition in additions.entries) {
+            if (!columns.contains(addition.key)) {
+              await txn.execute(
+                  'ALTER TABLE products ADD COLUMN ${addition.key} ${addition.value}');
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 43,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

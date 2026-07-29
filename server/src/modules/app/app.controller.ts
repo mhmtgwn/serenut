@@ -1,7 +1,11 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest, requirePortalAccess } from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
-import { filterNavByEntitlements, resolveLandingRoute } from '../../config/app-shell';
+import {
+  filterNavByEntitlements,
+  resolveLandingModuleId,
+  resolveLandingRoute,
+} from '../../config/app-shell';
 
 const router = Router();
 
@@ -34,6 +38,7 @@ router.get('/bootstrap', async (req: AuthenticatedRequest, res: Response) => {
       },
       company,
       navigation: filterNavByEntitlements(roles, permissions),
+      landing_module_id: resolveLandingModuleId(roles, permissions),
       landing_route: resolveLandingRoute(roles, permissions),
       workspaces: {
         platform: roles.includes('sysadmin'),

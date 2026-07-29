@@ -1210,6 +1210,47 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);
   }
 
+  @override
+  Future<void> printShelfLabels(
+    List<ProductEntity> products,
+    Settings settings, {
+    int copies = 1,
+  }) async {
+    if (products.isEmpty) return;
+    final targetSettings =
+        _getSettingsForPurpose(settings, PrinterPurpose.label);
+    if (!_hasPrinter(targetSettings)) {
+      throw StateError('Etiket yazıcısı tanımlı değil.');
+    }
+    final width = targetSettings.paperWidth <= 58 ? 32 : 48;
+    final logo = settings.printLogo
+        ? await _getLogoBytes(settings.businessLogo,
+            maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360)
+        : <int>[];
+    final bytes = <int>[];
+    for (final product in products) {
+      for (var copy = 0; copy < copies.clamp(1, 20); copy++) {
+        bytes.addAll(LabelLayoutEngine.generateLabelBytes(
+          LabelModel(
+            productName: product.name,
+            brand: product.brand,
+            unit: product.unit,
+            shelfCode: product.shelfCode,
+            businessName: settings.businessName,
+            weight: 1,
+            price: product.price,
+            barcode: product.id,
+            qrData: 'product|${product.id}',
+            timestamp: DateTime.now(),
+          ),
+          width: width,
+          logoBytes: logo,
+        ));
+      }
+    }
+    await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
+  }
+
   String _formatQty(double qty) {
     if (qty == qty.toInt()) {
       return qty.toInt().toString();

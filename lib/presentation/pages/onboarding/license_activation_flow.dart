@@ -4,11 +4,11 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/config/theme.dart';
 
@@ -57,9 +57,7 @@ class _LicenseActivationFlowState extends ConsumerState<LicenseActivationFlow> {
       final fingerprint = await fingerprintService.getFingerprint();
 
       // Get device name fallback
-      final deviceName = Platform.isAndroid
-          ? 'Android POS'
-          : (Platform.isWindows ? 'Windows POS' : 'POS Cihazı');
+      final deviceName = AppPlatform.deviceLabel;
 
       final response = await apiClient.send(
         'POST',

@@ -11,7 +11,6 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 
-
 class ProductsController extends AsyncNotifier<List<ProductEntity>> {
   late IProductRepository _repository;
   PaginationService<ProductEntity>? _paginationService;
@@ -91,6 +90,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
+      ref.invalidate(productInventorySummaryProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
@@ -155,6 +155,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
+      ref.invalidate(productInventorySummaryProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
@@ -187,6 +188,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       await _paginationService?.refresh();
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
+      ref.invalidate(productInventorySummaryProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
@@ -197,6 +199,7 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     state = await AsyncValue.guard(() async {
       await _loadCategories();
       await _paginationService?.refresh();
+      ref.invalidate(productInventorySummaryProvider);
       return _paginationService?.items ?? [];
     });
   }
@@ -209,15 +212,52 @@ final productsControllerProvider =
 
 // Search and Category Filter Providers
 final productSearchQueryProvider = StateProvider<String>((ref) => '');
+
+class ProductInventorySummary {
+  const ProductInventorySummary({
+    required this.productCount,
+    required this.totalQuantity,
+    required this.stockValue,
+    required this.criticalCount,
+  });
+
+  final int productCount;
+  final int totalQuantity;
+  final double stockValue;
+  final int criticalCount;
+}
+
+final productInventorySummaryProvider =
+    FutureProvider<ProductInventorySummary>((ref) async {
+  final repository = await ref.watch(productRepositoryProvider.future);
+  final products = await repository.findAll();
+  return ProductInventorySummary(
+    productCount: products.length,
+    totalQuantity: products.fold(0, (sum, item) => sum + item.quantity),
+    stockValue: products.fold(
+      0,
+      (sum, item) =>
+          sum +
+          ((item.purchasePrice > 0 ? item.purchasePrice : item.price) *
+              item.quantity),
+    ),
+    criticalCount:
+        products.where((item) => item.quantity <= item.minStock).length,
+  );
+});
 final productCategoryFilterProvider = StateProvider<String?>((ref) => null);
 
 final salesProductSearchQueryProvider = StateProvider<String>((ref) => '');
 final salesProductCategoryFilterProvider =
     StateProvider<String?>((ref) => null);
+final salesProductStockFilterProvider = StateProvider<String?>((ref) => null);
+final salesProductSortProvider = StateProvider<String?>((ref) => null);
 
 final ordersProductSearchQueryProvider = StateProvider<String>((ref) => '');
 final ordersProductCategoryFilterProvider =
     StateProvider<String?>((ref) => null);
+final ordersProductStockFilterProvider = StateProvider<String?>((ref) => null);
+final ordersProductSortProvider = StateProvider<String?>((ref) => null);
 
 final productPageProvider = StateProvider<int>((ref) => 1);
 
@@ -287,12 +327,16 @@ class SalesProductsController extends ProductsController {
 
     final searchQuery = ref.watch(salesProductSearchQueryProvider);
     final selectedCategory = ref.watch(salesProductCategoryFilterProvider);
+    final stockFilter = ref.watch(salesProductStockFilterProvider);
+    final sortBy = ref.watch(salesProductSortProvider);
 
     _paginationService = PaginationService<ProductEntity>(
       dataLoader: (offset, limit, query) async {
         return _repository.findFiltered(
           searchQuery: query,
           category: selectedCategory,
+          stockFilter: stockFilter,
+          sortBy: sortBy,
           offset: offset,
           limit: limit,
         );
@@ -319,12 +363,16 @@ class OrdersProductsController extends ProductsController {
 
     final searchQuery = ref.watch(ordersProductSearchQueryProvider);
     final selectedCategory = ref.watch(ordersProductCategoryFilterProvider);
+    final stockFilter = ref.watch(ordersProductStockFilterProvider);
+    final sortBy = ref.watch(ordersProductSortProvider);
 
     _paginationService = PaginationService<ProductEntity>(
       dataLoader: (offset, limit, query) async {
         return _repository.findFiltered(
           searchQuery: query,
           category: selectedCategory,
+          stockFilter: stockFilter,
+          sortBy: sortBy,
           offset: offset,
           limit: limit,
         );

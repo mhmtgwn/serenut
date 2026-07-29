@@ -2,6 +2,7 @@
 // Serenut Platform — Extensible Policy Engine for Update Decisions
 
 import 'dart:io';
+import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/domain/models/update_v2/release_manifest.dart';
 
 abstract class ProcessRunner {
@@ -26,7 +27,8 @@ class PolicyEvaluationResult {
     this.reason,
   });
 
-  factory PolicyEvaluationResult.pass() => PolicyEvaluationResult(isPassed: true);
+  factory PolicyEvaluationResult.pass() =>
+      PolicyEvaluationResult(isPassed: true);
 
   factory PolicyEvaluationResult.fail(String code, String reason) =>
       PolicyEvaluationResult(isPassed: false, errorCode: code, reason: reason);
@@ -47,7 +49,7 @@ class DefaultPolicyEngine implements PolicyEngine {
     ProcessRunner? processRunner,
     String? platformOverride,
   })  : _processRunner = processRunner ?? RealProcessRunner(),
-        _currentPlatform = platformOverride ?? (Platform.isAndroid ? 'android' : 'windows');
+        _currentPlatform = platformOverride ?? AppPlatform.releaseKey;
 
   @override
   Future<PolicyEvaluationResult> evaluate({
@@ -73,7 +75,8 @@ class DefaultPolicyEngine implements PolicyEngine {
 
       // Check RAM Capacity (Min requirements evaluation, e.g. rules.minRamMb)
       try {
-        final res = await _processRunner.run('wmic', ['computersystem', 'get', 'TotalPhysicalMemory']);
+        final res = await _processRunner
+            .run('wmic', ['computersystem', 'get', 'TotalPhysicalMemory']);
         if (res.exitCode == 0) {
           final lines = res.stdout.toString().split('\n');
           if (lines.length > 1) {
@@ -93,7 +96,8 @@ class DefaultPolicyEngine implements PolicyEngine {
 
       // Check Disk Space (Min requirements evaluation, e.g. rules.minFreeDiskMb)
       try {
-        final res = await _processRunner.run('powershell', ['-Command', '(Get-Volume -DriveLetter C).SizeRemaining']);
+        final res = await _processRunner.run('powershell',
+            ['-Command', '(Get-Volume -DriveLetter C).SizeRemaining']);
         if (res.exitCode == 0) {
           final bytes = int.tryParse(res.stdout.toString().trim()) ?? 0;
           final double freeMb = bytes / (1024 * 1024);

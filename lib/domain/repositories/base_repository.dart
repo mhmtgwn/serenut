@@ -68,6 +68,8 @@ abstract class IProductRepository implements BaseRepository<ProductEntity> {
   Future<List<ProductEntity>> findFiltered({
     String? searchQuery,
     String? category,
+    String? stockFilter,
+    String? sortBy,
     int? limit,
     int? offset,
   });
@@ -142,6 +144,8 @@ abstract class ISaleRepository implements BaseRepository<SaleEntity> {
   /// [limit] / [offset] control the page window.
   Future<List<SaleEntity>> findFiltered({
     String? searchQuery,
+    String? paymentMethod,
+    String? status,
     int limit = 25,
     int offset = 0,
   });
@@ -221,7 +225,12 @@ class ProductEntity {
   final String name;
   final String description;
   final double price;
+  final double purchasePrice;
   final int quantity;
+  final int minStock;
+  final String brand;
+  final String unit;
+  final String shelfCode;
   final String category;
   final int? vat; // VAT percentage
   final String? imageUrl;
@@ -233,7 +242,12 @@ class ProductEntity {
     required this.name,
     required this.description,
     required this.price,
+    this.purchasePrice = 0,
     required this.quantity,
+    this.minStock = 5,
+    this.brand = '',
+    this.unit = 'adet',
+    this.shelfCode = '',
     required this.category,
     this.vat,
     this.imageUrl,
@@ -243,12 +257,53 @@ class ProductEntity {
 
   bool get isWeighed => saleType == 'weighed';
 
+  ProductEntity copyWith({
+    String? id,
+    String? name,
+    String? description,
+    double? price,
+    double? purchasePrice,
+    int? quantity,
+    int? minStock,
+    String? brand,
+    String? unit,
+    String? shelfCode,
+    String? category,
+    int? vat,
+    String? imageUrl,
+    String? saleType,
+    int? minimumWeightGrams,
+  }) {
+    return ProductEntity(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      purchasePrice: purchasePrice ?? this.purchasePrice,
+      quantity: quantity ?? this.quantity,
+      minStock: minStock ?? this.minStock,
+      brand: brand ?? this.brand,
+      unit: unit ?? this.unit,
+      shelfCode: shelfCode ?? this.shelfCode,
+      category: category ?? this.category,
+      vat: vat ?? this.vat,
+      imageUrl: imageUrl ?? this.imageUrl,
+      saleType: saleType ?? this.saleType,
+      minimumWeightGrams: minimumWeightGrams ?? this.minimumWeightGrams,
+    );
+  }
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'name': name,
         'description': description,
         'price': price,
+        'purchase_price': purchasePrice,
         'quantity': quantity,
+        'min_stock': minStock,
+        'brand': brand,
+        'unit': unit,
+        'shelf_code': shelfCode,
         'category': category,
         'vat': vat,
         'image_url': imageUrl,
@@ -263,9 +318,19 @@ class ProductEntity {
         price: (map['price'] is num)
             ? (map['price'] as num).toDouble()
             : (double.tryParse((map['price'] ?? '0').toString()) ?? 0.0),
+        purchasePrice: (map['purchase_price'] is num)
+            ? (map['purchase_price'] as num).toDouble()
+            : (double.tryParse((map['purchase_price'] ?? '0').toString()) ??
+                0.0),
         quantity: (map['quantity'] is num)
             ? (map['quantity'] as num).toInt()
             : (int.tryParse((map['quantity'] ?? '0').toString()) ?? 0),
+        minStock: (map['min_stock'] is num)
+            ? (map['min_stock'] as num).toInt()
+            : (int.tryParse((map['min_stock'] ?? '5').toString()) ?? 5),
+        brand: (map['brand'] ?? '').toString(),
+        unit: (map['unit'] ?? 'adet').toString(),
+        shelfCode: (map['shelf_code'] ?? '').toString(),
         category: (map['category'] ?? 'Genel').toString(),
         vat: map['vat'] != null
             ? ((map['vat'] is num)
@@ -449,11 +514,9 @@ class FinancialTransactionEntity {
         debtAmount: (map['debt_amount'] is num)
             ? (map['debt_amount'] as num).toDouble()
             : (double.tryParse((map['debt_amount'] ?? '0').toString()) ?? 0.0),
-        date: DateTime.tryParse((map['created_at'] ??
-                    map['date'] ??
-                    map['occurred_at'] ??
-                    '')
-                .toString()) ??
+        date: DateTime.tryParse(
+                (map['created_at'] ?? map['date'] ?? map['occurred_at'] ?? '')
+                    .toString()) ??
             DateTime.now(),
         referenceId: map['reference_id']?.toString(),
         metadata: map['metadata'] is String

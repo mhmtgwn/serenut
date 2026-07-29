@@ -220,6 +220,8 @@ class InMemoryProductRepository implements IProductRepository {
   Future<List<ProductEntity>> findFiltered({
     String? searchQuery,
     String? category,
+    String? stockFilter,
+    String? sortBy,
     int? limit,
     int? offset,
   }) async {
@@ -233,7 +235,19 @@ class InMemoryProductRepository implements IProductRepository {
           p.name.toLowerCase().contains(q) ||
           p.description.toLowerCase().contains(q));
     }
+    if (stockFilter == 'in_stock') {
+      results = results.where((p) => p.quantity > 0);
+    } else if (stockFilter == 'critical') {
+      results = results.where((p) => p.quantity <= p.minStock);
+    }
     var list = results.toList();
+    if (sortBy == 'price_asc') {
+      list.sort((a, b) => a.price.compareTo(b.price));
+    } else if (sortBy == 'price_desc') {
+      list.sort((a, b) => b.price.compareTo(a.price));
+    } else {
+      list.sort((a, b) => a.name.compareTo(b.name));
+    }
     if (offset != null) {
       if (offset < list.length) {
         list = list.sublist(offset);
@@ -438,6 +452,8 @@ class InMemorySaleRepository implements ISaleRepository {
   @override
   Future<List<SaleEntity>> findFiltered({
     String? searchQuery,
+    String? paymentMethod,
+    String? status,
     int limit = 25,
     int offset = 0,
   }) async {
@@ -446,6 +462,14 @@ class InMemorySaleRepository implements ISaleRepository {
             searchQuery == null ||
             searchQuery.isEmpty ||
             s.id.toLowerCase().contains(searchQuery.toLowerCase()))
+        .where((s) =>
+            paymentMethod == null ||
+            paymentMethod.isEmpty ||
+            s.paymentMethod.toLowerCase() == paymentMethod.toLowerCase())
+        .where((s) =>
+            status == null ||
+            status.isEmpty ||
+            s.status.toLowerCase() == status.toLowerCase())
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     if (offset >= list.length) return [];

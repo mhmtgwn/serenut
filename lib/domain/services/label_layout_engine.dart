@@ -16,16 +16,32 @@ class LabelLayoutEngine {
   static const List<int> cut = [0x1D, 0x56, 0x41, 0x08];
 
   /// Generate ESC/POS bytes for a single label
-  static List<int> generateLabelBytes(LabelModel model, {int width = 32}) {
+  static List<int> generateLabelBytes(LabelModel model,
+      {int width = 32, List<int> logoBytes = const []}) {
     final List<int> bytes = [];
 
     bytes.addAll(init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
     bytes.addAll([0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish)
 
+    if (logoBytes.isNotEmpty) {
+      bytes.addAll(alignCenter);
+      bytes.addAll(logoBytes);
+      bytes.addAll(lf);
+    }
+    if (model.businessName?.trim().isNotEmpty == true) {
+      bytes.addAll(alignCenter);
+      bytes.addAll(boldOn);
+      bytes.addAll(_textToBytes('${model.businessName}\n'));
+      bytes.addAll(boldOff);
+    }
+
     bytes.addAll(alignCenter);
     bytes.addAll(boldOn);
     bytes.addAll(sizeLarge);
+    if (model.brand?.trim().isNotEmpty == true) {
+      bytes.addAll(_textToBytes('${model.brand}\n'));
+    }
     bytes.addAll(_textToBytes('${model.productName}\n'));
     bytes.addAll(sizeNormal);
     bytes.addAll(boldOff);
@@ -34,8 +50,15 @@ class LabelLayoutEngine {
 
     // Align Left for details
     bytes.addAll(alignLeft);
-    bytes.addAll(_textToBytes('Miktar: ${_formatQty(model.weight)}\n'));
-    bytes.addAll(_textToBytes('Fiyat: ₺${model.price.toStringAsFixed(2)}\n'));
+    bytes.addAll(_textToBytes('Birim: ${model.unit}\n'));
+    bytes.addAll(boldOn);
+    bytes.addAll(sizeLarge);
+    bytes.addAll(_textToBytes('₺${model.price.toStringAsFixed(2)}\n'));
+    bytes.addAll(sizeNormal);
+    bytes.addAll(boldOff);
+    if (model.shelfCode?.trim().isNotEmpty == true) {
+      bytes.addAll(_textToBytes('Raf: ${model.shelfCode}\n'));
+    }
     bytes.addAll(_textToBytes(
         'Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(model.timestamp)}\n'));
 

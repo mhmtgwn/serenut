@@ -15,6 +15,7 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/widgets/product_image.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -144,6 +145,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     final hasMore = ref.watch(productsControllerProvider.notifier).hasMoreData;
     final categoriesVal = ref.watch(productCategoriesProvider);
     final selectedCategory = ref.watch(productCategoryFilterProvider);
+    final inventorySummary = ref.watch(productInventorySummaryProvider);
 
     return PosPageLayout(
       title: 'Ürünler',
@@ -208,180 +210,160 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
 
           return Column(
             children: [
-              _buildSummaryBar(products),
+              _buildSummaryBar(inventorySummary, products),
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: products.length + (hasMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == products.length) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation(_kGreen),
+                child: RefreshIndicator(
+                  onRefresh: () =>
+                      ref.read(productsControllerProvider.notifier).refresh(),
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: products.length + (hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == products.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation(_kGreen),
+                            ),
                           ),
-                        ),
-                      );
-                    }
-                    final product = products[index];
-                    final isLowStock = product.quantity <= 5;
-                    final isOutOfStock = product.quantity <= 0;
+                        );
+                      }
+                      final product = products[index];
+                      final isLowStock = product.quantity <= product.minStock;
+                      final isOutOfStock = product.quantity <= 0;
 
-                    final stockColor = isOutOfStock
-                        ? _kRed
-                        : (isLowStock ? Colors.orange[700]! : _kGreen);
-                    final stockBg = isOutOfStock
-                        ? _kRedLight
-                        : (isLowStock ? _kAmberLight : _kGreenLight);
-                    final stockText = isOutOfStock
-                        ? 'Tükendi'
-                        : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
+                      final stockColor = isOutOfStock
+                          ? _kRed
+                          : (isLowStock ? Colors.orange[700]! : _kGreen);
+                      final stockBg = isOutOfStock
+                          ? _kRedLight
+                          : (isLowStock ? _kAmberLight : _kGreenLight);
+                      final stockText = isOutOfStock
+                          ? 'Tükendi'
+                          : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _kBorder),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () => context.push(
-                              '/products/edit/${product.id}',
-                              extra: product),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                            child: Row(
-                              children: [
-                                // Sol: Ürün görseli/kategori ikonu çerçevesi (Premium square design)
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: stockBg,
+                          border: Border.all(color: _kBorder),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => context.push(
+                                '/products/edit/${product.id}',
+                                extra: product),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              child: Row(
+                                children: [
+                                  // Sol: Ürün görseli/kategori ikonu çerçevesi (Premium square design)
+                                  ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color:
-                                            stockColor.withValues(alpha: 0.15)),
+                                    child: ProductImage(
+                                      imageUrl: product.imageUrl,
+                                      barcode: product.id,
+                                      size: 48,
+                                    ),
                                   ),
-                                  child: Icon(
-                                    _getCategoryIcon(product.category),
-                                    color: stockColor,
-                                    size: 22,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
+                                  const SizedBox(width: 12),
 
-                                // Orta Kısım: Ürün Adı, Açıklama, Kategori Tagı ve ID
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                          color: _kText,
+                                  // Orta Kısım: Ürün Adı, Açıklama, Kategori Tagı ve ID
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          product.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: _kText,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        product.description.isEmpty
-                                            ? 'Açıklama girilmemiş'
-                                            : product.description,
-                                        style: const TextStyle(
-                                            color: _kTextSecondary,
-                                            fontSize: 11),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          product.brand.isNotEmpty
+                                              ? product.brand
+                                              : product.category,
+                                          style: const TextStyle(
+                                              color: _kTextSecondary,
+                                              fontSize: 11),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        if (product.brand.isNotEmpty)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 5, vertical: 1.5),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF1F5F9),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border:
-                                                  Border.all(color: _kBorder),
-                                            ),
-                                            child: Text(
-                                              product.category,
-                                              style: const TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: _kTextSecondary,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF1F5F9),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border:
+                                                    Border.all(color: _kBorder),
+                                              ),
+                                              child: Text(
+                                                product.category,
+                                                style: const TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _kTextSecondary,
+                                                ),
                                               ),
                                             ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Sağ Kısım: Satış Fiyatı ve Stok Miktarı
+                                  SizedBox(
+                                    width: 88,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: _kGreenLight,
+                                            borderRadius:
+                                                BorderRadius.circular(6),
                                           ),
-                                          const SizedBox(width: 6),
-                                          const Icon(
-                                              Icons.qr_code_scanner_rounded,
-                                              size: 10,
-                                              color: _kTextSecondary),
-                                          const SizedBox(width: 2),
-                                          Expanded(
-                                            child: Text(
-                                              product.id,
-                                              style: const TextStyle(
-                                                  color: _kTextSecondary,
-                                                  fontSize: 9,
-                                                  fontFamily: 'monospace'),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                          child: Text(
+                                            '₺${product.price.toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 13,
+                                              color: _kGreenDark,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-
-                                // Sağ Kısım: Satış Fiyatı ve Stok Miktarı
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _kGreenLight,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        '₺${product.price.toStringAsFixed(2)}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 13,
-                                          color: _kGreenDark,
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
+                                        const SizedBox(height: 4),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 4, vertical: 1.5),
@@ -399,39 +381,29 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(width: 4),
+                                        const SizedBox(height: 3),
                                         Text(
-                                          '${product.quantity} Adet',
+                                          '${product.quantity} ${product.unit}',
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
                                             color:
                                                 isOutOfStock ? _kRed : _kText,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(width: 8),
-
-                                // Silme Aksiyonu (Compact delete button, no redundant chevron)
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline_rounded,
-                                      color: _kRed, size: 18),
-                                  onPressed: () =>
-                                      _confirmDelete(context, product),
-                                  constraints: const BoxConstraints(),
-                                  padding: const EdgeInsets.all(6),
-                                  tooltip: 'Sil',
-                                ),
-                              ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],
@@ -450,13 +422,23 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     );
   }
 
-  Widget _buildSummaryBar(List<ProductEntity> products) {
-    final totalStockValue =
-        products.fold<double>(0.0, (sum, p) => sum + (p.price * p.quantity));
-    final totalStockQuantity =
-        products.fold<int>(0, (sum, p) => sum + p.quantity);
-    final criticalStockCount = products.where((p) => p.quantity <= 5).length;
-
+  Widget _buildSummaryBar(
+    AsyncValue<ProductInventorySummary> summaryValue,
+    List<ProductEntity> visibleProducts,
+  ) {
+    final summary = summaryValue.valueOrNull;
+    final productCount = summary?.productCount ?? visibleProducts.length;
+    final totalStockQuantity = summary?.totalQuantity ??
+        visibleProducts.fold<int>(0, (sum, p) => sum + p.quantity);
+    final totalStockValue = summary?.stockValue ??
+        visibleProducts.fold<double>(
+          0,
+          (sum, p) =>
+              sum +
+              ((p.purchasePrice > 0 ? p.purchasePrice : p.price) * p.quantity),
+        );
+    final criticalStockCount = summary?.criticalCount ??
+        visibleProducts.where((p) => p.quantity <= p.minStock).length;
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -465,7 +447,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           Expanded(
             child: _SummaryChip(
               label: 'Toplam Envanter',
-              value: '${products.length} Çeşit',
+              value: '$productCount Çeşit',
               count: '$totalStockQuantity Adet',
               color: _kGreenDark,
               bg: _kGreenLight,

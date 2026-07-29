@@ -9,237 +9,263 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
 
     final customersVal = ref.watch(ordersCustomersControllerProvider);
 
-    return customersVal.when(
-      loading: () => const Center(
-          child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(_kGreen))),
-      error: (err, _) => Center(
-          child: Text('Müşteriler yüklenemedi: $err',
-              style: const TextStyle(color: _kRed))),
-      data: (customersList) {
-        final filtered = customersList;
-
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Search and add button row
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final bool isWide = constraints.maxWidth >= 500;
-                  final searchField = TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Müşteri ara (isim veya telefon)...',
-                      prefixIcon: const Icon(Icons.search_rounded,
-                          color: _kTextSecondary),
-                      suffixIcon: _customerQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 18),
-                              onPressed: () {
-                                updateState(() => _customerQuery = '');
-                                ref
-                                    .read(ordersCustomerSearchQueryProvider
-                                        .notifier)
-                                    .state = '';
-                                ref.invalidate(
-                                    ordersCustomersControllerProvider);
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                    ),
-                    onChanged: (val) {
-                      updateState(() => _customerQuery = val);
-                      if (_customerSearchDebounce?.isActive ?? false) {
-                        _customerSearchDebounce!.cancel();
-                      }
-                      _customerSearchDebounce =
-                          Timer(const Duration(milliseconds: 300), () {
-                        ref
-                            .read(ordersCustomerSearchQueryProvider.notifier)
-                            .state = val;
-                        ref.invalidate(ordersCustomersControllerProvider);
-                      });
-                    },
-                  );
-
-                  final addBtn = ElevatedButton.icon(
-                    onPressed: () => updateState(() {
-                      _isAddingCustomer = true;
-                      _newCustNameController.text = _customerQuery;
-                      _newCustPhoneController.clear();
-                    }),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kGreenLight,
-                      foregroundColor: _kGreenDark,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: _kGreen.withValues(alpha: 0.3)),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                    ),
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                    label: const Text('Yeni Müşteri Ekle',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                  );
-
-                  if (isWide) {
-                    return Row(
-                      children: [
-                        Expanded(child: searchField),
-                        const SizedBox(width: 12),
-                        addBtn,
-                      ],
-                    );
-                  } else {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        searchField,
-                        const SizedBox(height: 10),
-                        addBtn,
-                      ],
-                    );
+    final filtered = customersVal.valueOrNull ?? const <CustomerEntity>[];
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Search and add button row
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final bool isWide = constraints.maxWidth >= 500;
+              final searchField = TextField(
+                controller: _customerSearchController,
+                focusNode: _customerSearchFocusNode,
+                decoration: InputDecoration(
+                  hintText: 'Müşteri ara (isim veya telefon)...',
+                  prefixIcon:
+                      const Icon(Icons.search_rounded, color: _kTextSecondary),
+                  suffixIcon: _customerQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _customerSearchController.clear();
+                            updateState(() => _customerQuery = '');
+                            ref
+                                .read(
+                                    ordersCustomerSearchQueryProvider.notifier)
+                                .state = '';
+                            _customerSearchFocusNode.requestFocus();
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onChanged: (val) {
+                  updateState(() => _customerQuery = val);
+                  if (_customerSearchDebounce?.isActive ?? false) {
+                    _customerSearchDebounce!.cancel();
                   }
+                  _customerSearchDebounce =
+                      Timer(const Duration(milliseconds: 300), () {
+                    ref.read(ordersCustomerSearchQueryProvider.notifier).state =
+                        val;
+                  });
                 },
-              ),
-              const SizedBox(height: 16),
-              // Customer List
-              Expanded(
-                child: filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.people_outline_rounded,
-                                size: 64, color: Colors.grey[300]),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Aradığınız müşteri bulunamadı.',
-                              style: TextStyle(
-                                  color: _kTextSecondary, fontSize: 14),
-                            ),
-                          ],
+              );
+
+              final addBtn = ElevatedButton.icon(
+                onPressed: () => updateState(() {
+                  _isAddingCustomer = true;
+                  _newCustNameController.text = _customerQuery;
+                  _newCustPhoneController.clear();
+                }),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kGreenLight,
+                  foregroundColor: _kGreenDark,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: _kGreen.withValues(alpha: 0.3)),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                label: const Text('Yeni Müşteri Ekle',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              );
+
+              if (isWide) {
+                return Row(
+                  children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 12),
+                    addBtn,
+                  ],
+                );
+              } else {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    searchField,
+                    const SizedBox(height: 10),
+                    addBtn,
+                  ],
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          // Customer List
+          Expanded(
+            child: customersVal.hasError && filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      'Müşteriler yüklenemedi: ${customersVal.error}',
+                      style: const TextStyle(color: _kRed),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : customersVal.isLoading && filtered.isEmpty
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(_kGreen),
                         ),
                       )
-                    : ListView.builder(
-                        controller: _customerScrollController,
-                        itemCount: filtered.length +
-                            (ref
-                                    .read(ordersCustomersControllerProvider
-                                        .notifier)
-                                    .isLoadingMore
-                                ? 1
-                                : 0),
-                        itemBuilder: (context, idx) {
-                          if (idx == filtered.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                    : filtered.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.people_outline_rounded,
+                                    size: 64, color: Colors.grey[300]),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Aradığınız müşteri bulunamadı.',
+                                  style: TextStyle(
+                                      color: _kTextSecondary, fontSize: 14),
                                 ),
-                              ),
-                            );
-                          }
-                          final c = filtered[idx];
-                          final isSel = _selectedCustomer?.id == c.id;
-                          final isDebt = c.balance < 0;
+                              ],
+                            ),
+                          )
+                        : Stack(
+                            children: [
+                              ListView.builder(
+                                controller: _customerScrollController,
+                                itemCount: filtered.length +
+                                    (ref
+                                            .read(
+                                                ordersCustomersControllerProvider
+                                                    .notifier)
+                                            .isLoadingMore
+                                        ? 1
+                                        : 0),
+                                itemBuilder: (context, idx) {
+                                  if (idx == filtered.length) {
+                                    return const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 16),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation(_kGreen),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final c = filtered[idx];
+                                  final isSel = _selectedCustomer?.id == c.id;
+                                  final isDebt = c.balance < 0;
 
-                          return GestureDetector(
-                            onTap: () =>
-                                updateState(() => _selectedCustomer = c),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: isSel
-                                    ? _kGreen.withValues(alpha: 0.05)
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSel ? _kGreen : _kBorder,
-                                  width: 1.5,
-                                ),
-                                boxShadow: isSel
-                                    ? [
-                                        BoxShadow(
-                                            color:
-                                                _kGreen.withValues(alpha: 0.08),
-                                            blurRadius: 6)
-                                      ]
-                                    : null,
-                              ),
-                              child: ListTile(
-                                dense: true,
-                                leading: CircleAvatar(
-                                  backgroundColor: isSel
-                                      ? _kGreen
-                                      : (isDebt ? _kRedLight : _kGreenLight),
-                                  foregroundColor: isSel
-                                      ? Colors.white
-                                      : (isDebt ? _kRed : _kGreenDark),
-                                  child: Text(
-                                    c.name.isNotEmpty
-                                        ? c.name[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13),
-                                  ),
-                                ),
-                                title: Text(
-                                  c.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: _kText,
-                                      fontSize: 13),
-                                ),
-                                subtitle: Text(
-                                  c.phone.isNotEmpty ? c.phone : 'Telefon Yok',
-                                  style: const TextStyle(
-                                      color: _kTextSecondary, fontSize: 11),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '₺${c.balance.abs().toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 12,
-                                        color: isDebt ? _kRed : _kGreenDark,
+                                  return GestureDetector(
+                                    onTap: () => updateState(
+                                        () => _selectedCustomer = c),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 150),
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSel
+                                            ? _kGreen.withValues(alpha: 0.05)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSel ? _kGreen : _kBorder,
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: isSel
+                                            ? [
+                                                BoxShadow(
+                                                    color: _kGreen.withValues(
+                                                        alpha: 0.08),
+                                                    blurRadius: 6)
+                                              ]
+                                            : null,
+                                      ),
+                                      child: ListTile(
+                                        dense: true,
+                                        leading: CircleAvatar(
+                                          backgroundColor: isSel
+                                              ? _kGreen
+                                              : (isDebt
+                                                  ? _kRedLight
+                                                  : _kGreenLight),
+                                          foregroundColor: isSel
+                                              ? Colors.white
+                                              : (isDebt ? _kRed : _kGreenDark),
+                                          child: Text(
+                                            c.name.isNotEmpty
+                                                ? c.name[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13),
+                                          ),
+                                        ),
+                                        title: Text(
+                                          c.name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: _kText,
+                                              fontSize: 13),
+                                        ),
+                                        subtitle: Text(
+                                          c.phone.isNotEmpty
+                                              ? c.phone
+                                              : 'Telefon Yok',
+                                          style: const TextStyle(
+                                              color: _kTextSecondary,
+                                              fontSize: 11),
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '₺${c.balance.abs().toStringAsFixed(2)}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                                color: isDebt
+                                                    ? _kRed
+                                                    : _kGreenDark,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: isSel
+                                                  ? const Icon(
+                                                      Icons
+                                                          .check_circle_rounded,
+                                                      color: _kGreen,
+                                                      size: 20)
+                                                  : null,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: isSel
-                                          ? const Icon(
-                                              Icons.check_circle_rounded,
-                                              color: _kGreen,
-                                              size: 20)
-                                          : null,
-                                    ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                              if (customersVal.isLoading)
+                                const Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: LinearProgressIndicator(minHeight: 2),
+                                ),
+                            ],
+                          ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 

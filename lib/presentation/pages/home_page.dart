@@ -1,870 +1,430 @@
-// lib/presentation/pages/home_page.dart
-// Serenut OS — Ana Sayfa / Dashboard (Restructured & Redesigned)
-// Generated: 25 Jun 2026
-
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:serenutos/config/router.dart';
-import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
-import 'package:serenutos/presentation/controllers/customers_controller.dart';
-import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/domain/models/permission.dart';
-import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
-import 'package:serenutos/presentation/controllers/report_controller.dart';
-import 'package:serenutos/domain/services/dashboard_service.dart';
-import 'package:serenutos/presentation/pages/global_search_page.dart';
-import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/presentation/widgets/home/quick_actions_panel.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/presentation/widgets/serenut_ui.dart';
-
-// ── POS Tema Renkleri ─────────────────────────────────────────────────────────
-const _kBgColor = POSColors.surface;
-const _kTextDark = POSColors.text;
-const _kTextSecondary = POSColors.textSecondary;
-const _kBorderColor = POSColors.border;
+import 'package:serenutos/domain/services/dashboard_service.dart';
+import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
+import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
+import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dashboardAsync = ref.watch(dashboardProvider);
+    final dashboard = ref.watch(dashboardProvider);
     return Scaffold(
-      backgroundColor: _kBgColor,
+      backgroundColor: POSColors.surface,
       body: SafeArea(
-        child: dashboardAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(POSColors.green),
-            ),
-          ),
-          error: (err, _) => _ErrorView(
-            message: err.toString(),
+        child: dashboard.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _DashboardError(
+            message: error.toString(),
             onRetry: () => ref.invalidate(dashboardProvider),
           ),
-          data: (data) {
-            return RefreshIndicator(
-              color: POSColors.green,
-              onRefresh: () async {
-                ref.invalidate(dashboardProvider);
-                ref.invalidate(customersControllerProvider);
-                ref.invalidate(debtAgingProvider);
+          data: (data) => RefreshIndicator(
+            onRefresh: () async => ref.invalidate(dashboardProvider),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 900;
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(wide ? 28 : 16, 16,
+                      wide ? 28 : 16, 96),
+                  children: [
+                    _DashboardHeader(onReports: () =>
+                        context.push(AppRoutes.reports)),
+                    const SizedBox(height: 10),
+                    const RealtimeStatusIndicator(compact: false),
+                    const SizedBox(height: 16),
+                    _KpiGrid(summary: data.summary),
+                    const SizedBox(height: 16),
+                    _AttentionStrip(data: data),
+                    const SizedBox(height: 16),
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _TrendCard(points: data.weeklyTrend),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            flex: 2,
+                            child: _TopProductsCard(
+                                products: data.topProducts),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      _TrendCard(points: data.weeklyTrend),
+                      const SizedBox(height: 16),
+                      _TopProductsCard(products: data.topProducts),
+                    ],
+                    const SizedBox(height: 16),
+                    if (wide)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _CategoryCard(items: data.categoryShares),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _RecentSalesCard(sales: data.recentSales),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      _CategoryCard(items: data.categoryShares),
+                      const SizedBox(height: 16),
+                      _RecentSalesCard(sales: data.recentSales),
+                    ],
+                  ],
+                );
               },
-              child: LayoutBuilder(
-                builder: (ctx, constraints) {
-                  final isWide = constraints.maxWidth >= 800;
-                  return SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isWide ? 24 : 16,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 1. Üst Alan (Header)
-                        _buildHeader(context, ref, data),
-                        const SizedBox(height: 16),
-
-                        // Hızlı işlemler operasyon ekranının odağıdır. Teknik
-                        // sistem sağlığı ve ayrıntılı olaylar web panelindedir.
-                        const QuickActionsPanel(),
-                        const SizedBox(height: 20),
-
-                        // Finansal Özet Kartları (KPI)
-                        _buildFinancialSummary(data.summary),
-                        const SizedBox(height: 24),
-
-                        // Satış Grafiği
-                        _buildSalesTrendSection(data.weeklyTrend),
-                        const SizedBox(height: 24),
-
-                        // 7. Son Hareketler
-                        _buildRecentSalesSection(
-                            context, ref, data.recentSales),
-                        const SizedBox(height: 24),
-
-                        // 8. En Çok Satan Ürünler
-                        _buildTopProductsSection(
-                            context, data.topProducts.take(3).toList()),
-                        const SizedBox(height: 80), // nav bar boşluğu
-                      ],
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  // ── Header Builder ─────────────────────────────────────────────────────────
-  Widget _buildHeader(BuildContext context, WidgetRef ref, DashboardData data) {
-    final now = DateTime.now();
-    final dayName = DateFormat('EEEE', 'tr_TR').format(now);
-    final dateFormatted =
-        '${now.day} ${DateFormat('MMMM', 'tr_TR').format(now)} $dayName';
-
-    final settings = ref.watch(settingsNotifierProvider).value;
-    final currentUser = ref.watch(currentUserProvider);
-    final canViewInventory = currentUser != null &&
-        (currentUser.role == UserRole.owner ||
-            currentUser.role == UserRole.admin ||
-            currentUser.hasPermission(Permission.inventoryView.value));
-    final titleText =
-        (settings?.businessName != null && settings!.businessName.isNotEmpty)
-            ? settings.businessName
-            : 'İyi Çalışmalar';
-
-    return SerenutSectionHeader(
-      eyebrow: 'GÜNLÜK ÖZET',
-      title: titleText,
-      description: dateFormatted,
-      trailing: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded,
-                    color: Color(0xFF475569), size: 24),
-                tooltip: 'Bildirimler',
-                onPressed: () => _showNotifications(
-                  context,
-                  data,
-                  canViewInventory: canViewInventory,
-                ),
-              ),
-              if (canViewInventory && data.lowStockProducts.isNotEmpty)
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFEF4444),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.search_rounded,
-                color: Color(0xFF475569), size: 24),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const GlobalSearchPage(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 4),
-          if (currentUser != null &&
-              (currentUser.role == UserRole.owner ||
-                  currentUser.role == UserRole.admin ||
-                  currentUser.hasPermission(Permission.settingsView.value)))
-            IconButton(
-              icon: const Icon(Icons.settings_outlined,
-                  color: Color(0xFF475569), size: 24),
-              onPressed: () => context.push(AppRoutes.settings),
             ),
-        ],
+          ),
+        ),
       ),
     );
   }
+}
 
-  void _showNotifications(
-    BuildContext context,
-    DashboardData data, {
-    required bool canViewInventory,
-  }) {
-    final lowStockProducts =
-        canViewInventory ? data.lowStockProducts : const <ProductEntity>[];
-    if (lowStockProducts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Yeni bildiriminiz bulunmuyor.'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({required this.onReports});
+  final VoidCallback onReports;
 
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+  @override
+  Widget build(BuildContext context) {
+    final date = DateFormat('d MMMM EEEE', 'tr_TR').format(DateTime.now());
+    return Row(
+      children: [
+        Expanded(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Kritik Stok Uyarıları',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              ...lowStockProducts.take(5).map(
-                    (product) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const CircleAvatar(
-                        backgroundColor: Color(0xFFFEE2E2),
-                        child: Icon(Icons.inventory_2_outlined,
-                            color: Color(0xFFDC2626)),
-                      ),
-                      title: Text(product.name),
-                      subtitle: Text('Kalan stok: ${product.quantity}'),
-                    ),
-                  ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go(AppRoutes.products);
-                  },
-                  icon: const Icon(Icons.inventory_2_outlined),
-                  label: const Text('Ürünlere Git'),
-                ),
-              ),
+              Text('İşletme özeti',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900, color: POSColors.text)),
+              const SizedBox(height: 3),
+              Text(date,
+                  style: const TextStyle(color: POSColors.textSecondary)),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // ── Financial Summary KPI Cards ────────────────────────────────────────────
-  Widget _buildFinancialSummary(DashboardSummary summary) {
-    final format = NumberFormat('#,##0.00', 'tr_TR');
-    final items = [
-      _KpiData(
-        title: 'Bugünkü Ciro',
-        value: '₺${format.format(summary.todayRevenue)}',
-        desc: 'Toplam satış cirosu',
-        icon: Icons.trending_up_rounded,
-        iconColor: const Color(0xFF10B981),
-        bgColor: const Color(0xFFECFDF5),
-      ),
-      _KpiData(
-        title: 'Tahsilatlar',
-        value: '₺${format.format(summary.todayCollected)}',
-        desc: 'Nakit ve kartlı ödeme',
-        icon: Icons.payments_outlined,
-        iconColor: const Color(0xFF3B82F6),
-        bgColor: const Color(0xFFEFF6FF),
-      ),
-      _KpiData(
-        title: 'Vadeli Alacaklar',
-        value: '₺${format.format(summary.todayDebt)}',
-        desc: 'Açık hesap / veresiye',
-        icon: Icons.account_balance_wallet_outlined,
-        iconColor: const Color(0xFFFF9500),
-        bgColor: const Color(0xFFFFF7ED),
-      ),
-      _KpiData(
-        title: 'Toplam Alacak',
-        value: '₺${format.format(summary.totalReceivables)}',
-        desc: 'Müşteri açık hesap borçları',
-        icon: Icons.assignment_turned_in_rounded,
-        iconColor: const Color(0xFF8B5CF6),
-        bgColor: const Color(0xFFF5F3FF),
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossCount = constraints.maxWidth >= 720 ? 4 : 2;
-        // On small screens, lower aspect ratio (e.g. 0.95) allows more vertical space to avoid overflows.
-        final childRatio = constraints.maxWidth >= 720 ? 1.35 : 0.95;
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossCount,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: childRatio,
-          ),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _kBorderColor),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x03000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: item.bgColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(item.icon, color: item.iconColor, size: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            item.value,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: _kTextDark,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        Text(
-                          item.desc,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: _kTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ── Sales Trend Line Chart ─────────────────────────────────────────────────
-  Widget _buildSalesTrendSection(List<SalesTrendPoint> trend) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _kBorderColor),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x03000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'SATIŞ TRENDİ (SON 7 GÜN)',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: _kTextSecondary,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 180,
-            child: trend.isEmpty
-                ? const Center(child: Text('Veri bulunamadı'))
-                : LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        getDrawingHorizontalLine: (value) => const FlLine(
-                          color: _kBorderColor,
-                          strokeWidth: 1,
-                        ),
-                      ),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 22,
-                            interval: 1,
-                            getTitlesWidget: (value, meta) {
-                              final idx = value.toInt();
-                              if (idx >= 0 && idx < trend.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 6.0),
-                                  child: Text(
-                                    DateFormat('dd.MM').format(trend[idx].date),
-                                    style: const TextStyle(
-                                        color: Color(0xFF94A3B8),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                );
-                              }
-                              return const Text('');
-                            },
-                          ),
-                        ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 40,
-                            getTitlesWidget: (value, meta) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: Text(
-                                  value >= 1000
-                                      ? '${(value / 1000).toStringAsFixed(1)}K'
-                                      : value.toInt().toString(),
-                                  style: const TextStyle(
-                                      color: Color(0xFF94A3B8),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold),
-                                  textAlign: TextAlign.right,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: trend
-                              .asMap()
-                              .entries
-                              .map((e) =>
-                                  FlSpot(e.key.toDouble(), e.value.revenue))
-                              .toList(),
-                          isCurved: true,
-                          color: const Color(0xFF10B981), // Emerald 500
-                          barWidth: 3.5,
-                          isStrokeCapRound: true,
-                          dotData: const FlDotData(show: false),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            color: POSColors.green.withValues(alpha: 0.08),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Recent Activities ──────────────────────────────────────────────────────
-  Widget _buildRecentSalesSection(
-      BuildContext context, WidgetRef ref, List<SaleEntity> sales) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'SON İŞLEMLER',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: _kTextSecondary,
-                letterSpacing: 1.0,
-              ),
-            ),
-            GestureDetector(
-              onTap: () => context.go(AppRoutes.sales),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Tümünü Gör',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF10B981),
-                          fontWeight: FontWeight.w700)),
-                  Icon(Icons.chevron_right_rounded,
-                      size: 16, color: Color(0xFF10B981)),
-                ],
-              ),
-            ),
-          ],
+        OutlinedButton.icon(
+          onPressed: onReports,
+          icon: const Icon(Icons.analytics_outlined, size: 18),
+          label: const Text('Raporlar'),
         ),
-        const SizedBox(height: 12),
-        if (sales.isEmpty)
-          const _EmptyCard(
-              icon: Icons.receipt_long_outlined,
-              message: 'Henüz işlem bulunmuyor',
-              color: _kTextSecondary)
-        else
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _kBorderColor),
-            ),
-            child: Column(
-              children: sales.asMap().entries.map((e) {
-                final sale = e.value;
-                final isLast = e.key == sales.length - 1;
-
-                final pmLabel = {
-                      'cash': 'Nakit',
-                      'nakit': 'Nakit',
-                      'card': 'Kart',
-                      'kart': 'Kart',
-                      'debt': 'Vadeli',
-                      'vadeli': 'Vadeli',
-                      'mixed': 'Karma',
-                    }[sale.paymentMethod.toLowerCase()] ??
-                    sale.paymentMethod;
-
-                final isDebt =
-                    sale.paymentMethod.toLowerCase().contains('debt') ||
-                        sale.paymentMethod.toLowerCase().contains('vadeli');
-                final pmColor =
-                    isDebt ? const Color(0xFFFF9500) : const Color(0xFF10B981);
-                final pmBgColor =
-                    isDebt ? const Color(0xFFFFF7ED) : const Color(0xFFECFDF5);
-
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: pmBgColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.receipt_outlined,
-                                color: pmColor, size: 18),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Builder(builder: (context) {
-                                  final customers = ref
-                                          .watch(customersControllerProvider)
-                                          .value ??
-                                      [];
-                                  final customer = customers.firstWhere(
-                                    (c) => c.id == sale.customerId,
-                                    orElse: () => CustomerEntity(
-                                        id: '',
-                                        name: 'Hızlı Satış',
-                                        email: '',
-                                        phone: '',
-                                        balance: 0,
-                                        createdAt: DateTime.now()),
-                                  );
-                                  final customerName =
-                                      sale.customerId.isEmpty ||
-                                              sale.customerId == 'walkin' ||
-                                              customer.id.isEmpty
-                                          ? 'Hızlı Satış'
-                                          : customer.name;
-                                  return Text(
-                                    customerName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: _kTextDark,
-                                    ),
-                                  );
-                                }),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${DateFormat('HH:mm').format(sale.createdAt)} • $pmLabel Satış',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '₺${NumberFormat('#,##0.00', 'tr_TR').format(sale.totalAmount)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: _kTextDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!isLast) const Divider(height: 1, color: _kBorderColor),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildTopProductsSection(
-      BuildContext context, List<DashboardProductPerformance> products) {
-    final format = NumberFormat('#,##0.00', 'tr_TR');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'EN ÇOK SATAN ÜRÜNLER',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: _kTextSecondary,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (products.isEmpty)
-          const _EmptyCard(
-              icon: Icons.inventory_2_outlined,
-              message: 'Satış verisi bulunmuyor',
-              color: _kTextSecondary)
-        else
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _kBorderColor),
-            ),
-            child: Column(
-              children: products.asMap().entries.map((e) {
-                final prod = e.value;
-                final isLast = e.key == products.length - 1;
-
-                final badgeColor = [
-                  const Color(0xFFFBBF24), // Gold for 1st
-                  const Color(0xFF94A3B8), // Silver for 2nd
-                  const Color(0xFFB45309), // Bronze for 3rd
-                ][e.key % 3];
-
-                final badgeBgColor = [
-                  const Color(0xFFFEF3C7),
-                  const Color(0xFFF1F5F9),
-                  const Color(0xFFFEF3C7).withValues(alpha: 0.5),
-                ][e.key % 3];
-
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: badgeBgColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${prod.rank}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: badgeColor,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  prod.productName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: _kTextDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${prod.category} • ${prod.totalSold} adet satıldı',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '₺${format.format(prod.totalRevenue)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: _kTextDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!isLast) const Divider(height: 1, color: _kBorderColor),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
       ],
     );
   }
 }
 
-// ── Private Helper Widgets ───────────────────────────────────────────────────
-
-class _EmptyCard extends StatelessWidget {
-  final IconData icon;
-  final String message;
-  final Color color;
-  const _EmptyCard(
-      {required this.icon, required this.message, required this.color});
+class _KpiGrid extends StatelessWidget {
+  const _KpiGrid({required this.summary});
+  final DashboardSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 36, color: color.withValues(alpha: 0.5)),
-          const SizedBox(height: 8),
-          Text(message,
-              style:
-                  TextStyle(color: color.withValues(alpha: 0.7), fontSize: 13)),
-        ],
-      ),
+    final currency = NumberFormat.currency(locale: 'tr_TR', symbol: '₺');
+    final items = [
+      ('Bugünkü satış', currency.format(summary.todayRevenue),
+       '${summary.totalSalesToday} işlem', Icons.point_of_sale_rounded, POSColors.green),
+      ('Tahsilat', currency.format(summary.todayCollected),
+       'Bugün alınan', Icons.payments_rounded, POSColors.blue),
+      ('Vadeli satış', currency.format(summary.todayDebt),
+       'Bugünkü açık', Icons.schedule_rounded, POSColors.orange),
+      ('Toplam alacak', currency.format(summary.totalReceivables),
+       'Müşteri bakiyeleri', Icons.account_balance_wallet_rounded, POSColors.red),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 900 ? 4 : 2;
+      final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: items
+            .map((item) => SizedBox(
+                  width: width,
+                  child: _KpiCard(
+                    label: item.$1,
+                    value: item.$2,
+                    detail: item.$3,
+                    icon: item.$4,
+                    color: item.$5,
+                  ),
+                ))
+            .toList(),
+      );
+    });
+  }
+}
+
+class _KpiCard extends StatelessWidget {
+  const _KpiCard({required this.label, required this.value, required this.detail,
+    required this.icon, required this.color});
+  final String label;
+  final String value;
+  final String detail;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: POSColors.border),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, color: color, size: 21),
+          const SizedBox(height: 12),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 3),
+          Text(label, style: const TextStyle(fontSize: 12,
+              fontWeight: FontWeight.w700, color: POSColors.text)),
+          Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: POSColors.textSecondary)),
+        ]),
+      );
+}
+
+class _AttentionStrip extends StatelessWidget {
+  const _AttentionStrip({required this.data});
+  final DashboardData data;
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Expanded(child: _AttentionTile(
+          icon: Icons.pending_actions_rounded,
+          label: 'Bekleyen sipariş',
+          value: '${data.summary.pendingOrdersCount}',
+          color: POSColors.orange,
+          onTap: () => context.go(AppRoutes.orders),
+        )),
+        const SizedBox(width: 10),
+        Expanded(child: _AttentionTile(
+          icon: Icons.inventory_2_outlined,
+          label: 'Kritik stok',
+          value: '${data.lowStockProducts.length}',
+          color: POSColors.red,
+          onTap: () => context.go(AppRoutes.products),
+        )),
+      ]);
+}
+
+class _AttentionTile extends StatelessWidget {
+  const _AttentionTile({required this.icon, required this.label,
+    required this.value, required this.color, required this.onTap});
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(13),
+            child: Row(children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 10),
+              Expanded(child: Text(label, maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700))),
+              Text(value, style: TextStyle(fontSize: 20,
+                  color: color, fontWeight: FontWeight.w900)),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _TrendCard extends StatelessWidget {
+  const _TrendCard({required this.points});
+  final List<SalesTrendPoint> points;
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+        title: '7 günlük satış eğilimi',
+        subtitle: 'Gerçekleşen satış cirosu',
+        child: SizedBox(
+          height: 220,
+          child: points.isEmpty
+              ? const _EmptyData()
+              : LineChart(LineChartData(
+                  minY: 0,
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(show: true, drawVerticalLine: false),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= points.length) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(DateFormat('E', 'tr_TR').format(points[index].date),
+                              style: const TextStyle(fontSize: 10)),
+                        );
+                      },
+                    )),
+                  ),
+                  lineBarsData: [LineChartBarData(
+                    isCurved: true,
+                    color: POSColors.green,
+                    barWidth: 3,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(show: true,
+                        color: POSColors.green.withValues(alpha: .1)),
+                    spots: [for (var i = 0; i < points.length; i++)
+                      FlSpot(i.toDouble(), points[i].revenue)],
+                  )],
+                )),
+        ),
+      );
+}
+
+class _TopProductsCard extends StatelessWidget {
+  const _TopProductsCard({required this.products});
+  final List<DashboardProductPerformance> products;
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+        title: 'En çok satanlar',
+        subtitle: 'Son 30 gün',
+        child: products.isEmpty
+            ? const SizedBox(height: 160, child: _EmptyData())
+            : Column(children: products.take(5).map((product) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(radius: 15,
+                    backgroundColor: POSColors.greenLight,
+                    child: Text('${product.rank}', style: const TextStyle(
+                      color: POSColors.greenDark, fontWeight: FontWeight.w800))),
+                  title: Text(product.productName, maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                  subtitle: Text(product.category),
+                  trailing: Text('${product.totalSold} adet',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                )).toList()),
+      );
+}
+
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.items});
+  final List<DashboardCategoryShare> items;
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+        title: 'Kategori dağılımı',
+        subtitle: 'Son 30 günlük ciro payı',
+        child: items.isEmpty
+            ? const SizedBox(height: 140, child: _EmptyData())
+            : Column(children: items.take(5).map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(children: [
+                    Row(children: [
+                      Expanded(child: Text(item.category,
+                        style: const TextStyle(fontWeight: FontWeight.w700))),
+                      Text('%${item.percentage.toStringAsFixed(0)}'),
+                    ]),
+                    const SizedBox(height: 5),
+                    LinearProgressIndicator(value: (item.percentage / 100).clamp(0, 1),
+                      minHeight: 6, borderRadius: BorderRadius.circular(8)),
+                  ]),
+                )).toList()),
+      );
+}
+
+class _RecentSalesCard extends StatelessWidget {
+  const _RecentSalesCard({required this.sales});
+  final List<dynamic> sales;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = NumberFormat.currency(locale: 'tr_TR', symbol: '₺');
+    return _Panel(
+      title: 'Son satışlar',
+      subtitle: 'En yeni tamamlanan işlemler',
+      child: sales.isEmpty
+          ? const SizedBox(height: 140, child: _EmptyData())
+          : Column(children: sales.take(5).map((sale) => ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.receipt_outlined, color: POSColors.green),
+                title: Text(currency.format(sale.totalAmount),
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text(DateFormat('dd.MM HH:mm').format(sale.createdAt)),
+                trailing: Text(sale.paymentMethod.toString()),
+              )).toList()),
     );
   }
 }
 
-class _ErrorView extends StatelessWidget {
+class _Panel extends StatelessWidget {
+  const _Panel({required this.title, required this.subtitle, required this.child});
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: POSColors.border)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 16,
+              fontWeight: FontWeight.w900, color: POSColors.text)),
+          Text(subtitle, style: const TextStyle(fontSize: 11,
+              color: POSColors.textSecondary)),
+          const SizedBox(height: 16),
+          child,
+        ]),
+      );
+}
+
+class _EmptyData extends StatelessWidget {
+  const _EmptyData();
+  @override
+  Widget build(BuildContext context) => const Center(child: Text('Henüz veri yok',
+      style: TextStyle(color: POSColors.textSecondary)));
+}
+
+class _DashboardError extends StatelessWidget {
+  const _DashboardError({required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
-
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 64, color: Color(0xFFEF4444)),
-            const SizedBox(height: 16),
-            const Text('Veriler yüklenemedi',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Text(message,
-                style: const TextStyle(color: _kTextSecondary, fontSize: 12),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Tekrar Dene'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _KpiData {
-  final String title;
-  final String value;
-  final String desc;
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
-  const _KpiData({
-    required this.title,
-    required this.value,
-    required this.desc,
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
-  });
+  Widget build(BuildContext context) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [SizedBox(height: MediaQuery.sizeOf(context).height * .7,
+          child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.error_outline_rounded, size: 48, color: POSColors.red),
+            const SizedBox(height: 12),
+            const Text('Ana sayfa verileri alınamadı'),
+            const SizedBox(height: 6),
+            Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: onRetry, child: const Text('Tekrar dene')),
+          ])))],
+      );
 }

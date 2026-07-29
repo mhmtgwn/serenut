@@ -74,6 +74,16 @@
 .footer-brand:before{display:none}
 @media(max-width:380px){.menu-toggle span{display:none}.mobile-nav{grid-template-columns:1fr}}
 
+/* Product mockup uses the approved reverse wordmark instead of plain text. */
+.preview-brand{
+  width:112px;
+  height:30px;
+  overflow:hidden;
+  color:transparent;
+  font-size:0;
+  background:url("/shared/assets/serenut-white.svg") left center/contain no-repeat
+}
+
 .auth-launcher a{min-height:36px;display:inline-flex;align-items:center;padding:0 13px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:700 .78rem Inter,sans-serif}
 .auth-launcher a:last-child{background:var(--green);color:#fff}
 .auth-launcher a:hover{background:var(--soft-green);color:var(--green)}

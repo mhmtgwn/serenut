@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
+import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/hardware_devices_provider.dart';
 
@@ -392,6 +393,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   int _paperWidth = 80;
   int _step = 0;
   bool _working = false;
+  bool _discoveringBluetooth = false;
+  List<Map<String, String>> _bluetoothDevices = const [];
   String? _error;
 
   @override
@@ -670,11 +673,43 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         ],
         if (_type == HardwareDeviceType.receiptPrinter &&
             _connection == HardwareConnectionType.bluetooth) ...[
+          OutlinedButton.icon(
+            onPressed: _discoveringBluetooth ? null : _discoverBluetooth,
+            icon: _discoveringBluetooth
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.bluetooth_searching_rounded),
+            label: Text(_discoveringBluetooth
+                ? 'Yakındaki cihazlar aranıyor…'
+                : 'Bluetooth cihazlarını tara'),
+          ),
+          if (_bluetoothDevices.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ..._bluetoothDevices.map((device) {
+              final address = device['address'] ?? '';
+              final name = device['name'] ?? 'İsimsiz cihaz';
+              return RadioListTile<String>(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                value: address,
+                groupValue: _printerName.text,
+                onChanged: (value) => setState(() {
+                  _printerName.text = value ?? '';
+                }),
+                title: Text(name, overflow: TextOverflow.ellipsis),
+                subtitle: Text(address),
+              );
+            }),
+          ],
+          const SizedBox(height: 10),
           TextField(
             controller: _printerName,
+            readOnly: true,
             decoration: const InputDecoration(
-              labelText: 'Bluetooth cihaz kimliği',
-              helperText: 'Önceden eşleştirilmiş yazıcının adı veya adresi.',
+              labelText: 'Seçilen Bluetooth yazıcı',
+              helperText: 'Bağlantıda cihazın MAC adresi kullanılır.',
             ),
           ),
         ],
@@ -760,6 +795,23 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           clearLastError: true,
         ));
     if (mounted) Navigator.pop(context, true);
+  }
+
+  Future<void> _discoverBluetooth() async {
+    setState(() {
+      _discoveringBluetooth = true;
+      _error = null;
+    });
+    final devices = await NativePrinterBridge.scanBluetoothDevices();
+    if (!mounted) return;
+    setState(() {
+      _discoveringBluetooth = false;
+      _bluetoothDevices = devices;
+      if (devices.isEmpty) {
+        _error =
+            'Cihaz bulunamadı. Bluetooth ve yakın cihaz izinlerini verip tekrar tarayın.';
+      }
+    });
   }
 
   String? _validate() {

@@ -11,12 +11,21 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "branding"
+MASTER_ICON = OUT / "app" / "icon-master.png"
 GREEN = "#1B6B3C"
 YELLOW = "#E6B134"
 WHITE = "#FFFFFF"
 BLACK = "#111111"
 INK = "#19231F"
 FONT_BOLD = Path(r"C:\Windows\Fonts\segoeuib.ttf")
+
+
+def master_icon(size: int) -> Image.Image:
+    """Resize the approved application icon without redrawing its artwork."""
+    with Image.open(MASTER_ICON) as source:
+        return source.convert("RGBA").resize(
+            (size, size), Image.Resampling.LANCZOS
+        )
 
 
 def mark(size: int, variant: str = "color", padding: float = 0.08) -> Image.Image:
@@ -147,10 +156,7 @@ def main() -> None:
             save_png(mark(size, variant), f"png/{variant}/logo-{variant}-{size}.png")
 
     for size in (48, 72, 96, 144, 192, 512, 1024):
-        save_png(
-            rounded_icon(size, WHITE, "color", 0.19),
-            f"app/icon-color-{size}.png",
-        )
+        save_png(master_icon(size), f"app/icon-color-{size}.png")
         save_png(
             rounded_icon(size, GREEN, "white", 0.19),
             f"app/icon-reverse-{size}.png",
@@ -173,17 +179,14 @@ def main() -> None:
             rounded_icon(size, WHITE, "color", 0.25, corner_ratio=0),
             f"web/icon-maskable-{size}.png",
         )
-        save_png(
-            rounded_icon(size, WHITE, "color", 0.19),
-            f"web/icon-{size}.png",
-        )
+        save_png(master_icon(size), f"web/icon-{size}.png")
 
     for size in (16, 32, 48):
-        save_png(mark(size, "color", 0.10), f"web/favicon-{size}.png")
+        save_png(master_icon(size), f"web/favicon-{size}.png")
 
     save_png(social_card(), "web/social-card-1200x630.png")
 
-    ico_frames = [mark(size, "color", 0.10) for size in (16, 24, 32, 48, 64, 128, 256)]
+    ico_frames = [master_icon(size) for size in (16, 24, 32, 48, 64, 128, 256)]
     ico_path = OUT / "windows" / "app_icon.ico"
     ico_path.parent.mkdir(parents=True, exist_ok=True)
     ico_frames[-1].save(ico_path, format="ICO", sizes=[im.size for im in ico_frames])
@@ -202,7 +205,7 @@ def main() -> None:
         "xxxhdpi": 192,
     }
     for density, size in android_sizes.items():
-        launcher = rounded_icon(size, WHITE, "color", 0.19)
+        launcher = master_icon(size)
         save_project_png(
             launcher,
             f"android/app/src/main/res/mipmap-{density}/ic_launcher.png",
@@ -212,7 +215,7 @@ def main() -> None:
             f"android/app/src/main/res/mipmap-{density}/ic_launcher_round.png",
         )
     save_project_png(
-        mark(432, "color", 0.25),
+        master_icon(432),
         "android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png",
     )
     save_project_png(
@@ -240,9 +243,7 @@ def main() -> None:
         "Icon-App-1024x1024@1x.png": 1024,
     }
     for filename, size in ios_icons.items():
-        icon = Image.new("RGB", (size, size), WHITE)
-        symbol = mark(size, "color", 0.19).convert("RGBA")
-        icon.paste(symbol, (0, 0), symbol)
+        icon = master_icon(size).convert("RGB")
         save_project_png(
             icon,
             f"ios/Runner/Assets.xcassets/AppIcon.appiconset/{filename}",
@@ -250,18 +251,16 @@ def main() -> None:
 
     # Flutter web PWA/favicons.
     web_copies = {
-        "icons/Icon-192.png": rounded_icon(192, WHITE, "color", 0.19),
-        "icons/Icon-512.png": rounded_icon(512, WHITE, "color", 0.19),
+        "icons/Icon-192.png": master_icon(192),
+        "icons/Icon-512.png": master_icon(512),
         "icons/Icon-maskable-192.png": rounded_icon(
             192, WHITE, "color", 0.25, corner_ratio=0
         ),
         "icons/Icon-maskable-512.png": rounded_icon(
             512, WHITE, "color", 0.25, corner_ratio=0
         ),
-        "icons/apple-touch-icon.png": rounded_icon(
-            180, WHITE, "color", 0.19, corner_ratio=0
-        ),
-        "favicon.png": mark(32, "color", 0.10),
+        "icons/apple-touch-icon.png": master_icon(180),
+        "favicon.png": master_icon(32),
     }
     for relative_path, image in web_copies.items():
         save_project_png(image, f"web/{relative_path}")
@@ -284,19 +283,10 @@ def main() -> None:
     ):
         shutil.copy2(OUT / "svg" / filename, shared_assets / filename)
     shutil.copy2(ico_path, ROOT / "server" / "public" / "favicon.ico")
-    save_project_png(mark(32, "color", 0.10), "server/public/favicon-32.png")
-    save_project_png(
-        rounded_icon(180, WHITE, "color", 0.19, corner_ratio=0),
-        "server/public/apple-touch-icon.png",
-    )
-    save_project_png(
-        rounded_icon(192, WHITE, "color", 0.19),
-        "server/public/icon-192.png",
-    )
-    save_project_png(
-        rounded_icon(512, WHITE, "color", 0.19),
-        "server/public/icon-512.png",
-    )
+    save_project_png(master_icon(32), "server/public/favicon-32.png")
+    save_project_png(master_icon(180), "server/public/apple-touch-icon.png")
+    save_project_png(master_icon(192), "server/public/icon-192.png")
+    save_project_png(master_icon(512), "server/public/icon-512.png")
     save_project_png(social_card(), "server/public/social-card-1200x630.png")
 
 

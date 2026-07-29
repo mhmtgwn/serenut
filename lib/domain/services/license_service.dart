@@ -106,8 +106,6 @@ class LicenseService {
   String? _cachedLastSystemTime;
   String? _cachedMaxTimestampSeen;
   bool _isTampered = false;
-  final Stopwatch _stopwatch = Stopwatch()..start();
-  final DateTime _startTime = DateTime.now();
 
   LicenseService(
     this._prefs, {
@@ -418,16 +416,6 @@ class LicenseService {
   bool checkClockIntegrity() {
     if (_isTampered) return false;
 
-    // 0. Monotonic clock drift check
-    final elapsed = _stopwatch.elapsed;
-    final expectedTime = _startTime.add(elapsed);
-    final actualTime = DateTime.now();
-    final driftSeconds = actualTime.difference(expectedTime).inSeconds.abs();
-    if (driftSeconds > 15) {
-      _isTampered = true;
-      return false;
-    }
-
     final now = DateTime.now().toUtc();
 
     final lastTimeStr =
@@ -484,13 +472,12 @@ class LicenseService {
 
   /// Get status of license
   String checkLicenseStatus() {
-    if (!checkClockIntegrity()) {
-      return 'tampered';
-    }
-
     final info = getLicenseInfo();
     if (info == null) {
       return 'unlicensed';
+    }
+    if (!checkClockIntegrity()) {
+      return 'tampered';
     }
 
     final tokenStr = getLicenseToken()!;

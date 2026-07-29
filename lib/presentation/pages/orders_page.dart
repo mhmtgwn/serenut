@@ -226,9 +226,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             ref.read(ordersControllerProvider.notifier).applySearch(val);
             _refreshCounts();
           },
-          showRefresh: true,
-          onRefresh: () =>
-              ref.read(ordersControllerProvider.notifier).refresh(),
           filterWidget: PosFilterBar(
             padding: EdgeInsets.zero,
             selectedId: _statusFilter,
@@ -284,59 +281,73 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
               ),
             ],
           ),
-          body: filtered.isEmpty
-              ? _EmptyView(
-                  icon: Icons.receipt_long_rounded,
-                  message: _statusFilter == 'all'
-                      ? 'Henüz sipariş oluşturulmamış.'
-                      : 'Bu kategoride sipariş yok.',
-                  action: TextButton.icon(
-                    onPressed: () => _showOrderForm(context),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Sipariş Oluştur'),
-                    style: TextButton.styleFrom(foregroundColor: _kGreen),
-                  ),
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == filtered.length) {
-                      // Pagination footer
-                      final hasMore =
-                          ref.read(ordersControllerProvider.notifier).hasMore;
-                      if (!hasMore) return const SizedBox.shrink();
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    final order = filtered[index];
-                    final customerName = customersVal.maybeWhen(
-                      data: (list) {
-                        final c = list.firstWhere(
-                          (c) => c.id == order.customerId,
-                          orElse: () => CustomerEntity(
-                              id: '',
-                              name: 'Bilinmeyen',
-                              email: '',
-                              phone: '',
-                              balance: 0,
-                              createdAt: DateTime.now()),
+          body: RefreshIndicator(
+            onRefresh: () =>
+                ref.read(ordersControllerProvider.notifier).refresh(),
+            child: filtered.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * .55,
+                        child: _EmptyView(
+                          icon: Icons.receipt_long_rounded,
+                          message: _statusFilter == 'all'
+                              ? 'Henüz sipariş oluşturulmamış.'
+                              : 'Bu kategoride sipariş yok.',
+                          action: TextButton.icon(
+                            onPressed: () => _showOrderForm(context),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Sipariş Oluştur'),
+                            style:
+                                TextButton.styleFrom(foregroundColor: _kGreen),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == filtered.length) {
+                        // Pagination footer
+                        final hasMore =
+                            ref.read(ordersControllerProvider.notifier).hasMore;
+                        if (!hasMore) return const SizedBox.shrink();
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
                         );
-                        return c.name;
-                      },
-                      orElse: () => '...',
-                    );
-                    return _OrderCard(
-                      order: order,
-                      customerName: customerName,
-                      onDetail: () =>
-                          context.push('/orders/detail/${order.id}'),
-                    );
-                  },
-                ),
+                      }
+                      final order = filtered[index];
+                      final customerName = customersVal.maybeWhen(
+                        data: (list) {
+                          final c = list.firstWhere(
+                            (c) => c.id == order.customerId,
+                            orElse: () => CustomerEntity(
+                                id: '',
+                                name: 'Bilinmeyen',
+                                email: '',
+                                phone: '',
+                                balance: 0,
+                                createdAt: DateTime.now()),
+                          );
+                          return c.name;
+                        },
+                        orElse: () => '...',
+                      );
+                      return _OrderCard(
+                        order: order,
+                        customerName: customerName,
+                        onDetail: () =>
+                            context.push('/orders/detail/${order.id}'),
+                      );
+                    },
+                  ),
+          ),
           floatingActionButton: FloatingActionButton.extended(
             heroTag: 'fab_orders',
             onPressed: () => _showOrderForm(context),

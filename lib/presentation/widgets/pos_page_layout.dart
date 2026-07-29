@@ -38,7 +38,7 @@ class PosHeader extends StatelessWidget {
     this.showSettings = true,
     this.showRefresh = false,
     this.onRefresh,
-    this.showStatusIndicator = true,
+    this.showStatusIndicator = false,
   });
 
   @override
@@ -254,6 +254,7 @@ class PosPageLayout extends StatelessWidget {
   final bool showSettings;
   final bool showRefresh;
   final VoidCallback? onRefresh;
+  final bool showStatusIndicator;
 
   const PosPageLayout({
     super.key,
@@ -270,6 +271,7 @@ class PosPageLayout extends StatelessWidget {
     this.showSettings = true,
     this.showRefresh = false,
     this.onRefresh,
+    this.showStatusIndicator = false,
   });
 
   @override
@@ -290,9 +292,11 @@ class PosPageLayout extends StatelessWidget {
               showSettings: showSettings,
               showRefresh: showRefresh,
               onRefresh: onRefresh,
+              showStatusIndicator: showStatusIndicator,
             ),
             const Divider(height: 1),
-            const RealtimeStatusIndicator(compact: false),
+            if (showStatusIndicator)
+              const RealtimeStatusIndicator(compact: false),
             Expanded(
               child: ColoredBox(
                 color: POSColors.surface,

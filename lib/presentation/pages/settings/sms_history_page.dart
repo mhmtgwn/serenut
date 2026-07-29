@@ -61,13 +61,6 @@ class _SmsHistoryPageState extends ConsumerState<SmsHistoryPage> {
                     color: _kMuted, fontSize: 11, fontWeight: FontWeight.w500)),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Yenile',
-            onPressed: () => setState(_reload),
-            icon: const Icon(Icons.refresh_rounded, color: _kGreenDark),
-          ),
-        ],
       ),
       body: FutureBuilder<List<QueueEntry>>(
         future: _history,

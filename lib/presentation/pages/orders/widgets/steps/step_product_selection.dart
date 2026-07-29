@@ -5,6 +5,8 @@ extension OrderCreationProductStep on OrderCreationDialogState {
   Widget _buildProductStep() {
     final productsVal = ref.watch(ordersProductsControllerProvider);
     final categories = ref.watch(productCategoriesProvider);
+    final stockFilter = ref.watch(ordersProductStockFilterProvider);
+    final sortBy = ref.watch(ordersProductSortProvider);
 
     return productsVal.when(
       loading: () => const Center(
@@ -123,6 +125,14 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                       ),
                     ],
                     const SizedBox(width: 4),
+                    Badge(
+                      isLabelVisible: stockFilter != null || sortBy != null,
+                      child: IconButton(
+                        onPressed: _showOrderProductFilters,
+                        icon: const Icon(Icons.tune_rounded, color: _kGreen),
+                        tooltip: 'Ürün filtreleri',
+                      ),
+                    ),
                     // Photo Camera scanner
                     IconButton(
                       onPressed: () {
@@ -174,7 +184,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                           final p = filtered[idx];
                           final qtyInCart = _cart[p] ?? 0;
                           final outOfStock = p.quantity <= 0;
-                          final isLowStock = p.quantity <= 5;
+                          final isLowStock = p.quantity <= p.minStock;
                           final Color badgeBgColor = outOfStock
                               ? _kRedLight
                               : (isLowStock ? _kAmberLight : _kGreenLight);
@@ -429,6 +439,75 @@ extension OrderCreationProductStep on OrderCreationDialogState {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showOrderProductFilters() async {
+    var stock = ref.read(ordersProductStockFilterProvider);
+    var sort = ref.read(ordersProductSortProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Ürünleri filtrele',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Tümü'),
+                    selected: stock == null,
+                    onSelected: (_) => setSheetState(() => stock = null),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Stokta'),
+                    selected: stock == 'in_stock',
+                    onSelected: (_) =>
+                        setSheetState(() => stock = 'in_stock'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Kritik'),
+                    selected: stock == 'critical',
+                    onSelected: (_) =>
+                        setSheetState(() => stock = 'critical'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: sort,
+                decoration: const InputDecoration(labelText: 'Sıralama'),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Ürün adına göre')),
+                  DropdownMenuItem(
+                      value: 'best_selling', child: Text('En çok satanlar')),
+                  DropdownMenuItem(
+                      value: 'price_asc', child: Text('Fiyat: düşükten yükseğe')),
+                  DropdownMenuItem(
+                      value: 'price_desc', child: Text('Fiyat: yüksekten düşüğe')),
+                ],
+                onChanged: (value) => setSheetState(() => sort = value),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () {
+                  ref.read(ordersProductStockFilterProvider.notifier).state = stock;
+                  ref.read(ordersProductSortProvider.notifier).state = sort;
+                  Navigator.pop(context);
+                },
+                child: const Text('Uygula'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -2,9 +2,9 @@
 // Serenut OS — Critical/Mandatory Force Update Screen
 // Blueprint: Ecosystem UX & AC 8.3 (Zorunlu Güncelleme)
 
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
@@ -30,7 +30,7 @@ class ForceUpdatePage extends ConsumerWidget {
   Future<void> _startInAppUpdate(BuildContext context, WidgetRef ref) async {
     if (downloadUrl.isEmpty) return;
     final releaseManager = ref.read(releaseManagerServiceProvider);
-    final platform = Platform.isAndroid ? 'android' : 'windows';
+    final platform = AppPlatform.releaseKey;
     final jwtToken = ref.read(apiClientProvider).jwtToken;
     final deviceId = ref.read(deviceManagerProvider).getDeviceId();
 

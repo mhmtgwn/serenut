@@ -39,7 +39,7 @@ class LoginPage extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const SizedBox(height: 20),
-                // ── Logo (Özel serenutoslogo.png kullanımı) ──
+                // ── Uygulama kimliği ──
                 Container(
                   width: 96,
                   height: 96,
@@ -55,8 +55,8 @@ class LoginPage extends ConsumerWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
-                    'assets/serenutoslogo.png',
-                    fit: BoxFit.cover,
+                    'assets/branding/app/icon-color-192.png',
+                    fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => Container(
                       color: POSColors.greenLight,
                       child: const Icon(Icons.storefront_rounded,
@@ -145,7 +145,8 @@ class LoginPage extends ConsumerWidget {
                 // ── Alt bağlantı ──
                 TextButton(
                   onPressed: () async {
-                    final uri = Uri.parse('https://serenut.com/forgot-password');
+                    final uri =
+                        Uri.parse('https://serenut.com/forgot-password');
                     if (await canLaunchUrl(uri)) {
                       await launchUrl(uri,
                           mode: LaunchMode.externalApplication);

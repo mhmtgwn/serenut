@@ -27,6 +27,7 @@ import 'package:serenutos/presentation/pages/operations_center_page.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
+import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
 import 'package:serenutos/config/theme.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
@@ -391,6 +392,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: 'Fiş Tasarımı'),
       ));
     }
+    if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
+        _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {
+      if (group1.isNotEmpty) group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Ürün Kataloğu',
+        subtitle: 'Kategori, varsayılan KDV ve birimleri düzenleyin',
+        icon: Icons.category_rounded,
+        color: _kGreen,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CatalogSettingsPage()),
+        ),
+      ));
+    }
     if (_hasPermission(currentUser, Permission.settingsDatabase) &&
         (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') ||
             _matchesQuery('müşteri', 'rehber'))) {
@@ -527,7 +541,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             currentUser.role == UserRole.sysadmin) &&
         _matchesQuery('admin', 'yönetim', 'denetim', 'kurtarma', 'telemetri')) {
       group5.add(_buildCategoryRow(
-        title: 'Admin Kontrol Merkezi',
+        title: currentUser.role == UserRole.sysadmin
+            ? 'Sistem Yönetim Merkezi'
+            : 'Yönetim ve Güvenlik',
         subtitle: 'Sistem sağlığı, denetim ve veri kurtarma',
         icon: Icons.admin_panel_settings_rounded,
         color: _kPurple,

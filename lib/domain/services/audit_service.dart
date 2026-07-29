@@ -41,12 +41,12 @@ class AuditService {
       userName: approvedByUserName ?? _currentUserName,
       oldValue: oldValue,
       newValue: newValue,
-      timestamp: DateTime.now(),
+      timestamp: DateTime.now().toUtc(),
       deviceId: _deviceId,
       notes: notes,
     );
-    await _repository.logEvent(event);
-    await _remoteBuffer?.call(event);
+    final chainedEvent = await _repository.logEvent(event);
+    await _remoteBuffer?.call(chainedEvent);
   }
 
   // Wrappers

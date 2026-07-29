@@ -106,6 +106,8 @@ class SqliteSaleRepository implements ISaleRepository {
   @override
   Future<List<SaleEntity>> findFiltered({
     String? searchQuery,
+    String? paymentMethod,
+    String? status,
     int limit = 25,
     int offset = 0,
   }) async {
@@ -115,6 +117,14 @@ class SqliteSaleRepository implements ISaleRepository {
     if (searchQuery != null && searchQuery.isNotEmpty) {
       conditions.add('id LIKE ?');
       args.add('%$searchQuery%');
+    }
+    if (paymentMethod != null && paymentMethod.isNotEmpty) {
+      conditions.add('LOWER(payment_method) = LOWER(?)');
+      args.add(paymentMethod);
+    }
+    if (status != null && status.isNotEmpty) {
+      conditions.add('LOWER(status) = LOWER(?)');
+      args.add(status);
     }
 
     final where = conditions.join(' AND ');

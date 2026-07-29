@@ -114,7 +114,13 @@ class SqliteProductRepository implements IProductRepository {
             name: override['name'] as String? ?? p.name,
             description: override['description'] as String? ?? p.description,
             price: (override['price'] as num?)?.toDouble() ?? p.price,
+            purchasePrice: (override['purchase_price'] as num?)?.toDouble() ??
+                p.purchasePrice,
             quantity: (override['quantity'] as num?)?.toInt() ?? p.quantity,
+            minStock: (override['min_stock'] as num?)?.toInt() ?? p.minStock,
+            brand: override['brand'] as String? ?? p.brand,
+            unit: override['unit'] as String? ?? p.unit,
+            shelfCode: override['shelf_code'] as String? ?? p.shelfCode,
             category: override['category'] as String? ?? p.category,
             vat: override['vat'] as int? ?? p.vat,
             imageUrl: override['image_url'] as String? ?? p.imageUrl,
@@ -431,6 +437,8 @@ class SqliteProductRepository implements IProductRepository {
   Future<List<ProductEntity>> findFiltered({
     String? searchQuery,
     String? category,
+    String? stockFilter,
+    String? sortBy,
     int? limit,
     int? offset,
   }) async {
@@ -448,16 +456,30 @@ class SqliteProductRepository implements IProductRepository {
       whereArgs.add('%$searchQuery%');
       whereArgs.add('%$searchQuery%');
     }
+    if (stockFilter == 'in_stock') {
+      whereClauses.add('quantity > 0');
+    } else if (stockFilter == 'critical') {
+      whereClauses.add('quantity <= min_stock');
+    }
 
     final String whereString = whereClauses.join(' AND ');
 
+    final orderBy = switch (sortBy) {
+      'price_asc' => 'price ASC',
+      'price_desc' => 'price DESC',
+      'best_selling' =>
+        '(SELECT COALESCE(SUM(si.quantity), 0) FROM sale_items si '
+            'JOIN sales s ON s.id = si.sale_id '
+            "WHERE si.product_id = products.id AND s.status != 'cancelled') DESC, name ASC",
+      _ => 'name ASC',
+    };
     final rows = await _executor.query(
       'products',
       where: whereString,
       whereArgs: whereArgs,
       limit: limit,
       offset: offset,
-      orderBy: 'name ASC',
+      orderBy: orderBy,
     );
     return rows.map((row) => ProductEntity.fromMap(row)).toList();
   }

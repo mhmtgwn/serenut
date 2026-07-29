@@ -166,7 +166,8 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         '${tier ?? 'Standart'} paket • $days gün kullanım süresi kaldı.',
       'trial' => 'Deneme kullanımı aktif • $days gün kaldı.',
       'expired' => 'Lisans süresi dolmuş. Destek ekibiyle iletişime geçin.',
-      'tampered' => 'Cihaz saat bütünlüğü doğrulanamadı.',
+      'tampered' =>
+        '${tier ?? 'Mevcut'} lisans bulundu; cihaz saati yeniden doğrulanmalı.',
       _ => 'Bu cihazda doğrulanmış lisans bilgisi bulunamadı.',
     };
   }

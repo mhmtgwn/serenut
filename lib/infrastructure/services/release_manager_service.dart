@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:serenutos/config/app_platform.dart';
 import 'package:serenutos/config/environment.dart';
 
 /// Represents the result of an update check from the server.
@@ -145,7 +146,7 @@ enum InstallResult {
 /// final rm = ReleaseManagerService();
 /// final info = await rm.checkForUpdates(
 ///   currentVersion: '1.0.0+1',
-///   platform: Platform.isAndroid ? 'android' : 'windows',
+///   platform: AppPlatform.releaseKey,
 ///   deviceId: deviceId,
 ///   companyId: companyId,
 ///   jwtToken: token,
@@ -239,7 +240,7 @@ class ReleaseManagerService {
     cancellationToken?.throwIfCancelled();
     final downloadPath = updateInfo.downloadUrl!;
     final totalBytes = updateInfo.fileSizeBytes;
-    final ext = platform == 'android' ? '.apk' : '.exe';
+    final ext = AppPlatform.updateFileExtension(platform);
     final filename = 'serenut-update-${updateInfo.latestVersion}$ext';
 
     final tempDir = await getTemporaryDirectory();
@@ -367,7 +368,7 @@ class ReleaseManagerService {
 
   /// Get the path to the downloaded update file.
   Future<File?> getDownloadedFile(String version, String platform) async {
-    final ext = platform == 'android' ? '.apk' : '.exe';
+    final ext = AppPlatform.updateFileExtension(platform);
     final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/serenut-update-$version$ext');
     return await file.exists() ? file : null;
