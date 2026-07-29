@@ -235,9 +235,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
 
   @override
   Future<void> updateBalance(String customerId, double amount) async {
-    await _executor.execute(
-      'UPDATE customers SET balance = balance + ? WHERE id = ?',
-      [amount, customerId],
+    throw UnsupportedError(
+      'Müşteri bakiyesi doğrudan değiştirilemez. Tahsilat, borç veya ters kayıt finansal deftere yazılmalıdır.',
     );
   }
 

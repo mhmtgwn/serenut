@@ -150,7 +150,9 @@ class OrderDetailsPage extends ConsumerWidget {
                             ),
                           );
                           return {
-                            'product_id': prod.name,
+                            'product_id': item['product_id'],
+                            'product_name': item['product_name'] ?? prod.name,
+                            'barcode': prod.id,
                             'quantity': item['quantity'],
                             'unit_price': item['unit_price'],
                           };
@@ -602,32 +604,13 @@ class OrderDetailsPage extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
 
-              final txRepo =
-                  await ref.read(financialTransactionRepositoryProvider.future);
-              final transactions =
-                  await txRepo.getByCustomerId(order.customerId);
-              FinancialTransactionEntity? orderTx;
-              for (final t in transactions) {
-                if (t.referenceId == order.id && t.type == 'sale') {
-                  orderTx = t;
-                  break;
-                }
+              final controller = ref.read(ordersControllerProvider.notifier);
+              // Ledger rows are immutable. Cancellation creates the required
+              // reversal and restores stock before the order tombstone syncs.
+              if (order.status != 'cancelled') {
+                await controller.updateStatus(order.id, 'cancelled');
               }
-
-              if (orderTx != null && orderTx.debtAmount > 0) {
-                final customerRepo =
-                    await ref.read(customerRepositoryProvider.future);
-                await customerRepo.updateBalance(
-                    order.customerId, orderTx.debtAmount);
-              }
-
-              if (orderTx != null) {
-                await txRepo.delete(orderTx.id);
-              }
-
-              await ref
-                  .read(ordersControllerProvider.notifier)
-                  .deleteOrder(order.id);
+              await controller.deleteOrder(order.id);
 
               ref.invalidate(dashboardProvider);
               ref.invalidate(productsControllerProvider);
@@ -1039,7 +1022,9 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
         ),
       );
       return {
-        'product_id': prod.name,
+        'product_id': item['product_id'],
+        'product_name': item['product_name'] ?? prod.name,
+        'barcode': prod.id,
         'quantity': item['quantity'],
         'unit_price': item['unit_price'],
       };
@@ -1274,7 +1259,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 ),
               );
               return {
-                'product_id': prod.name,
+                'product_id': item['product_id'],
+                'product_name': item['product_name'] ?? prod.name,
+                'barcode': prod.id,
                 'quantity': item['quantity'],
                 'unit_price': item['unit_price'],
               };
@@ -1337,7 +1324,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               ),
             );
             return {
-              'product_id': prod.name,
+              'product_id': item['product_id'],
+              'product_name': item['product_name'] ?? prod.name,
+              'barcode': prod.id,
               'quantity': item['quantity'],
               'unit_price': item['unit_price'],
             };

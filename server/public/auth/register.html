@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hesap Oluştur | Serenut</title>
+  <link rel="stylesheet" href="/shared/css/tokens.css"><link rel="stylesheet" href="/shared/css/base.css"><link rel="stylesheet" href="/shared/css/components.css"><link rel="stylesheet" href="/shared/css/utilities.css">
+  <link rel="stylesheet" href="/app/css/app.css?v=20260729-brand-lockup1">
+</head>
+<body data-auth-page="register">
+  <main class="auth-layout">
+    <section class="auth-hero"><div class="auth-hero-inner"><a href="/" class="hero-brand">Serenut OS</a><h1 class="hero-title">30 gün ücretsiz başlayın.</h1><p class="hero-copy">Kredi kartı gerekmeden firmanızı oluşturun ve e-postanızı doğrulayın.</p></div></section>
+    <section class="auth-card-wrap"><div class="auth-card card">
+      <div class="auth-card-head"><div><div class="auth-eyebrow">Kayıt</div><h1 class="auth-heading">Firma hesabı oluştur</h1></div><a class="ghost-link" href="/login">Giriş Yap</a></div>
+      <form id="register-form">
+        <div class="form-group"><label class="form-label" for="company">Firma Ünvanı</label><input id="company" required></div>
+        <div class="form-group"><label class="form-label" for="name">Yetkili Ad Soyad</label><input id="name" required autocomplete="name"></div>
+        <div class="form-group"><label class="form-label" for="email">E-posta</label><input type="email" id="email" required autocomplete="email"></div>
+        <div class="form-group"><label class="form-label" for="phone">Telefon</label><input type="tel" id="phone" autocomplete="tel"></div>
+        <div class="form-group"><label class="form-label" for="tax-number">TC veya VKN</label><input id="tax-number" inputmode="numeric" maxlength="11" required></div>
+        <div class="form-group"><label class="form-label" for="tax-office">Vergi Dairesi</label><input id="tax-office"></div>
+        <div class="form-group form-row-two"><div><label class="form-label" for="city">İl</label><input id="city"></div><div><label class="form-label" for="district">İlçe</label><input id="district"></div></div>
+        <div class="form-group"><label class="form-label" for="address">Firma Adresi</label><textarea id="address" rows="2"></textarea></div>
+        <div class="form-group"><label class="form-label" for="password">Şifre</label><input type="password" id="password" minlength="8" required autocomplete="new-password"></div>
+        <div class="legal-consents">
+          <label><input type="checkbox" id="accept-terms" required> <a href="/terms" target="_blank">Üyelik koşullarını</a> kabul ediyorum.</label>
+          <label><input type="checkbox" id="accept-privacy" required> <a href="/privacy" target="_blank">Gizlilik politikasını</a> kabul ediyorum.</label>
+          <label><input type="checkbox" id="accept-kvkk" required> <a href="/kvkk" target="_blank">KVKK metnini</a> okudum.</label>
+          <label><input type="checkbox" id="accept-marketing"> Kampanya duyurularını almak istiyorum.</label>
+        </div>
+        <div class="auth-status text-sm text-red" id="status" role="status"></div>
+        <button class="btn btn-primary w-full" type="submit">Hesap Oluştur</button>
+      </form>
+    </div></section>
+  </main>
+  <script type="module" src="/auth/auth.js?v=20260729-auth-pages1"></script>
+</body>
+</html>

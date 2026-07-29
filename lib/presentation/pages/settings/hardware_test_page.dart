@@ -385,6 +385,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   late final TextEditingController _printerName;
   String _vendor = 'generic';
   String _protocol = 'vendor_sdk';
+  int _dataBits = 8;
+  int _stopBits = 1;
+  String _parity = 'none';
+  String _scaleUnit = 'kg';
   int _paperWidth = 80;
   int _step = 0;
   bool _working = false;
@@ -409,6 +413,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         TextEditingController(text: config['printerName']?.toString() ?? '');
     _vendor = config['vendor']?.toString() ?? 'generic';
     _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
+    _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
+    _stopBits = int.tryParse(config['stopBits']?.toString() ?? '') ?? 1;
+    _parity = config['parity']?.toString() ?? 'none';
+    _scaleUnit = config['defaultUnit']?.toString() ?? 'kg';
     _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 80;
   }
 
@@ -590,6 +598,65 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: _dataBits,
+                  decoration: const InputDecoration(labelText: 'Veri biti'),
+                  items: const [7, 8]
+                      .map((value) => DropdownMenuItem(
+                          value: value, child: Text('$value bit')))
+                      .toList(),
+                  onChanged: (value) => _dataBits = value ?? 8,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: _stopBits,
+                  decoration: const InputDecoration(labelText: 'Stop biti'),
+                  items: const [1, 2]
+                      .map((value) =>
+                          DropdownMenuItem(value: value, child: Text('$value')))
+                      .toList(),
+                  onChanged: (value) => _stopBits = value ?? 1,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _parity,
+                  decoration: const InputDecoration(labelText: 'Parite'),
+                  items: const {
+                    'none': 'Yok',
+                    'even': 'Çift',
+                    'odd': 'Tek',
+                  }
+                      .entries
+                      .map((entry) => DropdownMenuItem(
+                          value: entry.key, child: Text(entry.value)))
+                      .toList(),
+                  onChanged: (value) => _parity = value ?? 'none',
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (_type == HardwareDeviceType.scale) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _scaleUnit,
+            decoration: const InputDecoration(
+              labelText: 'Terazinin gönderdiği varsayılan birim',
+            ),
+            items: const [
+              DropdownMenuItem(value: 'kg', child: Text('Kilogram (kg)')),
+              DropdownMenuItem(value: 'g', child: Text('Gram (g)')),
+            ],
+            onChanged: (value) => _scaleUnit = value ?? 'kg',
+          ),
         ],
         if (_type == HardwareDeviceType.receiptPrinter &&
             _connection == HardwareConnectionType.windows) ...[
@@ -640,6 +707,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               DropdownMenuItem(value: 'ecr', child: Text('ECR')),
             ],
             onChanged: (value) => _protocol = value ?? 'vendor_sdk',
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'POS cihazı doğrudan bağlanmaz; seçilen banka/üretici SDK’sını kullanan Serenut POS Bridge bu IP ve portta çalışmalıdır.',
+            style: TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
         if (_type == HardwareDeviceType.receiptPrinter) ...[
@@ -694,12 +766,16 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     if (_name.text.trim().isEmpty) return 'Cihaz adı gereklidir.';
     if (_connection == HardwareConnectionType.tcp) {
       if (_host.text.trim().isEmpty) return 'IP adresi gereklidir.';
-      if (int.tryParse(_port.text) == null) return 'Port sayı olmalıdır.';
+      final port = int.tryParse(_port.text);
+      if (port == null || port < 1 || port > 65535) {
+        return 'Port 1-65535 arasında olmalıdır.';
+      }
     }
     if (_connection == HardwareConnectionType.serial) {
       if (_serialPort.text.trim().isEmpty) return 'COM portu gereklidir.';
-      if (int.tryParse(_baudRate.text) == null) {
-        return 'Baud değeri sayı olmalıdır.';
+      final baud = int.tryParse(_baudRate.text);
+      if (baud == null || baud <= 0) {
+        return 'Baud değeri sıfırdan büyük olmalıdır.';
       }
     }
     if (_connection == HardwareConnectionType.windows &&
@@ -727,10 +803,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'port': int.tryParse(_port.text) ?? _defaultPort(_type),
         'serialPort': _serialPort.text.trim(),
         'baudRate': int.tryParse(_baudRate.text) ?? 9600,
-        'dataBits': 8,
-        'stopBits': 1,
-        'parity': 'none',
-        'defaultUnit': 'kg',
+        'dataBits': _dataBits,
+        'stopBits': _stopBits,
+        'parity': _parity,
+        'defaultUnit': _scaleUnit,
         'printerName': _connection == HardwareConnectionType.embedded
             ? 'sunmi'
             : _connection == HardwareConnectionType.bluetooth

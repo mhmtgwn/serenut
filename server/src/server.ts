@@ -303,18 +303,26 @@ app.get(['/features', '/features.html'], (req, res) => {
 app.get(['/marketing/features', '/marketing/features.html', '/marketing/platform.html'], (req, res) => {
   res.redirect(301, '/platform.html');
 });
-app.get(['/login', '/login.html', '/signup', '/signup.html', '/register', '/register.html', '/reset-password'], (req, res) => {
-  res.sendFile(path.join(process.cwd(), 'public/app/index.html'));
+const authPages: Record<string, string> = {
+  '/login': 'login.html',
+  '/register': 'register.html',
+  '/forgot-password': 'forgot-password.html',
+  '/reset-password': 'reset-password.html',
+};
+Object.entries(authPages).forEach(([route, file]) => {
+  app.get(route, (_req, res) =>
+    res.sendFile(path.join(process.cwd(), 'public/auth', file)),
+  );
 });
 // ── STATIC WEB INTERFACES ────────────────────────────────────────────────────
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
+app.use('/auth', express.static(path.join(process.cwd(), 'public/auth')));
 
 // Automatically redirect /app (without trailing slash) to /app/ to avoid relative asset path resolution errors
 // Express'in varsayılan non-strict routing davranışında `/app` rotası `/app/`
 // isteğini de eşleştirir. Slash'li isteği tekrar kendisine yönlendirmek sonsuz
 // 301 döngüsü oluşturur; yalnız gerçekten slash'siz URL'yi yönlendir.
-app.get('/app', (req, res, next) => {
-  if (req.path === '/app/') return next();
+app.get(/^\/app$/, (_req, res) => {
   res.redirect(301, '/app/');
 });
 

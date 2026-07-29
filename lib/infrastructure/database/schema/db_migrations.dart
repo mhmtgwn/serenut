@@ -682,6 +682,66 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 39) {
+          final productColumns =
+              (await txn.rawQuery('PRAGMA table_info(products)'))
+                  .map((row) => row['name']?.toString())
+                  .toSet();
+          for (final table in const ['sale_items', 'order_items']) {
+            final tableInfo = await txn.rawQuery('PRAGMA table_info($table)');
+            if (tableInfo.isEmpty) continue;
+            final columns =
+                tableInfo.map((row) => row['name']?.toString()).toSet();
+            if (!columns.contains('product_name')) {
+              await txn
+                  .execute('ALTER TABLE $table ADD COLUMN product_name TEXT');
+            }
+            if (productColumns.contains('name') &&
+                productColumns.contains('id')) {
+              await txn.execute('''
+                UPDATE $table
+                   SET product_name = (
+                     SELECT p.name FROM products p
+                      WHERE p.id = $table.product_id
+                   )
+                 WHERE product_name IS NULL OR product_name = ''
+              ''');
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 39,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 40) {
+          final columns = (await txn.rawQuery('PRAGMA table_info(settings)'))
+              .map((row) => row['name']?.toString())
+              .toSet();
+          const additions = <String, String>{
+            'print_logo': 'INTEGER NOT NULL DEFAULT 1',
+            'print_customer_balance': 'INTEGER NOT NULL DEFAULT 1',
+            'receipt_font': "TEXT NOT NULL DEFAULT 'a'",
+            'receipt_text_size': "TEXT NOT NULL DEFAULT 'normal'",
+            'receipt_item_layout': "TEXT NOT NULL DEFAULT 'auto'",
+            'receipt_footer_text':
+                "TEXT NOT NULL DEFAULT 'Bizi tercih ettiğiniz için teşekkür ederiz!'",
+            'receipt_feed_lines': 'INTEGER NOT NULL DEFAULT 2',
+            'auto_cut_receipt': 'INTEGER NOT NULL DEFAULT 1',
+            'open_cash_drawer': 'INTEGER NOT NULL DEFAULT 1',
+          };
+          for (final column in additions.entries) {
+            if (!columns.contains(column.key)) {
+              await txn.execute(
+                  'ALTER TABLE settings ADD COLUMN ${column.key} ${column.value}');
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 40,
+            'migrated_at': DateTime.now().toUtc().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

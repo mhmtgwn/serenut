@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2100 500" role="img" aria-labelledby="title">
+  <title id="title">Serenut OS renkli yatay logo</title>
+  <g transform="translate(40 40) scale(.42)">
+    <g fill="#E6B134">
+      <rect x="420" y="80" width="160" height="840"/>
+      <rect x="80" y="420" width="840" height="160"/>
+    </g>
+    <g fill="#1B6B3C" transform="rotate(45 500 500)">
+      <rect x="420" y="80" width="160" height="840"/>
+      <rect x="80" y="420" width="840" height="160"/>
+    </g>
+  </g>
+  <text x="520" y="325" fill="#19231F" font-family="Outfit, Inter, 'Segoe UI', sans-serif" font-size="250" font-weight="700">Serenut OS</text>
+</svg>

@@ -236,7 +236,7 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _launchWebUrl(
-                                'https://serenut.com/?auth=register'),
+                                'https://serenut.com/register'),
                             icon:
                                 const Icon(Icons.person_add_rounded, size: 18),
                             label: const Text('Kayıt Ol'),
@@ -252,7 +252,7 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () => _launchWebUrl(
-                                'https://serenut.com/?auth=login'),
+                                'https://serenut.com/login'),
                             icon:
                                 const Icon(Icons.lock_reset_rounded, size: 18),
                             label: const Text('Şifremi Unuttum'),

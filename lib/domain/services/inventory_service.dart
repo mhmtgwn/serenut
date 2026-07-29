@@ -10,12 +10,14 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 /// Value class for sale/inventory item input
 class SaleItemInput {
   final String productId;
+  final String? productName;
   final int quantity;
   final double saleQuantity;
   final double unitPrice;
 
   SaleItemInput({
     required this.productId,
+    this.productName,
     required this.quantity,
     double? saleQuantity,
     required this.unitPrice,
@@ -23,6 +25,7 @@ class SaleItemInput {
 
   Map<String, dynamic> toMap() => {
         'product_id': productId,
+        'product_name': productName,
         'quantity': saleQuantity,
         'unit_price': unitPrice,
       };
@@ -74,9 +77,10 @@ class InventoryService {
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final int effectiveQty = (product != null && product.isWeighed && item.quantity >= 100)
-          ? item.saleQuantity.round()
-          : item.quantity;
+      final int effectiveQty =
+          (product != null && product.isWeighed && item.quantity >= 100)
+              ? item.saleQuantity.round()
+              : item.quantity;
       final qtyToDeduct = effectiveQty > 0 ? effectiveQty : 1;
 
       await _productRepository.decreaseStock(item.productId, qtyToDeduct);
@@ -97,9 +101,10 @@ class InventoryService {
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final int effectiveQty = (product != null && product.isWeighed && item.quantity >= 100)
-          ? item.saleQuantity.round()
-          : (item.quantity > 0 ? item.quantity : item.saleQuantity.round());
+      final int effectiveQty =
+          (product != null && product.isWeighed && item.quantity >= 100)
+              ? item.saleQuantity.round()
+              : (item.quantity > 0 ? item.quantity : item.saleQuantity.round());
       final qtyToApply = effectiveQty > 0 ? effectiveQty : 1;
 
       await _productRepository.increaseStock(item.productId, qtyToApply);

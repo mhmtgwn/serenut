@@ -178,9 +178,9 @@ class _Logo extends StatelessWidget {
           ),
           child: Center(
             child: Image.asset(
-              'assets/logo.png',
-              width: 60,
-              height: 60,
+              'assets/branding/app/icon-color-192.png',
+              width: 72,
+              height: 72,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const Icon(
                 Icons.store_rounded,

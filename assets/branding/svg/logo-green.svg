@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title">
+  <title id="title">Serenut yeşil tek renk amblem</title>
+  <g fill="#1B6B3C">
+    <rect x="420" y="80" width="160" height="840"/>
+    <rect x="80" y="420" width="840" height="160"/>
+    <g transform="rotate(45 500 500)">
+      <rect x="420" y="80" width="160" height="840"/>
+      <rect x="80" y="420" width="840" height="160"/>
+    </g>
+  </g>
+</svg>

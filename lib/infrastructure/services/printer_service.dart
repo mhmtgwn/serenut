@@ -2,6 +2,7 @@
 // Phase 4 — ESC/POS Thermal Printer Service
 // Updated: 24 Jun 2026 — Failover chain + persistent queue + platform guards
 
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show ByteData, rootBundle;
@@ -27,6 +28,8 @@ class EscPosCommands {
   static const List<int> alignRight = [0x1B, 0x61, 0x02];
   static const List<int> boldOn = [0x1B, 0x45, 0x01];
   static const List<int> boldOff = [0x1B, 0x45, 0x00];
+  static const List<int> fontA = [0x1B, 0x4D, 0x00];
+  static const List<int> fontB = [0x1B, 0x4D, 0x01];
   static const List<int> sizeNormal = [0x1D, 0x21, 0x00];
   static const List<int> sizeMedium = [
     0x1D,
@@ -141,17 +144,20 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final printerName = settings.printerName?.trim();
     final ip = settings.printerIp?.trim();
 
-    // Windows & iOS
+    // Windows & iOS. An explicit IP always means raw TCP; otherwise a Windows
+    // spooler printer name is used. This is especially important for the label
+    // route, whose synthetic printerName is "network".
     if (Platform.isWindows || Platform.isIOS) {
+      if (ip != null && ip.isNotEmpty) {
+        return PrinterBackend.network;
+      }
       if (Platform.isWindows &&
           printerName != null &&
           printerName.isNotEmpty &&
-          !printerName.contains('.')) {
+          printerName != 'network') {
         return PrinterBackend.usb;
       }
-      return (ip != null && ip.isNotEmpty)
-          ? PrinterBackend.network
-          : PrinterBackend.none;
+      return PrinterBackend.none;
     }
 
     // Android: Sunmi first, then USB, then network, then Bluetooth
@@ -231,13 +237,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final ip = settings.printerIp?.trim();
 
     if (Platform.isIOS || Platform.isWindows) {
+      if (ip != null && ip.isNotEmpty) {
+        chain.add(PrinterBackend.network);
+      }
       if (Platform.isWindows &&
           printerName != null &&
           printerName.isNotEmpty &&
-          !printerName.contains('.')) {
+          printerName != 'network') {
         chain.add(PrinterBackend.usb);
       }
-      chain.add(PrinterBackend.network);
+      if (chain.isEmpty) chain.add(PrinterBackend.none);
       return chain;
     }
 
@@ -318,9 +327,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   bool _hasPrinter(Settings settings) {
-    if (!kIsWeb && Platform.isAndroid) {
-      return true; // Android devices always support local/built-in printing fallbacks
-    }
     return (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
         (settings.printerName != null && settings.printerName!.isNotEmpty);
   }
@@ -386,25 +392,26 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   ) async {
     if (!_hasPrinter(settings)) return;
 
-    final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
-        ? 32
-        : 48;
+    final width = _receiptWidth(settings);
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
 
     // Trigger physical cash drawer open for cash transactions
-    if (sale.paymentMethod == 'cash') {
+    if (sale.paymentMethod == 'cash' && settings.openCashDrawer) {
       bytes.addAll(EscPosCommands.openDrawer);
     }
 
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
     bytes.addAll(
         [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(_receiptTypography(settings));
 
     // 0. Logo (Centred)
-    final logo = await _getLogoBytes(settings.businessLogo);
+    final logo = settings.printLogo
+        ? await _getLogoBytes(settings.businessLogo,
+            maxWidth: settings.paperWidth <= 58 ? 180 : 280)
+        : const <int>[];
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
       bytes.addAll(logo);
@@ -438,20 +445,26 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
     if (customer != null) {
       bytes.addAll(_textToBytes('Müşteri: ${customer.name}\n'));
-      final absBal = customer.balance.abs().toStringAsFixed(2);
-      if (customer.balance < 0) {
-        bytes.addAll(_textToBytes('Geçmiş Borç: $absBal $currency\n'));
-      } else if (customer.balance > 0) {
-        bytes.addAll(_textToBytes('Alacak: $absBal $currency\n'));
-      } else {
-        bytes.addAll(_textToBytes('Borç Durumu: Yok\n'));
+      if (settings.printCustomerBalance) {
+        final absBal = customer.balance.abs().toStringAsFixed(2);
+        if (customer.balance < 0) {
+          bytes.addAll(_textToBytes('Geçmiş Borç: $absBal $currency\n'));
+        } else if (customer.balance > 0) {
+          bytes.addAll(_textToBytes('Alacak: $absBal $currency\n'));
+        } else {
+          bytes.addAll(_textToBytes('Borç Durumu: Yok\n'));
+        }
       }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     // 3. Items (Tabular)
-    for (final item in items) {
-      final name = item['product_id']?.toString() ?? 'Ürün';
+    for (final item in settings.printProductDetails
+        ? items
+        : const <Map<String, dynamic>>[]) {
+      final name = item['product_name']?.toString().trim().isNotEmpty == true
+          ? item['product_name'].toString()
+          : item['product_id']?.toString() ?? 'Ürün';
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
       final subtotal = qty * price;
@@ -460,7 +473,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final left = '$name $details'.replaceAll('₺', 'TL');
       final right = '${subtotal.toStringAsFixed(2)} $currency';
 
-      if (left.length + right.length + 1 <= width) {
+      if (settings.receiptItemLayout == 'single') {
+        bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
+      } else if (settings.receiptItemLayout == 'auto' &&
+          left.length + right.length + 1 <= width) {
         bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
       } else {
         // Truncate name if it overflows width, preventing messy wrapping
@@ -469,6 +485,17 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
+      }
+      if (settings.printBarcode) {
+        final barcode =
+            item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
+        final barcodeBytes = _generateCode128Bytes(barcode);
+        if (barcodeBytes.isNotEmpty) {
+          bytes.addAll(EscPosCommands.alignCenter);
+          bytes.addAll(barcodeBytes);
+          bytes.addAll(EscPosCommands.lf);
+          bytes.addAll(EscPosCommands.alignLeft);
+        }
       }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
@@ -496,11 +523,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       bytes.addAll(EscPosCommands.lf);
     }
 
-    bytes
-        .addAll(_textToBytes('Bizi tercih ettiğiniz için\nteşekkür ederiz!\n'));
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(EscPosCommands.cut);
+    bytes.addAll(_textToBytes(
+        '${_wrapText(settings.receiptFooterText.trim(), width)}\n'));
+    for (var i = 0; i < settings.receiptFeedLines.clamp(0, 8); i++) {
+      bytes.addAll(EscPosCommands.lf);
+    }
+    if (settings.autoCutReceipt) bytes.addAll(EscPosCommands.cut);
 
     await _sendBytes(bytes, settings);
   }
@@ -517,19 +545,20 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }) async {
     if (!_hasPrinter(settings)) return;
 
-    final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
-        ? 32
-        : 48;
+    final width = _receiptWidth(settings);
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
     bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
     bytes.addAll(
         [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
+    bytes.addAll(_receiptTypography(settings));
 
     // 0. Logo (Centred)
-    final logo = await _getLogoBytes(settings.businessLogo);
+    final logo = settings.printLogo
+        ? await _getLogoBytes(settings.businessLogo,
+            maxWidth: settings.paperWidth <= 58 ? 180 : 280)
+        : const <int>[];
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
       bytes.addAll(logo);
@@ -568,13 +597,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       if (customer.phone.isNotEmpty) {
         bytes.addAll(_textToBytes('Tel: ${customer.phone}\n'));
       }
-      final absBal = customer.balance.abs().toStringAsFixed(2);
-      if (customer.balance < 0) {
-        bytes.addAll(_textToBytes('Geçmiş Borç: $absBal $currency\n'));
-      } else if (customer.balance > 0) {
-        bytes.addAll(_textToBytes('Alacak: $absBal $currency\n'));
-      } else {
-        bytes.addAll(_textToBytes('Borç Durumu: Yok\n'));
+      if (settings.printCustomerBalance) {
+        final absBal = customer.balance.abs().toStringAsFixed(2);
+        if (customer.balance < 0) {
+          bytes.addAll(_textToBytes('Geçmiş Borç: $absBal $currency\n'));
+        } else if (customer.balance > 0) {
+          bytes.addAll(_textToBytes('Alacak: $absBal $currency\n'));
+        } else {
+          bytes.addAll(_textToBytes('Borç Durumu: Yok\n'));
+        }
       }
     }
     if (notes != null && notes.isNotEmpty) {
@@ -584,8 +615,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     // 3. Items (Tabular)
     double totalAmount = 0.0;
-    for (final item in items) {
-      final name = item['product_id']?.toString() ?? 'Ürün';
+    for (final item in settings.printProductDetails
+        ? items
+        : const <Map<String, dynamic>>[]) {
+      final name = item['product_name']?.toString().trim().isNotEmpty == true
+          ? item['product_name'].toString()
+          : item['product_id']?.toString() ?? 'Ürün';
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
       final subtotal = qty * price;
@@ -595,7 +630,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final left = '$name $details'.replaceAll('₺', 'TL');
       final right = '${subtotal.toStringAsFixed(2)} $currency';
 
-      if (left.length + right.length + 1 <= width) {
+      if (settings.receiptItemLayout == 'single') {
+        bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
+      } else if (settings.receiptItemLayout == 'auto' &&
+          left.length + right.length + 1 <= width) {
         bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
       } else {
         final displayName =
@@ -603,6 +641,17 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
+      }
+      if (settings.printBarcode) {
+        final barcode =
+            item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
+        final barcodeBytes = _generateCode128Bytes(barcode);
+        if (barcodeBytes.isNotEmpty) {
+          bytes.addAll(EscPosCommands.alignCenter);
+          bytes.addAll(barcodeBytes);
+          bytes.addAll(EscPosCommands.lf);
+          bytes.addAll(EscPosCommands.alignLeft);
+        }
       }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
@@ -626,16 +675,18 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
-    // 5. QR Code (Always printed for orders delivery)
-    final qrData = 'order|${order.id}';
-    bytes.addAll(_generateQrCodeBytes(qrData));
-    bytes.addAll(EscPosCommands.lf);
+    if (settings.printQRCode) {
+      final qrData = 'order|${order.id}';
+      bytes.addAll(_generateQrCodeBytes(qrData));
+      bytes.addAll(EscPosCommands.lf);
+    }
 
-    bytes
-        .addAll(_textToBytes('Bizi tercih ettiğiniz için\nteşekkür ederiz!\n'));
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(EscPosCommands.cut);
+    bytes.addAll(_textToBytes(
+        '${_wrapText(settings.receiptFooterText.trim(), width)}\n'));
+    for (var i = 0; i < settings.receiptFeedLines.clamp(0, 8); i++) {
+      bytes.addAll(EscPosCommands.lf);
+    }
+    if (settings.autoCutReceipt) bytes.addAll(EscPosCommands.cut);
 
     await _sendBytes(bytes, settings);
   }
@@ -651,10 +702,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   ) async {
     if (!_hasPrinter(settings)) return;
 
-    final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
-        ? 32
-        : 48;
+    final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
@@ -746,10 +794,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   ) async {
     if (!_hasPrinter(settings)) return;
 
-    final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
-        ? 32
-        : 48;
+    final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
@@ -819,10 +864,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   ) async {
     if (!_hasPrinter(settings)) return;
 
-    final backend = await _detectBackend(settings);
-    final width = (backend == PrinterBackend.sunmi || settings.paperWidth == 58)
-        ? 32
-        : 48;
+    final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
 
     bytes.addAll(EscPosCommands.init);
@@ -893,6 +935,43 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     return left + (' ' * spaces) + right;
   }
 
+  int _receiptWidth(Settings settings) {
+    var width = settings.paperWidth <= 58
+        ? (settings.receiptFont == 'b' ? 42 : 32)
+        : (settings.receiptFont == 'b' ? 64 : 48);
+    if (settings.receiptTextSize == 'large') width ~/= 2;
+    return width;
+  }
+
+  List<int> _receiptTypography(Settings settings) => [
+        ...(settings.receiptFont == 'b'
+            ? EscPosCommands.fontB
+            : EscPosCommands.fontA),
+        ...(settings.receiptTextSize == 'large'
+            ? EscPosCommands.sizeLarge
+            : EscPosCommands.sizeNormal),
+      ];
+
+  String _wrapText(String text, int width) {
+    if (text.isEmpty) return '';
+    final lines = <String>[];
+    for (final paragraph in text.split('\n')) {
+      var line = '';
+      for (final word in paragraph.split(RegExp(r'\s+'))) {
+        if (line.isEmpty) {
+          line = word;
+        } else if (line.length + word.length + 1 <= width) {
+          line = '$line $word';
+        } else {
+          lines.add(line);
+          line = word;
+        }
+      }
+      if (line.isNotEmpty) lines.add(line);
+    }
+    return lines.join('\n');
+  }
+
   // Converts text to CP857 (Turkish) bytes safely for native printing
   List<int> _textToBytes(String text) {
     final List<int> bytes = [];
@@ -951,14 +1030,35 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   // Load and dither logo from settings or fallback asset
-  Future<List<int>> _getLogoBytes([String? logoPath]) async {
+  Future<List<int>> _getLogoBytes(String? logoPath,
+      {int maxWidth = 180}) async {
     if (_socketConnector != null) {
       // Test mode - bypass loading from assets/files to avoid errors
       return [];
     }
     try {
       Uint8List list;
-      if (!kIsWeb &&
+      if (logoPath != null && logoPath.startsWith('data:image/')) {
+        final comma = logoPath.indexOf(',');
+        if (comma < 0) return [];
+        list = base64Decode(logoPath.substring(comma + 1));
+      } else if (!kIsWeb &&
+          logoPath != null &&
+          (logoPath.startsWith('https://') || logoPath.startsWith('http://'))) {
+        final client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 5);
+        try {
+          final request = await client.getUrl(Uri.parse(logoPath));
+          final response = await request.close();
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw HttpException('Logo HTTP ${response.statusCode}');
+          }
+          list = Uint8List.fromList(await response
+              .fold<List<int>>([], (all, part) => all..addAll(part)));
+        } finally {
+          client.close(force: true);
+        }
+      } else if (!kIsWeb &&
           logoPath != null &&
           logoPath.isNotEmpty &&
           File(logoPath).existsSync()) {
@@ -969,8 +1069,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       }
       final img.Image? decoded = img.decodeImage(list);
       if (decoded != null) {
-        // Resize to 180px width for best receipt layout fit
-        final img.Image resized = img.copyResize(decoded, width: 180);
+        final targetWidth = decoded.width > maxWidth ? maxWidth : decoded.width;
+        final img.Image resized = img.copyResize(decoded, width: targetWidth);
         return _convertImageToEscPos(resized);
       }
     } catch (e) {
@@ -1038,6 +1138,26 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     ];
   }
 
+  /// Common Epson-compatible CODE128 subset B command. Non-ASCII identifiers
+  /// are skipped because silently replacing barcode data would make it scan to
+  /// the wrong product.
+  List<int> _generateCode128Bytes(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty ||
+        normalized.length > 120 ||
+        normalized.codeUnits.any((unit) => unit < 0x20 || unit > 0x7E)) {
+      return const [];
+    }
+    final data = <int>[0x7B, 0x42, ...normalized.codeUnits]; // {B + data
+    return [
+      0x1D, 0x48, 0x02, // Human-readable text below
+      0x1D, 0x68, 0x50, // Height: 80 dots
+      0x1D, 0x77, 0x02, // Module width
+      0x1D, 0x6B, 0x49, data.length,
+      ...data,
+    ];
+  }
+
   String _getPaymentLabel(String method) {
     switch (method.toLowerCase()) {
       case 'cash':
@@ -1064,15 +1184,13 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         _getSettingsForPurpose(settings, PrinterPurpose.label);
     if (!_hasPrinter(targetSettings)) return;
 
-    final backend = await _detectBackend(targetSettings);
-    final width =
-        (backend == PrinterBackend.sunmi || targetSettings.paperWidth == 58)
-            ? 32
-            : 48;
+    final width = targetSettings.paperWidth <= 58 ? 32 : 48;
     final List<int> allBytes = [];
 
     for (final item in items) {
-      final name = item['product_id']?.toString() ?? 'Ürün';
+      final name = item['product_name']?.toString().trim().isNotEmpty == true
+          ? item['product_name'].toString()
+          : item['product_id']?.toString() ?? 'Ürün';
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
 

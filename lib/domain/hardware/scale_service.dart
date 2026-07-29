@@ -78,6 +78,7 @@ class TcpScaleAdapter implements IScaleAdapter {
       _subscription = socket
           .cast<List<int>>()
           .transform(utf8.decoder)
+          .map((chunk) => chunk.replaceAll('\r', '\n'))
           .transform(const LineSplitter())
           .listen(_handleFrame, onError: _handleError, onDone: _handleDone);
     } catch (error) {
@@ -183,6 +184,7 @@ class SerialScaleAdapter implements IScaleAdapter {
       _subscription = _reader!.stream
           .cast<List<int>>()
           .transform(utf8.decoder)
+          .map((chunk) => chunk.replaceAll('\r', '\n'))
           .transform(const LineSplitter())
           .listen(_handleFrame, onError: _handleError);
     } catch (error) {

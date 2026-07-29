@@ -12,15 +12,16 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/config/theme.dart';
 
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kAmber = Color(0xFFEAB308);
-const _kRed = Color(0xFFDC2626);
-const _kSurface = Color(0xFFF8FAFC);
-const _kText = Color(0xFF0F172A);
-const _kTextSecondary = Color(0xFF64748B);
-const _kBorder = Color(0xFFE2E8F0);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kAmber = POSColors.amber;
+const _kRed = POSColors.red;
+const _kSurface = POSColors.surface;
+const _kText = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
+const _kBorder = POSColors.border;
 
 class ProductFormPage extends ConsumerStatefulWidget {
   final bool isEditing;

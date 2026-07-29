@@ -15,6 +15,7 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:serenutos/infrastructure/services/sms_gateway_service.dart';
+import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
 
 /// Builds SmsConfig from the current app Settings.
 SmsConfig? _buildSmsConfig(Settings? settings) {
@@ -40,6 +41,11 @@ final smsServiceProvider = Provider<SmsService>((ref) {
   final settings = settingsAsync.value;
   final config = _buildSmsConfig(settings);
   final apiClient = ref.watch(apiClientProvider);
+  final cloudOutbox = SmsCloudOutbox(apiClient);
+
+  // Delivery reports left by a previous offline session are retried whenever
+  // the SMS service is reconstructed (login, settings refresh, app restart).
+  cloudOutbox.flush();
 
   return SmsService(
     config: config,
@@ -47,23 +53,18 @@ final smsServiceProvider = Provider<SmsService>((ref) {
       await ref.read(settingsNotifierProvider.notifier).incrementSmsCounter();
     },
     onSmsDispatched: (phone, message, status, errorMessage, messageId) async {
-      try {
-        await apiClient.send(
-          'POST',
-          '/api/v1/notifications/sync-local',
-          body: {
-            'recipient': phone,
-            'body': message,
-            'status': status,
-            'error_message': errorMessage,
-            'channel': 'sms',
-            'client_message_id': messageId,
-            'created_at': DateTime.now().toIso8601String(),
-          },
-        );
-      } catch (e) {
-        // Silently catch sync errors to prevent blocking the UI/operation
-        debugPrint('❌ SMS Sync failed (usually offline): $e');
+      await cloudOutbox.enqueue({
+        'recipient': phone,
+        'body': message,
+        'status': status,
+        'error_message': errorMessage,
+        'channel': 'sms',
+        'client_message_id': messageId,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      final synced = await cloudOutbox.flush();
+      if (synced == 0) {
+        debugPrint('SMS teslim raporu çevrimdışı kuyruğa alındı: $messageId');
       }
     },
   );

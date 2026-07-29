@@ -13,18 +13,19 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
 import 'package:serenutos/presentation/pages/customer/ledger_explainability_sheet.dart';
+import 'package:serenutos/config/theme.dart';
 
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kGreenLight = Color(0xFFDCFCE7);
-const _kRed = Color(0xFFDC2626);
-const _kRedLight = Color(0xFFFEE2E2);
-const _kAmber = Color(0xFFEAB308);
-const _kAmberLight = Color(0xFFFEF9C3);
-const _kSurface = Color(0xFFF8FAFC);
-const _kText = Color(0xFF0F172A);
-const _kTextSecondary = Color(0xFF64748B);
-const _kBorder = Color(0xFFE2E8F0);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kGreenLight = POSColors.greenLight;
+const _kRed = POSColors.red;
+const _kRedLight = POSColors.redLight;
+const _kAmber = POSColors.amber;
+const _kAmberLight = POSColors.amberLight;
+const _kSurface = POSColors.surface;
+const _kText = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
+const _kBorder = POSColors.border;
 
 class CustomerDetailsPage extends ConsumerWidget {
   final String customerId;

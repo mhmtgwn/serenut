@@ -89,7 +89,7 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json(createError('AUTH005'));
   }
 
-  const { expected_version, name, address, phone, tax_office, owner_name, type, city, district, currency, logo_url } = req.body;
+  const { expected_version, name, address, phone, email, tax_number, tax_office, owner_name, type, city, district, currency, logo_url } = req.body;
 
   if (expected_version === undefined || expected_version === null) {
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'expected_version gereklidir.' } });
@@ -121,6 +121,8 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     if (name !== undefined) { updates.push(`name = $${idx++}`); values.push(name.trim()); }
     if (address !== undefined) { updates.push(`address = $${idx++}`); values.push(address); }
     if (phone !== undefined) { updates.push(`phone = $${idx++}`); values.push(phone); }
+    if (email !== undefined) { updates.push(`email = $${idx++}`); values.push(email); }
+    if (tax_number !== undefined) { updates.push(`tax_number = $${idx++}`); values.push(tax_number); }
     if (tax_office !== undefined) { updates.push(`tax_office = $${idx++}`); values.push(tax_office); }
     if (owner_name !== undefined) { updates.push(`owner_name = $${idx++}`); values.push(owner_name); }
     if (type !== undefined) { updates.push(`type = $${idx++}`); values.push(type); }

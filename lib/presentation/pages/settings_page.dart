@@ -407,6 +407,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
             title: 'İşletme Bilgileri'),
       ));
+      group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Fiş Tasarımı',
+        subtitle:
+            '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
+        icon: Icons.receipt_long_rounded,
+        color: _kBlue,
+        onTap: () => _runGuardedAction(
+            Permission.settingsReceipt, () => _showReceiptSettings(settings),
+            title: 'Fiş Tasarımı'),
+      ));
     }
     if (_hasPermission(currentUser, Permission.settingsDatabase) &&
         (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') ||
