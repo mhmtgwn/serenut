@@ -25,6 +25,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
+import 'package:serenutos/presentation/controllers/products_controller.dart';
 
 // ── Sync Status ───────────────────────────────────────────────────────────────
 enum SyncStatus { idle, syncing, success, error }
@@ -242,6 +243,9 @@ class SyncNotifier extends StateNotifier<SyncState>
         _ref.invalidate(salesControllerProvider);
         _ref.invalidate(salesHistoryControllerProvider);
         _ref.invalidate(customersControllerProvider);
+        _ref.invalidate(productsControllerProvider);
+        _ref.invalidate(salesProductsControllerProvider);
+        _ref.invalidate(ordersProductsControllerProvider);
         _ref.invalidate(allProductsProvider);
         _ref.invalidate(allCustomersProvider);
         _ref.invalidate(allSalesProvider);

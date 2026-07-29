@@ -73,6 +73,7 @@ void main() {
     ).sync();
 
     expect(result.success, isTrue);
+    expect(result.pulled, 4);
     expect(
         (await db.query('products', where: 'id = ?', whereArgs: ['prod-1']))
             .single['name'],

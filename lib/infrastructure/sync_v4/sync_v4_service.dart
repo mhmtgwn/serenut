@@ -152,6 +152,7 @@ class SyncV4Service {
     final state = await db.query('sync_cursor_v4',
         where: 'key = ?', whereArgs: ['global'], limit: 1);
     var cursor = state.isEmpty ? 0 : _syncInt(state.first['cursor']);
+    var pulled = 0;
 
     // A fresh installation cannot reconstruct a tenant from a change log that
     // started after the tenant's original records were created. Hydrate from
@@ -174,8 +175,10 @@ class SyncV4Service {
         await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': cursor},
             conflictAlgorithm: ConflictAlgorithm.replace);
       });
+      // Bootstrap rows are remote changes too. Counting them ensures consumers
+      // invalidate their in-memory lists immediately after first hydration.
+      pulled += snapshot.length;
     }
-    var pulled = 0;
     while (true) {
       final response = await _api.get(
         '/api/v4/sync/pull?cursor=$cursor&limit=200&device_activation_id=$deviceActivationId&device_id=$deviceId',
