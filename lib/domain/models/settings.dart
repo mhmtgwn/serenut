@@ -67,9 +67,15 @@ class Settings {
   final int smsAutoDebtReminderDays;
   final double smsAutoDebtReminderMinAmount;
   final bool labelPrinterEnabled;
+  final String? labelPrinterName;
   final String? labelPrinterIp;
   final int labelPrinterPort;
   final int labelPrinterCopies;
+  final String labelPrinterLanguage;
+  final int labelWidthMm;
+  final int labelHeightMm;
+  final int labelGapMm;
+  final int labelDpi;
   final String? adminPinCode;
 
   // SMS SIM ve Limit Ayarları (Sprint 10)
@@ -126,9 +132,15 @@ class Settings {
     this.smsAutoDebtReminderDays = 15,
     this.smsAutoDebtReminderMinAmount = 100.0,
     this.labelPrinterEnabled = false,
+    this.labelPrinterName,
     this.labelPrinterIp,
     this.labelPrinterPort = 9100,
     this.labelPrinterCopies = 1,
+    this.labelPrinterLanguage = 'tspl',
+    this.labelWidthMm = 50,
+    this.labelHeightMm = 30,
+    this.labelGapMm = 2,
+    this.labelDpi = 203,
     this.adminPinCode,
     this.smsSimSubscriptionId,
     this.smsSimSlotIndex,
@@ -207,9 +219,15 @@ class Settings {
           (map['sms_auto_debt_reminder_min_amount'] as num?)?.toDouble() ??
               100.0,
       labelPrinterEnabled: (map['label_printer_enabled'] as int?) == 1,
+      labelPrinterName: map['label_printer_name'] as String?,
       labelPrinterIp: map['label_printer_ip'] as String?,
       labelPrinterPort: (map['label_printer_port'] as int?) ?? 9100,
       labelPrinterCopies: (map['label_printer_copies'] as int?) ?? 1,
+      labelPrinterLanguage: map['label_printer_language'] as String? ?? 'tspl',
+      labelWidthMm: (map['label_width_mm'] as int?) ?? 50,
+      labelHeightMm: (map['label_height_mm'] as int?) ?? 30,
+      labelGapMm: (map['label_gap_mm'] as int?) ?? 2,
+      labelDpi: (map['label_dpi'] as int?) ?? 203,
       adminPinCode: map['admin_pin_code'] as String?,
 
       // Sprint 10 SIM SMS and Limits
@@ -270,9 +288,15 @@ class Settings {
       'sms_auto_debt_reminder_days': smsAutoDebtReminderDays,
       'sms_auto_debt_reminder_min_amount': smsAutoDebtReminderMinAmount,
       'label_printer_enabled': labelPrinterEnabled ? 1 : 0,
+      'label_printer_name': labelPrinterName,
       'label_printer_ip': labelPrinterIp,
       'label_printer_port': labelPrinterPort,
       'label_printer_copies': labelPrinterCopies,
+      'label_printer_language': labelPrinterLanguage,
+      'label_width_mm': labelWidthMm,
+      'label_height_mm': labelHeightMm,
+      'label_gap_mm': labelGapMm,
+      'label_dpi': labelDpi,
       'admin_pin_code': adminPinCode,
       'sms_sim_subscription_id': smsSimSubscriptionId,
       'sms_sim_slot_index': smsSimSlotIndex,
@@ -334,9 +358,15 @@ class Settings {
     int? smsAutoDebtReminderDays,
     double? smsAutoDebtReminderMinAmount,
     bool? labelPrinterEnabled,
+    String? labelPrinterName,
     String? labelPrinterIp,
     int? labelPrinterPort,
     int? labelPrinterCopies,
+    String? labelPrinterLanguage,
+    int? labelWidthMm,
+    int? labelHeightMm,
+    int? labelGapMm,
+    int? labelDpi,
     Object? adminPinCode = const _Unset(),
     int? smsSimSubscriptionId,
     int? smsSimSlotIndex,
@@ -397,9 +427,15 @@ class Settings {
       smsAutoDebtReminderMinAmount:
           smsAutoDebtReminderMinAmount ?? this.smsAutoDebtReminderMinAmount,
       labelPrinterEnabled: labelPrinterEnabled ?? this.labelPrinterEnabled,
+      labelPrinterName: labelPrinterName ?? this.labelPrinterName,
       labelPrinterIp: labelPrinterIp ?? this.labelPrinterIp,
       labelPrinterPort: labelPrinterPort ?? this.labelPrinterPort,
       labelPrinterCopies: labelPrinterCopies ?? this.labelPrinterCopies,
+      labelPrinterLanguage: labelPrinterLanguage ?? this.labelPrinterLanguage,
+      labelWidthMm: labelWidthMm ?? this.labelWidthMm,
+      labelHeightMm: labelHeightMm ?? this.labelHeightMm,
+      labelGapMm: labelGapMm ?? this.labelGapMm,
+      labelDpi: labelDpi ?? this.labelDpi,
       adminPinCode:
           adminPinCode is _Unset ? this.adminPinCode : adminPinCode as String?,
       smsSimSubscriptionId: smsSimSubscriptionId ?? this.smsSimSubscriptionId,

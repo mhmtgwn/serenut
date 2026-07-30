@@ -60,14 +60,26 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       ));
     }
     if (settings.labelPrinterEnabled) {
+      final labelPrinterName = settings.labelPrinterName ?? '';
+      final labelPrinterIp = settings.labelPrinterIp ?? '';
       devices.add(HardwareDevice(
         id: 'label-printer-primary',
-        name: 'Etiket Yazıcısı',
+        name:
+            labelPrinterName.isNotEmpty ? labelPrinterName : 'Etiket Yazıcısı',
         type: HardwareDeviceType.labelPrinter,
-        connectionType: HardwareConnectionType.tcp,
+        connectionType: labelPrinterIp.isNotEmpty
+            ? HardwareConnectionType.tcp
+            : _printerConnection(labelPrinterName),
         configuration: {
-          'host': settings.labelPrinterIp ?? '',
+          'printerName': labelPrinterName,
+          'host': labelPrinterIp,
           'port': settings.labelPrinterPort,
+          'language': settings.labelPrinterLanguage,
+          'labelWidthMm': settings.labelWidthMm,
+          'labelHeightMm': settings.labelHeightMm,
+          'labelGapMm': settings.labelGapMm,
+          'dpi': settings.labelDpi,
+          'copies': settings.labelPrinterCopies,
         },
       ));
     }
@@ -220,13 +232,23 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
             .timeout(const Duration(seconds: 8));
         return 'Fiş yazıcısı bağlantısı hazır';
       case HardwareDeviceType.labelPrinter:
-        final host = device.configuration['host'] as String? ?? '';
-        if (host.isEmpty) throw 'Etiket yazıcısı IP adresi eksik.';
+        final current = await _settings();
+        final candidate = current.copyWith(
+          labelPrinterEnabled: true,
+          labelPrinterName: config['printerName'] as String? ?? device.name,
+          labelPrinterIp: config['host'] as String? ?? '',
+          labelPrinterPort: _int(config['port'], 9100),
+          labelPrinterLanguage: config['language'] as String? ?? 'tspl',
+          labelWidthMm: _int(config['labelWidthMm'], 50),
+          labelHeightMm: _int(config['labelHeightMm'], 30),
+          labelGapMm: _int(config['labelGapMm'], 2),
+          labelDpi: _int(config['dpi'], 203),
+        );
         await ref
             .read(printerServiceProvider)
-            .testConnection(host, _int(device.configuration['port'], 9100))
+            .testLabelPrinterConnection(candidate)
             .timeout(const Duration(seconds: 8));
-        return 'Etiket yazıcısı bağlantısı hazır';
+        return 'Etiket yazıcısı bağlantısı ve fiziksel ölçü testi hazır';
       case HardwareDeviceType.barcodeScanner:
         final scanner = ref.read(scannerServiceProvider);
         await scanner.initialize();
@@ -293,8 +315,16 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         await ref.read(settingsNotifierProvider.notifier).updateSettings(
               settings.copyWith(
                 labelPrinterEnabled: device.enabled,
+                labelPrinterName: config['printerName'] as String? ?? '',
                 labelPrinterIp: config['host'] as String? ?? '',
                 labelPrinterPort: _int(config['port'], 9100),
+                labelPrinterLanguage: config['language'] as String? ?? 'tspl',
+                labelWidthMm: _int(config['labelWidthMm'], 50),
+                labelHeightMm: _int(config['labelHeightMm'], 30),
+                labelGapMm: _int(config['labelGapMm'], 2),
+                labelDpi: _int(config['dpi'], 203),
+                labelPrinterCopies:
+                    _int(config['copies'], 1).clamp(1, 20).toInt(),
               ),
             );
         return;

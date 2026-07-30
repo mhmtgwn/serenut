@@ -9,6 +9,7 @@ import 'package:serenutos/domain/services/sales_service.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
+import 'package:serenutos/config/theme.dart';
 
 class SaleDetailsPage extends ConsumerWidget {
   final String saleId;
@@ -27,7 +28,7 @@ class SaleDetailsPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: POSColors.surface,
       appBar: AppBar(
         title: Text('Satış Detayı #${saleId.toShortId}'),
         backgroundColor: Colors.white,

@@ -3,7 +3,6 @@
 // 3-tab layout: Sales | Products | Customer Debt + Cloud BI
 // Generated: 21 Jun 2026
 
-import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,7 +17,6 @@ import 'package:serenutos/domain/services/document_export_service.dart';
 // Sprint 7 Cloud BI Imports
 import 'package:serenutos/domain/models/analytics_models.dart';
 import 'package:serenutos/infrastructure/repositories/cloud_analytics_repository.dart';
-import 'package:serenutos/infrastructure/services/analytics_ws_service.dart';
 import 'package:serenutos/providers/auth_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:serenutos/presentation/widgets/reports/sales_tab.dart';
@@ -39,70 +37,16 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
   late TabController _tabController;
   DateRange _selectedRange = DateRange.thisMonth();
   bool _isLoading = false;
-  AnalyticsWsService? _wsService;
-  DashboardMetrics? _liveMetrics;
-  // DÜZELTME: StreamSubscription tutularak dispose'da cancel() çağrılabilsin
-  StreamSubscription<dynamic>? _wsSub;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-        length: 6, vsync: this); // Extended to 6 tabs (including Cloud BI)
-    _setupWebSocket();
-  }
-
-  void _setupWebSocket() {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        final authState = ref.read(authProvider);
-        final token = authState.token;
-        if (token != null) {
-          _wsService = ref.read(analyticsWsServiceProvider);
-          await _wsService!.connect(jwtToken: token);
-          // DÜZELTME: mounted kontrolü connect()'ten SONRA yapılıyor
-          if (!mounted) return;
-          _wsSub = _wsService!.eventStream.listen((event) {
-            if (event['event'] == 'sale_sync' && mounted) {
-              // Trigger reload of Cloud BI data or update local cache
-              setState(() {
-                // Instantly update Today Revenue for micro-animation
-                if (_liveMetrics != null) {
-                  final newSaleAmt =
-                      (event['data']['total_amount'] as num).toDouble();
-                  _liveMetrics = DashboardMetrics(
-                    todayRevenue: _liveMetrics!.todayRevenue + newSaleAmt,
-                    todayOrders: _liveMetrics!.todayOrders + 1,
-                    avgBasket: _liveMetrics!.todayOrders + 1 > 0
-                        ? ((_liveMetrics!.todayRevenue + newSaleAmt) /
-                                (_liveMetrics!.todayOrders + 1))
-                            .round()
-                        : 0,
-                    weeklyRevenue: _liveMetrics!.weeklyRevenue + newSaleAmt,
-                    weeklyGrowth: _liveMetrics!.weeklyGrowth,
-                    monthlyRevenue: _liveMetrics!.monthlyRevenue + newSaleAmt,
-                    monthlyGrowth: _liveMetrics!.monthlyGrowth,
-                    topProduct: _liveMetrics!.topProduct,
-                    busiestHour: _liveMetrics!.busiestHour,
-                    paymentBreakdown: _liveMetrics!.paymentBreakdown,
-                  );
-                }
-              });
-            }
-          });
-        }
-      } catch (e) {
-        debugPrint('[ReportsPage] WebSocket bağlantı hatası: $e');
-      }
-    });
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    // DÜZELTME: StreamSubscription cancel eklendi — bellek sızıntısı giderildi
-    _wsSub?.cancel();
-    _wsService?.disconnect();
     super.dispose();
   }
 
@@ -205,66 +149,13 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
     return Scaffold(
       backgroundColor: POSColors.surface,
       appBar: AppBar(
-        title: const Text('Raporlar & Analitik'),
+        title: const Text('Raporlar'),
         backgroundColor: Colors.white,
         foregroundColor: POSColors.text,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         iconTheme: const IconThemeData(color: POSColors.green),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(96),
-          child: Column(
-            children: [
-              // Date Range Picker
-              _DateRangePicker(
-                selected: _selectedRange,
-                onSelected: _onRangeSelected,
-              ),
-              // Tab Bar (Real-time Cloud tabs are hidden if offline)
-              TabBar(
-                controller: _tabController,
-                labelColor: POSColors.green,
-                unselectedLabelColor: POSColors.textSecondary,
-                indicatorColor: POSColors.green,
-                indicatorWeight: 2,
-                isScrollable: true,
-                tabs: [
-                  const Tab(
-                      icon: Icon(Icons.trending_up, size: 18), text: 'Satış'),
-                  const Tab(
-                      icon: Icon(Icons.inventory_2_outlined, size: 18),
-                      text: 'Ürün'),
-                  const Tab(
-                      icon:
-                          Icon(Icons.account_balance_wallet_outlined, size: 18),
-                      text: 'Borç'),
-                  const Tab(
-                      icon: Icon(Icons.bar_chart_rounded, size: 18),
-                      text: 'Grafikler'),
-                  if (isOnline)
-                    const Tab(
-                        icon: Icon(Icons.cloud_done_rounded, size: 18),
-                        text: 'Cloud BI'),
-                  if (isOnline)
-                    const Tab(
-                        icon: Icon(Icons.people_alt_outlined, size: 18),
-                        text: 'Kasiyer/Şube'),
-                ],
-              ),
-            ],
-          ),
-        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Yenile',
-            onPressed: _isLoading
-                ? null
-                : () {
-                    ref.read(reportControllerProvider.notifier).refresh();
-                    setState(() {}); // Triggers FutureBuilder redraw
-                  },
-          ),
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -346,21 +237,46 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
             ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          SalesTab(range: _selectedRange),
-          _ProductsTab(range: _selectedRange),
-          const _DebtTab(),
-          _AnalyticsTab(range: _selectedRange),
-          if (isOnline)
-            _CloudBiTab(
-                onMetricsLoaded: (metrics) {
-                  _liveMetrics ??= metrics;
-                },
-                liveMetrics: _liveMetrics),
-          if (isOnline) const _CloudStaffBranchTab(),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _DateRangePicker(
+              selected: _selectedRange,
+              onSelected: _onRangeSelected,
+            ),
+            ColoredBox(
+              color: Colors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: POSColors.green,
+                unselectedLabelColor: POSColors.textSecondary,
+                indicatorColor: POSColors.green,
+                indicatorWeight: 2,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: const [
+                  Tab(text: 'Satış'),
+                  Tab(text: 'Ürünler'),
+                  Tab(text: 'Borçlar'),
+                  Tab(text: 'Grafikler'),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  SalesTab(range: _selectedRange),
+                  _ProductsTab(range: _selectedRange),
+                  const _DebtTab(),
+                  _AnalyticsTab(range: _selectedRange),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -370,6 +286,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
 // Sprint 7 Cloud BI Tabs and Widgets
 // ════════════════════════════════════════════════════════════
 
+// Bulut rapor bileşenleri sonraki sunucu raporu sürümü için korunuyor; ana
+// rapor ekranında yalnızca doğrulanmış yerel raporlar gösteriliyor.
+// ignore: unused_element
 class _CloudBiTab extends ConsumerWidget {
   final Function(DashboardMetrics) onMetricsLoaded;
   final DashboardMetrics? liveMetrics;
@@ -914,6 +833,7 @@ class _CloudStockAlertWidget extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _CloudStaffBranchTab extends ConsumerWidget {
   const _CloudStaffBranchTab();
 
@@ -1140,12 +1060,11 @@ class _DateRangePicker extends StatelessWidget {
                             horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
                           color:
-                              isSelected ? POSColors.green : Colors.grey[100],
+                              isSelected ? POSColors.green : POSColors.surface,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected
-                                ? POSColors.green
-                                : Colors.grey[300]!,
+                            color:
+                                isSelected ? POSColors.green : POSColors.border,
                           ),
                         ),
                         child: Text(
@@ -1155,7 +1074,9 @@ class _DateRangePicker extends StatelessWidget {
                             fontWeight: isSelected
                                 ? FontWeight.bold
                                 : FontWeight.normal,
-                            color: isSelected ? Colors.white : Colors.grey[700],
+                            color: isSelected
+                                ? Colors.white
+                                : POSColors.textSecondary,
                           ),
                         ),
                       ),
@@ -1350,7 +1271,7 @@ class _ProductsTab extends ConsumerWidget {
                   ),
                 ),
                 if (i < products.length - 1)
-                  Divider(height: 1, color: Colors.grey[100]),
+                  const Divider(height: 1, color: POSColors.border),
               ],
             ),
           );
@@ -1465,7 +1386,7 @@ class _DebtTab extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: POSColors.surface,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey[200]!),
           ),
@@ -1499,9 +1420,9 @@ class _DebtTab extends ConsumerWidget {
           // Table header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: const BorderRadius.only(
+            decoration: const BoxDecoration(
+              color: POSColors.surface,
+              borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
               ),
@@ -1682,7 +1603,7 @@ Widget _emptyState(String message) {
   return Container(
     padding: const EdgeInsets.all(40),
     decoration: BoxDecoration(
-      color: Colors.grey[50],
+      color: POSColors.surface,
       borderRadius: BorderRadius.circular(12),
     ),
     child: Center(

@@ -11,12 +11,14 @@ import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/dataset_import_service.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
+import 'package:serenutos/config/theme.dart';
 
-const _kPrimary = Color(0xFF10B981); // Emerald Green
-const _kBackground = Color(0xFF0F172A); // Slate 900
-const _kCardBg = Color(0xFF1E293B); // Slate 800
-const _kBorderColor = Color(0xFF334155);
-const _kTextMuted = Color(0xFF94A3B8);
+const _kPrimary = POSColors.green;
+const _kBackground = POSColors.surface;
+const _kCardBg = POSColors.card;
+const _kBorderColor = POSColors.border;
+const _kTextMuted = POSColors.textSecondary;
+const _kText = POSColors.text;
 
 class CatalogImportWizardPage extends ConsumerStatefulWidget {
   const CatalogImportWizardPage({super.key});
@@ -185,11 +187,11 @@ class _CatalogImportWizardPageState
       backgroundColor: _kBackground,
       appBar: AppBar(
         title: const Text('Katalog İçe Aktarma Sihirbazı',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: _kText, fontWeight: FontWeight.bold)),
         backgroundColor: _kCardBg,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: _kPrimary),
           onPressed: () {
             if (_isAnalyzing || _isImporting) {
               // Prevent leaving mid-process easily
@@ -204,7 +206,9 @@ class _CatalogImportWizardPageState
           _buildStepProgressIndicator(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.all(
+                MediaQuery.sizeOf(context).width < 600 ? 12 : 24,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 700),
@@ -215,7 +219,9 @@ class _CatalogImportWizardPageState
                       side: const BorderSide(color: _kBorderColor, width: 1),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(32.0),
+                      padding: EdgeInsets.all(
+                        MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+                      ),
                       child: _buildCurrentStepView(),
                     ),
                   ),
@@ -231,6 +237,37 @@ class _CatalogImportWizardPageState
   // ── STEP PROGRESS INDICATOR ────────────────────────────────────────────────
   Widget _buildStepProgressIndicator() {
     final steps = ['Dosya Seç', 'Çözümle', 'Önizleme', 'Aktar', 'Sonuç'];
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return Container(
+        color: _kCardBg,
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Adım ${_currentStep + 1}/${steps.length} · ${steps[_currentStep]}',
+                style: const TextStyle(
+                  color: _kText,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 96,
+              child: LinearProgressIndicator(
+                value: (_currentStep + 1) / steps.length,
+                minHeight: 5,
+                borderRadius: BorderRadius.circular(5),
+                backgroundColor: POSColors.surfaceMuted,
+                valueColor: const AlwaysStoppedAnimation(_kPrimary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       color: _kCardBg,
       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
@@ -249,8 +286,8 @@ class _CatalogImportWizardPageState
                     color: isCompleted
                         ? _kPrimary
                         : isActive
-                            ? Colors.blueAccent
-                            : const Color(0xFF334155),
+                            ? _kPrimary
+                            : POSColors.surfaceMuted,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -258,8 +295,8 @@ class _CatalogImportWizardPageState
                         ? const Icon(Icons.check, color: Colors.white, size: 16)
                         : Text(
                             '${idx + 1}',
-                            style: const TextStyle(
-                                color: Colors.white,
+                            style: TextStyle(
+                                color: isActive ? Colors.white : _kTextMuted,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13),
                           ),
@@ -273,7 +310,7 @@ class _CatalogImportWizardPageState
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: isActive
-                          ? Colors.white
+                          ? _kText
                           : isCompleted
                               ? _kPrimary
                               : _kTextMuted,
@@ -333,7 +370,7 @@ class _CatalogImportWizardPageState
         const Text(
           'Katalog Dosyası Seçin',
           style: TextStyle(
-              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -350,11 +387,10 @@ class _CatalogImportWizardPageState
           child: Container(
             height: 160,
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
+              color: POSColors.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color:
-                    _selectedFile != null ? _kPrimary : const Color(0xFF475569),
+                color: _selectedFile != null ? _kPrimary : _kBorderColor,
                 style: BorderStyle.solid,
                 width: 1.5,
               ),
@@ -366,7 +402,7 @@ class _CatalogImportWizardPageState
                   _selectedFile != null
                       ? Icons.insert_drive_file_rounded
                       : Icons.cloud_upload_rounded,
-                  color: _selectedFile != null ? _kPrimary : Colors.blueAccent,
+                  color: _kPrimary,
                   size: 48,
                 ),
                 const SizedBox(height: 16),
@@ -375,9 +411,7 @@ class _CatalogImportWizardPageState
                       ? _selectedFile!.name
                       : 'Tıklayın ve Dosya Seçin',
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600),
+                      color: _kText, fontSize: 14, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
@@ -400,7 +434,7 @@ class _CatalogImportWizardPageState
               child: OutlinedButton(
                 onPressed: () => context.pop(),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
+                  foregroundColor: _kPrimary,
                   side: const BorderSide(color: _kBorderColor),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -412,10 +446,10 @@ class _CatalogImportWizardPageState
               child: ElevatedButton(
                 onPressed: _selectedFile != null ? _startAnalysis : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
+                  backgroundColor: _kPrimary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  disabledBackgroundColor: const Color(0xFF334155),
+                  disabledBackgroundColor: _kBorderColor,
                   disabledForegroundColor: _kTextMuted,
                 ),
                 child: const Text('Çözümlemeyi Başlat',
@@ -437,7 +471,7 @@ class _CatalogImportWizardPageState
           height: 60,
           width: 60,
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(Colors.blueAccent),
+            valueColor: AlwaysStoppedAnimation(_kPrimary),
             strokeWidth: 4.5,
           ),
         ),
@@ -445,7 +479,7 @@ class _CatalogImportWizardPageState
         const Text(
           'Katalog Dosyası Çözümleniyor',
           style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
@@ -456,7 +490,7 @@ class _CatalogImportWizardPageState
         const SizedBox(height: 24),
         LinearProgressIndicator(
           value: _analyzeProgress,
-          backgroundColor: const Color(0xFF0F172A),
+          backgroundColor: POSColors.surfaceMuted,
           valueColor: const AlwaysStoppedAnimation(_kPrimary),
           borderRadius: BorderRadius.circular(4),
           minHeight: 8,
@@ -465,7 +499,7 @@ class _CatalogImportWizardPageState
         Text(
           '${(_analyzeProgress * 100).toInt()}%',
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              color: _kText, fontWeight: FontWeight.bold, fontSize: 13),
         ),
         const SizedBox(height: 24),
       ],
@@ -491,7 +525,7 @@ class _CatalogImportWizardPageState
         const Text(
           'Önizleme ve İçe Aktarma Seçenekleri',
           style: TextStyle(
-              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
@@ -524,7 +558,7 @@ class _CatalogImportWizardPageState
         const Text(
           'İçe Aktarma Stratejisi',
           style: TextStyle(
-              color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 15, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
 
@@ -579,7 +613,7 @@ class _CatalogImportWizardPageState
                           setState(() => _duplicateResolution = val!),
                     ),
                     const Text('Mevcut Stoka Ekle (Topla)',
-                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                        style: TextStyle(color: _kText, fontSize: 13)),
                     const SizedBox(width: 16),
                     Radio<DuplicateResolution>(
                       value: DuplicateResolution.update,
@@ -589,7 +623,7 @@ class _CatalogImportWizardPageState
                           setState(() => _duplicateResolution = val!),
                     ),
                     const Text('Yeni Stokla Değiştir (Üzerine Yaz)',
-                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                        style: TextStyle(color: _kText, fontSize: 13)),
                   ],
                 ),
               ],
@@ -613,7 +647,7 @@ class _CatalogImportWizardPageState
               child: OutlinedButton(
                 onPressed: () => setState(() => _currentStep = 0),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
+                  foregroundColor: _kPrimary,
                   side: const BorderSide(color: _kBorderColor),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -656,7 +690,7 @@ class _CatalogImportWizardPageState
         const Text(
           'Katalog Veritabanına Yazılıyor',
           style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
@@ -667,7 +701,7 @@ class _CatalogImportWizardPageState
         const SizedBox(height: 24),
         LinearProgressIndicator(
           value: _importProgress,
-          backgroundColor: const Color(0xFF0F172A),
+          backgroundColor: POSColors.surfaceMuted,
           valueColor: const AlwaysStoppedAnimation(_kPrimary),
           borderRadius: BorderRadius.circular(4),
           minHeight: 8,
@@ -676,7 +710,7 @@ class _CatalogImportWizardPageState
         Text(
           '${(_importProgress * 100).toInt()}%',
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              color: _kText, fontWeight: FontWeight.bold, fontSize: 13),
         ),
         const SizedBox(height: 24),
       ],
@@ -702,7 +736,7 @@ class _CatalogImportWizardPageState
         const Text(
           'İçe Aktarma Tamamlandı!',
           style: TextStyle(
-              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 18, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -717,7 +751,7 @@ class _CatalogImportWizardPageState
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: POSColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: _kBorderColor),
           ),
@@ -756,7 +790,7 @@ class _CatalogImportWizardPageState
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: POSColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kBorderColor),
       ),
@@ -768,9 +802,7 @@ class _CatalogImportWizardPageState
           const SizedBox(height: 4),
           Text(value,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold)),
+                  color: _kText, fontSize: 14, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -783,7 +815,7 @@ class _CatalogImportWizardPageState
       onChanged: onChanged,
       title: Text(title,
           style: const TextStyle(
-              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              color: _kText, fontSize: 14, fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle,
           style: const TextStyle(color: _kTextMuted, fontSize: 12)),
       activeColor: _kPrimary,
@@ -797,8 +829,7 @@ class _CatalogImportWizardPageState
     return CheckboxListTile(
       value: value,
       onChanged: onChanged,
-      title: Text(title,
-          style: const TextStyle(color: Colors.white, fontSize: 13)),
+      title: Text(title, style: const TextStyle(color: _kText, fontSize: 13)),
       activeColor: _kPrimary,
       checkColor: Colors.white,
       contentPadding: EdgeInsets.zero,
@@ -829,7 +860,7 @@ class _CatalogImportWizardPageState
         const Text(
           'Bir Hata Oluştu',
           style: TextStyle(
-              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              color: _kText, fontSize: 16, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -851,7 +882,7 @@ class _CatalogImportWizardPageState
         ElevatedButton(
           onPressed: onBack,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF334155),
+            backgroundColor: _kPrimary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),

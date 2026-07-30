@@ -50,6 +50,26 @@ void main() {
       expect(settings.printerName, 'sunmi');
     });
 
+    test('Windows etiket yazıcısı adı ayarlarda korunur', () {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        labelPrinterEnabled: true,
+        labelPrinterName: 'TSC TE200',
+        labelPrinterLanguage: 'tspl',
+        labelWidthMm: 50,
+        labelHeightMm: 30,
+        createdAt: DateTime.now(),
+      );
+
+      final restored = Settings.fromMap(settings.toMap());
+      expect(restored.labelPrinterName, 'TSC TE200');
+      expect(restored.labelPrinterLanguage, 'tspl');
+      expect(restored.labelWidthMm, 50);
+      expect(restored.labelHeightMm, 30);
+    });
+
     test(
         'PrinterService printOrderLabels automatically routes to network and uses labelPrinterIp',
         () async {

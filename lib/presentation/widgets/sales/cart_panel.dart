@@ -4,6 +4,7 @@
 // Preserved: all callback signatures, no business logic changes
 
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
 const _kGreen = Color(0xFF16A34A);
@@ -11,7 +12,7 @@ const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
-const _kSurface = Color(0xFFF8FAFC);
+const _kSurface = POSColors.surface;
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);

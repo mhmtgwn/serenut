@@ -9,6 +9,8 @@ import 'package:serenutos/domain/services/dashboard_service.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
+import 'package:serenutos/domain/models/permission.dart';
+import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -36,7 +38,14 @@ class HomePage extends ConsumerWidget {
                       wide ? 28 : 16, 16, wide ? 28 : 16, 96),
                   children: [
                     _DashboardHeader(
-                        onReports: () => context.push(AppRoutes.reports)),
+                      onReports: () => context.push(AppRoutes.reports),
+                      onSettings: () => requirePermissionAccess(
+                        context,
+                        permission: Permission.settingsView,
+                        title: 'Ayarlar Yetkisi',
+                        onGranted: (_, __) => context.push(AppRoutes.settings),
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     const RealtimeStatusIndicator(compact: false),
                     const SizedBox(height: 16),
@@ -95,8 +104,12 @@ class HomePage extends ConsumerWidget {
 }
 
 class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({required this.onReports});
+  const _DashboardHeader({
+    required this.onReports,
+    required this.onSettings,
+  });
   final VoidCallback onReports;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +129,12 @@ class _DashboardHeader extends StatelessWidget {
             ],
           ),
         ),
+        IconButton(
+          onPressed: onSettings,
+          tooltip: 'Ayarlar',
+          icon: const Icon(Icons.settings_outlined),
+        ),
+        const SizedBox(width: 4),
         OutlinedButton.icon(
           onPressed: onReports,
           icon: const Icon(Icons.analytics_outlined, size: 18),

@@ -1,5 +1,6 @@
 // lib/presentation/pages/orders/widgets/order_creation_dialog.dart
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -36,7 +37,7 @@ const _kAmberLight = Color(0xFFFEF9C3);
 const _kAmberDark = Color(0xFFB45309);
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
-const _kSurface = Color(0xFFF8FAFC);
+const _kSurface = POSColors.surface;
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
@@ -741,26 +742,16 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
         // 2. Print label stickers if label printer toggle is enabled
         if (_printLabel) {
-          // Read label printer config from SQLite settings (single source of truth)
-          final labelIp = settings.labelPrinterIp ?? '';
-          final labelPort = settings.labelPrinterPort;
-          final labelSettings = settings.copyWith(
-            printerName: 'network',
-            printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
-            printerPort: labelPort,
-          );
-
-          for (int i = 0; i < _labelCopies; i++) {
-            final suffix = _labelCopies > 1 ? ' (Kopya ${i + 1})' : '';
-            ref.read(printerServiceProvider).enqueue(
-                  'Sipariş Etiketleri #${newOrder.id.toShortId}$suffix',
-                  () => ref.read(printerServiceProvider).printOrderLabels(
-                        newOrder,
-                        receiptItems,
-                        labelSettings,
-                      ),
-                );
-          }
+          final labelSettings =
+              settings.copyWith(labelPrinterCopies: _labelCopies);
+          ref.read(printerServiceProvider).enqueue(
+                'Sipariş Etiketleri #${newOrder.id.toShortId}',
+                () => ref.read(printerServiceProvider).printOrderLabels(
+                      newOrder,
+                      receiptItems,
+                      labelSettings,
+                    ),
+              );
         }
       }
 

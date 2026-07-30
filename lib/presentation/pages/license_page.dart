@@ -4,6 +4,7 @@
 // Created: Phase 6 — 01 Jul 2026
 
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -14,7 +15,7 @@ import 'package:serenutos/presentation/pages/onboarding/license_activation_flow.
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor = Color(0xFFF8FAFC);
+const _kBgColor = POSColors.surface;
 const _kCardBg = Colors.white;
 const _kBorderColor = Color(0xFFE2E8F0);
 const _kTextPrimary = Color(0xFF0F172A);

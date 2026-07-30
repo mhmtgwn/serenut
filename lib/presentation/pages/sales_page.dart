@@ -24,12 +24,13 @@ import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
 import 'package:serenutos/presentation/widgets/sales/live_scale_dialog.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
+import 'package:serenutos/config/theme.dart';
 
 part 'sales/animated_cart_tab.dart';
 
 const _kGreen = Color(0xFF16A34A);
 const _kRed = Color(0xFFDC2626);
-const _kSurface = Color(0xFFF8FAFC);
+const _kSurface = POSColors.surface;
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
 

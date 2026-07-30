@@ -16,6 +16,7 @@ import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/domain/services/i_printer_service.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/services/label_layout_engine.dart';
+import 'package:serenutos/domain/services/tspl_label_layout_engine.dart';
 
 /// Platform-aware printer backend.
 enum PrinterBackend { sunmi, network, bluetooth, usb, none }
@@ -181,8 +182,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final labelIp = settings.labelPrinterIp ?? '';
       final labelPort = settings.labelPrinterPort;
       return settings.copyWith(
-        printerName: 'network',
-        printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
+        printerName:
+            labelIp.isNotEmpty ? 'network' : (settings.labelPrinterName ?? ''),
+        printerIp: labelIp,
         printerPort: labelPort,
       );
     }
@@ -380,6 +382,32 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.cut);
 
     await _sendBytes(bytes, settings);
+  }
+
+  @override
+  Future<void> testLabelPrinterConnection(Settings settings) async {
+    final model = LabelModel(
+      productName: 'ETIKET TESTI',
+      brand: 'SERENUT OS',
+      unit: 'adet',
+      shelfCode: 'A-01',
+      businessName: settings.businessName,
+      weight: 1,
+      price: 123.45,
+      barcode: '869000000001',
+      qrData: 'serenut-label-test',
+      timestamp: DateTime.now(),
+    );
+    final bytes = settings.labelPrinterLanguage == 'tspl'
+        ? TsplLabelLayoutEngine.generateLabelBytes(
+            model,
+            widthMm: settings.labelWidthMm,
+            heightMm: settings.labelHeightMm,
+            gapMm: settings.labelGapMm,
+            dpi: settings.labelDpi,
+          )
+        : LabelLayoutEngine.generateLabelBytes(model, width: 32);
+    await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
   }
 
   /// Prints a sale receipt (Fiş)
@@ -1184,7 +1212,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         _getSettingsForPurpose(settings, PrinterPurpose.label);
     if (!_hasPrinter(targetSettings)) return;
 
-    final width = targetSettings.paperWidth <= 58 ? 32 : 48;
     final List<int> allBytes = [];
 
     for (final item in items) {
@@ -1202,8 +1229,19 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         timestamp: order.createdAt,
       );
 
-      final labelBytes =
-          LabelLayoutEngine.generateLabelBytes(labelModel, width: width);
+      final labelBytes = settings.labelPrinterLanguage == 'tspl'
+          ? TsplLabelLayoutEngine.generateLabelBytes(
+              labelModel,
+              widthMm: settings.labelWidthMm,
+              heightMm: settings.labelHeightMm,
+              gapMm: settings.labelGapMm,
+              dpi: settings.labelDpi,
+              copies: settings.labelPrinterCopies,
+            )
+          : LabelLayoutEngine.generateLabelBytes(
+              labelModel,
+              width: targetSettings.paperWidth <= 58 ? 32 : 48,
+            );
       allBytes.addAll(labelBytes);
     }
 
@@ -1222,30 +1260,46 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!_hasPrinter(targetSettings)) {
       throw StateError('Etiket yazıcısı tanımlı değil.');
     }
+    final isTspl = settings.labelPrinterLanguage == 'tspl';
     final width = targetSettings.paperWidth <= 58 ? 32 : 48;
-    final logo = settings.printLogo
+    final logo = !isTspl && settings.printLogo
         ? await _getLogoBytes(settings.businessLogo,
             maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360)
         : <int>[];
     final bytes = <int>[];
+    final effectiveCopies = copies == 1
+        ? settings.labelPrinterCopies.clamp(1, 20)
+        : copies.clamp(1, 20);
     for (final product in products) {
-      for (var copy = 0; copy < copies.clamp(1, 20); copy++) {
-        bytes.addAll(LabelLayoutEngine.generateLabelBytes(
-          LabelModel(
-            productName: product.name,
-            brand: product.brand,
-            unit: product.unit,
-            shelfCode: product.shelfCode,
-            businessName: settings.businessName,
-            weight: 1,
-            price: product.price,
-            barcode: product.id,
-            qrData: 'product|${product.id}',
-            timestamp: DateTime.now(),
-          ),
-          width: width,
-          logoBytes: logo,
+      final model = LabelModel(
+        productName: product.name,
+        brand: product.brand,
+        unit: product.unit,
+        shelfCode: product.shelfCode,
+        businessName: settings.businessName,
+        weight: 1,
+        price: product.price,
+        barcode: product.id,
+        qrData: 'product|${product.id}',
+        timestamp: DateTime.now(),
+      );
+      if (isTspl) {
+        bytes.addAll(TsplLabelLayoutEngine.generateLabelBytes(
+          model,
+          widthMm: settings.labelWidthMm,
+          heightMm: settings.labelHeightMm,
+          gapMm: settings.labelGapMm,
+          dpi: settings.labelDpi,
+          copies: effectiveCopies,
         ));
+      } else {
+        for (var copy = 0; copy < effectiveCopies; copy++) {
+          bytes.addAll(LabelLayoutEngine.generateLabelBytes(
+            model,
+            width: width,
+            logoBytes: logo,
+          ));
+        }
       }
     }
     await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);

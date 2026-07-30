@@ -22,7 +22,8 @@ class POSColors {
   static const amberLight = Color(0xFFFFF8DC);
 
   // ── Yüzey ────────────────────────────────────────────────
-  static const surface = Color(0xFFF5F7F5); // Arka plan
+  // Satış ekranındaki nötr, temiz yüzey uygulamanın tamamında kullanılır.
+  static const surface = Color(0xFFF8FAFC); // Arka plan
   static const card = Color(0xFFFFFFFF); // Kart zemini
   static const border = Color(0xFFDFE6E1); // Çerçeve
   static const surfaceMuted = Color(0xFFF0F4F1);

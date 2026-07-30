@@ -5,7 +5,7 @@
 [Setup]
 AppId={{5E22B005-9B28-4DE3-BB10-388C838F5F2B}
 AppName=Serenut OS
-AppVersion=1.2.0+53
+AppVersion=1.2.0+54
 AppPublisher=Serenut OS Software Technologies A.Ş.
 AppPublisherURL=https://serenut.com/
 AppSupportURL=https://serenut.com/faq.html
@@ -32,9 +32,6 @@ CloseApplicationsFilter=*serenutos.exe*
 [Languages]
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-
 [Files]
 Source: "..\..\build\windows\x64\runner\Release\serenutos.exe"; DestDir: "{app}"; DestName: "serenutos.exe"; Flags: ignoreversion
 Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -45,7 +42,13 @@ Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\Serenut OS"; Filename: "{app}\serenutos.exe"
-Name: "{autodesktop}\Serenut OS"; Filename: "{app}\serenutos.exe"; Tasks: desktopicon
+Name: "{commondesktop}\Serenut OS"; Filename: "{app}\serenutos.exe"
+
+[InstallDelete]
+; v1.2.0+52 and older used a per-user AppData installation. Remove only the
+; stale shortcuts so users cannot accidentally launch the obsolete binary.
+Type: files; Name: "{userdesktop}\Serenut OS.lnk"
+Type: files; Name: "{userprograms}\Serenut OS\Serenut OS.lnk"
 
 [Run]
 ; The installer already runs elevated because application files live under

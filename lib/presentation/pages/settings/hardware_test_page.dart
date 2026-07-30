@@ -384,6 +384,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   late final TextEditingController _serialPort;
   late final TextEditingController _baudRate;
   late final TextEditingController _printerName;
+  late final TextEditingController _labelWidth;
+  late final TextEditingController _labelHeight;
+  late final TextEditingController _labelGap;
+  late final TextEditingController _labelCopies;
   String _vendor = 'generic';
   String _protocol = 'vendor_sdk';
   int _dataBits = 8;
@@ -391,6 +395,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   String _parity = 'none';
   String _scaleUnit = 'kg';
   int _paperWidth = 80;
+  String _labelLanguage = 'tspl';
+  int _labelDpi = 203;
   int _step = 0;
   bool _working = false;
   bool _discoveringBluetooth = false;
@@ -414,6 +420,14 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         TextEditingController(text: config['baudRate']?.toString() ?? '9600');
     _printerName =
         TextEditingController(text: config['printerName']?.toString() ?? '');
+    _labelWidth =
+        TextEditingController(text: config['labelWidthMm']?.toString() ?? '50');
+    _labelHeight = TextEditingController(
+        text: config['labelHeightMm']?.toString() ?? '30');
+    _labelGap =
+        TextEditingController(text: config['labelGapMm']?.toString() ?? '2');
+    _labelCopies =
+        TextEditingController(text: config['copies']?.toString() ?? '1');
     _vendor = config['vendor']?.toString() ?? 'generic';
     _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
     _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
@@ -421,6 +435,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _parity = config['parity']?.toString() ?? 'none';
     _scaleUnit = config['defaultUnit']?.toString() ?? 'kg';
     _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 80;
+    _labelLanguage = config['language']?.toString() ?? 'tspl';
+    _labelDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
   }
 
   @override
@@ -431,6 +447,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _serialPort.dispose();
     _baudRate.dispose();
     _printerName.dispose();
+    _labelWidth.dispose();
+    _labelHeight.dispose();
+    _labelGap.dispose();
+    _labelCopies.dispose();
     super.dispose();
   }
 
@@ -661,7 +681,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             onChanged: (value) => _scaleUnit = value ?? 'kg',
           ),
         ],
-        if (_type == HardwareDeviceType.receiptPrinter &&
+        if ((_type == HardwareDeviceType.receiptPrinter ||
+                _type == HardwareDeviceType.labelPrinter) &&
             _connection == HardwareConnectionType.windows) ...[
           TextField(
             controller: _printerName,
@@ -671,7 +692,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             ),
           ),
         ],
-        if (_type == HardwareDeviceType.receiptPrinter &&
+        if ((_type == HardwareDeviceType.receiptPrinter ||
+                _type == HardwareDeviceType.labelPrinter) &&
             _connection == HardwareConnectionType.bluetooth) ...[
           OutlinedButton.icon(
             onPressed: _discoveringBluetooth ? null : _discoverBluetooth,
@@ -761,6 +783,76 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 setState(() => _paperWidth = values.first),
           ),
         ],
+        if (_type == HardwareDeviceType.labelPrinter) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _labelLanguage,
+            decoration: const InputDecoration(labelText: 'Yazıcı dili'),
+            items: const [
+              DropdownMenuItem(
+                value: 'tspl',
+                child: Text('TSPL / TSC uyumlu (önerilen)'),
+              ),
+              DropdownMenuItem(
+                value: 'escpos',
+                child: Text('ESC/POS (eski uyumluluk)'),
+              ),
+            ],
+            onChanged: (value) =>
+                setState(() => _labelLanguage = value ?? 'tspl'),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _labelWidth,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'En (mm)'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _labelHeight,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Boy (mm)'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _labelGap,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Boşluk (mm)'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _labelCopies,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Her ürün için etiket adedi',
+            ),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 203, label: Text('203 DPI')),
+              ButtonSegment(value: 300, label: Text('300 DPI')),
+            ],
+            selected: {_labelDpi},
+            onSelectionChanged: (values) =>
+                setState(() => _labelDpi = values.first),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Rulo üzerindeki tek etiketin gerçek ölçüsünü girin. Varsayılan raf etiketi 50×30 mm, etiket aralığı 2 mm’dir.',
+            style: TextStyle(fontSize: 11, color: kTextSecondary),
+          ),
+        ],
       ],
     );
   }
@@ -838,6 +930,24 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         _printerName.text.trim().isEmpty) {
       return 'Bluetooth cihaz kimliği gereklidir.';
     }
+    if (_type == HardwareDeviceType.labelPrinter) {
+      final width = int.tryParse(_labelWidth.text);
+      final height = int.tryParse(_labelHeight.text);
+      final gap = int.tryParse(_labelGap.text);
+      final copies = int.tryParse(_labelCopies.text);
+      if (width == null || width < 30 || width > 100) {
+        return 'Etiket eni 30-100 mm arasında olmalıdır.';
+      }
+      if (height == null || height < 20 || height > 100) {
+        return 'Etiket boyu 20-100 mm arasında olmalıdır.';
+      }
+      if (gap == null || gap < 0 || gap > 10) {
+        return 'Etiket boşluğu 0-10 mm arasında olmalıdır.';
+      }
+      if (copies == null || copies < 1 || copies > 20) {
+        return 'Etiket adedi 1-20 arasında olmalıdır.';
+      }
+    }
     return null;
   }
 
@@ -867,6 +977,12 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'paperWidth': _paperWidth,
         'vendor': _vendor,
         'protocol': _protocol,
+        'language': _labelLanguage,
+        'labelWidthMm': int.tryParse(_labelWidth.text) ?? 50,
+        'labelHeightMm': int.tryParse(_labelHeight.text) ?? 30,
+        'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
+        'dpi': _labelDpi,
+        'copies': int.tryParse(_labelCopies.text) ?? 1,
       },
     );
   }
@@ -1077,7 +1193,11 @@ List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {
         HardwareConnectionType.bluetooth,
         HardwareConnectionType.embedded,
       ],
-    HardwareDeviceType.labelPrinter => const [HardwareConnectionType.tcp],
+    HardwareDeviceType.labelPrinter => const [
+        HardwareConnectionType.windows,
+        HardwareConnectionType.tcp,
+        HardwareConnectionType.bluetooth,
+      ],
     HardwareDeviceType.scale => const [
         HardwareConnectionType.serial,
         HardwareConnectionType.tcp,

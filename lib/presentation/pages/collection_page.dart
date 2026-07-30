@@ -3,6 +3,7 @@
 // UX Redesign v3: Full-screen, no dialog, live balance preview
 
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,7 +22,7 @@ const _kBlue = Color(0xFF2563EB);
 const _kBlueLight = Color(0xFFDBEAFE);
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
-const _kSurface = Color(0xFFF8FAFC);
+const _kSurface = POSColors.surface;
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);

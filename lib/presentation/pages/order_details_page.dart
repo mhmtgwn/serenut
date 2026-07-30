@@ -1,5 +1,6 @@
 // lib/presentation/pages/order_details_page.dart
 import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
@@ -26,7 +27,7 @@ const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
 const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kSurface = Color(0xFFF8FAFC);
+const _kSurface = POSColors.surface;
 const _kText = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
@@ -1301,15 +1302,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final settingsAsync = ref.read(settingsNotifierProvider);
         final settings = settingsAsync.value;
         if (settings != null) {
-          // Read label printer config from SQLite settings (single source of truth)
-          final labelIp = settings.labelPrinterIp ?? '';
-          final labelPort = settings.labelPrinterPort;
-          final labelSettings = settings.copyWith(
-            printerName: 'network',
-            printerIp: labelIp.isNotEmpty ? labelIp : settings.printerIp,
-            printerPort: labelPort,
-          );
-
           final products = ref.read(productsControllerProvider).value ?? [];
           final receiptItems = widget.order.items.map((item) {
             final prod = products.firstWhere(
@@ -1332,17 +1324,16 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             };
           }).toList();
 
-          for (int i = 0; i < _labelCopies; i++) {
-            final suffix = _labelCopies > 1 ? ' (Kopya ${i + 1})' : '';
-            ref.read(printerServiceProvider).enqueue(
-                  'Sipariş Etiketleri #${widget.order.id.toShortId}$suffix',
-                  () => ref.read(printerServiceProvider).printOrderLabels(
-                        widget.order,
-                        receiptItems,
-                        labelSettings,
-                      ),
-                );
-          }
+          final labelSettings =
+              settings.copyWith(labelPrinterCopies: _labelCopies);
+          ref.read(printerServiceProvider).enqueue(
+                'Sipariş Etiketleri #${widget.order.id.toShortId}',
+                () => ref.read(printerServiceProvider).printOrderLabels(
+                      widget.order,
+                      receiptItems,
+                      labelSettings,
+                    ),
+              );
         }
       }
 

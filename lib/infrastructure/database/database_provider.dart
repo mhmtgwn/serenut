@@ -42,7 +42,7 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 43;
+  static const int _databaseVersion = 44;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -521,9 +521,15 @@ class DatabaseManager {
       'sms_auto_debt_reminder_days': 15,
       'sms_auto_debt_reminder_min_amount': 100.0,
       'label_printer_enabled': 0,
+      'label_printer_name': null,
       'label_printer_ip': '',
       'label_printer_port': 9100,
       'label_printer_copies': 1,
+      'label_printer_language': 'tspl',
+      'label_width_mm': 50,
+      'label_height_mm': 30,
+      'label_gap_mm': 2,
+      'label_dpi': 203,
       'admin_pin_code': null,
       'created_at': DateTime.now().toIso8601String(),
     });

@@ -38,6 +38,7 @@ abstract class IPrinterService implements Listenable {
 
   Future<void> testConnection(String ip, int port);
   Future<void> testPrinterConnection(Settings settings);
+  Future<void> testLabelPrinterConnection(Settings settings);
 
   Future<void> printSaleReceipt(
     SaleEntity sale,

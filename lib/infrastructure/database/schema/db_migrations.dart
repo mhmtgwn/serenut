@@ -802,6 +802,27 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 44) {
+          for (final statement in [
+            "ALTER TABLE settings ADD COLUMN label_printer_language TEXT NOT NULL DEFAULT 'tspl'",
+            'ALTER TABLE settings ADD COLUMN label_printer_name TEXT',
+            'ALTER TABLE settings ADD COLUMN label_width_mm INTEGER NOT NULL DEFAULT 50',
+            'ALTER TABLE settings ADD COLUMN label_height_mm INTEGER NOT NULL DEFAULT 30',
+            'ALTER TABLE settings ADD COLUMN label_gap_mm INTEGER NOT NULL DEFAULT 2',
+            'ALTER TABLE settings ADD COLUMN label_dpi INTEGER NOT NULL DEFAULT 203',
+          ]) {
+            try {
+              await txn.execute(statement);
+            } catch (e) {
+              handleMigrationError(e, 44);
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 44,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

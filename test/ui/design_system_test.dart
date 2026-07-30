@@ -7,7 +7,7 @@ void main() {
     test('website and mobile share the same brand tokens', () {
       expect(POSColors.green, const Color(0xFF11875D));
       expect(POSColors.greenDark, const Color(0xFF086B48));
-      expect(POSColors.surface, const Color(0xFFF5F7F5));
+      expect(POSColors.surface, const Color(0xFFF8FAFC));
       expect(POSColors.text, const Color(0xFF19231F));
       expect(POSColors.border, const Color(0xFFDFE6E1));
     });
