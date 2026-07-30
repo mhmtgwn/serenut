@@ -671,41 +671,23 @@ extension _SettingsPageDialogs on _SettingsPageState {
                               ),
                             ],
                           ),
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Birim: adet   Raf: A-01',
-                                style: TextStyle(fontSize: 8, color: _kTextSecondary),
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'adet 200.00 TL',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: POSColors.greenDark,
                               ),
-                              Text(
-                                '299.95 TL',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: POSColors.greenDark,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                          Center(
-                            child: Column(
-                              children: [
-                                Container(
-                                  height: 12,
-                                  width: double.infinity,
-                                  color: Colors.black87,
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  '869000000001',
-                                  style: TextStyle(
-                                    fontSize: 7,
-                                    letterSpacing: 1.5,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
+                          Container(
+                            height: 16,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(1),
                             ),
                           ),
                         ],

@@ -60,38 +60,33 @@ class LabelLayoutEngine {
 
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
-    // Align Left for details
-    bytes.addAll(alignLeft);
-    if (model.unit.isNotEmpty) {
-      bytes.addAll(_textToBytes('Birim: ${model.unit}\n'));
-    }
+    // Align Right / Prominent for Price with Unit
+    bytes.addAll(alignRight);
     bytes.addAll(boldOn);
     bytes.addAll(sizeLarge);
-    bytes.addAll(_textToBytes('${model.price.toStringAsFixed(2)} TL\n'));
+    final unitPrefix = model.unit.trim().isNotEmpty ? '${model.unit} ' : '';
+    bytes.addAll(_textToBytes('$unitPrefix${model.price.toStringAsFixed(2)} TL\n'));
     bytes.addAll(sizeNormal);
     bytes.addAll(boldOff);
-    if (model.shelfCode?.trim().isNotEmpty == true) {
-      bytes.addAll(_textToBytes('Raf: ${model.shelfCode}\n'));
+
+    // Compact Barcode Lines (no numbers underneath)
+    if (model.barcode != null && model.barcode!.trim().isNotEmpty) {
+      final code = model.barcode!.trim();
+      bytes.addAll(alignCenter);
+      // Select barcode height (32 dots)
+      bytes.addAll([0x1D, 0x68, 0x20]);
+      // Select HRI character position: 0 = Not printed
+      bytes.addAll([0x1D, 0x48, 0x00]);
+      // Select barcode width
+      bytes.addAll([0x1D, 0x77, 0x02]);
+      // Print CODE128 barcode
+      final codeBytes = code.codeUnits;
+      bytes.addAll([0x1D, 0x6B, 0x49, codeBytes.length + 2, 0x7B, 0x42]);
+      bytes.addAll(codeBytes);
+      bytes.addAll(lf);
     }
-    bytes.addAll(_textToBytes(
-        'Tarih: ${DateFormat('dd.MM.yyyy HH:mm').format(model.timestamp)}\n'));
 
-    if (model.batchNo != null && model.batchNo!.isNotEmpty) {
-      bytes.addAll(_textToBytes('Batch No: ${model.batchNo}\n'));
-    }
-
-    if (model.barcode != null && model.barcode!.isNotEmpty) {
-      bytes.addAll(_textToBytes('Barkod: ${model.barcode}\n'));
-    }
-
-    bytes.addAll(_textToBytes('${"_" * width}\n'));
-
-    // QR Code
-    bytes.addAll(alignCenter);
-    bytes.addAll(_generateQrCodeBytes(model.qrData));
-    bytes.addAll(lf);
     bytes.addAll(cut);
-
     return bytes;
   }
 

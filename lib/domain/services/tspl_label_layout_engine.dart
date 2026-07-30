@@ -27,12 +27,9 @@ class TsplLabelLayoutEngine {
 
     final company = _fit(model.businessName ?? '', 32);
     final brand = _fit(model.brand ?? '', 28);
-    final priceStr = '${model.price.toStringAsFixed(2)} TL';
-    final unitShelf = [
-      if (model.unit.isNotEmpty) 'Birim: ${_fit(model.unit, 10)}',
-      if (model.shelfCode?.trim().isNotEmpty == true)
-        'Raf: ${_fit(model.shelfCode!, 10)}',
-    ].join('   ');
+    final unitPrefix =
+        model.unit.trim().isNotEmpty ? '${_fit(model.unit, 6)} ' : '';
+    final priceStr = '$unitPrefix${model.price.toStringAsFixed(2)} TL';
     final barcode = _barcode(model.barcode ?? '');
 
     final commands = StringBuffer()
@@ -45,13 +42,13 @@ class TsplLabelLayoutEngine {
 
     int currentY = sy(6);
 
-    // 1. Company Name Header
+    // 1. Company Name Header / Logo
     if (company.isNotEmpty) {
       commands.writeln('TEXT ${sx(8)},$currentY,"1",0,1,1,"$company"');
       currentY += sy(18);
     }
 
-    // 2. Brand / Category
+    // 2. Brand (if specified)
     if (brand.isNotEmpty) {
       commands.writeln('TEXT ${sx(8)},$currentY,"1",0,1,1,"$brand"');
       currentY += sy(16);
@@ -65,23 +62,17 @@ class TsplLabelLayoutEngine {
       currentY += sy(24);
     }
 
-    currentY += sy(2);
+    currentY += sy(4);
 
-    // 4. Price (Clean, prominent)
+    // 4. Price (Clean & Prominent, e.g. "adet 200.00 TL")
     commands.writeln('TEXT ${sx(8)},$currentY,"3",0,1,2,"$priceStr"');
-    currentY += sy(42);
+    currentY += sy(40);
 
-    // 5. Unit & Shelf Code
-    if (unitShelf.isNotEmpty) {
-      commands.writeln('TEXT ${sx(8)},$currentY,"1",0,1,1,"$unitShelf"');
-      currentY += sy(18);
-    }
-
-    // 6. Barcode
+    // 5. Barcode (Compact barcode lines at bottom, human_readable = 0: no barcode numbers printed below)
     if (barcode.isNotEmpty) {
-      final barcodeHeight = sy(36).clamp(18, 55);
+      final barcodeHeight = sy(32).clamp(16, 50);
       commands.writeln(
-        'BARCODE ${sx(8)},$currentY,"128",$barcodeHeight,1,0,2,4,"$barcode"',
+        'BARCODE ${sx(8)},$currentY,"128",$barcodeHeight,0,0,2,4,"$barcode"',
       );
     }
 
