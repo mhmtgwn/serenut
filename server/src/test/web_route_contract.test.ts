@@ -23,6 +23,9 @@ async function run() {
   for (const [route, file] of Object.entries(authPages)) {
     assert.match(serverSource, new RegExp(route.replace('/', '\\/')), `${route} must be declared by Express`);
     assert.ok(fs.existsSync(path.join(projectRoot, 'public/auth', file)), `${file} must exist`);
+    const authHtml = fs.readFileSync(path.join(projectRoot, 'public/auth', file), 'utf8');
+    assert.match(authHtml, /<img src="\/shared\/assets\/serenut-os-color\.svg"/, `${file} must use the horizontal Serenut OS wordmark`);
+    assert.doesNotMatch(authHtml, /<img[^>]+(?:favicon|icon-(?:192|512)|logo-color\.svg)/, `${file} must not use an application icon as its brand heading`);
   }
   assert.doesNotMatch(serverSource, /['"]\/signup|['"]\/login\.html|['"]\/register\.html/, 'legacy authentication aliases must not be registered');
   assert.match(serverSource, /app\.get\(\/\^\\\/app\$\/.*res\.redirect\(301, '\/app\/'\)/s, 'only slashless /app must canonicalize to /app/');
@@ -58,6 +61,14 @@ async function run() {
   assert.match(appSource, /const iconPaths = \{/, 'navigation must provide module-specific icons');
   assert.match(themeSource, /\.sidebar-brand:before\s*\{[^}]*content:none!important[^}]*display:none!important/s, 'the sidebar wordmark must not render a second pseudo-element logo');
   assert.match(appHtml, /id="boot-state"/, 'application shell must expose a non-empty loading state');
+  assert.match(appHtml, /favicon\.ico\?v=20260730-icon3/, 'application shell must reference the current browser icon revision');
+
+  const webManifest = fs.readFileSync(path.join(projectRoot, 'public/site.webmanifest'), 'utf8');
+  assert.match(webManifest, /icon-maskable-192\.png/, 'web manifest must provide a 192px maskable icon');
+  assert.match(webManifest, /icon-maskable-512\.png/, 'web manifest must provide a 512px maskable icon');
+  for (const asset of ['favicon.ico', 'favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png']) {
+    assert.ok(fs.existsSync(path.join(projectRoot, 'public', asset)), `${asset} must exist`);
+  }
 
   assert.equal(resolveLandingModuleId(['sysadmin'], []), 'platform-overview');
   assert.equal(resolveLandingModuleId(['owner'], ['billing:view']), 'billing-center');

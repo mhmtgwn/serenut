@@ -6,11 +6,13 @@ all raster exports can be reproduced without the original reference PNG.
 
 from pathlib import Path
 import shutil
+import time
 from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "branding"
+APPROVED_ICON_SOURCE = OUT / "source" / "app-icon-white.png"
 MASTER_ICON = OUT / "app" / "icon-master.png"
 GREEN = "#1B6B3C"
 YELLOW = "#E6B134"
@@ -26,6 +28,35 @@ def master_icon(size: int) -> Image.Image:
         return source.convert("RGBA").resize(
             (size, size), Image.Resampling.LANCZOS
         )
+
+
+def padded_master_icon(size: int, content_ratio: float = 0.66) -> Image.Image:
+    """Place approved artwork inside adaptive/maskable safe zones."""
+    image = Image.new("RGBA", (size, size), WHITE)
+    content_size = round(size * content_ratio)
+    content = master_icon(content_size)
+    offset = (size - content_size) // 2
+    image.alpha_composite(content, (offset, offset))
+    return image
+
+
+def prepare_approved_icon() -> None:
+    """Normalize the supplied white-background artwork into an opaque square.
+
+    The approved PNG contains near-black pixels in its outer rounded corners.
+    Platform launchers apply their own mask, so those corner pixels must be
+    white instead of becoming a visible black frame in browser tabs and iOS.
+    """
+    with Image.open(APPROVED_ICON_SOURCE) as source:
+        image = source.convert("RGB")
+    pixels = image.load()
+    for y in range(image.height):
+        for x in range(image.width):
+            red, green, blue = pixels[x, y]
+            if max(red, green, blue) < 24 and max(red, green, blue) - min(red, green, blue) < 8:
+                pixels[x, y] = (255, 255, 255)
+    MASTER_ICON.parent.mkdir(parents=True, exist_ok=True)
+    image.save(MASTER_ICON, optimize=True)
 
 
 def mark(size: int, variant: str = "color", padding: float = 0.08) -> Image.Image:
@@ -141,16 +172,29 @@ def lockup(height: int, label: str, reverse: bool = False) -> Image.Image:
 def save_png(image: Image.Image, relative_path: str) -> None:
     path = OUT / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, optimize=True)
+    save_png_with_retry(image, path)
 
 
 def save_project_png(image: Image.Image, relative_path: str) -> None:
     path = ROOT / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, optimize=True)
+    save_png_with_retry(image, path)
+
+
+def save_png_with_retry(image: Image.Image, path: Path) -> None:
+    """Handle short-lived Windows file locks during full asset regeneration."""
+    for attempt in range(4):
+        try:
+            image.save(path, optimize=True)
+            return
+        except OSError:
+            if attempt == 3:
+                raise
+            time.sleep(0.25 * (attempt + 1))
 
 
 def main() -> None:
+    prepare_approved_icon()
     for variant in ("color", "green", "yellow", "black", "white"):
         for size in (24, 32, 48, 64, 96, 128, 256, 512, 1024):
             save_png(mark(size, variant), f"png/{variant}/logo-{variant}-{size}.png")
@@ -175,10 +219,7 @@ def main() -> None:
 
     # Maskable/PWA icons keep all critical artwork inside the central safe zone.
     for size in (192, 512):
-        save_png(
-            rounded_icon(size, WHITE, "color", 0.25, corner_ratio=0),
-            f"web/icon-maskable-{size}.png",
-        )
+        save_png(padded_master_icon(size), f"web/icon-maskable-{size}.png")
         save_png(master_icon(size), f"web/icon-{size}.png")
 
     for size in (16, 32, 48):
@@ -194,7 +235,6 @@ def main() -> None:
     # Flutter runtime images. Keep the historic filenames because they are
     # referenced by login, splash, settings and print workflows.
     save_project_png(lockup(256, "Serenut OS"), "assets/logo.png")
-    save_project_png(lockup(512, "Serenut OS"), "assets/serenutoslogo.png")
 
     # Android legacy launcher icons.
     android_sizes = {
@@ -215,7 +255,7 @@ def main() -> None:
             f"android/app/src/main/res/mipmap-{density}/ic_launcher_round.png",
         )
     save_project_png(
-        master_icon(432),
+        padded_master_icon(432),
         "android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png",
     )
     save_project_png(
@@ -253,12 +293,8 @@ def main() -> None:
     web_copies = {
         "icons/Icon-192.png": master_icon(192),
         "icons/Icon-512.png": master_icon(512),
-        "icons/Icon-maskable-192.png": rounded_icon(
-            192, WHITE, "color", 0.25, corner_ratio=0
-        ),
-        "icons/Icon-maskable-512.png": rounded_icon(
-            512, WHITE, "color", 0.25, corner_ratio=0
-        ),
+        "icons/Icon-maskable-192.png": padded_master_icon(192),
+        "icons/Icon-maskable-512.png": padded_master_icon(512),
         "icons/apple-touch-icon.png": master_icon(180),
         "favicon.png": master_icon(32),
     }
@@ -287,6 +323,8 @@ def main() -> None:
     save_project_png(master_icon(180), "server/public/apple-touch-icon.png")
     save_project_png(master_icon(192), "server/public/icon-192.png")
     save_project_png(master_icon(512), "server/public/icon-512.png")
+    save_project_png(padded_master_icon(192), "server/public/icon-maskable-192.png")
+    save_project_png(padded_master_icon(512), "server/public/icon-maskable-512.png")
     save_project_png(social_card(), "server/public/social-card-1200x630.png")
 
 

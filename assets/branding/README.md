@@ -1,7 +1,11 @@
 # Serenut logo paketi
 
-Bu paket, verilen marka kılavuzundaki geometrik amblem ve renk kodları esas
-alınarak yeniden çizilmiştir.
+Bu paket, onaylı Serenut görsellerinden platformlara uygun çıktılar üretir.
+
+## Onaylı ana kaynaklar
+
+- `source/app-icon-white.png`: Uygulama, favicon, PWA, Android, iOS ve Windows ikonlarının tek ana kaynağıdır.
+- `source/mark-transparent-effects.png`: Efektli transparan sunum görselidir. Küçük ikonlarda, giriş formlarında ve baskıda kullanılmaz.
 
 ## Ana renkler
 
@@ -20,6 +24,17 @@ alınarak yeniden çizilmiştir.
 - `app/`: Açık ve yeşil zeminli yuvarlatılmış uygulama ikonları.
 - `web/`: Favicon, standart PWA, maskable PWA ve sosyal paylaşım çıktısı.
 - `windows/`: Çok çözünürlüklü Windows `.ico` dosyası.
+
+## Ürün içindeki kullanım
+
+- Uygulama ve sekme ikonları: beyaz zeminli kare ana kaynak.
+- Giriş, kayıt ve şifre ekranları: yatay renkli `Serenut OS` logosu.
+- Koyu panel kenar çubuğu: renkli amblem ve beyaz yazılı tek yatay logo.
+- Açık web yüzeyleri: yatay renkli Serenut logosu.
+- Fiş/baskı: efektsiz, yüksek kontrastlı yatay logo.
+
+`assets/logo.png` Flutter ve fiş iş akışlarının ortak yatay logosudur. Eski
+`assets/serenutoslogo.png` kopyası kullanılmadığı için kaldırılmıştır.
 
 ## Kullanım kuralları
 
