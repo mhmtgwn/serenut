@@ -211,12 +211,25 @@ async function selectModule(moduleId) {
   document.querySelector('.shell-title').innerText = item.label;
   document.getElementById('embed-title').innerText = item.label;
   document.getElementById('embed-description').innerText = item.description;
-  const { loadModule } = await import('./module-runtime.js?v=20260729-panel-flow2');
-  await loadModule(item);
   overviewGrid.classList.add('app-hidden');
   modulePanel.classList.add('app-hidden');
   embedPanel.classList.remove('app-hidden');
   window.location.hash = item.id;
+  const content = document.getElementById('embed-content');
+  content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
+  try {
+    const { loadModule } = await import('./module-runtime.js?v=20260730-panel-flow4');
+    await loadModule(item);
+  } catch (error) {
+    content.innerHTML = `
+      <div class="module-error" role="alert">
+        <strong>${escapeHtml(item.label)} yüklenemedi</strong>
+        <p>${escapeHtml(error?.message || 'Modül başlatılamadı.')}</p>
+        <button class="btn btn-primary" id="module-retry" type="button">Tekrar Dene</button>
+      </div>
+    `;
+    document.getElementById('module-retry').onclick = () => selectModule(item.id);
+  }
 }
 
 function startRealtime() {
