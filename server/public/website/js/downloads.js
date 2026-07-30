@@ -14,13 +14,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="eyebrow">Windows</div>
         <h3>Serenut OS ${winVer}</h3>
         <p>${winNote}</p>
-        <a class="btn btn-primary" href="/download/windows" download>Paketi İndir (.exe)</a>
+        <a class="btn btn-primary" href="/download/windows" download>İndir</a>
       </article>
       <article class="feature-card">
         <div class="eyebrow">Android APK</div>
         <h3>Serenut OS ${apkVer}</h3>
         <p>${apkNote}</p>
-        <a class="btn btn-primary" href="/download/android" download>Paketi İndir (.apk)</a>
+        <a class="btn btn-primary" href="/download/android" download>İndir</a>
       </article>
       <article class="feature-card">
         <div class="eyebrow">Aktivasyon</div>
