@@ -30,13 +30,11 @@ def master_icon(size: int) -> Image.Image:
         )
 
 
-def padded_master_icon(size: int, content_ratio: float = 0.66) -> Image.Image:
-    """Place approved artwork inside adaptive/maskable safe zones."""
+def padded_master_icon(size: int, mark_padding: float = 0.15) -> Image.Image:
+    """Create clean maskable PWA icon with full-bleed white background and centered star mark."""
     image = Image.new("RGBA", (size, size), WHITE)
-    content_size = round(size * content_ratio)
-    content = master_icon(content_size)
-    offset = (size - content_size) // 2
-    image.alpha_composite(content, (offset, offset))
+    symbol = mark(size, "color", padding=mark_padding)
+    image.alpha_composite(symbol)
     return image
 
 
