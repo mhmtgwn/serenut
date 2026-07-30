@@ -326,11 +326,8 @@ body{background:var(--ui-canvas);color:var(--ui-ink)}
 
 /* Final brand assets: intentionally last in the cascade. */
 .sidebar-brand:before{
-  content:"";
-  background:transparent url("/shared/assets/logo-color.svg") center/contain no-repeat!important;
-  box-shadow:none!important;
-}
-.customer-shell .sidebar-brand:before,
-.sysadmin-shell .sidebar-brand:before{
-  background-image:url("/shared/assets/logo-white.svg")!important
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  box-shadow:none!important
 }

@@ -50,11 +50,13 @@ async function run() {
   assert.match(adminController, /SUNUCUYU TEMIZLE/, 'maintenance cleanup must require an explicit confirmation phrase');
 
   const appSource = fs.readFileSync(path.join(projectRoot, 'public/app/js/app.js'), 'utf8');
+  const themeSource = fs.readFileSync(path.join(projectRoot, 'public/app/css/theme.css'), 'utf8');
   assert.doesNotMatch(appSource, /module:\s*isSysadmin\s*\?/, 'frontend must preserve backend module kinds');
   assert.match(appSource, /item\.module === 'home'/, 'home must be a first-class shell view');
   assert.match(appSource, /landing_module_id/, 'frontend must use the canonical landing module id');
   assert.doesNotMatch(appSource, /M5 5h14v14H5z/, 'navigation must not regress to square placeholder icons');
   assert.match(appSource, /const iconPaths = \{/, 'navigation must provide module-specific icons');
+  assert.match(themeSource, /\.sidebar-brand:before\s*\{[^}]*content:none!important[^}]*display:none!important/s, 'the sidebar wordmark must not render a second pseudo-element logo');
   assert.match(appHtml, /id="boot-state"/, 'application shell must expose a non-empty loading state');
 
   assert.equal(resolveLandingModuleId(['sysadmin'], []), 'platform-overview');
