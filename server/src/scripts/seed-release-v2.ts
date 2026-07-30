@@ -41,8 +41,8 @@ async function runPublish() {
     const version = '1.2.1';
     const buildNum = 58;
     const releaseId = `rel-${version}-b${buildNum}`;
-    const winSha256 = 'ec03a9c3931f12d3c82056d4d62a8fd070d56de8e287581f9fdecbd1e911dd32';
-    const apkSha256 = 'af5ce92df4f602294fce42d11e645cb2aad641285e9b140a693a1e1964dab4ca';
+    const winSha256 = '78497231227069dbab0cb6a41f0acf283ec728fcb6430d321a2bee66581a108d';
+    const apkSha256 = '1bef547a2294ab63a050d21231ee46eefea1ecd3ef4c9e4e8f46006f4e727971';
 
     // 2. Sign Artifacts
     const signWin = crypto.createSign('SHA256');
@@ -221,7 +221,7 @@ async function runPublish() {
       false,
       'Yeni Serenut OS 1.2.1 güncellemesi yayınlandı! Müşteri filtreleme ve yazıcı logosu/etiket tasarımı iyileştirmeleri.',
       winSig,
-      14917025,
+      14949628,
       'stable',
       'active'
     ]);
@@ -242,7 +242,7 @@ async function runPublish() {
       false,
       'Mobil cihazlar için yeni Serenut OS 1.2.1 Android APK sürümü.',
       apkSig,
-      49837016,
+      50029356,
       'stable',
       'active'
     ]);
