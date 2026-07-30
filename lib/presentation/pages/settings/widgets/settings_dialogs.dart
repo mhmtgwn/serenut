@@ -627,68 +627,78 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // 1. Top Logo Header
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              Image.asset(
+                                'assets/logo.png',
+                                height: 16,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: POSColors.amberDark,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
                               Text(
                                 settings.businessName.isNotEmpty
                                     ? settings.businessName
-                                    : 'SERENUT OS',
+                                    : 'Serenut OS',
                                 style: const TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Text(
-                                '01.02.2026',
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: _kTextSecondary,
-                                ),
-                              ),
                             ],
                           ),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Örnek Ürün Adı Ve',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.1,
-                                ),
-                              ),
-                              Text(
-                                'Çeşidi Açıklaması',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.1,
-                                ),
-                              ),
-                            ],
-                          ),
+                          // 2. Middle Product Name
                           const Align(
-                            alignment: Alignment.centerRight,
+                            alignment: Alignment.centerLeft,
                             child: Text(
-                              'adet 200.00 TL',
+                              'Ürününüzün adı',
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w900,
-                                color: POSColors.greenDark,
+                                height: 1.1,
                               ),
                             ),
                           ),
-                          Container(
-                            height: 16,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.black87,
-                              borderRadius: BorderRadius.circular(1),
-                            ),
+                          // 3. Separator Line
+                          const Divider(height: 1, color: Colors.black26),
+                          // 4. Bottom Split Layout (Left: Kod & Barcode | Right: Huge Price)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Kod: 1234567890',
+                                    style: TextStyle(
+                                      fontSize: 7,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    height: 16,
+                                    width: 70,
+                                    color: Colors.black87,
+                                  ),
+                                ],
+                              ),
+                              const Text(
+                                '₺ 299.95',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

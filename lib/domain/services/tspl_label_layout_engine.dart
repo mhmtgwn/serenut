@@ -25,12 +25,10 @@ class TsplLabelLayoutEngine {
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
 
-    final company = _fit(model.businessName ?? '', 32);
-    final brand = _fit(model.brand ?? '', 28);
+    final barcode = _barcode(model.barcode ?? '');
     final unitPrefix =
         model.unit.trim().isNotEmpty ? '${_fit(model.unit, 6)} ' : '';
     final priceStr = '$unitPrefix${model.price.toStringAsFixed(2)} TL';
-    final barcode = _barcode(model.barcode ?? '');
 
     final commands = StringBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
@@ -42,38 +40,56 @@ class TsplLabelLayoutEngine {
 
     int currentY = sy(6);
 
-    // 1. Company Name Header / Logo
-    if (company.isNotEmpty) {
-      commands.writeln('TEXT ${sx(8)},$currentY,"1",0,1,1,"$company"');
-      currentY += sy(18);
-    }
+    // 1. Top Logo / Header (Centered)
+    final logoText = model.businessName?.trim().isNotEmpty == true
+        ? _ascii(model.businessName!.trim())
+        : 'SERENUT OS';
+    commands.writeln('TEXT ${sx(110)},$currentY,"2",0,1,1,"$logoText"');
+    currentY += sy(22);
 
-    // 2. Brand (if specified)
-    if (brand.isNotEmpty) {
-      commands.writeln('TEXT ${sx(8)},$currentY,"1",0,1,1,"$brand"');
-      currentY += sy(16);
-    }
-
-    // 3. Multi-line Product Name (1 or 2 lines)
-    final maxCharsPerLine = safeWidth >= 60 ? 28 : (safeWidth >= 45 ? 22 : 16);
-    final productLines = _wrapProductName(model.productName, maxCharsPerLine);
-    for (final line in productLines) {
-      commands.writeln('TEXT ${sx(8)},$currentY,"2",0,1,1,"$line"');
-      currentY += sy(24);
+    // 2. Middle: Auto-scaling Product Name
+    final nameClean = _ascii(model.productName.trim());
+    if (nameClean.length <= 14) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"4",0,1,1,"$nameClean"');
+      currentY += sy(36);
+    } else if (nameClean.length <= 26) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$nameClean"');
+      currentY += sy(30);
+    } else {
+      final lines = _wrapProductName(nameClean, 22);
+      for (final line in lines) {
+        commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$line"');
+        currentY += sy(22);
+      }
     }
 
     currentY += sy(4);
 
-    // 4. Price (Clean & Prominent, e.g. "adet 200.00 TL")
-    commands.writeln('TEXT ${sx(8)},$currentY,"3",0,1,2,"$priceStr"');
-    currentY += sy(40);
+    // 3. Horizontal Separator Line (matching price-tag sample)
+    commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
+    currentY += sy(8);
 
-    // 5. Barcode (Compact barcode lines at bottom, human_readable = 0: no barcode numbers printed below)
+    // 4. Bottom Split Layout (Left: Kod & Barcode lines | Right: Huge Auto-scaling Price)
+    final bottomY = currentY;
+
+    // Bottom Left: Kod & Barcode
     if (barcode.isNotEmpty) {
-      final barcodeHeight = sy(32).clamp(16, 50);
+      commands.writeln('TEXT ${sx(16)},$bottomY,"1",0,1,1,"Kod: $barcode"');
+      final barcodeY = bottomY + sy(16);
+      final barcodeHeight = sy(32).clamp(16, 45);
       commands.writeln(
-        'BARCODE ${sx(8)},$currentY,"128",$barcodeHeight,0,0,2,4,"$barcode"',
+        'BARCODE ${sx(16)},$barcodeY,"128",$barcodeHeight,0,0,2,3,"$barcode"',
       );
+    }
+
+    // Bottom Right: Huge Auto-scaling Price
+    final priceX = sx(200);
+    if (priceStr.length <= 8) {
+      commands.writeln('TEXT $priceX,$bottomY,"4",0,1,2,"$priceStr"');
+    } else if (priceStr.length <= 12) {
+      commands.writeln('TEXT $priceX,$bottomY,"3",0,1,2,"$priceStr"');
+    } else {
+      commands.writeln('TEXT $priceX,$bottomY,"2",0,1,2,"$priceStr"');
     }
 
     commands.writeln('PRINT ${copies.clamp(1, 20)},1');

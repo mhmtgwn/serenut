@@ -60,7 +60,8 @@ void main() {
     );
 
     expect(output, contains('Saman Market'));
-    expect(output, contains('Ornek Marka'));
+    expect(output, contains('Uzun Urun Adi ve Cesidi'));
+    expect(output, contains('BAR '));
     expect(output, isNot(contains('Ü')));
     expect(output, isNot(contains('geçersiz')));
   });
