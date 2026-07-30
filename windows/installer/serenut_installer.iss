@@ -34,7 +34,7 @@ Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 
 [Files]
 Source: "..\..\build\windows\x64\runner\Release\serenutos.exe"; DestDir: "{app}"; DestName: "serenutos.exe"; Flags: ignoreversion
-Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: ".sentry-native\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Flutter's Windows runner is linked against the Microsoft Visual C++ runtime.
 ; Bundle the official x64 redistributable so a clean customer machine never
 ; fails with a missing MSVCP140.dll / VCRUNTIME140.dll error.
