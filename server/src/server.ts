@@ -318,6 +318,26 @@ Object.entries(authPages).forEach(([route, file]) => {
 app.use('/shared', express.static(path.join(process.cwd(), 'public/shared')));
 app.use('/auth', express.static(path.join(process.cwd(), 'public/auth')));
 
+// Browser/PWA brand files live at the public root, while website pages are
+// served from public/website. Expose only the approved root assets explicitly
+// so favicon and manifest requests cannot fall through to the website 404.
+const rootBrandAssets = [
+  'favicon.ico',
+  'favicon-32.png',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-maskable-192.png',
+  'icon-maskable-512.png',
+  'site.webmanifest',
+  'social-card-1200x630.png',
+];
+rootBrandAssets.forEach((file) => {
+  app.get(`/${file}`, (_req, res) => {
+    res.sendFile(path.join(process.cwd(), 'public', file));
+  });
+});
+
 // Automatically redirect /app (without trailing slash) to /app/ to avoid relative asset path resolution errors
 // Express'in varsayılan non-strict routing davranışında `/app` rotası `/app/`
 // isteğini de eşleştirir. Slash'li isteği tekrar kendisine yönlendirmek sonsuz

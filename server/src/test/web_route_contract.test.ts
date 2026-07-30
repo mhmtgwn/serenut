@@ -68,6 +68,7 @@ async function run() {
   assert.match(webManifest, /icon-maskable-512\.png/, 'web manifest must provide a 512px maskable icon');
   for (const asset of ['favicon.ico', 'favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png']) {
     assert.ok(fs.existsSync(path.join(projectRoot, 'public', asset)), `${asset} must exist`);
+    assert.match(serverSource, new RegExp(`['"]${asset.replace('.', '\\.')}['"]`), `${asset} must be exposed from the public root`);
   }
 
   assert.equal(resolveLandingModuleId(['sysadmin'], []), 'platform-overview');
