@@ -5,7 +5,7 @@
 ; ============================================================
 
 #define MyAppName "Serenut OS"
-#define MyAppVersion "1.2.0+54"
+#define MyAppVersion "1.2.0+55"
 #define MyAppPublisher "Serenut Software Technologies"
 #define MyAppURL "https://serenut.com"
 #define MyAppExeName "serenutos.exe"
