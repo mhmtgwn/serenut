@@ -142,7 +142,7 @@ void main() {
       expect(find.text('Test Burger'), findsOneWidget);
 
       // Find the search icon and tap it to reveal TextField
-      final searchIconFinder = find.byTooltip('Ara');
+      final searchIconFinder = find.byTooltip('Ara ve filtrele');
       expect(searchIconFinder, findsOneWidget);
       await tester.tap(searchIconFinder);
       await tester.pump(const Duration(milliseconds: 500));

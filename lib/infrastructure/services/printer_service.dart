@@ -206,11 +206,13 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // Failover chain: Sunmi → Network → Bluetooth → PersistentQueue
     final backends = await _buildFailoverChain(targetSettings);
 
+    final failures = <String>[];
     for (final backend in backends) {
       try {
         await _sendViaBackend(bytes, backend, targetSettings);
         return; // Success
-      } catch (_) {
+      } catch (error) {
+        failures.add('${backend.name}: $error');
         // Try next backend
         continue;
       }
@@ -226,7 +228,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         receiptJson: bytes.join(','), // Compact byte list
       );
     }
-    throw Exception('Tum yazici backend’leri basarisiz. Fis kuyruga alindi.');
+    final jobName = purpose == PrinterPurpose.label ? 'Etiket' : 'Fiş';
+    final queueMessage =
+        queue == null ? 'Kuyruğa alınamadı.' : 'Kuyruğa alındı.';
+    throw Exception(
+      '$jobName yazdırılamadı. $queueMessage ${failures.join(' | ')}',
+    );
   }
 
   /// Build ordered failover chain for current platform and settings.
@@ -436,9 +443,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(_receiptTypography(settings));
 
     // 0. Logo (Centred)
+    final logoWidth = settings.paperWidth <= 58 ? 320 : 448;
     final logo = settings.printLogo
-        ? await _getLogoBytes(settings.businessLogo,
-            maxWidth: settings.paperWidth <= 58 ? 180 : 280)
+        ? await _getLogoBytes(settings.businessLogo, maxWidth: logoWidth)
         : const <int>[];
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
@@ -583,9 +590,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(_receiptTypography(settings));
 
     // 0. Logo (Centred)
+    final logoWidth = settings.paperWidth <= 58 ? 320 : 448;
     final logo = settings.printLogo
-        ? await _getLogoBytes(settings.businessLogo,
-            maxWidth: settings.paperWidth <= 58 ? 180 : 280)
+        ? await _getLogoBytes(settings.businessLogo, maxWidth: logoWidth)
         : const <int>[];
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
@@ -739,7 +746,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
 
     // 0. Logo (Centred)
-    final logo = await _getLogoBytes(settings.businessLogo);
+    final logoWidth = settings.paperWidth <= 58 ? 320 : 448;
+    final logo = settings.printLogo
+        ? await _getLogoBytes(settings.businessLogo, maxWidth: logoWidth)
+        : const <int>[];
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
       bytes.addAll(logo);
@@ -1059,7 +1069,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
   // Load and dither logo from settings or fallback asset
   Future<List<int>> _getLogoBytes(String? logoPath,
-      {int maxWidth = 180}) async {
+      {int maxWidth = 320}) async {
     if (_socketConnector != null) {
       // Test mode - bypass loading from assets/files to avoid errors
       return [];
@@ -1097,8 +1107,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       }
       final img.Image? decoded = img.decodeImage(list);
       if (decoded != null) {
-        final targetWidth = decoded.width > maxWidth ? maxWidth : decoded.width;
-        final img.Image resized = img.copyResize(decoded, width: targetWidth);
+        // Enforce logo width to be an exact multiple of 8 bytes for ESC/POS GS v 0
+        int rawTargetWidth = decoded.width > maxWidth ? maxWidth : decoded.width;
+        int targetWidth = (rawTargetWidth ~/ 8) * 8;
+        if (targetWidth < 8) targetWidth = 8;
+
+        final img.Image resized = img.copyResize(
+          decoded,
+          width: targetWidth,
+          interpolation: img.Interpolation.cubic,
+        );
         return _convertImageToEscPos(resized);
       }
     } catch (e) {
@@ -1129,9 +1147,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           final int px = x + bit;
           if (px < width) {
             final pixel = image.getPixel(px, y);
-            if (pixel.a < 128) {
-              // Transparent -> treat as white
-            } else {
+            // Handle transparent background pixels cleanly (treat alpha < 128 as white)
+            if (pixel.a >= 128) {
               final double luminance =
                   0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
               if (luminance < 128) {

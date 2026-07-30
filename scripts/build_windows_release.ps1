@@ -8,6 +8,7 @@ if (-not (Test-Path -LiteralPath $keyConfig)) {
 
 Push-Location $workspace
 try {
+  python tool/generate_brand_assets.py
   flutter pub get
   flutter build windows --release --dart-define-from-file="$keyConfig"
 } finally {

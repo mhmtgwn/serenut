@@ -38,22 +38,36 @@ class LabelLayoutEngine {
 
     bytes.addAll(alignCenter);
     bytes.addAll(boldOn);
-    bytes.addAll(sizeLarge);
     if (model.brand?.trim().isNotEmpty == true) {
+      bytes.addAll(sizeNormal);
       bytes.addAll(_textToBytes('${model.brand}\n'));
     }
-    bytes.addAll(_textToBytes('${model.productName}\n'));
-    bytes.addAll(sizeNormal);
+
+    // Product Name: Short -> sizeLarge, Long -> multi-line sizeNormal
+    final maxLargeChars = width ~/ 2;
+    if (model.productName.length <= maxLargeChars) {
+      bytes.addAll(sizeLarge);
+      bytes.addAll(_textToBytes('${model.productName}\n'));
+      bytes.addAll(sizeNormal);
+    } else {
+      bytes.addAll(sizeNormal);
+      final lines = _wrapText(model.productName, width);
+      for (final line in lines) {
+        bytes.addAll(_textToBytes('$line\n'));
+      }
+    }
     bytes.addAll(boldOff);
 
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     // Align Left for details
     bytes.addAll(alignLeft);
-    bytes.addAll(_textToBytes('Birim: ${model.unit}\n'));
+    if (model.unit.isNotEmpty) {
+      bytes.addAll(_textToBytes('Birim: ${model.unit}\n'));
+    }
     bytes.addAll(boldOn);
     bytes.addAll(sizeLarge);
-    bytes.addAll(_textToBytes('₺${model.price.toStringAsFixed(2)}\n'));
+    bytes.addAll(_textToBytes('${model.price.toStringAsFixed(2)} TL\n'));
     bytes.addAll(sizeNormal);
     bytes.addAll(boldOff);
     if (model.shelfCode?.trim().isNotEmpty == true) {
@@ -79,6 +93,24 @@ class LabelLayoutEngine {
     bytes.addAll(cut);
 
     return bytes;
+  }
+
+  static List<String> _wrapText(String text, int width) {
+    if (text.isEmpty) return [];
+    final lines = <String>[];
+    var currentLine = '';
+    for (final word in text.trim().split(RegExp(r'\s+'))) {
+      if (currentLine.isEmpty) {
+        currentLine = word;
+      } else if (currentLine.length + word.length + 1 <= width) {
+        currentLine = '$currentLine $word';
+      } else {
+        lines.add(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine.isNotEmpty) lines.add(currentLine);
+    return lines;
   }
 
   // Converts text to CP857 (Turkish) bytes safely

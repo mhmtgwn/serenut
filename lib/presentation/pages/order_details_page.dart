@@ -18,6 +18,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart'
     show paymentServiceProvider;
 import 'package:flutter/services.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
+import 'package:serenutos/providers/hardware_config_provider.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = Color(0xFF16A34A);
@@ -1143,7 +1144,9 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           : _selectedMethod == 'karma'
               ? _karmaCard
               : 0.0;
-      if (cardAmount > 0) {
+      final hasPos =
+          ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
+      if (cardAmount > 0 && hasPos) {
         cardPayment =
             await ref.read(physicalCardPaymentServiceProvider).authorize(
                   amount: cardAmount,
@@ -1151,6 +1154,12 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                       'order-payment-${widget.order.id}-${widget.totalPaid.toStringAsFixed(2)}',
                 );
       }
+      final cardMetadata = cardAmount <= 0
+          ? null
+          : cardPayment?.ledgerMetadata ??
+              PhysicalCardPaymentService.manualLedgerMetadata(
+                context: 'order_collection',
+              );
 
       if (_selectedMethod == 'cash') {
         if (remaining > 0) {
@@ -1161,7 +1170,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             method: 'cash',
             currentPaidAmount: widget.totalPaid,
             totalAmount: widget.saleTx.amount,
-            terminalMetadata: cardPayment?.ledgerMetadata,
+            terminalMetadata: null,
           );
         }
       } else if (_selectedMethod == 'card') {
@@ -1173,7 +1182,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             method: 'card',
             currentPaidAmount: widget.totalPaid,
             totalAmount: widget.saleTx.amount,
-            terminalMetadata: cardPayment?.ledgerMetadata,
+            terminalMetadata: cardMetadata,
           );
         }
       } else if (_selectedMethod == 'karma') {
@@ -1189,7 +1198,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             method: 'cash',
             currentPaidAmount: currentPaid,
             totalAmount: widget.saleTx.amount,
-            terminalMetadata: cardPayment?.ledgerMetadata,
+            terminalMetadata: null,
           );
           currentPaid += kCash;
         }
@@ -1201,7 +1210,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             method: 'card',
             currentPaidAmount: currentPaid,
             totalAmount: widget.saleTx.amount,
-            terminalMetadata: cardPayment?.ledgerMetadata,
+            terminalMetadata: cardMetadata,
           );
         }
       }

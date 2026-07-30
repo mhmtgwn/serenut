@@ -13,6 +13,8 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart'; // FullScreenSettingsPage
 import 'package:serenutos/domain/models/sms_log_entry.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/services/sms_message_analyzer.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/theme.dart'; // POSColors & AppSpacing
 
@@ -395,32 +397,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         }
 
         if (!context.mounted) return;
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Toplu Borç Hatırlatma'),
-            content: Text(
-                '${allDebtors.length} adet borçlu müşteriye SMS hatırlatma mesajı gönderilecektir. Devam edilsin mi?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Vazgeç',
-                    style: TextStyle(color: POSColors.textSecondary)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Devam Et',
-                    style: TextStyle(
-                        color: POSColors.green, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-
-        if (confirm != true) return;
-        activeDebtors = allDebtors;
+        final selectedDebtors = await _selectBulkDebtors(context, allDebtors);
+        if (selectedDebtors == null || selectedDebtors.isEmpty) return;
+        activeDebtors = selectedDebtors;
         totalCount = activeDebtors.length;
         pendingIds = activeDebtors.map((c) => c.id.toString()).toList();
 
@@ -455,7 +434,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 if (!isSendingBulk) {
                   isSendingBulk = true;
                   Future(() async {
-                    const int batchSize = 5;
+                    // A local SIM is a single-channel gateway. Serial delivery
+                    // prevents platform-channel races and false failures.
+                    const int batchSize = 1;
                     while (pendingIds.isNotEmpty && !isBulkCancelled) {
                       final currentBatchIds = pendingIds.sublist(
                           0,
@@ -601,6 +582,148 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     }
   }
 
+  Future<List<CustomerEntity>?> _selectBulkDebtors(
+    BuildContext context,
+    List<CustomerEntity> debtors,
+  ) {
+    final selected = debtors.map((customer) => customer.id).toSet();
+    var query = '';
+    var minimumDebt = 0.0;
+    return showDialog<List<CustomerEntity>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final visible = debtors.where((customer) {
+            final normalized = query.toLowerCase().trim();
+            final matchesQuery = normalized.isEmpty ||
+                customer.name.toLowerCase().contains(normalized) ||
+                customer.phone.contains(normalized);
+            return matchesQuery && customer.balance.abs() >= minimumDebt;
+          }).toList(growable: false);
+          final selectedCustomers = debtors
+              .where((customer) => selected.contains(customer.id))
+              .toList(growable: false);
+          final longestMessage = selectedCustomers.isEmpty
+              ? ''
+              : selectedCustomers
+                  .map((customer) =>
+                      'Sn. ${customer.name}, veresiye hesabınızda ${customer.balance.abs().toStringAsFixed(2).replaceAll('.', ',')} ₺ borç bulunmaktadır. Ödemenizi rica ederiz.')
+                  .reduce((a, b) => a.length >= b.length ? a : b);
+          final analysis = const SmsMessageAnalyzer().analyze(longestMessage);
+          return AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('SMS Alıcılarını Seç'),
+            content: SizedBox(
+              width: 520,
+              height: 430,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: POSColors.amberLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sms_rounded,
+                            color: POSColors.amberDark),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${selected.length} / ${debtors.length} müşteri • En uzun mesaj: ${analysis.characters} karakter, ${analysis.segments} SMS',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setDialogState(() {
+                            if (selected.length == debtors.length) {
+                              selected.clear();
+                            } else {
+                              selected.addAll(visible.map((e) => e.id));
+                            }
+                          }),
+                          child: Text(selected.length == debtors.length
+                              ? 'Temizle'
+                              : 'Tümünü seç'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search_rounded),
+                      labelText: 'Müşteri veya telefon ara',
+                      isDense: true,
+                    ),
+                    onChanged: (value) => setDialogState(() => query = value),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    children: [0.0, 100.0, 500.0, 1000.0]
+                        .map((amount) => ChoiceChip(
+                              label: Text(amount == 0
+                                  ? 'Tüm borçlar'
+                                  : '${amount.toStringAsFixed(0)} ₺ üzeri'),
+                              selected: minimumDebt == amount,
+                              onSelected: (_) =>
+                                  setDialogState(() => minimumDebt = amount),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: visible.length,
+                      itemBuilder: (context, index) {
+                        final customer = visible[index];
+                        return CheckboxListTile(
+                          value: selected.contains(customer.id),
+                          activeColor: POSColors.green,
+                          title: Text(customer.name),
+                          subtitle: Text(
+                            '${customer.phone} • ${customer.balance.abs().toStringAsFixed(2).replaceAll('.', ',')} ₺',
+                          ),
+                          onChanged: (checked) => setDialogState(() {
+                            checked == true
+                                ? selected.add(customer.id)
+                                : selected.remove(customer.id);
+                          }),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Vazgeç'),
+              ),
+              FilledButton.icon(
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => Navigator.pop(
+                          dialogContext,
+                          debtors
+                              .where(
+                                  (customer) => selected.contains(customer.id))
+                              .toList(),
+                        ),
+                icon: const Icon(Icons.send_rounded),
+                label: Text('${selected.length} kişiye gönder'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _sendBulkAnnouncement(BuildContext context) async {
     final confirmText = await showDialog<String>(
       context: context,
@@ -682,6 +805,60 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               behavior: SnackBarBehavior.floating),
         );
       }
+    }
+  }
+
+  Future<void> _retryFailedDebtMessages(BuildContext context) async {
+    final logRepository = ref.read(smsLogRepositoryProvider);
+    final failed = await logRepository.getFailedCampaignLogs();
+    if (failed.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Yeniden gönderilecek başarısız SMS bulunmuyor.'),
+        ));
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Başarısız SMS’leri Yeniden Gönder'),
+        content: Text('${failed.length} mesaj sırayla yeniden gönderilecek.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Yeniden gönder'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true) return;
+
+    var sent = 0;
+    for (final entry in failed) {
+      await logRepository.incrementRetry(entry.id);
+      await logRepository.updateStatus(entry.id, SmsLogStatus.sending);
+      final success = await ref
+          .read(smsServiceProvider)
+          .sendSms(entry.phone, entry.message);
+      await logRepository.updateStatus(
+        entry.id,
+        success ? SmsLogStatus.sent : SmsLogStatus.failed,
+        sentAt: success ? DateTime.now() : null,
+        errorMessage: success ? null : 'Retry failed',
+      );
+      if (success) sent++;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$sent / ${failed.length} SMS başarıyla gönderildi.'),
+      ));
     }
   }
 
@@ -831,6 +1008,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   },
             icon: const Icon(Icons.campaign_rounded),
             label: const Text('Toplu duyuru gönder'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed:
+                isSendingBulk ? null : () => _retryFailedDebtMessages(context),
+            icon: const Icon(Icons.replay_rounded),
+            label: const Text('Başarısız borç SMS’lerini yeniden gönder'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(

@@ -335,6 +335,7 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   @override
   Future<List<CustomerEntity>> findFiltered({
     String? searchQuery,
+    CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
     int? limit,
     int? offset,
   }) async {
@@ -346,6 +347,12 @@ class InMemoryCustomerRepository implements ICustomerRepository {
           c.phone.toLowerCase().contains(q) ||
           c.email.toLowerCase().contains(q));
     }
+    results = results.where((customer) => switch (balanceFilter) {
+          CustomerBalanceFilter.debt => customer.balance < 0,
+          CustomerBalanceFilter.credit => customer.balance > 0,
+          CustomerBalanceFilter.clear => customer.balance == 0,
+          CustomerBalanceFilter.all => true,
+        });
     var list = results.toList();
     if (offset != null) {
       if (offset < list.length) {
@@ -358,6 +365,42 @@ class InMemoryCustomerRepository implements ICustomerRepository {
       list = list.sublist(0, limit);
     }
     return list;
+  }
+
+  @override
+  Future<CustomerBalanceSummary> getBalanceSummary(
+      {String? searchQuery}) async {
+    Iterable<CustomerEntity> customers = InMemoryDb.customers;
+    if (searchQuery?.isNotEmpty == true) {
+      final query = searchQuery!.toLowerCase();
+      customers = customers.where((customer) =>
+          customer.name.toLowerCase().contains(query) ||
+          customer.phone.toLowerCase().contains(query) ||
+          customer.email.toLowerCase().contains(query));
+    }
+    var totalDebt = 0.0;
+    var totalCredit = 0.0;
+    var debtorCount = 0;
+    var creditCount = 0;
+    var clearCount = 0;
+    for (final customer in customers) {
+      if (customer.balance < 0) {
+        totalDebt += customer.balance.abs();
+        debtorCount++;
+      } else if (customer.balance > 0) {
+        totalCredit += customer.balance;
+        creditCount++;
+      } else {
+        clearCount++;
+      }
+    }
+    return CustomerBalanceSummary(
+      totalDebt: totalDebt,
+      totalCredit: totalCredit,
+      debtorCount: debtorCount,
+      creditCount: creditCount,
+      clearCount: clearCount,
+    );
   }
 
   @override

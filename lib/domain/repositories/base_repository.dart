@@ -79,6 +79,24 @@ abstract class IProductRepository implements BaseRepository<ProductEntity> {
 }
 
 /// Customer repository
+enum CustomerBalanceFilter { all, debt, credit, clear }
+
+class CustomerBalanceSummary {
+  final double totalDebt;
+  final double totalCredit;
+  final int debtorCount;
+  final int creditCount;
+  final int clearCount;
+
+  const CustomerBalanceSummary({
+    required this.totalDebt,
+    required this.totalCredit,
+    required this.debtorCount,
+    required this.creditCount,
+    required this.clearCount,
+  });
+}
+
 abstract class ICustomerRepository implements BaseRepository<CustomerEntity> {
   /// Search customers by name or email
   Future<List<CustomerEntity>> search(String query);
@@ -86,9 +104,13 @@ abstract class ICustomerRepository implements BaseRepository<CustomerEntity> {
   /// Find customers with search and pagination
   Future<List<CustomerEntity>> findFiltered({
     String? searchQuery,
+    CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
     int? limit,
     int? offset,
   });
+
+  /// Aggregate values are calculated by the data store, never from a page.
+  Future<CustomerBalanceSummary> getBalanceSummary({String? searchQuery});
 
   /// Get customers with debt
   Future<List<CustomerEntity>> getDebtors();

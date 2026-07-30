@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
@@ -38,6 +39,7 @@ class ProductsPage extends ConsumerStatefulWidget {
 }
 
 class _ProductsPageState extends ConsumerState<ProductsPage> {
+  static final NumberFormat _stockFormat = NumberFormat.decimalPattern('tr_TR');
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSearching = false;
@@ -157,7 +159,23 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     });
   }
 
-  void _queueShelfLabels(List<ProductEntity> visibleProducts) {
+  Future<void> _toggleAllMatchingLabels() async {
+    final products =
+        await ref.read(productsControllerProvider.notifier).findAllMatching();
+    if (!mounted) return;
+    setState(() {
+      final ids = products.map((product) => product.id).toSet();
+      final allSelected =
+          ids.isNotEmpty && ids.every(_selectedLabelProductIds.contains);
+      if (allSelected) {
+        _selectedLabelProductIds.removeAll(ids);
+      } else {
+        _selectedLabelProductIds.addAll(ids);
+      }
+    });
+  }
+
+  Future<void> _queueShelfLabels() async {
     final settings = ref.read(settingsNotifierProvider).valueOrNull;
     if (settings == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +183,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       );
       return;
     }
-    final selected = visibleProducts
+    final matchingProducts =
+        await ref.read(productsControllerProvider.notifier).findAllMatching();
+    if (!mounted) return;
+    final selected = matchingProducts
         .where((product) => _selectedLabelProductIds.contains(product.id))
         .toList(growable: false);
     if (selected.isEmpty) {
@@ -206,6 +227,12 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         setState(() {});
       },
       actions: [
+        if (_isLabelSelectionMode)
+          IconButton(
+            tooltip: 'Filtreye uyan tüm ürünleri seç / temizle',
+            onPressed: _toggleAllMatchingLabels,
+            icon: const Icon(Icons.select_all_rounded, color: _kGreen),
+          ),
         IconButton(
           tooltip: _isLabelSelectionMode
               ? 'Etiket seçimini kapat'
@@ -461,7 +488,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                                         ),
                                         const SizedBox(height: 3),
                                         Text(
-                                          '${product.quantity} ${product.unit}',
+                                          '${_stockFormat.format(product.quantity)} ${product.unit}',
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
@@ -488,21 +515,19 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         heroTag: 'fab_products',
+        tooltip: _isLabelSelectionMode
+            ? '${_selectedLabelProductIds.length} etiketi yazdır'
+            : 'Yeni ürün',
         onPressed: _isLabelSelectionMode
-            ? () => filteredProductsVal.whenData(_queueShelfLabels)
+            ? _queueShelfLabels
             : () => context.push('/products/add'),
         backgroundColor: _kGreen,
         foregroundColor: Colors.white,
-        icon: Icon(_isLabelSelectionMode
+        child: Icon(_isLabelSelectionMode
             ? Icons.print_rounded
             : Icons.add_box_rounded),
-        label: Text(
-            _isLabelSelectionMode
-                ? 'Etiket Bas (${_selectedLabelProductIds.length})'
-                : 'Yeni Ürün',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

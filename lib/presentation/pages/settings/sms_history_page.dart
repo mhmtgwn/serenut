@@ -6,7 +6,6 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/config/theme.dart';
 
 const _kGreen = POSColors.green;
-const _kGreenDark = POSColors.greenDark;
 const _kRed = POSColors.red;
 const _kAmber = POSColors.amberDark;
 const _kBlue = POSColors.blue;

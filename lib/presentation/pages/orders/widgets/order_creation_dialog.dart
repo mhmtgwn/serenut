@@ -376,6 +376,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       }
     }
 
+    if (!mounted) return;
+
     if (matched != null) {
       setState(() {
         // Find existing instance in the cart or create new entry
@@ -660,13 +662,21 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           : _paymentMethod == 'karma'
               ? _karmaCard
               : 0.0;
-      if (cardAmount > 0) {
+      final hasPos =
+          ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
+      if (cardAmount > 0 && hasPos) {
         cardPayment =
             await ref.read(physicalCardPaymentServiceProvider).authorize(
                   amount: cardAmount,
                   idempotencyKey: 'order-card-$orderId',
                 );
       }
+      final cardMetadata = cardAmount <= 0
+          ? null
+          : cardPayment?.ledgerMetadata ??
+              PhysicalCardPaymentService.manualLedgerMetadata(
+                context: 'order_creation',
+              );
       if (isEdit) {
         // Save Order to Local Database
         await ref.read(ordersControllerProvider.notifier).updateOrder(newOrder);
@@ -690,7 +700,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           totalAmount: _totalAmount,
           paidAmount: finalPaid,
           paymentMethod: _paymentMethod,
-          terminalMetadata: cardPayment?.ledgerMetadata,
+          terminalMetadata: cardMetadata,
         );
       }
       if (cardPayment != null) {

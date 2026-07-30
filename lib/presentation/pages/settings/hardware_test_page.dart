@@ -1197,6 +1197,7 @@ List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {
         HardwareConnectionType.windows,
         HardwareConnectionType.tcp,
         HardwareConnectionType.bluetooth,
+        HardwareConnectionType.embedded,
       ],
     HardwareDeviceType.scale => const [
         HardwareConnectionType.serial,

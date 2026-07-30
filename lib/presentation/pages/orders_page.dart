@@ -454,15 +454,14 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     },
                   ),
           ),
-          floatingActionButton: FloatingActionButton.extended(
+          floatingActionButton: FloatingActionButton(
             heroTag: 'fab_orders',
+            tooltip: 'Yeni sipariş',
             onPressed: () => _showOrderForm(context),
             backgroundColor: _kGreen,
             foregroundColor: Colors.white,
             elevation: 3,
-            icon: const Icon(Icons.add_shopping_cart_rounded),
-            label: const Text('Yeni Sipariş',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Icon(Icons.add_shopping_cart_rounded),
           ),
         );
       },

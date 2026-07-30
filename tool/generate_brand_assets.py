@@ -40,6 +40,13 @@ def padded_master_icon(size: int, content_ratio: float = 0.66) -> Image.Image:
     return image
 
 
+def platform_icon(size: int, mark_padding: float = 0.14) -> Image.Image:
+    """Opaque square source; Android/iOS apply their own outer mask."""
+    image = Image.new("RGBA", (size, size), WHITE)
+    image.alpha_composite(mark(size, "color", mark_padding))
+    return image
+
+
 def prepare_approved_icon() -> None:
     """Normalize the supplied white-background artwork into an opaque square.
 
@@ -199,8 +206,11 @@ def main() -> None:
         for size in (24, 32, 48, 64, 96, 128, 256, 512, 1024):
             save_png(mark(size, variant), f"png/{variant}/logo-{variant}-{size}.png")
 
-    for size in (48, 72, 96, 144, 192, 512, 1024):
-        save_png(master_icon(size), f"app/icon-color-{size}.png")
+    for size in (48, 72, 96, 112, 144, 192, 512, 1024):
+        # Runtime brand art is deliberately frameless. Platform launchers get
+        # their own opaque/maskable export further below.
+        save_png(mark(size, "color", 0.08), f"app/mark-color-{size}.png")
+        save_png(platform_icon(size), f"app/icon-color-{size}.png")
         save_png(
             rounded_icon(size, GREEN, "white", 0.19),
             f"app/icon-reverse-{size}.png",
@@ -229,7 +239,9 @@ def main() -> None:
 
     save_png(social_card(), "web/social-card-1200x630.png")
 
-    ico_frames = [master_icon(size) for size in (16, 24, 32, 48, 64, 128, 256)]
+    # Windows supports alpha in ICO frames. A transparent mark avoids the
+    # miniature rounded white tile that looked like a second icon border.
+    ico_frames = [mark(size, "color", 0.08) for size in (16, 24, 32, 48, 64, 128, 256)]
     ico_path = OUT / "windows" / "app_icon.ico"
     ico_path.parent.mkdir(parents=True, exist_ok=True)
     ico_frames[-1].save(ico_path, format="ICO", sizes=[im.size for im in ico_frames])
@@ -245,6 +257,10 @@ def main() -> None:
     # Flutter runtime images. Keep the historic filenames because they are
     # referenced by login, splash, settings and print workflows.
     save_project_png(lockup(256, "Serenut OS"), "assets/logo.png")
+    save_project_png(
+        lockup(192, "Serenut OS"),
+        "assets/branding/app/serenut-os-splash.png",
+    )
 
     # Android legacy launcher icons.
     android_sizes = {
@@ -255,7 +271,7 @@ def main() -> None:
         "xxxhdpi": 192,
     }
     for density, size in android_sizes.items():
-        launcher = master_icon(size)
+        launcher = platform_icon(size)
         save_project_png(
             launcher,
             f"android/app/src/main/res/mipmap-{density}/ic_launcher.png",
@@ -265,12 +281,16 @@ def main() -> None:
             f"android/app/src/main/res/mipmap-{density}/ic_launcher_round.png",
         )
     save_project_png(
-        padded_master_icon(432),
+        mark(432, "color", 0.22),
         "android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png",
     )
     save_project_png(
         mark(432, "white", 0.25),
         "android/app/src/main/res/drawable-nodpi/ic_launcher_monochrome.png",
+    )
+    save_project_png(
+        mark(160, "color", 0.08),
+        "android/app/src/main/res/drawable-nodpi/splash_mark.png",
     )
 
     # iOS AppIcon. iOS applies its own mask; source artwork must be opaque and
@@ -293,7 +313,7 @@ def main() -> None:
         "Icon-App-1024x1024@1x.png": 1024,
     }
     for filename, size in ios_icons.items():
-        icon = master_icon(size).convert("RGB")
+        icon = platform_icon(size).convert("RGB")
         save_project_png(
             icon,
             f"ios/Runner/Assets.xcassets/AppIcon.appiconset/{filename}",

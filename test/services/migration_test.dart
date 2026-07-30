@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' hide equals;
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/schema/db_schema.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -41,41 +42,18 @@ void main() {
 
     test('Should create a pre-migration backup file before upgrading schema',
         () async {
-      // 1. Create a version 3 mock database
-      final db =
-          await openDatabase(dbPath, version: 3, onCreate: (db, version) async {
-        await db.execute(
-            'CREATE TABLE settings (id INTEGER PRIMARY KEY, business_name TEXT)');
-        await db.execute(
-            'CREATE TABLE sales (id TEXT PRIMARY KEY, created_at TEXT, customer_id TEXT)');
-        await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY)');
-        await db.execute(
-            'CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, customer_id TEXT, created_at TEXT)');
-        await db.execute(
-            'CREATE TABLE sale_items (id TEXT PRIMARY KEY, sale_id TEXT, product_id TEXT)');
-        await db
-            .execute('CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT)');
-        await db.execute('''
-          CREATE TABLE users (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL,
-            is_active INTEGER NOT NULL DEFAULT 1,
-            last_login TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          )
-        ''');
-        await db.insert('settings', {'business_name': 'Test Store V3'});
+      // Build a structurally valid previous-version database. This test owns
+      // backup behavior; individual historical migrations have separate tests.
+      final db = await openDatabase(dbPath, version: 43,
+          onCreate: (db, version) async {
+        await DatabaseSchema.createTables(db);
       });
       await db.close();
 
       // 2. Set database provider override path
       DatabaseManager.overrideDatabasePath = dbPath;
 
-      // 3. Trigger upgrade using DatabaseManager (upgrades to version 5)
+      // 3. Trigger the current production upgrade.
       final upgradedDb = await DatabaseManager().getDatabase();
 
       // Check that tables were upgraded and the pre-migration backup was created
@@ -87,9 +65,9 @@ void main() {
       final backupFile = File(backupPath);
       expect(await backupFile.exists(), isTrue);
 
-      // Verify the backup file itself still contains the V3 version schema
+      // Verify the backup preserves the exact pre-upgrade schema version.
       final backupDb = await openDatabase(backupPath, readOnly: true);
-      expect(await backupDb.getVersion(), equals(3));
+      expect(await backupDb.getVersion(), equals(43));
       await backupDb.close();
 
       await upgradedDb.close();

@@ -415,7 +415,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               DropdownButtonFormField<String>(
                 value: _saleType,
                 decoration: InputDecoration(
-                  labelText: 'Birim',
+                  labelText: 'Satış Şekli',
                   prefixIcon: Icon(
                     _saleType == 'weighed'
                         ? Icons.monitor_weight_rounded
@@ -776,7 +776,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   if (match.isNotEmpty && match['rate'] != null) {
                     _vatCtrl.text = match['rate'].toString();
                   }
-                  _applyCategoryDefaults(match);
                 });
               }
             } else {
@@ -792,7 +791,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   if (match.isNotEmpty && match['rate'] != null) {
                     _vatCtrl.text = match['rate'].toString();
                   }
-                  _applyCategoryDefaults(match);
                 }
               });
             }
@@ -802,15 +800,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         ),
       ],
     );
-  }
-
-  void _applyCategoryDefaults(Map<String, dynamic> category) {
-    final defaultUnit = category['unit']?.toString();
-    if (defaultUnit == null || defaultUnit.isEmpty) return;
-    _unit = defaultUnit;
-    if (defaultUnit == 'kg') {
-      _saleType = 'weighed';
-    }
   }
 
   Future<String?> _showNewCategorySheet() async {

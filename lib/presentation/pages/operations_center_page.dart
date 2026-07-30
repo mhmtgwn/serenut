@@ -5,6 +5,26 @@ import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_settings_sheet.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/sms_provider.dart';
+import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
+import 'package:serenutos/config/theme.dart';
+
+final _operationPrintSummaryProvider = FutureProvider.autoDispose((ref) async {
+  final jobs = await ref.watch(persistentPrintQueueProvider).loadAll();
+  return (
+    pending: jobs
+        .where((job) =>
+            job.status == PrintJobStatus.pending ||
+            job.status == PrintJobStatus.printing)
+        .length,
+    failed: jobs
+        .where((job) =>
+            job.status == PrintJobStatus.failed ||
+            job.status == PrintJobStatus.abandoned)
+        .length,
+  );
+});
 
 class OperationsCenterPage extends ConsumerWidget {
   const OperationsCenterPage({super.key});
@@ -12,12 +32,39 @@ class OperationsCenterPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsNotifierProvider).value;
+    final smsPending = ref.watch(smsPendingCountProvider).valueOrNull ?? 0;
+    final printSummary = ref.watch(_operationPrintSummaryProvider).valueOrNull;
     return FullScreenSettingsPage(
       title: 'Operasyon Merkezi',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _OperationsIntro(),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _StatusTile(
+                label: 'Bekleyen SMS',
+                value: '$smsPending',
+                icon: Icons.sms_outlined,
+                attention: smsPending > 0,
+              ),
+              _StatusTile(
+                label: 'Bekleyen Baskı',
+                value: '${printSummary?.pending ?? 0}',
+                icon: Icons.print_outlined,
+                attention: (printSummary?.pending ?? 0) > 0,
+              ),
+              _StatusTile(
+                label: 'Başarısız Baskı',
+                value: '${printSummary?.failed ?? 0}',
+                icon: Icons.error_outline_rounded,
+                attention: (printSummary?.failed ?? 0) > 0,
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           _OperationCard(
             icon: Icons.print_rounded,
@@ -62,6 +109,53 @@ class OperationsCenterPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _StatusTile extends StatelessWidget {
+  const _StatusTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.attention,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final bool attention;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 170,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: attention ? POSColors.amberLight : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorderColor),
+        ),
+        child: Row(
+          children: [
+            Icon(icon,
+                color: attention ? POSColors.amberDark : POSColors.green),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(value,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w900)),
+                  Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(fontSize: 10, color: kTextSecondary)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _OperationsIntro extends StatelessWidget {

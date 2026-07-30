@@ -108,7 +108,7 @@ void main() {
       expect(find.text('Finans Hub & Raporlar'), findsNothing);
       expect(find.text('Denetim Merkezi (Audit Center)'), findsNothing);
       expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
-      expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
+      expect(find.text('Admin Kontrol Merkezi'), findsNothing);
 
       await tester.pump();
     });
@@ -154,7 +154,7 @@ void main() {
       expect(find.text('Finans Hub & Raporlar'), findsNothing);
       expect(find.text('Denetim Merkezi (Audit Center)'), findsNothing);
       expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
-      expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
+      expect(find.text('Admin Kontrol Merkezi'), findsNothing);
 
       await tester.pump();
     });
@@ -195,7 +195,7 @@ void main() {
 
       expect(find.text('Kullanıcı Yönetimi'), findsOneWidget);
       expect(find.text('Veritabanı Sağlık Kontrolü'), findsNothing);
-      expect(find.text('Admin Kontrol Merkezi'), findsOneWidget);
+      expect(find.text('Admin Kontrol Merkezi'), findsNothing);
 
       await tester.pump();
     });

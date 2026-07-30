@@ -56,23 +56,19 @@ class BrandedSplashScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset(
-                        'assets/branding/app/icon-color-192.png',
-                        width: 112,
-                        height: 112,
+                        'assets/branding/app/mark-color-112.png',
+                        width: 96,
+                        height: 96,
+                        fit: BoxFit.contain,
+                        semanticLabel: 'Serenut simgesi',
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Image.asset(
+                        'assets/branding/app/serenut-os-splash.png',
+                        width: 224,
+                        height: 72,
                         fit: BoxFit.contain,
                         semanticLabel: 'Serenut OS',
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Text(
-                        'Serenut OS',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              color: POSColors.text,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.6,
-                            ),
                       ),
                       const SizedBox(height: AppSpacing.xl + AppSpacing.sm),
                       AnimatedSwitcher(

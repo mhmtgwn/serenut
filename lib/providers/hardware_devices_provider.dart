@@ -9,6 +9,16 @@ import 'package:serenutos/infrastructure/repositories/shared_preferences_hardwar
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/infrastructure/services/device_hardware_profile_service.dart';
+import 'package:serenutos/infrastructure/services/printer_discovery_service.dart';
+
+final deviceHardwareProfileServiceProvider =
+    Provider<DeviceHardwareProfileService>((ref) {
+  return DeviceHardwareProfileService(
+    apiClient: ref.watch(apiClientProvider),
+    licenseService: ref.watch(licenseServiceProvider),
+  );
+});
 
 final hardwareDeviceRepositoryProvider =
     FutureProvider<HardwareDeviceRepository>((ref) async {
@@ -31,6 +41,14 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     _repository = await ref.watch(hardwareDeviceRepositoryProvider.future);
     final devices = await _repository.getAll();
     if (devices.isNotEmpty) return devices;
+    final remoteDevices = await _restoreRemoteProfile();
+    if (remoteDevices.isNotEmpty) {
+      for (final device in remoteDevices) {
+        await _repository.save(device);
+        await _syncLegacy(device);
+      }
+      return remoteDevices;
+    }
     final preferences = await SharedPreferences.getInstance();
     if (preferences.getBool(_migrationKey) == true) return [];
     return _migrate(preferences);
@@ -132,13 +150,33 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       await _repository.delete(duplicate.id);
     }
     await _repository.save(device);
-    state = AsyncData(await _repository.getAll());
+    final current = await _repository.getAll();
+    state = AsyncData(current);
+    await _backupRemoteProfile(current);
   }
 
   Future<void> remove(HardwareDevice device) async {
     await _disableLegacy(device);
     await _repository.delete(device.id);
-    state = AsyncData(await _repository.getAll());
+    final current = await _repository.getAll();
+    state = AsyncData(current);
+    await _backupRemoteProfile(current);
+  }
+
+  Future<List<HardwareDevice>> _restoreRemoteProfile() async {
+    try {
+      return ref.read(deviceHardwareProfileServiceProvider).restore();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _backupRemoteProfile(List<HardwareDevice> devices) async {
+    try {
+      await ref.read(deviceHardwareProfileServiceProvider).backup(devices);
+    } catch (_) {
+      // Local hardware remains authoritative while offline; next edit retries.
+    }
   }
 
   Future<HardwareTestResult> verify(HardwareDevice device) async {
@@ -177,7 +215,9 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       lastError: result.technicalDetail,
       clearLastError: result.success,
     ));
-    state = AsyncData(await _repository.getAll());
+    final current = await _repository.getAll();
+    state = AsyncData(current);
+    await _backupRemoteProfile(current);
     return result;
   }
 
@@ -219,6 +259,9 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         }
         return '${result.vendor} ${result.model} satışa hazır';
       case HardwareDeviceType.receiptPrinter:
+        if (device.connectionType == HardwareConnectionType.windows) {
+          return _verifyWindowsPrinter(device);
+        }
         final current = await _settings();
         final candidate = current.copyWith(
           printerName: config['printerName'] as String? ?? device.name,
@@ -232,6 +275,9 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
             .timeout(const Duration(seconds: 8));
         return 'Fiş yazıcısı bağlantısı hazır';
       case HardwareDeviceType.labelPrinter:
+        if (device.connectionType == HardwareConnectionType.windows) {
+          return _verifyWindowsPrinter(device);
+        }
         final current = await _settings();
         final candidate = current.copyWith(
           labelPrinterEnabled: true,
@@ -256,6 +302,27 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
             await scanner.scanStream.first.timeout(const Duration(seconds: 10));
         return 'Barkod okundu: ${scan.barcode}';
     }
+  }
+
+  Future<String> _verifyWindowsPrinter(HardwareDevice device) async {
+    final requested =
+        (device.configuration['printerName'] as String? ?? '').trim();
+    if (requested.isEmpty) {
+      throw StateError('Windows yazıcı adı boş bırakılamaz.');
+    }
+    final printers = await PrinterDiscoveryService().listWindowsPrinters();
+    final matched = printers.any(
+      (printer) => printer.name.toLowerCase() == requested.toLowerCase(),
+    );
+    if (!matched) {
+      final available = printers.map((printer) => printer.name).join(', ');
+      throw StateError(
+        available.isEmpty
+            ? 'Windows yazıcı listesi okunamadı. Yazıcı sürücüsünü ve Print Spooler hizmetini kontrol edin.'
+            : '"$requested" Windows yazıcı listesinde bulunamadı. Mevcut yazıcılar: $available',
+      );
+    }
+    return 'Windows yazıcı kuyruğu hazır: $requested';
   }
 
   Future<void> _syncLegacy(HardwareDevice device) async {

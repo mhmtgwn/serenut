@@ -301,20 +301,25 @@ class DatabaseManager {
           // Older databases can contain anonymous sales before the system
           // customer was introduced. Materialize it before checking relations.
           final now = DateTime.now().toUtc().toIso8601String();
-          await db.insert(
-            'customers',
-            {
-              'id': '',
-              'name': 'Peşin Müşteri',
-              'email': '',
-              'phone': '',
-              'balance': 0.0,
-              'status': 'active',
-              'created_at': now,
-              'updated_at': now,
-            },
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
+          try {
+            await db.insert(
+              'customers',
+              {
+                'id': '',
+                'name': 'Peşin Müşteri',
+                'email': '',
+                'phone': '',
+                'balance': 0.0,
+                'status': 'active',
+                'created_at': now,
+                'updated_at': now,
+              },
+              conflictAlgorithm: ConflictAlgorithm.ignore,
+            );
+          } on DatabaseException {
+            // Schema verification below owns malformed/legacy schema errors.
+            // Do not let optional seed repair mask the actionable invariant.
+          }
 
           final fkCheck = await db.rawQuery('PRAGMA foreign_key_check;');
           if (fkCheck.isNotEmpty) {

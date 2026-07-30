@@ -138,13 +138,14 @@ class SqliteCustomerRepository implements ICustomerRepository {
   @override
   Future<List<CustomerEntity>> findFiltered({
     String? searchQuery,
+    CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
     int? limit,
     int? offset,
   }) async {
     if (searchQuery == null || searchQuery.trim().isEmpty) {
       final rows = await _executor.query(
         'customers',
-        where: "is_active = 1 AND id != ''",
+        where: "is_active = 1 AND id != ''${_balanceWhere(balanceFilter)}",
         orderBy: 'normalized_name ASC',
         limit: limit,
         offset: offset,
@@ -163,16 +164,102 @@ class SqliteCustomerRepository implements ICustomerRepository {
       cleanPhone = cleanPhone.substring(1);
     }
 
-    final matches = await _legacyNormalizedSearch(
+    final matches = (await _legacyNormalizedSearch(
       normalizedQuery,
       normalizedPhone: cleanPhone,
-    );
+    ))
+        .where((row) => _matchesBalance(row, balanceFilter))
+        .toList(growable: false);
     final start = (offset ?? 0).clamp(0, matches.length);
     final end = limit == null
         ? matches.length
         : (start + limit).clamp(start, matches.length);
     final rows = matches.sublist(start, end);
     return rows.map((row) => CustomerEntity.fromMap(row)).toList();
+  }
+
+  @override
+  Future<CustomerBalanceSummary> getBalanceSummary(
+      {String? searchQuery}) async {
+    if (searchQuery == null || searchQuery.trim().isEmpty) {
+      final rows = await _executor.rawQuery('''
+        SELECT
+          COALESCE(SUM(CASE WHEN balance < 0 THEN -balance ELSE 0 END), 0) AS total_debt,
+          COALESCE(SUM(CASE WHEN balance > 0 THEN balance ELSE 0 END), 0) AS total_credit,
+          SUM(CASE WHEN balance < 0 THEN 1 ELSE 0 END) AS debtor_count,
+          SUM(CASE WHEN balance > 0 THEN 1 ELSE 0 END) AS credit_count,
+          SUM(CASE WHEN balance = 0 THEN 1 ELSE 0 END) AS clear_count
+        FROM customers WHERE is_active = 1 AND id != ''
+      ''');
+      final row = rows.first;
+      return CustomerBalanceSummary(
+        totalDebt: (row['total_debt'] as num?)?.toDouble() ?? 0,
+        totalCredit: (row['total_credit'] as num?)?.toDouble() ?? 0,
+        debtorCount: (row['debtor_count'] as num?)?.toInt() ?? 0,
+        creditCount: (row['credit_count'] as num?)?.toInt() ?? 0,
+        clearCount: (row['clear_count'] as num?)?.toInt() ?? 0,
+      );
+    }
+    final rows = await _legacyNormalizedSearch(
+      _normalizeTurkish(searchQuery.trim()),
+      normalizedPhone: _normalizedPhone(searchQuery),
+    );
+    return _summaryFromRows(rows);
+  }
+
+  static String _balanceWhere(CustomerBalanceFilter filter) => switch (filter) {
+        CustomerBalanceFilter.debt => ' AND balance < 0',
+        CustomerBalanceFilter.credit => ' AND balance > 0',
+        CustomerBalanceFilter.clear => ' AND balance = 0',
+        CustomerBalanceFilter.all => '',
+      };
+
+  static bool _matchesBalance(
+    Map<String, dynamic> row,
+    CustomerBalanceFilter filter,
+  ) {
+    final balance = (row['balance'] as num?)?.toDouble() ?? 0;
+    return switch (filter) {
+      CustomerBalanceFilter.debt => balance < 0,
+      CustomerBalanceFilter.credit => balance > 0,
+      CustomerBalanceFilter.clear => balance == 0,
+      CustomerBalanceFilter.all => true,
+    };
+  }
+
+  static String _normalizedPhone(String query) {
+    var digits = query.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('90')) digits = digits.substring(2);
+    if (digits.startsWith('0')) digits = digits.substring(1);
+    return digits;
+  }
+
+  static CustomerBalanceSummary _summaryFromRows(
+      List<Map<String, dynamic>> rows) {
+    var debt = 0.0;
+    var credit = 0.0;
+    var debtors = 0;
+    var creditors = 0;
+    var clear = 0;
+    for (final row in rows) {
+      final balance = (row['balance'] as num?)?.toDouble() ?? 0;
+      if (balance < 0) {
+        debt += balance.abs();
+        debtors++;
+      } else if (balance > 0) {
+        credit += balance;
+        creditors++;
+      } else {
+        clear++;
+      }
+    }
+    return CustomerBalanceSummary(
+      totalDebt: debt,
+      totalCredit: credit,
+      debtorCount: debtors,
+      creditCount: creditors,
+      clearCount: clear,
+    );
   }
 
   Future<List<Map<String, dynamic>>> _legacyNormalizedSearch(

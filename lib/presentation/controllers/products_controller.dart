@@ -62,6 +62,15 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     }
   }
 
+  /// Returns the complete repository-backed result set for bulk operations.
+  /// This does not mutate or exhaust the paginated UI state.
+  Future<List<ProductEntity>> findAllMatching() {
+    return _repository.findFiltered(
+      searchQuery: ref.read(productSearchQueryProvider),
+      category: ref.read(productCategoryFilterProvider),
+    );
+  }
+
   Future<void> addProduct(ProductEntity product) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

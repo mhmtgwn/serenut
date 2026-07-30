@@ -212,7 +212,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                     value: 'cloud_sales',
                     child: ListTile(
                       leading: Icon(Icons.cloud_download_rounded,
-                          color: Colors.blue),
+                          color: POSColors.green),
                       title: Text('Bulut Satış Geçmişi (CSV)'),
                     ),
                   ),
@@ -220,7 +220,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                     value: 'cloud_products',
                     child: ListTile(
                       leading: Icon(Icons.cloud_download_rounded,
-                          color: Colors.blue),
+                          color: POSColors.green),
                       title: Text('Bulut Ürün Analitiği (CSV)'),
                     ),
                   ),
@@ -228,7 +228,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage>
                     value: 'cloud_debtors',
                     child: ListTile(
                       leading: Icon(Icons.cloud_download_rounded,
-                          color: Colors.blue),
+                          color: POSColors.green),
                       title: Text('Bulut Cari Veresiye Listesi (CSV)'),
                     ),
                   ),

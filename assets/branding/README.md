@@ -4,7 +4,7 @@ Bu paket, onaylı Serenut görsellerinden platformlara uygun çıktılar üretir
 
 ## Onaylı ana kaynaklar
 
-- `source/app-icon-white.png`: Uygulama, favicon, PWA, Android, iOS ve Windows ikonlarının tek ana kaynağıdır.
+- `source/app-icon-white.png`: Kullanıcı tarafından onaylanan geometrik işaretin referans kaynağıdır.
 - `source/mark-transparent-effects.png`: Efektli transparan sunum görselidir. Küçük ikonlarda, giriş formlarında ve baskıda kullanılmaz.
 
 ## Ana renkler
@@ -27,7 +27,8 @@ Bu paket, onaylı Serenut görsellerinden platformlara uygun çıktılar üretir
 
 ## Ürün içindeki kullanım
 
-- Android/iOS/Windows uygulama ikonları: beyaz zeminli kare ana kaynak.
+- Android/iOS uygulama ikonları: platformun kendi maskesi üzerinde beyaz zemin ve çerçevesiz işaret.
+- Windows uygulama ikonu: transparan zeminde çerçevesiz renkli işaret.
 - Tarayıcı sekmesi: kutusuz, transparan ve boşluksuz sade renkli amblem.
 - Giriş, kayıt ve şifre ekranları: yatay renkli `Serenut OS` logosu.
 - Koyu panel kenar çubuğu: renkli amblem ve beyaz yazılı tek yatay logo.
@@ -43,6 +44,7 @@ Bu paket, onaylı Serenut görsellerinden platformlara uygun çıktılar üretir
 - Renkli sürümü beyaz veya çok açık nötr zeminde kullanın.
 - Koyu/yeşil zeminde beyaz ters sürümü kullanın.
 - Şekli döndürmeyin, oranlarını bozmayın, gölge veya efekt eklemeyin.
+- İşareti ikinci bir yuvarlatılmış kart veya dekoratif çerçeve içine almayın.
 - Dijitalde 24 px altına inmeyin; baskıda minimum 8 mm kullanın.
 - Android/PWA maskable ikonlarında `web/icon-maskable-*` dosyalarını tercih edin.
 

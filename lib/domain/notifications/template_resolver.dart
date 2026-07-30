@@ -5,6 +5,7 @@
 // Created: 01 Jul 2026
 
 import 'dart:convert';
+import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/domain/models/settings.dart';
 
 // ── SMS Event Type Constants ──────────────────────────────────────────────────
@@ -139,7 +140,7 @@ class SmsTemplateVars {
       'paid': _fmt(paidAmount, currency),
       'debt':
           _fmt((totalAmount - paidAmount).clamp(0, double.maxFinite), currency),
-      'id': saleId,
+      'id': saleId.toShortId,
       'business': businessName,
       'date': _today(),
       'items': itemNames?.join(', ') ?? '',
@@ -164,7 +165,7 @@ class SmsTemplateVars {
       'paid': _fmt(paidAmount, currency),
       'debt': _fmt(debtAmount, currency),
       'balance': _fmt(newBalance.abs(), currency),
-      'id': saleId,
+      'id': saleId.toShortId,
       'business': businessName,
       'date': _today(),
       'items': '',
@@ -188,7 +189,7 @@ class SmsTemplateVars {
           remainingDebt > 0 ? _fmt(remainingDebt, currency) : '0,00 $currency',
       'balance':
           remainingDebt > 0 ? _fmt(remainingDebt, currency) : '0,00 $currency',
-      'id': transactionId,
+      'id': transactionId.toShortId,
       'business': businessName,
       'date': _today(),
       'items': '',
@@ -209,7 +210,7 @@ class SmsTemplateVars {
       'amount': _fmt(totalAmount, currency),
       'paid': _fmt(0, currency),
       'debt': '0,00 $currency',
-      'id': orderId,
+      'id': orderId.toShortId,
       'business': businessName,
       'date': _today(),
       'items': itemNames?.join(', ') ?? '',

@@ -39,12 +39,13 @@ async function assertActiveSyncActivation(
   companyId: string,
   activationId: unknown,
   installationId: unknown,
+  executor: Pick<PoolClient, "query"> = pgPool,
 ): Promise<void> {
   if (typeof activationId !== "string" || typeof installationId !== "string" ||
       !activationId || !installationId) {
     throw new Error("invalid_device_activation");
   }
-  const activation = await pgPool.query(
+  const activation = await executor.query(
     `SELECT id FROM device_activations
      WHERE id = $1 AND company_id = $2 AND device_hash = $3 AND status = 'active'`,
     [activationId, companyId, installationId],
@@ -253,6 +254,73 @@ router.use((req, res, next) => {
   next();
 });
 router.use(syncLimiter);
+
+router.post("/device-hardware-profile/restore", async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const result = await client.query(
+      `SELECT profile, updated_at FROM device_hardware_profiles
+       WHERE device_activation_id = $1 AND company_id = $2`,
+      [activationId, user.company_id],
+    );
+    await client.query("COMMIT");
+    return res.json({
+      profile: result.rows[0]?.profile ?? [],
+      updated_at: result.rows[0]?.updated_at ?? null,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "profile_restore_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : 500)
+      .json({ error: message });
+  } finally {
+    client.release();
+  }
+});
+
+router.put("/device-hardware-profile", async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const profile = req.body?.profile;
+  if (!Array.isArray(profile) || profile.length > 20) {
+    return res.status(400).json({ error: "invalid_hardware_profile" });
+  }
+  const encoded = JSON.stringify(profile);
+  if (encoded.length > 64_000 || /password|secret|api[_-]?key|pin/i.test(encoded)) {
+    return res.status(400).json({ error: "unsafe_hardware_profile" });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    await client.query(
+      `INSERT INTO device_hardware_profiles
+         (device_activation_id, company_id, profile, updated_at)
+       VALUES ($1, $2, $3::jsonb, NOW())
+       ON CONFLICT (device_activation_id) DO UPDATE
+       SET profile = EXCLUDED.profile, updated_at = NOW()
+       WHERE device_hardware_profiles.company_id = EXCLUDED.company_id`,
+      [activationId, user.company_id, encoded],
+    );
+    await client.query("COMMIT");
+    return res.json({ success: true });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "profile_save_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : 500)
+      .json({ error: message });
+  } finally {
+    client.release();
+  }
+});
 
 router.post("/push", async (req, res) => {
   const user = (req as any).user;

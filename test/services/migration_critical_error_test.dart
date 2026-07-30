@@ -90,7 +90,9 @@ void main() {
         () async {
       final db = await openDatabase(
         tempDbPath,
-        version: 26,
+        // Current version skips upgrade logic so this test isolates the
+        // post-open schema invariant contract.
+        version: 44,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE IF NOT EXISTS users (

@@ -1,4 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Show the product lockup briefly once per browsing session. This is a
+  // restrained brand reveal, not a blocking loading screen.
+  if (!sessionStorage.getItem('serenut_brand_intro_seen')) {
+    sessionStorage.setItem('serenut_brand_intro_seen', '1');
+    const intro = document.createElement('div');
+    intro.className = 'brand-intro';
+    intro.setAttribute('aria-hidden', 'true');
+    intro.innerHTML = '<img src="/shared/assets/serenut-os-color.svg" alt="">';
+    document.body.appendChild(intro);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.setTimeout(() => {
+      intro.classList.add('is-leaving');
+      window.setTimeout(() => intro.remove(), reducedMotion ? 0 : 300);
+    }, reducedMotion ? 250 : 850);
+  }
+
   const currentPath = window.location.pathname.replace(/\.html$/, '') || '/';
   const icon = (path) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"></path></svg>`;
   const icons = { product:icon('M4 6h16M4 12h16M4 18h10'), plans:icon('M4 4h16v16H4zM8 9h8M8 13h5'), download:icon('M12 3v12m0 0 5-5m-5 5-5-5M5 21h14'), contact:icon('M4 5h16v14H4zM4 7l8 6 8-6') };

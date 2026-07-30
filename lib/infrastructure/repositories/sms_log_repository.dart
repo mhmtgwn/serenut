@@ -177,6 +177,29 @@ class SmsLogRepository {
     }
   }
 
+  Future<List<SmsLogEntry>> getFailedCampaignLogs() async {
+    if (kIsWeb) {
+      return _inMemoryLogs
+          .where((entry) =>
+              entry.eventType == 'bulk_debt_reminder' &&
+              entry.status == SmsLogStatus.failed)
+          .toList(growable: false);
+    }
+    try {
+      final database = await _db.getDatabase();
+      final rows = await database.query(
+        'sms_logs',
+        where: 'event_type = ? AND status = ?',
+        whereArgs: ['bulk_debt_reminder', SmsLogStatus.failed.value],
+        orderBy: 'created_at ASC',
+      );
+      return rows.map(SmsLogEntry.fromMap).toList(growable: false);
+    } catch (error) {
+      debugPrint('⚠️ SmsLogRepository.getFailedCampaignLogs error: $error');
+      return const [];
+    }
+  }
+
   /// Mark all active campaign logs as cancelled.
   Future<void> cancelActiveCampaignLogs() async {
     if (kIsWeb) {

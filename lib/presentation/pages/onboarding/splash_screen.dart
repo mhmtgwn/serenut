@@ -161,58 +161,30 @@ class _Logo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        Image.asset(
+          'assets/branding/app/mark-color-112.png',
           width: 96,
           height: 96,
-          decoration: BoxDecoration(
-            color: POSColors.greenLight,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: POSColors.green.withValues(alpha: 0.18),
-                blurRadius: 20,
-                spreadRadius: 2,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Center(
-            child: Image.asset(
-              'assets/branding/app/icon-color-192.png',
-              width: 72,
-              height: 72,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.store_rounded,
-                size: 48,
-                color: POSColors.green,
-              ),
-            ),
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.store_rounded,
+            size: 64,
+            color: POSColors.green,
           ),
         ),
-        const SizedBox(height: 16),
-        RichText(
-          text: const TextSpan(
-            children: [
-              TextSpan(
-                text: 'Serenut ',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: POSColors.text,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextSpan(
-                text: 'OS',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: POSColors.green,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
+        const SizedBox(height: 12),
+        Image.asset(
+          'assets/branding/app/serenut-os-splash.png',
+          width: 228,
+          height: 74,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Text(
+            'Serenut OS',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: POSColors.text,
+            ),
           ),
         ),
         const SizedBox(height: 4),

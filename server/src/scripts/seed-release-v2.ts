@@ -38,16 +38,22 @@ async function runPublish() {
       console.log('Public key generated for validation: ' + pair.publicKey.substring(0, 50).replace(/\n/g, '') + '...');
     }
 
-    const version = '1.2.0';
-    const buildNum = 22;
+    const version = '1.2.1';
+    const buildNum = 58;
     const releaseId = `rel-${version}-b${buildNum}`;
-    const artifactSha256 = '61f1fbdcfa6fdd5a8fe133a9636d322c9dda846686e9ea674156fe50920602c2';
+    const winSha256 = 'ec03a9c3931f12d3c82056d4d62a8fd070d56de8e287581f9fdecbd1e911dd32';
+    const apkSha256 = 'af5ce92df4f602294fce42d11e645cb2aad641285e9b140a693a1e1964dab4ca';
 
-    // 2. Sign Artifact
-    const signArt = crypto.createSign('SHA256');
-    signArt.update(artifactSha256);
-    signArt.end();
-    const artifactSig = signArt.sign(privateKey, 'base64');
+    // 2. Sign Artifacts
+    const signWin = crypto.createSign('SHA256');
+    signWin.update(winSha256);
+    signWin.end();
+    const winSig = signWin.sign(privateKey, 'base64');
+
+    const signApk = crypto.createSign('SHA256');
+    signApk.update(apkSha256);
+    signApk.end();
+    const apkSig = signApk.sign(privateKey, 'base64');
 
     // 3. Construct V2 Manifest
     const manifest = {
@@ -76,16 +82,24 @@ async function runPublish() {
         allowRollback: true,
         minFreeDiskMb: 300,
         minRamMb: 2048,
-        supportedArchitectures: ['x64']
+        supportedArchitectures: ['x64', 'arm64']
       },
       artifacts: [
         {
           type: 'installer_windows',
           filename: `SerenutOSSetup-${version}.exe`,
           downloadUrl: `/api/v1/updates/download/windows/latest`,
-          sizeBytes: 48120890,
-          sha256: artifactSha256,
-          signature: artifactSig
+          sizeBytes: 14917025,
+          sha256: winSha256,
+          signature: winSig
+        },
+        {
+          type: 'apk_android',
+          filename: `serenut-${version}.apk`,
+          downloadUrl: `/api/v1/updates/download/android/latest`,
+          sizeBytes: 49837016,
+          sha256: apkSha256,
+          signature: apkSig
         }
       ]
     };
@@ -99,7 +113,7 @@ async function runPublish() {
     const manifestHash = crypto.createHash('sha256').update(canonicalJson).digest('hex');
 
     // Calculate artifact set hash
-    const compositeHashData = [manifestHash, artifactSha256].join('|');
+    const compositeHashData = [manifestHash, winSha256, apkSha256].join('|');
     const artifactSetHash = crypto.createHash('sha256').update(compositeHashData).digest('hex');
 
     console.log(`🚀 Seeding Release v${version}+${buildNum} (Hash: ${artifactSetHash})`);
@@ -134,9 +148,9 @@ async function runPublish() {
       'installer_windows',
       `SerenutOSSetup-${version}.exe`,
       `/api/v1/updates/download/windows/latest`,
-      48120890,
-      artifactSha256,
-      artifactSig
+      14917025,
+      winSha256,
+      winSig
     ]);
 
     // 8. Insert release_manifest_store
@@ -203,18 +217,18 @@ async function runPublish() {
       `${version}+${buildNum}`,
       'windows',
       `/api/v1/updates/download/windows/latest`,
-      artifactSha256,
+      winSha256,
       false,
-      'Yeni Serenut OS 1.2.0 güncellemesi yayınlandı! Güçlendirilmiş FSM ve adli denetim log sistemi.',
-      artifactSig,
-      48120890,
+      'Yeni Serenut OS 1.2.1 güncellemesi yayınlandı! Müşteri filtreleme ve yazıcı logosu/etiket tasarımı iyileştirmeleri.',
+      winSig,
+      14917025,
       'stable',
       'active'
     ]);
 
     // Android
     const apkLegacyId = `apk-${version}`;
-    await client.query('DELETE FROM app_versions WHERE id = $1', [apkLegacyId]);
+    await client.query('DELETE FROM app_versions WHERE id = $1 OR version_code = $2', [apkLegacyId, `${version}+${buildNum}`]);
     await client.query(`
       INSERT INTO app_versions (
         id, version_code, platform, download_url, sha256_hash, is_mandatory, release_notes, signature, file_size_bytes, channel, status
@@ -224,17 +238,17 @@ async function runPublish() {
       `${version}+${buildNum}`,
       'android',
       `/api/v1/updates/download/android/latest`,
-      artifactSha256,
+      apkSha256,
       false,
-      'Mobil cihazlar için yeni Serenut OS Android APK sürümü.',
-      artifactSig,
-      35000000,
+      'Mobil cihazlar için yeni Serenut OS 1.2.1 Android APK sürümü.',
+      apkSig,
+      49837016,
       'stable',
       'active'
     ]);
 
     await client.query('COMMIT');
-    console.log('🎉 Sürüm 1.2.0 hem v2 registry hem de legacy indirme sayfaları için başarıyla yayınlandı!');
+    console.log(`🎉 Sürüm ${version}+${buildNum} hem v2 registry hem de legacy indirme sayfaları için başarıyla yayınlandı!`);
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Seeding failed:', err);

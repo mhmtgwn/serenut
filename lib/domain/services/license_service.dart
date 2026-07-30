@@ -472,12 +472,14 @@ class LicenseService {
 
   /// Get status of license
   String checkLicenseStatus() {
+    // Clock rollback is a device-integrity state and must not be hidden by a
+    // missing/cleared license token. This also protects fresh re-activation.
+    if (!checkClockIntegrity()) {
+      return 'tampered';
+    }
     final info = getLicenseInfo();
     if (info == null) {
       return 'unlicensed';
-    }
-    if (!checkClockIntegrity()) {
-      return 'tampered';
     }
 
     final tokenStr = getLicenseToken()!;

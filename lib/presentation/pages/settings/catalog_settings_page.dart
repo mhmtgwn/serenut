@@ -16,6 +16,17 @@ class CatalogSettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsNotifierProvider).valueOrNull;
     final categories = _decode(settings?.vatCategories);
+    final productCategories = ref.watch(productCategoriesProvider);
+    for (final name in productCategories) {
+      if (!categories.any((item) =>
+          item['name']?.toString().toLowerCase() == name.toLowerCase())) {
+        categories.add({'name': name, 'rate': null, 'inferred': true});
+      }
+    }
+    categories.sort((a, b) => (a['name'] ?? '')
+        .toString()
+        .toLowerCase()
+        .compareTo((b['name'] ?? '').toString().toLowerCase()));
     return FullScreenSettingsPage(
       title: 'Ürün Kataloğu',
       useScrollView: false,
@@ -40,7 +51,7 @@ class CatalogSettingsPage extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
-                    'Kategori adı, varsayılan KDV ve birimi buradan yönetin. '
+                    'Kategori adı ve varsayılan KDV oranını buradan yönetin. '
                     'Bir kategoriyi mevcut başka bir kategoriyle aynı ada '
                     'çevirirseniz ürünler otomatik olarak aynı kategori altında toplanır.',
                   ),
@@ -63,9 +74,9 @@ class CatalogSettingsPage extends ConsumerWidget {
                           ),
                           title:
                               Text(category['name']?.toString() ?? 'Kategori'),
-                          subtitle: Text(
-                            'KDV %${category['rate'] ?? 0} • ${category['unit'] ?? 'adet'}',
-                          ),
+                          subtitle: Text(category['rate'] == null
+                              ? 'KDV tanımlanmamış'
+                              : 'KDV %${category['rate']}'),
                           trailing: const Icon(Icons.edit_rounded),
                           onTap: () => _editCategory(
                             context,
@@ -114,58 +125,39 @@ class CatalogSettingsPage extends ConsumerWidget {
     Map<String, dynamic>? original,
   }) async {
     final name = TextEditingController(text: original?['name']?.toString());
-    final vat = TextEditingController(text: '${original?['rate'] ?? 20}');
-    var unit = original?['unit']?.toString() ?? 'adet';
+    final vat =
+        TextEditingController(text: original?['rate']?.toString() ?? '');
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title:
-              Text(original == null ? 'Kategori ekle' : 'Kategoriyi düzenle'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Kategori adı'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: vat,
-                keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Varsayılan KDV (%)'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: unit,
-                decoration:
-                    const InputDecoration(labelText: 'Varsayılan birim'),
-                items: const [
-                  DropdownMenuItem(value: 'adet', child: Text('Adet')),
-                  DropdownMenuItem(value: 'paket', child: Text('Paket')),
-                  DropdownMenuItem(value: 'kutu', child: Text('Kutu')),
-                  DropdownMenuItem(value: 'litre', child: Text('Litre')),
-                  DropdownMenuItem(
-                      value: 'kg', child: Text('Kilogram / Tartı')),
-                ],
-                onChanged: (value) =>
-                    setDialogState(() => unit = value ?? 'adet'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Vazgeç'),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(original == null ? 'Kategori ekle' : 'Kategoriyi düzenle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Kategori adı'),
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Kaydet'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: vat,
+              keyboardType: TextInputType.number,
+              decoration:
+                  const InputDecoration(labelText: 'Varsayılan KDV (%)'),
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Kaydet'),
+          ),
+        ],
       ),
     );
     if (accepted != true || !context.mounted) return;
@@ -187,7 +179,7 @@ class CatalogSettingsPage extends ConsumerWidget {
     final duplicateIndex = updated.indexWhere(
       (item) => item['name']?.toString().toLowerCase() == newName.toLowerCase(),
     );
-    final entry = {'name': newName, 'rate': rate, 'unit': unit};
+    final entry = {'name': newName, 'rate': rate};
     if (duplicateIndex >= 0) {
       updated[duplicateIndex] = entry;
     } else {
@@ -203,7 +195,6 @@ class CatalogSettingsPage extends ConsumerWidget {
         await repository.update(product.copyWith(
           category: newName,
           vat: rate,
-          unit: product.isWeighed ? 'kg' : unit,
         ));
       }
     }
@@ -223,7 +214,7 @@ class CatalogSettingsPage extends ConsumerWidget {
       entityId: newName,
       oldValue: original == null ? null : jsonEncode(original),
       newValue: jsonEncode(entry),
-      notes: 'Kategori ve varsayılan KDV/birim ayarı değiştirildi.',
+      notes: 'Kategori ve varsayılan KDV ayarı değiştirildi.',
     );
   }
 }

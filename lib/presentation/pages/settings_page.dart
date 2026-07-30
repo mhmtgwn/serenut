@@ -46,7 +46,6 @@ const _kTextSecondary = POSColors.textSecondary;
 const _kGreen = POSColors.green;
 const _kBlue = POSColors.blue; // Grafik ve bilgi vurgusu
 const _kOrange = POSColors.amber;
-const _kPurple = Color(0xFF8B5CF6); // Modern Violet
 const _kPink = POSColors.red;
 const _kGray = POSColors.textDisabled;
 const _kTeal = Color(0xFF0D9488); // Deep Teal
@@ -391,6 +390,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Permission.settingsReceipt, () => _showReceiptSettings(settings),
             title: 'Fiş Tasarımı'),
       ));
+      group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Etiket Tasarımı',
+        subtitle:
+            '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI',
+        icon: Icons.label_rounded,
+        color: _kOrange,
+        onTap: () => _runGuardedAction(
+            Permission.settingsReceipt, () => _showLabelSettings(settings),
+            title: 'Etiket Tasarımı'),
+      ));
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {
@@ -534,22 +544,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // Grup 5: Ürün & Operasyon Merkezi (Phase 4-6)
     final group5 = <Widget>[];
-
-    if (currentUser != null &&
-        (currentUser.role == UserRole.owner ||
-            currentUser.role == UserRole.admin ||
-            currentUser.role == UserRole.sysadmin) &&
-        _matchesQuery('admin', 'yönetim', 'denetim', 'kurtarma', 'telemetri')) {
-      group5.add(_buildCategoryRow(
-        title: currentUser.role == UserRole.sysadmin
-            ? 'Sistem Yönetim Merkezi'
-            : 'Yönetim ve Güvenlik',
-        subtitle: 'Sistem sağlığı, denetim ve veri kurtarma',
-        icon: Icons.admin_panel_settings_rounded,
-        color: _kPurple,
-        onTap: () => context.push(AppRoutes.admin),
-      ));
-    }
 
     if (_hasPermission(currentUser, Permission.settingsRecovery) &&
         (currentUser?.role == UserRole.owner ||

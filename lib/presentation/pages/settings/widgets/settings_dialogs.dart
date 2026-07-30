@@ -1,6 +1,6 @@
 part of '../../settings_page.dart';
 
-extension SettingsPageDialogs on _SettingsPageState {
+extension _SettingsPageDialogs on _SettingsPageState {
   void _showBusinessInfoSheet(Settings settings) async {
     if (!_citiesLoaded) {
       await _loadCities();
@@ -46,6 +46,7 @@ extension SettingsPageDialogs on _SettingsPageState {
                               maxWidth: 512,
                               maxHeight: 512,
                             );
+                            if (!context.mounted) return;
                             if (pickedFile != null) {
                               setModalState(() {
                                 selectedLogoPath = pickedFile.path;
@@ -524,6 +525,37 @@ extension SettingsPageDialogs on _SettingsPageState {
                   toggle('Nakit satışta çekmeceyi aç', openDrawer,
                       (v) => setModalState(() => openDrawer = v)),
                   const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final candidate = settings.copyWith(
+                        paperWidth: paperWidth,
+                        receiptFont: font,
+                        receiptTextSize: textSize,
+                      );
+                      try {
+                        await ref
+                            .read(printerServiceProvider)
+                            .testPrinterConnection(candidate);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Fiş yazıcısı testi başarılı.')),
+                          );
+                        }
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Yazıcı testi başarısız: $error')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.print_rounded),
+                    label: const Text('Fiş yazıcısını test et'),
+                  ),
+                  const SizedBox(height: 10),
                   _buildModalSaveButton(onTap: () async {
                     await _updateSettingField(settings.copyWith(
                       paperWidth: paperWidth,
@@ -549,6 +581,252 @@ extension SettingsPageDialogs on _SettingsPageState {
           }),
         ))
         .whenComplete(footerCtrl.dispose);
+  }
+
+  void _showLabelSettings(Settings settings) {
+    var width = settings.labelWidthMm.clamp(20, 100);
+    var height = settings.labelHeightMm.clamp(15, 100);
+    var gap = settings.labelGapMm.clamp(0, 10);
+    var dpi = settings.labelDpi;
+    var language = settings.labelPrinterLanguage;
+    var copies = settings.labelPrinterCopies.clamp(1, 20);
+
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => FullScreenSettingsPage(
+          title: 'Etiket Tasarımı',
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: 200,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _kGreen.withValues(alpha: .06),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _kBorderColor),
+                  ),
+                  child: AspectRatio(
+                    aspectRatio: width / height,
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: _kTextPrimary, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                settings.businessName.isNotEmpty
+                                    ? settings.businessName
+                                    : 'SERENUT OS',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Text(
+                                '01.02.2026',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: _kTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Örnek Ürün Adı Ve',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.1,
+                                ),
+                              ),
+                              Text(
+                                'Çeşidi Açıklaması',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Birim: adet   Raf: A-01',
+                                style: TextStyle(fontSize: 8, color: _kTextSecondary),
+                              ),
+                              Text(
+                                '299.95 TL',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: POSColors.greenDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Center(
+                            child: Column(
+                              children: [
+                                Container(
+                                  height: 12,
+                                  width: double.infinity,
+                                  color: Colors.black87,
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  '869000000001',
+                                  style: TextStyle(
+                                    fontSize: 7,
+                                    letterSpacing: 1.5,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text('Genişlik: $width mm'),
+                Slider(
+                    value: width.toDouble(),
+                    min: 20,
+                    max: 100,
+                    divisions: 80,
+                    activeColor: _kGreen,
+                    onChanged: (v) => setModalState(() => width = v.round())),
+                Text('Yükseklik: $height mm'),
+                Slider(
+                    value: height.toDouble(),
+                    min: 15,
+                    max: 100,
+                    divisions: 85,
+                    activeColor: _kGreen,
+                    onChanged: (v) => setModalState(() => height = v.round())),
+                Text('Etiket aralığı: $gap mm'),
+                Slider(
+                    value: gap.toDouble(),
+                    min: 0,
+                    max: 10,
+                    divisions: 10,
+                    activeColor: _kGreen,
+                    onChanged: (v) => setModalState(() => gap = v.round())),
+                _buildFormDropdown<int>(
+                  label: 'Baskı çözünürlüğü',
+                  icon: Icons.high_quality_rounded,
+                  value: <int>[203, 300, 600].contains(dpi) ? dpi : 203,
+                  items: const [
+                    DropdownMenuItem(value: 203, child: Text('203 DPI')),
+                    DropdownMenuItem(value: 300, child: Text('300 DPI')),
+                    DropdownMenuItem(value: 600, child: Text('600 DPI')),
+                  ],
+                  onChanged: (v) => setModalState(() => dpi = v ?? 203),
+                ),
+                const SizedBox(height: 12),
+                _buildFormDropdown<String>(
+                  label: 'Yazıcı dili',
+                  icon: Icons.code_rounded,
+                  value: ['tspl', 'escpos', 'zpl'].contains(language) ? language : 'tspl',
+                  items: const [
+                    DropdownMenuItem(value: 'tspl', child: Text('TSPL')),
+                    DropdownMenuItem(
+                        value: 'escpos', child: Text('ESC/POS (Termal)')),
+                    DropdownMenuItem(value: 'zpl', child: Text('ZPL')),
+                  ],
+                  onChanged: (v) => setModalState(() => language = v ?? 'tspl'),
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: Text('Varsayılan kopya: $copies')),
+                  IconButton(
+                      onPressed: copies > 1
+                          ? () => setModalState(() => copies--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline)),
+                  IconButton(
+                      onPressed: copies < 20
+                          ? () => setModalState(() => copies++)
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline)),
+                ]),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final candidate = settings.copyWith(
+                      labelPrinterEnabled: true,
+                      labelWidthMm: width,
+                      labelHeightMm: height,
+                      labelGapMm: gap,
+                      labelDpi: dpi,
+                      labelPrinterLanguage: language,
+                    );
+                    try {
+                      await ref
+                          .read(printerServiceProvider)
+                          .testLabelPrinterConnection(candidate);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Etiket yazıcısı testi başarılı.')),
+                        );
+                      }
+                    } catch (error) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Etiket testi başarısız: $error')),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.label_rounded),
+                  label: const Text('Etiket yazıcısını test et'),
+                ),
+                const SizedBox(height: 10),
+                _buildModalSaveButton(onTap: () async {
+                  await _updateSettingField(settings.copyWith(
+                    labelWidthMm: width,
+                    labelHeightMm: height,
+                    labelGapMm: gap,
+                    labelDpi: dpi,
+                    labelPrinterLanguage: language,
+                    labelPrinterCopies: copies,
+                  ));
+                  if (context.mounted) Navigator.pop(context);
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ));
   }
 }
 

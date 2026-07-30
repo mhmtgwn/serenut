@@ -106,68 +106,77 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             ],
           ),
         ),
-        Row(
-          children: [
-            Checkbox(
-              value: _printLabel,
-              activeColor: _kGreen,
-              onChanged: (val) {
-                if (val != null) {
-                  updateState(() => _printLabel = val);
-                  _saveLabelPrinterSettings();
-                }
-              },
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: _printLabel ? _kGreenLight : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _printLabel ? _kGreen.withValues(alpha: .3) : _kBorder,
             ),
-            const Text(
-              'Sipariş Etiketi Yazdır',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
-            ),
-            if (_printLabel) ...[
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  if (_labelCopies > 1) {
-                    updateState(() => _labelCopies--);
-                    _saveLabelPrinterSettings();
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: _kBorder),
-                      borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.remove,
-                      size: 12, color: _kTextSecondary),
+          ),
+          child: Column(
+            children: [
+              SwitchListTile.adaptive(
+                dense: true,
+                value: _printLabel,
+                activeColor: _kGreen,
+                secondary: Icon(Icons.label_rounded,
+                    color: _printLabel ? _kGreen : _kTextSecondary),
+                title: const Text('Sipariş etiketini yazdır',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                subtitle: Text(
+                  _printLabel
+                      ? 'Etiket yazdırma açık'
+                      : 'Etiket yazdırma kapalı',
+                  style: const TextStyle(fontSize: 11, color: _kTextSecondary),
                 ),
-              ),
-              const SizedBox(width: 6),
-              _InlineCopyCountField(
-                value: _labelCopies,
-                onChanged: (val) {
-                  updateState(() => _labelCopies = val);
+                onChanged: (value) {
+                  updateState(() => _printLabel = value);
                   _saveLabelPrinterSettings();
                 },
               ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () {
-                  updateState(() => _labelCopies++);
-                  _saveLabelPrinterSettings();
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: _kBorder),
-                      borderRadius: BorderRadius.circular(6)),
-                  child: const Icon(Icons.add, size: 12, color: _kGreen),
+              if (_printLabel)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: Row(
+                    children: [
+                      const Text('Kopya sayısı',
+                          style:
+                              TextStyle(fontSize: 11, color: _kTextSecondary)),
+                      const Spacer(),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _labelCopies > 1
+                            ? () {
+                                updateState(() => _labelCopies--);
+                                _saveLabelPrinterSettings();
+                              }
+                            : null,
+                        icon: const Icon(Icons.remove_rounded, size: 18),
+                      ),
+                      _InlineCopyCountField(
+                        value: _labelCopies,
+                        onChanged: (value) {
+                          updateState(() => _labelCopies = value);
+                          _saveLabelPrinterSettings();
+                        },
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () {
+                          updateState(() => _labelCopies++);
+                          _saveLabelPrinterSettings();
+                        },
+                        icon: const Icon(Icons.add_rounded,
+                            size: 18, color: _kGreen),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Text('Kopya',
-                  style: TextStyle(fontSize: 11, color: _kTextSecondary)),
             ],
-          ],
+          ),
         ),
       ],
     );
@@ -437,13 +446,12 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         'icon': Icons.money_rounded,
         'color': _kGreen
       },
-      if (hasPos)
-        {
-          'id': 'card',
-          'label': 'Kredi Kartı',
-          'icon': Icons.credit_card_rounded,
-          'color': Colors.blue
-        },
+      {
+        'id': 'card',
+        'label': hasPos ? 'Kart / POS' : 'Kart (Manuel)',
+        'icon': Icons.credit_card_rounded,
+        'color': Colors.blue
+      },
       if (_selectedCustomer != null)
         {
           'id': 'debt',

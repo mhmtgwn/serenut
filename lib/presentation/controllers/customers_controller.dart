@@ -9,6 +9,15 @@ import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 
 final customerSearchQueryProvider = StateProvider<String>((ref) => '');
+final customerBalanceFilterProvider =
+    StateProvider<CustomerBalanceFilter>((ref) => CustomerBalanceFilter.all);
+
+final customerBalanceSummaryProvider =
+    FutureProvider<CustomerBalanceSummary>((ref) async {
+  final repository = await ref.watch(customerRepositoryProvider.future);
+  final query = ref.watch(customerSearchQueryProvider);
+  return repository.getBalanceSummary(searchQuery: query);
+});
 
 class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
   late ICustomerRepository _repository;
@@ -20,6 +29,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     final searchService = await ref.watch(customerSearchServiceProvider.future);
 
     final searchQuery = ref.watch(customerSearchQueryProvider);
+    final balanceFilter = ref.watch(customerBalanceFilterProvider);
 
     _paginationService = PaginationService<CustomerEntity>(
       dataLoader: (offset, limit, query) async {
@@ -27,6 +37,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           query: query ?? '',
           page: offset ~/ limit,
           limit: limit,
+          balanceFilter: balanceFilter,
         );
         return result.items;
       },
@@ -207,6 +218,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       ref.invalidate(salesCustomersControllerProvider);
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(collectionCustomersControllerProvider);
+      ref.invalidate(customerBalanceSummaryProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
     });
   }

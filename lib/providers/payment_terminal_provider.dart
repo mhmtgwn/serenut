@@ -26,6 +26,15 @@ class PhysicalCardPaymentService {
   final IPaymentTerminalAdapter _terminal;
   final TerminalPaymentJournal _journal;
 
+  static Map<String, dynamic> manualLedgerMetadata({
+    required String context,
+  }) =>
+      {
+        'card_entry_mode': 'manual',
+        'terminal_authorized': false,
+        'entry_context': context,
+      };
+
   Future<AuthorizedCardPayment> authorize({
     required double amount,
     required String idempotencyKey,

@@ -19,7 +19,7 @@ class CustomerSearchResult {
 
 class CustomerSearchService {
   final ICustomerRepository _repository;
-  
+
   // Track current active request generation to prevent out-of-order async race conditions
   int _currentRequestId = 0;
 
@@ -33,6 +33,7 @@ class CustomerSearchService {
     required String query,
     required int page,
     required int limit,
+    CustomerBalanceFilter balanceFilter = CustomerBalanceFilter.all,
     int? expectedRequestId,
     String? companyScope,
   }) async {
@@ -44,6 +45,7 @@ class CustomerSearchService {
     // Call high performance database filtered query
     final results = await _repository.findFiltered(
       searchQuery: normalized,
+      balanceFilter: balanceFilter,
       limit: limit,
       offset: offset,
     );

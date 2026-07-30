@@ -165,21 +165,21 @@ class _KpiGrid extends StatelessWidget {
         currency.format(summary.todayCollected),
         'Bugün alınan',
         Icons.payments_rounded,
-        POSColors.blue
+        POSColors.greenDark
       ),
       (
         'Vadeli satış',
         currency.format(summary.todayDebt),
         'Bugünkü açık',
         Icons.schedule_rounded,
-        POSColors.orange
+        POSColors.amber
       ),
       (
         'Toplam alacak',
         currency.format(summary.totalReceivables),
         'Müşteri bakiyeleri',
         Icons.account_balance_wallet_rounded,
-        POSColors.red
+        POSColors.amberDark
       ),
     ];
     return LayoutBuilder(builder: (context, constraints) {

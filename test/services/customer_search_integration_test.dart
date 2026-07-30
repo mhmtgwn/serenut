@@ -7,6 +7,7 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/domain/services/customer_search_service.dart';
+import 'package:serenutos/domain/repositories/base_repository.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -29,7 +30,7 @@ void main() {
       // Initialize database manager
       databaseManager = DatabaseManager();
       final db = await databaseManager.getDatabase();
-      
+
       final dbGateway = DbGatewayImpl(databaseManager);
       customerRepository = SqliteCustomerRepository(dbGateway);
       searchService = CustomerSearchService(customerRepository);
@@ -41,7 +42,7 @@ void main() {
         final prefixChar = String.fromCharCode(65 + (i % 12)); // A to L
         final name = '$prefixChar-Customer-$i';
         final email = 'customer$i@example.com';
-        
+
         batch.insert('customers', {
           'id': 'cust-$i',
           'name': name,
@@ -94,6 +95,11 @@ void main() {
       }
 
       await batch.commit(noResult: true);
+
+      await db.update('customers', {'balance': -250.0},
+          where: 'id = ?', whereArgs: ['cust-1499']);
+      await db.update('customers', {'balance': 125.0},
+          where: 'id = ?', whereArgs: ['cust-1500']);
     });
 
     tearDown(() async {
@@ -101,7 +107,8 @@ void main() {
       DatabaseManager.overrideDatabasePath = null;
     });
 
-    test('Verification: empty search returns first page alphabetically', () async {
+    test('Verification: empty search returns first page alphabetically',
+        () async {
       final results = await searchService.searchCustomers(
         query: '',
         page: 0,
@@ -115,7 +122,8 @@ void main() {
       expect(results.items.any((c) => c.name.startsWith('Mehmet')), isFalse);
     });
 
-    test('Verification: search for "m" or "M" returns "Mehmet" and "Müşerref"', () async {
+    test('Verification: search for "m" or "M" returns "Mehmet" and "Müşerref"',
+        () async {
       // Lowercase "m" search
       final resultsLower = await searchService.searchCustomers(
         query: 'm',
@@ -139,7 +147,8 @@ void main() {
       expect(namesUpper.any((n) => n.contains('Müşerref')), isTrue);
     });
 
-    test('Verification: search for "müş" or "MÜŞ" matches Turkish characters', () async {
+    test('Verification: search for "müş" or "MÜŞ" matches Turkish characters',
+        () async {
       final resultsLower = await searchService.searchCustomers(
         query: 'müş',
         page: 0,
@@ -159,7 +168,9 @@ void main() {
       expect(namesUpper.any((n) => n.contains('Müşerref')), isTrue);
     });
 
-    test('Verification: search for Turkish letters "İsmail", "ismail", "ısmail" works correctly', () async {
+    test(
+        'Verification: search for Turkish letters "İsmail", "ismail", "ısmail" works correctly',
+        () async {
       final terms = ['İsmail', 'ismail', 'ısmail'];
       for (final term in terms) {
         final results = await searchService.searchCustomers(
@@ -172,7 +183,9 @@ void main() {
       }
     });
 
-    test('Verification: search pagination offset returns correct subsequent slices', () async {
+    test(
+        'Verification: search pagination offset returns correct subsequent slices',
+        () async {
       // Find all M-matching entries first to verify total count
       final resultsAll = await searchService.searchCustomers(
         query: 'm',
@@ -202,7 +215,38 @@ void main() {
       expect(page0Ids.intersection(page1Ids), isEmpty);
     });
 
-    test('Verification: phone search matches different inputs (0532, 532, +90, last 4 digits)', () async {
+    test(
+        'balance filters query the complete repository, not only the loaded page',
+        () async {
+      final debtors = await searchService.searchCustomers(
+        query: '',
+        page: 0,
+        limit: 20,
+        balanceFilter: CustomerBalanceFilter.debt,
+      );
+      expect(debtors.items.map((item) => item.id), contains('cust-1499'));
+
+      final creditors = await searchService.searchCustomers(
+        query: '',
+        page: 0,
+        limit: 20,
+        balanceFilter: CustomerBalanceFilter.credit,
+      );
+      expect(creditors.items.map((item) => item.id), contains('cust-1500'));
+    });
+
+    test('balance summary aggregates all customers beyond pagination limits',
+        () async {
+      final summary = await customerRepository.getBalanceSummary();
+      expect(summary.totalDebt, 250.0);
+      expect(summary.totalCredit, 125.0);
+      expect(summary.debtorCount, 1);
+      expect(summary.creditCount, 1);
+    });
+
+    test(
+        'Verification: phone search matches different inputs (0532, 532, +90, last 4 digits)',
+        () async {
       // 1. With spaces and formatting "+90 555 123 45 67"
       final results1 = await searchService.searchCustomers(
         query: '+90 555 123 45 67',
