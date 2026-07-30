@@ -1229,43 +1229,55 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   Future<void> printOrderLabels(
     OrderEntity order,
     List<Map<String, dynamic>> items,
-    Settings settings,
-  ) async {
+    Settings settings, {
+    String? customerName,
+  }) async {
     final targetSettings =
         _getSettingsForPurpose(settings, PrinterPurpose.label);
     if (!_hasPrinter(targetSettings)) return;
 
     final List<int> allBytes = [];
+    final isTspl = settings.labelPrinterLanguage == 'tspl';
+    final custName = customerName ?? order.customerId;
 
     for (final item in items) {
       final name = item['product_name']?.toString().trim().isNotEmpty == true
           ? item['product_name'].toString()
           : item['product_id']?.toString() ?? 'Ürün';
-      final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+      final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+      final note = item['note']?.toString() ?? order.notes;
 
-      final labelModel = LabelModel(
-        productName: name,
-        weight: qty,
-        price: price,
-        qrData: 'item|${order.id}|${item['product_id']}|$qty',
-        timestamp: order.createdAt,
-      );
-
-      final labelBytes = settings.labelPrinterLanguage == 'tspl'
-          ? TsplLabelLayoutEngine.generateLabelBytes(
-              labelModel,
-              widthMm: settings.labelWidthMm,
-              heightMm: settings.labelHeightMm,
-              gapMm: settings.labelGapMm,
-              dpi: settings.labelDpi,
-              copies: settings.labelPrinterCopies,
-            )
-          : LabelLayoutEngine.generateLabelBytes(
-              labelModel,
-              width: targetSettings.paperWidth <= 58 ? 32 : 48,
-            );
-      allBytes.addAll(labelBytes);
+      if (isTspl) {
+        final labelBytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
+          orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+          customerName: custName,
+          productName: name,
+          quantity: qty,
+          note: note,
+          timestamp: order.createdAt,
+          widthMm: settings.labelWidthMm,
+          heightMm: settings.labelHeightMm,
+          gapMm: settings.labelGapMm,
+          dpi: settings.labelDpi,
+          copies: settings.labelPrinterCopies,
+        );
+        allBytes.addAll(labelBytes);
+      } else {
+        final labelModel = LabelModel(
+          productName: name,
+          weight: qty,
+          price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
+          barcode: order.id,
+          businessName: settings.businessName,
+          qrData: 'item|${order.id}|${item['product_id']}|$qty',
+          timestamp: order.createdAt,
+        );
+        final labelBytes = LabelLayoutEngine.generateLabelBytes(
+          labelModel,
+          width: targetSettings.paperWidth <= 58 ? 32 : 48,
+        );
+        allBytes.addAll(labelBytes);
+      }
     }
 
     await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);

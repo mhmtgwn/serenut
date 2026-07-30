@@ -1311,6 +1311,21 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final settingsAsync = ref.read(settingsNotifierProvider);
         final settings = settingsAsync.value;
         if (settings != null) {
+          final customersVal = ref.read(customersControllerProvider);
+          final customer = customersVal.maybeWhen(
+            data: (list) => list.firstWhere(
+              (c) => c.id == widget.order.customerId,
+              orElse: () => CustomerEntity(
+                  id: '',
+                  name: 'Bilinmeyen Musteri',
+                  email: '',
+                  phone: '',
+                  balance: 0,
+                  createdAt: DateTime.now()),
+            ),
+            orElse: () => null,
+          );
+
           final products = ref.read(productsControllerProvider).value ?? [];
           final receiptItems = widget.order.items.map((item) {
             final prod = products.firstWhere(
@@ -1341,6 +1356,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                       widget.order,
                       receiptItems,
                       labelSettings,
+                      customerName: customer?.name,
                     ),
               );
         }

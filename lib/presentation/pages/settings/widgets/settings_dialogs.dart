@@ -628,19 +628,41 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // 1. Top Logo Header
+                          // 1. Top Logo Header (Dynamic Business Logo from Settings)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Image.asset(
-                                'assets/logo.png',
-                                height: 16,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.star_rounded,
-                                  size: 14,
-                                  color: POSColors.amberDark,
+                              if (settings.businessLogo != null &&
+                                  settings.businessLogo!.trim().isNotEmpty &&
+                                  File(settings.businessLogo!).existsSync())
+                                Image.file(
+                                  File(settings.businessLogo!),
+                                  height: 18,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Image.asset(
+                                    'assets/logo.png',
+                                    height: 16,
+                                    errorBuilder: (_, __, ___) => const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.star_rounded, size: 14, color: Color(0xFF1E6F3D)),
+                                        Icon(Icons.add_rounded, size: 12, color: Color(0xFFD97706)),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                Image.asset(
+                                  'assets/logo.png',
+                                  height: 16,
+                                  errorBuilder: (_, __, ___) => const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.star_rounded, size: 14, color: Color(0xFF1E6F3D)),
+                                      Icon(Icons.add_rounded, size: 12, color: Color(0xFFD97706)),
+                                    ],
+                                  ),
                                 ),
-                              ),
                               const SizedBox(width: 4),
                               Text(
                                 settings.businessName.isNotEmpty
@@ -649,6 +671,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.black,
                                 ),
                               ),
                             ],
@@ -659,44 +682,82 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             child: Text(
                               'Ürününüzün adı',
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w900,
                                 height: 1.1,
+                                color: Colors.black,
                               ),
                             ),
                           ),
                           // 3. Separator Line
-                          const Divider(height: 1, color: Colors.black26),
-                          // 4. Bottom Split Layout (Left: Kod & Barcode | Right: Huge Price)
+                          const Divider(height: 1, thickness: 1, color: Colors.black26),
+                          // 4. Bottom Split Layout (Left: Kod & Real Barcode | Right: Price with Superscript)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Text(
                                     'Kod: 1234567890',
                                     style: TextStyle(
-                                      fontSize: 7,
+                                      fontSize: 7.5,
                                       fontWeight: FontWeight.w600,
+                                      color: Colors.black,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  Container(
-                                    height: 16,
-                                    width: 70,
-                                    color: Colors.black87,
+                                  SizedBox(
+                                    height: 20,
+                                    width: 80,
+                                    child: BarcodeWidget(
+                                      barcode: Barcode.code128(),
+                                      data: '1234567890',
+                                      drawText: false,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ],
                               ),
-                              const Text(
-                                '₺ 299.95',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.black,
-                                ),
+                              const Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      '₺',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    '299',
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black,
+                                      height: 0.9,
+                                      letterSpacing: -1,
+                                    ),
+                                  ),
+                                  SizedBox(width: 1),
+                                  Text(
+                                    '95',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

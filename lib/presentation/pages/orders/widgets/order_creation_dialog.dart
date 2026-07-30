@@ -726,7 +726,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       if (settings != null) {
         final receiptItems = _cart.entries
             .map((e) => {
-                  'product_id': e.key.name,
+                  'product_name': e.key.name,
+                  'product_id': e.key.id,
+                  'barcode': e.key.id,
                   'quantity': e.value,
                   'unit_price': e.key.price,
                 })
@@ -760,6 +762,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                       newOrder,
                       receiptItems,
                       labelSettings,
+                      customerName: _selectedCustomer?.name,
                     ),
               );
         }

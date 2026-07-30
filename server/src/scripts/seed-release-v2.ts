@@ -39,7 +39,7 @@ async function runPublish() {
     }
 
     const version = '1.2.1';
-    const buildNum = 58;
+    const buildNum = 59;
     const releaseId = `rel-${version}-b${buildNum}`;
     const winSha256 = '78497231227069dbab0cb6a41f0acf283ec728fcb6430d321a2bee66581a108d';
     const apkSha256 = '1bef547a2294ab63a050d21231ee46eefea1ecd3ef4c9e4e8f46006f4e727971';
@@ -219,7 +219,7 @@ async function runPublish() {
       `/api/v1/updates/download/windows/latest`,
       winSha256,
       false,
-      'Yeni Serenut OS 1.2.1 güncellemesi yayınlandı! Müşteri filtreleme ve yazıcı logosu/etiket tasarımı iyileştirmeleri.',
+      'Yeni Serenut OS 1.2.1+59 güncellemesi yayınlandı! Dinamik işletme logosu, yeni etiket tasarımı (üst indis kuruş ve barkod) ile özel sipariş etiketi desteği eklendi.',
       winSig,
       14949628,
       'stable',

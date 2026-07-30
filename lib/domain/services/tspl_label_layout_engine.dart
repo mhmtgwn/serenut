@@ -26,9 +26,6 @@ class TsplLabelLayoutEngine {
     int sy(num value) => (value * heightDots / 240).round();
 
     final barcode = _barcode(model.barcode ?? '');
-    final unitPrefix =
-        model.unit.trim().isNotEmpty ? '${_fit(model.unit, 6)} ' : '';
-    final priceStr = '$unitPrefix${model.price.toStringAsFixed(2)} TL';
 
     final commands = StringBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
@@ -82,14 +79,118 @@ class TsplLabelLayoutEngine {
       );
     }
 
-    // Bottom Right: Huge Auto-scaling Price
+    // Bottom Right: Huge Price with Superscript Kuruş
+    final priceParts = model.price.toStringAsFixed(2).split('.');
+    final lira = priceParts[0];
+    final kurus = priceParts[1];
     final priceX = sx(200);
-    if (priceStr.length <= 8) {
-      commands.writeln('TEXT $priceX,$bottomY,"4",0,1,2,"$priceStr"');
-    } else if (priceStr.length <= 12) {
-      commands.writeln('TEXT $priceX,$bottomY,"3",0,1,2,"$priceStr"');
+
+    if (lira.length <= 5) {
+      commands.writeln('TEXT $priceX,${bottomY + sy(10)},"2",0,1,1,"TL"');
+      final liraX = priceX + sx(28);
+      commands.writeln('TEXT $liraX,$bottomY,"4",0,1,2,"$lira"');
+      final kurusX = liraX + lira.length * sx(24) + sx(4);
+      commands.writeln('TEXT $kurusX,$bottomY,"2",0,1,1,"$kurus"');
     } else {
-      commands.writeln('TEXT $priceX,$bottomY,"2",0,1,2,"$priceStr"');
+      commands.writeln('TEXT $priceX,${bottomY + sy(6)},"2",0,1,1,"TL"');
+      final liraX = priceX + sx(24);
+      commands.writeln('TEXT $liraX,$bottomY,"3",0,1,2,"$lira"');
+      final kurusX = liraX + lira.length * sx(18) + sx(4);
+      commands.writeln('TEXT $kurusX,$bottomY,"1",0,1,1,"$kurus"');
+    }
+
+    commands.writeln('PRINT ${copies.clamp(1, 20)},1');
+    return latin1.encode(commands.toString().replaceAll('\n', '\r\n'));
+  }
+
+  /// Generates TSPL commands specifically for Order Package / Kitchen / Item labels.
+  ///
+  /// Does NOT print logos, shelf prices, or store tags.
+  /// Focuses purely on Order ID, Customer ("kimin"), Product & Quantity ("ürünler"), and Order Barcode.
+  static List<int> generateOrderLabelBytes({
+    required String orderIdShort,
+    required String customerName,
+    required String productName,
+    required double quantity,
+    String? note,
+    DateTime? timestamp,
+    int widthMm = 50,
+    int heightMm = 30,
+    int gapMm = 2,
+    int dpi = 203,
+    int copies = 1,
+  }) {
+    final safeWidth = widthMm.clamp(30, 100);
+    final safeHeight = heightMm.clamp(20, 100);
+    final safeGap = gapMm.clamp(0, 10);
+    final safeDpi = dpi == 300 ? 300 : 203;
+    final widthDots = (safeWidth * safeDpi / 25.4).round();
+    final heightDots = (safeHeight * safeDpi / 25.4).round();
+    int sx(num value) => (value * widthDots / 400).round();
+    int sy(num value) => (value * heightDots / 240).round();
+
+    final timeStr = timestamp != null
+        ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
+        : '';
+    final qtyStr = quantity % 1 == 0
+        ? quantity.toInt().toString()
+        : quantity.toStringAsFixed(1);
+    final custClean = _ascii(customerName.trim());
+    final prodClean = _ascii(productName.trim());
+    final noteClean = note != null && note.trim().isNotEmpty
+        ? _ascii(note.trim())
+        : null;
+
+    final commands = StringBuffer()
+      ..writeln('SIZE $safeWidth mm,$safeHeight mm')
+      ..writeln('GAP $safeGap mm,0 mm')
+      ..writeln('DENSITY 8')
+      ..writeln('DIRECTION 1')
+      ..writeln('REFERENCE 0,0')
+      ..writeln('CLS');
+
+    int currentY = sy(6);
+
+    // 1. Header: Sipariş No & Tarih (No logo)
+    commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderIdShort"');
+    if (timeStr.isNotEmpty) {
+      commands.writeln('TEXT ${sx(220)},$currentY,"1",0,1,1,"$timeStr"');
+    }
+    currentY += sy(20);
+
+    // 2. Customer Info ("Kimin")
+    final whoText = custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
+    commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$whoText"');
+    currentY += sy(22);
+
+    // 3. Separator Line
+    commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
+    currentY += sy(8);
+
+    // 4. Product & Quantity ("Ürünler vs.")
+    final itemTitle = '$qtyStr x $prodClean';
+    if (itemTitle.length <= 18) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$itemTitle"');
+      currentY += sy(28);
+    } else {
+      commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$itemTitle"');
+      currentY += sy(22);
+    }
+
+    if (noteClean != null) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"Not: $noteClean"');
+      currentY += sy(16);
+    }
+
+    // 5. Order Barcode / Footer at Bottom Left
+    final barcodeY = heightDots - sy(48);
+    final barcodeHeight = sy(28).clamp(14, 36);
+    final cleanBarcode = _barcode(orderIdShort);
+    if (cleanBarcode.isNotEmpty) {
+      commands.writeln(
+        'BARCODE ${sx(16)},$barcodeY,"128",$barcodeHeight,0,0,2,3,"$cleanBarcode"',
+      );
+      commands.writeln('TEXT ${sx(220)},${barcodeY + sy(8)},"1",0,1,1,"#$orderIdShort"');
     }
 
     commands.writeln('PRINT ${copies.clamp(1, 20)},1');
@@ -125,13 +226,6 @@ class TsplLabelLayoutEngine {
     }
 
     return lines.isEmpty ? [clean] : lines;
-  }
-
-  static String _fit(String value, int maxLength) {
-    final normalized = _ascii(value.trim().replaceAll(RegExp(r'\s+'), ' '))
-        .replaceAll('"', "'");
-    if (normalized.length <= maxLength) return normalized;
-    return '${normalized.substring(0, maxLength - 2)}..';
   }
 
   static String _barcode(String value) {
