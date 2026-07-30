@@ -210,8 +210,8 @@ async function runPublish() {
     await client.query('DELETE FROM app_versions WHERE id = $1 OR version_code = $2', [winLegacyId, `${version}+${buildNum}`]);
     await client.query(`
       INSERT INTO app_versions (
-        id, version_code, platform, download_url, sha256_hash, is_mandatory, release_notes, signature, file_size_bytes, channel, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        id, version_code, platform, download_url, sha256_hash, is_mandatory, release_notes, signature, file_size_bytes, channel, status, file_path
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [
       winLegacyId,
       `${version}+${buildNum}`,
@@ -223,7 +223,8 @@ async function runPublish() {
       winSig,
       14949628,
       'stable',
-      'active'
+      'active',
+      'server/public/website/downloads/SerenutOSSetup.exe'
     ]);
 
     // Android
@@ -231,8 +232,8 @@ async function runPublish() {
     await client.query('DELETE FROM app_versions WHERE id = $1 OR version_code = $2', [apkLegacyId, `${version}+${buildNum}`]);
     await client.query(`
       INSERT INTO app_versions (
-        id, version_code, platform, download_url, sha256_hash, is_mandatory, release_notes, signature, file_size_bytes, channel, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        id, version_code, platform, download_url, sha256_hash, is_mandatory, release_notes, signature, file_size_bytes, channel, status, file_path
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [
       apkLegacyId,
       `${version}+${buildNum}`,
@@ -244,7 +245,8 @@ async function runPublish() {
       apkSig,
       50029356,
       'stable',
-      'active'
+      'active',
+      'server/public/website/downloads/serenut.apk'
     ]);
 
     await client.query('COMMIT');

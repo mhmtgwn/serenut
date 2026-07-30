@@ -199,7 +199,7 @@ router.get('/history', async (req: Request, res: Response) => {
     }
 
     const mapped = list.rows.map(row => {
-      const resolved = resolveReleaseFilePath(row.file_path);
+      const resolved = row.file_path ? resolveReleaseFilePath(row.file_path) : true;
       const isAvailable = Boolean(resolved);
       return {
         id: row.id,
