@@ -458,9 +458,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // 1. Header (Centred)
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
-    bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('${settings.businessName}\n'));
-    bytes.addAll(EscPosCommands.boldOff);
+    if (logo.isEmpty && settings.businessName.trim().isNotEmpty) {
+      bytes.addAll(EscPosCommands.boldOn);
+      bytes.addAll(_textToBytes('${settings.businessName}\n'));
+      bytes.addAll(EscPosCommands.boldOff);
+    }
     bytes.addAll(_textToBytes('${settings.businessAddress}\n'));
     bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
     if (settings.businessTaxId != null && settings.businessTaxId!.isNotEmpty) {
@@ -605,9 +607,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // 1. Header (Centred)
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
-    bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('${settings.businessName}\n'));
-    bytes.addAll(EscPosCommands.boldOff);
+    if (logo.isEmpty && settings.businessName.trim().isNotEmpty) {
+      bytes.addAll(EscPosCommands.boldOn);
+      bytes.addAll(_textToBytes('${settings.businessName}\n'));
+      bytes.addAll(EscPosCommands.boldOff);
+    }
     bytes.addAll(_textToBytes('${settings.businessAddress}\n'));
     bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
     if (settings.businessTaxId != null && settings.businessTaxId!.isNotEmpty) {
@@ -761,9 +765,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     // 1. Header (Centred)
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(EscPosCommands.sizeNormal);
-    bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('${settings.businessName}\n'));
-    bytes.addAll(EscPosCommands.boldOff);
+    if (logo.isEmpty && settings.businessName.trim().isNotEmpty) {
+      bytes.addAll(EscPosCommands.boldOn);
+      bytes.addAll(_textToBytes('${settings.businessName}\n'));
+      bytes.addAll(EscPosCommands.boldOff);
+    }
     bytes.addAll(_textToBytes('${settings.businessAddress}\n'));
     bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
     if (settings.businessTaxId != null && settings.businessTaxId!.isNotEmpty) {
