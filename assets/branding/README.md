@@ -27,7 +27,8 @@ Bu paket, onaylı Serenut görsellerinden platformlara uygun çıktılar üretir
 
 ## Ürün içindeki kullanım
 
-- Uygulama ve sekme ikonları: beyaz zeminli kare ana kaynak.
+- Android/iOS/Windows uygulama ikonları: beyaz zeminli kare ana kaynak.
+- Tarayıcı sekmesi: kutusuz, transparan ve boşluksuz sade renkli amblem.
 - Giriş, kayıt ve şifre ekranları: yatay renkli `Serenut OS` logosu.
 - Koyu panel kenar çubuğu: renkli amblem ve beyaz yazılı tek yatay logo.
 - Açık web yüzeyleri: yatay renkli Serenut logosu.

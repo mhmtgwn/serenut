@@ -61,7 +61,7 @@ async function run() {
   assert.match(appSource, /const iconPaths = \{/, 'navigation must provide module-specific icons');
   assert.match(themeSource, /\.sidebar-brand:before\s*\{[^}]*content:none!important[^}]*display:none!important/s, 'the sidebar wordmark must not render a second pseudo-element logo');
   assert.match(appHtml, /id="boot-state"/, 'application shell must expose a non-empty loading state');
-  assert.match(appHtml, /favicon\.ico\?v=20260730-icon3/, 'application shell must reference the current browser icon revision');
+  assert.match(appHtml, /favicon\.ico\?v=20260730-icon4/, 'application shell must reference the current browser icon revision');
 
   const webManifest = fs.readFileSync(path.join(projectRoot, 'public/site.webmanifest'), 'utf8');
   assert.match(webManifest, /icon-maskable-192\.png/, 'web manifest must provide a 192px maskable icon');

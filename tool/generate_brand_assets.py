@@ -222,8 +222,10 @@ def main() -> None:
         save_png(padded_master_icon(size), f"web/icon-maskable-{size}.png")
         save_png(master_icon(size), f"web/icon-{size}.png")
 
+    # Browser tabs need the mark itself, not a miniature application tile.
+    # A nearly edge-to-edge transparent mark remains legible at 16–32px.
     for size in (16, 32, 48):
-        save_png(master_icon(size), f"web/favicon-{size}.png")
+        save_png(mark(size, "color", 0.01), f"web/favicon-{size}.png")
 
     save_png(social_card(), "web/social-card-1200x630.png")
 
@@ -231,6 +233,14 @@ def main() -> None:
     ico_path = OUT / "windows" / "app_icon.ico"
     ico_path.parent.mkdir(parents=True, exist_ok=True)
     ico_frames[-1].save(ico_path, format="ICO", sizes=[im.size for im in ico_frames])
+
+    favicon_frames = [mark(size, "color", 0.01) for size in (16, 24, 32, 48)]
+    favicon_ico_path = OUT / "web" / "favicon.ico"
+    favicon_frames[-1].save(
+        favicon_ico_path,
+        format="ICO",
+        sizes=[image.size for image in favicon_frames],
+    )
 
     # Flutter runtime images. Keep the historic filenames because they are
     # referenced by login, splash, settings and print workflows.
@@ -296,7 +306,7 @@ def main() -> None:
         "icons/Icon-maskable-192.png": padded_master_icon(192),
         "icons/Icon-maskable-512.png": padded_master_icon(512),
         "icons/apple-touch-icon.png": master_icon(180),
-        "favicon.png": master_icon(32),
+        "favicon.png": mark(32, "color", 0.01),
     }
     for relative_path, image in web_copies.items():
         save_project_png(image, f"web/{relative_path}")
@@ -318,8 +328,8 @@ def main() -> None:
         "serenut-os-white.svg",
     ):
         shutil.copy2(OUT / "svg" / filename, shared_assets / filename)
-    shutil.copy2(ico_path, ROOT / "server" / "public" / "favicon.ico")
-    save_project_png(master_icon(32), "server/public/favicon-32.png")
+    shutil.copy2(favicon_ico_path, ROOT / "server" / "public" / "favicon.ico")
+    save_project_png(mark(32, "color", 0.01), "server/public/favicon-32.png")
     save_project_png(master_icon(180), "server/public/apple-touch-icon.png")
     save_project_png(master_icon(192), "server/public/icon-192.png")
     save_project_png(master_icon(512), "server/public/icon-512.png")
