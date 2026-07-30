@@ -40,6 +40,25 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     permissions: ['sales:view']
   },
   {
+    id: 'company-stores',
+    label: 'Şubeler',
+    section: 'operations',
+    href: '/app/#company-stores',
+    description: 'Şube kayıtlarını, adreslerini ve durumlarını yönetin.',
+    module: 'portal',
+    moduleTab: 'stores'
+  },
+  {
+    id: 'company-devices',
+    label: 'Cihazlar',
+    section: 'operations',
+    href: '/app/#company-devices',
+    description: 'Bağlı terminalleri, şubelerini ve çevrimiçi durumlarını izleyin.',
+    module: 'portal',
+    moduleTab: 'devices',
+    permissions: ['devices:view']
+  },
+  {
     id: 'team-management',
     label: 'Kullanıcılar ve Roller',
     section: 'operations',
@@ -58,6 +77,25 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     module: 'portal',
     moduleTab: 'subscription',
     permissions: ['billing:view']
+  },
+  {
+    id: 'company-licenses',
+    label: 'Lisanslar',
+    section: 'commerce',
+    href: '/app/#company-licenses',
+    description: 'Lisans anahtarlarını, cihaz haklarını ve geçerlilik tarihlerini görün.',
+    module: 'portal',
+    moduleTab: 'licenses',
+    permissions: ['devices:view']
+  },
+  {
+    id: 'company-downloads',
+    label: 'Uygulama İndir',
+    section: 'commerce',
+    href: '/app/#company-downloads',
+    description: 'Yetkili Windows ve Android kurulum paketlerini indirin.',
+    module: 'portal',
+    moduleTab: 'downloads'
   },
   {
     id: 'support-center',
@@ -109,6 +147,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
+    id: 'platform-subscriptions',
+    label: 'Abonelikler',
+    section: 'platform',
+    href: '/app/#platform-subscriptions',
+    description: 'Firma aboneliklerini, dönemlerini ve durumlarını inceleyin.',
+    module: 'admin',
+    moduleTab: 'subscriptions',
+    roles: ['sysadmin']
+  },
+  {
     id: 'platform-plans',
     label: 'Planlar',
     section: 'platform',
@@ -126,6 +174,26 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     description: 'Android ve Windows sürümlerini yayınlayın, kademeli dağıtın veya geri çekin.',
     module: 'admin',
     moduleTab: 'releases',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-licenses',
+    label: 'Lisanslar',
+    section: 'platform',
+    href: '/app/#platform-licenses',
+    description: 'Lisans üretin, yenileyin, askıya alın veya iptal edin.',
+    module: 'admin',
+    moduleTab: 'licenses',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-devices',
+    label: 'Cihazlar',
+    section: 'platform',
+    href: '/app/#platform-devices',
+    description: 'Tüm firmalara bağlı cihazları yönetin ve gerektiğinde değiştirin.',
+    module: 'admin',
+    moduleTab: 'devices',
     roles: ['sysadmin']
   },
   {

@@ -922,7 +922,7 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
 router.post('/devices/:id/toggle', async (req: AuthenticatedRequest, res: Response) => {
   const { action } = req.body; // 'activate' | 'disable' | 'block' | 'unblock'
   try {
-    const device = await runBypassingRLS('SELECT * FROM devices WHERE id = $1', [req.params.id]);
+    const device = await runBypassingRLS('SELECT * FROM device_activations WHERE id = $1', [req.params.id]);
     if (device.rows.length === 0) {
       return res.status(404).json({ error: 'device_not_found' });
     }
@@ -944,7 +944,7 @@ router.post('/devices/:id/toggle', async (req: AuthenticatedRequest, res: Respon
     }
 
     await runBypassingRLS(
-      'UPDATE devices SET status = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE device_activations SET status = $1 WHERE id = $2',
       [nextStatus, req.params.id]
     );
 
@@ -1592,7 +1592,7 @@ router.post('/devices/swap', async (req: AuthenticatedRequest, res: Response) =>
 
     // 1. Verify old device exists and belongs to the company
     const deviceRes = await client.query(
-      'SELECT * FROM devices WHERE id = $1 AND company_id = $2',
+      'SELECT * FROM device_activations WHERE id = $1 AND company_id = $2',
       [old_device_id, company_id]
     );
     if (deviceRes.rows.length === 0) {
@@ -1604,8 +1604,8 @@ router.post('/devices/swap', async (req: AuthenticatedRequest, res: Response) =>
 
     // 2. Perform the swap
     await client.query(
-      `UPDATE devices 
-       SET device_hash = $1, name = $2, last_active_at = NULL, last_sync_at = NULL, updated_at = NOW()
+      `UPDATE device_activations
+       SET device_hash = $1, device_name = $2, last_seen_at = NULL
        WHERE id = $3`,
       [new_device_hash, new_device_name, old_device_id]
     );

@@ -511,6 +511,14 @@ td small { display:block;color:#64748b;margin-top:3px; }
 .diagnostic-details p { margin:4px 0;color:#475569; }
 .diagnostic-details pre { margin:5px 0 0;padding:12px;max-height:320px;overflow:auto;border-radius:8px;background:#f5f7f5;color:#26352e;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere; }
 .diagnostic-action { padding:10px 12px;border-radius:8px;background:#ecfdf5;color:#065f46; }
+.portal-diagnostic-filters { grid-template-columns:minmax(150px,1fr) minmax(150px,1fr) minmax(260px,2fr) auto; }
+.release-download-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px; }
+.release-download-card { display:flex;flex-direction:column;gap:10px;min-height:220px;padding:20px;border:1px solid #dfe6e1;border-radius:14px;background:#fff; }
+.release-download-card h3,.release-download-card p { margin:0; }
+.release-download-card p { color:#617069;line-height:1.5; }
+.release-download-card small { color:#718078; }
+.release-download-card .btn { margin-top:auto;align-self:flex-start; }
+.release-platform { width:max-content;padding:5px 9px;border-radius:999px;background:#e9f6ef;color:#087453;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em; }
 .status-critical,.status-error,.status-server { background:#fee2e2;color:#991b1b; }
 .status-warning { background:#fef3c7;color:#92400e; }
 .status-client { background:#dbeafe;color:#1e40af; }
@@ -545,6 +553,7 @@ td small { display:block;color:#64748b;margin-top:3px; }
   .metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .inline-form,.support-form,.permission-grid { grid-template-columns:1fr 1fr; }
   .diagnostic-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .release-download-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .diagnostic-search { grid-column:1 / -1; }
   .maintenance-task-grid { grid-template-columns:1fr; }
 }
@@ -554,6 +563,7 @@ td small { display:block;color:#64748b;margin-top:3px; }
   .shell-header { align-items:flex-start; }
   .diagnostic-panel { padding:14px; }
   .diagnostic-filters { grid-template-columns:1fr; }
+  .release-download-grid { grid-template-columns:1fr; }
   .diagnostic-search { grid-column:auto; }
   .diagnostic-head { align-items:flex-start;flex-direction:column; }
   .maintenance-confirm { align-items:stretch;flex-direction:column; }

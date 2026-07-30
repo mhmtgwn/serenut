@@ -37,7 +37,11 @@ async function run() {
   assert.doesNotMatch(publicSources, /embed=1|auth-modal-iframe/, 'iframe authentication must stay removed');
 
   const runtime = fs.readFileSync(path.join(projectRoot, 'public/app/js/module-runtime.js'), 'utf8');
-  for (const loader of ['platform-companies', 'platform-health', 'platform-maintenance', 'platform-security']) {
+  for (const loader of [
+    'company-stores', 'company-devices', 'company-licenses', 'company-downloads',
+    'platform-companies', 'platform-subscriptions', 'platform-licenses', 'platform-devices',
+    'platform-health', 'platform-maintenance', 'platform-security',
+  ]) {
     assert.match(runtime, new RegExp(`'${loader}': async`), `${loader} loader must be registered`);
   }
   const adminController = fs.readFileSync(path.join(projectRoot, 'src/modules/admin/admin.controller.ts'), 'utf8');
@@ -49,6 +53,8 @@ async function run() {
   assert.doesNotMatch(appSource, /module:\s*isSysadmin\s*\?/, 'frontend must preserve backend module kinds');
   assert.match(appSource, /item\.module === 'home'/, 'home must be a first-class shell view');
   assert.match(appSource, /landing_module_id/, 'frontend must use the canonical landing module id');
+  assert.doesNotMatch(appSource, /M5 5h14v14H5z/, 'navigation must not regress to square placeholder icons');
+  assert.match(appSource, /const iconPaths = \{/, 'navigation must provide module-specific icons');
   assert.match(appHtml, /id="boot-state"/, 'application shell must expose a non-empty loading state');
 
   assert.equal(resolveLandingModuleId(['sysadmin'], []), 'platform-overview');
@@ -62,6 +68,9 @@ async function run() {
   const sysadminNav = filterNavByEntitlements(['sysadmin'], []);
   assert.ok(sysadminNav.some((item) => item.id === 'platform-overview' && item.module === 'admin'));
   assert.ok(sysadminNav.some((item) => item.id === 'platform-maintenance' && item.module === 'admin'));
+  for (const id of ['platform-subscriptions', 'platform-licenses', 'platform-devices']) {
+    assert.ok(sysadminNav.some((item) => item.id === id && item.module === 'admin'), `${id} must be visible to sysadmin`);
+  }
 
   console.log('Web route contract passed.');
 }
