@@ -289,6 +289,8 @@ class _LabelTemplateEditorPageState
         ? settings!.businessName
         : 'SERENUT OS MARKET';
 
+    final logoPath = settings?.businessLogo;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -303,9 +305,9 @@ class _LabelTemplateEditorPageState
             ),
           ),
           const SizedBox(height: 10),
-          _buildProductLabelPreview(bizName),
-          const SizedBox(height: 24),
-          _buildLogoPickerCard(),
+          _buildProductLabelPreview(bizName, logoPath),
+          const SizedBox(height: 20),
+          _buildBusinessInfoBanner(settings),
           const SizedBox(height: 16),
           Text(
             'Etiket İçerik Ayarları',
@@ -317,8 +319,8 @@ class _LabelTemplateEditorPageState
           ),
           const SizedBox(height: 12),
           _buildToggleTile(
-            title: 'Firma Adı Göster',
-            subtitle: 'Etiketin en üstünde firma adını basar',
+            title: 'Firma Adı / Logosu Göster',
+            subtitle: 'Etiketin en üstünde firma logosunu veya adını basar',
             value: _productShowBusinessName,
             onChanged: (v) => setState(() => _productShowBusinessName = v),
           ),
@@ -361,6 +363,7 @@ class _LabelTemplateEditorPageState
     final bizName = settings?.businessName.isNotEmpty == true
         ? settings!.businessName
         : 'SERENUT OS MARKET';
+    final logoPath = settings?.businessLogo;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -376,9 +379,9 @@ class _LabelTemplateEditorPageState
             ),
           ),
           const SizedBox(height: 10),
-          _buildOrderLabelPreview(bizName),
-          const SizedBox(height: 24),
-          _buildLogoPickerCard(),
+          _buildOrderLabelPreview(bizName, logoPath),
+          const SizedBox(height: 20),
+          _buildBusinessInfoBanner(settings),
           const SizedBox(height: 16),
           Text(
             'Sipariş Etiketi Ayarları',
@@ -596,14 +599,14 @@ class _LabelTemplateEditorPageState
     );
   }
 
-  // ── Logo Seçici Kartı ───────────────────────────────────────────────────
-  Widget _buildLogoPickerCard() {
-    final hasLogo = _businessLogoPath != null &&
-        _businessLogoPath!.trim().isNotEmpty &&
-        File(_businessLogoPath!).existsSync();
+  // ── İşletme Bilgisi Banner ──────────────────────────────────────────────
+  Widget _buildBusinessInfoBanner(Settings? settings) {
+    final hasLogo = settings?.businessLogo != null &&
+        settings!.businessLogo!.trim().isNotEmpty &&
+        File(settings.businessLogo!).existsSync();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: POSColors.card,
         borderRadius: BorderRadius.circular(12),
@@ -612,8 +615,8 @@ class _LabelTemplateEditorPageState
       child: Row(
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: POSColors.surface,
               borderRadius: BorderRadius.circular(8),
@@ -623,23 +626,23 @@ class _LabelTemplateEditorPageState
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(7),
                     child: Image.file(
-                      File(_businessLogoPath!),
+                      File(settings.businessLogo!),
                       fit: BoxFit.contain,
                     ),
                   )
                 : const Icon(
                     Icons.storefront_rounded,
-                    color: POSColors.textSecondary,
-                    size: 28,
+                    color: POSColors.green,
+                    size: 24,
                   ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasLogo ? 'İşletme Logosu Seçildi' : 'Etiket Logosu',
+                  'İşletme Adı & Logosu',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -648,8 +651,8 @@ class _LabelTemplateEditorPageState
                 ),
                 Text(
                   hasLogo
-                      ? 'Etiketin en üstünde bu logo basılır'
-                      : 'Etiket üstüne logonuzu ekleyebilirsiniz',
+                      ? 'Etiket başlığında İşletme Bilgileri logosu kullanılır.'
+                      : 'Logoyu değiştirmek için İşletme Bilgileri ekranını kullanabilirsiniz.',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: POSColors.textSecondary,
@@ -658,40 +661,22 @@ class _LabelTemplateEditorPageState
               ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: _pickLogo,
-            icon: const Icon(Icons.image_search_rounded, size: 16),
-            label: Text(hasLogo ? 'Değiştir' : 'Logo Seç'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: POSColors.green,
-              side: const BorderSide(color: POSColors.green),
-            ),
-          ),
-          if (hasLogo) ...[
-            const SizedBox(width: 6),
-            IconButton(
-              onPressed: () => setState(() => _businessLogoPath = null),
-              icon: const Icon(Icons.delete_outline_rounded,
-                  color: Colors.redAccent, size: 20),
-              tooltip: 'Logoyu Kaldır',
-            ),
-          ],
         ],
       ),
     );
   }
 
   // ── Önizleme Widget'ları ──────────────────────────────────────────────────
-  Widget _buildProductLabelPreview(String bizName) {
+  Widget _buildProductLabelPreview(String bizName, String? logoPath) {
     double scale = switch (_productFontSize) {
       'Küçük' => 0.85,
       'Büyük' => 1.15,
       _ => 1.0,
     };
 
-    final hasLogo = _businessLogoPath != null &&
-        _businessLogoPath!.trim().isNotEmpty &&
-        File(_businessLogoPath!).existsSync();
+    final hasLogo = logoPath != null &&
+        logoPath.trim().isNotEmpty &&
+        File(logoPath).existsSync();
 
     return Center(
       child: Container(
@@ -715,7 +700,7 @@ class _LabelTemplateEditorPageState
             if (_productShowBusinessName) ...[
               if (hasLogo) ...[
                 Image.file(
-                  File(_businessLogoPath!),
+                  File(logoPath),
                   height: 24 * scale,
                   fit: BoxFit.contain,
                 ),
@@ -808,16 +793,16 @@ class _LabelTemplateEditorPageState
     );
   }
 
-  Widget _buildOrderLabelPreview(String bizName) {
+  Widget _buildOrderLabelPreview(String bizName, String? logoPath) {
     double scale = switch (_orderFontSize) {
       'Küçük' => 0.85,
       'Büyük' => 1.15,
       _ => 1.0,
     };
 
-    final hasLogo = _businessLogoPath != null &&
-        _businessLogoPath!.trim().isNotEmpty &&
-        File(_businessLogoPath!).existsSync();
+    final hasLogo = logoPath != null &&
+        logoPath.trim().isNotEmpty &&
+        File(logoPath).existsSync();
 
     return Center(
       child: Container(
@@ -845,7 +830,7 @@ class _LabelTemplateEditorPageState
                   children: [
                     if (hasLogo) ...[
                       Image.file(
-                        File(_businessLogoPath!),
+                        File(logoPath),
                         height: 24 * scale,
                         fit: BoxFit.contain,
                       ),

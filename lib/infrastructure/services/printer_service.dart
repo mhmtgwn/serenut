@@ -445,6 +445,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             showPrice: settings.printProductDetails,
             showVat: settings.labelShowVat,
             fontSize: settings.labelFontSize,
+            logoPath: settings.businessLogo,
           )
         : LabelLayoutEngine.generateLabelBytes(
             model,
@@ -1387,6 +1388,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           showPrice: settings.printProductDetails,
           showVat: settings.labelShowVat,
           fontSize: settings.labelFontSize,
+          logoPath: settings.businessLogo,
         ));
       } else {
         for (var copy = 0; copy < effectiveCopies; copy++) {

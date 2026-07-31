@@ -1,5 +1,7 @@
 import 'dart:convert';
-
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/models/label_model.dart';
 
 /// Dynamic-size TSPL shelf-label renderer.
@@ -21,6 +23,7 @@ class TsplLabelLayoutEngine {
     bool showPrice = true,
     bool showVat = true,
     String fontSize = 'Orta',
+    String? logoPath,
   }) {
     final safeWidth = widthMm.clamp(30, 100);
     final safeHeight = heightMm.clamp(20, 100);
@@ -49,18 +52,24 @@ class TsplLabelLayoutEngine {
 
     int currentY = sy(6);
 
-    // 1. Top Logo / Header (Centered)
+    // 1. Top Logo / Header (Bitmap Logo or Centered Business Name)
     if (showBusinessName) {
-      final logoText = model.businessName?.trim().isNotEmpty == true
-          ? _ascii(model.businessName!.trim())
-          : 'SERENUT OS';
-      final fontType = fontScale < 0.9 ? '1' : '2';
-      final charW = fontType == '2' ? 12 : 8;
-      final textW = logoText.length * charW * fontScale;
-      final centerX =
-          ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
-      commands.writeln('TEXT $centerX,$currentY,"$fontType",0,1,1,"$logoText"');
-      currentY += sy(20 * fontScale).round();
+      final bitmapCmd = _generateTsplBitmap(logoPath, widthDots, currentY);
+      if (bitmapCmd != null) {
+        commands.writeln(bitmapCmd);
+        currentY += sy(36 * fontScale).round();
+      } else {
+        final logoText = model.businessName?.trim().isNotEmpty == true
+            ? _ascii(model.businessName!.trim())
+            : 'SERENUT OS';
+        final fontType = fontScale < 0.9 ? '1' : '2';
+        final charW = fontType == '2' ? 12 : 8;
+        final textW = logoText.length * charW * fontScale;
+        final centerX =
+            ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+        commands.writeln('TEXT $centerX,$currentY,"$fontType",0,1,1,"$logoText"');
+        currentY += sy(20 * fontScale).round();
+      }
     }
 
     // 2. Brand (if enabled)
@@ -337,5 +346,54 @@ class TsplLabelLayoutEngine {
       '₺': 'TL',
     };
     return value.split('').map((char) => replacements[char] ?? char).join();
+  }
+
+  static String? _generateTsplBitmap(
+      String? logoPath, int widthDots, int currentY) {
+    if (logoPath == null || logoPath.trim().isEmpty || kIsWeb) return null;
+    try {
+      final file = File(logoPath);
+      if (!file.existsSync()) return null;
+      final bytes = file.readAsBytesSync();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+
+      int targetWidth = 160; // 20mm at 203dpi
+      int targetHeight =
+          (decoded.height * (targetWidth / decoded.width)).round().clamp(10, 80);
+      targetWidth = (targetWidth ~/ 8) * 8; // Multiple of 8
+      if (targetWidth < 8) targetWidth = 8;
+      final widthBytes = targetWidth ~/ 8;
+
+      final resized =
+          img.copyResize(decoded, width: targetWidth, height: targetHeight);
+      final centerX =
+          ((widthDots - targetWidth) / 2).clamp(10, widthDots - 10).round();
+
+      final List<int> rasterBytes = [];
+      for (int y = 0; y < targetHeight; y++) {
+        for (int x = 0; x < widthBytes; x++) {
+          int b = 0;
+          for (int bit = 0; bit < 8; bit++) {
+            final px = x * 8 + bit;
+            if (px < targetWidth) {
+              final p = resized.getPixel(px, y);
+              final lum = img.getLuminance(p);
+              if (lum < 128) {
+                b |= (0x80 >> bit);
+              }
+            }
+          }
+          rasterBytes.add(b);
+        }
+      }
+
+      final hexData = rasterBytes
+          .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+          .join('');
+      return 'BITMAP $centerX,$currentY,$widthBytes,$targetHeight,0,$hexData';
+    } catch (_) {
+      return null;
+    }
   }
 }
