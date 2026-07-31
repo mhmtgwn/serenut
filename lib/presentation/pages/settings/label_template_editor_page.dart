@@ -24,9 +24,6 @@ class _LabelTemplateEditorPageState
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // Logo Ayarı
-  String? _businessLogoPath;
-
   // Ürün Etiketi Ayarları
   bool _productShowBusinessName = true;
   bool _productShowBrand = true;
@@ -95,26 +92,6 @@ class _LabelTemplateEditorPageState
     _labelDpi = settings.labelDpi;
     _labelPrinterLanguage = settings.labelPrinterLanguage;
     _labelPrinterCopies = settings.labelPrinterCopies.clamp(1, 20);
-  }
-
-  Future<void> _pickLogo() async {
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 600,
-        maxHeight: 600,
-      );
-      if (picked != null) {
-        setState(() => _businessLogoPath = picked.path);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Logo seçimi başarısız: $e')),
-        );
-      }
-    }
   }
 
   Future<void> _saveSettings() async {
