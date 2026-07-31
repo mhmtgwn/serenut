@@ -389,39 +389,30 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (_checkingIntegrity) {
-      return MaterialApp(
-        title: 'Serenut OS',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        home: const BrandedSplashScreen(
-          status: 'Sistem kontrol ediliyor',
-          detail: 'Verileriniz ve yarım kalan işlemler güvenle hazırlanıyor.',
-        ),
-      );
-    }
+    if (_checkingIntegrity || _checkingVersion || _integrityError != null) {
+      final String status;
+      final String? detail;
 
-    if (_integrityError != null) {
+      if (_integrityError != null) {
+        status = 'Sistem kontrol ediliyor';
+        detail = null;
+      } else if (_checkingIntegrity) {
+        status = 'Sistem kontrol ediliyor';
+        detail = 'Verileriniz ve yarım kalan işlemler güvenle hazırlanıyor.';
+      } else {
+        status = 'Uygulama hazırlanıyor';
+        detail = 'Sürüm ve güvenlik kontrolleri tamamlanıyor.';
+      }
+
       return MaterialApp(
         title: 'Serenut OS',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: BrandedSplashScreen(
-          status: 'Sistem kontrol ediliyor',
-          error: _integrityError!,
-          onRetry: _retryStartupChecks,
-        ),
-      );
-    }
-
-    if (_checkingVersion) {
-      return MaterialApp(
-        title: 'Serenut OS',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        home: const BrandedSplashScreen(
-          status: 'Uygulama hazırlanıyor',
-          detail: 'Sürüm ve güvenlik kontrolleri tamamlanıyor.',
+          status: status,
+          detail: detail,
+          error: _integrityError,
+          onRetry: _integrityError != null ? _retryStartupChecks : null,
         ),
       );
     }

@@ -14,8 +14,16 @@ class LabelLayoutEngine {
   static const List<int> cut = [0x1D, 0x56, 0x41, 0x08];
 
   /// Generate ESC/POS bytes for a single label
-  static List<int> generateLabelBytes(LabelModel model,
-      {int width = 32, List<int> logoBytes = const []}) {
+  static List<int> generateLabelBytes(
+    LabelModel model, {
+    int width = 32,
+    List<int> logoBytes = const [],
+    bool showBusinessName = true,
+    bool showBrand = true,
+    bool showBarcode = true,
+    bool showPrice = true,
+    bool showVat = true,
+  }) {
     final List<int> bytes = [];
 
     bytes.addAll(init);
@@ -27,7 +35,7 @@ class LabelLayoutEngine {
       bytes.addAll(logoBytes);
       bytes.addAll(lf);
     }
-    if (model.businessName?.trim().isNotEmpty == true) {
+    if (showBusinessName && model.businessName?.trim().isNotEmpty == true) {
       bytes.addAll(alignCenter);
       bytes.addAll(boldOn);
       bytes.addAll(_textToBytes('${model.businessName}\n'));
@@ -36,7 +44,7 @@ class LabelLayoutEngine {
 
     bytes.addAll(alignCenter);
     bytes.addAll(boldOn);
-    if (model.brand?.trim().isNotEmpty == true) {
+    if (showBrand && model.brand?.trim().isNotEmpty == true) {
       bytes.addAll(sizeNormal);
       bytes.addAll(_textToBytes('${model.brand}\n'));
     }
@@ -59,16 +67,18 @@ class LabelLayoutEngine {
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     // Align Right / Prominent for Price with Unit
-    bytes.addAll(alignRight);
-    bytes.addAll(boldOn);
-    bytes.addAll(sizeLarge);
-    final unitPrefix = model.unit.trim().isNotEmpty ? '${model.unit} ' : '';
-    bytes.addAll(_textToBytes('$unitPrefix${model.price.toStringAsFixed(2)} TL\n'));
-    bytes.addAll(sizeNormal);
-    bytes.addAll(boldOff);
+    if (showPrice) {
+      bytes.addAll(alignRight);
+      bytes.addAll(boldOn);
+      bytes.addAll(sizeLarge);
+      final vatText = showVat ? ' (KDV Dahil)' : '';
+      bytes.addAll(_textToBytes('${model.price.toStringAsFixed(2)} TL$vatText\n'));
+      bytes.addAll(sizeNormal);
+      bytes.addAll(boldOff);
+    }
 
     // Compact Barcode Lines (no numbers underneath)
-    if (model.barcode != null && model.barcode!.trim().isNotEmpty) {
+    if (showBarcode && model.barcode != null && model.barcode!.trim().isNotEmpty) {
       final code = model.barcode!.trim();
       bytes.addAll(alignCenter);
       // Select barcode height (32 dots)

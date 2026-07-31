@@ -15,6 +15,12 @@ class TsplLabelLayoutEngine {
     int gapMm = 2,
     int dpi = 203,
     int copies = 1,
+    bool showBusinessName = true,
+    bool showBrand = true,
+    bool showBarcode = true,
+    bool showPrice = true,
+    bool showVat = true,
+    String fontSize = 'Orta',
   }) {
     final safeWidth = widthMm.clamp(30, 100);
     final safeHeight = heightMm.clamp(20, 100);
@@ -24,6 +30,12 @@ class TsplLabelLayoutEngine {
     final heightDots = (safeHeight * safeDpi / 25.4).round();
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
+
+    final fontScale = switch (fontSize) {
+      'Küçük' => 0.85,
+      'Büyük' => 1.15,
+      _ => 1.0,
+    };
 
     final barcode = _barcode(model.barcode ?? '');
 
@@ -38,75 +50,89 @@ class TsplLabelLayoutEngine {
     int currentY = sy(6);
 
     // 1. Top Logo / Header (Centered)
-    final logoText = model.businessName?.trim().isNotEmpty == true
-        ? _ascii(model.businessName!.trim())
-        : 'SERENUT OS';
-    commands.writeln('TEXT ${sx(110)},$currentY,"2",0,1,1,"$logoText"');
-    currentY += sy(22);
+    if (showBusinessName) {
+      final logoText = model.businessName?.trim().isNotEmpty == true
+          ? _ascii(model.businessName!.trim())
+          : 'SERENUT OS';
+      final fontType = fontScale < 0.9 ? '1' : '2';
+      commands.writeln('TEXT ${sx(110)},$currentY,"$fontType",0,1,1,"$logoText"');
+      currentY += sy(20 * fontScale);
+    }
 
-    // 2. Middle: Auto-scaling Product Name
+    // 2. Brand (if enabled)
+    if (showBrand && model.brand?.trim().isNotEmpty == true) {
+      final brandText = _ascii(model.brand!.trim());
+      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$brandText"');
+      currentY += sy(16 * fontScale);
+    }
+
+    // 3. Middle: Auto-scaling Product Name
     final nameClean = _ascii(model.productName.trim());
     if (nameClean.length <= 14) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"4",0,1,1,"$nameClean"');
-      currentY += sy(36);
+      final f = fontScale > 1.1 ? '4' : (fontScale < 0.9 ? '3' : '4');
+      commands.writeln('TEXT ${sx(16)},$currentY,"$f",0,1,1,"$nameClean"');
+      currentY += sy(34 * fontScale);
     } else if (nameClean.length <= 26) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$nameClean"');
-      currentY += sy(30);
+      final f = fontScale > 1.1 ? '3' : (fontScale < 0.9 ? '2' : '3');
+      commands.writeln('TEXT ${sx(16)},$currentY,"$f",0,1,1,"$nameClean"');
+      currentY += sy(28 * fontScale);
     } else {
-      final lines = _wrapProductName(nameClean, 22);
+      final lines = _wrapProductName(nameClean, (22 / fontScale).round());
       for (final line in lines) {
         commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$line"');
-        currentY += sy(22);
+        currentY += sy(20 * fontScale);
       }
     }
 
     currentY += sy(4);
 
-    // 3. Horizontal Separator Line (matching price-tag sample)
+    // 4. Horizontal Separator Line
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
     currentY += sy(8);
 
-    // 4. Bottom Split Layout (Left: Kod & Barcode lines | Right: Huge Auto-scaling Price)
+    // 5. Bottom Split Layout (Left: Barcode | Right: Price & KDV)
     final bottomY = currentY;
 
-    // Bottom Left: Kod & Barcode
-    if (barcode.isNotEmpty) {
+    // Bottom Left: Barcode (if enabled)
+    if (showBarcode && barcode.isNotEmpty) {
       commands.writeln('TEXT ${sx(16)},$bottomY,"1",0,1,1,"Kod: $barcode"');
-      final barcodeY = bottomY + sy(16);
-      final barcodeHeight = sy(32).clamp(16, 45);
+      final barcodeY = bottomY + sy(14);
+      final barcodeHeight = sy(28 * fontScale).clamp(14, 40).round();
       commands.writeln(
         'BARCODE ${sx(16)},$barcodeY,"128",$barcodeHeight,0,0,2,3,"$barcode"',
       );
     }
 
-    // Bottom Right: Huge Price with Superscript Kuruş
-    final priceParts = model.price.toStringAsFixed(2).split('.');
-    final lira = priceParts[0];
-    final kurus = priceParts[1];
-    final priceX = sx(200);
+    // Bottom Right: Price & KDV (if enabled)
+    if (showPrice) {
+      final priceParts = model.price.toStringAsFixed(2).split('.');
+      final lira = priceParts[0];
+      final kurus = priceParts[1];
+      final priceX = sx(180);
 
-    if (lira.length <= 5) {
-      commands.writeln('TEXT $priceX,${bottomY + sy(10)},"2",0,1,1,"TL"');
-      final liraX = priceX + sx(28);
-      commands.writeln('TEXT $liraX,$bottomY,"4",0,1,2,"$lira"');
-      final kurusX = liraX + lira.length * sx(24) + sx(4);
-      commands.writeln('TEXT $kurusX,$bottomY,"2",0,1,1,"$kurus"');
-    } else {
-      commands.writeln('TEXT $priceX,${bottomY + sy(6)},"2",0,1,1,"TL"');
-      final liraX = priceX + sx(24);
-      commands.writeln('TEXT $liraX,$bottomY,"3",0,1,2,"$lira"');
-      final kurusX = liraX + lira.length * sx(18) + sx(4);
-      commands.writeln('TEXT $kurusX,$bottomY,"1",0,1,1,"$kurus"');
+      final vatSuffix = showVat ? ' KDV Dahil' : '';
+
+      if (lira.length <= 5) {
+        commands.writeln('TEXT $priceX,${bottomY + sy(8)},"2",0,1,1,"TL$vatSuffix"');
+        final liraX = priceX + sx(24);
+        final fLira = fontScale > 1.1 ? '4' : '4';
+        commands.writeln('TEXT $liraX,$bottomY,"$fLira",0,1,2,"$lira"');
+        final kurusX = liraX + lira.length * sx(22) + sx(4);
+        commands.writeln('TEXT $kurusX,$bottomY,"2",0,1,1,"$kurus"');
+      } else {
+        commands.writeln('TEXT $priceX,${bottomY + sy(4)},"2",0,1,1,"TL$vatSuffix"');
+        final liraX = priceX + sx(20);
+        commands.writeln('TEXT $liraX,$bottomY,"3",0,1,2,"$lira"');
+        final kurusX = liraX + lira.length * sx(16) + sx(4);
+        commands.writeln('TEXT $kurusX,$bottomY,"1",0,1,1,"$kurus"');
+      }
     }
 
     commands.writeln('PRINT ${copies.clamp(1, 20)},1');
     return latin1.encode(commands.toString().replaceAll('\n', '\r\n'));
   }
 
-  /// Generates TSPL commands specifically for Order Package / Kitchen / Item labels.
-  ///
-  /// Does NOT print logos, shelf prices, or store tags.
-  /// Focuses purely on Order ID, Customer ("kimin"), Product & Quantity ("ürünler"), and Order Barcode.
+  /// Generates TSPL commands for Order Package / Kitchen / Item labels with options.
   static List<int> generateOrderLabelBytes({
     required String orderIdShort,
     required String customerName,
@@ -114,11 +140,21 @@ class TsplLabelLayoutEngine {
     required double quantity,
     String? note,
     DateTime? timestamp,
+    double? totalAmount,
+    int? itemsCount,
     int widthMm = 50,
     int heightMm = 30,
     int gapMm = 2,
     int dpi = 203,
     int copies = 1,
+    bool showBusinessName = true,
+    bool showCustomerName = true,
+    bool showOrderNo = true,
+    bool showDate = true,
+    bool showTotalAmount = true,
+    bool showItemsCount = true,
+    String fontSize = 'Orta',
+    String? businessName,
   }) {
     final safeWidth = widthMm.clamp(30, 100);
     final safeHeight = heightMm.clamp(20, 100);
@@ -129,7 +165,7 @@ class TsplLabelLayoutEngine {
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
 
-    final timeStr = timestamp != null
+    final timeStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
         : '';
     final qtyStr = quantity % 1 == 0
@@ -151,30 +187,48 @@ class TsplLabelLayoutEngine {
 
     int currentY = sy(6);
 
-    // 1. Header: Sipariş No & Tarih (No logo)
-    commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderIdShort"');
-    if (timeStr.isNotEmpty) {
+    // 1. Business Header (if enabled)
+    if (showBusinessName && businessName != null && businessName.trim().isNotEmpty) {
+      final bizClean = _ascii(businessName.trim());
+      commands.writeln('TEXT ${sx(110)},$currentY,"2",0,1,1,"$bizClean"');
+      currentY += sy(20);
+    }
+
+    // 2. Header: Sipariş No & Tarih
+    if (showOrderNo) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderIdShort"');
+    }
+    if (showDate && timeStr.isNotEmpty) {
       commands.writeln('TEXT ${sx(220)},$currentY,"1",0,1,1,"$timeStr"');
     }
-    currentY += sy(20);
+    if (showOrderNo || (showDate && timeStr.isNotEmpty)) {
+      currentY += sy(20);
+    }
 
-    // 2. Customer Info ("Kimin")
-    final whoText = custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
-    commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$whoText"');
-    currentY += sy(22);
+    // 3. Customer Info ("Müşteri")
+    if (showCustomerName) {
+      final whoText = custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
+      commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$whoText"');
+      currentY += sy(22);
+    }
 
-    // 3. Separator Line
+    // 4. Separator Line
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
     currentY += sy(8);
 
-    // 4. Product & Quantity ("Ürünler vs.")
+    // 5. Items Count & Product Quantity
+    if (showItemsCount && itemsCount != null) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"• $itemsCount Parca Urun / Paket"');
+      currentY += sy(18);
+    }
+
     final itemTitle = '$qtyStr x $prodClean';
     if (itemTitle.length <= 18) {
       commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$itemTitle"');
-      currentY += sy(28);
+      currentY += sy(26);
     } else {
       commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$itemTitle"');
-      currentY += sy(22);
+      currentY += sy(20);
     }
 
     if (noteClean != null) {
@@ -182,7 +236,13 @@ class TsplLabelLayoutEngine {
       currentY += sy(16);
     }
 
-    // 5. Order Barcode / Footer at Bottom Left
+    // 6. Total Amount & Order Barcode Footer
+    if (showTotalAmount && totalAmount != null) {
+      final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
+      commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$totalStr"');
+      currentY += sy(26);
+    }
+
     final barcodeY = heightDots - sy(48);
     final barcodeHeight = sy(28).clamp(14, 36);
     final cleanBarcode = _barcode(orderIdShort);

@@ -204,8 +204,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       return;
     }
 
-    // Failover chain: Sunmi → Network → Bluetooth → PersistentQueue
-    final backends = await _buildFailoverChain(targetSettings);
+    // Failover chain: Network / USB / Bluetooth → PersistentQueue
+    final backends = await _buildFailoverChain(targetSettings, purpose: purpose);
 
     final failures = <String>[];
     for (final backend in backends) {
@@ -238,7 +238,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   /// Build ordered failover chain for current platform and settings.
-  Future<List<PrinterBackend>> _buildFailoverChain(Settings settings) async {
+  Future<List<PrinterBackend>> _buildFailoverChain(
+    Settings settings, {
+    PrinterPurpose purpose = PrinterPurpose.receipt,
+  }) async {
     final chain = <PrinterBackend>[];
 
     if (kIsWeb) return [PrinterBackend.none];
@@ -260,21 +263,27 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       return chain;
     }
 
-    // Android: preferred backend first, then fallbacks
+    final isLabel = purpose == PrinterPurpose.label;
+
+    // Android: preferred backend first, then fallbacks (labels do NOT bleed into receipt printer)
     if (printerName == 'sunmi') {
       chain.add(PrinterBackend.sunmi);
       if (ip != null && ip.isNotEmpty) chain.add(PrinterBackend.network);
     } else if (printerName != null && printerName.startsWith('usb:')) {
       chain.add(PrinterBackend.usb);
-      chain.add(PrinterBackend.sunmi);
+      if (!isLabel) chain.add(PrinterBackend.sunmi);
     } else if (ip != null && ip.isNotEmpty) {
       chain.add(PrinterBackend.network);
-      chain.add(PrinterBackend.sunmi); // Sunmi as last-resort on Sunmi devices
+      if (!isLabel) chain.add(PrinterBackend.sunmi); // Sunmi as last-resort ONLY for receipts
     } else if (printerName != null && printerName.contains(':')) {
       chain.add(PrinterBackend.bluetooth);
-      chain.add(PrinterBackend.sunmi);
+      if (!isLabel) chain.add(PrinterBackend.sunmi);
     } else {
-      chain.add(PrinterBackend.sunmi);
+      if (!isLabel) {
+        chain.add(PrinterBackend.sunmi);
+      } else {
+        chain.add(PrinterBackend.none);
+      }
     }
 
     return chain;
@@ -1273,11 +1282,21 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           quantity: qty,
           note: note,
           timestamp: order.createdAt,
+          totalAmount: order.totalAmount,
+          itemsCount: items.length,
           widthMm: settings.labelWidthMm,
           heightMm: settings.labelHeightMm,
           gapMm: settings.labelGapMm,
           dpi: settings.labelDpi,
           copies: settings.labelPrinterCopies,
+          showBusinessName: settings.labelOrderShowBusinessName,
+          showCustomerName: settings.labelOrderShowCustomerName,
+          showOrderNo: settings.labelOrderShowOrderNo,
+          showDate: settings.labelOrderShowDate,
+          showTotalAmount: settings.labelOrderShowTotalAmount,
+          showItemsCount: settings.labelOrderShowItemsCount,
+          fontSize: settings.labelOrderFontSize,
+          businessName: settings.businessName,
         );
         allBytes.addAll(labelBytes);
       } else {
@@ -1293,6 +1312,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         final labelBytes = LabelLayoutEngine.generateLabelBytes(
           labelModel,
           width: targetSettings.paperWidth <= 58 ? 32 : 48,
+          showBusinessName: settings.labelOrderShowBusinessName,
+          showBarcode: settings.labelOrderShowOrderNo,
+          showPrice: settings.labelOrderShowTotalAmount,
         );
         allBytes.addAll(labelBytes);
       }
@@ -1344,6 +1366,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           gapMm: settings.labelGapMm,
           dpi: settings.labelDpi,
           copies: effectiveCopies,
+          showBusinessName: settings.printLogo,
+          showBrand: settings.labelShowBrand,
+          showBarcode: settings.printBarcode,
+          showPrice: settings.printProductDetails,
+          showVat: settings.labelShowVat,
+          fontSize: settings.labelFontSize,
         ));
       } else {
         for (var copy = 0; copy < effectiveCopies; copy++) {
@@ -1351,6 +1379,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             model,
             width: width,
             logoBytes: logo,
+            showBusinessName: settings.printLogo,
+            showBrand: settings.labelShowBrand,
+            showBarcode: settings.printBarcode,
+            showPrice: settings.printProductDetails,
+            showVat: settings.labelShowVat,
           ));
         }
       }
