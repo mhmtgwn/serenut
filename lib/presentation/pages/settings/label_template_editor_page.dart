@@ -1,9 +1,11 @@
 // lib/presentation/pages/settings/label_template_editor_page.dart
 // Serenut OS — Etiket Tasarımı, Şablonlar & Donanım Ayarları (Canlı Önizlemeli)
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
@@ -21,6 +23,9 @@ class _LabelTemplateEditorPageState
     extends ConsumerState<LabelTemplateEditorPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  // Logo Ayarı
+  String? _businessLogoPath;
 
   // Ürün Etiketi Ayarları
   bool _productShowBusinessName = true;
@@ -67,6 +72,8 @@ class _LabelTemplateEditorPageState
     if (_initialized) return;
     _initialized = true;
 
+    _businessLogoPath = settings.businessLogo;
+
     _productShowBusinessName = settings.printLogo;
     _productShowBrand = settings.labelShowBrand;
     _productShowBarcode = settings.printBarcode;
@@ -90,6 +97,26 @@ class _LabelTemplateEditorPageState
     _labelPrinterCopies = settings.labelPrinterCopies.clamp(1, 20);
   }
 
+  Future<void> _pickLogo() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 600,
+        maxHeight: 600,
+      );
+      if (picked != null) {
+        setState(() => _businessLogoPath = picked.path);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Logo seçimi başarısız: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _saveSettings() async {
     final settings = ref.read(settingsNotifierProvider).value;
     if (settings == null) return;
@@ -97,6 +124,7 @@ class _LabelTemplateEditorPageState
     setState(() => _isSaving = true);
     try {
       final updated = settings.copyWith(
+        businessLogo: _businessLogoPath,
         printLogo: _productShowBusinessName,
         printBarcode: _productShowBarcode,
         printProductDetails: _productShowPrice,
@@ -148,6 +176,7 @@ class _LabelTemplateEditorPageState
     if (settings == null) return;
 
     final candidate = settings.copyWith(
+      businessLogo: _businessLogoPath,
       printLogo: _productShowBusinessName,
       printBarcode: _productShowBarcode,
       printProductDetails: _productShowPrice,
@@ -276,6 +305,8 @@ class _LabelTemplateEditorPageState
           const SizedBox(height: 10),
           _buildProductLabelPreview(bizName),
           const SizedBox(height: 24),
+          _buildLogoPickerCard(),
+          const SizedBox(height: 16),
           Text(
             'Etiket İçerik Ayarları',
             style: GoogleFonts.inter(
@@ -347,6 +378,8 @@ class _LabelTemplateEditorPageState
           const SizedBox(height: 10),
           _buildOrderLabelPreview(bizName),
           const SizedBox(height: 24),
+          _buildLogoPickerCard(),
+          const SizedBox(height: 16),
           Text(
             'Sipariş Etiketi Ayarları',
             style: GoogleFonts.inter(
@@ -427,7 +460,6 @@ class _LabelTemplateEditorPageState
             ),
             child: Column(
               children: [
-                // Genişlik
                 Row(
                   children: [
                     Text('Genişlik (mm): $_labelWidthMm mm',
@@ -447,7 +479,6 @@ class _LabelTemplateEditorPageState
                   ],
                 ),
                 const Divider(height: 16),
-                // Yükseklik
                 Row(
                   children: [
                     Text('Yükseklik (mm): $_labelHeightMm mm',
@@ -467,7 +498,6 @@ class _LabelTemplateEditorPageState
                   ],
                 ),
                 const Divider(height: 16),
-                // Gap
                 Row(
                   children: [
                     Text('Boşluk (Gap): $_labelGapMm mm',
@@ -487,7 +517,6 @@ class _LabelTemplateEditorPageState
                   ],
                 ),
                 const Divider(height: 16),
-                // DPI
                 Row(
                   children: [
                     Text('Çözünürlük (DPI)',
@@ -513,7 +542,6 @@ class _LabelTemplateEditorPageState
                   ],
                 ),
                 const Divider(height: 16),
-                // Komut Dili
                 Row(
                   children: [
                     Text('Yazıcı Dili',
@@ -568,6 +596,91 @@ class _LabelTemplateEditorPageState
     );
   }
 
+  // ── Logo Seçici Kartı ───────────────────────────────────────────────────
+  Widget _buildLogoPickerCard() {
+    final hasLogo = _businessLogoPath != null &&
+        _businessLogoPath!.trim().isNotEmpty &&
+        File(_businessLogoPath!).existsSync();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: POSColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: POSColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: POSColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: POSColors.border),
+            ),
+            child: hasLogo
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: Image.file(
+                      File(_businessLogoPath!),
+                      fit: BoxFit.contain,
+                    ),
+                  )
+                : const Icon(
+                    Icons.storefront_rounded,
+                    color: POSColors.textSecondary,
+                    size: 28,
+                  ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasLogo ? 'İşletme Logosu Seçildi' : 'Etiket Logosu',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: POSColors.text,
+                  ),
+                ),
+                Text(
+                  hasLogo
+                      ? 'Etiketin en üstünde bu logo basılır'
+                      : 'Etiket üstüne logonuzu ekleyebilirsiniz',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: POSColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: _pickLogo,
+            icon: const Icon(Icons.image_search_rounded, size: 16),
+            label: Text(hasLogo ? 'Değiştir' : 'Logo Seç'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: POSColors.green,
+              side: const BorderSide(color: POSColors.green),
+            ),
+          ),
+          if (hasLogo) ...[
+            const SizedBox(width: 6),
+            IconButton(
+              onPressed: () => setState(() => _businessLogoPath = null),
+              icon: const Icon(Icons.delete_outline_rounded,
+                  color: Colors.redAccent, size: 20),
+              tooltip: 'Logoyu Kaldır',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ── Önizleme Widget'ları ──────────────────────────────────────────────────
   Widget _buildProductLabelPreview(String bizName) {
     double scale = switch (_productFontSize) {
@@ -575,6 +688,10 @@ class _LabelTemplateEditorPageState
       'Büyük' => 1.15,
       _ => 1.0,
     };
+
+    final hasLogo = _businessLogoPath != null &&
+        _businessLogoPath!.trim().isNotEmpty &&
+        File(_businessLogoPath!).existsSync();
 
     return Center(
       child: Container(
@@ -596,6 +713,14 @@ class _LabelTemplateEditorPageState
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_productShowBusinessName) ...[
+              if (hasLogo) ...[
+                Image.file(
+                  File(_businessLogoPath!),
+                  height: 24 * scale,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 2),
+              ],
               Text(
                 bizName.toUpperCase(),
                 style: GoogleFonts.inter(
@@ -690,6 +815,10 @@ class _LabelTemplateEditorPageState
       _ => 1.0,
     };
 
+    final hasLogo = _businessLogoPath != null &&
+        _businessLogoPath!.trim().isNotEmpty &&
+        File(_businessLogoPath!).existsSync();
+
     return Center(
       child: Container(
         width: 280,
@@ -712,13 +841,25 @@ class _LabelTemplateEditorPageState
           children: [
             if (_orderShowBusinessName) ...[
               Center(
-                child: Text(
-                  bizName.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 11 * scale,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+                child: Column(
+                  children: [
+                    if (hasLogo) ...[
+                      Image.file(
+                        File(_businessLogoPath!),
+                        height: 24 * scale,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 2),
+                    ],
+                    Text(
+                      bizName.toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 11 * scale,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const Divider(height: 10, thickness: 0.5),
@@ -787,14 +928,26 @@ class _LabelTemplateEditorPageState
               ),
             ],
             const Divider(height: 12, thickness: 0.5),
-            if (_orderShowItemsCount)
+            if (_orderShowItemsCount) ...[
               Text(
-                '• 3 Parça Ürün / Paket',
+                'ÜRÜN İÇERİĞİ (3 Parça):',
+                style: GoogleFonts.inter(
+                  fontSize: 10 * scale,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '• 2x Taze Çifte Kavrulmuş Fındık 500g\n• 1x Anamur Muz 1kg',
                 style: GoogleFonts.inter(
                   fontSize: 11 * scale,
                   fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
               ),
+              const SizedBox(height: 6),
+            ],
             if (_orderShowTotalAmount) ...[
               const SizedBox(height: 6),
               Row(

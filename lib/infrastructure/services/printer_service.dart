@@ -439,8 +439,22 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             heightMm: settings.labelHeightMm,
             gapMm: settings.labelGapMm,
             dpi: settings.labelDpi,
+            showBusinessName: settings.printLogo,
+            showBrand: settings.labelShowBrand,
+            showBarcode: settings.printBarcode,
+            showPrice: settings.printProductDetails,
+            showVat: settings.labelShowVat,
+            fontSize: settings.labelFontSize,
           )
-        : LabelLayoutEngine.generateLabelBytes(model, width: 32);
+        : LabelLayoutEngine.generateLabelBytes(
+            model,
+            width: 32,
+            showBusinessName: settings.printLogo,
+            showBrand: settings.labelShowBrand,
+            showBarcode: settings.printBarcode,
+            showPrice: settings.printProductDetails,
+            showVat: settings.labelShowVat,
+          );
     await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
   }
 
@@ -1280,6 +1294,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           customerName: custName,
           productName: name,
           quantity: qty,
+          items: items,
           note: note,
           timestamp: order.createdAt,
           totalAmount: order.totalAmount,

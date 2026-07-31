@@ -42,7 +42,7 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 44;
+  static const int _databaseVersion = 45;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;

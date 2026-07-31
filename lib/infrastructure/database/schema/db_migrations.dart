@@ -823,6 +823,31 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 45) {
+          for (final statement in [
+            "ALTER TABLE settings ADD COLUMN label_show_brand INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_show_vat INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_font_size TEXT NOT NULL DEFAULT 'Orta'",
+            "ALTER TABLE settings ADD COLUMN label_order_show_business_name INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_order_show_customer_name INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_order_show_order_no INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_order_show_date INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_order_show_total_amount INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_order_show_items_count INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_order_font_size TEXT NOT NULL DEFAULT 'Orta'",
+          ]) {
+            try {
+              await txn.execute(statement);
+            } catch (e) {
+              handleMigrationError(e, 45);
+            }
+          }
+          await txn.insert('app_migration_history', {
+            'version': 45,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

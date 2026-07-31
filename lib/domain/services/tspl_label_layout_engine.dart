@@ -55,32 +55,42 @@ class TsplLabelLayoutEngine {
           ? _ascii(model.businessName!.trim())
           : 'SERENUT OS';
       final fontType = fontScale < 0.9 ? '1' : '2';
-      commands.writeln('TEXT ${sx(110)},$currentY,"$fontType",0,1,1,"$logoText"');
-      currentY += sy(20 * fontScale);
+      final charW = fontType == '2' ? 12 : 8;
+      final textW = logoText.length * charW * fontScale;
+      final centerX =
+          ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+      commands.writeln('TEXT $centerX,$currentY,"$fontType",0,1,1,"$logoText"');
+      currentY += sy(20 * fontScale).round();
     }
 
     // 2. Brand (if enabled)
     if (showBrand && model.brand?.trim().isNotEmpty == true) {
       final brandText = _ascii(model.brand!.trim());
-      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$brandText"');
-      currentY += sy(16 * fontScale);
+      final textW = brandText.length * 8 * fontScale;
+      final centerX =
+          ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+      commands.writeln('TEXT $centerX,$currentY,"1",0,1,1,"$brandText"');
+      currentY += sy(16 * fontScale).round();
     }
 
-    // 3. Middle: Auto-scaling Product Name
+    // 3. Middle: Auto-scaling Product Name (Centered)
     final nameClean = _ascii(model.productName.trim());
-    if (nameClean.length <= 14) {
-      final f = fontScale > 1.1 ? '4' : (fontScale < 0.9 ? '3' : '4');
-      commands.writeln('TEXT ${sx(16)},$currentY,"$f",0,1,1,"$nameClean"');
-      currentY += sy(34 * fontScale);
-    } else if (nameClean.length <= 26) {
+    if (nameClean.length <= 16) {
       final f = fontScale > 1.1 ? '3' : (fontScale < 0.9 ? '2' : '3');
-      commands.writeln('TEXT ${sx(16)},$currentY,"$f",0,1,1,"$nameClean"');
-      currentY += sy(28 * fontScale);
+      final charW = f == '3' ? 16 : 12;
+      final textW = nameClean.length * charW * fontScale;
+      final centerX =
+          ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+      commands.writeln('TEXT $centerX,$currentY,"$f",0,1,1,"$nameClean"');
+      currentY += sy(32 * fontScale).round();
     } else {
       final lines = _wrapProductName(nameClean, (22 / fontScale).round());
       for (final line in lines) {
-        commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$line"');
-        currentY += sy(20 * fontScale);
+        final textW = line.length * 12 * fontScale;
+        final centerX =
+            ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+        commands.writeln('TEXT $centerX,$currentY,"2",0,1,1,"$line"');
+        currentY += sy(20 * fontScale).round();
       }
     }
 
@@ -90,7 +100,7 @@ class TsplLabelLayoutEngine {
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
     currentY += sy(8);
 
-    // 5. Bottom Split Layout (Left: Barcode | Right: Price & KDV)
+    // 5. Bottom Layout (Left: Barcode | Right: Price & KDV)
     final bottomY = currentY;
 
     // Bottom Left: Barcode (if enabled)
@@ -103,28 +113,28 @@ class TsplLabelLayoutEngine {
       );
     }
 
-    // Bottom Right: Price & KDV (if enabled)
+    // Bottom Right or Centered: Price & KDV (if enabled)
     if (showPrice) {
-      final priceParts = model.price.toStringAsFixed(2).split('.');
-      final lira = priceParts[0];
-      final kurus = priceParts[1];
-      final priceX = sx(180);
+      final priceStr = 'TL ${model.price.toStringAsFixed(2)}';
+      final vatStr = '(KDV Dahil)';
 
-      final vatSuffix = showVat ? ' KDV Dahil' : '';
-
-      if (lira.length <= 5) {
-        commands.writeln('TEXT $priceX,${bottomY + sy(8)},"2",0,1,1,"TL$vatSuffix"');
-        final liraX = priceX + sx(24);
-        final fLira = fontScale > 1.1 ? '4' : '4';
-        commands.writeln('TEXT $liraX,$bottomY,"$fLira",0,1,2,"$lira"');
-        final kurusX = liraX + lira.length * sx(22) + sx(4);
-        commands.writeln('TEXT $kurusX,$bottomY,"2",0,1,1,"$kurus"');
+      if (showBarcode && barcode.isNotEmpty) {
+        final priceX = sx(200);
+        commands.writeln('TEXT $priceX,$bottomY,"3",0,1,1,"$priceStr"');
+        if (showVat) {
+          commands.writeln('TEXT $priceX,${bottomY + sy(22)},"1",0,1,1,"$vatStr"');
+        }
       } else {
-        commands.writeln('TEXT $priceX,${bottomY + sy(4)},"2",0,1,1,"TL$vatSuffix"');
-        final liraX = priceX + sx(20);
-        commands.writeln('TEXT $liraX,$bottomY,"3",0,1,2,"$lira"');
-        final kurusX = liraX + lira.length * sx(16) + sx(4);
-        commands.writeln('TEXT $kurusX,$bottomY,"1",0,1,1,"$kurus"');
+        final textW = priceStr.length * 16 * fontScale;
+        final priceX =
+            ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+        commands.writeln('TEXT $priceX,$bottomY,"4",0,1,1,"$priceStr"');
+        if (showVat) {
+          final vatW = vatStr.length * 8 * fontScale;
+          final vatX =
+              ((widthDots - vatW) / 2).clamp(10, widthDots - 10).round();
+          commands.writeln('TEXT $vatX,${bottomY + sy(30)},"1",0,1,1,"$vatStr"');
+        }
       }
     }
 
@@ -138,6 +148,7 @@ class TsplLabelLayoutEngine {
     required String customerName,
     required String productName,
     required double quantity,
+    List<Map<String, dynamic>>? items,
     String? note,
     DateTime? timestamp,
     double? totalAmount,
@@ -216,19 +227,35 @@ class TsplLabelLayoutEngine {
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
     currentY += sy(8);
 
-    // 5. Items Count & Product Quantity
+    // 5. Items Count & Product Quantity / Items List
     if (showItemsCount && itemsCount != null) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"• $itemsCount Parca Urun / Paket"');
+      commands.writeln(
+          'TEXT ${sx(16)},$currentY,"1",0,1,1,"• $itemsCount Parca Urun / Paket"');
       currentY += sy(18);
     }
 
-    final itemTitle = '$qtyStr x $prodClean';
-    if (itemTitle.length <= 18) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$itemTitle"');
-      currentY += sy(26);
+    if (items != null && items.isNotEmpty) {
+      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"URUN ICERIGI:"');
+      currentY += sy(16);
+      for (final item in items) {
+        final name = _ascii(
+            (item['product_name'] ?? item['name'] ?? 'Urun').toString());
+        final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+        final itemQtyStr =
+            itemQty % 1 == 0 ? itemQty.toInt().toString() : itemQty.toStringAsFixed(1);
+        final lineStr = '• ${itemQtyStr}x $name';
+        commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$lineStr"');
+        currentY += sy(18);
+      }
     } else {
-      commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$itemTitle"');
-      currentY += sy(20);
+      final itemTitle = '$qtyStr x $prodClean';
+      if (itemTitle.length <= 18) {
+        commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$itemTitle"');
+        currentY += sy(26);
+      } else {
+        commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$itemTitle"');
+        currentY += sy(20);
+      }
     }
 
     if (noteClean != null) {

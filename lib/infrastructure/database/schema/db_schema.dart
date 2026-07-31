@@ -374,7 +374,17 @@ class DatabaseSchema {
         sms_sim_slot_index INTEGER,
         sms_monthly_limit INTEGER,
         sms_sent_this_month INTEGER NOT NULL DEFAULT 0,
-        sms_limit_reset_month INTEGER
+        sms_limit_reset_month INTEGER,
+        label_show_brand INTEGER NOT NULL DEFAULT 1,
+        label_show_vat INTEGER NOT NULL DEFAULT 1,
+        label_font_size TEXT NOT NULL DEFAULT 'Orta',
+        label_order_show_business_name INTEGER NOT NULL DEFAULT 1,
+        label_order_show_customer_name INTEGER NOT NULL DEFAULT 1,
+        label_order_show_order_no INTEGER NOT NULL DEFAULT 1,
+        label_order_show_date INTEGER NOT NULL DEFAULT 1,
+        label_order_show_total_amount INTEGER NOT NULL DEFAULT 1,
+        label_order_show_items_count INTEGER NOT NULL DEFAULT 1,
+        label_order_font_size TEXT NOT NULL DEFAULT 'Orta'
       )
     ''');
 
