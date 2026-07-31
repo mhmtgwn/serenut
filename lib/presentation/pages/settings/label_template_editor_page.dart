@@ -69,8 +69,6 @@ class _LabelTemplateEditorPageState
     if (_initialized) return;
     _initialized = true;
 
-    _businessLogoPath = settings.businessLogo;
-
     _productShowBusinessName = settings.printLogo;
     _productShowBrand = settings.labelShowBrand;
     _productShowBarcode = settings.printBarcode;
@@ -101,7 +99,6 @@ class _LabelTemplateEditorPageState
     setState(() => _isSaving = true);
     try {
       final updated = settings.copyWith(
-        businessLogo: _businessLogoPath,
         printLogo: _productShowBusinessName,
         printBarcode: _productShowBarcode,
         printProductDetails: _productShowPrice,
@@ -153,7 +150,6 @@ class _LabelTemplateEditorPageState
     if (settings == null) return;
 
     final candidate = settings.copyWith(
-      businessLogo: _businessLogoPath,
       printLogo: _productShowBusinessName,
       printBarcode: _productShowBarcode,
       printProductDetails: _productShowPrice,
@@ -675,23 +671,22 @@ class _LabelTemplateEditorPageState
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_productShowBusinessName) ...[
-              if (hasLogo) ...[
+              if (hasLogo)
                 Image.file(
                   File(logoPath),
-                  height: 24 * scale,
+                  height: 26 * scale,
                   fit: BoxFit.contain,
+                )
+              else
+                Text(
+                  bizName.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: 10 * scale,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                    letterSpacing: 0.5,
+                  ),
                 ),
-                const SizedBox(height: 2),
-              ],
-              Text(
-                bizName.toUpperCase(),
-                style: GoogleFonts.inter(
-                  fontSize: 10 * scale,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                  letterSpacing: 0.5,
-                ),
-              ),
               const Divider(height: 10, thickness: 0.5),
             ],
             if (_productShowBrand)
@@ -803,26 +798,20 @@ class _LabelTemplateEditorPageState
           children: [
             if (_orderShowBusinessName) ...[
               Center(
-                child: Column(
-                  children: [
-                    if (hasLogo) ...[
-                      Image.file(
+                child: hasLogo
+                    ? Image.file(
                         File(logoPath),
-                        height: 24 * scale,
+                        height: 26 * scale,
                         fit: BoxFit.contain,
+                      )
+                    : Text(
+                        bizName.toUpperCase(),
+                        style: GoogleFonts.inter(
+                          fontSize: 11 * scale,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                    ],
-                    Text(
-                      bizName.toUpperCase(),
-                      style: GoogleFonts.inter(
-                        fontSize: 11 * scale,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const Divider(height: 10, thickness: 0.5),
             ],
