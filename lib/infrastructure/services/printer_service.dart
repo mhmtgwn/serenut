@@ -2,6 +2,7 @@
 // Phase 4 — ESC/POS Thermal Printer Service
 // Updated: 24 Jun 2026 — Failover chain + persistent queue + platform guards
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -311,16 +312,21 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   Future<void> _sendViaTcp(List<int> bytes, String ip, int port) async {
-    const maxAttempts = 3;
-    const retryDelay = Duration(milliseconds: 500);
+    final cleanIp = ip.trim();
+    if (cleanIp.isEmpty) {
+      throw Exception('Yazıcı IP adresi belirtilmemiş.');
+    }
+
+    const maxAttempts = 2;
+    const retryDelay = Duration(milliseconds: 400);
 
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         final socket = _socketConnector != null
-            ? await _socketConnector!(ip, port,
-                timeout: const Duration(seconds: 5))
-            : await Socket.connect(ip, port,
-                timeout: const Duration(seconds: 5));
+            ? await _socketConnector!(cleanIp, port,
+                timeout: const Duration(seconds: 4))
+            : await Socket.connect(cleanIp, port,
+                timeout: const Duration(seconds: 4));
         try {
           socket.add(bytes);
           await socket.flush();
@@ -328,10 +334,22 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           await socket.close();
         }
         return; // success
+      } on SocketException catch (e) {
+        if (attempt >= maxAttempts) {
+          throw Exception(
+              'Yazıcıya ulaşılamadı ($cleanIp:$port). Lütfen yazıcının açık ve aynı ağa bağlı olduğunu kontrol edin. (Detay: ${e.message})');
+        }
+      } on TimeoutException {
+        if (attempt >= maxAttempts) {
+          throw Exception(
+              'Yazıcı yanıt vermedi ($cleanIp:$port). Zaman aşımı oluştu.');
+        }
       } catch (e) {
-        if (attempt >= maxAttempts) rethrow;
-        await Future.delayed(retryDelay);
+        if (attempt >= maxAttempts) {
+          throw Exception('Yazıcı bağlantı hatası ($cleanIp:$port): $e');
+        }
       }
+      await Future.delayed(retryDelay);
     }
   }
 

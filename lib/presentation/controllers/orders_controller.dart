@@ -1,6 +1,7 @@
 // lib/presentation/controllers/orders_controller.dart
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
@@ -173,7 +174,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         orderIdStr: order.id,
         customerIdStr: order.customerId,
       ));
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+    }
 
     // Log to Audit Trail
     try {
@@ -188,7 +191,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             'Tutar: ₺${total.toStringAsFixed(2)}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
         notes: 'Yeni sipariş oluşturuldu: ${order.id}',
       );
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+    }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
@@ -222,7 +227,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
             'Durum: ${order.status}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
         notes: 'Sipariş güncellendi: ${order.id}',
       );
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+    }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
@@ -265,7 +272,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         approvedByUserId: approvedByUserId,
         approvedByUserName: approvedByUserName,
       );
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+    }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
@@ -334,7 +343,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         newValue: status,
         notes: 'Sipariş durumu güncellendi: $id -> $status',
       );
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+    }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();

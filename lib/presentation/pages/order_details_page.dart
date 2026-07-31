@@ -398,7 +398,7 @@ class OrderDetailsPage extends ConsumerWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                              'Durum güncellendi: ${_statusLabels[status]}'),
+                              '📱 Durum güncellendi: ${_statusLabels[status]} (SMS bildirimi tetiklendi)'),
                           backgroundColor: _kGreenDark,
                           behavior: SnackBarBehavior.floating,
                         ),

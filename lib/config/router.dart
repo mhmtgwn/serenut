@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/pages/onboarding/bootstrap_loading_view.d
 import 'package:serenutos/presentation/pages/onboarding/splash_screen.dart';
 import 'package:serenutos/presentation/pages/login_page.dart';
 import 'package:serenutos/presentation/pages/register_page.dart';
+import 'package:serenutos/presentation/pages/forgot_password_page.dart';
 import 'package:serenutos/presentation/pages/operational_error_page.dart';
 import 'package:serenutos/presentation/pages/home_page.dart';
 import 'package:serenutos/presentation/pages/sales_page.dart';
@@ -106,8 +107,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onLogin = state.matchedLocation == AppRoutes.login;
       final onLoginForm = state.matchedLocation == '/login/form';
       final onRegister = state.matchedLocation.startsWith('/register');
+      final onForgotPassword = state.matchedLocation == '/forgot-password';
       final onOnboarding = state.matchedLocation.startsWith('/onboarding');
-      final onAuthScreen = onLogin || onLoginForm || onRegister || onOnboarding;
+      final onAuthScreen = onLogin || onLoginForm || onRegister || onForgotPassword || onOnboarding;
 
       if (!loggedIn) {
         if (!onAuthScreen) return AppRoutes.login;
@@ -141,6 +143,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login/form',
         name: 'login-form',
         builder: (context, state) => const LoginFormPage(),
+      ),
+
+      // ── Şifremi Unuttum
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordPage(),
       ),
 
       // ── Hesap Oluştur (2 adımlı kayıt)

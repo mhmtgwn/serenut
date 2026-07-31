@@ -187,6 +187,8 @@ class LoginFormPage extends ConsumerStatefulWidget {
 class _LoginFormPageState extends ConsumerState<LoginFormPage> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _usernameFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _isLoading = false;
   bool _obscure = true;
   String? _errorMessage;
@@ -195,6 +197,8 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _usernameFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -306,6 +310,9 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                   icon: Icons.person_outline_rounded,
                   enabled: !_isLoading,
                   keyboardType: TextInputType.emailAddress,
+                  focusNode: _usernameFocus,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _passwordFocus.requestFocus(),
                 ),
                 const SizedBox(height: 14),
 
@@ -317,6 +324,8 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                   icon: Icons.lock_outline_rounded,
                   enabled: !_isLoading,
                   obscureText: _obscure,
+                  focusNode: _passwordFocus,
+                  textInputAction: TextInputAction.done,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscure
@@ -362,6 +371,29 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Şifremi unuttum linki ──
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => context.push('/forgot-password'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Şifremi unuttum?',
+                      style: GoogleFonts.inter(
+                        color: POSColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
 
@@ -519,6 +551,8 @@ class _LightField extends StatelessWidget {
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
   final void Function(String)? onSubmitted;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
 
   const _LightField({
     required this.controller,
@@ -530,6 +564,8 @@ class _LightField extends StatelessWidget {
     this.suffixIcon,
     this.keyboardType,
     this.onSubmitted,
+    this.focusNode,
+    this.textInputAction,
   });
 
   @override
@@ -540,6 +576,8 @@ class _LightField extends StatelessWidget {
       obscureText: obscureText,
       keyboardType: keyboardType,
       onSubmitted: onSubmitted,
+      focusNode: focusNode,
+      textInputAction: textInputAction,
       style: GoogleFonts.inter(color: POSColors.text, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,

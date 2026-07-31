@@ -14,6 +14,7 @@ import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, listEquals;
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 class AuthException implements Exception {
   final String message;
@@ -182,7 +183,9 @@ class AuthService {
               final hash = _hashService.hashPassword(password);
               await _userRepository.updateUserFields(user,
                   isActive: true, passwordHash: hash);
-            } catch (_) {}
+            } catch (e, st) {
+              TelemetryService().logError(e, st, context: 'AuthService', level: LogLevel.warning);
+            }
           }
 
           _currentUser = user;
@@ -208,7 +211,9 @@ class AuthService {
                         ? nestedError['message'] as String?
                         : null) ??
                     message;
-              } catch (_) {}
+              } catch (e, st) {
+                TelemetryService().logError(e, st, context: 'AuthService', level: LogLevel.warning);
+              }
             }
             throw AuthException(message);
           }
@@ -318,7 +323,9 @@ class AuthService {
                 : payload['message']?.toString() ??
                     error?.toString() ??
                     message;
-          } catch (_) {}
+          } catch (e, st) {
+            TelemetryService().logError(e, st, context: 'AuthService', level: LogLevel.warning);
+          }
         }
         throw AuthException(message);
       }

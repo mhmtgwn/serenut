@@ -5,6 +5,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/domain/services/pagination_service.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 
@@ -77,7 +78,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           newValue: 'Ad: ${customer.name}, Bakiye: ₺${customer.balance}',
           notes: 'Yeni müşteri eklendi: ${customer.name}',
         );
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+      }
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
@@ -96,7 +99,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           customer.name,
           'Eski bakiye: ₺${original?.balance}, Yeni bakiye: ₺${customer.balance}',
         );
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+      }
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
@@ -118,7 +123,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           approvedByUserId: approvedByUserId,
           approvedByUserName: approvedByUserName,
         );
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+      }
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
     });
@@ -161,7 +168,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
         amount,
         method,
       );
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+    }
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
 
@@ -197,7 +206,9 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
             ? notes!.trim()
             : '${customer?.name ?? 'Müşteri'} için elle borç eklendi',
       );
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+    }
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
     await refresh();

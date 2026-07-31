@@ -5,7 +5,8 @@ import 'package:serenutos/config/theme.dart';
 ///
 /// Yapay gecikme oluşturmaz; çağıran başlangıç adımı tamamlandığında ekrandan
 /// çıkılır. İlerleme bilinmiyorsa [progress] null bırakılabilir.
-class BrandedSplashScreen extends StatelessWidget {
+/// Logo, yükleme sırasında sürekli dönerek uygulamanın çalıştığını gösterir.
+class BrandedSplashScreen extends StatefulWidget {
   final String status;
   final String? detail;
   final double? progress;
@@ -22,9 +23,46 @@ class BrandedSplashScreen extends StatelessWidget {
   });
 
   @override
+  State<BrandedSplashScreen> createState() => _BrandedSplashScreenState();
+}
+
+class _BrandedSplashScreenState extends State<BrandedSplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spinController;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    // Hata yoksa sürekli döndür
+    if (widget.error == null) {
+      _spinController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BrandedSplashScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.error != null && _spinController.isAnimating) {
+      _spinController.stop();
+    } else if (widget.error == null && !_spinController.isAnimating) {
+      _spinController.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _spinController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final hasError = error != null;
-    final normalizedProgress = progress?.clamp(0.0, 1.0);
+    final hasError = widget.error != null;
+    final normalizedProgress = widget.progress?.clamp(0.0, 1.0);
 
     return Scaffold(
       backgroundColor: POSColors.surface,
@@ -55,12 +93,19 @@ class BrandedSplashScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        'assets/branding/app/mark-color-112.png',
-                        width: 96,
-                        height: 96,
-                        fit: BoxFit.contain,
-                        semanticLabel: 'Serenut simgesi',
+                      // ── Dönen Logo ──
+                      RotationTransition(
+                        turns: CurvedAnimation(
+                          parent: _spinController,
+                          curve: Curves.linear,
+                        ),
+                        child: Image.asset(
+                          'assets/branding/app/mark-color-112.png',
+                          width: 96,
+                          height: 96,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Serenut simgesi',
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Image.asset(
@@ -86,8 +131,10 @@ class BrandedSplashScreen extends StatelessWidget {
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 220),
                         child: Text(
-                          hasError ? 'Başlatma tamamlanamadı' : status,
-                          key: ValueKey('$hasError-$status'),
+                          hasError
+                              ? 'Başlatma tamamlanamadı'
+                              : widget.status,
+                          key: ValueKey('$hasError-${widget.status}'),
                           textAlign: TextAlign.center,
                           style: Theme.of(context)
                               .textTheme
@@ -98,10 +145,10 @@ class BrandedSplashScreen extends StatelessWidget {
                               ),
                         ),
                       ),
-                      if (detail != null || hasError) ...[
+                      if (widget.detail != null || hasError) ...[
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          hasError ? error! : detail!,
+                          hasError ? widget.error! : widget.detail!,
                           textAlign: TextAlign.center,
                           maxLines: 4,
                           overflow: TextOverflow.ellipsis,
@@ -140,12 +187,12 @@ class BrandedSplashScreen extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (hasError && onRetry != null) ...[
+                      if (hasError && widget.onRetry != null) ...[
                         const SizedBox(height: AppSpacing.lg),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed: onRetry,
+                            onPressed: widget.onRetry,
                             icon: const Icon(Icons.refresh_rounded),
                             label: const Text('Tekrar Dene'),
                           ),

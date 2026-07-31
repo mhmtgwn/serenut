@@ -41,8 +41,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   // ── Sayfa 0: Hesap ──
   final _emailCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _password2Ctrl = TextEditingController();
+
+  final _emailFocus = FocusNode();
+  final _usernameFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _password2Focus = FocusNode();
+
   bool _obscurePass = true;
   bool _obscurePass2 = true;
   bool _acceptTerms = false;
@@ -55,6 +62,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _ownerNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _taxNoCtrl = TextEditingController();
+
+  final _bizNameFocus = FocusNode();
+  final _ownerNameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _taxNoFocus = FocusNode();
 
   String? _selectedCity;
   String? _selectedDistrict;
@@ -77,14 +89,62 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   void dispose() {
     _emailCtrl.dispose();
+    _usernameCtrl.dispose();
     _passwordCtrl.dispose();
     _password2Ctrl.dispose();
+    _emailFocus.dispose();
+    _usernameFocus.dispose();
+    _passwordFocus.dispose();
+    _password2Focus.dispose();
+
     _bizNameCtrl.dispose();
     _ownerNameCtrl.dispose();
     _phoneCtrl.dispose();
     _taxNoCtrl.dispose();
+    _bizNameFocus.dispose();
+    _ownerNameFocus.dispose();
+    _phoneFocus.dispose();
+    _taxNoFocus.dispose();
+
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _focusFirstError({required int step}) {
+    FocusNode? target;
+    if (step == 0) {
+      if (_emailCtrl.text.trim().isEmpty) {
+        target = _emailFocus;
+      } else if (_usernameCtrl.text.trim().isEmpty) {
+        target = _usernameFocus;
+      } else if (_passwordCtrl.text.isEmpty) {
+        target = _passwordFocus;
+      } else if (_password2Ctrl.text.isEmpty) {
+        target = _password2Focus;
+      }
+    } else {
+      if (_bizNameCtrl.text.trim().isEmpty) {
+        target = _bizNameFocus;
+      } else if (_ownerNameCtrl.text.trim().isEmpty) {
+        target = _ownerNameFocus;
+      } else if (_phoneCtrl.text.trim().isEmpty) {
+        target = _phoneFocus;
+      } else if (_taxNoCtrl.text.trim().isEmpty) {
+        target = _taxNoFocus;
+      }
+    }
+
+    if (target != null) {
+      target.requestFocus();
+      final currentContext = target.context;
+      if (currentContext != null) {
+        Scrollable.ensureVisible(
+          currentContext,
+          duration: const Duration(milliseconds: 300),
+          alignment: 0.2,
+        );
+      }
+    }
   }
 
   Future<void> _loadCities() async {
@@ -118,7 +178,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   // ── Adım 0 doğrulama ve geçiş ──
   void _goToStep1() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      _focusFirstError(step: 0);
+      return;
+    }
     setState(() => _step = 1);
     _pageController.animateToPage(
       1,
@@ -129,7 +192,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   // ── Kayıt tamamla ──
   Future<void> _submit() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      _focusFirstError(step: 1);
+      return;
+    }
     if (_selectedCity == null) {
       setState(() => _error = 'Lütfen şehir seçin.');
       return;
@@ -157,6 +223,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         'company_name': _bizNameCtrl.text.trim(),
         'name': _ownerNameCtrl.text.trim(),
         'email': _emailCtrl.text.trim().toLowerCase(),
+        'username': _usernameCtrl.text.trim(),
         'password': _passwordCtrl.text,
         'phone': _phoneCtrl.text.trim(),
         'tax_number': _taxNoCtrl.text.trim(),
@@ -364,6 +431,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 hint: 'ahmet@market.com',
                 icon: Icons.email_outlined,
                 keyboard: TextInputType.emailAddress,
+                focusNode: _emailFocus,
+                textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return 'E-posta zorunludur';
@@ -374,11 +443,34 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ),
               const SizedBox(height: 14),
               _LightFormField(
+                controller: _usernameCtrl,
+                label: 'Kullanıcı Adı *',
+                hint: 'ahmet_yilmaz',
+                icon: Icons.person_outline_rounded,
+                focusNode: _usernameFocus,
+                textInputAction: TextInputAction.next,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Kullanıcı adı zorunludur';
+                  }
+                  if (v.trim().length < 3) {
+                    return 'En az 3 karakter olmalıdır';
+                  }
+                  if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim())) {
+                    return 'Sadece harf, rakam ve alt çizgi kullanılabilir';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              _LightFormField(
                 controller: _passwordCtrl,
                 label: 'Şifre *',
                 hint: '••••••••',
                 icon: Icons.lock_outline_rounded,
                 obscureText: _obscurePass,
+                focusNode: _passwordFocus,
+                textInputAction: TextInputAction.next,
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePass
@@ -402,6 +494,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 hint: '••••••••',
                 icon: Icons.lock_rounded,
                 obscureText: _obscurePass2,
+                focusNode: _password2Focus,
+                textInputAction: TextInputAction.done,
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePass2
@@ -476,6 +570,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 label: 'İşletme Adı *',
                 hint: 'ABC Market',
                 icon: Icons.storefront_rounded,
+                focusNode: _bizNameFocus,
+                textInputAction: TextInputAction.next,
                 validator: (v) => (v?.trim().isEmpty ?? true)
                     ? 'İşletme adı zorunludur'
                     : null,
@@ -486,6 +582,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 label: 'Yetkili Adı Soyadı *',
                 hint: 'Ahmet Yılmaz',
                 icon: Icons.person_rounded,
+                focusNode: _ownerNameFocus,
+                textInputAction: TextInputAction.next,
                 validator: (v) =>
                     (v?.trim().isEmpty ?? true) ? 'Ad Soyad zorunludur' : null,
               ),
@@ -496,6 +594,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 hint: '0532 xxx xx xx',
                 icon: Icons.phone_rounded,
                 keyboard: TextInputType.phone,
+                focusNode: _phoneFocus,
+                textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v?.trim().isEmpty ?? true) return 'Telefon zorunludur';
                   return null;
@@ -508,6 +608,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 hint: '1234567890',
                 icon: Icons.badge_rounded,
                 keyboard: TextInputType.number,
+                focusNode: _taxNoFocus,
+                textInputAction: TextInputAction.done,
                 validator: (v) {
                   if (v?.trim().isEmpty ?? true) return 'Vergi no zorunludur';
                   final digits = v!.replaceAll(RegExp(r'\D'), '');
@@ -790,6 +892,8 @@ class _LightFormField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
+  final FocusNode? focusNode;
+  final TextInputAction? textInputAction;
 
   const _LightFormField({
     required this.controller,
@@ -800,6 +904,8 @@ class _LightFormField extends StatelessWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.validator,
+    this.focusNode,
+    this.textInputAction,
   });
 
   @override
@@ -809,6 +915,8 @@ class _LightFormField extends StatelessWidget {
       keyboardType: keyboard,
       obscureText: obscureText,
       validator: validator,
+      focusNode: focusNode,
+      textInputAction: textInputAction,
       style: GoogleFonts.inter(color: POSColors.text, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,

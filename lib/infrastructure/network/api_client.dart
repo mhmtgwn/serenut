@@ -69,7 +69,7 @@ class ApiClient {
   /// Helper to build request headers.
   Map<String, String> _buildHeaders({String? idempotencyKey}) {
     final Map<String, String> headers = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
       'Accept': 'application/json',
       'x-sync-protocol-version': '$syncProtocolVersion',
     };

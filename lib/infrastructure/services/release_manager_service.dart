@@ -480,7 +480,7 @@ class ReleaseManagerService {
             Uri.parse(
                 '${_config.apiBaseUrl}${_config.releaseEndpoint}/report-version'),
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': 'application/json; charset=utf-8',
               'Authorization': 'Bearer $jwtToken',
             },
             body: jsonEncode({
@@ -511,7 +511,7 @@ class ReleaseManagerService {
             Uri.parse(
                 '${_config.apiBaseUrl}${_config.releaseEndpoint}/confirm-download'),
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': 'application/json; charset=utf-8',
               'Authorization': 'Bearer $jwtToken',
             },
             body: jsonEncode({'log_id': logId, 'verified': verified}),

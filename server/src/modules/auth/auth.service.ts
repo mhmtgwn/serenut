@@ -91,7 +91,7 @@ export class AuthService {
       // 1. Fetch user status (lock check)
       const userRes = await client.query(
         `SELECT id, company_id, password_hash, failed_login_attempts, locked_until, is_active, email_verified_at
-         FROM users WHERE LOWER(email) = $1`,
+         FROM users WHERE LOWER(email) = $1 OR LOWER(username) = $1`,
         [normalizedEmail]
       );
 
@@ -590,6 +590,55 @@ export class AuthService {
       await client.query('UPDATE sessions SET is_revoked = TRUE WHERE user_id = $1', [userId]);
 
       await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async verifyIdentity(
+    email: string,
+    companyName: string,
+    taxNumber: string
+  ): Promise<string | null> {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedCompanyName = String(companyName || '').trim();
+    const normalizedTax = String(taxNumber || '').replace(/\D/g, '');
+
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      const res = await client.query(
+        `SELECT u.id, u.company_id
+         FROM users u
+         JOIN companies c ON u.company_id = c.id
+         WHERE (LOWER(u.email) = $1 OR LOWER(u.username) = $1)
+           AND LOWER(c.name) = LOWER($2)
+           AND REGEXP_REPLACE(c.tax_number, '\\D', '', 'g') = $3
+           AND u.is_active = TRUE`,
+        [normalizedEmail, normalizedCompanyName, normalizedTax]
+      );
+
+      if (res.rows.length === 0) {
+        await client.query('COMMIT');
+        return null;
+      }
+
+      const userId = res.rows[0].id;
+      const resetToken = crypto.randomBytes(30).toString('hex');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+      await client.query(
+        'UPDATE users SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3',
+        [resetToken, expiresAt, userId]
+      );
+
+      await client.query('COMMIT');
+      return resetToken;
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

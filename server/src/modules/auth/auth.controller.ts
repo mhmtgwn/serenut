@@ -256,6 +256,34 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
   }
 });
 
+router.post('/verify-identity', passwordResetLimiter, async (req: Request, res: Response) => {
+  const { email, company_name, tax_number } = req.body;
+  if (!email || !company_name || !tax_number) {
+    return res.status(400).json({
+      error: 'missing_fields',
+      message: 'Kullanıcı adı/e-posta, işletme adı ve vergi no zorunludur.'
+    });
+  }
+
+  try {
+    const token = await AuthService.verifyIdentity(email, company_name, tax_number);
+    if (!token) {
+      return res.status(400).json({
+        error: 'verification_failed',
+        message: 'Girdiğiniz bilgiler kayıtlı hesap detaylarıyla eşleşmedi.'
+      });
+    }
+    return res.json({
+      success: true,
+      token,
+      message: 'Kimlik doğrulama başarılı. Yeni şifrenizi belirleyebilirsiniz.'
+    });
+  } catch (err) {
+    logger.error('Verify identity error:', err);
+    return res.status(500).json({ error: 'server_error', message: 'Sunucu hatası oluştu.' });
+  }
+});
+
 router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: Response) => {
   const { email } = req.body;
   if (!email) {
@@ -302,9 +330,10 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
 // ── SELF-SERVICE REGISTRATION ────────────────────────────────────────────────
 // Creates a new company tenant + owner/admin user in a single atomic transaction.
 router.post('/register', signupLimiter, async (req: Request, res: Response) => {
-  const { company_name, name, email, password, phone, tax_number, tax_office, city, district, address,
+  const { company_name, name, email, username, password, phone, tax_number, tax_office, city, district, address,
     accept_terms, accept_privacy, accept_kvkk, accept_marketing } = req.body;
   const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedUsername = username ? String(username).trim().toLowerCase() : null;
   const normalizedTaxNumber = String(tax_number || '').replace(/\D/g, '');
 
   if (!company_name || !name || !normalizedEmail || !password || !normalizedTaxNumber) {
@@ -389,9 +418,9 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     const userId = `usr-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const passwordHash = await AuthService.hashPassword(password);
     await client.query(
-      `INSERT INTO users (id, company_id, name, email, password_hash, is_active, email_verified_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, companyId, name, normalizedEmail, passwordHash,
+      `INSERT INTO users (id, company_id, name, email, username, password_hash, is_active, email_verified_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [userId, companyId, name, normalizedEmail, normalizedUsername, passwordHash,
         !emailVerificationRequired, emailVerificationRequired ? null : new Date()]
     );
     registeredUserId = userId;

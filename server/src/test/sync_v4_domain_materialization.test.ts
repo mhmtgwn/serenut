@@ -50,6 +50,7 @@ async function run() {
       payload: { type: 'sale', customer_id: 'customer-1', amount: 30, paid_amount: 30, debt_amount: 0, date: '2026-07-27T00:00:00.000Z' },
     });
     await client.query('COMMIT');
+    client.release();
 
     const [saleRows, saleItemRows, orderRows, orderItemRows, ledgerRows] = await Promise.all([
       pgPool.query("SELECT id FROM sales WHERE company_id = 'sync-v4-company'"),

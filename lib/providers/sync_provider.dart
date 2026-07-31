@@ -84,8 +84,9 @@ class SyncNotifier extends StateNotifier<SyncState>
         const Duration(seconds: 30),
         (_) => triggerSync(),
       );
-    } catch (_) {
+    } catch (e, st) {
       // Silent — sync will be retried on next foreground
+      TelemetryService().logError(e, st, context: 'SyncNotifier.initSync', level: LogLevel.warning);
     }
   }
 
@@ -95,7 +96,9 @@ class SyncNotifier extends StateNotifier<SyncState>
       final db = kIsWeb ? null : await DatabaseManager().getDatabase();
       await db
           ?.delete('sync_cursor_v4', where: 'key = ?', whereArgs: ['global']);
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'SyncNotifier.forceFullSync', level: LogLevel.warning);
+    }
 
     state = const SyncState();
     await triggerSync();
@@ -189,7 +192,9 @@ class SyncNotifier extends StateNotifier<SyncState>
       try {
         final authService = _ref.read(authServiceProvider);
         await authService.checkCurrentUserSessionOnline();
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'SyncNotifier.checkCurrentUserSessionOnline', level: LogLevel.warning);
+      }
 
       if (result.success) {
         state = state.copyWith(

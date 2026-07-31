@@ -29,6 +29,8 @@ import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
+import 'package:serenutos/presentation/pages/settings/label_template_editor_page.dart';
+import 'package:serenutos/presentation/pages/settings/support_page.dart';
 import 'package:serenutos/config/theme.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
@@ -402,6 +404,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Permission.settingsReceipt, () => _showLabelSettings(settings),
             title: 'Etiket Tasarımı'),
       ));
+      group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Etiket Taslakları & Önizleme',
+        subtitle: 'Ürün ve sipariş etiket alanlarını canlı önizlemeli düzenleyin',
+        icon: Icons.design_services_rounded,
+        color: _kTeal,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const LabelTemplateEditorPage(),
+          ),
+        ),
+      ));
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {
@@ -413,6 +427,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         color: _kGreen,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CatalogSettingsPage()),
+        ),
+      ));
+      group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Destek Talebi Gönder',
+        subtitle: 'Sorularınız veya talepleriniz için destek ekibine ulaşın',
+        icon: Icons.support_agent_rounded,
+        color: _kBlue,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SupportPage()),
         ),
       ));
     }

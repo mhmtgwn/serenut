@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:io' show Platform;
 
 /// ════════════════════════════════════════════════════════════
 /// POSColors — Serenut OS Merkezi Renk Paleti
@@ -81,6 +83,10 @@ class AppTheme {
   /// [useGoogleFonts] test ve tamamen çevrimdışı çalışma senaryolarında
   /// ağ tabanlı font çözümlemesini devre dışı bırakmak için kullanılabilir.
   static ThemeData build({bool useGoogleFonts = true}) {
+    // Masaüstü platformlarda fontları biraz daha belirgin yap
+    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final double dfs = isDesktop ? 2.0 : 0.0; // desktop font size boost
+
     final baseTextTheme =
         useGoogleFonts ? GoogleFonts.interTextTheme() : const TextTheme();
     TextStyle? heading(TextStyle? style) => useGoogleFonts
@@ -111,42 +117,51 @@ class AppTheme {
       // ── Text Theme ──────────────────────────────────────
       textTheme: baseTextTheme.copyWith(
         displayLarge: heading(baseTextTheme.displayLarge)?.copyWith(
-          fontSize: 32,
+          fontSize: 32 + dfs,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
         ),
         headlineLarge: heading(baseTextTheme.headlineLarge)?.copyWith(
-          fontSize: 28,
+          fontSize: 28 + dfs,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
         ),
         headlineMedium: heading(baseTextTheme.headlineMedium)?.copyWith(
-          fontSize: 24,
+          fontSize: 24 + dfs,
           fontWeight: FontWeight.w700,
           color: POSColors.text,
         ),
         headlineSmall: heading(baseTextTheme.headlineSmall)?.copyWith(
-          fontSize: 20,
+          fontSize: 20 + dfs,
           fontWeight: FontWeight.w600,
           color: POSColors.text,
         ),
         titleLarge: heading(baseTextTheme.titleLarge)?.copyWith(
-          fontSize: 18,
+          fontSize: 18 + dfs,
           fontWeight: FontWeight.w600,
           color: POSColors.text,
         ),
         bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-          fontSize: 16,
+          fontSize: 16 + dfs,
           color: POSColors.text,
         ),
         bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-          fontSize: 14,
+          fontSize: 14 + dfs,
+          color: POSColors.textSecondary,
+        ),
+        bodySmall: baseTextTheme.bodySmall?.copyWith(
+          fontSize: 12 + dfs,
           color: POSColors.textSecondary,
         ),
         labelLarge: baseTextTheme.labelLarge?.copyWith(
-          fontSize: 14,
+          fontSize: 14 + dfs,
           fontWeight: FontWeight.w600,
           color: POSColors.text,
+        ),
+        labelMedium: baseTextTheme.labelMedium?.copyWith(
+          fontSize: 12 + dfs,
+          fontWeight: FontWeight.w500,
+          color: POSColors.textSecondary,
         ),
       ),
 

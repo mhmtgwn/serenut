@@ -10,6 +10,7 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/widgets/serenut_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
@@ -103,6 +104,22 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                           remainingDays,
                         ),
                         style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse('https://serenut.com/pricing');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text('Lisansı Uzat / Yenile'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: POSColors.green,
+                          side: const BorderSide(color: POSColors.green),
+                        ),
                       ),
                     ],
                   ),

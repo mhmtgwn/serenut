@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
@@ -46,7 +47,9 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
     try {
       final cats = await _repository.getCategories();
       ref.read(productCategoriesStateProvider.notifier).state = cats;
-    } catch (_) {}
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+    }
   }
 
   Future<void> loadNextPage() async {
@@ -85,7 +88,9 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
               'Ad: ${product.name}, Fiyat: ₺${product.price}, Miktar: ${product.quantity}',
           notes: 'Yeni ürün eklendi: ${product.name}',
         );
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+      }
       ref.read(auditLogServiceProvider).log(
             action: 'product_created',
             details: jsonEncode({
@@ -149,7 +154,9 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
             notes: 'Ürün güncellendi: ${product.name}',
           );
         }
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+      }
 
       ref.read(auditLogServiceProvider).log(
             action: logAction,
@@ -185,7 +192,9 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
           approvedByUserId: approvedByUserId,
           approvedByUserName: approvedByUserName,
         );
-      } catch (_) {}
+      } catch (e, st) {
+        TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+      }
       ref.read(auditLogServiceProvider).log(
             action: 'product_deleted',
             details: jsonEncode({
@@ -280,17 +289,7 @@ final productCategoriesProvider = Provider<List<String>>((ref) {
 
 final categoryPoolProvider = Provider<List<String>>((ref) {
   const defaultCats = [
-    'Gıda',
-    'İçecek',
-    'Kuruyemiş',
-    'Şekerleme',
-    'Temizlik',
-    'Kişisel Bakım',
-    'Ev & Yaşam',
-    'Kırtasiye',
-    'Elektronik',
-    'Sigara & Tütün',
-    'Diğer',
+    'Genel',
   ];
   final existingCats = ref.watch(productCategoriesProvider);
   final settingsAsync = ref.watch(settingsNotifierProvider);
@@ -308,7 +307,9 @@ final categoryPoolProvider = Provider<List<String>>((ref) {
               }
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+        }
       }
     },
   );

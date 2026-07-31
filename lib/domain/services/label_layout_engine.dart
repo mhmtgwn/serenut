@@ -1,5 +1,3 @@
-// lib/domain/services/label_layout_engine.dart
-import 'package:intl/intl.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 
 class LabelLayoutEngine {

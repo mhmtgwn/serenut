@@ -1,0 +1,645 @@
+// lib/presentation/pages/settings/label_template_editor_page.dart
+// Serenut OS — Etiket Taslağı Düzenleyici (Canlı Önizlemeli)
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/models/settings.dart';
+import 'package:serenutos/providers/settings_provider.dart';
+
+class LabelTemplateEditorPage extends ConsumerStatefulWidget {
+  const LabelTemplateEditorPage({super.key});
+
+  @override
+  ConsumerState<LabelTemplateEditorPage> createState() =>
+      _LabelTemplateEditorPageState();
+}
+
+class _LabelTemplateEditorPageState
+    extends ConsumerState<LabelTemplateEditorPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  // Ürün Etiketi Ayarları
+  bool _productShowBusinessName = true;
+  bool _productShowBrand = true;
+  bool _productShowBarcode = true;
+  bool _productShowPrice = true;
+  bool _productShowVat = true;
+  String _productFontSize = 'Orta'; // Küçük, Orta, Büyük
+
+  // Sipariş Etiketi Ayarları
+  bool _orderShowBusinessName = true;
+  bool _orderShowCustomerName = true;
+  bool _orderShowOrderNo = true;
+  bool _orderShowDate = true;
+  bool _orderShowTotalAmount = true;
+  bool _orderShowItemsCount = true;
+  String _orderFontSize = 'Orta';
+
+  bool _initialized = false;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _loadFromSettings(Settings settings) {
+    if (_initialized) return;
+    _initialized = true;
+
+    _productShowBusinessName = settings.printLogo;
+    _productShowBarcode = settings.printBarcode;
+    _productShowPrice = settings.printProductDetails;
+  }
+
+  Future<void> _saveSettings() async {
+    final settings = ref.read(settingsNotifierProvider).value;
+    if (settings == null) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final updated = settings.copyWith(
+        printLogo: _productShowBusinessName,
+        printBarcode: _productShowBarcode,
+        printProductDetails: _productShowPrice,
+      );
+      await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Etiket taslakları başarıyla kaydedildi.'),
+            backgroundColor: POSColors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Kaydetme hatası: $e'),
+            backgroundColor: POSColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsNotifierProvider).value;
+    if (settings != null) {
+      _loadFromSettings(settings);
+    }
+
+    return Scaffold(
+      backgroundColor: POSColors.surface,
+      appBar: AppBar(
+        backgroundColor: POSColors.card,
+        elevation: 0,
+        title: Text(
+          'Etiket Taslakları',
+          style: GoogleFonts.inter(
+            color: POSColors.text,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: _isSaving ? null : _saveSettings,
+              icon: _isSaving
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Kaydet'),
+              style: FilledButton.styleFrom(
+                backgroundColor: POSColors.green,
+              ),
+            ),
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: POSColors.green,
+          unselectedLabelColor: POSColors.textSecondary,
+          indicatorColor: POSColors.green,
+          indicatorWeight: 3,
+          tabs: const [
+            Tab(icon: Icon(Icons.qr_code_2_rounded), text: 'Ürün Etiketi'),
+            Tab(icon: Icon(Icons.receipt_long_rounded), text: 'Sipariş Etiketi'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildProductLabelTab(settings),
+          _buildOrderLabelTab(settings),
+        ],
+      ),
+    );
+  }
+
+  // ── Ürün Etiketi Sekmesi ──────────────────────────────────────────────────
+  Widget _buildProductLabelTab(Settings? settings) {
+    final bizName = settings?.businessName.isNotEmpty == true
+        ? settings!.businessName
+        : 'SERENUT OS MARKET';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Canlı Önizleme',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: POSColors.text,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildProductLabelPreview(bizName),
+          const SizedBox(height: 24),
+          Text(
+            'Etiket İçerik Ayarları',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: POSColors.text,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildToggleTile(
+            title: 'Firma Adı Göster',
+            subtitle: 'Etiketin en üstünde firma adını basar',
+            value: _productShowBusinessName,
+            onChanged: (v) => setState(() => _productShowBusinessName = v),
+          ),
+          _buildToggleTile(
+            title: 'Marka Göster',
+            subtitle: 'Ürünün markasını adının üstünde basar',
+            value: _productShowBrand,
+            onChanged: (v) => setState(() => _productShowBrand = v),
+          ),
+          _buildToggleTile(
+            title: 'Barkod Göster',
+            subtitle: 'Çizgi barkod ve barkod numarasını basar',
+            value: _productShowBarcode,
+            onChanged: (v) => setState(() => _productShowBarcode = v),
+          ),
+          _buildToggleTile(
+            title: 'Fiyat Göster',
+            subtitle: 'Büyük punto ile ürün satış fiyatını basar',
+            value: _productShowPrice,
+            onChanged: (v) => setState(() => _productShowPrice = v),
+          ),
+          _buildToggleTile(
+            title: 'KDV Bilgisi Göster',
+            subtitle: 'Fiyatın yanında "KDV Dahil" metnini ekler',
+            value: _productShowVat,
+            onChanged: (v) => setState(() => _productShowVat = v),
+          ),
+          const SizedBox(height: 16),
+          _buildFontSizeSelector(
+            current: _productFontSize,
+            onSelect: (v) => setState(() => _productFontSize = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Sipariş Etiketi Sekmesi ────────────────────────────────────────────────
+  Widget _buildOrderLabelTab(Settings? settings) {
+    final bizName = settings?.businessName.isNotEmpty == true
+        ? settings!.businessName
+        : 'SERENUT OS MARKET';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Canlı Önizleme',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: POSColors.text,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildOrderLabelPreview(bizName),
+          const SizedBox(height: 24),
+          Text(
+            'Sipariş Etiketi Ayarları',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: POSColors.text,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildToggleTile(
+            title: 'Firma Adı Göster',
+            subtitle: 'Sipariş etiketinin başında işletme adını yazar',
+            value: _orderShowBusinessName,
+            onChanged: (v) => setState(() => _orderShowBusinessName = v),
+          ),
+          _buildToggleTile(
+            title: 'Müşteri Adı Göster',
+            subtitle: 'Sipariş sahibinin ad soyadını basar',
+            value: _orderShowCustomerName,
+            onChanged: (v) => setState(() => _orderShowCustomerName = v),
+          ),
+          _buildToggleTile(
+            title: 'Sipariş No / Kodu Göster',
+            subtitle: 'Örn: #ORD-2026-0042',
+            value: _orderShowOrderNo,
+            onChanged: (v) => setState(() => _orderShowOrderNo = v),
+          ),
+          _buildToggleTile(
+            title: 'Tarih & Saat Göster',
+            subtitle: 'Sipariş alma tarih saatini basar',
+            value: _orderShowDate,
+            onChanged: (v) => setState(() => _orderShowDate = v),
+          ),
+          _buildToggleTile(
+            title: 'Toplam Tutar Göster',
+            subtitle: 'Sipariş toplam tutarını belirgin basar',
+            value: _orderShowTotalAmount,
+            onChanged: (v) => setState(() => _orderShowTotalAmount = v),
+          ),
+          _buildToggleTile(
+            title: 'Ürün Adedi Göster',
+            subtitle: 'Paketteki toplam parça sayısını basar',
+            value: _orderShowItemsCount,
+            onChanged: (v) => setState(() => _orderShowItemsCount = v),
+          ),
+          const SizedBox(height: 16),
+          _buildFontSizeSelector(
+            current: _orderFontSize,
+            onSelect: (v) => setState(() => _orderFontSize = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Önizleme Widget'ları ──────────────────────────────────────────────────
+  Widget _buildProductLabelPreview(String bizName) {
+    double scale = switch (_productFontSize) {
+      'Küçük' => 0.85,
+      'Büyük' => 1.15,
+      _ => 1.0,
+    };
+
+    return Center(
+      child: Container(
+        width: 280,
+        padding: EdgeInsets.all(14 * scale),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black38, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_productShowBusinessName) ...[
+              Text(
+                bizName.toUpperCase(),
+                style: GoogleFonts.inter(
+                  fontSize: 10 * scale,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Divider(height: 10, thickness: 0.5),
+            ],
+            if (_productShowBrand)
+              Text(
+                'SERENUT ORGANİK',
+                style: GoogleFonts.inter(
+                  fontSize: 10 * scale,
+                  color: Colors.grey[600],
+                ),
+              ),
+            Text(
+              'Taze Çifte Kavrulmuş Fındık 500g',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14 * scale,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_productShowBarcode) ...[
+              Container(
+                height: 36 * scale,
+                width: 180,
+                color: Colors.grey[200],
+                child: Center(
+                  child: Text(
+                    '||||| ||||||| ||||||| |||||',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14 * scale,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '8690000123456',
+                style: GoogleFonts.inter(
+                  fontSize: 10 * scale,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            if (_productShowPrice)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '₺185,00',
+                    style: GoogleFonts.inter(
+                      fontSize: 22 * scale,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black,
+                    ),
+                  ),
+                  if (_productShowVat) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      '(KDV Dahil)',
+                      style: GoogleFonts.inter(
+                        fontSize: 9 * scale,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderLabelPreview(String bizName) {
+    double scale = switch (_orderFontSize) {
+      'Küçük' => 0.85,
+      'Büyük' => 1.15,
+      _ => 1.0,
+    };
+
+    return Center(
+      child: Container(
+        width: 280,
+        padding: EdgeInsets.all(14 * scale),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black38, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_orderShowBusinessName) ...[
+              Center(
+                child: Text(
+                  bizName.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: 11 * scale,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const Divider(height: 10, thickness: 0.5),
+            ],
+            if (_orderShowOrderNo)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'SİPARİŞ NO:',
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * scale,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '#ORD-2026-0042',
+                    style: GoogleFonts.inter(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            if (_orderShowCustomerName) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'MÜŞTERİ:',
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * scale,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    'Ahmet Yılmaz',
+                    style: GoogleFonts.inter(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (_orderShowDate) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'TARİH:',
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * scale,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '31.07.2026 14:30',
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * scale,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const Divider(height: 12, thickness: 0.5),
+            if (_orderShowItemsCount)
+              Text(
+                '• 3 Parça Ürün / Paket',
+                style: GoogleFonts.inter(
+                  fontSize: 11 * scale,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            if (_orderShowTotalAmount) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'TOPLAM:',
+                    style: GoogleFonts.inter(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '₺420,00',
+                    style: GoogleFonts.inter(
+                      fontSize: 16 * scale,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Yardımcı UI ───────────────────────────────────────────────────────────
+  Widget _buildToggleTile({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: POSColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: POSColors.border),
+      ),
+      child: SwitchListTile(
+        title: Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: POSColors.text,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: POSColors.textSecondary,
+          ),
+        ),
+        activeColor: POSColors.green,
+        value: value,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildFontSizeSelector({
+    required String current,
+    required ValueChanged<String> onSelect,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: POSColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: POSColors.border),
+      ),
+      child: Row(
+        children: [
+          Text(
+            'Yazı Boyutu',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: POSColors.text,
+            ),
+          ),
+          const Spacer(),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'Küçük', label: Text('Küçük')),
+              ButtonSegment(value: 'Orta', label: Text('Orta')),
+              ButtonSegment(value: 'Büyük', label: Text('Büyük')),
+            ],
+            selected: {current},
+            onSelectionChanged: (set) {
+              if (set.isNotEmpty) onSelect(set.first);
+            },
+            style: SegmentedButton.styleFrom(
+              selectedBackgroundColor: POSColors.greenLight,
+              selectedForegroundColor: POSColors.greenDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -19,6 +19,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
+import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -763,21 +764,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ],
           onChanged: (val) async {
             if (val == '__new__') {
-              final newCat = await _showNewCategorySheet();
-              if (newCat != null && newCat.isNotEmpty) {
-                setState(() {
-                  _selectedCategory = newCat;
-                  final match = parsedVatCategories.firstWhere(
-                    (item) =>
-                        item['name']?.toString().toLowerCase() ==
-                        newCat.toLowerCase(),
-                    orElse: () => <String, dynamic>{},
-                  );
-                  if (match.isNotEmpty && match['rate'] != null) {
-                    _vatCtrl.text = match['rate'].toString();
-                  }
-                });
-              }
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CatalogSettingsPage()),
+              );
             } else {
               setState(() {
                 _selectedCategory = val;
