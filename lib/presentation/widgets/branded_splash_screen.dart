@@ -108,12 +108,16 @@ class _BrandedSplashScreenState extends State<BrandedSplashScreen>
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      Image.asset(
-                        'assets/branding/app/serenut-os-splash.png',
-                        width: 224,
-                        height: 72,
-                        fit: BoxFit.contain,
-                        semanticLabel: 'Serenut OS',
+                      Text(
+                        'Serenut OS',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: POSColors.text,
+                              letterSpacing: -0.5,
+                            ),
                       ),
                       const SizedBox(height: AppSpacing.xl + AppSpacing.sm),
                       AnimatedSwitcher(

@@ -173,18 +173,13 @@ class _Logo extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Image.asset(
-          'assets/branding/app/serenut-os-splash.png',
-          width: 228,
-          height: 74,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Text(
-            'Serenut OS',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: POSColors.text,
-            ),
+        const Text(
+          'Serenut OS',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: POSColors.text,
+            letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 4),
