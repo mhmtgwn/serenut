@@ -613,18 +613,20 @@ class OrderEntity {
       };
 
   factory OrderEntity.fromMap(Map<String, dynamic> map) => OrderEntity(
-        id: map['id'].toString(),
-        customerId: map['customer_id'].toString(),
-        status: map['status'] as String,
-        createdAt: DateTime.parse(map['created_at'] as String),
+        id: (map['id'] ?? '').toString(),
+        customerId: (map['customer_id'] ?? '').toString(),
+        status: (map['status'] ?? 'created').toString(),
+        createdAt: map['created_at'] != null
+            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
         expectedDeliveryDate: map['expected_delivery_date'] != null
-            ? DateTime.parse(map['expected_delivery_date'] as String)
+            ? DateTime.tryParse(map['expected_delivery_date'].toString())
             : null,
         actualDeliveryDate: map['actual_delivery_date'] != null
-            ? DateTime.parse(map['actual_delivery_date'] as String)
+            ? DateTime.tryParse(map['actual_delivery_date'].toString())
             : null,
-        notes: map['notes'] as String?,
-        createdBy: map['created_by'] as String?,
+        notes: map['notes']?.toString(),
+        createdBy: map['created_by']?.toString(),
         items: [],
       );
 }
