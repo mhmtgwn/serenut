@@ -368,43 +368,51 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Grup 1: İşletme Ayarları
     final group1 = <Widget>[];
     final groupData = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsReceipt) &&
-        _matchesQuery('işletme', 'bilgiler', settings.businessName)) {
-      group1.add(_buildCategoryRow(
-        title: 'İşletme Bilgileri',
-        subtitle: settings.businessName.isNotEmpty
-            ? settings.businessName
-            : 'Ayarlanmadı',
-        icon: Icons.storefront_rounded,
-        color: _kGreen,
-        onTap: () => _runGuardedAction(
-            Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
-            title: 'İşletme Bilgileri'),
-      ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Fiş Tasarımı',
-        subtitle:
-            '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
-        icon: Icons.receipt_long_rounded,
-        color: _kBlue,
-        onTap: () => _runGuardedAction(
-            Permission.settingsReceipt, () => _showReceiptSettings(settings),
-            title: 'Fiş Tasarımı'),
-      ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Etiket Tasarımı',
-        subtitle:
-            '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI • Canlı önizleme & boyutlar',
-        icon: Icons.label_rounded,
-        color: _kOrange,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const LabelTemplateEditorPage(),
+    if (_hasPermission(currentUser, Permission.settingsReceipt) ||
+        _hasPermission(currentUser, Permission.settingsPrinter)) {
+      if (_matchesQuery('işletme', 'bilgiler', 'firma', settings.businessName)) {
+        group1.add(_buildCategoryRow(
+          title: 'İşletme Bilgileri',
+          subtitle: settings.businessName.isNotEmpty
+              ? settings.businessName
+              : 'Ayarlanmadı',
+          icon: Icons.storefront_rounded,
+          color: _kGreen,
+          onTap: () => _runGuardedAction(
+              Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
+              title: 'İşletme Bilgileri'),
+        ));
+      }
+
+      if (_matchesQuery('fiş', 'tasarım', 'yazıcı', 'kağıt', 'termal', 'makbuz')) {
+        if (group1.isNotEmpty) group1.add(const _IOSDivider());
+        group1.add(_buildCategoryRow(
+          title: 'Fiş Tasarımı',
+          subtitle:
+              '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
+          icon: Icons.receipt_long_rounded,
+          color: _kBlue,
+          onTap: () => _runGuardedAction(
+              Permission.settingsReceipt, () => _showReceiptSettings(settings),
+              title: 'Fiş Tasarımı'),
+        ));
+      }
+
+      if (_matchesQuery('etiket', 'tasarım', 'barkod', 'dpi', 'boyut', 'şablon', 'tspl', 'yazıcı')) {
+        if (group1.isNotEmpty) group1.add(const _IOSDivider());
+        group1.add(_buildCategoryRow(
+          title: 'Etiket Tasarımı',
+          subtitle:
+              '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI • Canlı önizleme & boyutlar',
+          icon: Icons.label_rounded,
+          color: _kOrange,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const LabelTemplateEditorPage(),
+            ),
           ),
-        ),
-      ));
+        ));
+      }
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {
