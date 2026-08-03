@@ -16,6 +16,7 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/domain/services/license_service.dart';
+import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
@@ -255,10 +256,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
       // Pre-warm local SQLite repositories so products & catalog are 100% ready instantly when splash ends
       try {
-        await ref.read(settingsRepositoryProvider).getSettings();
-        await ref.read(productRepositoryProvider).getProducts();
-        await ref.read(categoryRepositoryProvider).getCategories();
-        await ref.read(customerRepositoryProvider).getCustomers();
+        final settingsRepo = await ref.read(settingsRepositoryProvider.future);
+        await settingsRepo.getSettings();
+
+        final productRepo = await ref.read(productRepositoryProvider.future);
+        await productRepo.getProducts();
+        await productRepo.getCategories();
+
+        final customerRepo = await ref.read(customerRepositoryProvider.future);
+        await customerRepo.getCustomers();
       } catch (e) {
         debugPrint('Pre-warm warning at startup: $e');
       }
