@@ -10,7 +10,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/router.dart';
-import 'package:barcode_widget/barcode_widget.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
@@ -382,7 +381,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
             title: 'İşletme Bilgileri'),
       ));
-
+      group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Fiş Tasarımı',
+        subtitle:
+            '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
+        icon: Icons.receipt_long_rounded,
+        color: _kBlue,
+        onTap: () => _runGuardedAction(
+            Permission.settingsReceipt, () => _showReceiptSettings(settings),
+            title: 'Fiş Tasarımı'),
+      ));
+      group1.add(const _IOSDivider());
+      group1.add(_buildCategoryRow(
+        title: 'Etiket Tasarımı',
+        subtitle:
+            '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI • Canlı önizleme & boyutlar',
+        icon: Icons.label_rounded,
+        color: _kOrange,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const LabelTemplateEditorPage(),
+          ),
+        ),
+      ));
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {

@@ -76,6 +76,17 @@ class Settings {
   final int labelHeightMm;
   final int labelGapMm;
   final int labelDpi;
+  // Etiket Taslak Ayarları
+  final bool labelShowBrand;
+  final bool labelShowVat;
+  final String labelFontSize;
+  final bool labelOrderShowBusinessName;
+  final bool labelOrderShowCustomerName;
+  final bool labelOrderShowOrderNo;
+  final bool labelOrderShowDate;
+  final bool labelOrderShowTotalAmount;
+  final bool labelOrderShowItemsCount;
+  final String labelOrderFontSize;
   final String? adminPinCode;
 
   // SMS SIM ve Limit Ayarları (Sprint 10)
@@ -141,6 +152,16 @@ class Settings {
     this.labelHeightMm = 30,
     this.labelGapMm = 2,
     this.labelDpi = 203,
+    this.labelShowBrand = true,
+    this.labelShowVat = true,
+    this.labelFontSize = 'Orta',
+    this.labelOrderShowBusinessName = true,
+    this.labelOrderShowCustomerName = true,
+    this.labelOrderShowOrderNo = true,
+    this.labelOrderShowDate = true,
+    this.labelOrderShowTotalAmount = true,
+    this.labelOrderShowItemsCount = true,
+    this.labelOrderFontSize = 'Orta',
     this.adminPinCode,
     this.smsSimSubscriptionId,
     this.smsSimSlotIndex,
@@ -228,6 +249,16 @@ class Settings {
       labelHeightMm: (map['label_height_mm'] as int?) ?? 30,
       labelGapMm: (map['label_gap_mm'] as int?) ?? 2,
       labelDpi: (map['label_dpi'] as int?) ?? 203,
+      labelShowBrand: (map['label_show_brand'] as int? ?? 1) == 1,
+      labelShowVat: (map['label_show_vat'] as int? ?? 1) == 1,
+      labelFontSize: map['label_font_size'] as String? ?? 'Orta',
+      labelOrderShowBusinessName: (map['label_order_show_business_name'] as int? ?? 1) == 1,
+      labelOrderShowCustomerName: (map['label_order_show_customer_name'] as int? ?? 1) == 1,
+      labelOrderShowOrderNo: (map['label_order_show_order_no'] as int? ?? 1) == 1,
+      labelOrderShowDate: (map['label_order_show_date'] as int? ?? 1) == 1,
+      labelOrderShowTotalAmount: (map['label_order_show_total_amount'] as int? ?? 1) == 1,
+      labelOrderShowItemsCount: (map['label_order_show_items_count'] as int? ?? 1) == 1,
+      labelOrderFontSize: map['label_order_font_size'] as String? ?? 'Orta',
       adminPinCode: map['admin_pin_code'] as String?,
 
       // Sprint 10 SIM SMS and Limits
@@ -297,6 +328,16 @@ class Settings {
       'label_height_mm': labelHeightMm,
       'label_gap_mm': labelGapMm,
       'label_dpi': labelDpi,
+      'label_show_brand': labelShowBrand ? 1 : 0,
+      'label_show_vat': labelShowVat ? 1 : 0,
+      'label_font_size': labelFontSize,
+      'label_order_show_business_name': labelOrderShowBusinessName ? 1 : 0,
+      'label_order_show_customer_name': labelOrderShowCustomerName ? 1 : 0,
+      'label_order_show_order_no': labelOrderShowOrderNo ? 1 : 0,
+      'label_order_show_date': labelOrderShowDate ? 1 : 0,
+      'label_order_show_total_amount': labelOrderShowTotalAmount ? 1 : 0,
+      'label_order_show_items_count': labelOrderShowItemsCount ? 1 : 0,
+      'label_order_font_size': labelOrderFontSize,
       'admin_pin_code': adminPinCode,
       'sms_sim_subscription_id': smsSimSubscriptionId,
       'sms_sim_slot_index': smsSimSlotIndex,
@@ -367,6 +408,16 @@ class Settings {
     int? labelHeightMm,
     int? labelGapMm,
     int? labelDpi,
+    bool? labelShowBrand,
+    bool? labelShowVat,
+    String? labelFontSize,
+    bool? labelOrderShowBusinessName,
+    bool? labelOrderShowCustomerName,
+    bool? labelOrderShowOrderNo,
+    bool? labelOrderShowDate,
+    bool? labelOrderShowTotalAmount,
+    bool? labelOrderShowItemsCount,
+    String? labelOrderFontSize,
     Object? adminPinCode = const _Unset(),
     int? smsSimSubscriptionId,
     int? smsSimSlotIndex,
@@ -436,6 +487,21 @@ class Settings {
       labelHeightMm: labelHeightMm ?? this.labelHeightMm,
       labelGapMm: labelGapMm ?? this.labelGapMm,
       labelDpi: labelDpi ?? this.labelDpi,
+      labelShowBrand: labelShowBrand ?? this.labelShowBrand,
+      labelShowVat: labelShowVat ?? this.labelShowVat,
+      labelFontSize: labelFontSize ?? this.labelFontSize,
+      labelOrderShowBusinessName:
+          labelOrderShowBusinessName ?? this.labelOrderShowBusinessName,
+      labelOrderShowCustomerName:
+          labelOrderShowCustomerName ?? this.labelOrderShowCustomerName,
+      labelOrderShowOrderNo:
+          labelOrderShowOrderNo ?? this.labelOrderShowOrderNo,
+      labelOrderShowDate: labelOrderShowDate ?? this.labelOrderShowDate,
+      labelOrderShowTotalAmount:
+          labelOrderShowTotalAmount ?? this.labelOrderShowTotalAmount,
+      labelOrderShowItemsCount:
+          labelOrderShowItemsCount ?? this.labelOrderShowItemsCount,
+      labelOrderFontSize: labelOrderFontSize ?? this.labelOrderFontSize,
       adminPinCode:
           adminPinCode is _Unset ? this.adminPinCode : adminPinCode as String?,
       smsSimSubscriptionId: smsSimSubscriptionId ?? this.smsSimSubscriptionId,

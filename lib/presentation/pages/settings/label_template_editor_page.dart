@@ -1,12 +1,15 @@
 // lib/presentation/pages/settings/label_template_editor_page.dart
-// Serenut OS — Etiket Taslağı Düzenleyici (Canlı Önizlemeli)
+// Serenut OS — Etiket Tasarımı, Şablonlar & Donanım Ayarları (Canlı Önizlemeli)
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
+import 'package:serenutos/providers/service_providers.dart';
 
 class LabelTemplateEditorPage extends ConsumerStatefulWidget {
   const LabelTemplateEditorPage({super.key});
@@ -38,13 +41,22 @@ class _LabelTemplateEditorPageState
   bool _orderShowItemsCount = true;
   String _orderFontSize = 'Orta';
 
+  // Donanım & Fiziki Boyut Ayarları
+  int _labelWidthMm = 50;
+  int _labelHeightMm = 30;
+  int _labelGapMm = 2;
+  int _labelDpi = 203;
+  String _labelPrinterLanguage = 'tspl';
+  int _labelPrinterCopies = 1;
+
   bool _initialized = false;
   bool _isSaving = false;
+  bool _isTestingPrinter = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -58,8 +70,26 @@ class _LabelTemplateEditorPageState
     _initialized = true;
 
     _productShowBusinessName = settings.printLogo;
+    _productShowBrand = settings.labelShowBrand;
     _productShowBarcode = settings.printBarcode;
     _productShowPrice = settings.printProductDetails;
+    _productShowVat = settings.labelShowVat;
+    _productFontSize = settings.labelFontSize;
+
+    _orderShowBusinessName = settings.labelOrderShowBusinessName;
+    _orderShowCustomerName = settings.labelOrderShowCustomerName;
+    _orderShowOrderNo = settings.labelOrderShowOrderNo;
+    _orderShowDate = settings.labelOrderShowDate;
+    _orderShowTotalAmount = settings.labelOrderShowTotalAmount;
+    _orderShowItemsCount = settings.labelOrderShowItemsCount;
+    _orderFontSize = settings.labelOrderFontSize;
+
+    _labelWidthMm = settings.labelWidthMm.clamp(20, 100);
+    _labelHeightMm = settings.labelHeightMm.clamp(15, 100);
+    _labelGapMm = settings.labelGapMm.clamp(0, 10);
+    _labelDpi = settings.labelDpi;
+    _labelPrinterLanguage = settings.labelPrinterLanguage;
+    _labelPrinterCopies = settings.labelPrinterCopies.clamp(1, 20);
   }
 
   Future<void> _saveSettings() async {
@@ -72,13 +102,29 @@ class _LabelTemplateEditorPageState
         printLogo: _productShowBusinessName,
         printBarcode: _productShowBarcode,
         printProductDetails: _productShowPrice,
+        labelShowBrand: _productShowBrand,
+        labelShowVat: _productShowVat,
+        labelFontSize: _productFontSize,
+        labelOrderShowBusinessName: _orderShowBusinessName,
+        labelOrderShowCustomerName: _orderShowCustomerName,
+        labelOrderShowOrderNo: _orderShowOrderNo,
+        labelOrderShowDate: _orderShowDate,
+        labelOrderShowTotalAmount: _orderShowTotalAmount,
+        labelOrderShowItemsCount: _orderShowItemsCount,
+        labelOrderFontSize: _orderFontSize,
+        labelWidthMm: _labelWidthMm,
+        labelHeightMm: _labelHeightMm,
+        labelGapMm: _labelGapMm,
+        labelDpi: _labelDpi,
+        labelPrinterLanguage: _labelPrinterLanguage,
+        labelPrinterCopies: _labelPrinterCopies,
       );
       await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Etiket taslakları başarıyla kaydedildi.'),
+            content: Text('Etiket tasarımı ve ayarları başarıyla kaydedildi.'),
             backgroundColor: POSColors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -99,6 +145,54 @@ class _LabelTemplateEditorPageState
     }
   }
 
+  Future<void> _testLabelPrinter() async {
+    final settings = ref.read(settingsNotifierProvider).value;
+    if (settings == null) return;
+
+    final candidate = settings.copyWith(
+      printLogo: _productShowBusinessName,
+      printBarcode: _productShowBarcode,
+      printProductDetails: _productShowPrice,
+      labelShowBrand: _productShowBrand,
+      labelShowVat: _productShowVat,
+      labelFontSize: _productFontSize,
+      labelWidthMm: _labelWidthMm,
+      labelHeightMm: _labelHeightMm,
+      labelGapMm: _labelGapMm,
+      labelDpi: _labelDpi,
+      labelPrinterLanguage: _labelPrinterLanguage,
+      labelPrinterCopies: _labelPrinterCopies,
+    );
+
+    setState(() => _isTestingPrinter = true);
+    try {
+      await ref
+          .read(printerServiceProvider)
+          .testLabelPrinterConnection(candidate);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Etiket yazıcısı testi başarılı! Çıktı gönderildi.'),
+            backgroundColor: POSColors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Yazıcı testi başarısız: $e'),
+            backgroundColor: POSColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTestingPrinter = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsNotifierProvider).value;
@@ -112,7 +206,7 @@ class _LabelTemplateEditorPageState
         backgroundColor: POSColors.card,
         elevation: 0,
         title: Text(
-          'Etiket Taslakları',
+          'Etiket Tasarımı',
           style: GoogleFonts.inter(
             color: POSColors.text,
             fontWeight: FontWeight.bold,
@@ -147,6 +241,7 @@ class _LabelTemplateEditorPageState
           tabs: const [
             Tab(icon: Icon(Icons.qr_code_2_rounded), text: 'Ürün Etiketi'),
             Tab(icon: Icon(Icons.receipt_long_rounded), text: 'Sipariş Etiketi'),
+            Tab(icon: Icon(Icons.aspect_ratio_rounded), text: 'Boyut & Donanım'),
           ],
         ),
       ),
@@ -155,6 +250,7 @@ class _LabelTemplateEditorPageState
         children: [
           _buildProductLabelTab(settings),
           _buildOrderLabelTab(settings),
+          _buildHardwareTab(settings),
         ],
       ),
     );
@@ -166,13 +262,15 @@ class _LabelTemplateEditorPageState
         ? settings!.businessName
         : 'SERENUT OS MARKET';
 
+    final logoPath = settings?.businessLogo;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Canlı Önizleme',
+            'Canlı Önizleme (${_labelWidthMm}x$_labelHeightMm mm)',
             style: GoogleFonts.inter(
               fontSize: 15,
               fontWeight: FontWeight.bold,
@@ -180,8 +278,10 @@ class _LabelTemplateEditorPageState
             ),
           ),
           const SizedBox(height: 10),
-          _buildProductLabelPreview(bizName),
-          const SizedBox(height: 24),
+          _buildProductLabelPreview(bizName, logoPath),
+          const SizedBox(height: 20),
+          _buildBusinessInfoBanner(settings),
+          const SizedBox(height: 16),
           Text(
             'Etiket İçerik Ayarları',
             style: GoogleFonts.inter(
@@ -192,8 +292,8 @@ class _LabelTemplateEditorPageState
           ),
           const SizedBox(height: 12),
           _buildToggleTile(
-            title: 'Firma Adı Göster',
-            subtitle: 'Etiketin en üstünde firma adını basar',
+            title: 'Firma Adı / Logosu Göster',
+            subtitle: 'Etiketin en üstünde firma logosunu veya adını basar',
             value: _productShowBusinessName,
             onChanged: (v) => setState(() => _productShowBusinessName = v),
           ),
@@ -236,6 +336,7 @@ class _LabelTemplateEditorPageState
     final bizName = settings?.businessName.isNotEmpty == true
         ? settings!.businessName
         : 'SERENUT OS MARKET';
+    final logoPath = settings?.businessLogo;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -243,7 +344,7 @@ class _LabelTemplateEditorPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Canlı Önizleme',
+            'Canlı Önizleme (${_labelWidthMm}x$_labelHeightMm mm)',
             style: GoogleFonts.inter(
               fontSize: 15,
               fontWeight: FontWeight.bold,
@@ -251,8 +352,10 @@ class _LabelTemplateEditorPageState
             ),
           ),
           const SizedBox(height: 10),
-          _buildOrderLabelPreview(bizName),
-          const SizedBox(height: 24),
+          _buildOrderLabelPreview(bizName, logoPath),
+          const SizedBox(height: 20),
+          _buildBusinessInfoBanner(settings),
+          const SizedBox(height: 16),
           Text(
             'Sipariş Etiketi Ayarları',
             style: GoogleFonts.inter(
@@ -308,13 +411,245 @@ class _LabelTemplateEditorPageState
     );
   }
 
+  // ── Donanım & Fiziki Boyut Sekmesi ──────────────────────────────────────────
+  Widget _buildHardwareTab(Settings? settings) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Fiziki Etiket & Yazıcı Ayarları',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: POSColors.text,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: POSColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: POSColors.border),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Text('Genişlik (mm): $_labelWidthMm mm',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Spacer(),
+                    Slider(
+                      value: _labelWidthMm.toDouble(),
+                      min: 20,
+                      max: 100,
+                      divisions: 80,
+                      activeColor: POSColors.green,
+                      label: '$_labelWidthMm mm',
+                      onChanged: (val) =>
+                          setState(() => _labelWidthMm = val.round()),
+                    ),
+                  ],
+                ),
+                const Divider(height: 16),
+                Row(
+                  children: [
+                    Text('Yükseklik (mm): $_labelHeightMm mm',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Spacer(),
+                    Slider(
+                      value: _labelHeightMm.toDouble(),
+                      min: 15,
+                      max: 100,
+                      divisions: 85,
+                      activeColor: POSColors.green,
+                      label: '$_labelHeightMm mm',
+                      onChanged: (val) =>
+                          setState(() => _labelHeightMm = val.round()),
+                    ),
+                  ],
+                ),
+                const Divider(height: 16),
+                Row(
+                  children: [
+                    Text('Boşluk (Gap): $_labelGapMm mm',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Spacer(),
+                    Slider(
+                      value: _labelGapMm.toDouble(),
+                      min: 0,
+                      max: 10,
+                      divisions: 10,
+                      activeColor: POSColors.green,
+                      label: '$_labelGapMm mm',
+                      onChanged: (val) =>
+                          setState(() => _labelGapMm = val.round()),
+                    ),
+                  ],
+                ),
+                const Divider(height: 16),
+                Row(
+                  children: [
+                    Text('Çözünürlük (DPI)',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Spacer(),
+                    SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(value: 203, label: Text('203 DPI')),
+                        ButtonSegment(value: 300, label: Text('300 DPI')),
+                      ],
+                      selected: {_labelDpi},
+                      onSelectionChanged: (set) {
+                        if (set.isNotEmpty) {
+                          setState(() => _labelDpi = set.first);
+                        }
+                      },
+                      style: SegmentedButton.styleFrom(
+                        selectedBackgroundColor: POSColors.greenLight,
+                        selectedForegroundColor: POSColors.greenDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 16),
+                Row(
+                  children: [
+                    Text('Yazıcı Dili',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
+                    const Spacer(),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'tspl', label: Text('TSPL')),
+                        ButtonSegment(value: 'escpos', label: Text('ESC/POS')),
+                      ],
+                      selected: {_labelPrinterLanguage},
+                      onSelectionChanged: (set) {
+                        if (set.isNotEmpty) {
+                          setState(() => _labelPrinterLanguage = set.first);
+                        }
+                      },
+                      style: SegmentedButton.styleFrom(
+                        selectedBackgroundColor: POSColors.greenLight,
+                        selectedForegroundColor: POSColors.greenDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: _isTestingPrinter ? null : _testLabelPrinter,
+              icon: _isTestingPrinter
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.print_rounded),
+              label: const Text('Etiket Yazıcısını Test Et'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: POSColors.green,
+                side: const BorderSide(color: POSColors.green),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── İşletme Bilgisi Banner ──────────────────────────────────────────────
+  Widget _buildBusinessInfoBanner(Settings? settings) {
+    final hasLogo = settings?.businessLogo != null &&
+        settings!.businessLogo!.trim().isNotEmpty &&
+        File(settings.businessLogo!).existsSync();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: POSColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: POSColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: POSColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: POSColors.border),
+            ),
+            child: hasLogo
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: Image.file(
+                      File(settings.businessLogo!),
+                      fit: BoxFit.contain,
+                    ),
+                  )
+                : const Icon(
+                    Icons.storefront_rounded,
+                    color: POSColors.green,
+                    size: 24,
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'İşletme Adı & Logosu',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: POSColors.text,
+                  ),
+                ),
+                Text(
+                  hasLogo
+                      ? 'Etiket başlığında İşletme Bilgileri logosu kullanılır.'
+                      : 'Logoyu değiştirmek için İşletme Bilgileri ekranını kullanabilirsiniz.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: POSColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Önizleme Widget'ları ──────────────────────────────────────────────────
-  Widget _buildProductLabelPreview(String bizName) {
+  Widget _buildProductLabelPreview(String bizName, String? logoPath) {
     double scale = switch (_productFontSize) {
       'Küçük' => 0.85,
       'Büyük' => 1.15,
       _ => 1.0,
     };
+
+    final hasLogo = logoPath != null &&
+        logoPath.trim().isNotEmpty &&
+        File(logoPath).existsSync();
 
     return Center(
       child: Container(
@@ -336,15 +671,22 @@ class _LabelTemplateEditorPageState
           mainAxisSize: MainAxisSize.min,
           children: [
             if (_productShowBusinessName) ...[
-              Text(
-                bizName.toUpperCase(),
-                style: GoogleFonts.inter(
-                  fontSize: 10 * scale,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                  letterSpacing: 0.5,
+              if (hasLogo)
+                Image.file(
+                  File(logoPath),
+                  height: 26 * scale,
+                  fit: BoxFit.contain,
+                )
+              else
+                Text(
+                  bizName.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: 10 * scale,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
               const Divider(height: 10, thickness: 0.5),
             ],
             if (_productShowBrand)
@@ -423,12 +765,16 @@ class _LabelTemplateEditorPageState
     );
   }
 
-  Widget _buildOrderLabelPreview(String bizName) {
+  Widget _buildOrderLabelPreview(String bizName, String? logoPath) {
     double scale = switch (_orderFontSize) {
       'Küçük' => 0.85,
       'Büyük' => 1.15,
       _ => 1.0,
     };
+
+    final hasLogo = logoPath != null &&
+        logoPath.trim().isNotEmpty &&
+        File(logoPath).existsSync();
 
     return Center(
       child: Container(
@@ -452,14 +798,20 @@ class _LabelTemplateEditorPageState
           children: [
             if (_orderShowBusinessName) ...[
               Center(
-                child: Text(
-                  bizName.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 11 * scale,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                child: hasLogo
+                    ? Image.file(
+                        File(logoPath),
+                        height: 26 * scale,
+                        fit: BoxFit.contain,
+                      )
+                    : Text(
+                        bizName.toUpperCase(),
+                        style: GoogleFonts.inter(
+                          fontSize: 11 * scale,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
               ),
               const Divider(height: 10, thickness: 0.5),
             ],
@@ -527,14 +879,26 @@ class _LabelTemplateEditorPageState
               ),
             ],
             const Divider(height: 12, thickness: 0.5),
-            if (_orderShowItemsCount)
+            if (_orderShowItemsCount) ...[
               Text(
-                '• 3 Parça Ürün / Paket',
+                'ÜRÜN İÇERİĞİ (3 Parça):',
+                style: GoogleFonts.inter(
+                  fontSize: 10 * scale,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '• 2x Taze Çifte Kavrulmuş Fındık 500g\n• 1x Anamur Muz 1kg',
                 style: GoogleFonts.inter(
                   fontSize: 11 * scale,
                   fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
               ),
+              const SizedBox(height: 6),
+            ],
             if (_orderShowTotalAmount) ...[
               const SizedBox(height: 6),
               Row(

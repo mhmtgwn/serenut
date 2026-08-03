@@ -589,6 +589,18 @@ class OrderEntity {
         status != 'delivered';
   }
 
+  double get totalAmount {
+    double total = 0.0;
+    for (final item in items) {
+      final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+      final unitPrice = (item['unit_price'] as num?)?.toDouble() ??
+          (item['price'] as num?)?.toDouble() ??
+          0.0;
+      total += qty * unitPrice;
+    }
+    return total;
+  }
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'customer_id': customerId,
