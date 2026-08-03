@@ -4,9 +4,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const root = document.getElementById('downloads-container');
   if (!root) return;
 
+  function cleanVer(v) {
+    if (!v) return '';
+    const s = String(v).split('+')[0].trim();
+    return s.startsWith('v') ? s : `v${s}`;
+  }
+
   function renderCards(windows, android) {
-    const winVer  = windows ? `v${esc(windows.version_code)}` : '';
-    const apkVer  = android ? `v${esc(android.version_code)}` : '';
+    const winVer  = windows ? esc(cleanVer(windows.version_code)) : '';
+    const apkVer  = android ? esc(cleanVer(android.version_code)) : '';
     const winNote = windows ? esc(windows.release_notes  || 'Masaüstü kurulum paketi.') : 'Masaüstü kurulum paketi.';
     const apkNote = android ? esc(android.release_notes  || 'Android uygulama paketi.') : 'Android uygulama paketi.';
     root.innerHTML = `

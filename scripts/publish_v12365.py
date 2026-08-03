@@ -73,11 +73,7 @@ def insert_db(id_val, version, platform, channel, path, size, checksum, sig, not
     print(f"DB Result {platform}:", res.stdout, res.stderr)
 
 # Clean semantic version 1.2.3 without internal build number '+' for public UI and API
-insert_db("rel-apk-12365", "1.2.3+65", "android", "stable", "/var/www/serenut-api/releases/SerenutOS-v1.2.3.apk", apk_size, apk_chk, apk_sig, "Serenut OS v1.2.3 — Stable Release")
-insert_db("rel-win-12365", "1.2.3+65", "windows", "stable", "/var/www/serenut-api/releases/SerenutOS-v1.2.3.exe", win_size, win_chk, win_sig, "Serenut OS v1.2.3 — Stable Release")
-
-# Also insert clean semantic tag 1.2.3 if queried by exact semantic version
-insert_db("rel-apk-123", "1.2.3", "android", "stable", "/var/www/serenut-api/releases/SerenutOS-v1.2.3.apk", apk_size, apk_chk, apk_sig, "Serenut OS v1.2.3 — Stable Release")
-insert_db("rel-win-123", "1.2.3", "windows", "stable", "/var/www/serenut-api/releases/SerenutOS-v1.2.3.exe", win_size, win_chk, win_sig, "Serenut OS v1.2.3 — Stable Release")
+insert_db("rel-apk-12365", "1.2.3", "android", "stable", "/var/www/serenut-api/releases/SerenutOS-v1.2.3.apk", apk_size, apk_chk, apk_sig, "Serenut OS v1.2.3 — Stable Release")
+insert_db("rel-win-12365", "1.2.3", "windows", "stable", "/var/www/serenut-api/releases/SerenutOS-v1.2.3.exe", win_size, win_chk, win_sig, "Serenut OS v1.2.3 — Stable Release")
 
 print("ALL_RELEASES_1.2.3_PUBLISHED_SUCCESSFULLY")
