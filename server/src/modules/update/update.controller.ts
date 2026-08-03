@@ -142,7 +142,10 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
     );
 
     const ext = path.extname(resolvedPath);
-    const filename = `serenut-${versionCode}-${platform}${ext}`;
+    const cleanVersion = (versionCode || '').split('+')[0];
+    const filename = platform === 'windows'
+      ? `SerenutOS-Setup-v${cleanVersion}${ext}`
+      : `SerenutOS-v${cleanVersion}${ext}`;
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     if (req.method === 'HEAD') {
