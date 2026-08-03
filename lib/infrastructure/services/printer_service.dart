@@ -1272,7 +1272,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     OrderEntity order,
     List<Map<String, dynamic>> items,
     Settings settings, {
-    String? customerName,
+    CustomerEntity? customer,
   }) async {
     final targetSettings =
         _getSettingsForPurpose(settings, PrinterPurpose.label);
@@ -1280,7 +1280,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     final List<int> allBytes = [];
     final isTspl = settings.labelPrinterLanguage == 'tspl';
-    final custName = customerName ?? order.customerId;
+    final custName = customer?.fullName ?? customer?.companyName ?? order.customerId;
 
     for (final item in items) {
       final name = item['product_name']?.toString().trim().isNotEmpty == true
