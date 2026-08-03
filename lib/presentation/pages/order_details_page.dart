@@ -1356,7 +1356,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                       widget.order,
                       receiptItems,
                       labelSettings,
-                      customerName: customer?.name,
+                      customer: customer,
                     ),
               );
         }

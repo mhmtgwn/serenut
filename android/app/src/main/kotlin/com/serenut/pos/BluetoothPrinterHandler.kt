@@ -112,7 +112,11 @@ class BluetoothPrinterHandler(private val context: Context) : MethodChannel.Meth
                 PrinterConstants.Connect.CLOSED -> {
                     Log.d(TAG, "✗ Bağlantı kapandı")
                     isConnected = false
-                    printerInstance = null
+                    if (connectionCallback == null) {
+                        printerInstance = null
+                    } else {
+                        Log.d(TAG, "Bağlantı denemesi sırasında gelen CLOSED (103) yoksayıldı.")
+                    }
                 }
                 PrinterConstants.Connect.NODEVICE -> {
                     Log.w(TAG, "✗ Kayıtlı cihaz bulunamadı")

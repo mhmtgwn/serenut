@@ -762,7 +762,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                       newOrder,
                       receiptItems,
                       labelSettings,
-                      customerName: _selectedCustomer?.name,
+                      customer: _selectedCustomer,
                     ),
               );
         }

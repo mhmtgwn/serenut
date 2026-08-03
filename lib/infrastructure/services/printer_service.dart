@@ -205,7 +205,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
 
     // Failover chain: Sunmi → Network → Bluetooth → PersistentQueue
-    final backends = await _buildFailoverChain(targetSettings);
+    final backends = await _buildFailoverChain(targetSettings, purpose: purpose);
 
     final failures = <String>[];
     for (final backend in backends) {
@@ -238,7 +238,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }
 
   /// Build ordered failover chain for current platform and settings.
-  Future<List<PrinterBackend>> _buildFailoverChain(Settings settings) async {
+  Future<List<PrinterBackend>> _buildFailoverChain(Settings settings, {PrinterPurpose purpose = PrinterPurpose.receipt}) async {
     final chain = <PrinterBackend>[];
 
     if (kIsWeb) return [PrinterBackend.none];
@@ -261,18 +261,20 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
 
     // Android: preferred backend first, then fallbacks
+    final isLabel = purpose == PrinterPurpose.label;
+
     if (printerName == 'sunmi') {
       chain.add(PrinterBackend.sunmi);
       if (ip != null && ip.isNotEmpty) chain.add(PrinterBackend.network);
     } else if (printerName != null && printerName.startsWith('usb:')) {
       chain.add(PrinterBackend.usb);
-      chain.add(PrinterBackend.sunmi);
+      if (!isLabel) chain.add(PrinterBackend.sunmi);
     } else if (ip != null && ip.isNotEmpty) {
       chain.add(PrinterBackend.network);
-      chain.add(PrinterBackend.sunmi); // Sunmi as last-resort on Sunmi devices
+      if (!isLabel) chain.add(PrinterBackend.sunmi); // Sunmi as last-resort on Sunmi devices
     } else if (printerName != null && printerName.contains(':')) {
       chain.add(PrinterBackend.bluetooth);
-      chain.add(PrinterBackend.sunmi);
+      if (!isLabel) chain.add(PrinterBackend.sunmi);
     } else {
       chain.add(PrinterBackend.sunmi);
     }
@@ -384,45 +386,61 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     await _sendViaTcp(bytes, ip, port);
   }
 
-  /// Sends a brief connection test page based on settings
+  /// Sends a realistic sample receipt page based on the new fixed layout
   @override
   Future<void> testPrinterConnection(Settings settings) async {
-    final List<int> bytes = [];
-    bytes.addAll(EscPosCommands.init);
-    bytes.addAll([0x1C, 0x2E]); // Cancel Chinese character mode
-    bytes.addAll(
-        [0x1B, 0x74, 0x0D]); // Select Code Page CP857 (Turkish) on Sunmi/Epson
-    bytes.addAll(EscPosCommands.alignCenter);
-    bytes.addAll(EscPosCommands.sizeNormal);
-    bytes.addAll(EscPosCommands.boldOn);
-    bytes.addAll(_textToBytes('SERENUT OS\n'));
-    bytes.addAll(EscPosCommands.boldOff);
-    bytes.addAll(_textToBytes('Yazıcı Bağlantı Testi\n'));
-    bytes.addAll(
-        _textToBytes('Tarih: ${DateTime.now().toString().substring(0, 19)}\n'));
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(_textToBytes('Durum: BAĞLANTI BAŞARILI! :)\n'));
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(EscPosCommands.lf);
-    bytes.addAll(EscPosCommands.cut);
+    // Generate a dummy order to test the actual receipt layout
+    final order = OrderEntity(
+      id: 'TEST-1001',
+      customerId: '0',
+      status: 'completed',
+      createdAt: DateTime.now(),
+      items: [
+        {
+          'product_name': 'Test Ürünü (Örnek)',
+          'quantity': 2,
+          'unit_price': 150.0,
+          'barcode': '12345678',
+        },
+        {
+          'product_name': 'Kurulum Hizmeti',
+          'quantity': 1,
+          'unit_price': 50.0,
+        },
+      ],
+    );
 
-    await _sendBytes(bytes, settings);
+    // We reuse printOrderReceipt to ensure the test exactly matches production layout
+    await printOrderReceipt(
+      order,
+      order.items,
+      null, // No customer info
+      settings,
+      paidAmount: 350.0,
+      notes: 'Bu bir yazıcı test fişidir. Başarıyla yazdırıldı!',
+    );
   }
 
   @override
   Future<void> testLabelPrinterConnection(Settings settings) async {
     final model = LabelModel(
-      productName: 'ETIKET TESTI',
-      brand: 'SERENUT OS',
-      unit: 'adet',
+      productName: 'Çifte Kavrulmuş Fındık 500g',
+      brand: 'SERENUT ORGANİK',
+      unit: 'Adet',
       shelfCode: 'A-01',
-      businessName: settings.businessName,
+      businessName: settings.businessName.isNotEmpty
+          ? settings.businessName
+          : 'Serenut OS',
       weight: 1,
-      price: 123.45,
-      barcode: '869000000001',
-      qrData: 'serenut-label-test',
+      price: 249.90,
+      barcode: '8690123456789',
+      qrData: 'product|8690123456789',
       timestamp: DateTime.now(),
     );
+    final escPosLogo = settings.labelPrinterLanguage != 'tspl' && settings.printLogo
+        ? await _getLogoBytes(settings.businessLogo, maxWidth: 320, maxHeight: 45)
+        : const <int>[];
+
     final bytes = settings.labelPrinterLanguage == 'tspl'
         ? TsplLabelLayoutEngine.generateLabelBytes(
             model,
@@ -430,8 +448,13 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             heightMm: settings.labelHeightMm,
             gapMm: settings.labelGapMm,
             dpi: settings.labelDpi,
+            showLogo: settings.printLogo,
+            showBusinessName: true,
+            showBarcode: true,
+            showPrice: true,
+            logoPath: settings.businessLogo,
           )
-        : LabelLayoutEngine.generateLabelBytes(model, width: 32);
+        : LabelLayoutEngine.generateLabelBytes(model, width: 32, logoBytes: escPosLogo);
     await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
   }
 
@@ -468,23 +491,48 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
       bytes.addAll(logo);
-      bytes.addAll(EscPosCommands.lf);
+      // Logodan sonraki boşluğu azalttık
     }
 
     final currency = settings.currency == '₺' ? 'TL' : settings.currency;
 
     // 1. Header (Centred)
     bytes.addAll(EscPosCommands.alignCenter);
-    bytes.addAll(EscPosCommands.sizeNormal);
-    if (logo.isEmpty && settings.businessName.trim().isNotEmpty) {
+    if (settings.businessName.trim().isNotEmpty) {
+      bytes.addAll(EscPosCommands.sizeMedium);
       bytes.addAll(EscPosCommands.boldOn);
-      bytes.addAll(_textToBytes('${settings.businessName}\n'));
+      bytes.addAll([0x1D, 0x42, 0x01]); // Invert ON (Siyah Arkaplan)
+      bytes.addAll(_textToBytes(' ${settings.businessName} \n'));
+      bytes.addAll([0x1D, 0x42, 0x00]); // Invert OFF
+      bytes.addAll(EscPosCommands.sizeNormal);
       bytes.addAll(EscPosCommands.boldOff);
+      bytes.addAll(EscPosCommands.lf);
+    } else {
+      bytes.addAll(EscPosCommands.sizeNormal);
     }
-    bytes.addAll(_textToBytes('${settings.businessAddress}\n'));
-    bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
+    
+    bytes.addAll(EscPosCommands.boldOn);
+    bytes.addAll(_textToBytes('*** SATIŞ FİŞİ ***\n\n'));
+    bytes.addAll(EscPosCommands.boldOff);
+    if (settings.ownerName.trim().isNotEmpty) {
+      bytes.addAll(_textToBytes('Yetkili: ${settings.ownerName}\n'));
+    }
+
+    final fullAddress = [
+      settings.businessCity,
+      settings.businessDistrict,
+      settings.businessAddress
+    ].where((e) => e.trim().isNotEmpty).join(', ');
+
+    if (fullAddress.isNotEmpty) {
+      bytes.addAll(_textToBytes('${_wrapText(fullAddress, width)}\n'));
+    }
+
+    if (settings.businessPhone.trim().isNotEmpty) {
+      bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
+    }
     if (settings.businessTaxId != null && settings.businessTaxId!.isNotEmpty) {
-      bytes.addAll(_textToBytes('Vergi No: ${settings.businessTaxId}\n'));
+      bytes.addAll(_textToBytes('VKN/TC: ${settings.businessTaxId}\n'));
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -557,9 +605,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     // 4. Totals (Right aligned)
     bytes.addAll(EscPosCommands.alignRight);
+    bytes.addAll(EscPosCommands.sizeMedium); // Make total pop!
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes(
         'TOPLAM: ${sale.totalAmount.toStringAsFixed(2)} $currency\n'));
+    bytes.addAll(EscPosCommands.sizeNormal); // Revert size
     bytes.addAll(EscPosCommands.boldOff);
     bytes.addAll(_textToBytes(
         'Ödenen: ${sale.paidAmount.toStringAsFixed(2)} $currency\n'));
@@ -571,9 +621,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.alignCenter);
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
-    // 5. QR Code (optional)
+    // 5. QR Code
     if (settings.printQRCode) {
-      final qrData = 'sale|${sale.id}|${sale.totalAmount}';
+      final qrData = sale.id;
       bytes.addAll(_generateQrCodeBytes(qrData));
       bytes.addAll(EscPosCommands.lf);
     }
@@ -617,23 +667,48 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (logo.isNotEmpty) {
       bytes.addAll(EscPosCommands.alignCenter);
       bytes.addAll(logo);
-      bytes.addAll(EscPosCommands.lf);
+      // Logodan sonraki boşluğu azalttık
     }
 
     final currency = settings.currency == '₺' ? 'TL' : settings.currency;
 
     // 1. Header (Centred)
     bytes.addAll(EscPosCommands.alignCenter);
-    bytes.addAll(EscPosCommands.sizeNormal);
-    if (logo.isEmpty && settings.businessName.trim().isNotEmpty) {
+    if (settings.businessName.trim().isNotEmpty) {
+      bytes.addAll(EscPosCommands.sizeMedium);
       bytes.addAll(EscPosCommands.boldOn);
-      bytes.addAll(_textToBytes('${settings.businessName}\n'));
+      bytes.addAll([0x1D, 0x42, 0x01]); // Invert ON (Siyah Arkaplan)
+      bytes.addAll(_textToBytes(' ${settings.businessName} \n'));
+      bytes.addAll([0x1D, 0x42, 0x00]); // Invert OFF
+      bytes.addAll(EscPosCommands.sizeNormal);
       bytes.addAll(EscPosCommands.boldOff);
+      bytes.addAll(EscPosCommands.lf);
+    } else {
+      bytes.addAll(EscPosCommands.sizeNormal);
     }
-    bytes.addAll(_textToBytes('${settings.businessAddress}\n'));
-    bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
+    
+    bytes.addAll(EscPosCommands.boldOn);
+    bytes.addAll(_textToBytes('*** SİPARİŞ FİŞİ ***\n\n'));
+    bytes.addAll(EscPosCommands.boldOff);
+    if (settings.ownerName.trim().isNotEmpty) {
+      bytes.addAll(_textToBytes('Yetkili: ${settings.ownerName}\n'));
+    }
+
+    final fullAddress = [
+      settings.businessCity,
+      settings.businessDistrict,
+      settings.businessAddress
+    ].where((e) => e.trim().isNotEmpty).join(', ');
+
+    if (fullAddress.isNotEmpty) {
+      bytes.addAll(_textToBytes('${_wrapText(fullAddress, width)}\n'));
+    }
+
+    if (settings.businessPhone.trim().isNotEmpty) {
+      bytes.addAll(_textToBytes('Tel: ${settings.businessPhone}\n'));
+    }
     if (settings.businessTaxId != null && settings.businessTaxId!.isNotEmpty) {
-      bytes.addAll(_textToBytes('Vergi No: ${settings.businessTaxId}\n'));
+      bytes.addAll(_textToBytes('VKN/TC: ${settings.businessTaxId}\n'));
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -687,18 +762,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final left = '$name $details'.replaceAll('₺', 'TL');
       final right = '${subtotal.toStringAsFixed(2)} $currency';
 
-      if (settings.receiptItemLayout == 'single') {
-        bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
-      } else if (settings.receiptItemLayout == 'auto' &&
-          left.length + right.length + 1 <= width) {
-        bytes.addAll(_textToBytes('${_formatLine(left, right, width)}\n'));
-      } else {
-        final displayName =
-            name.length > width ? '${name.substring(0, width - 3)}...' : name;
-        bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
-        final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
-        bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
-      }
+      final displayName = name.length > width ? '${name.substring(0, width - 3)}...' : name;
+      bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
+      
+      final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
+      bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
       if (settings.printBarcode) {
         final barcode =
             item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
@@ -715,9 +783,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     // 4. Totals (Right aligned)
     bytes.addAll(EscPosCommands.alignRight);
+    bytes.addAll(EscPosCommands.sizeMedium); // Make total pop!
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(
         _textToBytes('TOPLAM: ${totalAmount.toStringAsFixed(2)} $currency\n'));
+    bytes.addAll(EscPosCommands.sizeNormal); // Revert size
     bytes.addAll(EscPosCommands.boldOff);
 
     if (paidAmount != null) {
@@ -733,7 +803,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
     if (settings.printQRCode) {
-      final qrData = 'order|${order.id}';
+      final qrData = order.id;
       bytes.addAll(_generateQrCodeBytes(qrData));
       bytes.addAll(EscPosCommands.lf);
     }
@@ -1093,7 +1163,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
   // Load and dither logo from settings or fallback asset
   Future<List<int>> _getLogoBytes(String? logoPath,
-      {int maxWidth = 320}) async {
+      {int maxWidth = 320, int? maxHeight}) async {
     if (_socketConnector != null) {
       // Test mode - bypass loading from assets/files to avoid errors
       return [];
@@ -1135,6 +1205,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         int rawTargetWidth = decoded.width > maxWidth ? maxWidth : decoded.width;
         int targetWidth = (rawTargetWidth ~/ 8) * 8;
         if (targetWidth < 8) targetWidth = 8;
+
+        if (maxHeight != null) {
+          double ratio = targetWidth / decoded.width;
+          int projectedHeight = (decoded.height * ratio).toInt();
+          if (projectedHeight > maxHeight) {
+            double heightRatio = maxHeight / decoded.height;
+            targetWidth = ((decoded.width * heightRatio) ~/ 8) * 8;
+            if (targetWidth < 8) targetWidth = 8;
+          }
+        }
 
         final img.Image resized = img.copyResize(
           decoded,
@@ -1219,7 +1299,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
     final data = <int>[0x7B, 0x42, ...normalized.codeUnits]; // {B + data
     return [
-      0x1D, 0x48, 0x02, // Human-readable text below
+      0x1D, 0x48, 0x00, // Human-readable text disabled (No text under barcode)
       0x1D, 0x68, 0x50, // Height: 80 dots
       0x1D, 0x77, 0x02, // Module width
       0x1D, 0x6B, 0x49, data.length,
@@ -1248,7 +1328,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     OrderEntity order,
     List<Map<String, dynamic>> items,
     Settings settings, {
-    String? customerName,
+    CustomerEntity? customer,
   }) async {
     final targetSettings =
         _getSettingsForPurpose(settings, PrinterPurpose.label);
@@ -1256,46 +1336,47 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     final List<int> allBytes = [];
     final isTspl = settings.labelPrinterLanguage == 'tspl';
-    final custName = customerName ?? order.customerId;
+    final custName = customer?.name ?? order.customerId;
 
-    for (final item in items) {
-      final name = item['product_name']?.toString().trim().isNotEmpty == true
-          ? item['product_name'].toString()
-          : item['product_id']?.toString() ?? 'Ürün';
-      final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
-      final note = item['note']?.toString() ?? order.notes;
-
-      if (isTspl) {
-        final labelBytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
-          orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
-          customerName: custName,
-          productName: name,
-          quantity: qty,
-          note: note,
-          timestamp: order.createdAt,
-          widthMm: settings.labelWidthMm,
-          heightMm: settings.labelHeightMm,
-          gapMm: settings.labelGapMm,
-          dpi: settings.labelDpi,
-          copies: settings.labelPrinterCopies,
-        );
-        allBytes.addAll(labelBytes);
-      } else {
-        final labelModel = LabelModel(
-          productName: name,
-          weight: qty,
-          price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          barcode: order.id,
-          businessName: settings.businessName,
-          qrData: 'item|${order.id}|${item['product_id']}|$qty',
-          timestamp: order.createdAt,
-        );
-        final labelBytes = LabelLayoutEngine.generateLabelBytes(
-          labelModel,
-          width: targetSettings.paperWidth <= 58 ? 32 : 48,
-        );
-        allBytes.addAll(labelBytes);
+    if (!isTspl) {
+      // ESC/POS - Tek bir uzun sipariş etiketi basılır (Tüm ürünler içinde)
+      final escPosLogo = settings.printLogo 
+          ? await _getLogoBytes(settings.businessLogo, maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360, maxHeight: 45) 
+          : const <int>[];
+          
+      final labelBytes = LabelLayoutEngine.generateOrderLabelBytes(
+        order: order,
+        items: items,
+        customer: customer,
+        settings: settings,
+        width: targetSettings.paperWidth <= 58 ? 32 : 48,
+        logoBytes: escPosLogo,
+      );
+      allBytes.addAll(labelBytes);
+    } else {
+      // TSPL - Fiş gibi tüm ürünler tek bir uzun etikette basılır
+      double orderTotal = 0.0;
+      for (final item in items) {
+        final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+        final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+        orderTotal += qty * price;
       }
+      
+      final labelBytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+        customerName: custName,
+        customerPhone: customer?.phone,
+        items: items,
+        orderNotes: order.notes,
+        totalAmount: orderTotal,
+        timestamp: order.createdAt,
+        widthMm: settings.labelWidthMm,
+        heightMm: settings.labelHeightMm,
+        gapMm: settings.labelGapMm,
+        dpi: settings.labelDpi,
+        copies: settings.labelPrinterCopies,
+      );
+      allBytes.addAll(labelBytes);
     }
 
     await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);
@@ -1317,7 +1398,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final width = targetSettings.paperWidth <= 58 ? 32 : 48;
     final logo = !isTspl && settings.printLogo
         ? await _getLogoBytes(settings.businessLogo,
-            maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360)
+            maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360,
+            maxHeight: 45)
         : <int>[];
     final bytes = <int>[];
     final effectiveCopies = copies == 1
@@ -1343,7 +1425,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           heightMm: settings.labelHeightMm,
           gapMm: settings.labelGapMm,
           dpi: settings.labelDpi,
-          copies: effectiveCopies,
+          showLogo: settings.printLogo,
+          showBusinessName: true,
+          showBarcode: settings.printBarcode,
+          showPrice: true,
+          logoPath: settings.businessLogo,
         ));
       } else {
         for (var copy = 0; copy < effectiveCopies; copy++) {
@@ -1448,6 +1534,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         .map((s) => int.parse(s.trim()))
         .toList();
 
+    final isLabel = persistedJob.title.toLowerCase().contains('etiket');
+    final targetSettings = isLabel
+        ? _getSettingsForPurpose(settings, PrinterPurpose.label)
+        : settings;
+
     final queue = _persistentQueue;
     if (queue != null) {
       await queue.markPrinting(persistedJob.id);
@@ -1456,13 +1547,14 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       if (_socketConnector != null) {
         // Test mode — use mock socket directly
         await _sendViaTcp(
-            bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
+            bytes, targetSettings.printerIp ?? '127.0.0.1', targetSettings.printerPort);
       } else {
-        final backends = await _buildFailoverChain(settings);
+        final purpose = isLabel ? PrinterPurpose.label : PrinterPurpose.receipt;
+        final backends = await _buildFailoverChain(targetSettings, purpose: purpose);
         bool sent = false;
         for (final backend in backends) {
           try {
-            await _sendViaBackend(bytes, backend, settings);
+            await _sendViaBackend(bytes, backend, targetSettings);
             sent = true;
             break;
           } catch (_) {

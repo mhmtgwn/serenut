@@ -59,9 +59,11 @@ void main() {
       ),
     );
 
-    expect(output, contains('Saman Market'));
-    expect(output, contains('Uzun Urun Adi ve Cesidi'));
-    expect(output, contains('BAR '));
+    expect(output, contains('Uzun Urun Adi'));
+    expect(output, contains('ve Cesidi'));
+    expect(output, contains('"2",0,2,2'));
+    expect(output, contains('"128"'));
+    expect(output, contains('TL"'));
     expect(output, isNot(contains('Ü')));
     expect(output, isNot(contains('geçersiz')));
   });

@@ -80,7 +80,7 @@ abstract class IPrinterService implements Listenable {
     OrderEntity order,
     List<Map<String, dynamic>> items,
     Settings settings, {
-    String? customerName,
+    CustomerEntity? customer,
   });
 
   Future<void> printShelfLabels(

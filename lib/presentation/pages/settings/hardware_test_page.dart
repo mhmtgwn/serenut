@@ -278,9 +278,12 @@ class _DeviceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: kBorderColor),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -362,6 +365,7 @@ class _DeviceCard extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -397,6 +401,12 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   int _paperWidth = 80;
   String _labelLanguage = 'tspl';
   int _labelDpi = 203;
+  bool _autoCut = true;
+  bool _openDrawer = false;
+  bool _printLogo = true;
+  bool _printBarcode = true;
+  bool _printQr = false;
+  
   int _step = 0;
   bool _working = false;
   bool _discoveringBluetooth = false;
@@ -437,6 +447,12 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 80;
     _labelLanguage = config['language']?.toString() ?? 'tspl';
     _labelDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
+    
+    _autoCut = config['autoCut'] as bool? ?? true;
+    _openDrawer = config['openDrawer'] as bool? ?? false;
+    _printLogo = config['printLogo'] as bool? ?? true;
+    _printBarcode = config['printBarcode'] as bool? ?? true;
+    _printQr = config['printQr'] as bool? ?? false;
   }
 
   @override
@@ -782,6 +798,39 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             onSelectionChanged: (values) =>
                 setState(() => _paperWidth = values.first),
           ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text('Fiş Sonunda Otomatik Kes'),
+            value: _autoCut,
+            onChanged: (val) => setState(() => _autoCut = val),
+            contentPadding: EdgeInsets.zero,
+          ),
+          SwitchListTile(
+            title: const Text('Kasa Çekmecesini Aç'),
+            value: _openDrawer,
+            onChanged: (val) => setState(() => _openDrawer = val),
+            contentPadding: EdgeInsets.zero,
+          ),
+          SwitchListTile(
+            title: const Text('İşletme Logosunu Bas'),
+            value: _printLogo,
+            onChanged: (val) => setState(() => _printLogo = val),
+            contentPadding: EdgeInsets.zero,
+          ),
+          SwitchListTile(
+            title: const Text('Sipariş Barkodu Bas'),
+            value: _printBarcode,
+            onChanged: (val) => setState(() => _printBarcode = val),
+            contentPadding: EdgeInsets.zero,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _labelCopies,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Yazdırılacak kopya sayısı',
+            ),
+          ),
         ],
         if (_type == HardwareDeviceType.labelPrinter) ...[
           const SizedBox(height: 12),
@@ -808,28 +857,21 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 child: TextField(
                   controller: _labelWidth,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'En (mm)'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _labelHeight,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Boy (mm)'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _labelGap,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Boşluk (mm)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Kağıt Genişliği / En (mm)',
+                    helperText: 'Standart etiket uzunluğu 30mm, boşluksuz (sürekli) format.',
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text('İşletme Logosunu Bas'),
+            value: _printLogo,
+            onChanged: (val) => setState(() => _printLogo = val),
+            contentPadding: EdgeInsets.zero,
+          ),
           TextField(
             controller: _labelCopies,
             keyboardType: TextInputType.number,
@@ -983,6 +1025,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
         'dpi': _labelDpi,
         'copies': int.tryParse(_labelCopies.text) ?? 1,
+        'autoCut': _autoCut,
+        'openDrawer': _openDrawer,
+        'printLogo': _printLogo,
+        'printBarcode': _printBarcode,
+        'printQr': _printQr,
       },
     );
   }

@@ -612,33 +612,36 @@ class _LabelTemplateEditorPageState
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: POSColors.border),
       ),
-      child: Row(
-        children: [
-          Text(
-            'Yazı Boyutu',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: POSColors.text,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Text(
+              'Yazı Boyutu',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: POSColors.text,
+              ),
             ),
-          ),
-          const Spacer(),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'Küçük', label: Text('Küçük')),
-              ButtonSegment(value: 'Orta', label: Text('Orta')),
-              ButtonSegment(value: 'Büyük', label: Text('Büyük')),
-            ],
-            selected: {current},
-            onSelectionChanged: (set) {
-              if (set.isNotEmpty) onSelect(set.first);
-            },
-            style: SegmentedButton.styleFrom(
-              selectedBackgroundColor: POSColors.greenLight,
-              selectedForegroundColor: POSColors.greenDark,
+            const SizedBox(width: 16),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'Küçük', label: Text('Küçük')),
+                ButtonSegment(value: 'Orta', label: Text('Orta')),
+                ButtonSegment(value: 'Büyük', label: Text('Büyük')),
+              ],
+              selected: {current},
+              onSelectionChanged: (set) {
+                if (set.isNotEmpty) onSelect(set.first);
+              },
+              style: SegmentedButton.styleFrom(
+                selectedBackgroundColor: POSColors.greenLight,
+                selectedForegroundColor: POSColors.greenDark,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

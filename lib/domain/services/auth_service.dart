@@ -13,7 +13,7 @@ import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, listEquals;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, listEquals, kDebugMode;
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
 class AuthException implements Exception {
@@ -117,6 +117,26 @@ class AuthService {
   Future<AuthUser> login(String username, String password) async {
     if (username.trim().isEmpty || password.isEmpty) {
       throw AuthException('Kullanıcı adı ve şifre boş olamaz.');
+    }
+
+    // Allow local admin fallback in debug mode for development testing
+    if (kDebugMode && username.trim().toLowerCase() == 'admin' && password == 'admin') {
+      final debugAdmin = AuthUser(
+        id: 'debug_admin_id',
+        companyId: 'debug_company_id',
+        name: 'Admin',
+        email: 'admin@serenut.com',
+        role: UserRole.admin,
+        permissions: Permission.forRole(UserRole.admin).map((p) => p.value).toList(),
+        createdAt: DateTime.now(),
+      );
+      _currentUser = debugAdmin;
+      await _prefs.setString(_userStorageKey, debugAdmin.toJson());
+      await _prefs.setString(
+        'serenut_last_authz_verified_at_${debugAdmin.id}',
+        DateTime.now().toUtc().toIso8601String(),
+      );
+      return debugAdmin;
     }
 
     // Try online login first if API client is available

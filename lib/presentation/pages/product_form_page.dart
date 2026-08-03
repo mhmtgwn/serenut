@@ -352,57 +352,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     ? 'Lütfen ürün adı giriniz.'
                     : null,
               ),
-              const SizedBox(height: 12),
-              _buildField(
-                controller: _descCtrl,
-                label: 'Açıklama',
-                icon: Icons.description_rounded,
-                maxLines: 2,
-              ),
+
               const SizedBox(height: 12),
               // ── Kategori ───────────────────────────────────────────────────
               _buildCategoryField(allCategories, parsedVatCategories),
-              const SizedBox(height: 12),
-              _buildField(
-                controller: _brandCtrl,
-                label: 'Marka',
-                icon: Icons.verified_rounded,
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _saleType == 'weighed' ? 'kg' : _unit,
-                      decoration: InputDecoration(
-                        labelText: 'Birim',
-                        prefixIcon: const Icon(Icons.straighten_rounded),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'adet', child: Text('Adet')),
-                        DropdownMenuItem(value: 'paket', child: Text('Paket')),
-                        DropdownMenuItem(value: 'kutu', child: Text('Kutu')),
-                        DropdownMenuItem(value: 'litre', child: Text('Litre')),
-                        DropdownMenuItem(value: 'kg', child: Text('Kilogram')),
-                      ],
-                      onChanged: _saleType == 'weighed'
-                          ? null
-                          : (value) => setState(() => _unit = value ?? 'adet'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildField(
-                      controller: _shelfCodeCtrl,
-                      label: 'Raf Kodu',
-                      icon: Icons.shelves,
-                    ),
-                  ),
-                ],
-              ),
             ]),
             const SizedBox(height: 16),
 
@@ -570,11 +523,17 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: InputDecoration(
                         labelText: 'Barkod',
-                        prefixIcon: const Icon(Icons.qr_code_rounded),
-                        suffixIcon: IconButton(
-                          tooltip: 'Kamerayla barkod okut',
-                          onPressed: _scanBarcode,
-                          icon: const Icon(Icons.qr_code_scanner_rounded),
+                        suffixIcon: Container(
+                          margin: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: _kGreen.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: IconButton(
+                            tooltip: 'Kamerayla barkod okut',
+                            onPressed: _scanBarcode,
+                            icon: const Icon(Icons.qr_code_scanner_rounded, color: _kGreen),
+                          ),
                         ),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10)),

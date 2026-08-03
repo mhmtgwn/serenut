@@ -382,40 +382,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
             title: 'İşletme Bilgileri'),
       ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Fiş Tasarımı',
-        subtitle:
-            '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
-        icon: Icons.receipt_long_rounded,
-        color: _kBlue,
-        onTap: () => _runGuardedAction(
-            Permission.settingsReceipt, () => _showReceiptSettings(settings),
-            title: 'Fiş Tasarımı'),
-      ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Etiket Tasarımı',
-        subtitle:
-            '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI',
-        icon: Icons.label_rounded,
-        color: _kOrange,
-        onTap: () => _runGuardedAction(
-            Permission.settingsReceipt, () => _showLabelSettings(settings),
-            title: 'Etiket Tasarımı'),
-      ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Etiket Taslakları & Önizleme',
-        subtitle: 'Ürün ve sipariş etiket alanlarını canlı önizlemeli düzenleyin',
-        icon: Icons.design_services_rounded,
-        color: _kTeal,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const LabelTemplateEditorPage(),
-          ),
-        ),
-      ));
+
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {

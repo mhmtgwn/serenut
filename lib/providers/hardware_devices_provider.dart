@@ -268,6 +268,12 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           printerIp: config['host'] as String? ?? '',
           printerPort: _int(config['port'], 9100),
           paperWidth: _int(config['paperWidth'], 80),
+          autoCutReceipt: config['autoCut'] as bool? ?? true,
+          openCashDrawer: config['openDrawer'] as bool? ?? false,
+          printLogo: config['printLogo'] as bool? ?? true,
+          printBarcode: config['printBarcode'] as bool? ?? true,
+          printQRCode: config['printQr'] as bool? ?? false,
+          printCopies: _int(config['copies'], 1).clamp(1, 20).toInt(),
         );
         await ref
             .read(printerServiceProvider)
@@ -289,6 +295,8 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           labelHeightMm: _int(config['labelHeightMm'], 30),
           labelGapMm: _int(config['labelGapMm'], 2),
           labelDpi: _int(config['dpi'], 203),
+          printLogo: config['printLogo'] as bool? ?? true,
+          labelPrinterCopies: _int(config['copies'], 1).clamp(1, 20).toInt(),
         );
         await ref
             .read(printerServiceProvider)
@@ -374,6 +382,12 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
                 printerIp: config['host'] as String? ?? '',
                 printerPort: _int(config['port'], 9100),
                 paperWidth: _int(config['paperWidth'], 80),
+                autoCutReceipt: config['autoCut'] as bool? ?? true,
+                openCashDrawer: config['openDrawer'] as bool? ?? false,
+                printLogo: config['printLogo'] as bool? ?? true,
+                printBarcode: config['printBarcode'] as bool? ?? true,
+                printQRCode: config['printQr'] as bool? ?? false,
+                printCopies: _int(config['copies'], 1).clamp(1, 20).toInt(),
               ),
             );
         return;
@@ -392,6 +406,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
                 labelDpi: _int(config['dpi'], 203),
                 labelPrinterCopies:
                     _int(config['copies'], 1).clamp(1, 20).toInt(),
+                printLogo: config['printLogo'] as bool? ?? true,
               ),
             );
         return;
