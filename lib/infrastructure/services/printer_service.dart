@@ -177,14 +177,20 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     return PrinterBackend.none;
   }
 
-  /// Settings helper based on purpose
+  /// Settings helper based on purpose with fallback to main printer
   Settings _getSettingsForPurpose(Settings settings, PrinterPurpose purpose) {
     if (purpose == PrinterPurpose.label) {
-      final labelIp = settings.labelPrinterIp ?? '';
-      final labelPort = settings.labelPrinterPort;
+      final hasLabelIp = settings.labelPrinterIp?.isNotEmpty ?? false;
+      final hasLabelName = settings.labelPrinterName?.isNotEmpty ?? false;
+
+      final labelIp = hasLabelIp ? settings.labelPrinterIp! : (settings.printerIp ?? '');
+      final labelName = hasLabelName ? settings.labelPrinterName! : (settings.printerName ?? '');
+      final labelPort = (hasLabelIp && settings.labelPrinterPort > 0)
+          ? settings.labelPrinterPort
+          : (settings.printerPort > 0 ? settings.printerPort : 9100);
+
       return settings.copyWith(
-        printerName:
-            labelIp.isNotEmpty ? 'network' : (settings.labelPrinterName ?? ''),
+        printerName: labelName,
         printerIp: labelIp,
         printerPort: labelPort,
       );
@@ -1276,7 +1282,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }) async {
     final targetSettings =
         _getSettingsForPurpose(settings, PrinterPurpose.label);
-    if (!_hasPrinter(targetSettings)) return;
+    if (!_hasPrinter(targetSettings)) {
+      throw StateError('Etiket yazıcısı tanımlı değil.');
+    }
 
     final List<int> allBytes = [];
     final isTspl = settings.labelPrinterLanguage == 'tspl';
