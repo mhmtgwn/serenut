@@ -132,17 +132,21 @@ class SyncNotifier extends StateNotifier<SyncState>
       }
     }
     if (activationId == null || activationId.isEmpty) {
-      await TelemetryService().logStructured(
-        event: 'sync_activation_recovery_failed',
-        level: LogLevel.error,
-        metadata: {
-          'has_access_token':
-              (_ref.read(apiClientProvider).jwtToken?.isNotEmpty ?? false),
-          'has_refresh_token':
-              _ref.read(authServiceProvider).getRefreshToken()?.isNotEmpty ??
-                  false,
-        },
-      );
+      final hasAccessToken = _ref.read(apiClientProvider).jwtToken?.isNotEmpty ?? false;
+      final hasRefreshToken = _ref.read(authServiceProvider).getRefreshToken()?.isNotEmpty ?? false;
+
+      // Only log structured error if the user is authenticated but missing device activation
+      if (hasAccessToken || hasRefreshToken) {
+        await TelemetryService().logStructured(
+          event: 'sync_activation_recovery_failed',
+          level: LogLevel.error,
+          metadata: {
+            'has_access_token': hasAccessToken,
+            'has_refresh_token': hasRefreshToken,
+          },
+        );
+      }
+
       state = state.copyWith(
         status: SyncStatus.error,
         lastError:
