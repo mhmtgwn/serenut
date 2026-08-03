@@ -260,11 +260,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         await settingsRepo.getSettings();
 
         final productRepo = await ref.read(productRepositoryProvider.future);
-        await productRepo.getProducts();
+        await productRepo.findAll();
         await productRepo.getCategories();
 
         final customerRepo = await ref.read(customerRepositoryProvider.future);
-        await customerRepo.getCustomers();
+        await customerRepo.findAll();
       } catch (e) {
         debugPrint('Pre-warm warning at startup: $e');
       }

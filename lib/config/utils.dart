@@ -32,19 +32,21 @@ extension IdShortener on String {
 
 extension TurkishNormalization on String {
   String get normalizeTurkish {
-    return toLowerCase()
-        .replaceAll('ı', 'i')
-        .replaceAll('İ', 'i')
-        .replaceAll('ş', 's')
+    return replaceAll('İ', 'i')
+        .replaceAll('I', 'i')
         .replaceAll('Ş', 's')
-        .replaceAll('ç', 'c')
         .replaceAll('Ç', 'c')
-        .replaceAll('ğ', 'g')
         .replaceAll('Ğ', 'g')
-        .replaceAll('ü', 'u')
         .replaceAll('Ü', 'u')
-        .replaceAll('ö', 'o')
         .replaceAll('Ö', 'o')
+        .toLowerCase()
+        .replaceAll('\u0307', '')
+        .replaceAll('ı', 'i')
+        .replaceAll('ş', 's')
+        .replaceAll('ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ö', 'o')
         .trim();
   }
 }
