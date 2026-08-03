@@ -118,3 +118,6 @@ flutter_*.png
 android/key.properties
 
 vps_key.pem
+
+# Codex worktrees (git worktree references, not submodules)
+.codex-worktrees/
