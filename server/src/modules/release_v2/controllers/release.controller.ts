@@ -4,6 +4,7 @@ import { pgPool } from '../../../config/database';
 import { ReleaseRegistryService } from '../services/release-registry.service';
 import { ReleaseFsmService } from '../services/release-fsm.service';
 import { ReleaseAuditService } from '../services/release-audit.service';
+import { authenticateUser, AuthenticatedRequest, requireRole } from '../../../middleware/auth.middleware';
 
 const router = Router();
 const registryService = new ReleaseRegistryService(pgPool);
@@ -11,9 +12,9 @@ const fsmService = new ReleaseFsmService(pgPool);
 const auditService = new ReleaseAuditService(pgPool);
 
 // 1. Atomic Release Publish
-router.post('/publish', async (req: Request, res: Response) => {
-  const { manifest, canonicalManifestJson, manifestSignature, buildCommit, buildPipelineId, actorId } = req.body;
-  if (!manifest || !canonicalManifestJson || !manifestSignature || !buildCommit || !buildPipelineId || !actorId) {
+router.post('/publish', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
+  const { manifest, canonicalManifestJson, manifestSignature, buildCommit, buildPipelineId } = req.body;
+  if (!manifest || !canonicalManifestJson || !manifestSignature || !buildCommit || !buildPipelineId) {
     return res.status(400).json({ error: 'missing_parameters', message: 'All release parameters are required.' });
   }
 
@@ -24,7 +25,7 @@ router.post('/publish', async (req: Request, res: Response) => {
       manifestSignature,
       buildCommit,
       buildPipelineId,
-      actorId
+      req.user!.id
     );
 
     if (!result.success) {
@@ -42,16 +43,16 @@ router.post('/publish', async (req: Request, res: Response) => {
 });
 
 // 2. FSM Transition
-router.post('/:id/transition', async (req: Request, res: Response) => {
+router.post('/:id/transition', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const { targetState, actorId } = req.body;
+  const { targetState } = req.body;
 
-  if (!targetState || !actorId) {
-    return res.status(400).json({ error: 'missing_parameters', message: 'targetState and actorId are required.' });
+  if (!targetState) {
+    return res.status(400).json({ error: 'missing_parameters', message: 'targetState is required.' });
   }
 
   try {
-    const result = await fsmService.transition(id, targetState, actorId);
+    const result = await fsmService.transition(id, targetState, req.user!.id);
     if (!result.success) {
       return res.status(400).json({ error: 'transition_failed', message: result.error });
     }
@@ -93,7 +94,7 @@ router.get('/latest', async (req: Request, res: Response) => {
 });
 
 // 4. Insert Health Snapshot
-router.post('/:id/health-snapshot', async (req: Request, res: Response) => {
+router.post('/:id/health-snapshot', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const { rolloutPercent, devices, successRate, rollbackRate, crashRate, healthScore } = req.body;
 
@@ -114,7 +115,7 @@ router.post('/:id/health-snapshot', async (req: Request, res: Response) => {
 });
 
 // 5. Verify Audit Chain
-router.get('/audit/verify', async (req: Request, res: Response) => {
+router.get('/audit/verify', authenticateUser, requireRole('sysadmin'), async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await auditService.verifyAuditChain();
     return res.json(result);

@@ -28,6 +28,8 @@ import {
   subscriptionCancelledEmail,
   SmsTemplates,
 } from '../modules/notifications/email.templates';
+import { CommercialLifecycleService } from '../modules/billing/commercial_lifecycle.service';
+import { PaymentReconciliationService } from '../modules/billing/payment-reconciliation.service';
 
 // ── REDIS BAĞLANTISI ─────────────────────────────────────────────────────────
 function getRedisConnection() {
@@ -96,9 +98,9 @@ async function getCompanyInfo(companyId: string) {
 // ── A. TRIAL YAŞAM DÖNGÜSÜ İŞLERİNİ ZAMANLA ─────────────────────────────────
 /**
  * Trial aktivasyonunda çağrılır. Otomatik olarak:
- *   - Gün 7: "7 gün kaldı" email + SMS
- *   - Gün 13: "1 gün kaldı" email + SMS
- *   - Gün 14: "Trial bitti" email + SMS
+ *   - Bitişe 7 gün: email + SMS
+ *   - Bitişe 1 gün: email + SMS
+ *   - Bitiş anı: trial kapatma + email
  * BullMQ delayed job olarak kaydedilir — sunucu yeniden başlatılsa kaybolmaz.
  */
 export async function scheduleTrialLifecycleJobs(params: {
@@ -114,9 +116,10 @@ export async function scheduleTrialLifecycleJobs(params: {
   const DAY = 24 * 60 * 60 * 1000;
   const now = Date.now();
 
-  const day7Ms  = trialStartDate.getTime() + 7  * DAY - now;
-  const day13Ms = trialStartDate.getTime() + 13 * DAY - now;
-  const day14Ms = trialStartDate.getTime() + 14 * DAY - now;
+  const trialEndMs = trialStartDate.getTime() + trialDays * DAY;
+  const day7Ms = trialEndMs - 7 * DAY - now;
+  const day1Ms = trialEndMs - DAY - now;
+  const expiryMs = trialEndMs - now;
 
   const expiryDate = new Date(trialStartDate.getTime() + trialDays * DAY)
     .toLocaleDateString('tr-TR');
@@ -132,17 +135,17 @@ export async function scheduleTrialLifecycleJobs(params: {
     logger.info(`[BillingScheduler] Trial Gün-7 uyarısı zamanlandı: ${companyId} (${Math.round(day7Ms / DAY)} gün sonra)`);
   }
 
-  if (day13Ms > 0) {
+  if (day1Ms > 0) {
     await queue.add('trial-expiring-1', { type: 'trial_expiring_1', ...base }, {
-      delay: day13Ms,
+      delay: day1Ms,
       jobId: `trial-1d-${companyId}`,
     });
     logger.info(`[BillingScheduler] Trial Gün-13 uyarısı zamanlandı: ${companyId}`);
   }
 
-  if (day14Ms > 0) {
+  if (expiryMs > 0) {
     await queue.add('trial-expired', { type: 'trial_expired', ...base }, {
-      delay: day14Ms,
+      delay: expiryMs,
       jobId: `trial-expired-${companyId}`,
     });
     logger.info(`[BillingScheduler] Trial sona erme zamanlandı: ${companyId}`);
@@ -154,9 +157,9 @@ export async function scheduleTrialLifecycleJobs(params: {
  * Ödeme başarısız olduğunda çağrılır.
  * 3 ayrı BullMQ delayed job:
  *   - Anında: "Ödeme alınamadı" bildirimi gönder
- *   - 24 saat: Retry #1
- *   - 72 saat: Retry #2
- *   - 7 gün: Retry #3 — başarısız olursa askıya al
+ *   - 24 saat, 72 saat ve 7 gün: sağlayıcı durumunu yeniden denetleme ve ödeme bağlantısı hatırlatması
+ * Kayıtlı kart için doğrulanmış recurring-charge sözleşmesi bulunmadığından bu
+ * işler tahsilat yapmış gibi davranmaz ve kullanıcıyı keyfi olarak askıya almaz.
  */
 export async function schedulePaymentRetry(params: {
   companyId: string;
@@ -214,11 +217,10 @@ export async function processSubscriptionCancellation(
       return { success: false, periodEnd: null, message: 'Şirket bulunamadı' };
     }
 
-    // cancel_at_period_end = true yap (dönem sonunda otomatik iptal)
-    await runBypassingRLS(
-      `UPDATE subscriptions SET cancel_at_period_end = true WHERE company_id = $1`,
-      [companyId]
-    );
+    await runCommercialTransaction(client =>
+      CommercialLifecycleService.setAutoRenewal(client, {
+        companyId, actorId: requestedBy, enabled: false,
+      }));
 
     const periodEnd = info.current_period_end ? new Date(info.current_period_end) : null;
 
@@ -269,7 +271,7 @@ export async function processSubscriptionCancellation(
 // ── D. YENİDEN AKTİVASYON ────────────────────────────────────────────────────
 export async function processReactivation(
   companyId: string,
-  planId: string
+  actorId: string
 ): Promise<{ success: boolean; message: string }> {
   try {
     const info = await getCompanyInfo(companyId);
@@ -277,23 +279,10 @@ export async function processReactivation(
       return { success: false, message: 'Şirket bulunamadı' };
     }
 
-    // cancel_at_period_end = false, status = active yap
-    await runBypassingRLS(
-      `UPDATE subscriptions
-       SET cancel_at_period_end = false, status = 'active', grace_period_until = null, last_payment_status = 'success'
-       WHERE company_id = $1`,
-      [companyId]
-    );
-
-    // Lisansı da aktif et
-    await runBypassingRLS(
-      `UPDATE license_entitlements SET status = 'active', token_version = token_version + 1, updated_at = NOW() WHERE company_id = $1`,
-      [companyId]
-    );
-    await runBypassingRLS(
-      `UPDATE licenses SET status = 'active' WHERE company_id = $1`,
-      [companyId]
-    );
+    await runCommercialTransaction(client =>
+      CommercialLifecycleService.setAutoRenewal(client, {
+        companyId, actorId, enabled: true,
+      }));
 
     // "Hoş geldin geri" bildirimi
     await enqueueNotification({
@@ -324,6 +313,40 @@ export async function processReactivation(
 
 // ── E. BİLLİNG WORKER — JOB İŞLEME ──────────────────────────────────────────
 let billingWorker: Worker | null = null;
+
+export async function expireTrials(companyId?: string): Promise<number> {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const count = await CommercialLifecycleService.expireTrials(client, companyId);
+    await client.query('COMMIT');
+    return count;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function runCommercialTransaction<T>(
+  work: (client: import('pg').PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls='true'");
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 export function startBillingScheduler(): void {
   const redisUrl = process.env.REDIS_URL;
@@ -395,11 +418,7 @@ export function startBillingScheduler(): void {
 
         // Trial bitti
         case 'trial_expired': {
-          // DB'de trial'ı sonlandır
-          await runBypassingRLS(
-            `UPDATE subscriptions SET status = 'trial_expired' WHERE company_id = $1 AND status = 'trial'`,
-            [data.companyId]
-          );
+          await expireTrials(data.companyId);
           await enqueueNotification({
             notification_id: `trial-expired-email-${data.companyId}-${Date.now()}`,
             company_id: data.companyId,
@@ -411,6 +430,12 @@ export function startBillingScheduler(): void {
               upgradeLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
             }).html,
           });
+          break;
+        }
+
+        case 'lifecycle_reconcile': {
+          await expireTrials();
+          await PaymentReconciliationService.reconcileBatch();
           break;
         }
 
@@ -479,16 +504,13 @@ export function startBillingScheduler(): void {
             logger.error(`[BillingScheduler] Pre-flight subscription status check failed: ${dbErr.message}`);
           }
 
-          // Gerçek ödeme yeniden deneme (İyzico servis çağrısı)
-          logger.info(`[BillingScheduler] Ödeme retry #${retryCount}: ${data.companyId} — ${data.amount} ${data.currency}`);
-
-          if (retryCount < 3) {
-            await enqueueNotification({
+          logger.info(`[BillingScheduler] Ödeme durumu kontrolü #${retryCount}: ${data.companyId}`);
+          await enqueueNotification({
               notification_id: `pay-retry-email-${data.invoiceId}-${retryCount}-${Date.now()}`,
               company_id: data.companyId,
               channel: 'email',
               recipient: data.email,
-              title: `Ödemeniz tekrar deneniyor (${retryCount}/3)`,
+              title: `Ödemeniz bekliyor (${retryCount}/3)`,
               body: paymentRetryEmail({
                 companyName: data.companyName,
                 amount: data.amount,
@@ -497,22 +519,6 @@ export function startBillingScheduler(): void {
                 paymentLink: `${process.env.PORTAL_URL || 'https://serenut.com/portal'}/billing`,
               }).html,
             });
-          } else {
-            // Retry #3 başarısız → askıya al
-            await runBypassingRLS(
-              `UPDATE subscriptions SET status = 'suspended' WHERE company_id = $1`,
-              [data.companyId]
-            );
-            await runBypassingRLS(
-              `UPDATE license_entitlements SET status = 'expired', token_version = token_version + 1, updated_at = NOW() WHERE company_id = $1`,
-              [data.companyId]
-            );
-            await runBypassingRLS(
-              `UPDATE licenses SET status = 'suspended' WHERE company_id = $1`,
-              [data.companyId]
-            );
-            logger.error(`[BillingScheduler] 3 retry başarısız — ${data.companyId} askıya alındı.`);
-          }
           break;
         }
 
@@ -538,6 +544,12 @@ export function startBillingScheduler(): void {
       concurrency: 3,
     }
   );
+
+  void getBillingQueue().upsertJobScheduler(
+    'commercial-lifecycle-reconcile',
+    { pattern: '15 * * * *' },
+    { name: 'commercial-lifecycle-reconcile', data: { type: 'lifecycle_reconcile' } },
+  ).catch((error) => logger.error('[BillingScheduler] Reconciliation schedule failed', error));
 
   billingWorker.on('completed', (job) => {
     logger.info(`[BillingScheduler] Tamamlandı: ${job.name} (${job.data.type})`);

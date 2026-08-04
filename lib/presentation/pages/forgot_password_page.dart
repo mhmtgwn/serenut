@@ -1,5 +1,5 @@
 // lib/presentation/pages/forgot_password_page.dart
-// Serenut OS — Şifre Sıfırlama Sayfası (Bilgi Doğrulama & E-posta Fallback)
+// Serenut OS — Kurtarma Kodu ve Yönetici Destekli Şifre Kurtarma
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,8 +12,7 @@ class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
 
   @override
-  ConsumerState<ForgotPasswordPage> createState() =>
-      _ForgotPasswordPageState();
+  ConsumerState<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
 class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
@@ -23,6 +22,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   final _identifierCtrl = TextEditingController(); // E-posta veya Kullanıcı Adı
   final _companyNameCtrl = TextEditingController();
   final _taxNoCtrl = TextEditingController();
+  final _recoveryCodeCtrl = TextEditingController();
+  final _requestIdCtrl = TextEditingController();
+  final _claimCodeCtrl = TextEditingController();
 
   // ── Adım 2: Yeni Şifre ──
   final _newPasswordCtrl = TextEditingController();
@@ -40,6 +42,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     _identifierCtrl.dispose();
     _companyNameCtrl.dispose();
     _taxNoCtrl.dispose();
+    _recoveryCodeCtrl.dispose();
+    _requestIdCtrl.dispose();
+    _claimCodeCtrl.dispose();
     _newPasswordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     super.dispose();
@@ -56,24 +61,22 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/auth/verify-identity', {
-        'email': _identifierCtrl.text.trim(),
+      final response = await apiClient.post('/auth/recovery/authorize-code', {
+        'identifier': _identifierCtrl.text.trim(),
         'company_name': _companyNameCtrl.text.trim(),
         'tax_number': _taxNoCtrl.text.trim(),
+        'recovery_code': _recoveryCodeCtrl.text.trim(),
       });
 
       final body = response.json as Map<String, dynamic>;
-      final token = body['token'] as String?;
-
-      if (token != null && token.isNotEmpty) {
+      final token = body['reset_token']?.toString();
+      if (token == null || token.isEmpty) {
+        throw StateError('Sıfırlama yetkisi alınamadı.');
+      }
+      if (mounted) {
         setState(() {
           _resetToken = token;
           _step = 1;
-        });
-      } else {
-        setState(() {
-          _errorMessage =
-              body['message']?.toString() ?? 'Bilgiler eşleşmedi.';
         });
       }
     } catch (e) {
@@ -120,51 +123,39 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     }
   }
 
-  // ── Fallback: E-posta ile Talep Gönder ──
-  Future<void> _requestEmailReset() async {
-    if (_identifierCtrl.text.trim().isEmpty) {
-      setState(() {
-        _errorMessage =
-            'E-posta ile sıfırlama linki almak için lütfen e-posta / kullanıcı adı alanını doldurun.';
-      });
+  Future<void> _claimAdminRecovery() async {
+    if (_requestIdCtrl.text.trim().isEmpty ||
+        _claimCodeCtrl.text.trim().isEmpty) {
+      setState(() =>
+          _errorMessage = 'Talep numarası ve tek kullanımlık kod zorunludur.');
       return;
     }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
-      final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/auth/forgot-password', {
-        'email': _identifierCtrl.text.trim(),
+      final response =
+          await ref.read(apiClientProvider).post('/auth/recovery/claim', {
+        'request_id': _requestIdCtrl.text.trim(),
+        'claim_code': _claimCodeCtrl.text.trim(),
       });
-
       final body = response.json as Map<String, dynamic>;
-      final msg = body['message']?.toString() ??
-          'Şifre sıfırlama talebiniz alındı.';
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('E-posta Bildirimi'),
-            content: Text(msg),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Tamam'),
-              ),
-            ],
-          ),
-        );
+      final token = body['reset_token']?.toString();
+      if (token == null || token.isEmpty) {
+        throw StateError('Sıfırlama yetkisi alınamadı.');
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage =
-            'E-posta servisine şu an ulaşılamıyor. Lütfen bilgi doğrulama adımıyla sıfırlamayı deneyin veya teknik destekle iletişime geçin.';
-      });
+      if (mounted) {
+        setState(() {
+          _resetToken = token;
+          _step = 1;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMessage =
+            'Talep veya tek kullanımlık kod geçersiz ya da süresi dolmuş.');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -244,7 +235,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Hesabınızı doğrulamak için kayıtlı bilgilerinizi giriniz.',
+                      'Kayıt bilgilerinizi ve tek kullanımlık kurtarma kodunuzu giriniz.',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: POSColors.textSecondary,
@@ -264,6 +255,15 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           icon: Icons.person_outline_rounded,
           validator: (v) =>
               (v?.trim().isEmpty ?? true) ? 'Bu alan zorunludur' : null,
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _recoveryCodeCtrl,
+          label: 'Kurtarma Kodu *',
+          hint: 'SRNT-XXXX-XXXX-XXXX-XXXX',
+          icon: Icons.key_rounded,
+          validator: (v) =>
+              (v?.trim().isEmpty ?? true) ? 'Kurtarma kodu zorunludur' : null,
         ),
         const SizedBox(height: 14),
         _buildField(
@@ -304,23 +304,34 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                       strokeWidth: 2, color: Colors.white),
                 )
               : Text(
-                  'Bilgileri Doğrula & Devam Et',
+                  'Doğrula ve Devam Et',
                   style: GoogleFonts.inter(
                       fontWeight: FontWeight.bold, fontSize: 15),
                 ),
         ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: _isLoading ? null : _requestEmailReset,
-          icon: const Icon(Icons.mail_outline_rounded, size: 18),
-          label: const Text('E-posta ile Sıfırlama Linki İste'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: POSColors.textSecondary,
-            side: const BorderSide(color: POSColors.border),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 12),
+        Text('Yönetici destekli kurtarma',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        _buildField(
+          controller: _requestIdCtrl,
+          label: 'Talep Numarası',
+          hint: 'prr-...',
+          icon: Icons.receipt_long_rounded,
+        ),
+        const SizedBox(height: 12),
+        _buildField(
+          controller: _claimCodeCtrl,
+          label: 'Tek Kullanımlık Kod',
+          hint: 'XXXXXXXXXX',
+          icon: Icons.password_rounded,
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: _isLoading ? null : _claimAdminRecovery,
+          child: const Text('Yönetici Kodunu Doğrula'),
         ),
       ],
     );
@@ -387,7 +398,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           ),
           validator: (v) {
             if (v == null || v.isEmpty) return 'Şifre zorunludur';
-            if (v.length < 8) return 'En az 8 karakter olmalı';
+            if (v.length < 12 ||
+                !RegExp(r'[a-z]').hasMatch(v) ||
+                !RegExp(r'[A-Z]').hasMatch(v) ||
+                !RegExp(r'\d').hasMatch(v) ||
+                !RegExp(r'[^A-Za-z0-9]').hasMatch(v)) {
+              return 'En az 12 karakter; büyük/küçük harf, rakam ve sembol gerekli';
+            }
             return null;
           },
         ),
@@ -446,7 +463,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   Widget _buildStep2() {
     return Column(
       children: [
-        const Icon(Icons.check_circle_rounded, color: POSColors.green, size: 64),
+        const Icon(Icons.check_circle_rounded,
+            color: POSColors.green, size: 64),
         const SizedBox(height: 16),
         Text(
           'Şifreniz Değiştirildi!',
@@ -478,8 +496,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             ),
             child: Text(
               'Giriş Yap Ekranına Dön',
-              style: GoogleFonts.inter(
-                  fontWeight: FontWeight.bold, fontSize: 15),
+              style:
+                  GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           ),
         ),

@@ -35,7 +35,7 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
   late final TextEditingController _passwordCtrl;
 
   bool _obscurePassword = true;
-  bool _showPasswordField = false;
+  final bool _showPasswordField = true;
   int _pinLength = 4; // 4 veya 6
 
   @override
@@ -261,16 +261,15 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                           children: [
                             const _SectionTitle(
                                 icon: Icons.security_rounded,
-                                text: 'Ek Güvenlik (İsteğe Bağlı)'),
+                                text: 'Hesap Güvenliği'),
                             const SizedBox(height: 12),
                             _SwitchTile(
                               icon: Icons.password_rounded,
-                              title: 'Güçlü Şifre Ekle',
+                              title: 'Güçlü Şifre',
                               subtitle:
-                                  'Yedek giriş yöntemi olarak şifre belirle',
+                                  'Sunucu hesabınız için güçlü şifre belirleyin',
                               value: _showPasswordField,
-                              onChanged: (v) =>
-                                  setState(() => _showPasswordField = v),
+                              onChanged: (_) {},
                             ),
                             if (_showPasswordField) ...[
                               const SizedBox(height: 12),
@@ -279,7 +278,7 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                 obscureText: _obscurePassword,
                                 decoration: InputDecoration(
                                   labelText: 'Şifre',
-                                  hintText: 'En az 8 karakter',
+                                  hintText: '12+ karakter, büyük/küçük harf, rakam ve sembol',
                                   prefixIcon: const Icon(Icons.password_rounded,
                                       size: 20, color: POSColors.textSecondary),
                                   suffixIcon: IconButton(
@@ -294,9 +293,13 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                   ),
                                 ),
                                 validator: (v) {
-                                  if (!_showPasswordField) return null;
-                                  if ((v?.length ?? 0) < 8) {
-                                    return 'En az 8 karakter';
+                                  final value = v ?? '';
+                                  if (value.length < 12 ||
+                                      !RegExp(r'[a-z]').hasMatch(value) ||
+                                      !RegExp(r'[A-Z]').hasMatch(value) ||
+                                      !RegExp(r'\d').hasMatch(value) ||
+                                      !RegExp(r'[^A-Za-z0-9]').hasMatch(value)) {
+                                    return '12+ karakter; büyük/küçük harf, rakam ve sembol gerekli';
                                   }
                                   return null;
                                 },

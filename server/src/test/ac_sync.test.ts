@@ -16,7 +16,7 @@ const activationA = 'sync-http-activation-a';
 const activationB = 'sync-http-activation-b';
 const installationA = 'sync-http-installation-a';
 const installationB = 'sync-http-installation-b';
-const syncProtocolHeader = { 'x-sync-protocol-version': '5' };
+const syncProtocolHeader = { 'x-sync-protocol-version': '6' };
 
 function fail(message: string): never {
   throw new Error(`Sync V4 HTTP acceptance failed: ${message}`);
@@ -119,7 +119,7 @@ async function run() {
       device_id: installationA,
       mutations: [productMutation],
     });
-  if (unsupportedProtocol.status !== 426 || unsupportedProtocol.body.required_version !== 5) {
+  if (unsupportedProtocol.status !== 426 || unsupportedProtocol.body.required_version !== 6) {
     fail(`outdated sync protocol was not rejected safely: ${unsupportedProtocol.status}`);
   }
 

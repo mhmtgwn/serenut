@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { pgPool } from '../config/database';
+import { PasswordRecoveryService } from '../modules/auth/password-recovery.service';
 
 const BCRYPT_ROUNDS = 12;
 const PLATFORM_COMPANY_ID = 'serenut_cloud';
@@ -45,8 +46,9 @@ function readHidden(prompt: string): Promise<string> {
 }
 
 function validatePassword(password: string): void {
-  if (password.length < 8) {
-    throw new Error('Parola en az 8 karakter olmalıdır.');
+  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) ||
+      !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    throw new Error('Parola en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.');
   }
 }
 
@@ -73,18 +75,6 @@ async function main() {
     await client.query("SET LOCAL app.bypass_rls = 'true'");
     await client.query("SELECT pg_advisory_xact_lock(hashtext('serenut:create-sysadmin'))");
 
-    const existing = await client.query(
-      `SELECT u.email
-         FROM users u
-         JOIN user_roles ur ON ur.user_id = u.id
-         JOIN roles r ON r.id = ur.role_id
-        WHERE r.name = 'sysadmin'
-        LIMIT 1`
-    );
-    if (existing.rows.length > 0) {
-      throw new Error(`Sysadmin hesabı zaten mevcut: ${existing.rows[0].email}`);
-    }
-
     const duplicateEmail = await client.query(
       'SELECT 1 FROM users WHERE LOWER(email) = $1 LIMIT 1',
       [email]
@@ -100,12 +90,13 @@ async function main() {
       [PLATFORM_COMPANY_ID, PLATFORM_COMPANY_NAME, PLATFORM_TAX_NUMBER]
     );
 
-    const roleResult = await client.query(
+    await client.query(
       `INSERT INTO roles (id, name, description)
        VALUES ('sysadmin', 'sysadmin', 'Serenut platform system administrator')
-       ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description
-       RETURNING id`
+       ON CONFLICT DO NOTHING`
     );
+    const roleResult = await client.query(`SELECT id FROM roles WHERE name='sysadmin' LIMIT 1`);
+    if (!roleResult.rowCount) throw new Error('Sysadmin rolü oluşturulamadı.');
 
     const userId = `sysadmin-${crypto.randomUUID()}`;
     await client.query(
@@ -118,9 +109,13 @@ async function main() {
       'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
       [userId, roleResult.rows[0].id]
     );
+    const recoveryCodes = await PasswordRecoveryService.issueRecoveryCodes(client, userId);
 
     await client.query('COMMIT');
     console.log(`Sysadmin oluşturuldu: ${name} <${email}>`);
+    console.log('\nKurtarma kodları (yalnızca şimdi gösterilir):');
+    recoveryCodes.forEach(code => console.log(code));
+    console.log('\nKodları çevrimdışı ve güvenli bir yerde saklayın.');
     console.log('Parola daha sonra Hesap Ayarları ekranından değiştirilebilir.');
   } catch (error) {
     await client.query('ROLLBACK');
