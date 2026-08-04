@@ -1114,36 +1114,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       return [];
     }
     try {
-      Uint8List list;
-      if (logoPath != null && logoPath.startsWith('data:image/')) {
-        final comma = logoPath.indexOf(',');
-        if (comma < 0) return [];
-        list = base64Decode(logoPath.substring(comma + 1));
-      } else if (!kIsWeb &&
-          logoPath != null &&
-          (logoPath.startsWith('https://') || logoPath.startsWith('http://'))) {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 5);
-        try {
-          final request = await client.getUrl(Uri.parse(logoPath));
-          final response = await request.close();
-          if (response.statusCode < 200 || response.statusCode >= 300) {
-            throw HttpException('Logo HTTP ${response.statusCode}');
-          }
-          list = Uint8List.fromList(await response
-              .fold<List<int>>([], (all, part) => all..addAll(part)));
-        } finally {
-          client.close(force: true);
-        }
-      } else if (!kIsWeb &&
-          logoPath != null &&
-          logoPath.isNotEmpty &&
-          File(logoPath).existsSync()) {
-        list = await File(logoPath).readAsBytes();
-      } else {
-        final ByteData data = await rootBundle.load('assets/logo.png');
-        list = data.buffer.asUint8List();
-      }
+      final list = await _loadLogoSourceBytes(logoPath);
       final img.Image? decoded = img.decodeImage(list);
       if (decoded != null) {
         // Enforce logo width to be an exact multiple of 8 bytes for ESC/POS GS v 0
@@ -1152,17 +1123,64 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         int targetWidth = (rawTargetWidth ~/ 8) * 8;
         if (targetWidth < 8) targetWidth = 8;
 
-        final img.Image resized = img.copyResize(
+        var resized = img.copyResize(
           decoded,
           width: targetWidth,
           interpolation: img.Interpolation.cubic,
         );
+        final maxHeight = maxWidth <= 320 ? 96 : 128;
+        if (resized.height > maxHeight) {
+          resized = img.copyResize(
+            resized,
+            height: maxHeight,
+            interpolation: img.Interpolation.cubic,
+          );
+          final alignedWidth = (resized.width ~/ 8) * 8;
+          resized = img.copyResize(
+            resized,
+            width: alignedWidth < 8 ? 8 : alignedWidth,
+            interpolation: img.Interpolation.cubic,
+          );
+        }
         return _convertImageToEscPos(resized);
       }
     } catch (e) {
       debugPrint('Logo yukleme hatasi: $e');
     }
     return [];
+  }
+
+  Future<Uint8List> _loadLogoSourceBytes(String? logoPath) async {
+    if (logoPath != null && logoPath.startsWith('data:image/')) {
+      final comma = logoPath.indexOf(',');
+      if (comma < 0) throw const FormatException('Invalid data image logo');
+      return base64Decode(logoPath.substring(comma + 1));
+    }
+    if (!kIsWeb &&
+        logoPath != null &&
+        (logoPath.startsWith('https://') || logoPath.startsWith('http://'))) {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
+      try {
+        final request = await client.getUrl(Uri.parse(logoPath));
+        final response = await request.close();
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw HttpException('Logo HTTP ${response.statusCode}');
+        }
+        return Uint8List.fromList(await response
+            .fold<List<int>>([], (all, part) => all..addAll(part)));
+      } finally {
+        client.close(force: true);
+      }
+    }
+    if (!kIsWeb &&
+        logoPath != null &&
+        logoPath.isNotEmpty &&
+        File(logoPath).existsSync()) {
+      return File(logoPath).readAsBytes();
+    }
+    final ByteData data = await rootBundle.load('assets/logo.png');
+    return data.buffer.asUint8List();
   }
 
   // Converts an Image into ESC/POS GS v 0 raster bit image bytes
@@ -1180,6 +1198,13 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     bytes.addAll([0x1D, 0x76, 0x30, 0, xL, xH, yL, yH]);
 
+    const bayer4x4 = <List<int>>[
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ];
+
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < widthBytes * 8; x += 8) {
         int byte = 0;
@@ -1187,13 +1212,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           final int px = x + bit;
           if (px < width) {
             final pixel = image.getPixel(px, y);
-            // Handle transparent background pixels cleanly (treat alpha < 128 as white)
-            if (pixel.a >= 128) {
-              final double luminance =
-                  0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
-              if (luminance < 128) {
-                byte |= (1 << (7 - bit));
-              }
+            // Composite transparency onto white before monochrome conversion.
+            // Ordered dithering preserves coloured logo details instead of
+            // collapsing every mid-tone into one solid black shape.
+            final alpha = pixel.a / 255.0;
+            final sourceLuminance =
+                0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+            final luminance = sourceLuminance * alpha + 255 * (1 - alpha);
+            final threshold = 80 + bayer4x4[y % 4][px % 4] * 8;
+            if (luminance < threshold) {
+              byte |= (1 << (7 - bit));
             }
           }
         }
@@ -1256,62 +1284,59 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final isTspl = settings.labelPrinterLanguage == 'tspl';
     final custName = customer?.name ?? order.customerId;
 
-    for (final item in items) {
-      final name = item['product_name']?.toString().trim().isNotEmpty == true
-          ? item['product_name'].toString()
-          : item['product_id']?.toString() ?? 'Ürün';
-      final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
-      final note = item['note']?.toString() ?? order.notes;
+    final firstItem = items.isEmpty ? null : items.first;
+    final summaryName = items.length == 1
+        ? (firstItem?['product_name']?.toString().trim().isNotEmpty == true
+            ? firstItem!['product_name'].toString()
+            : firstItem?['product_id']?.toString() ?? 'Urun')
+        : '${items.length} Urun / Paket';
+    final summaryQuantity = items.length == 1
+        ? (firstItem?['quantity'] as num?)?.toDouble() ?? 1.0
+        : 1.0;
+    final note = firstItem?['note']?.toString() ?? order.notes;
 
-      if (isTspl) {
-        final labelBytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
-          orderIdShort:
-              order.id.length > 8 ? order.id.substring(0, 8) : order.id,
-          customerName: custName,
-          productName: name,
-          quantity: qty,
-          // One physical label is generated for each order item. Passing the
-          // whole order here duplicated every item on every label and caused
-          // the TSPL content to run past the configured label height.
-          items: [item],
-          note: note,
-          timestamp: order.createdAt,
-          totalAmount: order.totalAmount,
-          itemsCount: items.length,
-          widthMm: settings.labelWidthMm,
-          heightMm: settings.labelHeightMm,
-          gapMm: settings.labelGapMm,
-          dpi: settings.labelDpi,
-          copies: settings.labelPrinterCopies,
-          showBusinessName: settings.labelOrderShowBusinessName,
-          showCustomerName: settings.labelOrderShowCustomerName,
-          showOrderNo: settings.labelOrderShowOrderNo,
-          showDate: settings.labelOrderShowDate,
-          showTotalAmount: settings.labelOrderShowTotalAmount,
-          showItemsCount: settings.labelOrderShowItemsCount,
-          fontSize: settings.labelOrderFontSize,
-          businessName: settings.businessName,
-        );
-        allBytes.addAll(labelBytes);
-      } else {
-        final labelModel = LabelModel(
-          productName: name,
-          weight: qty,
-          price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          barcode: order.id,
-          businessName: settings.businessName,
-          qrData: 'item|${order.id}|${item['product_id']}|$qty',
-          timestamp: order.createdAt,
-        );
-        final labelBytes = LabelLayoutEngine.generateLabelBytes(
-          labelModel,
-          width: targetSettings.paperWidth <= 58 ? 32 : 48,
-          showBusinessName: settings.labelOrderShowBusinessName,
-          showBarcode: settings.labelOrderShowOrderNo,
-          showPrice: settings.labelOrderShowTotalAmount,
-        );
-        allBytes.addAll(labelBytes);
-      }
+    if (isTspl) {
+      allBytes.addAll(TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+        customerName: custName,
+        productName: summaryName,
+        quantity: summaryQuantity,
+        items: items,
+        note: note,
+        timestamp: order.createdAt,
+        totalAmount: order.totalAmount,
+        itemsCount: items.length,
+        widthMm: settings.labelWidthMm,
+        heightMm: settings.labelHeightMm,
+        gapMm: settings.labelGapMm,
+        dpi: settings.labelDpi,
+        copies: settings.labelPrinterCopies,
+        showBusinessName: settings.labelOrderShowBusinessName,
+        showCustomerName: settings.labelOrderShowCustomerName,
+        showOrderNo: settings.labelOrderShowOrderNo,
+        showDate: settings.labelOrderShowDate,
+        showTotalAmount: settings.labelOrderShowTotalAmount,
+        showItemsCount: settings.labelOrderShowItemsCount,
+        fontSize: settings.labelOrderFontSize,
+        businessName: settings.businessName,
+      ));
+    } else {
+      final labelModel = LabelModel(
+        productName: summaryName,
+        weight: summaryQuantity,
+        price: order.totalAmount,
+        barcode: order.id,
+        businessName: settings.businessName,
+        qrData: 'order|${order.id}',
+        timestamp: order.createdAt,
+      );
+      allBytes.addAll(LabelLayoutEngine.generateLabelBytes(
+        labelModel,
+        width: targetSettings.paperWidth <= 58 ? 32 : 48,
+        showBusinessName: settings.labelOrderShowBusinessName,
+        showBarcode: settings.labelOrderShowOrderNo,
+        showPrice: settings.labelOrderShowTotalAmount,
+      ));
     }
 
     await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);
@@ -1331,6 +1356,9 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
     final isTspl = settings.labelPrinterLanguage == 'tspl';
     final width = targetSettings.paperWidth <= 58 ? 32 : 48;
+    final tsplLogoBytes = isTspl && settings.printLogo
+        ? await _loadLogoSourceBytes(settings.businessLogo)
+        : null;
     final logo = !isTspl && settings.printLogo
         ? await _getLogoBytes(settings.businessLogo,
             maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360)
@@ -1367,6 +1395,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           showVat: settings.labelShowVat,
           fontSize: settings.labelFontSize,
           logoPath: settings.businessLogo,
+          logoBytes: tsplLogoBytes,
         ));
       } else {
         for (var copy = 0; copy < effectiveCopies; copy++) {

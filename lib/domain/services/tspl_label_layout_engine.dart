@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/models/label_model.dart';
@@ -24,6 +25,7 @@ class TsplLabelLayoutEngine {
     bool showVat = true,
     String fontSize = 'Orta',
     String? logoPath,
+    List<int>? logoBytes,
   }) {
     final safeWidth = widthMm.clamp(30, 100);
     final safeHeight = heightMm.clamp(20, 100);
@@ -54,7 +56,8 @@ class TsplLabelLayoutEngine {
 
     // 1. Top Logo / Header (Bitmap Logo or Centered Business Name)
     if (showBusinessName) {
-      final bitmapCmd = _generateTsplBitmap(logoPath, widthDots, currentY);
+      final bitmapCmd =
+          _generateTsplBitmap(logoPath, logoBytes, widthDots, currentY);
       if (bitmapCmd != null) {
         commands.writeln(bitmapCmd);
         currentY += sy(36 * fontScale).round();
@@ -101,7 +104,9 @@ class TsplLabelLayoutEngine {
       currentY += sy(32 * fontScale).round();
     } else {
       final lines = _wrapProductName(nameClean, (22 / fontScale).round());
-      for (final line in lines) {
+      final maxLineChars = (22 / fontScale).round();
+      for (final rawLine in lines) {
+        final line = _fit(rawLine, maxLineChars);
         final textW = line.length * 12 * fontScale;
         final centerX =
             ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
@@ -125,7 +130,7 @@ class TsplLabelLayoutEngine {
       final barcodeY = bottomY + sy(14);
       final barcodeHeight = sy(28 * fontScale).clamp(14, 40).round();
       commands.writeln(
-        'BARCODE ${sx(16)},$barcodeY,"128",$barcodeHeight,0,0,2,3,"$barcode"',
+        'BARCODE ${sx(16)},$barcodeY,"128",$barcodeHeight,0,0,1,2,"$barcode"',
       );
     }
 
@@ -142,10 +147,12 @@ class TsplLabelLayoutEngine {
         final currencyX = sx(190);
         final wholeX = sx(218);
         final centsX = widthDots - sx(38);
+        final wholeFont =
+            whole.length <= 3 ? '4' : (whole.length <= 7 ? '3' : '2');
         final wholeMultiplier = whole.length <= 3 ? 2 : 1;
         commands.writeln('TEXT $currencyX,${bottomY + sy(22)},"2",0,1,1,"TL"');
         commands.writeln(
-            'TEXT $wholeX,$bottomY,"4",0,$wholeMultiplier,$wholeMultiplier,"$whole"');
+            'TEXT $wholeX,$bottomY,"$wholeFont",0,$wholeMultiplier,$wholeMultiplier,"$whole"');
         commands.writeln('TEXT $centsX,$bottomY,"2",0,1,1,"$cents"');
         if (showVat) {
           commands.writeln(
@@ -153,10 +160,15 @@ class TsplLabelLayoutEngine {
         }
       } else {
         final priceStr = 'TL $whole.$cents';
-        final textW = priceStr.length * 16 * fontScale;
+        final priceFont =
+            priceStr.length <= 7 ? '4' : (priceStr.length <= 11 ? '3' : '2');
+        final priceCharWidth =
+            priceFont == '4' ? 24 : (priceFont == '3' ? 16 : 12);
+        final textW = priceStr.length * priceCharWidth * fontScale;
         final priceX =
             ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
-        commands.writeln('TEXT $priceX,$bottomY,"4",0,1,1,"$priceStr"');
+        commands
+            .writeln('TEXT $priceX,$bottomY,"$priceFont",0,1,1,"$priceStr"');
         if (showVat) {
           final vatW = vatStr.length * 8 * fontScale;
           final vatX =
@@ -268,10 +280,21 @@ class TsplLabelLayoutEngine {
       currentY += sy(18);
     }
 
+    final barcodeY = heightDots - sy(48);
+    final reservedAfterItems = (noteClean != null ? sy(16) : 0) +
+        (showTotalAmount && totalAmount != null ? sy(26) : 0) +
+        sy(4);
+
     if (items != null && items.isNotEmpty) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"URUN ICERIGI:"');
-      currentY += sy(16);
-      for (final item in items) {
+      final availableForItems =
+          (barcodeY - currentY - reservedAfterItems).clamp(0, heightDots);
+      final maxItemLines = (availableForItems ~/ sy(18)).clamp(0, 4);
+      final visibleCount = items.length <= maxItemLines
+          ? items.length
+          : (maxItemLines > 1 ? maxItemLines - 1 : 0);
+
+      for (var index = 0; index < visibleCount; index++) {
+        final item = items[index];
         final name = _fit(
             (item['product_name'] ?? item['name'] ?? 'Urun').toString(), 22);
         final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
@@ -280,6 +303,13 @@ class TsplLabelLayoutEngine {
             : itemQty.toStringAsFixed(1);
         final lineStr = '- ${itemQtyStr}x $name';
         commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$lineStr"');
+        currentY += sy(18);
+      }
+
+      final remaining = items.length - visibleCount;
+      if (remaining > 0 && maxItemLines > visibleCount) {
+        commands.writeln(
+            'TEXT ${sx(16)},$currentY,"1",0,1,1,"+$remaining diger urun"');
         currentY += sy(18);
       }
     } else {
@@ -306,7 +336,6 @@ class TsplLabelLayoutEngine {
       currentY += sy(26);
     }
 
-    final barcodeY = heightDots - sy(48);
     final barcodeHeight = sy(28).clamp(14, 36);
     final cleanBarcode = _barcode(orderIdShort);
     if (cleanBarcode.isNotEmpty) {
@@ -354,7 +383,9 @@ class TsplLabelLayoutEngine {
 
   static String _barcode(String value) {
     final sanitized = value.trim().replaceAll(RegExp(r'[^A-Za-z0-9._\-/]'), '');
-    return sanitized.length <= 40 ? sanitized : sanitized.substring(0, 40);
+    // Never truncate barcode payloads: a shortened code scans as a different
+    // product. Long UUID-style identifiers also exceed the left label column.
+    return sanitized.length <= 16 ? sanitized : '';
   }
 
   static String _fit(String value, int maxLength) {
@@ -384,13 +415,18 @@ class TsplLabelLayoutEngine {
   }
 
   static String? _generateTsplBitmap(
-      String? logoPath, int widthDots, int currentY) {
-    if (logoPath == null || logoPath.trim().isEmpty || kIsWeb) return null;
+      String? logoPath, List<int>? logoBytes, int widthDots, int currentY) {
     try {
-      final file = File(logoPath);
-      if (!file.existsSync()) return null;
-      final bytes = file.readAsBytesSync();
-      final decoded = img.decodeImage(bytes);
+      final List<int> bytes;
+      if (logoBytes != null && logoBytes.isNotEmpty) {
+        bytes = logoBytes;
+      } else {
+        if (logoPath == null || logoPath.trim().isEmpty || kIsWeb) return null;
+        final file = File(logoPath);
+        if (!file.existsSync()) return null;
+        bytes = file.readAsBytesSync();
+      }
+      final decoded = img.decodeImage(Uint8List.fromList(bytes));
       if (decoded == null) return null;
 
       int targetWidth = 120;
