@@ -60,11 +60,35 @@ void main() {
     );
 
     expect(output, contains('Uzun Urun Adi'));
-    expect(output, contains('ve Cesidi'));
-    expect(output, contains('"2",0,2,2'));
+    expect(output, contains('Cesidi'));
+    expect(output, contains('"2",0,1,1'));
     expect(output, contains('"128"'));
-    expect(output, contains('TL"'));
+    expect(output, contains('TL 123.45'));
     expect(output, isNot(contains('Ü')));
     expect(output, isNot(contains('geçersiz')));
+  });
+
+  test('sipariş etiketi yalnızca Latin-1 uyumlu TSPL üretir', () {
+    final bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
+      orderIdShort: 'order-123',
+      customerName: 'Şaman Müşteri',
+      productName: 'Çeşitli Ürün',
+      quantity: 2,
+      items: const [
+        {
+          'product_name': 'Örnek Ürün',
+          'quantity': 2.0,
+        },
+      ],
+      itemsCount: 1,
+      totalAmount: 20,
+      businessName: 'Şaman Market',
+    );
+    final output = latin1.decode(bytes);
+
+    expect(output, contains('- 1 Parca Urun / Paket'));
+    expect(output, contains('- 2x Ornek Urun'));
+    expect(output, isNot(contains('•')));
+    expect(output, endsWith('PRINT 1,1\r\n'));
   });
 }

@@ -67,7 +67,8 @@ class TsplLabelLayoutEngine {
         final textW = logoText.length * charW * fontScale;
         final centerX =
             ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
-        commands.writeln('TEXT $centerX,$currentY,"$fontType",0,1,1,"$logoText"');
+        commands
+            .writeln('TEXT $centerX,$currentY,"$fontType",0,1,1,"$logoText"');
         currentY += sy(20 * fontScale).round();
       }
     }
@@ -125,13 +126,14 @@ class TsplLabelLayoutEngine {
     // Bottom Right or Centered: Price & KDV (if enabled)
     if (showPrice) {
       final priceStr = 'TL ${model.price.toStringAsFixed(2)}';
-      final vatStr = '(KDV Dahil)';
+      const vatStr = '(KDV Dahil)';
 
       if (showBarcode && barcode.isNotEmpty) {
         final priceX = sx(200);
         commands.writeln('TEXT $priceX,$bottomY,"3",0,1,1,"$priceStr"');
         if (showVat) {
-          commands.writeln('TEXT $priceX,${bottomY + sy(22)},"1",0,1,1,"$vatStr"');
+          commands
+              .writeln('TEXT $priceX,${bottomY + sy(22)},"1",0,1,1,"$vatStr"');
         }
       } else {
         final textW = priceStr.length * 16 * fontScale;
@@ -142,7 +144,8 @@ class TsplLabelLayoutEngine {
           final vatW = vatStr.length * 8 * fontScale;
           final vatX =
               ((widthDots - vatW) / 2).clamp(10, widthDots - 10).round();
-          commands.writeln('TEXT $vatX,${bottomY + sy(30)},"1",0,1,1,"$vatStr"');
+          commands
+              .writeln('TEXT $vatX,${bottomY + sy(30)},"1",0,1,1,"$vatStr"');
         }
       }
     }
@@ -193,9 +196,8 @@ class TsplLabelLayoutEngine {
         : quantity.toStringAsFixed(1);
     final custClean = _ascii(customerName.trim());
     final prodClean = _ascii(productName.trim());
-    final noteClean = note != null && note.trim().isNotEmpty
-        ? _ascii(note.trim())
-        : null;
+    final noteClean =
+        note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
 
     final commands = StringBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
@@ -208,7 +210,9 @@ class TsplLabelLayoutEngine {
     int currentY = sy(6);
 
     // 1. Business Header (if enabled)
-    if (showBusinessName && businessName != null && businessName.trim().isNotEmpty) {
+    if (showBusinessName &&
+        businessName != null &&
+        businessName.trim().isNotEmpty) {
       final bizClean = _ascii(businessName.trim());
       commands.writeln('TEXT ${sx(110)},$currentY,"2",0,1,1,"$bizClean"');
       currentY += sy(20);
@@ -216,7 +220,8 @@ class TsplLabelLayoutEngine {
 
     // 2. Header: Sipariş No & Tarih
     if (showOrderNo) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderIdShort"');
+      commands.writeln(
+          'TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderIdShort"');
     }
     if (showDate && timeStr.isNotEmpty) {
       commands.writeln('TEXT ${sx(220)},$currentY,"1",0,1,1,"$timeStr"');
@@ -227,7 +232,8 @@ class TsplLabelLayoutEngine {
 
     // 3. Customer Info ("Müşteri")
     if (showCustomerName) {
-      final whoText = custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
+      final whoText =
+          custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
       commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$whoText"');
       currentY += sy(22);
     }
@@ -239,7 +245,7 @@ class TsplLabelLayoutEngine {
     // 5. Items Count & Product Quantity / Items List
     if (showItemsCount && itemsCount != null) {
       commands.writeln(
-          'TEXT ${sx(16)},$currentY,"1",0,1,1,"• $itemsCount Parca Urun / Paket"');
+          'TEXT ${sx(16)},$currentY,"1",0,1,1,"- $itemsCount Parca Urun / Paket"');
       currentY += sy(18);
     }
 
@@ -247,12 +253,13 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"URUN ICERIGI:"');
       currentY += sy(16);
       for (final item in items) {
-        final name = _ascii(
-            (item['product_name'] ?? item['name'] ?? 'Urun').toString());
+        final name =
+            _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
         final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
-        final itemQtyStr =
-            itemQty % 1 == 0 ? itemQty.toInt().toString() : itemQty.toStringAsFixed(1);
-        final lineStr = '• ${itemQtyStr}x $name';
+        final itemQtyStr = itemQty % 1 == 0
+            ? itemQty.toInt().toString()
+            : itemQty.toStringAsFixed(1);
+        final lineStr = '- ${itemQtyStr}x $name';
         commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$lineStr"');
         currentY += sy(18);
       }
@@ -286,7 +293,8 @@ class TsplLabelLayoutEngine {
       commands.writeln(
         'BARCODE ${sx(16)},$barcodeY,"128",$barcodeHeight,0,0,2,3,"$cleanBarcode"',
       );
-      commands.writeln('TEXT ${sx(220)},${barcodeY + sy(8)},"1",0,1,1,"#$orderIdShort"');
+      commands.writeln(
+          'TEXT ${sx(220)},${barcodeY + sy(8)},"1",0,1,1,"#$orderIdShort"');
     }
 
     commands.writeln('PRINT ${copies.clamp(1, 20)},1');
@@ -359,8 +367,9 @@ class TsplLabelLayoutEngine {
       if (decoded == null) return null;
 
       int targetWidth = 160; // 20mm at 203dpi
-      int targetHeight =
-          (decoded.height * (targetWidth / decoded.width)).round().clamp(10, 80);
+      int targetHeight = (decoded.height * (targetWidth / decoded.width))
+          .round()
+          .clamp(10, 80);
       targetWidth = (targetWidth ~/ 8) * 8; // Multiple of 8
       if (targetWidth < 8) targetWidth = 8;
       final widthBytes = targetWidth ~/ 8;
