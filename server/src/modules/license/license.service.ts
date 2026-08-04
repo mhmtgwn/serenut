@@ -2,6 +2,8 @@ import { pgPool } from '../../config/database';
 import { signPayload } from '../../crypto_helper';
 import crypto from 'crypto';
 import { logger } from '../../config/logger';
+import { scheduleTrialLifecycleJobs } from '../../workers/billing.scheduler';
+import { CommercialLifecycleService } from '../billing/commercial_lifecycle.service';
 
 export interface LicenseActivationResult {
   status: string;
@@ -88,12 +90,13 @@ export class LicenseService {
     fingerprint?: any
   ): Promise<LicenseActivationResult> {
     const client = await pgPool.connect();
+    let startedTrial: { start: Date; end: Date } | null = null;
     try {
       await client.query('BEGIN');
 
       // 1. Fetch active entitlement details with row lock
       const entRes = await client.query(
-        `SELECT id, company_id, plan_id, device_limit, status, valid_until, token_version 
+        `SELECT id, company_id, subscription_id, plan_id, device_limit, status, valid_until, token_version
          FROM license_entitlements 
          WHERE license_key = $1 AND status IN ('trial', 'active') 
          ORDER BY valid_until DESC LIMIT 1 FOR UPDATE`,
@@ -112,7 +115,43 @@ export class LicenseService {
 
       const now = new Date();
 
-      if (new Date(entitlement.valid_until) < now) {
+      // The trial clock starts with the first successful device activation.
+      // Subscription, entitlement, legacy compatibility row and device binding
+      // are all part of this transaction, so a partial activation is impossible.
+      if (entitlement.status === 'trial') {
+        const trialSub = await client.query(
+          `SELECT id, trial_started_at FROM subscriptions
+           WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+          [entitlement.subscription_id, entitlement.company_id],
+        );
+        if (trialSub.rows[0] && !trialSub.rows[0].trial_started_at) {
+          const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          await client.query(
+            `UPDATE subscriptions
+             SET trial_started_at=$1, trial_ends_at=$2,
+                 current_period_start=$1, current_period_end=$2,
+                 status='trialing', updated_at=NOW()
+             WHERE id=$3`,
+            [now, trialEnd, trialSub.rows[0].id],
+          );
+          await client.query(
+            `UPDATE license_entitlements
+             SET valid_from=$1, valid_until=$2, updated_at=NOW()
+             WHERE id=$3`,
+            [now, trialEnd, entitlement.id],
+          );
+          await client.query(
+            `UPDATE licenses
+             SET status='active', expires_at=$1, updated_at=NOW()
+             WHERE company_id=$2 AND license_key=$3`,
+            [trialEnd, entitlement.company_id, licenseKey],
+          );
+          entitlement.valid_until = trialEnd;
+          startedTrial = { start: now, end: trialEnd };
+        }
+      }
+
+      if (!entitlement.valid_until || new Date(entitlement.valid_until) < now) {
         await client.query("UPDATE license_entitlements SET status = 'expired', updated_at = NOW() WHERE id = $1", [entitlement.id]);
         throw new Error('license_expired');
       }
@@ -239,47 +278,27 @@ export class LicenseService {
 
       await client.query('COMMIT');
 
-      // 3. Trigger trial start on first activation if trial_started_at is NULL
-      try {
-        const trialClient = await pgPool.connect();
+      if (startedTrial && process.env.REDIS_URL) {
         try {
-          await trialClient.query('BEGIN');
-          const subCheck = await trialClient.query(
-            `SELECT id FROM subscriptions WHERE company_id = $1 AND trial_started_at IS NULL LIMIT 1`,
-            [entitlement.company_id]
+          const company = await pgPool.query(
+            'SELECT name, email, phone FROM companies WHERE id=$1',
+            [entitlement.company_id],
           );
-          if (subCheck.rows.length > 0) {
-            const trialStart = new Date();
-            const trialEnd = new Date(trialStart.getTime() + 30 * 24 * 60 * 60 * 1000);
-            await trialClient.query(
-              `UPDATE subscriptions
-               SET trial_started_at = $1,
-                   trial_ends_at = $2,
-                   current_period_start = $1,
-                   current_period_end = $2,
-                   status = 'trialing'
-               WHERE id = $3`,
-              [trialStart, trialEnd, subCheck.rows[0].id]
-            );
-            await trialClient.query(
-              `UPDATE license_entitlements
-               SET valid_from = $1, valid_until = $2, updated_at = NOW()
-               WHERE id = $3 AND status = 'trial'`,
-              [trialStart, trialEnd, entitlement.id]
-            );
-            // The response below is built from the row fetched before this update.
-            // Keep it aligned so the client receives the actual 30-day trial end.
-            entitlement.valid_until = trialEnd;
+          const contact = company.rows[0];
+          if (contact?.email) {
+            await scheduleTrialLifecycleJobs({
+              companyId: entitlement.company_id,
+              companyName: contact.name,
+              email: contact.email,
+              phone: contact.phone || undefined,
+              trialStartDate: startedTrial.start,
+              trialDays: 30,
+            });
           }
-          await trialClient.query('COMMIT');
-        } catch (trialErr) {
-          await trialClient.query('ROLLBACK');
-          logger.error('[LicenseService] Trial start update failed:', trialErr);
-        } finally {
-          trialClient.release();
+        } catch (scheduleError) {
+          // Hourly reconciliation remains the durable expiry safety net.
+          logger.error('[LicenseService] Trial notification schedule failed', scheduleError);
         }
-      } catch (trialConnErr) {
-        logger.error('[LicenseService] Trial connection error:', trialConnErr);
       }
 
       // 4. Build device-specific signed license payload (alphabetical keys for canonical json)
@@ -482,99 +501,34 @@ export class LicenseService {
     }
   }
 
-  // --- Sprint 3: License Renewal ---
-  public static async renew(licenseKey: string, extendDays: number): Promise<any> {
+  public static async revoke(licenseKey: string, actorId: string, reason: string): Promise<void> {
+    if (!reason.trim()) throw new Error('status_reason_required');
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
 
       const res = await client.query(
-        `SELECT id, valid_until as expires_at, status, company_id, plan_id, token_version 
-         FROM license_entitlements WHERE license_key = $1 AND status IN ('trial', 'active') 
-         ORDER BY valid_until DESC LIMIT 1 FOR UPDATE`,
-        [licenseKey]
+        'SELECT company_id FROM license_entitlements WHERE license_key = $1 FOR UPDATE',
+        [licenseKey],
       );
-      if (res.rows.length === 0) {
-        throw new Error('invalid_license_key');
-      }
-
-      const entitlement = res.rows[0];
-      let currentExpiry = new Date(entitlement.expires_at);
-      if (currentExpiry < new Date()) {
-        currentExpiry = new Date();
-      }
-
-      const newExpiry = new Date(currentExpiry.getTime() + extendDays * 24 * 60 * 60 * 1000);
-
-      await client.query(
-        "UPDATE license_entitlements SET valid_until = $1, status = 'active', updated_at = NOW() WHERE id = $2",
-        [newExpiry, entitlement.id]
-      );
-
-      // Increment token version to force refresh
-      await client.query(
-        "UPDATE license_entitlements SET token_version = token_version + 1 WHERE id = $1",
-        [entitlement.id]
-      );
-
-      // Sync legacy licenses table
-      await client.query(
-        "UPDATE licenses SET expires_at = $1, status = 'active', updated_at = NOW() WHERE company_id = $2",
-        [newExpiry, entitlement.company_id]
-      );
-
-      await client.query('COMMIT');
-
-      const licenseInfo = {
-        device_id: '',
-        device_token_version: 1,
-        expiry_date: newExpiry.toISOString(),
-        tier: entitlement.plan_id.includes('pro') ? 'pro_plus' : 'basic',
-        features: entitlement.plan_id.includes('pro') ? ['cloud_sync', 'sms_reports', 'multi_store'] : ['cloud_sync'],
-        merchant_id: entitlement.company_id,
-        token_version: entitlement.token_version + 1
-      };
-
-      const sortedPayload = Object.fromEntries(Object.entries(licenseInfo).sort());
-      const signature = signPayload(JSON.stringify(sortedPayload));
-
-      return {
-        status: 'renewed',
-        license_info: licenseInfo,
-        signature
-      };
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  // --- Sprint 3: License Revocation ---
-  public static async revoke(licenseKey: string): Promise<void> {
-    const client = await pgPool.connect();
-    try {
-      await client.query('BEGIN');
-
-      const res = await client.query('SELECT id, company_id FROM license_entitlements WHERE license_key = $1', [licenseKey]);
       if (res.rows.length === 0) {
         throw new Error('invalid_license_key');
       }
 
       const companyId = res.rows[0].company_id;
 
-      // Block license entitlements
-      await client.query("UPDATE license_entitlements SET status = 'revoked', updated_at = NOW() WHERE company_id = $1", [companyId]);
+      await CommercialLifecycleService.setEntitlementStatus(client, {
+        companyId,
+        status: 'revoked',
+        actorId,
+        reason,
+      });
 
       // Block all linked devices activations
       await client.query(
         `UPDATE device_activations SET status = 'revoked', revoked_at = NOW(), revoked_by = 'sysadmin' WHERE company_id = $1`,
         [companyId]
       );
-
-      // Sync legacy licenses table
-      await client.query("UPDATE licenses SET status = 'suspended', updated_at = NOW() WHERE company_id = $1", [companyId]);
 
       await client.query('COMMIT');
     } catch (err) {

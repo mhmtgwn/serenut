@@ -8,7 +8,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { pgPool, redisClient } from '../../config/database';
 import { logger } from '../../config/logger';
-import { enqueueNotification } from '../../workers/notification.worker';
 
 // ── STARTUP SECRETS VALIDATION ────────────────────────────────────────────────
 // Fail fast on startup if JWT_SECRET is missing or dangerously weak.
@@ -583,182 +582,21 @@ export class AuthService {
         throw new Error('invalid_old_password');
       }
 
+      const { valid: reusesCurrentPassword } = await this.verifyPassword(newPlain, verifyRes.rows[0].password_hash);
+      if (reusesCurrentPassword) {
+        throw new Error('password_reuse_not_allowed');
+      }
+
       const newHash = await this.hashPassword(newPlain);
-      await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
+      await client.query(
+        `UPDATE users SET password_hash = $1, token_version = token_version + 1,
+         failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = $2`,
+        [newHash, userId],
+      );
 
       // Revoke all sessions on password change (security best practice)
-      await client.query('UPDATE sessions SET is_revoked = TRUE WHERE user_id = $1', [userId]);
+      await client.query('UPDATE sessions SET is_revoked = TRUE, updated_at = NOW() WHERE user_id = $1', [userId]);
 
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  public static async verifyIdentity(
-    email: string,
-    companyName: string,
-    taxNumber: string
-  ): Promise<string | null> {
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    const normalizedCompanyName = String(companyName || '').trim();
-    const normalizedTax = String(taxNumber || '').replace(/\D/g, '');
-
-    const client = await pgPool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-      const res = await client.query(
-        `SELECT u.id, u.company_id
-         FROM users u
-         JOIN companies c ON u.company_id = c.id
-         WHERE (LOWER(u.email) = $1 OR LOWER(u.username) = $1)
-           AND LOWER(c.name) = LOWER($2)
-           AND REGEXP_REPLACE(c.tax_number, '\\D', '', 'g') = $3
-           AND u.is_active = TRUE`,
-        [normalizedEmail, normalizedCompanyName, normalizedTax]
-      );
-
-      if (res.rows.length === 0) {
-        await client.query('COMMIT');
-        return null;
-      }
-
-      const userId = res.rows[0].id;
-      const resetToken = crypto.randomBytes(30).toString('hex');
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-
-      await client.query(
-        'UPDATE users SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3',
-        [resetToken, expiresAt, userId]
-      );
-
-      await client.query('COMMIT');
-      return resetToken;
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  public static async forgotPassword(email: string): Promise<string | null> {
-    const client = await pgPool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL app.bypass_rls = 'true'");
-      
-      const res = await client.query('SELECT id, company_id, name FROM users WHERE email = $1 AND is_active = TRUE', [email]);
-      if (res.rows.length === 0) {
-        await client.query('COMMIT');
-        return null;
-      }
-      
-      const userId = res.rows[0].id;
-      const companyId = res.rows[0].company_id;
-      const userName = res.rows[0].name;
-      const resetToken = crypto.randomBytes(30).toString('hex');
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-      
-      await client.query(
-        'UPDATE users SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3',
-        [resetToken, expiresAt, userId]
-      );
-
-      const notificationId = `notif-reset-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-      const resetBody = `Merhaba ${userName},\n\nŞifrenizi sıfırlamak için aşağıdaki bağlantıyı kullanabilirsiniz. Bu bağlantı 1 saat boyunca geçerlidir:\n\n${(process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '')}/reset-password?token=${resetToken}\n\nEğer bu talebi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız.`;
-      const resetTitle = 'Serenut OS — Şifre Sıfırlama Talebi';
-      await client.query(
-        `INSERT INTO notification_queue
-           (id, company_id, channel, recipient, title, body, status, scheduled_at)
-         VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
-        [notificationId, companyId, email, resetTitle, resetBody]
-      );
-      
-      await client.query('COMMIT');
-      
-      try {
-        await enqueueNotification({
-          notification_id: notificationId,
-          company_id: companyId,
-          channel: 'email',
-          recipient: email,
-          title: resetTitle,
-          body: resetBody,
-        });
-      } catch (queueError) {
-        // The durable DB row remains pending and can be recovered by operations.
-        logger.error('Password reset email could not be enqueued', queueError);
-      }
-      
-      logger.info(`Password reset token generated and queued for ${email}`);
-      return resetToken;
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  public static async resetPassword(token: string, newPlain: string): Promise<boolean> {
-    const client = await pgPool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL app.bypass_rls = 'true'");
-      
-      // Find user with valid token
-      const res = await client.query(
-        'SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires_at > NOW() AND is_active = TRUE',
-        [token]
-      );
-      
-      if (res.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return false;
-      }
-      
-      const userId = res.rows[0].id;
-      const newHash = await this.hashPassword(newPlain);
-      
-      // Update password and clear token
-      await client.query(
-        'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires_at = NULL WHERE id = $2',
-        [newHash, userId]
-      );
-      
-      // Revoke all existing sessions for security
-      await client.query('UPDATE sessions SET is_revoked = TRUE WHERE user_id = $1', [userId]);
-      
-      await client.query('COMMIT');
-      return true;
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
-
-  // ── ADMIN: Force Password Reset ──────────────────────────────────────────────
-
-  /**
-   * Called by admin to set a user's password directly (bypasses old-password check).
-   * Revokes all sessions.
-   */
-  public static async adminSetPassword(userId: string, newPlain: string): Promise<void> {
-    const newHash = await this.hashPassword(newPlain);
-    const client = await pgPool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL app.bypass_rls = 'true'");
-      await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
-      await client.query('UPDATE sessions SET is_revoked = TRUE WHERE user_id = $1', [userId]);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');

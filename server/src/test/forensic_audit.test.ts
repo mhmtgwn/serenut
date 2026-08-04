@@ -10,7 +10,6 @@ let sysadminToken = '';
 let regularToken = '';
 let companyId = '';
 let invoiceId = '';
-let subscriptionId = '';
 
 async function runAudit() {
   console.log('--- STARTING FORENSIC AUDIT ---');
@@ -123,6 +122,10 @@ async function runAudit() {
       INSERT INTO invoices (id, company_id, invoice_number, amount, status, due_at, billing_details)
       VALUES ($1, $2, $1, 100, 'pending', NOW(), '{"planId":"plan-pro","billingPeriod":"monthly"}')
     `, [invoiceId, companyId]);
+    await client.query(`
+      INSERT INTO bank_transfer_notifications (id,invoice_id,company_id,reference_code,status)
+      VALUES ($1,$2,$3,$4,'pending_review')
+    `, [`btn-${Date.now()}`, invoiceId, companyId, `AUDIT-${Date.now()}-1`]);
 
     // Check pre-approval (no active sub)
     const preSub = await client.query('SELECT * FROM subscriptions WHERE company_id = $1', [companyId]);
@@ -173,7 +176,7 @@ async function runAudit() {
     const checkInv2 = await client.query('SELECT status FROM invoices WHERE id = $1', [invId2]);
     assert.strictEqual(checkInv2.rows[0].status, 'paid', 'Invoice should be paid');
     const entRes = await client.query('SELECT * FROM license_entitlements WHERE company_id = $1', [companyId]);
-    // There was 1 entitlement from test 6, this test should only add 1 more or update it.
+    assert.strictEqual(entRes.rows.filter((row: any) => row.status === 'active').length, 1, 'Only one entitlement may remain active');
     console.log('✅ TEST 7 PASS');
 
     // TEST 8: HTTP double approval and concurrency
@@ -183,6 +186,10 @@ async function runAudit() {
       INSERT INTO invoices (id, company_id, invoice_number, amount, status, due_at, billing_details)
       VALUES ($1, $2, $1, 300, 'pending', NOW(), '{"planId":"plan-pro","billingPeriod":"monthly"}')
     `, [invId3, companyId]);
+    await client.query(`
+      INSERT INTO bank_transfer_notifications (id,invoice_id,company_id,reference_code,status)
+      VALUES ($1,$2,$3,$4,'pending_review')
+    `, [`btn-http-${Date.now()}`, invId3, companyId, `AUDIT-${Date.now()}-3`]);
 
     // Send 5 concurrent HTTP approval requests
     const httpPromises = [];
@@ -209,6 +216,36 @@ async function runAudit() {
     assert.strictEqual(seqApprRes.body.error, 'already_paid', 'Must return already_paid error code');
 
     console.log('✅ TEST 8 PASS');
+
+    // TEST 9: Reject and customer-cancel state transitions
+    console.log('[TEST 9] Verifying transfer rejection and cancellation...');
+    const rejectInvoiceId = `inv-reject-${Date.now()}`;
+    await client.query(`INSERT INTO invoices (id,company_id,invoice_number,amount,status,due_at,billing_details)
+      VALUES ($1,$2,$1,100,'pending',NOW(),'{"planId":"plan-pro","billingPeriod":"monthly"}')`, [rejectInvoiceId, companyId]);
+    await client.query(`INSERT INTO bank_transfer_notifications (id,invoice_id,company_id,reference_code,status)
+      VALUES ($1,$2,$3,$4,'pending_review')`, [`btn-reject-${Date.now()}`, rejectInvoiceId, companyId, `AUDIT-REJECT-${Date.now()}`]);
+    const rejectResponse = await request(app)
+      .put(`/api/v1/billing/admin/invoices/${rejectInvoiceId}/reject-payment`)
+      .set('Authorization', `Bearer ${sysadminToken}`)
+      .send({ note: 'Banka hareketinde ödeme bulunamadı.' });
+    assert.strictEqual(rejectResponse.status, 200);
+    const rejected = await client.query('SELECT status FROM invoices WHERE id=$1', [rejectInvoiceId]);
+    assert.strictEqual(rejected.rows[0].status, 'rejected');
+
+    const cancelInvoiceId = `inv-cancel-${Date.now()}`;
+    await client.query(`INSERT INTO invoices (id,company_id,invoice_number,amount,status,due_at,billing_details)
+      VALUES ($1,$2,$1,100,'pending',NOW(),'{"planId":"plan-pro","billingPeriod":"monthly"}')`, [cancelInvoiceId, companyId]);
+    await client.query(`INSERT INTO bank_transfer_notifications (id,invoice_id,company_id,reference_code,status)
+      VALUES ($1,$2,$3,$4,'pending')`, [`btn-cancel-${Date.now()}`, cancelInvoiceId, companyId, `AUDIT-CANCEL-${Date.now()}`]);
+    const cancelResponse = await request(app)
+      .post(`/api/v1/billing/transfer-requests/${cancelInvoiceId}/cancel`)
+      .set('Authorization', `Bearer ${regularToken}`);
+    assert.strictEqual(cancelResponse.status, 200);
+    const cancelled = await client.query('SELECT status FROM invoices WHERE id=$1', [cancelInvoiceId]);
+    assert.strictEqual(cancelled.rows[0].status, 'cancelled');
+    console.log('✅ TEST 9 PASS');
+
+    await client.query('DELETE FROM companies WHERE id=$1', [companyId]);
 
     console.log('--- ALL FORENSIC AUDIT TESTS PASSED ---');
     process.exit(0);

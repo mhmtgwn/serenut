@@ -1,6 +1,5 @@
 import { pgPool } from '../config/database';
 import { CommercialLifecycleService } from '../modules/billing/commercial_lifecycle.service';
-import crypto from 'crypto';
 import assert from 'assert';
 
 async function runTests() {
@@ -19,7 +18,7 @@ async function runTests() {
 
     await client.query(`
       INSERT INTO invoices (id, company_id, invoice_number, amount, status, due_at, billing_details)
-      VALUES ($1, $2, 'TEST-INV-1', 100, 'pending', NOW(), '{"planId":"plan-pro","billingPeriod":"monthly"}')
+      VALUES ($1, $2, $1, 100, 'pending', NOW(), '{"planId":"plan-pro","billingPeriod":"monthly","currency":"TRY"}')
     `, [invoiceId, companyId]);
 
     // 2. Test Concurrency & Idempotency
@@ -35,7 +34,10 @@ async function runTests() {
         const pClient = await pgPool.connect();
         try {
           await pClient.query('BEGIN');
-          await CommercialLifecycleService.finalizeInvoicePayment(pClient, invoiceId, 'bank_transfer', 'sysadmin-id');
+          await CommercialLifecycleService.finalizeInvoicePayment(
+            pClient, invoiceId, 'card', undefined,
+            { providerTransactionId: 'provider-test-payment-1', amount: 100, currency: 'TRY' },
+          );
           await pClient.query('COMMIT');
           successCount++;
         } catch (e) {
@@ -73,15 +75,51 @@ async function runTests() {
 
     // Verify old licenses table backward compatibility
     const licRes = await client.query('SELECT * FROM licenses WHERE company_id = $1', [companyId]);
-    // It creates it or updates it, wait activatePaidSubscription only UPDATES legacy licenses table, doesn't insert if not exists.
-    // Let's just check if invoice is paid
+    assert.strictEqual(licRes.rows.length, 1, 'Legacy license must be created for installed clients');
+    assert.strictEqual(
+      new Date(licRes.rows[0].expires_at).toISOString(),
+      new Date(entRes.rows[0].valid_until).toISOString(),
+      'Legacy and entitlement expiry dates must stay synchronized'
+    );
     const invRes = await client.query('SELECT status, subscription_id FROM invoices WHERE id = $1', [invoiceId]);
     assert.strictEqual(invRes.rows[0].status, 'paid');
     assert.strictEqual(invRes.rows[0].subscription_id, sub.id);
 
+    // A yearly renewal must be added after the remaining monthly period; it
+    // must not restart from today or leave either license model behind.
+    const previousExpiry = new Date(entRes.rows[0].valid_until);
+    const yearlyInvoiceId = `inv-yearly-${Date.now()}`;
+    await client.query(
+      `INSERT INTO invoices (id,company_id,invoice_number,amount,status,due_at,billing_details)
+       VALUES ($1,$2,$1,1020,'pending',NOW(),
+               '{"planId":"plan-pro","billingPeriod":"yearly","currency":"TRY"}')`,
+      [yearlyInvoiceId, companyId],
+    );
+    await client.query('BEGIN');
+    const yearlyRenewal = await CommercialLifecycleService.finalizeInvoicePayment(
+      client, yearlyInvoiceId, 'card', undefined,
+      { providerTransactionId: 'provider-test-payment-2', amount: 1020, currency: 'TRY' },
+    );
+    await client.query('COMMIT');
+    const expectedYearlyExpiry = new Date(previousExpiry);
+    expectedYearlyExpiry.setFullYear(expectedYearlyExpiry.getFullYear() + 1);
+    assert.strictEqual(
+      yearlyRenewal.validUntil.toISOString(),
+      expectedYearlyExpiry.toISOString(),
+      'Yearly renewal must extend the remaining license by one full year'
+    );
+    const renewedLegacy = await client.query('SELECT expires_at FROM licenses WHERE company_id = $1', [companyId]);
+    assert.strictEqual(
+      new Date(renewedLegacy.rows[0].expires_at).toISOString(),
+      yearlyRenewal.validUntil.toISOString(),
+      'Yearly renewal must be visible to legacy clients'
+    );
+
     console.log('✅ Concurrency & Idempotency tests passed!');
 
     // Clean up
+    await client.query('DELETE FROM commercial_entitlement_grants WHERE invoice_id IN (SELECT id FROM invoices WHERE company_id=$1)', [companyId]);
+    await client.query('DELETE FROM payment_transactions WHERE company_id=$1', [companyId]);
     await client.query('DELETE FROM license_entitlements WHERE company_id = $1', [companyId]);
     await client.query('DELETE FROM subscriptions WHERE company_id = $1', [companyId]);
     await client.query('DELETE FROM invoices WHERE company_id = $1', [companyId]);
