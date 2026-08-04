@@ -110,5 +110,74 @@ void main() {
       expect(connectedIp, '192.168.1.150');
       expect(connectedPort, 9100);
     });
+
+    test(
+        'PrinterService falls back to the main printer when no label printer is configured',
+        () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        printerName: 'network',
+        printerIp: '192.168.1.50',
+        printerPort: 9200,
+        createdAt: DateTime.now(),
+      );
+
+      String? connectedIp;
+      int? connectedPort;
+      final service = PrinterService((ip, port, {timeout}) async {
+        connectedIp = ip;
+        connectedPort = port;
+        return MockSocket();
+      }, null);
+
+      final order = OrderEntity(
+        id: 'order-fallback',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: [
+          {'product_id': 'prod-1', 'quantity': 1.0, 'unit_price': 10.0}
+        ],
+      );
+
+      await service.printOrderLabels(order, order.items, settings);
+
+      expect(connectedIp, '192.168.1.50');
+      expect(connectedPort, 9200);
+    });
+
+    test('PrinterService reports a missing label and main printer', () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        createdAt: DateTime.now(),
+      );
+      final service = PrinterService((ip, port, {timeout}) async {
+        return MockSocket();
+      }, null);
+      final order = OrderEntity(
+        id: 'order-no-printer',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: [
+          {'product_id': 'prod-1', 'quantity': 1.0, 'unit_price': 10.0}
+        ],
+      );
+
+      await expectLater(
+        service.printOrderLabels(order, order.items, settings),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'Etiket yazıcısı tanımlı değil.',
+          ),
+        ),
+      );
+    });
   });
 }
