@@ -182,7 +182,7 @@ void main() {
       );
     });
 
-    test('each order label contains only its own item', () async {
+    test('one order label summarizes all items without overflowing', () async {
       final settings = Settings(
         businessName: 'Test Market',
         businessPhone: '123456',
@@ -209,6 +209,24 @@ void main() {
           'quantity': 2.0,
           'unit_price': 20.0,
         },
+        {
+          'product_id': 'prod-3',
+          'product_name': 'Ucuncu Urun',
+          'quantity': 3.0,
+          'unit_price': 30.0,
+        },
+        {
+          'product_id': 'prod-4',
+          'product_name': 'Dorduncu Urun',
+          'quantity': 4.0,
+          'unit_price': 40.0,
+        },
+        {
+          'product_id': 'prod-5',
+          'product_name': 'Besinci Urun',
+          'quantity': 5.0,
+          'unit_price': 50.0,
+        },
       ];
       final order = OrderEntity(
         id: 'order-two-items',
@@ -223,7 +241,11 @@ void main() {
       final output = String.fromCharCodes(socket.writtenBytes);
       expect('Birinci Urun'.allMatches(output), hasLength(1));
       expect('Ikinci Urun'.allMatches(output), hasLength(1));
-      expect('PRINT 1,1'.allMatches(output), hasLength(2));
+      expect(output, isNot(contains('Ucuncu Urun')));
+      expect(output, isNot(contains('Dorduncu Urun')));
+      expect(output, isNot(contains('Besinci Urun')));
+      expect(output, contains('+3 diger urun'));
+      expect('PRINT 1,1'.allMatches(output), hasLength(1));
     });
   });
 }

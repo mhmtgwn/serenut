@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/label_model.dart';
@@ -62,9 +63,8 @@ void main() {
     expect(output, contains('Uzun Urun Adi'));
     expect(output, contains('Cesidi'));
     expect(output, contains('"2",0,1,1'));
-    expect(output, contains('"128"'));
-    expect(output, contains('"4",0,2,2,"123"'));
-    expect(output, contains('"2",0,1,1,"45"'));
+    expect(output, isNot(contains('BARCODE ')));
+    expect(output, contains('"3",0,1,1,"TL 123.45"'));
     expect(output, isNot(contains('Ü')));
     expect(output, isNot(contains('geçersiz')));
   });
@@ -94,6 +94,42 @@ void main() {
     expect(output, contains('"4",0,2,2,"299"'));
     expect(output, contains('"2",0,1,1,"95"'));
     expect(output, isNot(contains('TL 299.95')));
+  });
+
+  test('paket logosu TSPL ürün etiketine bitmap olarak eklenir', () {
+    final logoBytes = File('assets/logo.png').readAsBytesSync();
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateLabelBytes(
+        productLabel(),
+        logoBytes: logoBytes,
+      ),
+    );
+
+    expect(output, contains('BITMAP '));
+    expect(output, isNot(contains('TEXT 128,6,"2",0,1,1,"Saman Market"')));
+  });
+
+  test('uzun kimlik ve büyük fiyat ürün etiketinin sağından taşmaz', () {
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateLabelBytes(
+        LabelModel(
+          productName: 'CokUzunTekParcaUrunAdiEtiketSiniriniAsamaz',
+          businessName: 'Serenut OS',
+          weight: 1,
+          price: 1234567.89,
+          barcode: '550e8400-e29b-41d4-a716-446655440000',
+          qrData: 'product-test',
+          timestamp: DateTime(2026, 7, 30),
+        ),
+        widthMm: 50,
+        heightMm: 30,
+      ),
+    );
+
+    expect(output, isNot(contains('BARCODE ')));
+    expect(output, contains('"2",0,1,1,"TL 1234567.89"'));
+    expect(
+        output, isNot(contains('CokUzunTekParcaUrunAdiEtiketSiniriniAsamaz')));
   });
 
   test('sipariş etiketi yalnızca Latin-1 uyumlu TSPL üretir', () {
