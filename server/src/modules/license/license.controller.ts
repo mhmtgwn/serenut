@@ -16,7 +16,7 @@ const licenseRateLimit = createRedisLimiter({
 
 
 // Secured Activation Route (enforces authentication to lock down activation scope)
-router.post('/activate', licenseRateLimit, async (req: Request, res: Response) => {
+router.post('/activate', authenticateUser, licenseRateLimit, async (req: AuthenticatedRequest, res: Response) => {
   const { license_key, device_hash, device_name, fingerprint } = req.body;
   if (!license_key || !device_hash || !device_name) {
     incrementLicenseValidation(false);
@@ -24,7 +24,13 @@ router.post('/activate', licenseRateLimit, async (req: Request, res: Response) =
   }
 
   try {
-    const result = await LicenseService.activate(license_key, device_hash, device_name, undefined, fingerprint);
+    const result = await LicenseService.activate(
+      license_key,
+      device_hash,
+      device_name,
+      req.user!.company_id,
+      fingerprint,
+    );
     incrementLicenseValidation(true);
     return res.json(result);
   } catch (err: any) {
@@ -197,51 +203,22 @@ router.get('/status', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 // POST /licenses/renew (Extend license)
-router.post('/renew', requireRole('owner'), async (req: AuthenticatedRequest, res: Response) => {
-  const { license_key, extend_days } = req.body;
-  if (!license_key || !extend_days) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  try {
-    // Check tenant association before renewing
-    const details = await LicenseService.getStatus(license_key);
-    if (details.company_id !== req.user!.company_id && !req.user!.roles.includes('sysadmin')) {
-      return res.status(403).json({ error: 'forbidden' });
-    }
-
-    const result = await LicenseService.renew(license_key, parseInt(extend_days, 10));
-
-    // Broadcast LicenseUpdated event
-    try {
-      const { RealtimeBroadcastService } = require('../realtime/broadcast.service');
-      await RealtimeBroadcastService.publishEvent(req.user!.company_id, 'LicenseUpdated', {
-        licenseKey: license_key,
-        status: 'renewed',
-        extendDays: extend_days,
-        expiresAt: result.expires_at,
-      });
-    } catch (_) {}
-
-    return res.json(result);
-  } catch (err: any) {
-    if (err.message === 'invalid_license_key') {
-      return res.status(404).json({ error: 'invalid_license_key' });
-    }
-    logger.error('Renew error:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
+router.post('/renew', requireRole('owner'), async (_req: AuthenticatedRequest, res: Response) => {
+  return res.status(410).json({
+    error: 'paid_renewal_required',
+    message: 'Lisanslar yalnızca doğrulanmış bir ödeme veya denetlenen yönetici istisnası üzerinden uzatılabilir.',
+  });
 });
 
 // POST /licenses/revoke (Suspend license - global admin only)
 router.post('/revoke', requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
-  const { license_key } = req.body;
-  if (!license_key) {
-    return res.status(400).json({ error: 'missing_license_key' });
+  const { license_key, reason } = req.body;
+  if (!license_key || typeof reason !== 'string' || !reason.trim()) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Lisans anahtarı ve iptal gerekçesi zorunludur.' });
   }
 
   try {
-    await LicenseService.revoke(license_key);
+    await LicenseService.revoke(license_key, req.user!.id, reason.trim());
     return res.json({ success: true, message: 'Lisans başarıyla bloke edilmiş ve tüm bağlı POS terminalleri engellenmiştir.' });
   } catch (err: any) {
     if (err.message === 'invalid_license_key') {

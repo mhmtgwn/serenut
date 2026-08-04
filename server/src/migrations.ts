@@ -8,6 +8,10 @@ export async function runMigrations(pool: Pool): Promise<void> {
   try {
     console.log('🔒 Configuring database migration lock timeout (10s)...');
     await client.query("SET lock_timeout = '10s'");
+    // Schema and PL/pgSQL compilation can legitimately exceed the ordinary
+    // request-query timeout on slow CI/test hosts. This applies only to this
+    // dedicated migration connection and is reset before it returns to pool.
+    await client.query('SET statement_timeout = 0');
     console.log('🔒 Acquiring database migration lock...');
     await client.query('SELECT pg_advisory_lock(7429185)');
     console.log('🔄 Running database migrations...');
@@ -97,6 +101,8 @@ export async function runMigrations(pool: Pool): Promise<void> {
     } catch (unlockErr: any) {
       console.error('⚠️ Failed to release migration lock:', unlockErr.message);
     }
+    await client.query('RESET statement_timeout').catch(() => {});
+    await client.query('RESET lock_timeout').catch(() => {});
     client.release();
   }
 }

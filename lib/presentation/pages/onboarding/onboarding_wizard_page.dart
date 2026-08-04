@@ -154,7 +154,34 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       _persistence.saveState(updated);
       _persistence.saveStep(3);
 
-      await _saveOnboardingData(updated);
+      final recoveryCodes = await _saveOnboardingData(updated);
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Kurtarma kodlarınızı saklayın'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                    'Bu kodlar yalnızca şimdi gösterilir ve her biri tek kullanımlıktır.'),
+                const SizedBox(height: 12),
+                SelectableText(recoveryCodes.join('\n')),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Kodları Kaydettim'),
+            ),
+          ],
+        ),
+      );
 
       if (mounted) context.go('/onboarding/success');
     } catch (e) {
@@ -172,7 +199,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     }
   }
 
-  Future<void> _saveOnboardingData(OnboardingState state) async {
+  Future<List<String>> _saveOnboardingData(OnboardingState state) async {
     final prefs = ref.read(sharedPreferencesProvider);
     final dbManager = DatabaseManager();
     final gateway = DbGatewayImpl(dbManager);
@@ -180,9 +207,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     // The server owns account, tenant and device entitlement creation.  Do this
     // before persisting a local business so a failed registration cannot leave a
     // device that looks configured but has no tenant to sync with.
-    final rawPassword = state.admin.password.isNotEmpty
-        ? state.admin.password
-        : state.admin.pin;
+    final rawPassword = state.admin.password;
     final apiClient = ref.read(apiClientProvider);
     final registration = await apiClient.post('/auth/register', {
       'company_name': state.business.businessName,
@@ -190,11 +215,27 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       'email': state.admin.username,
       'password': rawPassword,
       'phone': state.business.phone,
+      'tax_number': state.business.taxNumber,
+      'city': state.business.city,
+      'district': state.business.district,
+      'address': '${state.business.district}, ${state.business.city}',
+      'accept_terms': true,
+      'accept_privacy': true,
+      'accept_kvkk': true,
+      'accept_marketing': false,
     });
     if (!registration.isSuccess) {
       throw Exception(
         registration.json['error']?['message'] ?? 'Sunucu kayıt hatası.',
       );
+    }
+    final recoveryCodes =
+        (registration.json['recovery_codes'] as List<dynamic>? ?? const [])
+            .map((code) => code.toString())
+            .toList(growable: false);
+    if (recoveryCodes.length != 10) {
+      throw StateError(
+          'Kurtarma kodları oluşturulamadı. Kayıt güvenle tamamlanamadı.');
     }
 
     // Login establishes the authenticated session, subscription cache and the
@@ -257,7 +298,6 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       currency: state.business.currency,
       createdAt: DateTime.now(),
     ));
-
     // 4. Sektör şablonundaki ürünleri SQLite'a tohumla (seed)
     final template =
         IndustryTemplateRegistry.getTemplate(state.business.businessType);
@@ -279,6 +319,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
 
     // 5. Onboarding tamamlandı
     await _persistence.markCompleted();
+    return recoveryCodes;
   }
 
   /// Basit PIN hash'leme (HMAC-SHA256)

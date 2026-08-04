@@ -227,39 +227,23 @@ async function runBypassingRLS(sql: string, params: any[] = []) {
 
 async function markSent(notificationId: string, companyId: string, channel: string) {
   await runBypassingRLS(
-    `UPDATE notification_queue
-     SET status = 'sent', delivered_at = NOW(), error_message = NULL
-     WHERE id = $1`,
+    `WITH marked AS (
+       UPDATE notification_queue SET status='sent',delivered_at=NOW(),error_message=NULL,updated_at=NOW()
+       WHERE id=$1 AND status<>'sent' RETURNING id
+     )
+     UPDATE notification_credit_reservations SET status='consumed',consumed_at=NOW()
+     WHERE notification_id=$1 AND status='reserved' AND EXISTS(SELECT 1 FROM marked)`,
     [notificationId]
   );
-  await deductCredits(companyId, channel);
+  await invalidateCreditCache(companyId, channel);
 }
 
-async function markFailed(notificationId: string, errorMsg: string) {
-  await runBypassingRLS(
-    `UPDATE notification_queue
-     SET status = 'failed', error_message = $1
-     WHERE id = $2`,
-    [errorMsg, notificationId]
-  );
+function creditColumn(channel: string) {
+  return channel === 'whatsapp' ? 'whatsapp_credits' : channel === 'email' ? 'email_credits' : 'sms_credits';
 }
 
-async function deductCredits(companyId: string, channel: string) {
+async function invalidateCreditCache(companyId: string, channel: string) {
   if (channel === 'push') return;
-  const creditCol =
-    channel === 'whatsapp' ? 'whatsapp_credits' :
-    channel === 'email' ? 'email_credits' :
-    'sms_credits';
-
-  await runBypassingRLS(
-    `INSERT INTO company_notification_credits (company_id)
-     VALUES ($1)
-     ON CONFLICT (company_id) DO UPDATE
-       SET ${creditCol} = GREATEST(company_notification_credits.${creditCol} - 1, 0)`,
-    [companyId]
-  );
-
-  // Invalidate Redis cache
   const cacheKey = `notif_credits:${companyId}:${channel}`;
   if (redisClient && redisClient.isOpen) {
     try {
@@ -273,6 +257,129 @@ async function deductCredits(companyId: string, channel: string) {
 
 // ── WORKER ───────────────────────────────────────────────────────────────────
 let workerInstance: Worker | null = null;
+let outboxDispatcher: NodeJS.Timeout | null = null;
+let outboxDispatchRunning = false;
+
+/**
+ * notification_queue is the durable PostgreSQL outbox. Producers commit the
+ * business event and this row together; this dispatcher is the only bridge to
+ * BullMQ. A deterministic jobId makes retries and multi-instance dispatch safe.
+ */
+export async function dispatchNotificationOutboxBatch(limit = 100): Promise<number> {
+  if (outboxDispatchRunning) return 0;
+  outboxDispatchRunning = true;
+  try {
+    const result = await runBypassingRLS(
+      `SELECT id, company_id, channel, recipient, title, body, scheduled_at, max_retries
+       FROM notification_queue
+       WHERE status IN ('pending', 'queued', 'retrying')
+         AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+       ORDER BY created_at ASC
+       LIMIT $1`,
+      [Math.min(Math.max(limit, 1), 500)],
+    );
+    let dispatched = 0;
+    for (const row of result.rows) {
+      try {
+        if (!await reserveNotificationCredit(row.id, row.company_id, row.channel)) continue;
+        const scheduledAt = row.scheduled_at ? new Date(row.scheduled_at).getTime() : Date.now();
+        await enqueueBullNotification({
+          notification_id: row.id,
+          company_id: row.company_id,
+          channel: row.channel,
+          recipient: row.recipient,
+          title: row.title || undefined,
+          body: row.body,
+          max_retries: row.max_retries || 3,
+        }, Math.max(0, scheduledAt - Date.now()));
+        await runBypassingRLS(
+          `UPDATE notification_queue SET status = 'enqueued', updated_at = NOW()
+           WHERE id = $1 AND status IN ('pending', 'queued', 'retrying')`,
+          [row.id],
+        );
+        dispatched++;
+      } catch (error: any) {
+        logger.error('[NotificationOutbox] Dispatch failed', {
+          notificationId: row.id,
+          error: error?.message || 'outbox_dispatch_failed',
+        });
+      }
+    }
+    return dispatched;
+  } finally {
+    outboxDispatchRunning = false;
+  }
+}
+
+async function markFailed(notificationId: string, companyId: string, channel: string, errorMsg: string) {
+  const creditCol = creditColumn(channel);
+  await runBypassingRLS(
+    channel === 'push'
+      ? `UPDATE notification_queue SET status='failed',error_message=$1,updated_at=NOW() WHERE id=$2`
+      : `WITH released AS (
+           UPDATE notification_credit_reservations SET status='released',released_at=NOW()
+           WHERE notification_id=$2 AND status='reserved' RETURNING company_id
+         ), restored AS (
+           UPDATE company_notification_credits SET ${creditCol}=${creditCol}+1
+           WHERE company_id=$3 AND EXISTS(SELECT 1 FROM released)
+         )
+         UPDATE notification_queue SET status='failed',error_message=$1,updated_at=NOW() WHERE id=$2`,
+    channel === 'push' ? [errorMsg, notificationId] : [errorMsg, notificationId, companyId],
+  );
+  await invalidateCreditCache(companyId, channel);
+}
+
+export async function reserveNotificationCredit(notificationId: string, companyId: string, channel: string): Promise<boolean> {
+  if (channel === 'push') return true;
+  const creditCol = creditColumn(channel);
+  const client = await pgPool.connect();
+  let allowed = false;
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls='true'");
+    await client.query(
+      `INSERT INTO company_notification_credits(company_id) VALUES($1) ON CONFLICT(company_id) DO NOTHING`,
+      [companyId],
+    );
+    const locked = await client.query(
+      `SELECT id FROM notification_queue WHERE id=$1 AND company_id=$2
+       AND status IN ('pending','queued','retrying','enqueued') FOR UPDATE`,
+      [notificationId, companyId],
+    );
+    if (locked.rowCount) {
+      const existing = await client.query(
+        `SELECT status FROM notification_credit_reservations
+         WHERE notification_id=$1 AND status IN ('reserved','consumed')`,
+        [notificationId],
+      );
+      if (existing.rowCount) {
+        allowed = true;
+      } else {
+        const debited = await client.query(
+          `UPDATE company_notification_credits SET ${creditCol}=${creditCol}-1
+           WHERE company_id=$1 AND ${creditCol}>0 RETURNING company_id`,
+          [companyId],
+        );
+        if (debited.rowCount) {
+          await client.query(
+            `INSERT INTO notification_credit_reservations(notification_id,company_id,channel) VALUES($1,$2,$3)`,
+            [notificationId, companyId, channel],
+          );
+          allowed = true;
+        }
+      }
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+  if (!allowed) await markFailed(notificationId, companyId, channel, 'out_of_credits');
+  await invalidateCreditCache(companyId, channel);
+  return allowed;
+}
 
 export function startNotificationWorker(): void {
   const redisUrl = process.env.REDIS_URL;
@@ -343,7 +450,7 @@ export function startNotificationWorker(): void {
           failed_at: new Date().toISOString(),
           attempts: job.attemptsMade,
         });
-        await markFailed(data.notification_id, `Max retries exceeded: ${err.message}`);
+        await markFailed(data.notification_id, data.company_id, data.channel, `Max retries exceeded: ${err.message}`);
         logger.error(`[NotificationWorker] DLQ'ya taşındı: job=${job.id}`);
       } catch (dlqErr) {
         logger.error('[NotificationWorker] DLQ yazma hatası:', dlqErr);
@@ -356,10 +463,16 @@ export function startNotificationWorker(): void {
   });
 
   logger.info('[NotificationWorker] ✅ BullMQ worker başlatıldı (concurrency=5)');
+
+  void dispatchNotificationOutboxBatch();
+  outboxDispatcher = setInterval(() => {
+    void dispatchNotificationOutboxBatch();
+  }, 5_000);
+  outboxDispatcher.unref();
 }
 
 // ── YARDIMCI: Kuyruğa Bildirim Ekle ─────────────────────────────────────────
-export async function enqueueNotification(data: NotificationJobData, delayMs = 0): Promise<void> {
+async function enqueueBullNotification(data: NotificationJobData, delayMs = 0): Promise<void> {
   const queue = getNotificationQueue();
 
   await queue.add('send-notification', data, {
@@ -372,8 +485,28 @@ export async function enqueueNotification(data: NotificationJobData, delayMs = 0
   );
 }
 
+/**
+ * The only producer entry point. It persists a durable outbox row; only the
+ * dispatcher may talk to BullMQ, after atomically reserving channel credit.
+ */
+export async function enqueueNotification(data: NotificationJobData, delayMs = 0): Promise<void> {
+  const scheduledAt = new Date(Date.now() + Math.max(0, delayMs));
+  await runBypassingRLS(
+    `INSERT INTO notification_queue
+       (id,company_id,channel,recipient,title,body,status,scheduled_at,max_retries,updated_at)
+     VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,NOW())
+     ON CONFLICT(id) DO NOTHING`,
+    [data.notification_id,data.company_id,data.channel,data.recipient,data.title || null,
+      data.body,scheduledAt,data.max_retries || 3],
+  );
+}
+
 // ── GRACEFUL SHUTDOWN ─────────────────────────────────────────────────────────
 export async function stopNotificationWorker(): Promise<void> {
+  if (outboxDispatcher) {
+    clearInterval(outboxDispatcher);
+    outboxDispatcher = null;
+  }
   if (workerInstance) {
     await workerInstance.close();
     logger.info('[NotificationWorker] Worker durduruldu.');

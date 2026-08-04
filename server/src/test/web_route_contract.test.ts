@@ -40,6 +40,15 @@ async function run() {
   assert.doesNotMatch(publicSources, /embed=1|auth-modal-iframe/, 'iframe authentication must stay removed');
 
   const runtime = fs.readFileSync(path.join(projectRoot, 'public/app/js/module-runtime.js'), 'utf8');
+  const authRuntime = fs.readFileSync(path.join(projectRoot, 'public/auth/auth.js'), 'utf8');
+  const forgotHtml = fs.readFileSync(path.join(projectRoot, 'public/auth/forgot-password.html'), 'utf8');
+  assert.match(forgotHtml, /id="recovery-code"/, 'self-service recovery must require a recovery code');
+  assert.match(forgotHtml, /id="recovery-claim-form"/, 'admin-assisted recovery must have a claim UI');
+  assert.doesNotMatch(forgotHtml, /Bağlantı Gönder|e-postayı girin/i, 'email-only recovery copy must be removed');
+  assert.match(authRuntime, /sessionStorage\.setItem\('serenut_password_reset_token'/, 'reset authorization must stay out of the URL');
+  assert.doesNotMatch(authRuntime, /new URLSearchParams\(window\.location\.search\)\.get\('token'\)/, 'reset token must not be read from URL history');
+  assert.doesNotMatch(runtime, /body:\{new_password:/, 'admin UI must not set user passwords directly');
+  assert.match(runtime, /recovery\/admin-assist/, 'tenant admin UI must use canonical recovery requests');
   for (const loader of [
     'company-stores', 'company-devices', 'company-licenses', 'company-downloads',
     'platform-companies', 'platform-subscriptions', 'platform-licenses', 'platform-devices',
@@ -48,6 +57,8 @@ async function run() {
     assert.match(runtime, new RegExp(`'${loader}': async`), `${loader} loader must be registered`);
   }
   const adminController = fs.readFileSync(path.join(projectRoot, 'src/modules/admin/admin.controller.ts'), 'utf8');
+  const billingController = fs.readFileSync(path.join(projectRoot, 'src/modules/billing/billing.controller.ts'), 'utf8');
+  assert.doesNotMatch(billingController, /mock-checkout|ENABLE_MOCK_PAYMENTS|SİMÜLE KART/i, 'mock payment routes and controls must not exist');
   assert.match(adminController, /\/maintenance\/preview/, 'maintenance preview endpoint must exist');
   assert.match(adminController, /\/maintenance\/cleanup/, 'maintenance cleanup endpoint must exist');
   assert.match(adminController, /SUNUCUYU TEMIZLE/, 'maintenance cleanup must require an explicit confirmation phrase');

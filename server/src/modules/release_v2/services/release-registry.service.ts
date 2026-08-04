@@ -2,7 +2,17 @@
 import { Pool } from 'pg';
 import crypto from 'crypto';
 import { ReleaseAuditService } from './release-audit.service';
-import { ReleaseManifestDTO } from '../models/release-manifest.dto';
+import { ReleaseManifestDTO, validateReleaseManifestDTO } from '../models/release-manifest.dto';
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
 
 export class ReleaseRegistryService {
   private auditService: ReleaseAuditService;
@@ -25,6 +35,30 @@ export class ReleaseRegistryService {
   ): Promise<{ success: boolean; releaseId: string; artifactSetHash: string; error?: string }> {
     const client = await this.pool.connect();
     try {
+      const validation = validateReleaseManifestDTO(manifest);
+      if (!validation.valid) throw new Error(`invalid_manifest:${validation.errors.join(',')}`);
+      let parsedCanonical: unknown;
+      try { parsedCanonical = JSON.parse(canonicalManifestJson); }
+      catch (_) { throw new Error('invalid_canonical_manifest_json'); }
+      if (stableJson(parsedCanonical) !== stableJson(manifest)) {
+        throw new Error('canonical_manifest_mismatch');
+      }
+      const configuredKey = process.env.RELEASE_SIGNING_PUBLIC_KEY;
+      if (!configuredKey) throw new Error('release_signing_public_key_not_configured');
+      const publicKey = configuredKey.includes('BEGIN PUBLIC KEY')
+        ? configuredKey.replace(/\\n/g, '\n')
+        : Buffer.from(configuredKey, 'base64').toString('utf8');
+      const signature = Buffer.from(manifestSignature, 'base64');
+      if (!signature.length || !crypto.verify('RSA-SHA256', Buffer.from(canonicalManifestJson, 'utf8'), publicKey, signature)) {
+        throw new Error('invalid_manifest_signature');
+      }
+      for (const artifact of manifest.artifacts) {
+        const artifactSignature = Buffer.from(artifact.signature, 'base64');
+        if (!artifactSignature.length ||
+            !crypto.verify('RSA-SHA256', Buffer.from(artifact.sha256.toLowerCase(), 'utf8'), publicKey, artifactSignature)) {
+          throw new Error(`invalid_artifact_signature:${artifact.filename}`);
+        }
+      }
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
 

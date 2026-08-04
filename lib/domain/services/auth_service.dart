@@ -13,7 +13,8 @@ import 'package:serenutos/domain/services/trial_manager.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, listEquals, kDebugMode;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, debugPrint, listEquals, kDebugMode;
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
 class AuthException implements Exception {
@@ -120,14 +121,17 @@ class AuthService {
     }
 
     // Allow local admin fallback in debug mode for development testing
-    if (kDebugMode && username.trim().toLowerCase() == 'admin' && password == 'admin') {
+    if (kDebugMode &&
+        username.trim().toLowerCase() == 'admin' &&
+        password == 'admin') {
       final debugAdmin = AuthUser(
         id: 'debug_admin_id',
         companyId: 'debug_company_id',
         name: 'Admin',
         email: 'admin@serenut.com',
         role: UserRole.admin,
-        permissions: Permission.forRole(UserRole.admin).map((p) => p.value).toList(),
+        permissions:
+            Permission.forRole(UserRole.admin).map((p) => p.value).toList(),
         createdAt: DateTime.now(),
       );
       _currentUser = debugAdmin;
@@ -204,7 +208,8 @@ class AuthService {
               await _userRepository.updateUserFields(user,
                   isActive: true, passwordHash: hash);
             } catch (e, st) {
-              TelemetryService().logError(e, st, context: 'AuthService', level: LogLevel.warning);
+              TelemetryService().logError(e, st,
+                  context: 'AuthService', level: LogLevel.warning);
             }
           }
 
@@ -232,7 +237,8 @@ class AuthService {
                         : null) ??
                     message;
               } catch (e, st) {
-                TelemetryService().logError(e, st, context: 'AuthService', level: LogLevel.warning);
+                TelemetryService().logError(e, st,
+                    context: 'AuthService', level: LogLevel.warning);
               }
             }
             throw AuthException(message);
@@ -344,7 +350,8 @@ class AuthService {
                     error?.toString() ??
                     message;
           } catch (e, st) {
-            TelemetryService().logError(e, st, context: 'AuthService', level: LogLevel.warning);
+            TelemetryService().logError(e, st,
+                context: 'AuthService', level: LogLevel.warning);
           }
         }
         throw AuthException(message);
@@ -557,20 +564,6 @@ class AuthService {
   Future<bool> isAuthenticated() async {
     final user = await getCurrentUser();
     return user != null;
-  }
-
-  /// Şifre sıfırlama isteği gönder (backend e-posta akışı)
-  ///
-  /// Backend POST /auth/forgot-password çağırır.
-  /// Network yoksa veya backend hata verirse silent fail —
-  /// güvenlik gereği kullanıcıya her zaman başarı gösterilir.
-  Future<void> requestPasswordReset(String email) async {
-    if (_apiClient == null) return;
-    try {
-      await _apiClient!.post('/auth/forgot-password', {'email': email});
-    } catch (_) {
-      // Silent fail — enumeration önlemi için UI her zaman başarı gösterir
-    }
   }
 
   /// Phase 5: Entitlement Recovery

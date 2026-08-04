@@ -237,6 +237,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       final registration = response.json as Map<String, dynamic>;
       final verificationRequired =
           registration['email_verification_required'] as bool? ?? false;
+      final recoveryCodes =
+          (registration['recovery_codes'] as List<dynamic>? ?? const [])
+              .map((code) => code.toString())
+              .toList(growable: false);
+      if (recoveryCodes.length != 10) {
+        throw StateError(
+            'Kurtarma kodları oluşturulamadı. Kayıt güvenle tamamlanamadı.');
+      }
       if (!verificationRequired) {
         await ref.read(authServiceProvider).login(
               _emailCtrl.text.trim().toLowerCase(),
@@ -294,12 +302,26 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           title: Text(verificationRequired
               ? 'E-postanızı doğrulayın'
               : 'Hesabınız oluşturuldu'),
-          content: Text(registration['message'] as String? ??
-              'Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(registration['message'] as String? ??
+                    'Hesabınız oluşturuldu.'),
+                const SizedBox(height: 12),
+                const Text(
+                    'Bu kodlar yalnızca şimdi gösterilir. Güvenli bir yere kaydedin.',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                SelectableText(recoveryCodes.join('\n')),
+              ],
+            ),
+          ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Giriş Ekranına Geç'),
+              child: const Text('Kodları Kaydettim'),
             ),
           ],
         ),
@@ -483,7 +505,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Şifre zorunludur';
-                  if (v.length < 8) return 'En az 8 karakter olmalı';
+                  if (v.length < 12 ||
+                      !RegExp(r'[a-z]').hasMatch(v) ||
+                      !RegExp(r'[A-Z]').hasMatch(v) ||
+                      !RegExp(r'\d').hasMatch(v) ||
+                      !RegExp(r'[^A-Za-z0-9]').hasMatch(v)) {
+                    return '12+ karakter; büyük/küçük harf, rakam ve sembol gerekli';
+                  }
                   return null;
                 },
               ),

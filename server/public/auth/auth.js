@@ -44,6 +44,30 @@ async function post(endpoint, body) {
   return data;
 }
 
+function showRecoveryCodes(codes, destination = '/app/?flow=panel') {
+  const form = document.querySelector('form');
+  if (form) form.hidden = true;
+  const panel = document.createElement('section');
+  panel.setAttribute('aria-labelledby', 'recovery-codes-title');
+  panel.innerHTML = `
+    <h2 id="recovery-codes-title">Kurtarma kodlarınızı saklayın</h2>
+    <p>Bu kodlar yalnızca şimdi gösterilir. Her kod tek kullanımlıktır.</p>
+    <pre id="recovery-code-list" class="simple-field" style="white-space:pre-wrap;user-select:all"></pre>
+    <button type="button" class="btn btn-primary w-full" id="download-recovery-codes">Kodları İndir</button>
+    <a class="btn w-full" id="continue-after-codes" href="${destination}">Kodları Kaydettim, Devam Et</a>`;
+  panel.querySelector('#recovery-code-list').textContent = codes.join('\n');
+  panel.querySelector('#download-recovery-codes').addEventListener('click', () => {
+    const blob = new Blob([`Serenut OS kurtarma kodları\n\n${codes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'serenut-kurtarma-kodlari.txt';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+  status.after(panel);
+  message('Hesabınız oluşturuldu. Devam etmeden önce kurtarma kodlarını kaydedin.', true);
+}
+
 document.getElementById('login-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const button = event.submitter;
@@ -91,6 +115,11 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
     message('TC Kimlik No 11, Vergi Kimlik No 10 haneli olmalıdır.');
     return;
   }
+  const password = document.getElementById('password').value;
+  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    message('Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.');
+    return;
+  }
 
   button.disabled = true;
   try {
@@ -104,7 +133,7 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
       city: document.getElementById('city').value.trim(),
       district: document.getElementById('district').value.trim(),
       address: document.getElementById('address').value.trim(),
-      password: document.getElementById('password').value,
+      password,
       accept_terms: document.getElementById('accept-terms').checked,
       accept_privacy: document.getElementById('accept-privacy').checked,
       accept_kvkk: document.getElementById('accept-kvkk').checked,
@@ -115,11 +144,19 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
       setAuthToken(data.access_token);
       setRefreshToken(data.refresh_token);
       if (data.user) setUserProfile(data.user);
+      if (Array.isArray(data.recovery_codes) && data.recovery_codes.length) {
+        showRecoveryCodes(data.recovery_codes);
+        return;
+      }
       window.location.replace('/app/?flow=panel');
       return;
     }
 
-    message(data.message || 'Hesabınız oluşturuldu. E-postanızı doğruladıktan sonra giriş yapabilirsiniz.', true);
+    if (Array.isArray(data.recovery_codes) && data.recovery_codes.length) {
+      showRecoveryCodes(data.recovery_codes, '/login');
+      return;
+    }
+    message(data.message || 'Hesabınız oluşturuldu.', true);
     button.remove();
     const login = document.createElement('a');
     login.className = 'btn btn-primary w-full';
@@ -138,8 +175,32 @@ document.getElementById('forgot-form')?.addEventListener('submit', async (event)
   const button = event.submitter;
   button.disabled = true;
   try {
-    const data = await post('forgot-password', { email: document.getElementById('email').value.trim() });
-    message(data.message || 'Şifre sıfırlama bağlantısı gönderildi.', true);
+    const data = await post('recovery/authorize-code', {
+      identifier: document.getElementById('identifier').value.trim(),
+      company_name: document.getElementById('company-name').value.trim(),
+      tax_number: document.getElementById('tax-number').value.replace(/\D/g, ''),
+      recovery_code: document.getElementById('recovery-code').value.trim()
+    });
+    sessionStorage.setItem('serenut_password_reset_token', data.reset_token);
+    window.location.replace('/reset-password');
+  } catch (error) {
+    message(error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById('recovery-claim-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    const data = await post('recovery/claim', {
+      request_id: document.getElementById('request-id').value.trim(),
+      claim_code: document.getElementById('claim-code').value.trim()
+    });
+    sessionStorage.setItem('serenut_password_reset_token', data.reset_token);
+    window.location.replace('/reset-password');
   } catch (error) {
     message(error.message);
   } finally {
@@ -149,15 +210,17 @@ document.getElementById('forgot-form')?.addEventListener('submit', async (event)
 
 document.getElementById('reset-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const token = new URLSearchParams(window.location.search).get('token');
+  const token = sessionStorage.getItem('serenut_password_reset_token');
   const password = document.getElementById('password').value;
   if (!token) return message('Şifre sıfırlama bağlantısı geçersiz.');
   if (password !== document.getElementById('password-confirm').value) return message('Şifreler eşleşmiyor.');
+  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) return message('Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.');
 
   const button = event.submitter;
   button.disabled = true;
   try {
     const data = await post('reset-password', { token, newPassword: password });
+    sessionStorage.removeItem('serenut_password_reset_token');
     message(data.message || 'Şifreniz güncellendi.', true);
     button.remove();
     const login = document.createElement('a');

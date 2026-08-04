@@ -6,6 +6,7 @@ import { requireActiveEntitlement } from "../../middleware/auth.middleware";
 import { RealtimeBroadcastService } from "../realtime/broadcast.service";
 import { logger } from "../../config/logger";
 import type { PoolClient } from "pg";
+import { RefundService } from "../order/refund.service";
 
 const router = Router();
 const entityTypes = new Set([
@@ -14,10 +15,11 @@ const entityTypes = new Set([
   "order",
   "sale",
   "financial_transaction",
+  "refund",
 ]);
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const syncProtocolVersion = 5;
+const syncProtocolVersion = 6;
 
 type SyncMutation = {
   entity_type: string;
@@ -62,6 +64,7 @@ export async function applyDomainMutation(
   client: PoolClient,
   companyId: string,
   mutation: SyncMutation,
+  actorId?: string,
 ): Promise<void> {
   const payload = mutation.payload;
   const id = mutation.entity_id;
@@ -87,13 +90,11 @@ export async function applyDomainMutation(
         );
         return;
       case "sale":
-        await client.query(
-          "UPDATE sales SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
-          [id, companyId],
-        );
-        return;
+        throw new Error("immutable_sale");
       case "financial_transaction":
         throw new Error("immutable_financial_transaction");
+      case "refund":
+        throw new Error("immutable_refund");
     }
   }
 
@@ -150,6 +151,25 @@ export async function applyDomainMutation(
     case "financial_transaction":
       await upsertFinancialTransaction(client, companyId, id, payload);
       return;
+    case "refund": {
+      if (!actorId) throw new Error("refund_actor_required");
+      const rawItems = Array.isArray(payload.items) ? payload.items : [];
+      await RefundService.create(client, {
+        companyId,
+        saleId: stringValue(payload, "sale_id"),
+        actorId,
+        idempotencyKey: id,
+        refundId: id,
+        reason: stringValue(payload, "reason"),
+        refundMethod: stringValue(payload, "refund_method") as 'cash'|'balance'|'card'|'mixed',
+        externalReference: stringValue(payload, "external_reference") || undefined,
+        items: rawItems.map((item: any) => ({
+          saleItemId: typeof item?.sale_item_id === 'string' ? item.sale_item_id : '',
+          quantity: Number(item?.quantity),
+        })),
+      });
+      return;
+    }
   }
 }
 
@@ -157,32 +177,85 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
   const customerId = nullableId(stringValue(payload, "customer_id"));
   const paymentMethod = stringValue(payload, "payment_method", "cash");
   const items = Array.isArray(payload.items) ? payload.items : [];
-  await client.query(
-    `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10::timestamptz,NOW()),NOW(),false,$11)
-     ON CONFLICT (id) DO UPDATE SET customer_id=EXCLUDED.customer_id, total_amount=EXCLUDED.total_amount,
-       paid_amount=EXCLUDED.paid_amount, payment_method=EXCLUDED.payment_method, status=EXCLUDED.status,
-       fsm_state=EXCLUDED.fsm_state, is_deleted=false, updated_at=NOW() WHERE sales.company_id=EXCLUDED.company_id`,
-    [id, companyId, customerId, numberValue(payload, "total_amount"), numberValue(payload, "paid_amount"),
-      paymentMethod, stringValue(payload, "status", "completed"), stringValue(payload, "status", "completed"),
-      stringValue(payload, "idempotency_key") || null, stringValue(payload, "created_at") || null,
-      stringValue(payload, "created_by") || null],
+  if (!items.length || !["cash", "card", "credit", "mixed", "veresiye", "debt", "karma"].includes(paymentMethod)) {
+    throw new Error("invalid_sale");
+  }
+  const prior = await client.query(
+    "SELECT id FROM sales WHERE id = $1 AND company_id = $2 FOR UPDATE",
+    [id, companyId],
   );
-  await client.query("DELETE FROM sale_items WHERE sale_id = $1 AND company_id = $2", [id, companyId]);
+  // A completed sale is an immutable financial fact. Replayed materialization
+  // is a no-op; later changes must be represented by a refund/reversal.
+  if (prior.rowCount) return;
+  if (customerId) {
+    const customer = await client.query(
+      "SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_deleted = false",
+      [customerId, companyId],
+    );
+    if (!customer.rowCount) throw new Error("invalid_customer");
+  }
+  let computedTotal = 0;
+  const normalizedItems: Array<{ id: string; productId: string; productName: string | null; quantity: number; unitPrice: number; subtotal: number; createdAt: string | null }> = [];
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
     if (!item || typeof item !== "object") throw new Error("invalid_mutation");
     const row = item as Record<string, unknown>;
     const productId = stringValue(row, "product_id");
-    if (!productId) throw new Error("invalid_mutation");
-    const quantity = numberValue(row, "quantity");
-    const unitPrice = numberValue(row, "unit_price", numberValue(row, "price"));
+    const quantity = numberValue(row, "quantity", Number.NaN);
+    const unitPrice = numberValue(row, "unit_price", numberValue(row, "price", Number.NaN));
+    if (!productId || !Number.isFinite(quantity) || quantity <= 0 ||
+        !Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("invalid_sale_item");
+    const subtotal = quantity * unitPrice;
+    computedTotal += subtotal;
+    normalizedItems.push({
+      id: stringValue(row, "id", `sync-${id}-${index}`),
+      productId,
+      productName: stringValue(row, "product_name") || null,
+      quantity,
+      unitPrice,
+      subtotal,
+      createdAt: stringValue(row, "created_at") || null,
+    });
+  }
+  const clientTotal = numberValue(payload, "total_amount", Number.NaN);
+  const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
+  if (!Number.isFinite(clientTotal) || Math.abs(clientTotal - computedTotal) > 0.01 ||
+      !Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > computedTotal) {
+    throw new Error("sale_total_mismatch");
+  }
+  if ((paymentMethod === "credit" || paymentMethod === "veresiye" || paymentMethod === "debt") && paidAmount !== 0) {
+    throw new Error("invalid_credit_payment");
+  }
+  if ((paymentMethod === "cash" || paymentMethod === "card") &&
+      Math.abs(paidAmount-computedTotal)>0.01) {
+    throw new Error("invalid_full_payment");
+  }
+  await client.query(
+    `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,'completed','completed',$7,COALESCE($8::timestamptz,NOW()),NOW(),false,$9)`,
+    [id, companyId, customerId, computedTotal, paidAmount, paymentMethod,
+      stringValue(payload, "idempotency_key") || null, stringValue(payload, "created_at") || null,
+      stringValue(payload, "created_by") || null],
+  );
+  for (const row of normalizedItems) {
+    const stock = await client.query(
+      `UPDATE products SET quantity = quantity - $1, updated_at = NOW()
+       WHERE id = $2 AND company_id = $3 AND is_deleted = false AND quantity >= $1
+       RETURNING id`,
+      [row.quantity, row.productId, companyId],
+    );
+    if (!stock.rowCount) throw new Error("insufficient_stock");
+    await client.query(
+      `INSERT INTO inventory_movements(id,company_id,product_id,movement_type,quantity_delta,reference_type,reference_id,created_by)
+       VALUES($1,$2,$3,'sale',$4,'sale',$5,$6)`,
+      [`mov-${id}-${row.id}`, companyId, row.productId, -row.quantity, id,
+        stringValue(payload, "created_by") || null],
+    );
     await client.query(
       `INSERT INTO sale_items (id, sale_id, product_id, product_name, quantity, unit_price, subtotal, company_id, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9::timestamptz,NOW()))`,
-      [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
-        stringValue(row, "product_name") || null, quantity, unitPrice,
-        numberValue(row, "subtotal", quantity * unitPrice), companyId, stringValue(row, "created_at") || null],
+      [row.id, id, row.productId, row.productName, row.quantity, row.unitPrice,
+        row.subtotal, companyId, row.createdAt],
     );
   }
 }
@@ -223,6 +296,46 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
 
 async function upsertFinancialTransaction(client: PoolClient, companyId: string, id: string, payload: Record<string, unknown>) {
   const customerId = nullableId(stringValue(payload, "customer_id"));
+  const type = stringValue(payload, "type");
+  const amount = numberValue(payload, "amount", Number.NaN);
+  const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
+  const debtAmount = numberValue(payload, "debt_amount", Number.NaN);
+  const referenceId = nullableId(stringValue(payload, "reference_id"));
+  if (!["sale","payment","collection"].includes(type) || !customerId ||
+      !Number.isFinite(amount) || !Number.isFinite(paidAmount) || !Number.isFinite(debtAmount) ||
+      amount < 0 || paidAmount < 0 || debtAmount < 0) throw new Error("invalid_financial_transaction");
+  const prior = await client.query(
+    `SELECT id FROM financial_transactions WHERE id=$1 AND company_id=$2 FOR UPDATE`, [id, companyId]);
+  if (prior.rowCount) return;
+  const customer = await client.query(
+    `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
+  if (!customer.rowCount) throw new Error("invalid_customer");
+  if (type === "sale") {
+    const sale = await client.query(
+      `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+      [referenceId, companyId]);
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+        Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01 ||
+        Math.abs(Number(sale.rows[0].paid_amount)-paidAmount)>0.01 ||
+        Math.abs(amount-paidAmount-debtAmount)>0.01) throw new Error("sale_ledger_mismatch");
+  } else if (type === "payment") {
+    if (!referenceId || amount <= 0 || Math.abs(amount-paidAmount)>0.01) {
+      throw new Error("invalid_payment_transaction");
+    }
+    const sale = await client.query(
+      `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+      [referenceId, companyId]);
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+        Number(sale.rows[0].paid_amount)+amount > Number(sale.rows[0].total_amount)+0.01) {
+      throw new Error("payment_exceeds_sale");
+    }
+    const newPaid = Number(sale.rows[0].paid_amount)+amount;
+    await client.query(
+      `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
+      [newPaid, newPaid >= Number(sale.rows[0].total_amount)-0.01 ? 'completed' : 'partial', referenceId, companyId]);
+  } else if (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId) {
+    throw new Error("invalid_collection_transaction");
+  }
   const description = stringValue(payload, "description") || stringValue(payload, "notes") || null;
   const metadata = typeof payload.metadata === "object" && payload.metadata !== null ? JSON.stringify(payload.metadata) : (stringValue(payload, "metadata") || null);
   const paymentMethod = stringValue(payload, "payment_method") || null;
@@ -233,10 +346,10 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
        description = COALESCE(EXCLUDED.description, financial_transactions.description),
        metadata = COALESCE(EXCLUDED.metadata, financial_transactions.metadata),
        payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method)`,
-    [id, companyId, stringValue(payload, "type", "payment"), customerId, numberValue(payload, "amount"),
-      numberValue(payload, "paid_amount"), numberValue(payload, "debt_amount"),
+    [id, companyId, type, customerId, amount,
+      paidAmount, debtAmount,
       stringValue(payload, "date") || stringValue(payload, "created_at") || null,
-      stringValue(payload, "reference_id") || null, numberValue(payload, "logical_clock"),
+      referenceId, numberValue(payload, "logical_clock"),
       stringValue(payload, "device_id") || null, description, metadata, paymentMethod],
   );
 }
@@ -435,7 +548,7 @@ router.post("/push", async (req, res) => {
       };
       // The domain write and the durable replication record are atomic. Never
       // acknowledge a mutation that cannot be materialized for another device.
-      await applyDomainMutation(client, user.company_id, domainMutation);
+      await applyDomainMutation(client, user.company_id, domainMutation, user.id);
       const inserted = await client.query(
         `INSERT INTO sync_v4_changes (tenant_id, mutation_id, device_id, device_activation_id, entity_type, entity_id, operation, payload)
          VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8::jsonb)
@@ -628,13 +741,16 @@ router.get("/bootstrap", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    const [products, customers, sales, saleItems, orders, orderItems, financial, revision] = await Promise.all([
+    const [products, customers, sales, saleItems, orders, orderItems, refunds, refundItems, financial, revision] = await Promise.all([
       client.query("SELECT * FROM products WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customers WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM sales WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM sale_items WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customer_orders WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customer_order_items WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query("SELECT * FROM refunds WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query(`SELECT ri.* FROM refund_items ri JOIN refunds r ON r.id=ri.refund_id
+        WHERE r.company_id=$1 ORDER BY r.created_at,ri.id`, [user.company_id]),
       client.query("SELECT * FROM financial_transactions WHERE company_id = $1 ORDER BY date", [user.company_id]),
       client.query("SELECT COALESCE(MAX(revision), 0) AS cursor FROM sync_v4_changes WHERE tenant_id = $1", [user.company_id]),
     ]);
@@ -663,6 +779,7 @@ router.get("/bootstrap", async (req, res) => {
     });
     const saleItemsBySale = itemsFor(saleItems.rows.map(localItem), "sale_id");
     const orderItemsByOrder = itemsFor(orderItems.rows.map(localItem), "order_id");
+    const refundItemsByRefund = itemsFor(refundItems.rows, "refund_id");
     const localPayload = (entityType: string, row: Record<string, unknown>) => {
       const deleted = row.is_deleted === true ? 1 : 0;
       switch (entityType) {
@@ -692,6 +809,11 @@ router.get("/bootstrap", async (req, res) => {
             actual_delivery_date: row.actual_delivery_date, notes: row.notes, created_at: row.created_at,
             updated_at: row.updated_at, is_deleted: deleted, deleted_at: row.deleted_at,
             deleted_by: row.deleted_by, created_by: row.created_by };
+        case "refund":
+          return { id: row.id, sale_id: row.sale_id, amount: row.amount,
+            refund_method: row.refund_method, external_reference: row.external_reference,
+            reason: row.reason, status: row.status, created_at: row.created_at,
+            _snapshot_projection: true };
         default:
           return { id: row.id, type: row.type, customer_id: row.customer_id ?? "", amount: row.amount,
             paid_amount: row.paid_amount, debt_amount: row.debt_amount, reference_id: row.reference_id,
@@ -715,6 +837,7 @@ router.get("/bootstrap", async (req, res) => {
       ...customers.rows.map((row) => change("customer", row)),
       ...orders.rows.map((row) => change("order", row, orderItemsByOrder.get(String(row.id)) ?? [])),
       ...sales.rows.map((row) => change("sale", row, saleItemsBySale.get(String(row.id)) ?? [])),
+      ...refunds.rows.map((row) => change("refund", row, refundItemsByRefund.get(String(row.id)) ?? [])),
       ...financial.rows.map((row) => change("financial_transaction", row)),
     ];
     return res.json({ changes, next_cursor: Number(revision.rows[0].cursor) });
