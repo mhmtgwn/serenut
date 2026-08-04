@@ -83,15 +83,21 @@ class TsplLabelLayoutEngine {
       currentY += sy(16 * fontScale).round();
     }
 
-    // 3. Middle: Auto-scaling Product Name (Centered)
-    final nameClean = _ascii(model.productName.trim());
-    if (nameClean.length <= 16) {
-      final f = fontScale > 1.1 ? '3' : (fontScale < 0.9 ? '2' : '3');
-      final charW = f == '3' ? 16 : 12;
+    // 3. Middle: dominant product name, matching the shelf-label hierarchy.
+    final nameClean = _fit(model.productName, 44);
+    if (nameClean.length <= 14) {
+      final f = fontScale < 0.9 ? '3' : '4';
+      final charW = f == '4' ? 24 : 16;
       final textW = nameClean.length * charW * fontScale;
       final centerX =
           ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
       commands.writeln('TEXT $centerX,$currentY,"$f",0,1,1,"$nameClean"');
+      currentY += sy(38 * fontScale).round();
+    } else if (nameClean.length <= 22) {
+      final textW = nameClean.length * 16 * fontScale;
+      final centerX =
+          ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
+      commands.writeln('TEXT $centerX,$currentY,"3",0,1,1,"$nameClean"');
       currentY += sy(32 * fontScale).round();
     } else {
       final lines = _wrapProductName(nameClean, (22 / fontScale).round());
@@ -123,19 +129,30 @@ class TsplLabelLayoutEngine {
       );
     }
 
-    // Bottom Right or Centered: Price & KDV (if enabled)
+    // Bottom right: currency, dominant whole amount and superscript decimals.
+    // Keeping these as separate fields reproduces the visual hierarchy of a
+    // shelf price tag without letting a long combined string cross the edge.
     if (showPrice) {
-      final priceStr = 'TL ${model.price.toStringAsFixed(2)}';
+      final priceParts = model.price.toStringAsFixed(2).split('.');
+      final whole = priceParts.first;
+      final cents = priceParts.length > 1 ? priceParts.last : '00';
       const vatStr = '(KDV Dahil)';
 
       if (showBarcode && barcode.isNotEmpty) {
-        final priceX = sx(200);
-        commands.writeln('TEXT $priceX,$bottomY,"3",0,1,1,"$priceStr"');
+        final currencyX = sx(190);
+        final wholeX = sx(218);
+        final centsX = widthDots - sx(38);
+        final wholeMultiplier = whole.length <= 3 ? 2 : 1;
+        commands.writeln('TEXT $currencyX,${bottomY + sy(22)},"2",0,1,1,"TL"');
+        commands.writeln(
+            'TEXT $wholeX,$bottomY,"4",0,$wholeMultiplier,$wholeMultiplier,"$whole"');
+        commands.writeln('TEXT $centsX,$bottomY,"2",0,1,1,"$cents"');
         if (showVat) {
-          commands
-              .writeln('TEXT $priceX,${bottomY + sy(22)},"1",0,1,1,"$vatStr"');
+          commands.writeln(
+              'TEXT $currencyX,${bottomY + sy(70)},"1",0,1,1,"$vatStr"');
         }
       } else {
+        final priceStr = 'TL $whole.$cents';
         final textW = priceStr.length * 16 * fontScale;
         final priceX =
             ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
@@ -213,15 +230,16 @@ class TsplLabelLayoutEngine {
     if (showBusinessName &&
         businessName != null &&
         businessName.trim().isNotEmpty) {
-      final bizClean = _ascii(businessName.trim());
+      final bizClean = _fit(businessName, 28);
       commands.writeln('TEXT ${sx(110)},$currentY,"2",0,1,1,"$bizClean"');
       currentY += sy(20);
     }
 
     // 2. Header: Sipariş No & Tarih
     if (showOrderNo) {
-      commands.writeln(
-          'TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderIdShort"');
+      final orderNo = _fit(orderIdShort, 12);
+      commands
+          .writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderNo"');
     }
     if (showDate && timeStr.isNotEmpty) {
       commands.writeln('TEXT ${sx(220)},$currentY,"1",0,1,1,"$timeStr"');
@@ -232,8 +250,9 @@ class TsplLabelLayoutEngine {
 
     // 3. Customer Info ("Müşteri")
     if (showCustomerName) {
-      final whoText =
-          custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
+      final whoText = custClean.isNotEmpty
+          ? 'Musteri: ${_fit(custClean, 22)}'
+          : 'Musteri: Genel';
       commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$whoText"');
       currentY += sy(22);
     }
@@ -253,8 +272,8 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"URUN ICERIGI:"');
       currentY += sy(16);
       for (final item in items) {
-        final name =
-            _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
+        final name = _fit(
+            (item['product_name'] ?? item['name'] ?? 'Urun').toString(), 22);
         final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
         final itemQtyStr = itemQty % 1 == 0
             ? itemQty.toInt().toString()
@@ -275,7 +294,8 @@ class TsplLabelLayoutEngine {
     }
 
     if (noteClean != null) {
-      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"Not: $noteClean"');
+      commands.writeln(
+          'TEXT ${sx(16)},$currentY,"1",0,1,1,"Not: ${_fit(noteClean, 38)}"');
       currentY += sy(16);
     }
 
@@ -337,6 +357,13 @@ class TsplLabelLayoutEngine {
     return sanitized.length <= 40 ? sanitized : sanitized.substring(0, 40);
   }
 
+  static String _fit(String value, int maxLength) {
+    final normalized = _ascii(value.trim().replaceAll(RegExp(r'\s+'), ' '))
+        .replaceAll('"', "'");
+    if (normalized.length <= maxLength) return normalized;
+    return '${normalized.substring(0, maxLength - 2)}..';
+  }
+
   static String _ascii(String value) {
     const replacements = {
       'ç': 'c',
@@ -366,10 +393,10 @@ class TsplLabelLayoutEngine {
       final decoded = img.decodeImage(bytes);
       if (decoded == null) return null;
 
-      int targetWidth = 160; // 20mm at 203dpi
+      int targetWidth = 120;
       int targetHeight = (decoded.height * (targetWidth / decoded.width))
           .round()
-          .clamp(10, 80);
+          .clamp(10, 32);
       targetWidth = (targetWidth ~/ 8) * 8; // Multiple of 8
       if (targetWidth < 8) targetWidth = 8;
       final widthBytes = targetWidth ~/ 8;

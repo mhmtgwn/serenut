@@ -5,8 +5,10 @@ import 'package:serenutos/infrastructure/services/printer_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
 class MockSocket implements Socket {
+  final List<int> writtenBytes = [];
+
   @override
-  void add(List<int> data) {}
+  void add(List<int> data) => writtenBytes.addAll(data);
   @override
   Future<void> flush() async {}
   @override
@@ -178,6 +180,50 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('each order label contains only its own item', () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        printerName: 'network',
+        printerIp: '192.168.1.50',
+        printerPort: 9100,
+        labelPrinterLanguage: 'tspl',
+        createdAt: DateTime.now(),
+      );
+      final socket = MockSocket();
+      final service =
+          PrinterService((ip, port, {timeout}) async => socket, null);
+      final items = <Map<String, dynamic>>[
+        {
+          'product_id': 'prod-1',
+          'product_name': 'Birinci Urun',
+          'quantity': 1.0,
+          'unit_price': 10.0,
+        },
+        {
+          'product_id': 'prod-2',
+          'product_name': 'Ikinci Urun',
+          'quantity': 2.0,
+          'unit_price': 20.0,
+        },
+      ];
+      final order = OrderEntity(
+        id: 'order-two-items',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: items,
+      );
+
+      await service.printOrderLabels(order, items, settings);
+
+      final output = String.fromCharCodes(socket.writtenBytes);
+      expect('Birinci Urun'.allMatches(output), hasLength(1));
+      expect('Ikinci Urun'.allMatches(output), hasLength(1));
+      expect('PRINT 1,1'.allMatches(output), hasLength(2));
     });
   });
 }
