@@ -63,9 +63,37 @@ void main() {
     expect(output, contains('Cesidi'));
     expect(output, contains('"2",0,1,1'));
     expect(output, contains('"128"'));
-    expect(output, contains('TL 123.45'));
+    expect(output, contains('"4",0,2,2,"123"'));
+    expect(output, contains('"2",0,1,1,"45"'));
     expect(output, isNot(contains('Ü')));
     expect(output, isNot(contains('geçersiz')));
+  });
+
+  test('ürün etiketi referans hiyerarşisinde büyük ad ve bölünmüş fiyat üretir',
+      () {
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateLabelBytes(
+        LabelModel(
+          productName: 'Kisa Urun',
+          businessName: 'Serenut OS',
+          weight: 1,
+          price: 299.95,
+          barcode: '1234567890',
+          qrData: 'product-test',
+          timestamp: DateTime(2026, 7, 30),
+        ),
+        widthMm: 50,
+        heightMm: 30,
+        showBrand: false,
+        showVat: false,
+      ),
+    );
+
+    expect(output, contains('"4",0,1,1,"Kisa Urun"'));
+    expect(output, contains('Kod: 1234567890'));
+    expect(output, contains('"4",0,2,2,"299"'));
+    expect(output, contains('"2",0,1,1,"95"'));
+    expect(output, isNot(contains('TL 299.95')));
   });
 
   test('sipariş etiketi yalnızca Latin-1 uyumlu TSPL üretir', () {

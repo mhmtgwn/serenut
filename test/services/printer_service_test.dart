@@ -121,6 +121,11 @@ void main() {
               [83, 129, 116, 32, 40, 51, 32, 120, 32, 51, 48, 46, 48, 48, 41]),
           isTrue); // 'Süt (3 x 30.00)'
       expect(writtenText, contains('Elma (2 x 10.00)'));
+      expect(
+        _containsBytes(mockSocket.writtenBytes, [0x1D, 0x6B, 0x49]),
+        isFalse,
+        reason: 'Normal sales receipts must not print a barcode per item.',
+      );
 
       // Verify totals exist
       expect(writtenText, contains('TOPLAM: 120.00 TL'));
@@ -226,6 +231,11 @@ void main() {
           isTrue); // '*** SİPARİŞ FİŞİ ***'
       expect(writtenText, contains('Cay (5 x 10.00)'));
       expect(writtenText, contains('Borek (2 x 25.00)'));
+      expect(
+        _containsBytes(mockSocket.writtenBytes, [0x1D, 0x6B, 0x49]),
+        isFalse,
+        reason: 'Order receipts must not print a barcode per item.',
+      );
       expect(writtenText, contains('TOPLAM: 100.00 TL'));
       expect(
           _containsBytes(mockSocket.writtenBytes, [

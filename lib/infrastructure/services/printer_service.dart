@@ -183,8 +183,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final hasLabelIp = settings.labelPrinterIp?.isNotEmpty ?? false;
       final hasLabelName = settings.labelPrinterName?.isNotEmpty ?? false;
 
-      final labelIp = hasLabelIp ? settings.labelPrinterIp! : (settings.printerIp ?? '');
-      final labelName = hasLabelName ? settings.labelPrinterName! : (settings.printerName ?? '');
+      final labelIp =
+          hasLabelIp ? settings.labelPrinterIp! : (settings.printerIp ?? '');
+      final labelName = hasLabelName
+          ? settings.labelPrinterName!
+          : (settings.printerName ?? '');
       final labelPort = (hasLabelIp && settings.labelPrinterPort > 0)
           ? settings.labelPrinterPort
           : (settings.printerPort > 0 ? settings.printerPort : 9100);
@@ -211,7 +214,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
 
     // Failover chain: Network / USB / Bluetooth → PersistentQueue
-    final backends = await _buildFailoverChain(targetSettings, purpose: purpose);
+    final backends =
+        await _buildFailoverChain(targetSettings, purpose: purpose);
 
     final failures = <String>[];
     for (final backend in backends) {
@@ -280,7 +284,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       if (!isLabel) chain.add(PrinterBackend.sunmi);
     } else if (ip != null && ip.isNotEmpty) {
       chain.add(PrinterBackend.network);
-      if (!isLabel) chain.add(PrinterBackend.sunmi); // Sunmi as last-resort ONLY for receipts
+      if (!isLabel) {
+        chain.add(
+            PrinterBackend.sunmi); // Sunmi as last-resort ONLY for receipts
+      }
     } else if (printerName != null && printerName.contains(':')) {
       chain.add(PrinterBackend.bluetooth);
       if (!isLabel) chain.add(PrinterBackend.sunmi);
@@ -571,17 +578,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
       }
-      if (settings.printBarcode) {
-        final barcode =
-            item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
-        final barcodeBytes = _generateCode128Bytes(barcode);
-        if (barcodeBytes.isNotEmpty) {
-          bytes.addAll(EscPosCommands.alignCenter);
-          bytes.addAll(barcodeBytes);
-          bytes.addAll(EscPosCommands.lf);
-          bytes.addAll(EscPosCommands.alignLeft);
-        }
-      }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -728,17 +724,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         bytes.addAll(_textToBytes('${displayName.replaceAll('₺', 'TL')}\n'));
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
-      }
-      if (settings.printBarcode) {
-        final barcode =
-            item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
-        final barcodeBytes = _generateCode128Bytes(barcode);
-        if (barcodeBytes.isNotEmpty) {
-          bytes.addAll(EscPosCommands.alignCenter);
-          bytes.addAll(barcodeBytes);
-          bytes.addAll(EscPosCommands.lf);
-          bytes.addAll(EscPosCommands.alignLeft);
-        }
       }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
@@ -1162,7 +1147,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       final img.Image? decoded = img.decodeImage(list);
       if (decoded != null) {
         // Enforce logo width to be an exact multiple of 8 bytes for ESC/POS GS v 0
-        int rawTargetWidth = decoded.width > maxWidth ? maxWidth : decoded.width;
+        int rawTargetWidth =
+            decoded.width > maxWidth ? maxWidth : decoded.width;
         int targetWidth = (rawTargetWidth ~/ 8) * 8;
         if (targetWidth < 8) targetWidth = 8;
 
@@ -1237,26 +1223,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     ];
   }
 
-  /// Common Epson-compatible CODE128 subset B command. Non-ASCII identifiers
-  /// are skipped because silently replacing barcode data would make it scan to
-  /// the wrong product.
-  List<int> _generateCode128Bytes(String value) {
-    final normalized = value.trim();
-    if (normalized.isEmpty ||
-        normalized.length > 120 ||
-        normalized.codeUnits.any((unit) => unit < 0x20 || unit > 0x7E)) {
-      return const [];
-    }
-    final data = <int>[0x7B, 0x42, ...normalized.codeUnits]; // {B + data
-    return [
-      0x1D, 0x48, 0x02, // Human-readable text below
-      0x1D, 0x68, 0x50, // Height: 80 dots
-      0x1D, 0x77, 0x02, // Module width
-      0x1D, 0x6B, 0x49, data.length,
-      ...data,
-    ];
-  }
-
   String _getPaymentLabel(String method) {
     switch (method.toLowerCase()) {
       case 'cash':
@@ -1299,11 +1265,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
       if (isTspl) {
         final labelBytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
-          orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+          orderIdShort:
+              order.id.length > 8 ? order.id.substring(0, 8) : order.id,
           customerName: custName,
           productName: name,
           quantity: qty,
-          items: items,
+          // One physical label is generated for each order item. Passing the
+          // whole order here duplicated every item on every label and caused
+          // the TSPL content to run past the configured label height.
+          items: [item],
           note: note,
           timestamp: order.createdAt,
           totalAmount: order.totalAmount,
