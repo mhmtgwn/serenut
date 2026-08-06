@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/hardware_devices_provider.dart';
@@ -32,6 +33,8 @@ class HardwareTestPage extends ConsumerWidget {
           devices: items,
           onAdd: () => _openEditor(context, ref),
           onEdit: (device) => _openEditor(context, ref, device: device),
+          onActivate: (device) =>
+              ref.read(hardwareDevicesProvider.notifier).activate(device),
           onTest: (device) => _testDevice(context, ref, device),
           onDelete: (device) => _deleteDevice(context, ref, device),
         ),
@@ -59,13 +62,56 @@ class HardwareTestPage extends ConsumerWidget {
     WidgetRef ref,
     HardwareDevice device,
   ) async {
-    final result =
-        await ref.read(hardwareDevicesProvider.notifier).test(device);
+    PrintDocumentKind? kind;
+    if (device.type == HardwareDeviceType.labelPrinter) {
+      kind = await showDialog<PrintDocumentKind>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Test etiketi türü'),
+          content: const Text(
+            'Aynı fiziksel cihaz farklı tasarım profilleri kullanır. '
+            'Fiziksel olarak sınanacak belgeyi seçin.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                PrintDocumentKind.productLabel,
+              ),
+              child: const Text('Ürün etiketi'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                PrintDocumentKind.orderLabel,
+              ),
+              child: const Text('Sipariş etiketi'),
+            ),
+          ],
+        ),
+      );
+      if (kind == null || !context.mounted) return;
+    }
+    final result = await ref
+        .read(hardwareDevicesProvider.notifier)
+        .test(device, printKind: kind);
     if (!context.mounted) return;
-    await showDialog<void>(
+    final physicalResult = await showDialog<bool>(
       context: context,
       builder: (_) => _TestResultDialog(result: result),
     );
+    if (result.requiresPhysicalConfirmation && physicalResult != null) {
+      await ref
+          .read(hardwareDevicesProvider.notifier)
+          .confirmPhysicalPrintTest(result, passed: physicalResult);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(physicalResult
+            ? 'Yazıcı fiziksel olarak doğrulandı.'
+            : 'Test reddedildi; cihaz kontrol edilmeli.'),
+        backgroundColor: physicalResult ? kGreen : kPink,
+      ));
+    }
   }
 
   Future<void> _deleteDevice(
@@ -101,6 +147,7 @@ class _DeviceList extends StatelessWidget {
   final List<HardwareDevice> devices;
   final VoidCallback onAdd;
   final ValueChanged<HardwareDevice> onEdit;
+  final ValueChanged<HardwareDevice> onActivate;
   final ValueChanged<HardwareDevice> onTest;
   final ValueChanged<HardwareDevice> onDelete;
 
@@ -108,6 +155,7 @@ class _DeviceList extends StatelessWidget {
     required this.devices,
     required this.onAdd,
     required this.onEdit,
+    required this.onActivate,
     required this.onTest,
     required this.onDelete,
   });
@@ -160,6 +208,7 @@ class _DeviceList extends StatelessWidget {
                       return _DeviceCard(
                         device: device,
                         onEdit: () => onEdit(device),
+                        onActivate: () => onActivate(device),
                         onTest: () => onTest(device),
                         onDelete: () => onDelete(device),
                       );
@@ -257,12 +306,14 @@ class _Metric extends StatelessWidget {
 class _DeviceCard extends StatelessWidget {
   final HardwareDevice device;
   final VoidCallback onEdit;
+  final VoidCallback onActivate;
   final VoidCallback onTest;
   final VoidCallback onDelete;
 
   const _DeviceCard({
     required this.device,
     required this.onEdit,
+    required this.onActivate,
     required this.onTest,
     required this.onDelete,
   });
@@ -270,13 +321,21 @@ class _DeviceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = _statusPresentation(device.status);
+    final activeFor = (device.configuration['activeFor'] as List?)
+            ?.map((value) => value.toString())
+            .toList(growable: false) ??
+        const <String>[];
+    final isActivePrinter = activeFor.isNotEmpty;
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: kBorderColor),
+        side: BorderSide(
+          color: isActivePrinter ? kGreen : kBorderColor,
+          width: isActivePrinter ? 2 : 1,
+        ),
       ),
       child: InkWell(
         onTap: onEdit,
@@ -284,87 +343,121 @@ class _DeviceCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor:
-                      _typeColor(device.type).withValues(alpha: .1),
-                  foregroundColor: _typeColor(device.type),
-                  child: Icon(_typeIcon(device.type)),
-                ),
-                const Spacer(),
-                _StatusBadge(label: status.$1, color: status.$2),
-                PopupMenuButton<String>(
-                  tooltip: 'Diğer işlemler',
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                    PopupMenuItem(value: 'delete', child: Text('Kaldır')),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor:
+                        _typeColor(device.type).withValues(alpha: .1),
+                    foregroundColor: _typeColor(device.type),
+                    child: Icon(_typeIcon(device.type)),
+                  ),
+                  const Spacer(),
+                  if (isActivePrinter) ...[
+                    const _StatusBadge(label: 'Aktif', color: kGreen),
+                    const SizedBox(width: 6),
                   ],
+                  _StatusBadge(label: status.$1, color: status.$2),
+                  PopupMenuButton<String>(
+                    tooltip: 'Diğer işlemler',
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'activate') onActivate();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (_) => [
+                      if (!isActivePrinter)
+                        const PopupMenuItem(
+                            value: 'activate', child: Text('Aktif cihaz yap')),
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('Düzenle')),
+                      const PopupMenuItem(
+                          value: 'delete', child: Text('Kaldır')),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                device.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}',
+                style: const TextStyle(fontSize: 12, color: kTextSecondary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _deviceConfigurationSummary(device),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+              ),
+              if (isActivePrinter) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _activeRouteLabel(activeFor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: kGreen,
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              device.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}',
-              style: const TextStyle(fontSize: 12, color: kTextSecondary),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Text(
-                device.lastMessage ??
-                    device.lastError ??
-                    'Bağlantı henüz doğrulanmadı.',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: device.lastError == null ? kTextSecondary : kPink,
+              const SizedBox(height: 12),
+              Expanded(
+                child: Text(
+                  device.lastMessage ??
+                      device.lastError ??
+                      'Bağlantı henüz doğrulanmadı.',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: device.lastError == null ? kTextSecondary : kPink,
+                  ),
                 ),
               ),
-            ),
-            if (device.lastTestedAt != null)
-              Text(
-                'Son test: ${DateFormat('dd.MM.yyyy HH:mm').format(device.lastTestedAt!)}',
-                style: const TextStyle(fontSize: 10, color: kTextSecondary),
+              if (device.lastTestedAt != null)
+                Text(
+                  'Son test: ${DateFormat('dd.MM.yyyy HH:mm').format(device.lastTestedAt!)}',
+                  style: const TextStyle(fontSize: 10, color: kTextSecondary),
+                ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: device.status == HardwareDeviceStatus.testing
+                      ? null
+                      : onTest,
+                  icon: device.status == HardwareDeviceStatus.testing
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow_rounded),
+                  label: Text(device.status == HardwareDeviceStatus.testing
+                      ? 'Test ediliyor'
+                      : _deviceTestLabel(device.type)),
+                ),
               ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: device.status == HardwareDeviceStatus.testing
-                    ? null
-                    : onTest,
-                icon: device.status == HardwareDeviceStatus.testing
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_arrow_rounded),
-                label: Text(device.status == HardwareDeviceStatus.testing
-                    ? 'Test ediliyor'
-                    : 'Bağlantıyı test et'),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -392,6 +485,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   late final TextEditingController _labelHeight;
   late final TextEditingController _labelGap;
   late final TextEditingController _labelCopies;
+  late final TextEditingController _printableWidthDots;
   String _vendor = 'generic';
   String _protocol = 'vendor_sdk';
   int _dataBits = 8;
@@ -401,12 +495,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   int _paperWidth = 80;
   String _labelLanguage = 'tspl';
   int _labelDpi = 203;
+  int _printDirection = 0;
   bool _autoCut = true;
   bool _openDrawer = false;
-  bool _printLogo = true;
-  bool _printBarcode = true;
-  bool _printQr = false;
-  
+
   int _step = 0;
   bool _working = false;
   bool _discoveringBluetooth = false;
@@ -438,21 +530,22 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         TextEditingController(text: config['labelGapMm']?.toString() ?? '2');
     _labelCopies =
         TextEditingController(text: config['copies']?.toString() ?? '1');
+    _printableWidthDots = TextEditingController(
+        text: config['printableWidthDots']?.toString() ?? '384');
     _vendor = config['vendor']?.toString() ?? 'generic';
     _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
     _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
     _stopBits = int.tryParse(config['stopBits']?.toString() ?? '') ?? 1;
     _parity = config['parity']?.toString() ?? 'none';
     _scaleUnit = config['defaultUnit']?.toString() ?? 'kg';
-    _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 80;
+    _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 58;
     _labelLanguage = config['language']?.toString() ?? 'tspl';
     _labelDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
-    
+    _printDirection =
+        int.tryParse(config['printDirection']?.toString() ?? '') ?? 0;
+
     _autoCut = config['autoCut'] as bool? ?? true;
     _openDrawer = config['openDrawer'] as bool? ?? false;
-    _printLogo = config['printLogo'] as bool? ?? true;
-    _printBarcode = config['printBarcode'] as bool? ?? true;
-    _printQr = config['printQr'] as bool? ?? false;
   }
 
   @override
@@ -467,6 +560,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelHeight.dispose();
     _labelGap.dispose();
     _labelCopies.dispose();
+    _printableWidthDots.dispose();
     super.dispose();
   }
 
@@ -536,7 +630,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : Text(_step < 2 ? 'Devam' : 'Doğrula ve kaydet'),
+                        : Text(_step < 2 ? 'Devam' : 'Test et ve kaydet'),
                   ),
                 ],
               ),
@@ -811,18 +905,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             onChanged: (val) => setState(() => _openDrawer = val),
             contentPadding: EdgeInsets.zero,
           ),
-          SwitchListTile(
-            title: const Text('İşletme Logosunu Bas'),
-            value: _printLogo,
-            onChanged: (val) => setState(() => _printLogo = val),
-            contentPadding: EdgeInsets.zero,
-          ),
-          SwitchListTile(
-            title: const Text('Sipariş Barkodu Bas'),
-            value: _printBarcode,
-            onChanged: (val) => setState(() => _printBarcode = val),
-            contentPadding: EdgeInsets.zero,
-          ),
           const SizedBox(height: 8),
           TextField(
             controller: _labelCopies,
@@ -858,20 +940,33 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                   controller: _labelWidth,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'Kağıt Genişliği / En (mm)',
-                    helperText: 'Standart etiket uzunluğu 30mm, boşluksuz (sürekli) format.',
+                    labelText: 'Etiket eni (mm)',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _labelHeight,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Etiket boyu (mm)',
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          SwitchListTile(
-            title: const Text('İşletme Logosunu Bas'),
-            value: _printLogo,
-            onChanged: (val) => setState(() => _printLogo = val),
-            contentPadding: EdgeInsets.zero,
+          TextField(
+            controller: _labelGap,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Etiketler arası boşluk (mm)',
+              helperText:
+                  '58 mm yazıcı genişliği ile etiketin gerçek en/boy ölçüsü aynı ayar değildir.',
+            ),
           ),
+          const SizedBox(height: 12),
           TextField(
             controller: _labelCopies,
             keyboardType: TextInputType.number,
@@ -889,9 +984,28 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             onSelectionChanged: (values) =>
                 setState(() => _labelDpi = values.first),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _printableWidthDots,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Basılabilir genişlik (nokta)',
+              helperText: '58 mm / 203 DPI cihazlarda genellikle 384 noktadır.',
+            ),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('Normal yön')),
+              ButtonSegment(value: 1, label: Text('Ters yön')),
+            ],
+            selected: {_printDirection},
+            onSelectionChanged: (values) =>
+                setState(() => _printDirection = values.first),
+          ),
           const SizedBox(height: 8),
           const Text(
-            'Rulo üzerindeki tek etiketin gerçek ölçüsünü girin. Varsayılan raf etiketi 50×30 mm, etiket aralığı 2 mm’dir.',
+            'Rulo üzerindeki tek etiketin gerçek en ve boy ölçüsünü girin. 58 mm cihaz, en fazla 58 mm medya kullanabildiğini belirtir; örneğin gerçek etiket 50×30 mm olabilir.',
             style: TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
@@ -977,6 +1091,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       final height = int.tryParse(_labelHeight.text);
       final gap = int.tryParse(_labelGap.text);
       final copies = int.tryParse(_labelCopies.text);
+      final printableDots = int.tryParse(_printableWidthDots.text);
       if (width == null || width < 30 || width > 100) {
         return 'Etiket eni 30-100 mm arasında olmalıdır.';
       }
@@ -988,6 +1103,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       }
       if (copies == null || copies < 1 || copies > 20) {
         return 'Etiket adedi 1-20 arasında olmalıdır.';
+      }
+      if (printableDots == null ||
+          printableDots < 200 ||
+          printableDots > 1200) {
+        return 'Basılabilir genişlik 200-1200 nokta arasında olmalıdır.';
       }
     }
     return null;
@@ -1024,31 +1144,63 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelHeightMm': int.tryParse(_labelHeight.text) ?? 30,
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
         'dpi': _labelDpi,
+        'printableWidthDots': int.tryParse(_printableWidthDots.text) ?? 384,
+        'printDirection': _printDirection,
         'copies': int.tryParse(_labelCopies.text) ?? 1,
         'autoCut': _autoCut,
         'openDrawer': _openDrawer,
-        'printLogo': _printLogo,
-        'printBarcode': _printBarcode,
-        'printQr': _printQr,
       },
     );
   }
 }
 
-class _TestResultDialog extends StatelessWidget {
+class _TestResultDialog extends StatefulWidget {
   final HardwareTestResult result;
 
   const _TestResultDialog({required this.result});
 
   @override
+  State<_TestResultDialog> createState() => _TestResultDialogState();
+}
+
+class _TestResultDialogState extends State<_TestResultDialog> {
+  bool _confirmationEnabled = false;
+
+  HardwareTestResult get result => widget.result;
+
+  @override
+  void initState() {
+    super.initState();
+    if (result.requiresPhysicalConfirmation) {
+      Future<void>.delayed(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() => _confirmationEnabled = true);
+      });
+    } else {
+      _confirmationEnabled = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AlertDialog(
       icon: Icon(
-        result.success ? Icons.check_circle_rounded : Icons.error_rounded,
-        color: result.success ? kGreen : kPink,
+        result.requiresPhysicalConfirmation
+            ? Icons.fact_check_rounded
+            : result.success
+                ? Icons.check_circle_rounded
+                : Icons.error_rounded,
+        color: result.requiresPhysicalConfirmation
+            ? kOrange
+            : result.success
+                ? kGreen
+                : kPink,
         size: 48,
       ),
-      title: Text(result.success ? 'Bağlantı hazır' : 'Bağlantı kurulamadı'),
+      title: Text(result.requiresPhysicalConfirmation
+          ? 'Çıktıyı kontrol edin'
+          : result.success
+              ? 'Bağlantı hazır'
+              : 'Bağlantı kurulamadı'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1069,10 +1221,24 @@ class _TestResultDialog extends StatelessWidget {
         ],
       ),
       actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Tamam'),
-        ),
+        if (result.requiresPhysicalConfirmation) ...[
+          TextButton(
+            onPressed: _confirmationEnabled
+                ? () => Navigator.pop(context, false)
+                : null,
+            child: const Text('Hayır, hatalı'),
+          ),
+          FilledButton(
+            onPressed: _confirmationEnabled
+                ? () => Navigator.pop(context, true)
+                : null,
+            child: const Text('Evet, doğru'),
+          ),
+        ] else
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tamam'),
+          ),
       ],
     );
   }
@@ -1205,6 +1371,41 @@ String _typeLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.paymentTerminal => 'Fiziksel POS',
       HardwareDeviceType.barcodeScanner => 'Barkod okuyucu',
     };
+
+String _deviceTestLabel(HardwareDeviceType type) => switch (type) {
+      HardwareDeviceType.receiptPrinter => 'Test fişi bas',
+      HardwareDeviceType.labelPrinter => 'Test etiketi bas',
+      HardwareDeviceType.scale => 'Canlı ağırlığı test et',
+      HardwareDeviceType.paymentTerminal => 'POS bağlantısını test et',
+      HardwareDeviceType.barcodeScanner => 'Barkod okut ve test et',
+    };
+
+String _deviceConfigurationSummary(HardwareDevice device) {
+  final config = device.configuration;
+  int value(String key, int fallback) =>
+      int.tryParse(config[key]?.toString() ?? '') ?? fallback;
+  return switch (device.type) {
+    HardwareDeviceType.receiptPrinter =>
+      '${value('paperWidth', 58)} mm fiş · ${config['autoCut'] == true ? 'otomatik kesim' : 'kesimsiz'}',
+    HardwareDeviceType.labelPrinter =>
+      '${value('labelWidthMm', 50)}×${value('labelHeightMm', 30)} mm · ${value('dpi', 203)} DPI · ${(config['language'] ?? 'tspl').toString().toUpperCase()}',
+    HardwareDeviceType.scale =>
+      '${value('baudRate', 9600)} baud · ${(config['defaultUnit'] ?? 'kg').toString()}',
+    HardwareDeviceType.paymentTerminal =>
+      '${(config['vendor'] ?? 'generic').toString()} · ${(config['protocol'] ?? 'vendor_sdk').toString().toUpperCase()}',
+    HardwareDeviceType.barcodeScanner => 'Okutma ile doğrulama',
+  };
+}
+
+String _activeRouteLabel(List<String> activeFor) {
+  final labels = activeFor.map((kind) => switch (kind) {
+        'receipt' => 'Fiş',
+        'productLabel' => 'Ürün etiketi',
+        'orderLabel' => 'Sipariş etiketi',
+        _ => kind,
+      });
+  return 'Aktif rota: ${labels.join(', ')}';
+}
 
 IconData _typeIcon(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter => Icons.print_rounded,

@@ -94,7 +94,8 @@ extension SettingsUserManagementSheets on _SettingsPageState {
                                 return ListTile(
                                   leading: CircleAvatar(
                                     radius: 18,
-                                    backgroundColor: _kGreen.withValues(alpha: 0.12),
+                                    backgroundColor:
+                                        _kGreen.withValues(alpha: 0.12),
                                     child: Text(
                                       initials,
                                       style: const TextStyle(

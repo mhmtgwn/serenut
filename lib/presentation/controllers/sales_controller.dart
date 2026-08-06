@@ -18,6 +18,7 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
 
 final inventoryServiceProvider = FutureProvider<InventoryService>((ref) async {
   final productRepo = await ref.watch(productRepositoryProvider.future);
@@ -65,6 +66,7 @@ final salesServiceProvider = FutureProvider<SalesService>((ref) async {
   final gateway = ref.watch(dbGatewayProvider);
   final securityGate = ref.watch(securityGateProvider);
   final dataIntegrity = await ref.watch(dataIntegrityServiceProvider.future);
+  final refundStore = SqliteRefundMutationStore(gateway);
 
   return SalesService(
     saleRepository: saleRepo,
@@ -73,13 +75,13 @@ final salesServiceProvider = FutureProvider<SalesService>((ref) async {
     eventPublisher: eventPublisher,
     transactionRunner: gateway,
     securityGate: securityGate,
+    refundStore: refundStore,
     dataIntegrityService: dataIntegrity,
   );
 });
 
 final orderCancellationServiceProvider =
     FutureProvider<OrderCancellationService>((ref) async {
-  final saleRepo = await ref.watch(saleRepositoryProvider.future);
   final orderRepo = await ref.watch(orderRepositoryProvider.future);
   final inventoryService = await ref.watch(inventoryServiceProvider.future);
   final paymentService = await ref.watch(paymentServiceProvider.future);
@@ -89,7 +91,6 @@ final orderCancellationServiceProvider =
   final dataIntegrity = await ref.watch(dataIntegrityServiceProvider.future);
 
   return OrderCancellationService(
-    saleRepository: saleRepo,
     orderRepository: orderRepo,
     inventoryService: inventoryService,
     paymentService: paymentService,
@@ -170,38 +171,11 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     return created;
   }
 
-  Future<void> cancelSale(String saleId) async {
-    await future;
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final sale = await _saleRepository.findById(saleId);
-      await _salesService.cancelSale(saleId);
-      try {
-        final auditService = await ref.read(auditServiceProvider.future);
-        await auditService.logDelete('sale', saleId,
-            'Satış İptali: ₺${sale?.totalAmount.toStringAsFixed(2)}');
-      } catch (e) {
-        debugPrint('Failed to log sale cancellation audit event: $e');
-      }
-      if (sale != null && sale.customerId.isNotEmpty) {
-        ref.invalidate(customersControllerProvider);
-        ref.invalidate(customerTransactionsProvider(sale.customerId));
-        ref.invalidate(customerBalanceDetailsProvider(sale.customerId));
-      }
-      ref.invalidate(productsControllerProvider);
-      ref.invalidate(dashboardProvider);
-      return _saleRepository.findAll();
-    });
-    if (!state.hasError) {
-      ref.invalidate(salesHistoryControllerProvider);
-      unawaited(ref.read(syncProvider.notifier).triggerSync());
-    }
-  }
-
   Future<void> returnItems({
     required String saleId,
     required List<SaleItemInput> itemsToReturn,
     required String refundMethod,
+    required String reason,
   }) async {
     await future;
     state = const AsyncValue.loading();
@@ -211,6 +185,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
         saleId: saleId,
         itemsToReturn: itemsToReturn,
         refundMethod: refundMethod,
+        reason: reason,
       );
       try {
         final auditService = await ref.read(auditServiceProvider.future);
@@ -218,7 +193,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           eventType: 'items_returned',
           entityType: 'sale',
           entityId: saleId,
-          notes: 'Satıştan iade alındı: $saleId, Yöntem: $refundMethod',
+          notes: 'Satıştan iade alındı: $saleId, Yöntem: $refundMethod, Gerekçe: $reason',
         );
       } catch (e) {
         debugPrint('Failed to log items_returned audit event: $e');

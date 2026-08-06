@@ -71,7 +71,8 @@ class CheckoutSession {
     required this.checkoutFormContent,
   });
 
-  factory CheckoutSession.fromJson(Map<String, dynamic> json) => CheckoutSession(
+  factory CheckoutSession.fromJson(Map<String, dynamic> json) =>
+      CheckoutSession(
         invoiceId: json['invoiceId'] as String? ?? '',
         token: json['token'] as String? ?? '',
         checkoutFormContent: json['checkoutFormContent'] as String? ?? '',
@@ -102,7 +103,8 @@ class BillingRepository {
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final session = CheckoutSession.fromJson(data);
-    if (session.invoiceId.isEmpty || session.token.isEmpty ||
+    if (session.invoiceId.isEmpty ||
+        session.token.isEmpty ||
         session.checkoutFormContent.isEmpty) {
       throw const FormatException('Geçersiz ödeme sağlayıcı oturumu yanıtı.');
     }

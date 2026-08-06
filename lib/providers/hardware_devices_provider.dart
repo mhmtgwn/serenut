@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
@@ -11,6 +13,10 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/infrastructure/services/device_hardware_profile_service.dart';
 import 'package:serenutos/infrastructure/services/printer_discovery_service.dart';
+import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/infrastructure/printing/physical_print_test_service.dart';
 
 final deviceHardwareProfileServiceProvider =
     Provider<DeviceHardwareProfileService>((ref) {
@@ -39,19 +45,37 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
   @override
   Future<List<HardwareDevice>> build() async {
     _repository = await ref.watch(hardwareDeviceRepositoryProvider.future);
-    final devices = await _repository.getAll();
+    final legacyDevices = await _repository.getAll();
+    final legacyPrinters = legacyDevices.where(_isPrinter).toList();
+    if (legacyPrinters.isNotEmpty) {
+      for (final printer in legacyPrinters) {
+        await _savePrinter(printer, createRouteWhenMissing: true);
+        await _repository.delete(printer.id);
+      }
+    }
+    final devices = await _loadAll();
     if (devices.isNotEmpty) return devices;
     final remoteDevices = await _restoreRemoteProfile();
     if (remoteDevices.isNotEmpty) {
       for (final device in remoteDevices) {
-        await _repository.save(device);
-        await _syncLegacy(device);
+        if (_isPrinter(device)) {
+          await _savePrinter(device, createRouteWhenMissing: true);
+        } else {
+          await _repository.save(device);
+          await _syncLegacy(device);
+        }
       }
-      return remoteDevices;
+      return _loadAll();
     }
     final preferences = await SharedPreferences.getInstance();
     if (preferences.getBool(_migrationKey) == true) return [];
-    return _migrate(preferences);
+    await _migrate(preferences);
+    final migrated = await _repository.getAll();
+    for (final printer in migrated.where(_isPrinter).toList()) {
+      await _savePrinter(printer, createRouteWhenMissing: true);
+      await _repository.delete(printer.id);
+    }
+    return _loadAll();
   }
 
   Future<List<HardwareDevice>> _migrate(
@@ -143,11 +167,20 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
   }
 
   Future<void> save(HardwareDevice device) async {
+    if (_isPrinter(device)) {
+      await _savePrinter(device, createRouteWhenMissing: true);
+      state = AsyncData(await _loadAll());
+      await _backupRemoteProfile(state.requireValue);
+      return;
+    }
     await _syncLegacy(device);
-    for (final duplicate in (await _repository.getAll()).where(
-      (item) => item.type == device.type && item.id != device.id,
-    )) {
-      await _repository.delete(duplicate.id);
+    if (device.type != HardwareDeviceType.receiptPrinter &&
+        device.type != HardwareDeviceType.labelPrinter) {
+      for (final duplicate in (await _repository.getAll()).where(
+        (item) => item.type == device.type && item.id != device.id,
+      )) {
+        await _repository.delete(duplicate.id);
+      }
     }
     await _repository.save(device);
     final current = await _repository.getAll();
@@ -156,8 +189,61 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
   }
 
   Future<void> remove(HardwareDevice device) async {
-    await _disableLegacy(device);
+    if (_isPrinter(device)) {
+      final printing = ref.read(printingRepositoryProvider);
+      final siblings = (await printing.getDevices())
+          .where((item) =>
+              item.id != device.id &&
+              item.language == _printerLanguage(device.type) &&
+              item.enabled)
+          .toList(growable: false);
+      for (final kind in _documentKinds(device.type)) {
+        final route = await printing.getRoute(kind);
+        if (route?.deviceId == device.id && siblings.isNotEmpty) {
+          await _savePrinterRoute(kind, siblings.first.id);
+        }
+      }
+      await printing.deleteDevice(device.id);
+      final current = await _loadAll();
+      state = AsyncData(current);
+      await _backupRemoteProfile(current);
+      return;
+    }
+    final siblings = (await _repository.getAll())
+        .where((item) => item.type == device.type && item.id != device.id)
+        .toList(growable: false);
+    final settings = await _settings();
+    final removesActivePrinter =
+        (device.type == HardwareDeviceType.receiptPrinter &&
+                settings.activeReceiptPrinterId == device.id) ||
+            (device.type == HardwareDeviceType.labelPrinter &&
+                settings.activeLabelPrinterId == device.id);
+    if (removesActivePrinter && siblings.isNotEmpty) {
+      await _syncLegacy(siblings.first);
+    } else {
+      await _disableLegacy(device);
+    }
     await _repository.delete(device.id);
+    final current = await _repository.getAll();
+    state = AsyncData(current);
+    await _backupRemoteProfile(current);
+  }
+
+  /// Makes an already registered device the active route for its type without
+  /// deleting any sibling devices.
+  Future<void> activate(HardwareDevice device) async {
+    if (_isPrinter(device)) {
+      await _savePrinter(device.copyWith(enabled: true));
+      for (final kind in _documentKinds(device.type)) {
+        await _savePrinterRoute(kind, device.id);
+      }
+      final current = await _loadAll();
+      state = AsyncData(current);
+      await _backupRemoteProfile(current);
+      return;
+    }
+    await _syncLegacy(device);
+    await _repository.save(device.copyWith(enabled: true));
     final current = await _repository.getAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
@@ -200,7 +286,67 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     }
   }
 
-  Future<HardwareTestResult> test(HardwareDevice device) async {
+  Future<HardwareTestResult> test(
+    HardwareDevice device, {
+    PrintDocumentKind? printKind,
+  }) async {
+    if (_isPrinter(device)) {
+      await _savePrinter(device.copyWith(status: HardwareDeviceStatus.testing));
+      state = AsyncData(await _loadAll());
+      final started = DateTime.now();
+      late HardwareTestResult result;
+      try {
+        final kind = device.type == HardwareDeviceType.receiptPrinter
+            ? PrintDocumentKind.receipt
+            : printKind ?? PrintDocumentKind.productLabel;
+        if (device.type == HardwareDeviceType.labelPrinter &&
+            kind != PrintDocumentKind.productLabel &&
+            kind != PrintDocumentKind.orderLabel) {
+          throw ArgumentError.value(kind, 'printKind', 'Etiket türü geçersiz.');
+        }
+        final dispatch =
+            await ref.read(physicalPrintTestServiceProvider).dispatch(
+                  deviceId: device.id,
+                  kind: kind,
+                );
+        result = HardwareTestResult(
+          success: true,
+          message:
+              'Test işi yazıcıya teslim edildi. Kâğıt üzerindeki sonucu doğrulayın.',
+          elapsed: DateTime.now().difference(started),
+          completedAt: DateTime.now(),
+          requiresPhysicalConfirmation: true,
+          printJobId: dispatch.jobId,
+          deviceId: dispatch.deviceId,
+          printKind: dispatch.kind.name,
+        );
+      } catch (error) {
+        result = HardwareTestResult(
+          success: false,
+          message: 'Test çıktısı yazıcıya teslim edilemedi.',
+          technicalDetail: error.toString(),
+          elapsed: DateTime.now().difference(started),
+          completedAt: DateTime.now(),
+        );
+      }
+      await _savePrinter(device.copyWith(
+        status: result.requiresPhysicalConfirmation
+            ? HardwareDeviceStatus.unverified
+            : result.success
+                ? HardwareDeviceStatus.ready
+                : HardwareDeviceStatus.error,
+        lastTestedAt: result.completedAt,
+        lastMessage: result.requiresPhysicalConfirmation
+            ? 'Fiziksel çıktı doğrulaması bekleniyor.'
+            : result.message,
+        lastError: result.technicalDetail,
+        clearLastError: result.success,
+      ));
+      final current = await _loadAll();
+      state = AsyncData(current);
+      await _backupRemoteProfile(current);
+      return result;
+    }
     await _repository.save(
       device.copyWith(status: HardwareDeviceStatus.testing),
     );
@@ -219,6 +365,28 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     state = AsyncData(current);
     await _backupRemoteProfile(current);
     return result;
+  }
+
+  Future<void> confirmPhysicalPrintTest(
+    HardwareTestResult result, {
+    required bool passed,
+  }) async {
+    if (!result.requiresPhysicalConfirmation ||
+        result.printJobId == null ||
+        result.deviceId == null ||
+        result.printKind == null) {
+      throw StateError('Fiziksel doğrulama bilgisi eksik.');
+    }
+    await ref.read(physicalPrintTestServiceProvider).confirm(
+          PhysicalPrintTestDispatch(
+            jobId: result.printJobId!,
+            deviceId: result.deviceId!,
+            kind: PrintDocumentKind.values.byName(result.printKind!),
+            deliveredAt: result.completedAt,
+          ),
+          passed: passed,
+        );
+    state = AsyncData(await _loadAll());
   }
 
   Future<String> _probe(HardwareDevice device) async {
@@ -259,50 +427,11 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         }
         return '${result.vendor} ${result.model} satışa hazır';
       case HardwareDeviceType.receiptPrinter:
-        if (device.connectionType == HardwareConnectionType.windows) {
-          return _verifyWindowsPrinter(device);
-        }
-        final current = await _settings();
-        final candidate = current.copyWith(
-          printerName: config['printerName'] as String? ?? device.name,
-          printerIp: config['host'] as String? ?? '',
-          printerPort: _int(config['port'], 9100),
-          paperWidth: _int(config['paperWidth'], 80),
-          autoCutReceipt: config['autoCut'] as bool? ?? true,
-          openCashDrawer: config['openDrawer'] as bool? ?? false,
-          printLogo: config['printLogo'] as bool? ?? true,
-          printBarcode: config['printBarcode'] as bool? ?? true,
-          printQRCode: config['printQr'] as bool? ?? false,
-          printCopies: _int(config['copies'], 1).clamp(1, 20).toInt(),
-        );
-        await ref
-            .read(printerServiceProvider)
-            .testPrinterConnection(candidate)
-            .timeout(const Duration(seconds: 8));
-        return 'Fiş yazıcısı bağlantısı hazır';
+        await _probePrinterConnection(device);
+        return 'Fiş yazıcısı erişilebilir; fiziksel çıktı testi bekleniyor';
       case HardwareDeviceType.labelPrinter:
-        if (device.connectionType == HardwareConnectionType.windows) {
-          return _verifyWindowsPrinter(device);
-        }
-        final current = await _settings();
-        final candidate = current.copyWith(
-          labelPrinterEnabled: true,
-          labelPrinterName: config['printerName'] as String? ?? device.name,
-          labelPrinterIp: config['host'] as String? ?? '',
-          labelPrinterPort: _int(config['port'], 9100),
-          labelPrinterLanguage: config['language'] as String? ?? 'tspl',
-          labelWidthMm: _int(config['labelWidthMm'], 50),
-          labelHeightMm: _int(config['labelHeightMm'], 30),
-          labelGapMm: _int(config['labelGapMm'], 2),
-          labelDpi: _int(config['dpi'], 203),
-          printLogo: config['printLogo'] as bool? ?? true,
-          labelPrinterCopies: _int(config['copies'], 1).clamp(1, 20).toInt(),
-        );
-        await ref
-            .read(printerServiceProvider)
-            .testLabelPrinterConnection(candidate)
-            .timeout(const Duration(seconds: 8));
-        return 'Etiket yazıcısı bağlantısı ve fiziksel ölçü testi hazır';
+        await _probePrinterConnection(device);
+        return 'Etiket yazıcısı erişilebilir; fiziksel ölçü testi bekleniyor';
       case HardwareDeviceType.barcodeScanner:
         final scanner = ref.read(scannerServiceProvider);
         await scanner.initialize();
@@ -331,6 +460,37 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       );
     }
     return 'Windows yazıcı kuyruğu hazır: $requested';
+  }
+
+  Future<void> _probePrinterConnection(HardwareDevice device) async {
+    final config = device.configuration;
+    switch (device.connectionType) {
+      case HardwareConnectionType.windows:
+        await _verifyWindowsPrinter(device);
+      case HardwareConnectionType.tcp:
+        final host = config['host']?.toString().trim() ?? '';
+        final port = _int(config['port'], 9100);
+        if (host.isEmpty) throw StateError('Yazıcı IP adresi boş.');
+        final socket = await Socket.connect(
+          host,
+          port,
+          timeout: const Duration(seconds: 5),
+        );
+        await socket.close();
+      case HardwareConnectionType.bluetooth:
+        final address =
+            (config['address'] ?? config['printerName'])?.toString() ?? '';
+        if (address.isEmpty ||
+            !await NativePrinterBridge.connectBluetoothDevice(address)) {
+          throw StateError('Bluetooth yazıcıya bağlanılamadı.');
+        }
+      case HardwareConnectionType.embedded:
+        if (!await NativePrinterBridge.hasSunmiPrinter()) {
+          throw StateError('Gömülü yazıcı bulunamadı.');
+        }
+      case HardwareConnectionType.serial || HardwareConnectionType.keyboard:
+        throw StateError('Bu bağlantı türü yazıcı için desteklenmiyor.');
+    }
   }
 
   Future<void> _syncLegacy(HardwareDevice device) async {
@@ -384,9 +544,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
                 paperWidth: _int(config['paperWidth'], 80),
                 autoCutReceipt: config['autoCut'] as bool? ?? true,
                 openCashDrawer: config['openDrawer'] as bool? ?? false,
-                printLogo: config['printLogo'] as bool? ?? true,
-                printBarcode: config['printBarcode'] as bool? ?? true,
-                printQRCode: config['printQr'] as bool? ?? false,
+                activeReceiptPrinterId: device.id,
                 printCopies: _int(config['copies'], 1).clamp(1, 20).toInt(),
               ),
             );
@@ -406,7 +564,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
                 labelDpi: _int(config['dpi'], 203),
                 labelPrinterCopies:
                     _int(config['copies'], 1).clamp(1, 20).toInt(),
-                printLogo: config['printLogo'] as bool? ?? true,
+                activeLabelPrinterId: device.id,
               ),
             );
         return;
@@ -454,6 +612,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         return;
       case HardwareDeviceType.receiptPrinter:
         final settings = await _settings();
+        if (settings.activeReceiptPrinterId != device.id) return;
         await ref.read(settingsNotifierProvider.notifier).updateSettings(
               settings.copyWith(
                 printerName: '',
@@ -464,6 +623,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         return;
       case HardwareDeviceType.labelPrinter:
         final settings = await _settings();
+        if (settings.activeLabelPrinterId != device.id) return;
         await ref.read(settingsNotifierProvider.notifier).updateSettings(
               settings.copyWith(
                 labelPrinterEnabled: false,
@@ -478,6 +638,178 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
 
   Future<Settings> _settings() async {
     return (await ref.read(settingsRepositoryProvider.future)).getSettings();
+  }
+
+  Future<List<HardwareDevice>> _loadAll() async {
+    final nonPrinters =
+        (await _repository.getAll()).where((item) => !_isPrinter(item));
+    final printing = ref.read(printingRepositoryProvider);
+    final routes = <PrintDocumentKind, PrinterRoute?>{};
+    for (final kind in PrintDocumentKind.values) {
+      routes[kind] = await printing.getRoute(kind);
+    }
+    final printers = (await printing.getDevices()).map((profile) {
+      final activeFor = routes.entries
+          .where((entry) => entry.value?.deviceId == profile.id)
+          .map((entry) => entry.key.name)
+          .toList(growable: false);
+      return _fromPrinterProfile(profile, activeFor);
+    });
+    return [...printers, ...nonPrinters];
+  }
+
+  Future<void> _savePrinter(
+    HardwareDevice device, {
+    bool createRouteWhenMissing = false,
+  }) async {
+    final printing = ref.read(printingRepositoryProvider);
+    await printing.saveDevice(_toPrinterProfile(device));
+    if (!createRouteWhenMissing) return;
+    for (final kind in _documentKinds(device.type)) {
+      if (await printing.getRoute(kind) == null) {
+        await _savePrinterRoute(kind, device.id);
+      }
+    }
+  }
+
+  Future<void> _savePrinterRoute(
+    PrintDocumentKind kind,
+    String deviceId,
+  ) async {
+    final printing = ref.read(printingRepositoryProvider);
+    final profiles = await printing.getDesignProfiles(kind);
+    final profile = profiles.where((item) => item.isDefault).firstOrNull ??
+        profiles.firstOrNull;
+    if (profile == null) {
+      throw StateError('${kind.name} için tasarım profili bulunamadı.');
+    }
+    await printing.saveRoute(PrinterRoute(
+      kind: kind,
+      deviceId: deviceId,
+      designProfileId: profile.id,
+      updatedAt: DateTime.now(),
+    ));
+  }
+
+  static bool _isPrinter(HardwareDevice device) =>
+      device.type == HardwareDeviceType.receiptPrinter ||
+      device.type == HardwareDeviceType.labelPrinter;
+
+  static List<PrintDocumentKind> _documentKinds(HardwareDeviceType type) =>
+      type == HardwareDeviceType.receiptPrinter
+          ? const [PrintDocumentKind.receipt]
+          : const [
+              PrintDocumentKind.productLabel,
+              PrintDocumentKind.orderLabel,
+            ];
+
+  static PrinterLanguage _printerLanguage(HardwareDeviceType type) =>
+      type == HardwareDeviceType.receiptPrinter
+          ? PrinterLanguage.escPos
+          : PrinterLanguage.tspl;
+
+  static PrinterTransportKind _transport(HardwareConnectionType connection) =>
+      switch (connection) {
+        HardwareConnectionType.embedded => PrinterTransportKind.embedded,
+        HardwareConnectionType.windows => PrinterTransportKind.windowsSpooler,
+        HardwareConnectionType.bluetooth => PrinterTransportKind.bluetooth,
+        _ => PrinterTransportKind.tcp,
+      };
+
+  static HardwareConnectionType _connection(PrinterTransportKind transport) =>
+      switch (transport) {
+        PrinterTransportKind.embedded => HardwareConnectionType.embedded,
+        PrinterTransportKind.windowsSpooler => HardwareConnectionType.windows,
+        PrinterTransportKind.usb => HardwareConnectionType.windows,
+        PrinterTransportKind.bluetooth => HardwareConnectionType.bluetooth,
+        PrinterTransportKind.tcp => HardwareConnectionType.tcp,
+      };
+
+  static PrinterDeviceProfile _toPrinterProfile(HardwareDevice device) {
+    final now = DateTime.now();
+    final config = Map<String, Object?>.from(device.configuration)
+      ..remove('activeFor');
+    final isLabel = device.type == HardwareDeviceType.labelPrinter;
+    final capabilities = isLabel
+        ? {
+            'dpi': _int(config['dpi'], 203),
+            'mediaWidthMm': _int(config['labelWidthMm'], 50),
+            'mediaHeightMm': _int(config['labelHeightMm'], 30),
+            'gapMm': _int(config['labelGapMm'], 2),
+            'printableWidthDots': _int(config['printableWidthDots'], 384),
+            'direction': _int(config['printDirection'], 0),
+            'raster': true,
+          }
+        : {
+            'paperWidthMm': _int(config['paperWidth'], 58),
+            'printableWidthDots':
+                _int(config['paperWidth'], 58) <= 58 ? 384 : 576,
+            'raster': true,
+            'cutter': config['autoCut'] as bool? ?? false,
+            'cashDrawer': config['openDrawer'] as bool? ?? false,
+          };
+    return PrinterDeviceProfile(
+      id: device.id,
+      name: device.name,
+      language: _printerLanguage(device.type),
+      transport: _transport(device.connectionType),
+      transportConfig: config,
+      capabilities: capabilities,
+      enabled: device.enabled,
+      lastTestedAt: device.lastTestedAt,
+      lastTestSucceeded: switch (device.status) {
+        HardwareDeviceStatus.ready => true,
+        HardwareDeviceStatus.error || HardwareDeviceStatus.offline => false,
+        _ => null,
+      },
+      lastTestMessage: device.lastError ?? device.lastMessage,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  static HardwareDevice _fromPrinterProfile(
+    PrinterDeviceProfile profile,
+    List<String> activeFor,
+  ) {
+    final isLabel = profile.language == PrinterLanguage.tspl;
+    final config = <String, Object?>{
+      ...profile.transportConfig,
+      'activeFor': activeFor,
+      if (isLabel) ...{
+        'language': 'tspl',
+        'dpi': profile.capabilities['dpi'],
+        'labelWidthMm': profile.capabilities['mediaWidthMm'],
+        'labelHeightMm': profile.capabilities['mediaHeightMm'],
+        'labelGapMm': profile.capabilities['gapMm'],
+        'printableWidthDots': profile.capabilities['printableWidthDots'],
+        'printDirection': profile.capabilities['direction'],
+      } else ...{
+        'paperWidth': profile.capabilities['paperWidthMm'],
+        'autoCut': profile.capabilities['cutter'],
+        'openDrawer': profile.capabilities['cashDrawer'],
+      },
+    };
+    return HardwareDevice(
+      id: profile.id,
+      name: profile.name,
+      type: isLabel
+          ? HardwareDeviceType.labelPrinter
+          : HardwareDeviceType.receiptPrinter,
+      connectionType: _connection(profile.transport),
+      configuration: config,
+      enabled: profile.enabled,
+      status: profile.lastTestSucceeded == true
+          ? HardwareDeviceStatus.ready
+          : profile.lastTestSucceeded == false
+              ? HardwareDeviceStatus.error
+              : HardwareDeviceStatus.unverified,
+      lastTestedAt: profile.lastTestedAt,
+      lastMessage:
+          profile.lastTestSucceeded == false ? null : profile.lastTestMessage,
+      lastError:
+          profile.lastTestSucceeded == false ? profile.lastTestMessage : null,
+    );
   }
 
   static HardwareConnectionType _printerConnection(String? name) {

@@ -38,7 +38,7 @@ class ApiException implements Exception {
 class ApiClient {
   /// Wire-contract version, deliberately independent from the local SQLite
   /// schema. The server validates this only for Sync V4 endpoints.
-  static const int syncProtocolVersion = 5;
+  static const int syncProtocolVersion = 6;
   final http.Client _client;
   final EnvironmentConfig _config;
   String? _jwtToken;

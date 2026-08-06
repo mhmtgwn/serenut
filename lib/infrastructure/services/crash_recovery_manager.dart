@@ -82,8 +82,7 @@ class CrashRecoveryManager {
       final pendingPushLogs = await db.rawQuery(
         'SELECT COUNT(*) as cnt FROM failed_push_log WHERE resolved = 0',
       );
-      final pendingCount =
-          (pendingPushLogs.first['cnt'] as int?) ?? 0;
+      final pendingCount = (pendingPushLogs.first['cnt'] as int?) ?? 0;
       if (pendingCount > 0) {
         debugPrint(
             '[CrashRecovery] failed_push_log\u2019da $pendingCount \u00e7\u00f6z\u00fcmlenmemi\u015f hata kayd\u0131 var.');

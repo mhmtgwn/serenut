@@ -56,6 +56,7 @@ class EscPosCommands {
 }
 
 /// Service to handle connection, receipt formatting, and binary transmission
+@Deprecated('Use SqlitePrintingApplicationService and PrintingRuntime.')
 class PrinterService with ChangeNotifier implements IPrinterService {
   // Socket connector abstraction for mock tests
   final Future<Socket> Function(String, int, {Duration? timeout})?
@@ -180,22 +181,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   /// Settings helper based on purpose with fallback to main printer
   Settings _getSettingsForPurpose(Settings settings, PrinterPurpose purpose) {
     if (purpose == PrinterPurpose.label) {
-      final hasLabelIp = settings.labelPrinterIp?.isNotEmpty ?? false;
-      final hasLabelName = settings.labelPrinterName?.isNotEmpty ?? false;
-
-      final labelIp =
-          hasLabelIp ? settings.labelPrinterIp! : (settings.printerIp ?? '');
-      final labelName = hasLabelName
-          ? settings.labelPrinterName!
-          : (settings.printerName ?? '');
-      final labelPort = (hasLabelIp && settings.labelPrinterPort > 0)
-          ? settings.labelPrinterPort
-          : (settings.printerPort > 0 ? settings.printerPort : 9100);
-
       return settings.copyWith(
-        printerName: labelName,
-        printerIp: labelIp,
-        printerPort: labelPort,
+        printerName: settings.labelPrinterName ?? '',
+        printerIp: settings.labelPrinterIp ?? '',
+        printerPort:
+            settings.labelPrinterPort > 0 ? settings.labelPrinterPort : 9100,
       );
     }
     return settings;
@@ -203,7 +193,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
   /// Helper to send bytes with Sunmi → Network → Bluetooth → PersistentQueue failover.
   Future<void> _sendBytes(List<int> bytes, Settings settings,
-      {PrinterPurpose purpose = PrinterPurpose.receipt}) async {
+      {PrintJobKind jobKind = PrintJobKind.receipt}) async {
+    final purpose = jobKind.purpose;
     final targetSettings = _getSettingsForPurpose(settings, purpose);
 
     if (_socketConnector != null && _persistentQueue == null) {
@@ -233,10 +224,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final queue = _persistentQueue;
     if (queue != null) {
       await queue.enqueue(
-        title: purpose == PrinterPurpose.label
-            ? 'Etiket (failover)'
-            : 'Fis (failover)',
+        title: switch (jobKind) {
+          PrintJobKind.receipt => 'Fis (failover)',
+          PrintJobKind.productLabel => 'Urun etiketi (failover)',
+          PrintJobKind.orderLabel => 'Siparis etiketi (failover)',
+        },
         receiptJson: bytes.join(','), // Compact byte list
+        purpose: jobKind,
+        deviceId: purpose == PrinterPurpose.label
+            ? settings.activeLabelPrinterId
+            : settings.activeReceiptPrinterId,
       );
     }
     final jobName = purpose == PrinterPurpose.label ? 'Etiket' : 'Fiş';
@@ -380,6 +377,14 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         (settings.printerName != null && settings.printerName!.isNotEmpty);
   }
 
+  void _requirePrinter(Settings settings, PrinterPurpose purpose) {
+    final target = _getSettingsForPurpose(settings, purpose);
+    if (_hasPrinter(target)) return;
+    throw StateError(purpose == PrinterPurpose.label
+        ? 'Etiket yazıcısı tanımlı değil.'
+        : 'Fiş yazıcısı tanımlı değil.');
+  }
+
   /// Backward-compatible TCP test (used by printer_service_test.dart).
   /// Sends a minimal test page directly via TCP — bypasses failover chain.
   @override
@@ -445,6 +450,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       qrData: 'serenut-label-test',
       timestamp: DateTime.now(),
     );
+    final logoBytes = settings.labelPrinterLanguage == 'tspl' &&
+            settings.labelShowBusinessName
+        ? await _loadLogoSourceBytes(settings.businessLogo)
+        : null;
     final bytes = settings.labelPrinterLanguage == 'tspl'
         ? TsplLabelLayoutEngine.generateLabelBytes(
             model,
@@ -452,24 +461,25 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             heightMm: settings.labelHeightMm,
             gapMm: settings.labelGapMm,
             dpi: settings.labelDpi,
-            showBusinessName: settings.printLogo,
+            showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
-            showBarcode: settings.printBarcode,
-            showPrice: settings.printProductDetails,
+            showBarcode: settings.labelShowBarcode,
+            showPrice: settings.labelShowPrice,
             showVat: settings.labelShowVat,
             fontSize: settings.labelFontSize,
             logoPath: settings.businessLogo,
+            logoBytes: logoBytes,
           )
         : LabelLayoutEngine.generateLabelBytes(
             model,
             width: 32,
-            showBusinessName: settings.printLogo,
+            showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
-            showBarcode: settings.printBarcode,
-            showPrice: settings.printProductDetails,
+            showBarcode: settings.labelShowBarcode,
+            showPrice: settings.labelShowPrice,
             showVat: settings.labelShowVat,
           );
-    await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
+    await _sendBytes(bytes, settings, jobKind: PrintJobKind.productLabel);
   }
 
   /// Prints a sale receipt (Fiş)
@@ -480,7 +490,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     CustomerEntity? customer,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = _receiptWidth(settings);
     final List<int> bytes = [];
@@ -624,7 +634,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     double? paidAmount,
     String? notes,
   }) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = _receiptWidth(settings);
     final List<int> bytes = [];
@@ -668,7 +678,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('*** SİPARİŞ FİŞİ ***\n'));
     bytes.addAll(EscPosCommands.boldOff);
-    bytes.addAll(_textToBytes('Sipariş No: #${order.id.toShortId}\n'));
+    bytes.addAll(_textToBytes('Sipariş No: #${order.displayNumber}\n'));
     bytes.addAll(_textToBytes(
         'Tarih: ${order.createdAt.toString().substring(0, 16)}\n'));
     if (order.expectedDeliveryDate != null) {
@@ -772,7 +782,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     String? notes,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
@@ -869,7 +879,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<CategoryRevenue> categories,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
@@ -939,7 +949,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<CategoryRevenue> categories,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
@@ -1198,13 +1208,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     bytes.addAll([0x1D, 0x76, 0x30, 0, xL, xH, yL, yH]);
 
-    const bayer4x4 = <List<int>>[
-      [0, 8, 2, 10],
-      [12, 4, 14, 6],
-      [3, 11, 1, 9],
-      [15, 7, 13, 5],
-    ];
-
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < widthBytes * 8; x += 8) {
         int byte = 0;
@@ -1212,16 +1215,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           final int px = x + bit;
           if (px < width) {
             final pixel = image.getPixel(px, y);
-            // Composite transparency onto white before monochrome conversion.
-            // Ordered dithering preserves coloured logo details instead of
-            // collapsing every mid-tone into one solid black shape.
-            final alpha = pixel.a / 255.0;
-            final sourceLuminance =
-                0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
-            final luminance = sourceLuminance * alpha + 255 * (1 - alpha);
-            final threshold = 80 + bayer4x4[y % 4][px % 4] * 8;
-            if (luminance < threshold) {
-              byte |= (1 << (7 - bit));
+            // Use the same proven monochrome conversion as sales receipts.
+            // Transparent pixels stay white and logo colour details retain
+            // their original luminance instead of becoming a solid block.
+            if (pixel.a >= 128) {
+              final luminance =
+                  0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+              if (luminance < 128) {
+                byte |= (1 << (7 - bit));
+              }
             }
           }
         }
@@ -1339,7 +1341,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       ));
     }
 
-    await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);
+    await _sendBytes(allBytes, settings, jobKind: PrintJobKind.orderLabel);
   }
 
   @override
@@ -1356,10 +1358,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
     final isTspl = settings.labelPrinterLanguage == 'tspl';
     final width = targetSettings.paperWidth <= 58 ? 32 : 48;
-    final tsplLogoBytes = isTspl && settings.printLogo
+    final tsplLogoBytes = isTspl && settings.labelShowBusinessName
         ? await _loadLogoSourceBytes(settings.businessLogo)
         : null;
-    final logo = !isTspl && settings.printLogo
+    final logo = !isTspl && settings.labelShowBusinessName
         ? await _getLogoBytes(settings.businessLogo,
             maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360)
         : <int>[];
@@ -1388,10 +1390,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           gapMm: settings.labelGapMm,
           dpi: settings.labelDpi,
           copies: effectiveCopies,
-          showBusinessName: settings.printLogo,
+          showBusinessName: settings.labelShowBusinessName,
           showBrand: settings.labelShowBrand,
-          showBarcode: settings.printBarcode,
-          showPrice: settings.printProductDetails,
+          showBarcode: settings.labelShowBarcode,
+          showPrice: settings.labelShowPrice,
           showVat: settings.labelShowVat,
           fontSize: settings.labelFontSize,
           logoPath: settings.businessLogo,
@@ -1403,16 +1405,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             model,
             width: width,
             logoBytes: logo,
-            showBusinessName: settings.printLogo,
+            showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
-            showBarcode: settings.printBarcode,
-            showPrice: settings.printProductDetails,
+            showBarcode: settings.labelShowBarcode,
+            showPrice: settings.labelShowPrice,
             showVat: settings.labelShowVat,
           ));
         }
       }
     }
-    await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
+    await _sendBytes(bytes, settings, jobKind: PrintJobKind.productLabel);
   }
 
   String _formatQty(double qty) {
@@ -1424,7 +1426,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
   @override
   Future<void> printDiagnosticsTest(Settings settings, int paperWidth) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final backend = await _detectBackend(settings);
     final width = paperWidth == 58 ? 32 : 48;
@@ -1500,6 +1502,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   @override
   Future<void> retryPersistedJob(dynamic job, Settings settings) async {
     final persistedJob = job as PersistedPrintJob;
+    final purpose = persistedJob.purpose.purpose;
+    final activeDeviceId = purpose == PrinterPurpose.label
+        ? settings.activeLabelPrinterId
+        : settings.activeReceiptPrinterId;
+    if (persistedJob.deviceId != activeDeviceId) {
+      throw StateError(
+          'Kuyruk işi ${persistedJob.deviceId} cihazına ait; aktif cihaz $activeDeviceId. Hedef cihaz değiştirilmeden yeniden gönderilemez.');
+    }
+    final targetSettings = _getSettingsForPurpose(settings, purpose);
+    _requirePrinter(settings, purpose);
     final bytes = persistedJob.receiptJson
         .split(',')
         .map((s) => int.parse(s.trim()))
@@ -1512,14 +1524,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     try {
       if (_socketConnector != null) {
         // Test mode — use mock socket directly
-        await _sendViaTcp(
-            bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
+        await _sendViaTcp(bytes, targetSettings.printerIp ?? '127.0.0.1',
+            targetSettings.printerPort);
       } else {
-        final backends = await _buildFailoverChain(settings);
+        final backends =
+            await _buildFailoverChain(targetSettings, purpose: purpose);
         bool sent = false;
         for (final backend in backends) {
           try {
-            await _sendViaBackend(bytes, backend, settings);
+            await _sendViaBackend(bytes, backend, targetSettings);
             sent = true;
             break;
           } catch (_) {

@@ -119,11 +119,13 @@ final realtimeAutoSyncProvider = Provider<void>((ref) {
     unawaited(ref.read(syncProvider.notifier).triggerSync());
   });
 
-  final subInventory = repo.subscribeToTopic(user.companyId, 'inventory').listen((_) {
+  final subInventory =
+      repo.subscribeToTopic(user.companyId, 'inventory').listen((_) {
     unawaited(ref.read(syncProvider.notifier).triggerSync());
   });
 
-  final subCustomers = repo.subscribeToTopic(user.companyId, 'customers').listen((_) {
+  final subCustomers =
+      repo.subscribeToTopic(user.companyId, 'customers').listen((_) {
     unawaited(ref.read(syncProvider.notifier).triggerSync());
   });
 
@@ -133,4 +135,3 @@ final realtimeAutoSyncProvider = Provider<void>((ref) {
     subCustomers.cancel();
   });
 });
-

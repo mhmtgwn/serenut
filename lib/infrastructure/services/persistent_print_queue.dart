@@ -6,6 +6,7 @@
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:serenutos/domain/services/i_printer_service.dart';
 
 // ── Print Job Status ──────────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ class PersistedPrintJob {
   final DateTime createdAt;
   final int retryCount;
   final PrintJobStatus status;
+  final PrintJobKind purpose;
+  final String deviceId;
   final String? lastError;
 
   const PersistedPrintJob({
@@ -29,6 +32,8 @@ class PersistedPrintJob {
     required this.createdAt,
     this.retryCount = 0,
     this.status = PrintJobStatus.pending,
+    this.purpose = PrintJobKind.receipt,
+    this.deviceId = 'receipt-printer-primary',
     this.lastError,
   });
 
@@ -44,6 +49,8 @@ class PersistedPrintJob {
       createdAt: createdAt,
       retryCount: retryCount ?? this.retryCount,
       status: status ?? this.status,
+      purpose: purpose,
+      deviceId: deviceId,
       lastError: lastError ?? this.lastError,
     );
   }
@@ -55,6 +62,8 @@ class PersistedPrintJob {
         'created_at': createdAt.toIso8601String(),
         'retry_count': retryCount,
         'status': status.name,
+        'purpose': purpose.name,
+        'device_id': deviceId,
         'last_error': lastError,
       };
 
@@ -70,6 +79,11 @@ class PersistedPrintJob {
         (s) => s.name == (map['status'] as String?),
         orElse: () => PrintJobStatus.pending,
       ),
+      purpose: PrintJobKind.values.firstWhere(
+        (value) => value.name == (map['purpose'] as String?),
+        orElse: () => PrintJobKind.receipt,
+      ),
+      deviceId: map['device_id'] as String? ?? 'receipt-printer-primary',
       lastError: (map['last_error'] ?? map['lastError']) as String?,
     );
   }
@@ -78,6 +92,7 @@ class PersistedPrintJob {
 // ── Persistent Print Queue ────────────────────────────────────────────────────
 
 /// Crash-safe print queue backed by SQLite database.
+@Deprecated('Use PrintingRepository; print_jobs is the authoritative queue.')
 class PersistentPrintQueue {
   static const int _maxRetries = 5;
   static const int _maxJobs = 200;
@@ -106,6 +121,8 @@ class PersistentPrintQueue {
           created_at TEXT NOT NULL,
           retry_count INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL,
+          purpose TEXT NOT NULL DEFAULT 'receipt',
+          device_id TEXT NOT NULL DEFAULT 'receipt-printer-primary',
           last_error TEXT
         )
       ''');
@@ -118,12 +135,16 @@ class PersistentPrintQueue {
   Future<PersistedPrintJob> enqueue({
     required String title,
     required String receiptJson,
+    PrintJobKind purpose = PrintJobKind.receipt,
+    String deviceId = 'receipt-printer-primary',
   }) {
     return _lock.run(() async {
       final job = PersistedPrintJob(
         id: '${DateTime.now().microsecondsSinceEpoch}_${++_idCounter}',
         title: title,
         receiptJson: receiptJson,
+        purpose: purpose,
+        deviceId: deviceId,
         createdAt: DateTime.now(),
       );
 
@@ -137,6 +158,8 @@ class PersistentPrintQueue {
         'created_at': job.createdAt.toIso8601String(),
         'retry_count': job.retryCount,
         'status': job.status.name,
+        'purpose': job.purpose.name,
+        'device_id': job.deviceId,
         'last_error': job.lastError,
       });
 
@@ -258,6 +281,21 @@ class PersistentPrintQueue {
         'status': PrintJobStatus.pending.name,
         'retry_count': 0,
         'last_error': null,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Permanently cancels a job. Cancelled work is never eligible for retry.
+  Future<void> cancelJob(String id, {String? reason}) async {
+    final db = await _getDb();
+    await _ensureTable(db);
+    await db.update(
+      _tableName,
+      {
+        'status': PrintJobStatus.abandoned.name,
+        'last_error': reason ?? 'Kullanıcı tarafından iptal edildi',
       },
       where: 'id = ?',
       whereArgs: [id],

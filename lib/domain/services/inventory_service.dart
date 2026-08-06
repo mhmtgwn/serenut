@@ -9,6 +9,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 
 /// Value class for sale/inventory item input
 class SaleItemInput {
+  final String? saleItemId;
   final String productId;
   final String? productName;
   final int quantity;
@@ -16,6 +17,7 @@ class SaleItemInput {
   final double unitPrice;
 
   SaleItemInput({
+    this.saleItemId,
     required this.productId,
     this.productName,
     required this.quantity,
@@ -24,6 +26,7 @@ class SaleItemInput {
   }) : saleQuantity = saleQuantity ?? quantity.toDouble();
 
   Map<String, dynamic> toMap() => {
+        if (saleItemId != null) 'sale_item_id': saleItemId,
         'product_id': productId,
         'product_name': productName,
         'quantity': saleQuantity,
@@ -64,12 +67,11 @@ class InventoryService {
       if (product == null) {
         throw ProductNotFoundException('Ürün bulunamadı: ${item.productId}');
       }
-      // Business requirement: allow selling into negative stock levels
-      // if (product.quantity < item.quantity) {
-      //   throw InsufficientStockException(
-      //     'Yetersiz stok: "${product.name}" için mevcut stok: ${product.quantity}, talep edilen: ${item.quantity}',
-      //   );
-      // }
+      if (product.quantity < item.quantity) {
+        throw InsufficientStockException(
+          'Yetersiz stok: "${product.name}" için mevcut stok: ${product.quantity}, talep edilen: ${item.quantity}',
+        );
+      }
     }
   }
 

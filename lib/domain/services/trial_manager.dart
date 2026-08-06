@@ -177,5 +177,4 @@ class TrialManager {
     }
     return null;
   }
-
 }

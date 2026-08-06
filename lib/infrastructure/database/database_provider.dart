@@ -42,7 +42,10 @@ class DatabaseManager {
   ''';
 
   static const String _databaseName = 'serenut_pos.db';
-  static const int _databaseVersion = 45;
+
+  /// Authoritative local schema version. Exposed for migration fixtures and
+  /// diagnostics so tests do not duplicate a version literal.
+  static const int databaseVersion = 49;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -95,7 +98,7 @@ class DatabaseManager {
       ],
       'business_profile': ['id', 'version'],
       'sms_logs': ['id', 'status', 'event_type'],
-      'print_queue': ['id', 'status'],
+      'print_queue': ['id', 'status', 'purpose', 'device_id'],
     };
 
     for (final table in expectedColumns.keys) {
@@ -211,7 +214,7 @@ class DatabaseManager {
         try {
           final cleanDb = await openDatabase(
             path,
-            version: _databaseVersion,
+            version: databaseVersion,
             onCreate: _onCreate,
           );
           if (pendingSales.isNotEmpty || pendingTransactions.isNotEmpty) {
@@ -258,7 +261,7 @@ class DatabaseManager {
               .logError(e, st, context: 'db_pre_upgrade_version_check');
         }
 
-        if (currentVersion > 0 && currentVersion < _databaseVersion) {
+        if (currentVersion > 0 && currentVersion < databaseVersion) {
           final dbDir = dirname(path);
           backupPath = join(dbDir, 'serenut_pos_upgrade_backup.db');
           final backupFile = File(backupPath);
@@ -276,7 +279,7 @@ class DatabaseManager {
     try {
       final db = await openDatabase(
         path,
-        version: _databaseVersion,
+        version: databaseVersion,
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
         onConfigure: (db) async {
@@ -406,7 +409,7 @@ class DatabaseManager {
 
           return await openDatabase(
             path,
-            version: _databaseVersion,
+            version: databaseVersion,
             onCreate: _onCreate,
             onUpgrade: _onUpgrade,
             onConfigure: (db) async {

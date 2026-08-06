@@ -844,7 +844,21 @@ class InMemoryOrderRepository implements IOrderRepository {
 
   @override
   Future<int> create(OrderEntity entity) async {
-    InMemoryDb.orders.add(entity);
+    final number = entity.orderNumber.isNotEmpty
+        ? entity.orderNumber
+        : 'SP-${(InMemoryDb.orders.length + 1).toString().padLeft(6, '0')}';
+    InMemoryDb.orders.add(OrderEntity(
+      id: entity.id,
+      orderNumber: number,
+      customerId: entity.customerId,
+      status: entity.status,
+      createdAt: entity.createdAt,
+      expectedDeliveryDate: entity.expectedDeliveryDate,
+      actualDeliveryDate: entity.actualDeliveryDate,
+      items: entity.items,
+      notes: entity.notes,
+      createdBy: entity.createdBy,
+    ));
     return 1;
   }
 
@@ -905,6 +919,7 @@ class InMemoryOrderRepository implements IOrderRepository {
       final o = InMemoryDb.orders[idx];
       InMemoryDb.orders[idx] = OrderEntity(
         id: o.id,
+        orderNumber: o.orderNumber,
         customerId: o.customerId,
         status: status,
         createdAt: o.createdAt,

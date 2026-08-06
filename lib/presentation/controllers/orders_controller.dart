@@ -160,6 +160,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       await inventory.decreaseStock(_inventoryItems(order.items));
     });
 
+    final persistedOrder = await _repository.findById(order.id);
+    if (persistedOrder == null || persistedOrder.orderNumber.isEmpty) {
+      throw StateError('Oluşturulan siparişin benzersiz numarası alınamadı.');
+    }
+
     // Calculate total amount from items
     final total = MathEngine.calculateMappedItemsTotal(order.items);
 
@@ -171,11 +176,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         customerId: 0,
         totalAmount: total,
         expectedDeliveryDate: order.expectedDeliveryDate ?? DateTime.now(),
-        orderIdStr: order.id,
+        orderIdStr: persistedOrder.orderNumber,
         customerIdStr: order.customerId,
       ));
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'orders_controller', level: LogLevel.warning);
     }
 
     // Log to Audit Trail
@@ -192,7 +198,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         notes: 'Yeni sipariş oluşturuldu: ${order.id}',
       );
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'orders_controller', level: LogLevel.warning);
     }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
@@ -228,7 +235,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         notes: 'Sipariş güncellendi: ${order.id}',
       );
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'orders_controller', level: LogLevel.warning);
     }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
@@ -273,7 +281,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         approvedByUserName: approvedByUserName,
       );
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'orders_controller', level: LogLevel.warning);
     }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());
@@ -292,13 +301,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
 
       await cancellationService.cancel(
         id: order.id,
-        isOrder: true,
       );
 
       publisher.publish(OrderCancelledEvent(
         orderId: 0,
         customerId: 0,
-        orderIdStr: order.id,
+        orderIdStr: order.orderNumber,
         customerIdStr: order.customerId,
       ));
 
@@ -313,21 +321,21 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         publisher.publish(OrderDeliveredEvent(
           orderId: 0,
           customerId: 0,
-          orderIdStr: order.id,
+          orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
         ));
       } else if (status == 'preparing') {
         publisher.publish(OrderPreparingEvent(
           orderId: 0,
           customerId: 0,
-          orderIdStr: order.id,
+          orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
         ));
       } else if (status == 'ready') {
         publisher.publish(OrderReadyEvent(
           orderId: 0,
           customerId: 0,
-          orderIdStr: order.id,
+          orderIdStr: order.orderNumber,
           customerIdStr: order.customerId,
         ));
       }
@@ -344,7 +352,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         notes: 'Sipariş durumu güncellendi: $id -> $status',
       );
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'orders_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'orders_controller', level: LogLevel.warning);
     }
 
     unawaited(ref.read(syncProvider.notifier).triggerSync());

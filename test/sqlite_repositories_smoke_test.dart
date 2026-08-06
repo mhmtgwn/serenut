@@ -197,6 +197,8 @@ void main() {
         final found = await orderRepo.findById(order.id);
         expect(found, isNotNull);
         expect(found!.id, equals(order.id));
+        expect(found.orderNumber, matches(RegExp(r'^SP-\d{6,}$')));
+        expect(found.displayNumber, equals(found.orderNumber));
         expect(found.customerId, equals(order.customerId));
         expect(found.status, equals('created'));
 
@@ -215,7 +217,13 @@ void main() {
 
         final foundAfterUpdate = await orderRepo.findById(order.id);
         expect(foundAfterUpdate!.status, equals('preparing'));
+        expect(foundAfterUpdate.orderNumber, equals(found.orderNumber));
         expect(foundAfterUpdate.actualDeliveryDate, isNotNull);
+
+        final foundByNumber = await orderRepo.findFiltered(
+          searchQuery: found.orderNumber,
+        );
+        expect(foundByNumber.map((item) => item.id), contains(order.id));
 
         // A status-only transition must be durable and replicated. Previously
         // this changed SQLite but never entered the v4 outbox.

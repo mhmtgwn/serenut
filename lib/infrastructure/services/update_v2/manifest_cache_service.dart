@@ -29,7 +29,8 @@ class CachedManifestEntry {
 
   factory CachedManifestEntry.fromJson(Map<String, dynamic> json) {
     return CachedManifestEntry(
-      manifest: ReleaseManifest.fromJson(json['manifest'] as Map<String, dynamic>),
+      manifest:
+          ReleaseManifest.fromJson(json['manifest'] as Map<String, dynamic>),
       rawManifestContent: json['rawManifestContent'] as String? ?? '',
       signature: json['signature'] as String? ?? '',
       cachedAt: json['cachedAt'] as String? ?? '',
@@ -42,7 +43,8 @@ class ManifestCacheService {
 
   Future<File> _getCacheFile() async {
     final dir = await getApplicationSupportDirectory();
-    final cacheDir = Directory('${dir.path}/cache')..createSync(recursive: true);
+    final cacheDir = Directory('${dir.path}/cache')
+      ..createSync(recursive: true);
     return File('${cacheDir.path}/$_cacheFileName');
   }
 
@@ -61,7 +63,8 @@ class ManifestCacheService {
         cachedAt: DateTime.now().toIso8601String(),
       );
       await file.writeAsString(jsonEncode(entry.toJson()), flush: true);
-      debugPrint('[ManifestCacheService] Manifest cached successfully for release ${manifest.releaseId}');
+      debugPrint(
+          '[ManifestCacheService] Manifest cached successfully for release ${manifest.releaseId}');
       return true;
     } catch (e) {
       debugPrint('[ManifestCacheService] Cache save failed: $e');

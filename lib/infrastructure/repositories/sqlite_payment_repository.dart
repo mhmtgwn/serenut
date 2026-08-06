@@ -20,11 +20,10 @@ class SqliteSaleRepository implements ISaleRepository {
 
     final saleIds = rows.map((r) => r['id'] as String).toList();
     final placeholders = List.filled(saleIds.length, '?').join(',');
-    final itemRows = await _executor.query(
-      'sale_items',
-      where: 'sale_id IN ($placeholders)',
-      whereArgs: saleIds,
-    );
+    final itemRows = await _executor.rawQuery('''
+      SELECT si.*,COALESCE((SELECT SUM(ri.quantity) FROM refund_items ri
+        WHERE ri.sale_item_id=si.id),0) AS refunded_quantity
+      FROM sale_items si WHERE si.sale_id IN ($placeholders)''', saleIds);
 
     // Group items by sale_id for O(1) lookup
     final itemsBySaleId = <String, List<Map<String, dynamic>>>{};

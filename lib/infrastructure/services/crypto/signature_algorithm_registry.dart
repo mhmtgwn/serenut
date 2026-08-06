@@ -24,7 +24,8 @@ class SignatureAlgorithmRegistry {
   SignatureVerifier? getVerifier(String algorithmName) {
     final verifier = _verifiers[algorithmName.toUpperCase()];
     if (verifier == null) {
-      debugPrint('[SignatureAlgorithmRegistry] Unsupported algorithm: $algorithmName');
+      debugPrint(
+          '[SignatureAlgorithmRegistry] Unsupported algorithm: $algorithmName');
     }
     return verifier;
   }

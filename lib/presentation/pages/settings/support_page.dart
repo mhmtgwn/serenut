@@ -199,7 +199,8 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                         SegmentedButton<String>(
                           segments: const [
                             ButtonSegment(value: 'low', label: Text('Düşük')),
-                            ButtonSegment(value: 'normal', label: Text('Normal')),
+                            ButtonSegment(
+                                value: 'normal', label: Text('Normal')),
                             ButtonSegment(value: 'high', label: Text('Yüksek')),
                             ButtonSegment(value: 'urgent', label: Text('Acil')),
                           ],
@@ -250,7 +251,8 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                     maxLines: 5,
                     decoration: InputDecoration(
                       labelText: 'Detaylı Açıklama *',
-                      hintText: 'Yaşadığınız durumu veya isteğinizi detaylıca açıklayınız…',
+                      hintText:
+                          'Yaşadığınız durumu veya isteğinizi detaylıca açıklayınız…',
                       alignLabelWithHint: true,
                       prefixIcon: const Padding(
                         padding: EdgeInsets.only(bottom: 80),
@@ -269,7 +271,8 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                       ),
                     ),
                     validator: (v) {
-                      if (v?.trim().isEmpty ?? true) return 'Açıklama zorunludur';
+                      if (v?.trim().isEmpty ?? true)
+                        return 'Açıklama zorunludur';
                       if (v!.trim().length < 10) {
                         return 'Lütfen sorunu en az 10 karakterle açıklayın';
                       }

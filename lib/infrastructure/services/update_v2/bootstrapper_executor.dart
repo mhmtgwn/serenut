@@ -57,20 +57,23 @@ class BootstrapperExecutor {
     if (parentPid != null && parentPid > 0) {
       final exited = await waitForProcessExit(parentPid, waitTimeout);
       if (!exited) {
-        debugPrint('[Bootstrapper] Error: Parent application process (PID $parentPid) did not exit within timeout.');
+        debugPrint(
+            '[Bootstrapper] Error: Parent application process (PID $parentPid) did not exit within timeout.');
         return BootstrapperResult.lockTimeout;
       }
     }
 
     // 2. Lock Detection
     if (await isFileLocked(targetFile)) {
-      debugPrint('[Bootstrapper] Error: Target file is locked by another process (DLL or sharing violation).');
+      debugPrint(
+          '[Bootstrapper] Error: Target file is locked by another process (DLL or sharing violation).');
       return BootstrapperResult.lockTimeout;
     }
 
     // Self-Protection check: make sure newFile path is not the same as targetFile or current executable path
     if (targetFile.path == Platform.script.toFilePath()) {
-      debugPrint('[Bootstrapper] Error: Self-protection triggered. Cannot overwrite the current updater instance.');
+      debugPrint(
+          '[Bootstrapper] Error: Self-protection triggered. Cannot overwrite the current updater instance.');
       return BootstrapperResult.installFailed;
     }
 
@@ -83,13 +86,15 @@ class BootstrapperExecutor {
         await targetFile.rename(backupFile.path);
       }
     } catch (e) {
-      debugPrint('[Bootstrapper] Error: Failed to rename target file to backup: $e');
+      debugPrint(
+          '[Bootstrapper] Error: Failed to rename target file to backup: $e');
       return BootstrapperResult.installFailed;
     }
 
     // 4. Verify Backup Validation (Check backup executable size and existence)
     if (!await backupFile.exists() || await backupFile.length() == 0) {
-      debugPrint('[Bootstrapper] Error: Backup executable verification failed. Aborting installation.');
+      debugPrint(
+          '[Bootstrapper] Error: Backup executable verification failed. Aborting installation.');
       return BootstrapperResult.installFailed;
     }
 
@@ -97,7 +102,8 @@ class BootstrapperExecutor {
     try {
       await newFile.copy(targetFile.path);
     } catch (e) {
-      debugPrint('[Bootstrapper] Error: Failed to copy new executable. Initiating rollback. Exception: $e');
+      debugPrint(
+          '[Bootstrapper] Error: Failed to copy new executable. Initiating rollback. Exception: $e');
       // Rollback: Restore backup file
       try {
         if (await backupFile.exists()) {
@@ -108,7 +114,8 @@ class BootstrapperExecutor {
           return BootstrapperResult.rollbackCompleted;
         }
       } catch (rollbackErr) {
-        debugPrint('[Bootstrapper] Critical: Rollback failed! Target executable is missing/corrupted: $rollbackErr');
+        debugPrint(
+            '[Bootstrapper] Critical: Rollback failed! Target executable is missing/corrupted: $rollbackErr');
         return BootstrapperResult.rollbackFailed;
       }
       return BootstrapperResult.installFailed;

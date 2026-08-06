@@ -848,6 +848,107 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 46) {
+          for (final statement in [
+            "ALTER TABLE settings ADD COLUMN label_show_business_name INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_show_barcode INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN label_show_price INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE settings ADD COLUMN active_receipt_printer_id TEXT NOT NULL DEFAULT 'receipt-printer-primary'",
+            "ALTER TABLE settings ADD COLUMN active_label_printer_id TEXT NOT NULL DEFAULT 'label-printer-primary'",
+            "ALTER TABLE print_queue ADD COLUMN purpose TEXT NOT NULL DEFAULT 'receipt'",
+            "ALTER TABLE print_queue ADD COLUMN device_id TEXT NOT NULL DEFAULT 'receipt-printer-primary'",
+          ]) {
+            try {
+              await txn.execute(statement);
+            } catch (e) {
+              handleMigrationError(e, 46);
+            }
+          }
+          await txn.execute(
+            'UPDATE settings SET label_show_business_name = print_logo, label_show_barcode = print_barcode, label_show_price = print_product_details',
+          );
+          await txn.insert('app_migration_history', {
+            'version': 46,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 47 && newVersion >= 47) {
+          await _createPrintingV2Tables(txn);
+          await _seedLegacyPrintingProfiles(txn);
+          await txn.insert('app_migration_history', {
+            'version': 47,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 48 && newVersion >= 48) {
+          for (final statement in [
+            'ALTER TABLE sales ADD COLUMN refunded_amount REAL NOT NULL DEFAULT 0',
+            'ALTER TABLE sales ADD COLUMN fsm_state TEXT NOT NULL DEFAULT \'completed\'',
+          ]) {
+            try {
+              await txn.execute(statement);
+            } catch (e) {
+              handleMigrationError(e, 48);
+            }
+          }
+          await txn.execute('''CREATE TABLE IF NOT EXISTS refunds (
+            id TEXT PRIMARY KEY, sale_id TEXT NOT NULL, amount REAL NOT NULL CHECK(amount>0),
+            refund_method TEXT NOT NULL, external_reference TEXT, reason TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed', created_at TEXT NOT NULL,
+            FOREIGN KEY(sale_id) REFERENCES sales(id) ON DELETE RESTRICT)''');
+          await txn.execute('''CREATE TABLE IF NOT EXISTS refund_items (
+            id TEXT PRIMARY KEY, refund_id TEXT NOT NULL, sale_item_id TEXT NOT NULL,
+            product_id TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0),
+            unit_refund_amount REAL NOT NULL, subtotal REAL NOT NULL,
+            UNIQUE(refund_id,sale_item_id),
+            FOREIGN KEY(refund_id) REFERENCES refunds(id) ON DELETE RESTRICT,
+            FOREIGN KEY(sale_item_id) REFERENCES sale_items(id) ON DELETE RESTRICT,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE RESTRICT)''');
+          await txn.execute(
+              'CREATE INDEX IF NOT EXISTS idx_refund_items_sale_item ON refund_items(sale_item_id)');
+          await txn.insert('app_migration_history', {
+            'version': 48,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
+        if (oldVersion < 49 && newVersion >= 49) {
+          try {
+            await txn
+                .execute('ALTER TABLE orders ADD COLUMN order_number TEXT');
+          } catch (e) {
+            handleMigrationError(e, 49);
+          }
+          final orders = await txn.query('orders',
+              columns: const ['id'], orderBy: 'created_at ASC, id ASC');
+          for (var index = 0; index < orders.length; index++) {
+            await txn.update(
+              'orders',
+              {'order_number': 'SP-${(index + 1).toString().padLeft(6, '0')}'},
+              where: 'id = ?',
+              whereArgs: [orders[index]['id']],
+            );
+          }
+          await txn.execute(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)');
+          await txn
+              .execute('''CREATE TABLE IF NOT EXISTS order_number_sequence (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            next_value INTEGER NOT NULL CHECK (next_value > 0)
+          )''');
+          await txn.insert(
+            'order_number_sequence',
+            {'id': 1, 'next_value': orders.length + 1},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          await txn.insert('app_migration_history', {
+            'version': 49,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing
@@ -866,6 +967,375 @@ class DatabaseMigrations {
     // This cannot run inside a transaction because SharedPreferences is async/external.
     if (oldVersion < 22) {
       await _migrateSharedPrefsToSqlite(db);
+    }
+    if (oldVersion < 47 && newVersion >= 47) {
+      await _migratePrintingDevicesAndRoutes(db);
+    }
+  }
+
+  static Future<void> _migratePrintingDevicesAndRoutes(Database db) async {
+    final settingsRows = await db.query('settings', limit: 1);
+    if (settingsRows.isEmpty) return;
+    final settings = settingsRows.first;
+    final now = DateTime.now().toIso8601String();
+    final devices = <Map<String, Object?>>[];
+    // Database migrations must be deterministic and platform-independent.
+    // SharedPreferences hardware-registry import belongs to application
+    // bootstrap (HardwareDevicesNotifier), before PrintingRuntime starts.
+    final printerName = settings['printer_name'] as String? ?? '';
+    final printerIp = settings['printer_ip'] as String? ?? '';
+    if (printerName.isNotEmpty || printerIp.isNotEmpty) {
+      devices.add(_printingDeviceRow(
+        id: settings['active_receipt_printer_id'] as String? ??
+            'receipt-printer-primary',
+        name: printerName.isEmpty ? 'Fiş Yazıcısı' : printerName,
+        isLabel: false,
+        connection: printerIp.isEmpty ? 'windows' : 'tcp',
+        config: {
+          'printerName': printerName,
+          'host': printerIp,
+          'port': settings['printer_port'] ?? 9100,
+          'paperWidth': settings['paper_width'] ?? 58,
+        },
+        enabled: true,
+        now: now,
+      ));
+    }
+    if (settings['label_printer_enabled'] == 1) {
+      final printerName = settings['label_printer_name'] as String? ?? '';
+      final printerIp = settings['label_printer_ip'] as String? ?? '';
+      devices.add(_printingDeviceRow(
+        id: settings['active_label_printer_id'] as String? ??
+            'label-printer-primary',
+        name: printerName.isEmpty ? 'Etiket Yazıcısı' : printerName,
+        isLabel: true,
+        connection: printerIp.isEmpty ? 'windows' : 'tcp',
+        config: {
+          'printerName': printerName,
+          'host': printerIp,
+          'port': settings['label_printer_port'] ?? 9100,
+          'labelWidthMm': settings['label_width_mm'] ?? 50,
+          'labelHeightMm': settings['label_height_mm'] ?? 30,
+          'labelGapMm': settings['label_gap_mm'] ?? 2,
+          'dpi': settings['label_dpi'] ?? 203,
+        },
+        enabled: true,
+        now: now,
+      ));
+    }
+
+    await db.transaction((txn) async {
+      for (final device in devices) {
+        await txn.insert('printer_devices', device,
+            conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+      final receiptId = settings['active_receipt_printer_id'] as String?;
+      final labelId = settings['active_label_printer_id'] as String?;
+      final knownIds = devices.map((row) => row['id']).toSet();
+      if (receiptId != null && knownIds.contains(receiptId)) {
+        await txn.insert(
+          'printer_routes',
+          {
+            'kind': 'receipt',
+            'device_id': receiptId,
+            'design_profile_id': 'receipt-default-v1',
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      if (labelId != null && knownIds.contains(labelId)) {
+        for (final route in const [
+          ['productLabel', 'product-label-default-v1'],
+          ['orderLabel', 'order-label-default-v1'],
+        ]) {
+          await txn.insert(
+            'printer_routes',
+            {
+              'kind': route[0],
+              'device_id': labelId,
+              'design_profile_id': route[1],
+              'updated_at': now,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+      }
+    });
+    await _migrateLegacyPrintJobs(db);
+  }
+
+  static Future<void> _migrateLegacyPrintJobs(Database db) async {
+    final table = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      ['print_queue'],
+    );
+    if (table.isEmpty) return;
+    final legacyJobs = await db.query('print_queue', orderBy: 'created_at ASC');
+    if (legacyJobs.isEmpty) return;
+
+    await db.transaction((txn) async {
+      for (final legacy in legacyJobs) {
+        final rawKind = legacy['purpose'] as String? ?? 'receipt';
+        final kind = switch (rawKind) {
+          'productLabel' => 'productLabel',
+          'orderLabel' => 'orderLabel',
+          _ => 'receipt',
+        };
+        final designId = switch (kind) {
+          'productLabel' => 'product-label-default-v1',
+          'orderLabel' => 'order-label-default-v1',
+          _ => 'receipt-default-v1',
+        };
+        final profiles = await txn.query(
+          'print_design_profiles',
+          where: 'id = ?',
+          whereArgs: [designId],
+          limit: 1,
+        );
+        final deviceId = legacy['device_id'] as String? ??
+            (kind == 'receipt'
+                ? 'receipt-printer-primary'
+                : 'label-printer-primary');
+        final devices = await txn.query(
+          'printer_devices',
+          columns: ['transport', 'transport_config_json', 'capabilities_json'],
+          where: 'id = ?',
+          whereArgs: [deviceId],
+          limit: 1,
+        );
+        final legacyStatus = legacy['status'] as String? ?? 'pending';
+        final retryCount = (legacy['retry_count'] as num?)?.toInt() ?? 0;
+        final state = switch (legacyStatus) {
+          'success' => 'delivered',
+          'abandoned' => 'failed',
+          'failed' when retryCount >= 5 => 'failed',
+          'failed' => 'retryWait',
+          // A process may have died after sending bytes. Retaining the job as
+          // queued makes the ambiguity visible; the coordinator applies its
+          // recovery policy instead of silently marking it successful.
+          'printing' => 'queued',
+          _ => 'queued',
+        };
+        final createdAt =
+            legacy['created_at'] as String? ?? DateTime.now().toIso8601String();
+        await txn.insert(
+          'print_jobs',
+          {
+            'id': 'legacy-${legacy['id']}',
+            'kind': kind,
+            'payload_json': legacy['receipt_json'] as String? ?? '{}',
+            'copies': 1,
+            'design_profile_id': designId,
+            'design_snapshot_json': profiles.isEmpty
+                ? '{}'
+                : profiles.first['definition_json'] as String,
+            'device_id': deviceId,
+            'transport_snapshot_json': devices.isEmpty
+                ? '{}'
+                : jsonEncode({
+                    'kind': devices.first['transport'],
+                    'config': jsonDecode(
+                      devices.first['transport_config_json']! as String,
+                    ),
+                  }),
+            'capability_snapshot_json': devices.isEmpty
+                ? '{}'
+                : devices.first['capabilities_json'] as String,
+            'renderer_version': 'legacy-raw-v1',
+            'state': state,
+            'attempt_count': retryCount,
+            'created_at': createdAt,
+            'updated_at': DateTime.now().toIso8601String(),
+            'next_attempt_at':
+                state == 'retryWait' ? DateTime.now().toIso8601String() : null,
+            'error_code': state == 'failed' ? 'legacy_abandoned' : null,
+            'error_message': legacy['last_error'] as String?,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      await txn.update(
+        'print_queue',
+        {
+          'status': 'abandoned',
+          'last_error': 'Yeni yazdırma kuyruğuna taşındı (v47).',
+        },
+        where: 'status IN (?, ?, ?)',
+        whereArgs: ['pending', 'printing', 'failed'],
+      );
+    });
+  }
+
+  static Map<String, Object?> _printingDeviceRow({
+    required String id,
+    required String name,
+    required bool isLabel,
+    required String connection,
+    required Map<String, Object?> config,
+    required bool enabled,
+    required String now,
+    String? lastTestedAt,
+    bool? lastTestSucceeded,
+    String? lastTestMessage,
+  }) {
+    final transport = switch (connection) {
+      'embedded' => 'embedded',
+      'windows' => 'windowsSpooler',
+      'usb' => 'usb',
+      'bluetooth' => 'bluetooth',
+      _ => 'tcp',
+    };
+    final capabilities = isLabel
+        ? {
+            'dpi': config['dpi'] ?? 203,
+            'mediaWidthMm': config['labelWidthMm'] ?? 50,
+            'mediaHeightMm': config['labelHeightMm'] ?? 30,
+            'gapMm': config['labelGapMm'] ?? 2,
+            'raster': true,
+          }
+        : {
+            'paperWidthMm': config['paperWidth'] ?? 58,
+            'raster': true,
+            'cutter': config['autoCut'] ?? false,
+            'cashDrawer': config['openDrawer'] ?? false,
+          };
+    return {
+      'id': id,
+      'name': name,
+      'language': isLabel ? 'tspl' : 'escPos',
+      'transport': transport,
+      'transport_config_json': jsonEncode(config),
+      'capabilities_json': jsonEncode(capabilities),
+      'enabled': enabled ? 1 : 0,
+      'last_tested_at': lastTestedAt,
+      'last_test_succeeded':
+          lastTestSucceeded == null ? null : (lastTestSucceeded ? 1 : 0),
+      'last_test_message': lastTestMessage,
+      'created_at': now,
+      'updated_at': now,
+    };
+  }
+
+  static Future<void> _createPrintingV2Tables(DatabaseExecutor db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS print_design_profiles (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL,
+      schema_version INTEGER NOT NULL, renderer_version TEXT NOT NULL,
+      definition_json TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''');
+    await db
+        .execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_print_design_default
+      ON print_design_profiles(kind) WHERE is_default = 1''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS printer_devices (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, language TEXT NOT NULL,
+      transport TEXT NOT NULL, transport_config_json TEXT NOT NULL,
+      capabilities_json TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+      last_tested_at TEXT, last_test_succeeded INTEGER, last_test_message TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS printer_routes (
+      kind TEXT PRIMARY KEY, device_id TEXT NOT NULL REFERENCES printer_devices(id),
+      design_profile_id TEXT NOT NULL REFERENCES print_design_profiles(id),
+      updated_at TEXT NOT NULL)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS print_jobs (
+      id TEXT PRIMARY KEY, kind TEXT NOT NULL, payload_json TEXT NOT NULL,
+      copies INTEGER NOT NULL DEFAULT 1 CHECK(copies > 0),
+      design_profile_id TEXT NOT NULL, design_snapshot_json TEXT NOT NULL,
+      device_id TEXT NOT NULL, transport_snapshot_json TEXT NOT NULL,
+      capability_snapshot_json TEXT NOT NULL,
+      renderer_version TEXT NOT NULL, state TEXT NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL, next_attempt_at TEXT, error_code TEXT,
+      error_message TEXT, rendered_checksum TEXT,
+      delivery_observation_json TEXT)''');
+    await db.execute('''CREATE INDEX IF NOT EXISTS idx_print_jobs_claim
+      ON print_jobs(state, next_attempt_at, created_at)''');
+    await db.execute('''CREATE INDEX IF NOT EXISTS idx_print_jobs_device_state
+      ON print_jobs(device_id, state)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS print_job_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL REFERENCES print_jobs(id), attempt_no INTEGER NOT NULL,
+      started_at TEXT NOT NULL, completed_at TEXT, outcome TEXT, error_code TEXT,
+      error_message TEXT, transport_observation_json TEXT,
+      UNIQUE(job_id, attempt_no))''');
+  }
+
+  static Future<void> _seedLegacyPrintingProfiles(DatabaseExecutor db) async {
+    final rows = await db.query('settings', limit: 1);
+    if (rows.isEmpty) return;
+    final settings = rows.first;
+    final now = DateTime.now().toIso8601String();
+    int flag(String key, [int fallback = 1]) =>
+        (settings[key] as num?)?.toInt() ?? fallback;
+    int number(String key, int fallback) =>
+        (settings[key] as num?)?.toInt() ?? fallback;
+    String text(String key, String fallback) =>
+        settings[key] as String? ?? fallback;
+
+    final profiles = <Map<String, Object?>>[
+      {
+        'id': 'receipt-default-v1',
+        'name': 'Varsayılan Fiş',
+        'kind': 'receipt',
+        'schema_version': 1,
+        'renderer_version': 'escpos-v1',
+        'definition_json': jsonEncode({
+          'showLogo': flag('print_logo') == 1,
+          'showBarcode': flag('print_barcode') == 1,
+          'showProductDetails': flag('print_product_details') == 1,
+          'showCustomerBalance': flag('print_customer_balance') == 1,
+          'font': text('receipt_font', 'a'),
+          'textSize': text('receipt_text_size', 'normal'),
+          'itemLayout': text('receipt_item_layout', 'auto'),
+          'footerText': text('receipt_footer_text', ''),
+          'feedLines': number('receipt_feed_lines', 2),
+          'autoCut': flag('auto_cut_receipt') == 1,
+          'openCashDrawer': flag('open_cash_drawer') == 1,
+        }),
+        'is_default': 1,
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'id': 'product-label-default-v1',
+        'name': 'Varsayılan Ürün Etiketi',
+        'kind': 'productLabel',
+        'schema_version': 1,
+        'renderer_version': 'tspl-product-v1',
+        'definition_json': jsonEncode({
+          'showBusinessName': flag('label_show_business_name') == 1,
+          'showBrand': flag('label_show_brand') == 1,
+          'showBarcode': flag('label_show_barcode') == 1,
+          'showPrice': flag('label_show_price') == 1,
+          'showVat': flag('label_show_vat') == 1,
+          'fontSize': text('label_font_size', 'Orta'),
+        }),
+        'is_default': 1,
+        'created_at': now,
+        'updated_at': now,
+      },
+      {
+        'id': 'order-label-default-v1',
+        'name': 'Varsayılan Sipariş Etiketi',
+        'kind': 'orderLabel',
+        'schema_version': 1,
+        'renderer_version': 'tspl-order-v1',
+        'definition_json': jsonEncode({
+          'showBusinessName': flag('label_order_show_business_name') == 1,
+          'showCustomerName': flag('label_order_show_customer_name') == 1,
+          'showOrderNo': flag('label_order_show_order_no') == 1,
+          'showDate': flag('label_order_show_date') == 1,
+          'showTotalAmount': flag('label_order_show_total_amount') == 1,
+          'showItemsCount': flag('label_order_show_items_count') == 1,
+          'fontSize': text('label_order_font_size', 'Orta'),
+        }),
+        'is_default': 1,
+        'created_at': now,
+        'updated_at': now,
+      },
+    ];
+    for (final profile in profiles) {
+      await db.insert('print_design_profiles', profile,
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 

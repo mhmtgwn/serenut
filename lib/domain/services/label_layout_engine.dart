@@ -72,13 +72,16 @@ class LabelLayoutEngine {
       bytes.addAll(boldOn);
       bytes.addAll(sizeLarge);
       final vatText = showVat ? ' (KDV Dahil)' : '';
-      bytes.addAll(_textToBytes('${model.price.toStringAsFixed(2)} TL$vatText\n'));
+      bytes.addAll(
+          _textToBytes('${model.price.toStringAsFixed(2)} TL$vatText\n'));
       bytes.addAll(sizeNormal);
       bytes.addAll(boldOff);
     }
 
     // Compact Barcode Lines (no numbers underneath)
-    if (showBarcode && model.barcode != null && model.barcode!.trim().isNotEmpty) {
+    if (showBarcode &&
+        model.barcode != null &&
+        model.barcode!.trim().isNotEmpty) {
       final code = model.barcode!.trim();
       bytes.addAll(alignCenter);
       // Select barcode height (32 dots)

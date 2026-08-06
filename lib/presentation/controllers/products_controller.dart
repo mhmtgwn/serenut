@@ -48,7 +48,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       final cats = await _repository.getCategories();
       ref.read(productCategoriesStateProvider.notifier).state = cats;
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'products_controller', level: LogLevel.warning);
     }
   }
 
@@ -89,7 +90,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
           notes: 'Yeni ürün eklendi: ${product.name}',
         );
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'products_controller', level: LogLevel.warning);
       }
       ref.read(auditLogServiceProvider).log(
             action: 'product_created',
@@ -155,7 +157,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
           );
         }
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'products_controller', level: LogLevel.warning);
       }
 
       ref.read(auditLogServiceProvider).log(
@@ -193,7 +196,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
           approvedByUserName: approvedByUserName,
         );
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'products_controller', level: LogLevel.warning);
       }
       ref.read(auditLogServiceProvider).log(
             action: 'product_deleted',
@@ -308,7 +312,8 @@ final categoryPoolProvider = Provider<List<String>>((ref) {
             }
           }
         } catch (e, st) {
-          TelemetryService().logError(e, st, context: 'products_controller', level: LogLevel.warning);
+          TelemetryService().logError(e, st,
+              context: 'products_controller', level: LogLevel.warning);
         }
       }
     },

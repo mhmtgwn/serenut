@@ -28,9 +28,10 @@ import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
-import 'package:serenutos/presentation/pages/settings/label_template_editor_page.dart';
 import 'package:serenutos/presentation/pages/settings/support_page.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
@@ -364,13 +365,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ── Gruplanmış Ayarlar Menüsü ────────────────────────────────────────────────
   List<Widget> _buildGroupedSettings(Settings settings, AuthUser? currentUser) {
     final List<Widget> groups = [];
-
+    // Device discovery is asynchronous and can legitimately be unavailable
+    // while the database is opening (or in widget-test/repair environments).
+    // A settings shell must remain usable in that state; the hardware screens
+    // expose the actionable repository/runtime error when opened.
     // Grup 1: İşletme Ayarları
     final group1 = <Widget>[];
     final groupData = <Widget>[];
     if (_hasPermission(currentUser, Permission.settingsReceipt) ||
         _hasPermission(currentUser, Permission.settingsPrinter)) {
-      if (_matchesQuery('işletme', 'bilgiler', 'firma', settings.businessName)) {
+      if (_matchesQuery(
+          'işletme', 'bilgiler', 'firma', settings.businessName)) {
         group1.add(_buildCategoryRow(
           title: 'İşletme Bilgileri',
           subtitle: settings.businessName.isNotEmpty
@@ -378,39 +383,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               : 'Ayarlanmadı',
           icon: Icons.storefront_rounded,
           color: _kGreen,
-          onTap: () => _runGuardedAction(
-              Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
+          onTap: () => _runGuardedAction(Permission.settingsReceipt,
+              () => _showBusinessInfoSheet(settings),
               title: 'İşletme Bilgileri'),
-        ));
-      }
-
-      if (_matchesQuery('fiş', 'tasarım', 'yazıcı', 'kağıt', 'termal', 'makbuz')) {
-        if (group1.isNotEmpty) group1.add(const _IOSDivider());
-        group1.add(_buildCategoryRow(
-          title: 'Fiş Tasarımı',
-          subtitle:
-              '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
-          icon: Icons.receipt_long_rounded,
-          color: _kBlue,
-          onTap: () => _runGuardedAction(
-              Permission.settingsReceipt, () => _showReceiptSettings(settings),
-              title: 'Fiş Tasarımı'),
-        ));
-      }
-
-      if (_matchesQuery('etiket', 'tasarım', 'barkod', 'dpi', 'boyut', 'şablon', 'tspl', 'yazıcı')) {
-        if (group1.isNotEmpty) group1.add(const _IOSDivider());
-        group1.add(_buildCategoryRow(
-          title: 'Etiket Tasarımı',
-          subtitle:
-              '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI • Canlı önizleme & boyutlar',
-          icon: Icons.label_rounded,
-          color: _kOrange,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const LabelTemplateEditorPage(),
-            ),
-          ),
         ));
       }
     }

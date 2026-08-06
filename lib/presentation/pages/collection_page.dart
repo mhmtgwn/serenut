@@ -8,9 +8,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
@@ -518,16 +519,12 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   // Info about the active printer configuration
                   Builder(
                     builder: (context) {
-                      final settingsAsync = ref.watch(settingsNotifierProvider);
-                      final settings = settingsAsync.value;
-                      if (settings == null) return const SizedBox.shrink();
+                      final activeDevice = ref.watch(
+                          activePrinterDeviceProvider(
+                              PrintDocumentKind.receipt));
+                      final device = activeDevice.value;
 
-                      final hasIp = settings.printerIp != null &&
-                          settings.printerIp!.isNotEmpty;
-                      final hasName = settings.printerName != null &&
-                          settings.printerName!.isNotEmpty;
-
-                      if (!hasIp && !hasName) {
+                      if (device == null) {
                         return GestureDetector(
                           onTap: () {
                             context.push('/settings');
@@ -563,12 +560,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                         );
                       }
 
-                      String printerInfo = '';
-                      if (hasIp) {
-                        printerInfo = 'Ağ Yazıcısı: ${settings.printerIp}';
-                      } else if (hasName) {
-                        printerInfo = 'Yazıcı: ${settings.printerName}';
-                      }
+                      final printerInfo = 'Yazıcı: ${device.name}';
 
                       return Container(
                         padding: const EdgeInsets.symmetric(
@@ -688,17 +680,16 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
               : null);
 
       if (_printReceipt && settings != null && customerToPrint != null) {
-        ref.read(printerServiceProvider).enqueue(
-              'Tahsilat Fişi (${customerToPrint.name})',
-              () => ref.read(printerServiceProvider).printCollectionReceipt(
-                    customerToPrint,
-                    _enteredAmount,
-                    _selectedMethod,
-                    _noteController.text.trim().isEmpty
-                        ? null
-                        : _noteController.text.trim(),
-                    settings,
-                  ),
+        await ref
+            .read(printingApplicationServiceProvider)
+            .queueCollectionReceipt(
+              customerToPrint,
+              _enteredAmount,
+              _selectedMethod,
+              _noteController.text.trim().isEmpty
+                  ? null
+                  : _noteController.text.trim(),
+              settings,
             );
       }
 

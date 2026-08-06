@@ -92,7 +92,8 @@ class BackupService implements IBackupService {
           timestamp: DateTime.now(),
         ));
       } catch (e, stackTrace) {
-        developer.log('Yedekleme audit olayı kaydedilemedi', error: e, stackTrace: stackTrace);
+        developer.log('Yedekleme audit olayı kaydedilemedi',
+            error: e, stackTrace: stackTrace);
       }
 
       return backupPath;

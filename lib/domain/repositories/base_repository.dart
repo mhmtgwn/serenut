@@ -6,6 +6,7 @@
 import 'dart:convert';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
+import 'package:serenutos/config/utils.dart';
 
 /// Generic repository interface for CRUD operations
 ///
@@ -562,6 +563,7 @@ class FinancialTransactionEntity {
 /// Order entity
 class OrderEntity {
   final String id;
+  final String orderNumber;
   final String customerId;
   final String status; // created, preparing, ready, delivered, cancelled
   final DateTime createdAt;
@@ -573,6 +575,7 @@ class OrderEntity {
 
   OrderEntity({
     required this.id,
+    this.orderNumber = '',
     required this.customerId,
     required this.status,
     required this.createdAt,
@@ -582,6 +585,9 @@ class OrderEntity {
     this.notes,
     this.createdBy,
   });
+
+  String get displayNumber =>
+      orderNumber.isNotEmpty ? orderNumber : id.toShortId;
 
   bool get isOverdue {
     if (expectedDeliveryDate == null) return false;
@@ -603,6 +609,7 @@ class OrderEntity {
 
   Map<String, dynamic> toMap() => {
         'id': id,
+        'order_number': orderNumber,
         'customer_id': customerId,
         'status': status,
         'created_at': createdAt.toIso8601String(),
@@ -614,6 +621,7 @@ class OrderEntity {
 
   factory OrderEntity.fromMap(Map<String, dynamic> map) => OrderEntity(
         id: (map['id'] ?? '').toString(),
+        orderNumber: (map['order_number'] ?? '').toString(),
         customerId: (map['customer_id'] ?? '').toString(),
         status: (map['status'] ?? 'created').toString(),
         createdAt: map['created_at'] != null
@@ -634,6 +642,22 @@ class OrderEntity {
 /// Abstract contract for orchestrating database transactions from the domain layer.
 abstract class IDbTransactionRunner {
   Future<T> transaction<T>(Future<T> Function() action);
+}
+
+class RefundLineRequest {
+  const RefundLineRequest({required this.saleItemId, required this.quantity});
+  final String saleItemId;
+  final int quantity;
+}
+
+abstract class IRefundMutationStore {
+  Future<String> create({
+    required String saleId,
+    required List<RefundLineRequest> items,
+    required String refundMethod,
+    required String reason,
+    String? externalReference,
+  });
 }
 
 /// User repository contract

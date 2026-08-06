@@ -113,8 +113,7 @@ void main() {
       expect(connectedPort, 9100);
     });
 
-    test(
-        'PrinterService falls back to the main printer when no label printer is configured',
+    test('PrinterService never sends label bytes to the receipt printer',
         () async {
       final settings = Settings(
         businessName: 'Test Market',
@@ -126,11 +125,7 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      String? connectedIp;
-      int? connectedPort;
       final service = PrinterService((ip, port, {timeout}) async {
-        connectedIp = ip;
-        connectedPort = port;
         return MockSocket();
       }, null);
 
@@ -144,10 +139,10 @@ void main() {
         ],
       );
 
-      await service.printOrderLabels(order, order.items, settings);
-
-      expect(connectedIp, '192.168.1.50');
-      expect(connectedPort, 9200);
+      await expectLater(
+        service.printOrderLabels(order, order.items, settings),
+        throwsA(isA<StateError>()),
+      );
     });
 
     test('PrinterService reports a missing label and main printer', () async {
@@ -187,9 +182,10 @@ void main() {
         businessName: 'Test Market',
         businessPhone: '123456',
         businessAddress: 'Address',
-        printerName: 'network',
-        printerIp: '192.168.1.50',
-        printerPort: 9100,
+        labelPrinterEnabled: true,
+        labelPrinterName: 'network',
+        labelPrinterIp: '192.168.1.150',
+        labelPrinterPort: 9100,
         labelPrinterLanguage: 'tspl',
         createdAt: DateTime.now(),
       );
@@ -240,11 +236,11 @@ void main() {
 
       final output = String.fromCharCodes(socket.writtenBytes);
       expect('Birinci Urun'.allMatches(output), hasLength(1));
-      expect('Ikinci Urun'.allMatches(output), hasLength(1));
+      expect(output, isNot(contains('Ikinci Urun')));
       expect(output, isNot(contains('Ucuncu Urun')));
       expect(output, isNot(contains('Dorduncu Urun')));
       expect(output, isNot(contains('Besinci Urun')));
-      expect(output, contains('+3 diger urun'));
+      expect(output, contains('+4 diger urun'));
       expect('PRINT 1,1'.allMatches(output), hasLength(1));
     });
   });

@@ -1,37 +1,9 @@
-// lib/presentation/pages/settings/print_queue_page.dart
-// Serenut OS — Yazıcı Kuyruğu İzleme Ekranı
-// Backend: PersistentPrintQueue — crash-safe, retry logic bağlı
-// Created: Phase 4 — 01 Jul 2026
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
-import 'package:serenutos/providers/service_providers.dart';
-import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/config/theme.dart';
-
-// ── Design Constants ──────────────────────────────────────────────────────────
-const _kBgColor = POSColors.surface;
-const _kCardBg = POSColors.card;
-const _kBorderColor = POSColors.border;
-const _kTextPrimary = POSColors.text;
-const _kTextSecondary = POSColors.textSecondary;
-const _kGreen = POSColors.green;
-const _kRed = POSColors.red;
-const _kAmber = POSColors.amber;
-const _kBlue = POSColors.blue;
-const _kGray = POSColors.textDisabled;
-
-// ── Providers ─────────────────────────────────────────────────────────────────
-
-final _printJobsProvider =
-    FutureProvider.autoDispose<List<PersistedPrintJob>>((ref) async {
-  final queue = ref.watch(persistentPrintQueueProvider);
-  return queue.loadAll();
-});
-
-// ── Page ──────────────────────────────────────────────────────────────────────
+import 'package:serenutos/domain/printing/printing_models.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 
 class PrintQueuePage extends ConsumerStatefulWidget {
   const PrintQueuePage({super.key});
@@ -41,381 +13,106 @@ class PrintQueuePage extends ConsumerStatefulWidget {
 }
 
 class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
-  String _filterStatus = 'all'; // all | pending | success | failed | abandoned
+  bool _loading = true;
+  String? _error;
+  List<PrintJobRecord> _jobs = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final jobs = await ref.read(printingRepositoryProvider).getJobs();
+      if (mounted) setState(() => _jobs = jobs);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _retry(PrintJobRecord job) async {
+    await ref.read(printingRepositoryProvider).retryJob(job.id);
+    await ref.read(printingRuntimeProvider).processNow();
+    await _load();
+  }
+
+  Future<void> _cancel(PrintJobRecord job) async {
+    await ref.read(printingRepositoryProvider).cancelJob(job.id);
+    await _load();
+  }
+
+  Future<void> _resolve(PrintJobRecord job, bool printed) async {
+    await ref
+        .read(printingRepositoryProvider)
+        .confirmUncertainDelivery(job.id, printed: printed);
+    if (!printed) await ref.read(printingRuntimeProvider).processNow();
+    await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final jobsAsync = ref.watch(_printJobsProvider);
-
+    final runtime = ref.watch(printingRuntimeSnapshotProvider);
+    final runtimeError = runtime.value?.error ?? runtime.error?.toString();
+    ref.listen(printingRuntimeSnapshotProvider, (_, next) {
+      if (next.hasValue) _load();
+    });
     return Scaffold(
-      backgroundColor: _kBgColor,
+      backgroundColor: POSColors.surface,
       appBar: AppBar(
-        backgroundColor: POSColors.card,
-        elevation: 0,
-        title: const Text(
-          'Yazıcı Kuyruğu',
-          style: TextStyle(
-            color: _kTextPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
+        title: const Text('Yazdırma Kuyruğu'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: _kTextPrimary),
-            tooltip: 'Yenile',
-            onPressed: () => ref.invalidate(_printJobsProvider),
-          ),
+              onPressed: _load,
+              tooltip: 'Yenile',
+              icon: const Icon(Icons.refresh_rounded)),
         ],
       ),
       body: Column(
         children: [
-          // ── Status Summary Banner ───────────────────────────────────────────
-          jobsAsync.when(
-            data: (jobs) => _buildSummaryBanner(jobs),
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-          ),
-
-          // ── Filter Chips ────────────────────────────────────────────────────
-          _buildFilterChips(),
-
-          // ── Job List ────────────────────────────────────────────────────────
+          if (runtimeError != null)
+            Container(
+              width: double.infinity,
+              color: POSColors.redLight,
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Yazdırma altyapısı çalışmıyor: $runtimeError',
+                style: const TextStyle(color: POSColors.red),
+              ),
+            ),
           Expanded(
-            child: jobsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(_kGreen),
-                ),
-              ),
-              error: (e, _) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 48, color: _kRed),
-                    const SizedBox(height: 12),
-                    Text('Kuyruk yüklenemedi: $e',
-                        style: const TextStyle(color: _kTextSecondary)),
-                  ],
-                ),
-              ),
-              data: (jobs) {
-                final filtered = _filterJobs(jobs);
-                if (filtered.isEmpty) return _buildEmptyState();
-                return RefreshIndicator(
-                  color: _kGreen,
-                  onRefresh: () async => ref.invalidate(_printJobsProvider),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _PrintJobCard(
-                      job: filtered[i],
-                      onRetry: () => _retryJob(filtered[i]),
-                      onDelete: () => _deleteJob(filtered[i]),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: jobsAsync.maybeWhen(
-        data: (jobs) {
-          final hasPending =
-              jobs.any((j) => j.status == PrintJobStatus.pending);
-          final hasCompleted = jobs.any(
-            (j) =>
-                j.status == PrintJobStatus.success ||
-                j.status == PrintJobStatus.abandoned,
-          );
-          if (!hasPending && !hasCompleted) return null;
-          return _buildBottomActions(hasPending, hasCompleted);
-        },
-        orElse: () => null,
-      ),
-    );
-  }
-
-  // ── Summary Banner ─────────────────────────────────────────────────────────
-
-  Widget _buildSummaryBanner(List<PersistedPrintJob> jobs) {
-    final pending =
-        jobs.where((j) => j.status == PrintJobStatus.pending).length;
-    final success =
-        jobs.where((j) => j.status == PrintJobStatus.success).length;
-    final failed = jobs.where((j) => j.status == PrintJobStatus.failed).length;
-    final abandoned =
-        jobs.where((j) => j.status == PrintJobStatus.abandoned).length;
-
-    return Column(
-      children: [
-        if (abandoned > 0)
-          Container(
-            color: const Color(0xFFFEF2F2),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded,
-                    color: Colors.redAccent, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '$abandoned adet fiş basılamadı ve iptal edildi. Lütfen yazıcıyı kontrol edin.',
-                    style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            children: [
-              _SummaryChip(count: pending, label: 'Bekliyor', color: _kAmber),
-              const SizedBox(width: 8),
-              _SummaryChip(count: success, label: 'Başarılı', color: _kGreen),
-              const SizedBox(width: 8),
-              _SummaryChip(count: failed, label: 'Başarısız', color: _kRed),
-              const SizedBox(width: 8),
-              _SummaryChip(count: abandoned, label: 'İptal', color: _kGray),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Filter Chips ───────────────────────────────────────────────────────────
-
-  Widget _buildFilterChips() {
-    const filters = [
-      ('all', 'Tümü'),
-      ('pending', 'Bekliyor'),
-      ('success', 'Başarılı'),
-      ('failed', 'Başarısız'),
-      ('abandoned', 'İptal'),
-    ];
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: filters.map((f) {
-            final isActive = _filterStatus == f.$1;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: GestureDetector(
-                onTap: () => setState(() => _filterStatus = f.$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isActive ? _kBlue : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    f.$2,
-                    style: TextStyle(
-                      color: isActive ? Colors.white : _kTextSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  // ── Bottom Actions ─────────────────────────────────────────────────────────
-
-  Widget _buildBottomActions(bool hasPending, bool hasCompleted) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: _kBorderColor)),
-      ),
-      child: Row(
-        children: [
-          if (hasPending)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _retryAllPending,
-                icon: const Icon(Icons.replay_rounded, size: 18),
-                label: const Text('Tümünü Yeniden Dene'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _kBlue,
-                  side: const BorderSide(color: _kBlue),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-          if (hasPending && hasCompleted) const SizedBox(width: 10),
-          if (hasCompleted)
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _clearCompleted,
-                icon: const Icon(Icons.cleaning_services_rounded, size: 18),
-                label: const Text('Tamamlananları Temizle'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  foregroundColor: _kTextSecondary,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-
-  Future<void> _retryJob(PersistedPrintJob job) async {
-    final queue = ref.read(persistentPrintQueueProvider);
-    final printerService = ref.read(printerServiceProvider);
-    final settingsAsync = ref.read(settingsNotifierProvider);
-    final settings = settingsAsync.value;
-    if (settings == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ayarlar yüklenemedi, tekrar deneyin'),
-            backgroundColor: _kRed,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return;
-    }
-
-    await queue.resetJob(job.id);
-    ref.invalidate(_printJobsProvider);
-
-    try {
-      await printerService.retryPersistedJob(job, settings);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Fiş başarıyla yazdırıldı'),
-            backgroundColor: _kGreen,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Yazdırma hatası: $e'),
-            backgroundColor: _kRed,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      ref.invalidate(_printJobsProvider);
-    }
-  }
-
-  Future<void> _deleteJob(PersistedPrintJob job) async {
-    final queue = ref.read(persistentPrintQueueProvider);
-    await queue.markFailed(job.id, error: 'Kullanıcı tarafından iptal edildi');
-    ref.invalidate(_printJobsProvider);
-  }
-
-  Future<void> _retryAllPending() async {
-    final queue = ref.read(persistentPrintQueueProvider);
-    final printerService = ref.read(printerServiceProvider);
-    final settingsAsync = ref.read(settingsNotifierProvider);
-    final settings = settingsAsync.value;
-    if (settings == null) return;
-
-    final jobs = await queue.loadPending();
-    if (jobs.isEmpty) return;
-
-    await queue.resetStuckJobs();
-    for (final job in jobs) {
-      await queue.resetJob(job.id);
-    }
-    ref.invalidate(_printJobsProvider);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${jobs.length} iş yeniden yazdırılıyor...'),
-          backgroundColor: _kBlue,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-
-    try {
-      await printerService.processPendingQueue(settings);
-    } catch (_) {}
-
-    ref.invalidate(_printJobsProvider);
-  }
-
-  Future<void> _clearCompleted() async {
-    final queue = ref.read(persistentPrintQueueProvider);
-    await queue.clearCompleted();
-    ref.invalidate(_printJobsProvider);
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  List<PersistedPrintJob> _filterJobs(List<PersistedPrintJob> jobs) {
-    if (_filterStatus == 'all') return jobs.reversed.toList();
-    return jobs.reversed.where((j) => j.status.name == _filterStatus).toList();
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(Icons.print_rounded, size: 40, color: _kGray),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Yazıcı kuyruğu boş',
-            style: TextStyle(
-              color: _kTextPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Satış fişi basıldığında burada görünür.',
-            style: TextStyle(color: _kTextSecondary, fontSize: 13),
-            textAlign: TextAlign.center,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text('Kuyruk yüklenemedi: $_error'))
+                    : _jobs.isEmpty
+                        ? const _EmptyQueue()
+                        : RefreshIndicator(
+                            onRefresh: _load,
+                            child: ListView.separated(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _jobs.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (_, index) => _JobCard(
+                                job: _jobs[index],
+                                onRetry: () => _retry(_jobs[index]),
+                                onCancel: () => _cancel(_jobs[index]),
+                                onPrinted: () => _resolve(_jobs[index], true),
+                                onNotPrinted: () =>
+                                    _resolve(_jobs[index], false),
+                              ),
+                            ),
+                          ),
           ),
         ],
       ),
@@ -423,249 +120,114 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
   }
 }
 
-// ── Print Job Card ────────────────────────────────────────────────────────────
-
-class _PrintJobCard extends StatelessWidget {
-  final PersistedPrintJob job;
+class _JobCard extends StatelessWidget {
+  final PrintJobRecord job;
   final VoidCallback onRetry;
-  final VoidCallback onDelete;
+  final VoidCallback onCancel;
+  final VoidCallback onPrinted;
+  final VoidCallback onNotPrinted;
 
-  const _PrintJobCard({
-    required this.job,
-    required this.onRetry,
-    required this.onDelete,
-  });
+  const _JobCard(
+      {required this.job,
+      required this.onRetry,
+      required this.onCancel,
+      required this.onPrinted,
+      required this.onNotPrinted});
 
   @override
   Widget build(BuildContext context) {
-    final style = _jobStyle(job.status);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: style.borderColor),
-      ),
+    final presentation = _state(job.state);
+    final retryable = const [
+      PrintJobState.failed,
+      PrintJobState.rejected,
+      PrintJobState.cancelled
+    ].contains(job.state);
+    final cancellable = const [PrintJobState.queued, PrintJobState.retryWait]
+        .contains(job.state);
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: style.bgColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(style.icon, size: 20, color: style.fgColor),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        job.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: _kTextPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        DateFormat('dd.MM.yyyy HH:mm').format(job.createdAt),
-                        style: const TextStyle(
-                            color: _kTextSecondary, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: style.bgColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    style.label,
-                    style: TextStyle(
-                      color: style.fgColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (job.retryCount > 0 || job.lastError != null) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFED7AA)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.replay_rounded, size: 14, color: _kAmber),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        job.lastError ?? 'Deneme sayısı: ${job.retryCount}/5',
-                        style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF92400E)),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (job.status == PrintJobStatus.pending ||
-                job.status == PrintJobStatus.failed) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onRetry,
-                      icon: const Icon(Icons.replay_rounded, size: 15),
-                      label: const Text('Yeniden Dene'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _kBlue,
-                        side: const BorderSide(color: _kBlue),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        textStyle: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline_rounded, size: 15),
-                    label: const Text('İptal'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _kRed,
-                      side: const BorderSide(color: _kRed),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 12),
-                      textStyle: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(_kindIcon(job.kind), color: presentation.$2),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(_kindLabel(job.kind),
+                    style: const TextStyle(fontWeight: FontWeight.w800))),
+            Chip(label: Text(presentation.$1)),
+          ]),
+          const SizedBox(height: 8),
+          Text('Cihaz: ${job.deviceId} · Kopya: ${job.copies}'),
+          Text(DateFormat('dd.MM.yyyy HH:mm:ss').format(job.createdAt),
+              style: const TextStyle(color: POSColors.textSecondary)),
+          if (job.errorMessage != null) ...[
+            const SizedBox(height: 6),
+            Text(job.errorMessage!,
+                style: const TextStyle(color: POSColors.red)),
           ],
-        ),
+          if (job.state == PrintJobState.awaitingUserCheck) ...[
+            const SizedBox(height: 10),
+            const Text('Fiziksel çıktı oluştu mu?',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            Row(children: [
+              TextButton(
+                  onPressed: onNotPrinted,
+                  child: const Text('Hayır, tekrar dene')),
+              const Spacer(),
+              FilledButton(
+                  onPressed: onPrinted, child: const Text('Evet, basıldı')),
+            ]),
+          ] else if (retryable || cancellable) ...[
+            const SizedBox(height: 8),
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              if (cancellable)
+                TextButton(onPressed: onCancel, child: const Text('İptal et')),
+              if (retryable)
+                FilledButton.tonal(
+                    onPressed: onRetry, child: const Text('Tekrar dene')),
+            ]),
+          ],
+        ]),
       ),
     );
   }
-
-  _JobStyle _jobStyle(PrintJobStatus status) {
-    switch (status) {
-      case PrintJobStatus.pending:
-        return const _JobStyle(
-          icon: Icons.pending_rounded,
-          label: 'Bekliyor',
-          bgColor: Color(0xFFFFFBEB),
-          fgColor: _kAmber,
-          borderColor: Color(0xFFFDE68A),
-        );
-      case PrintJobStatus.printing:
-        return const _JobStyle(
-          icon: Icons.print_rounded,
-          label: 'Basılıyor',
-          bgColor: Color(0xFFEFF6FF),
-          fgColor: _kBlue,
-          borderColor: Color(0xFFBFDBFE),
-        );
-      case PrintJobStatus.success:
-        return const _JobStyle(
-          icon: Icons.check_circle_rounded,
-          label: 'Başarılı',
-          bgColor: Color(0xFFECFDF5),
-          fgColor: _kGreen,
-          borderColor: Color(0xFFA7F3D0),
-        );
-      case PrintJobStatus.failed:
-        return const _JobStyle(
-          icon: Icons.error_rounded,
-          label: 'Başarısız',
-          bgColor: Color(0xFFFEF2F2),
-          fgColor: _kRed,
-          borderColor: Color(0xFFFECACA),
-        );
-      case PrintJobStatus.abandoned:
-        return const _JobStyle(
-          icon: Icons.cancel_rounded,
-          label: 'İptal Edildi',
-          bgColor: Color(0xFFF8FAFC),
-          fgColor: _kGray,
-          borderColor: _kBorderColor,
-        );
-    }
-  }
 }
 
-class _JobStyle {
-  final IconData icon;
-  final String label;
-  final Color bgColor;
-  final Color fgColor;
-  final Color borderColor;
-  const _JobStyle({
-    required this.icon,
-    required this.label,
-    required this.bgColor,
-    required this.fgColor,
-    required this.borderColor,
-  });
-}
-
-// ── Summary Chip ──────────────────────────────────────────────────────────────
-
-class _SummaryChip extends StatelessWidget {
-  final int count;
-  final String label;
-  final Color color;
-
-  const _SummaryChip(
-      {required this.count, required this.label, required this.color});
-
+class _EmptyQueue extends StatelessWidget {
+  const _EmptyQueue();
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        children: [
-          Text('$count',
-              style: TextStyle(
-                  color: color, fontWeight: FontWeight.w900, fontSize: 18)),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 10, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.print_disabled_rounded,
+              size: 56, color: POSColors.textSecondary),
+          SizedBox(height: 12),
+          Text('Yazdırma kuyruğu boş'),
+        ]),
+      );
 }
+
+(String, Color) _state(PrintJobState state) => switch (state) {
+      PrintJobState.created => ('Oluşturuldu', POSColors.textSecondary),
+      PrintJobState.queued => ('Bekliyor', POSColors.amber),
+      PrintJobState.rendering => ('Hazırlanıyor', POSColors.blue),
+      PrintJobState.sending => ('Gönderiliyor', POSColors.blue),
+      PrintJobState.delivered => ('Teslim edildi', POSColors.green),
+      PrintJobState.retryWait => ('Tekrar bekliyor', POSColors.amber),
+      PrintJobState.awaitingUserCheck => ('Doğrulama gerekli', POSColors.amber),
+      PrintJobState.confirmed => ('Doğrulandı', POSColors.green),
+      PrintJobState.rejected => ('Çıktı hatalı', POSColors.red),
+      PrintJobState.failed => ('Başarısız', POSColors.red),
+      PrintJobState.cancelled => ('İptal edildi', POSColors.textSecondary),
+    };
+
+String _kindLabel(PrintDocumentKind kind) => switch (kind) {
+      PrintDocumentKind.receipt => 'Fiş',
+      PrintDocumentKind.productLabel => 'Ürün etiketi',
+      PrintDocumentKind.orderLabel => 'Sipariş etiketi',
+    };
+
+IconData _kindIcon(PrintDocumentKind kind) => switch (kind) {
+      PrintDocumentKind.receipt => Icons.receipt_long_rounded,
+      PrintDocumentKind.productLabel => Icons.label_rounded,
+      PrintDocumentKind.orderLabel => Icons.inventory_2_rounded,
+    };

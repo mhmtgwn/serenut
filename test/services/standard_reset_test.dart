@@ -86,6 +86,7 @@ void main() {
       });
       await db.insert('orders', {
         'id': 'ord-1',
+        'order_number': 'TEST-ORD-1',
         'customer_id': 'cust-1',
         'status': 'created',
         'total_amount': 300.0,

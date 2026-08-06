@@ -23,7 +23,8 @@ class InMemoryUpdateLockProvider implements UpdateLockProvider {
     // Since Dart runs in a single-threaded event loop, synchronous checking
     // and setting of the variable is fully atomic and thread-safe.
     if (_holderCorrelationId != null) {
-      debugPrint('[UpdateLock] Lock acquire failed. Already locked by: $_holderCorrelationId (Request: $correlationId)');
+      debugPrint(
+          '[UpdateLock] Lock acquire failed. Already locked by: $_holderCorrelationId (Request: $correlationId)');
       return false;
     }
     _holderCorrelationId = correlationId;
@@ -37,7 +38,8 @@ class InMemoryUpdateLockProvider implements UpdateLockProvider {
       _holderCorrelationId = null;
       debugPrint('[UpdateLock] Lock released by: $correlationId');
     } else {
-      debugPrint('[UpdateLock] Lock release rejected: owner mismatch (Held by: $_holderCorrelationId, Request: $correlationId)');
+      debugPrint(
+          '[UpdateLock] Lock release rejected: owner mismatch (Held by: $_holderCorrelationId, Request: $correlationId)');
     }
   }
 

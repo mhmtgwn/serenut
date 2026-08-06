@@ -9,6 +9,16 @@ import 'package:serenutos/infrastructure/repositories/report_repository.dart'; /
 /// Printer purpose distinguishing between receipt and label printing
 enum PrinterPurpose { receipt, label }
 
+/// Semantic job type. Unlike [PrinterPurpose], this survives persistence and
+/// identifies which renderer/device route produced the bytes.
+enum PrintJobKind { receipt, productLabel, orderLabel }
+
+extension PrintJobKindRouting on PrintJobKind {
+  PrinterPurpose get purpose => this == PrintJobKind.receipt
+      ? PrinterPurpose.receipt
+      : PrinterPurpose.label;
+}
+
 /// Print Queue Job Model
 class PrintJob {
   final String id;
@@ -28,6 +38,12 @@ class PrintJob {
   });
 }
 
+/// Legacy v1 printing contract.
+///
+/// Production code must use [PrintingApplicationService]. This contract is
+/// retained temporarily only so older integrations can be identified and
+/// migrated without silently changing their behavior.
+@Deprecated('Use PrintingApplicationService and PrintingRepository.')
 abstract class IPrinterService implements Listenable {
   List<PrintJob> get queue;
   bool get isProcessing;

@@ -84,7 +84,8 @@ class AppTheme {
   /// ağ tabanlı font çözümlemesini devre dışı bırakmak için kullanılabilir.
   static ThemeData build({bool useGoogleFonts = true}) {
     // Masaüstü platformlarda fontları biraz daha belirgin yap
-    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    final isDesktop =
+        !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
     final double dfs = isDesktop ? 2.0 : 0.0; // desktop font size boost
 
     final baseTextTheme =

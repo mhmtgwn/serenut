@@ -15,14 +15,13 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/sales_service.dart'
     show SaleItemInput;
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/widgets/sales/catalog_panel.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/presentation/widgets/sales/cart_panel.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
 import 'package:serenutos/presentation/widgets/sales/live_scale_dialog.dart';
-import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/config/theme.dart';
 
@@ -326,21 +325,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     }
   }
 
-  void _printReceipt(SaleEntity sale, CustomerEntity? selectedCustomer) {
+  Future<void> _printReceipt(
+      SaleEntity sale, CustomerEntity? selectedCustomer) async {
     final settingsAsync = ref.read(settingsNotifierProvider);
     final settings = settingsAsync.value;
     if (settings == null) {
       _showErrorSnackBar('Yazıcı ayarları yüklenemedi.');
       return;
     }
-    final hasPrinter =
-        (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-            (settings.printerName != null && settings.printerName!.isNotEmpty);
-    if (!hasPrinter) {
-      _showErrorSnackBar('Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.');
-      return;
-    }
-
     try {
       final customer = selectedCustomer ??
           CustomerEntity(
@@ -373,20 +365,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
         };
       }).toList();
 
-      final copies = settings.printCopies.clamp(1, 10);
-      for (var copy = 1; copy <= copies; copy++) {
-        final suffix = copies > 1 ? ' ($copy/$copies)' : '';
-        ref.read(printerServiceProvider).enqueue(
-              'Satış Fişi #${sale.id.toShortId}$suffix',
-              () => ref.read(printerServiceProvider).printSaleReceipt(
-                    sale,
-                    receiptItems,
-                    customer.id.isNotEmpty ? customer : null,
-                    settings,
-                  ),
-            );
-      }
+      await ref.read(printingApplicationServiceProvider).queueSaleReceipt(
+            sale,
+            receiptItems,
+            customer.id.isNotEmpty ? customer : null,
+            settings,
+          );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Yazdırma işlemi sıraya eklendi.'),

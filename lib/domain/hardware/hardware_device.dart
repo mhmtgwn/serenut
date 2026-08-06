@@ -114,6 +114,10 @@ class HardwareTestResult {
   final String? technicalDetail;
   final Duration elapsed;
   final DateTime completedAt;
+  final bool requiresPhysicalConfirmation;
+  final String? printJobId;
+  final String? deviceId;
+  final String? printKind;
 
   const HardwareTestResult({
     required this.success,
@@ -121,5 +125,9 @@ class HardwareTestResult {
     required this.elapsed,
     required this.completedAt,
     this.technicalDetail,
+    this.requiresPhysicalConfirmation = false,
+    this.printJobId,
+    this.deviceId,
+    this.printKind,
   });
 }
