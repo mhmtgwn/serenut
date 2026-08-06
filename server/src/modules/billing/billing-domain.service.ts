@@ -33,7 +33,7 @@ export class BillingDomainService {
     requestedPeriod: unknown
   ): Promise<BillingQuote> {
     const result = await client.query(`
-      SELECT p.id, p.name, p.price, p.currency,
+      SELECT p.id, p.name, p.price, p.currency, p.billing_interval,
              COALESCE(o.custom_price, p.price) AS effective_price,
              o.custom_price, o.billing_interval AS override_billing_interval,
              COALESCE(o.device_limit, p.device_limit) AS device_limit,
@@ -51,8 +51,13 @@ export class BillingDomainService {
       ? this.normalizePeriod(plan.override_billing_interval)
       : this.normalizePeriod(requestedPeriod);
     let amount = Number(plan.effective_price);
-    // A custom price is the full price for its explicitly configured interval.
-    if (period === 'yearly' && plan.custom_price == null) amount *= 12 * 0.85;
+    // Price is stored for the plan's configured interval. Company-specific
+    // prices are already the full price for their locked override interval.
+    if (plan.custom_price == null) {
+      const priceInterval = this.normalizePeriod(plan.billing_interval);
+      if (priceInterval === 'monthly' && period === 'yearly') amount *= 12 * 0.85;
+      if (priceInterval === 'yearly' && period === 'monthly') amount /= 12 * 0.85;
+    }
     return {
       planId: plan.id,
       planName: plan.name,

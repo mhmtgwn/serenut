@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pgPool, redisClient } from '../../config/database';
-import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
+import { authenticateUser, AuthenticatedRequest, requirePermission, requireRole } from '../../middleware/auth.middleware';
 import { IyzicoService, loadIyzicoConfig } from './iyzico.service';
 import { logger } from '../../config/logger';
 import { webhookLimiter } from '../../middleware/rate-limit.middleware';
@@ -87,7 +87,7 @@ router.get('/plans', async (req, res: Response) => {
   }
 });
 
-router.post('/quotes', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/quotes', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
@@ -111,6 +111,19 @@ router.get('/effective-plans', authenticateUser, async (req: AuthenticatedReques
     const result = await runBypassingRLS(
       `SELECT p.*, COALESCE(o.custom_price,p.price) AS price,
               COALESCE(o.billing_interval,p.billing_interval) AS billing_interval,
+              CASE
+                WHEN o.billing_interval = 'yearly' THEN NULL
+                WHEN o.custom_price IS NOT NULL THEN o.custom_price
+                WHEN p.billing_interval = 'yearly' THEN ROUND((p.price / (12 * 0.85))::numeric, 2)
+                ELSE p.price
+              END AS monthly_price,
+              CASE
+                WHEN o.billing_interval = 'monthly' THEN NULL
+                WHEN o.custom_price IS NOT NULL THEN o.custom_price
+                WHEN p.billing_interval = 'yearly' THEN p.price
+                ELSE ROUND((p.price * 12 * 0.85)::numeric, 2)
+              END AS yearly_price,
+              o.billing_interval AS locked_billing_period,
               COALESCE(o.device_limit,p.device_limit) AS device_limit,
               COALESCE(o.store_limit,p.store_limit) AS store_limit,
               COALESCE(o.user_limit,p.user_limit) AS user_limit,
@@ -174,11 +187,11 @@ router.get('/payment-methods', async (req: Request, res: Response) => {
     `);
     
     // We intentionally exclude secrets and backend metadata (last_test_at, etc.)
-    return res.json(result.rows);
+    return res.json(result.rows.map(row => ({ ...row, is_enabled: true })));
   } catch (err: any) {
-    // If the table doesn't exist yet, fallback to default bank transfer until migrations run
+    // Missing schema is an operational error; never invent a payment method.
     if (err.code === '42P01') {
-      return res.json([{ id: 'bank_transfer', display_name: 'Havale / EFT', config: {} }]);
+      return res.status(503).json({ error: 'payment_configuration_unavailable' });
     }
     logger.error('Error fetching payment methods:', err);
     return res.status(500).json({ error: 'server_error' });
@@ -233,7 +246,7 @@ router.put('/bank-accounts/:id', authenticateUser, requireRole('sysadmin'), asyn
  *     security:
  *       - BearerAuth: []
  */
-router.post('/request-bank-transfer', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/request-bank-transfer', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { quote_id, bank_account_id } = req.body;
   if (!quote_id || !bank_account_id) {
@@ -316,7 +329,7 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
  *     security:
  *       - BearerAuth: []
  */
-router.post('/notify-transfer', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/notify-transfer', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { invoice_id, sender_name, sender_bank, transfer_date, transfer_description } = req.body;
   if (!invoice_id) {
@@ -374,7 +387,7 @@ router.get('/admin/pending-transfers', authenticateUser, requireRole('sysadmin')
   }
 });
 
-router.post('/transfer-requests/:invoiceId/cancel', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/transfer-requests/:invoiceId/cancel', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
@@ -674,8 +687,8 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-router.post('/subscribe', authenticateUser, subscribeHandler);
-router.post('/checkout', authenticateUser, subscribeHandler);
+router.post('/subscribe', authenticateUser, requirePermission('billing:view'), subscribeHandler);
+router.post('/checkout', authenticateUser, requirePermission('billing:view'), subscribeHandler);
 
 /**
  * @openapi
