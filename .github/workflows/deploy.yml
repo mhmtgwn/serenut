@@ -214,7 +214,10 @@ jobs:
           path: build/windows/installer/SerenutOSSetup.exe
 
   deploy-production:
-    needs: [backend-ci, flutter-ci, windows-ci]
+    # Backend changes are independently verified and deployed by
+    # sync-hotfix.yml. Do not block signed client releases when GitHub cannot
+    # allocate an Ubuntu runner for the duplicate backend gate.
+    needs: [flutter-ci, windows-ci]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
@@ -264,7 +267,7 @@ jobs:
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'
 
   deploy-staging:
-    needs: [backend-ci, flutter-ci, windows-ci]
+    needs: [flutter-ci, windows-ci]
     if: github.ref == 'refs/heads/staging' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: staging
