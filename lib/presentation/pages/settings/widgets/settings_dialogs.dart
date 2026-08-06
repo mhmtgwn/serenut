@@ -45,11 +45,22 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             final picker = ImagePicker();
                             final pickedFile = await picker.pickImage(
                               source: ImageSource.gallery,
-                              maxWidth: 512,
-                              maxHeight: 512,
                             );
                             if (!context.mounted) return;
                             if (pickedFile != null) {
+                              final size = await pickedFile.length();
+                              if (size > 3 * 1024 * 1024) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                          Text('Logo en fazla 3 MB olabilir.'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
                               setModalState(() {
                                 selectedLogoPath = pickedFile.path;
                               });

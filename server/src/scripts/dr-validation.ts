@@ -125,7 +125,8 @@ async function verifyDr() {
 
     // 5. Non-Database System Asset Verification
     console.log('🔍 Auditing non-database system configuration files and uploads storage...');
-    const uploadsDir = path.join(__dirname, '../../public/uploads');
+    const uploadsDir = process.env.COMPANY_LOGOS_DIR ||
+      path.join(__dirname, '../../public/uploads/company-logos');
     const logsDir = path.join(__dirname, '../../logs');
     const envFile = path.join(__dirname, '../../.env');
 

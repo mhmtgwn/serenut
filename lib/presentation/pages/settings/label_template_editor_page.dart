@@ -2,6 +2,7 @@
 // Serenut OS — Etiket Tasarımı, Şablonlar & Donanım Ayarları (Canlı Önizlemeli)
 
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -397,8 +398,7 @@ class _LabelTemplateEditorPageState
   // ── İşletme Bilgisi Banner ──────────────────────────────────────────────
   Widget _buildBusinessInfoBanner(Settings? settings) {
     final hasLogo = settings?.businessLogo != null &&
-        settings!.businessLogo!.trim().isNotEmpty &&
-        File(settings.businessLogo!).existsSync();
+        settings!.businessLogo!.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -420,8 +420,8 @@ class _LabelTemplateEditorPageState
             child: hasLogo
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(7),
-                    child: Image.file(
-                      File(settings.businessLogo!),
+                    child: _logoImage(
+                      settings.businessLogo!,
                       fit: BoxFit.contain,
                     ),
                   )
@@ -469,9 +469,7 @@ class _LabelTemplateEditorPageState
       _ => 1.0,
     };
 
-    final hasLogo = logoPath != null &&
-        logoPath.trim().isNotEmpty &&
-        File(logoPath).existsSync();
+    final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
 
     return Center(
       child: Container(
@@ -494,8 +492,8 @@ class _LabelTemplateEditorPageState
           children: [
             if (_productShowBusinessName) ...[
               if (hasLogo)
-                Image.file(
-                  File(logoPath),
+                _logoImage(
+                  logoPath,
                   height: 26 * scale,
                   fit: BoxFit.contain,
                 )
@@ -594,9 +592,7 @@ class _LabelTemplateEditorPageState
       _ => 1.0,
     };
 
-    final hasLogo = logoPath != null &&
-        logoPath.trim().isNotEmpty &&
-        File(logoPath).existsSync();
+    final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
 
     return Center(
       child: Container(
@@ -621,8 +617,8 @@ class _LabelTemplateEditorPageState
             if (_orderShowBusinessName) ...[
               Center(
                 child: hasLogo
-                    ? Image.file(
-                        File(logoPath),
+                    ? _logoImage(
+                        logoPath,
                         height: 26 * scale,
                         fit: BoxFit.contain,
                       )
@@ -747,6 +743,41 @@ class _LabelTemplateEditorPageState
           ],
         ),
       ),
+    );
+  }
+
+  Widget _logoImage(
+    String source, {
+    double? height,
+    BoxFit fit = BoxFit.contain,
+  }) {
+    Widget fallback(BuildContext _, Object __, StackTrace? ___) =>
+        const Icon(Icons.storefront_rounded, color: POSColors.green);
+    if (source.startsWith('data:image/')) {
+      final comma = source.indexOf(',');
+      if (comma < 0) {
+        return const Icon(Icons.storefront_rounded, color: POSColors.green);
+      }
+      return Image.memory(
+        base64Decode(source.substring(comma + 1)),
+        height: height,
+        fit: fit,
+        errorBuilder: fallback,
+      );
+    }
+    if (source.startsWith('https://') || source.startsWith('http://')) {
+      return Image.network(
+        source,
+        height: height,
+        fit: fit,
+        errorBuilder: fallback,
+      );
+    }
+    return Image.file(
+      File(source),
+      height: height,
+      fit: fit,
+      errorBuilder: fallback,
     );
   }
 

@@ -52,117 +52,136 @@ class _CatalogProductCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             splashColor: _kGreenLight,
             highlightColor: _kGreenLight.withValues(alpha: 0.5),
-            child: Padding(
-              padding: const EdgeInsets.all(11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Üst satır: Kategori + Stok Rozeti
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 140;
+                final imageSize = compact ? 46.0 : 72.0;
+                final gap = compact ? 5.0 : 8.0;
+                return Padding(
+                  padding: EdgeInsets.all(compact ? 9 : 11),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          product.category.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: _kTextSecondary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.6,
+                      // Üst satır: Kategori + Stok Rozeti
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              product.category.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: _kTextSecondary,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // Stok rozeti
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: badgeBgColor,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          product.isWeighed
-                              ? '⚖ kg'
-                              : outOfStock
-                                  ? 'Tükendi'
-                                  : (isLowStock
-                                      ? '${product.quantity} adet'
-                                      : '${product.quantity}'),
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: badgeTextColor,
-                            fontWeight: FontWeight.w800,
+                          const SizedBox(width: 4),
+                          // Stok rozeti
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: badgeBgColor,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              product.isWeighed
+                                  ? '⚖ kg'
+                                  : outOfStock
+                                      ? 'Tükendi'
+                                      : (isLowStock
+                                          ? '${product.quantity} adet'
+                                          : '${product.quantity}'),
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: badgeTextColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-                  Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: ProductImage(
-                        imageUrl: product.imageUrl,
-                        barcode: product.id,
-                        size: 72.0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Ürün Adı
-                  Text(
-                    product.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: _kText,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Alt satır: Fiyat + Sepet ikonu
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Fiyat — POS için büyük ve belirgin
-                      Text(
-                        '₺${product.price % 1 == 0 ? product.price.toInt() : product.price.toStringAsFixed(2)}${product.isWeighed ? '/kg' : ''}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
-                          color: _kGreenDark,
-                          letterSpacing: -0.3,
-                        ),
+                        ],
                       ),
 
-                      // Sepete Ekle butonu
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: outOfStock ? Colors.grey[100] : _kGreen,
+                      SizedBox(height: gap),
+                      Center(
+                        child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
+                          child: ProductImage(
+                            imageUrl: product.imageUrl,
+                            barcode: product.id,
+                            size: imageSize,
+                          ),
                         ),
-                        child: Icon(
-                          outOfStock ? Icons.block_rounded : Icons.add_rounded,
-                          color: outOfStock ? Colors.grey[400] : Colors.white,
-                          size: 18,
+                      ),
+                      SizedBox(height: gap),
+
+                      // Ürün Adı
+                      Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: compact ? 13 : 14,
+                          color: _kText,
+                          height: 1.25,
                         ),
+                      ),
+                      SizedBox(height: compact ? 5 : 10),
+
+                      // Alt satır: Fiyat + Sepet ikonu
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Fiyat — POS için büyük ve belirgin
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '₺${product.price % 1 == 0 ? product.price.toInt() : product.price.toStringAsFixed(2)}${product.isWeighed ? '/kg' : ''}',
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17,
+                                  color: _kGreenDark,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 6),
+
+                          // Sepete Ekle butonu
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: outOfStock ? Colors.grey[100] : _kGreen,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              outOfStock
+                                  ? Icons.block_rounded
+                                  : Icons.add_rounded,
+                              color:
+                                  outOfStock ? Colors.grey[400] : Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),

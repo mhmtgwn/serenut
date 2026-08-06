@@ -111,7 +111,7 @@ class SalesTab extends ConsumerWidget {
                             const SnackBar(
                               content:
                                   Text('X Raporu yazdırma sırasına eklendi.'),
-                              backgroundColor: Colors.green,
+                              backgroundColor: POSColors.green,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -182,7 +182,7 @@ class SalesTab extends ConsumerWidget {
                             const SnackBar(
                               content:
                                   Text('Z Raporu yazdırma sırasına eklendi.'),
-                              backgroundColor: Colors.green,
+                              backgroundColor: POSColors.green,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );

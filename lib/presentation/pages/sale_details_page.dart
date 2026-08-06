@@ -333,7 +333,7 @@ class SaleDetailsPage extends ConsumerWidget {
             const SizedBox(height: 16),
             _paymentRow('Toplam Tutar', sale.totalAmount, Colors.black87),
             const SizedBox(height: 8),
-            _paymentRow('Ödenen', sale.paidAmount, Colors.green[700]!),
+            _paymentRow('Ödenen', sale.paidAmount, POSColors.greenDark),
             if (remaining > 0) ...[
               const SizedBox(height: 8),
               _paymentRow('Kalan Borç', remaining, Colors.red[700]!,
@@ -408,7 +408,6 @@ class SaleDetailsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
         ],
-
       ],
     );
   }
@@ -516,7 +515,8 @@ class SaleDetailsPage extends ConsumerWidget {
                         labelText: 'İade gerekçesi',
                         border: OutlineInputBorder(),
                       ),
-                      onChanged: (value) => setDialog(() => reason = value.trim()),
+                      onChanged: (value) =>
+                          setDialog(() => reason = value.trim()),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
@@ -747,7 +747,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                   SnackBar(
                     content:
                         Text('${amount.toStringAsFixed(2)} TL ödeme alındı.'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: POSColors.green,
                   ),
                 );
               }

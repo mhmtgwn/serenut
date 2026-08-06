@@ -27,7 +27,7 @@ import 'package:serenutos/config/theme.dart';
 
 part 'sales/animated_cart_tab.dart';
 
-const _kGreen = Color(0xFF16A34A);
+const _kGreen = POSColors.green;
 const _kRed = Color(0xFFDC2626);
 const _kSurface = POSColors.surface;
 const _kTextSecondary = Color(0xFF64748B);

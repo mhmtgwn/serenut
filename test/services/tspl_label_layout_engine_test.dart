@@ -193,4 +193,41 @@ void main() {
     expect(output, isNot(contains('•')));
     expect(output, endsWith('PRINT 1,1\r\n'));
   });
+
+  test('58 mm sipariş etiketinde tarih alt satırda ve ürünler detaylıdır', () {
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: 'ORD-2026-42',
+        customerName: 'Test Musteri',
+        productName: '4 Urun',
+        quantity: 1,
+        timestamp: DateTime(2026, 8, 6, 15, 45),
+        items: const [
+          {'product_name': 'Elma', 'quantity': 2.0, 'unit_price': 12.5},
+          {'product_name': 'Armut', 'quantity': 1.0, 'unit_price': 20.0},
+          {'product_name': 'Muz', 'quantity': 3.0, 'unit_price': 10.0},
+          {'product_name': 'Erik', 'quantity': 1.0, 'unit_price': 5.0},
+        ],
+        itemsCount: 4,
+        totalAmount: 80,
+        widthMm: 58,
+        heightMm: 30,
+        logoBytes: File('assets/logo.png').readAsBytesSync(),
+      ),
+    );
+
+    final order =
+        RegExp(r'TEXT \d+,(\d+),"1",0,1,1,"SIPARIS').firstMatch(output);
+    final date =
+        RegExp(r'TEXT \d+,(\d+),"1",0,1,1,"06\.08 15:45"').firstMatch(output);
+    expect(order, isNotNull);
+    expect(date, isNotNull);
+    expect(
+        int.parse(date!.group(1)!), greaterThan(int.parse(order!.group(1)!)));
+    expect(output, contains('- 2x Elma TL25.00'));
+    expect(output, contains('- 1x Armut TL20.00'));
+    expect(output, contains('- 3x Muz TL30.00'));
+    expect(output, isNot(contains('- 1x Erik TL5.00')));
+    expect(output, contains('- 3x Muz TL30.00 +1'));
+  });
 }

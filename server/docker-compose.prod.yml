@@ -21,12 +21,14 @@ services:
     env_file: .env.production
     environment:
       RELEASE_RSA_PRIVATE_KEY_FILE: /run/secrets/serenut_release_private_key
+      COMPANY_LOGOS_DIR: /var/lib/serenut/company-logos
       MAINTENANCE_AGENT_URL: http://maintenance-agent:3070
       MAINTENANCE_AGENT_TOKEN_FILE: /run/secrets/maintenance_agent_token
     volumes:
       - ./public:/app/public
       - ./logs:/app/logs
       - ./releases:/var/www/serenut-api/releases
+      - ./company-logos:/var/lib/serenut/company-logos
       - ./.release-private.pem:/run/secrets/serenut_release_private_key:ro
       - ./.maintenance-token:/run/secrets/maintenance_agent_token:ro
     ports:

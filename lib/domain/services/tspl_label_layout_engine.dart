@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
 import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/models/label_model.dart';
 
@@ -262,10 +262,16 @@ class TsplLabelLayoutEngine {
 
     // 1. Business Header (if enabled)
     if (showBusinessName) {
-      final bitmap = _generateTsplBitmap(null, logoBytes, widthDots, currentY);
+      final bitmap = _generateTsplBitmap(
+        null,
+        logoBytes,
+        widthDots,
+        currentY,
+        maxHeight: 16,
+      );
       if (bitmap != null) {
         commands.addAll(bitmap);
-        currentY += sy(26);
+        currentY += sy(22);
       } else if (businessName != null && businessName.trim().isNotEmpty) {
         final bizClean = _fit(businessName, maxFont2Chars);
         final bizX = ((widthDots - bizClean.length * 12) / 2)
@@ -277,22 +283,18 @@ class TsplLabelLayoutEngine {
     }
 
     // 2. Header: Sipariş No & Tarih
-    final dateSharesHeader =
-        showOrderNo && showDate && timeStr.isNotEmpty && widthDots >= 360;
     if (showOrderNo) {
       final orderNo = _fit(orderIdShort, (maxFont2Chars - 9).clamp(4, 12));
       commands
-          .writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"SIPARIS #$orderNo"');
-      if (dateSharesHeader) {
-        commands.writeln(
-            'TEXT ${widthDots - sx(180)},$currentY,"1",0,1,1,"${_fit(timeStr, 14)}"');
-      }
-      currentY += sy(30);
+          .writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"SIPARIS #$orderNo"');
+      currentY += sy(22);
     }
-    if (showDate && timeStr.isNotEmpty && !dateSharesHeader) {
+    // Date/time always owns the next line. Sharing the order-number baseline
+    // caused the two fields to collide on 58 mm printers.
+    if (showDate && timeStr.isNotEmpty) {
       final safeTime = _fit(timeStr, maxFont1Chars);
       commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$safeTime"');
-      currentY += sy(16);
+      currentY += sy(22);
     }
 
     // 3. Customer Info ("Müşteri")
@@ -300,13 +302,13 @@ class TsplLabelLayoutEngine {
       final whoText = custClean.isNotEmpty
           ? 'Musteri: ${_fit(custClean, (maxFont2Chars - 9).clamp(4, 40))}'
           : 'Musteri: Genel';
-      commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$whoText"');
-      currentY += sy(32);
+      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$whoText"');
+      currentY += sy(22);
     }
 
     // 4. Separator Line
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
-    currentY += sy(8);
+    currentY += sy(4);
 
     // 5. Items Count & Product Quantity / Items List
     if (showItemsCount &&
@@ -318,38 +320,49 @@ class TsplLabelLayoutEngine {
     }
 
     final footerY = heightDots - sy(70);
-    final reservedAfterItems =
-        (showTotalAmount && totalAmount != null ? sy(26) : 0) + sy(4);
+    // Total and QR share the fixed footer row (left/right), so item rows do
+    // not need to reserve a separate vertical total block.
+    final reservedAfterItems = sy(4);
     var hiddenItemCount = 0;
 
     if (items != null && items.isNotEmpty) {
       final availableForItems =
           (footerY - currentY - reservedAfterItems).clamp(0, heightDots);
-      final maxItemLines = (availableForItems ~/ sy(28)).clamp(0, 4);
+      final maxItemLines = (availableForItems ~/ sy(22)).clamp(0, 3);
       final visibleCount =
           items.length <= maxItemLines ? items.length : maxItemLines;
 
       for (var index = 0; index < visibleCount; index++) {
         final item = items[index];
-        final name = _fit(
-            (item['product_name'] ?? item['name'] ?? 'Urun').toString(),
-            (maxFont2Chars - 5).clamp(4, 40));
+        final rawName =
+            _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
         final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
         final itemQtyStr = itemQty % 1 == 0
             ? itemQty.toInt().toString()
             : itemQty.toStringAsFixed(1);
-        final lineStr = _fit('- ${itemQtyStr}x $name', maxFont2Chars);
-        commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$lineStr"');
-        currentY += sy(28);
+        final unitPrice = (item['unit_price'] as num?)?.toDouble();
+        final lineTotal = unitPrice == null ? null : unitPrice * itemQty;
+        final hiddenSuffix =
+            index == visibleCount - 1 && items.length > visibleCount
+                ? ' +${items.length - visibleCount}'
+                : '';
+        final suffix = lineTotal == null
+            ? hiddenSuffix
+            : ' TL${lineTotal.toStringAsFixed(2)}$hiddenSuffix';
+        final nameLimit =
+            (maxFont1Chars - itemQtyStr.length - suffix.length - 4)
+                .clamp(4, maxFont1Chars);
+        final lineStr = _fit(
+            '- ${itemQtyStr}x ${_fit(rawName, nameLimit)}$suffix',
+            maxFont1Chars);
+        commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$lineStr"');
+        currentY += sy(22);
       }
 
       final remaining = items.length - visibleCount;
       hiddenItemCount = remaining;
-      if (remaining > 0 && currentY + sy(18) <= footerY) {
-        commands.writeln(
-            'TEXT ${sx(16)},$currentY,"1",0,1,1,"+$remaining diger urun"');
-        currentY += sy(18);
-      }
+      // Remaining count is appended to the final visible item. A separate
+      // summary row would collide with the fixed footer on 30 mm media.
     } else {
       final itemTitle = '$qtyStr x $prodClean';
       if (itemTitle.length <= maxFont3Chars) {
@@ -374,12 +387,9 @@ class TsplLabelLayoutEngine {
     // Code-128 consumed most of the 58 mm width and was not the order design.
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
-      final totalFont = totalStr.length <= maxFont3Chars ? '3' : '2';
-      final safeTotal =
-          _fit(totalStr, totalFont == '3' ? maxFont3Chars : maxFont2Chars);
-      commands
-          .writeln('TEXT ${sx(16)},$currentY,"$totalFont",0,1,1,"$safeTotal"');
-      currentY += sy(26);
+      final footerTextChars = ((widthDots - sx(110)) ~/ 8).clamp(8, 50);
+      final safeTotal = _fit(totalStr, footerTextChars);
+      commands.writeln('TEXT ${sx(16)},$footerY,"1",0,1,1,"$safeTotal"');
     }
 
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
@@ -459,7 +469,12 @@ class TsplLabelLayoutEngine {
   }
 
   static List<int>? _generateTsplBitmap(
-      String? logoPath, List<int>? logoBytes, int widthDots, int currentY) {
+    String? logoPath,
+    List<int>? logoBytes,
+    int widthDots,
+    int currentY, {
+    int maxHeight = 32,
+  }) {
     try {
       final List<int> bytes;
       if (logoBytes != null && logoBytes.isNotEmpty) {
@@ -476,7 +491,7 @@ class TsplLabelLayoutEngine {
       int targetWidth = 120;
       int targetHeight = (decoded.height * (targetWidth / decoded.width))
           .round()
-          .clamp(10, 32);
+          .clamp(10, maxHeight);
       targetWidth = (targetWidth ~/ 8) * 8; // Multiple of 8
       if (targetWidth < 8) targetWidth = 8;
       final widthBytes = targetWidth ~/ 8;
@@ -486,7 +501,24 @@ class TsplLabelLayoutEngine {
       final centerX =
           ((widthDots - targetWidth) / 2).clamp(10, widthDots - 10).round();
 
+      final corners = [
+        resized.getPixel(0, 0),
+        resized.getPixel(targetWidth - 1, 0),
+        resized.getPixel(0, targetHeight - 1),
+        resized.getPixel(targetWidth - 1, targetHeight - 1),
+      ];
+      final backgroundAlpha =
+          corners.map((p) => p.a).reduce((a, b) => a + b) / corners.length;
+      final transparentCanvas = backgroundAlpha < 128;
+      final backgroundR =
+          corners.map((p) => p.r).reduce((a, b) => a + b) / corners.length;
+      final backgroundG =
+          corners.map((p) => p.g).reduce((a, b) => a + b) / corners.length;
+      final backgroundB =
+          corners.map((p) => p.b).reduce((a, b) => a + b) / corners.length;
+
       final List<int> rasterBytes = [];
+      var firedDots = 0;
       for (int y = 0; y < targetHeight; y++) {
         for (int x = 0; x < widthBytes; x++) {
           int b = 0;
@@ -494,17 +526,38 @@ class TsplLabelLayoutEngine {
             final px = x * 8 + bit;
             if (px < targetWidth) {
               final p = resized.getPixel(px, y);
-              // Match the proven collection-receipt monochrome conversion:
-              // transparent pixels stay white and only opaque, dark artwork
-              // becomes a thermal-printer dot.
-              final luminance = 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
-              if (p.a >= 128 && luminance < 128) {
+              // Preserve the complete mark regardless of its source colours.
+              // Transparent artwork treats every visible pixel as logo. For
+              // opaque artwork, separate the logo from its corner canvas.
+              final backgroundDistance = (p.r - backgroundR).abs() +
+                  (p.g - backgroundG).abs() +
+                  (p.b - backgroundB).abs();
+              final isForeground = transparentCanvas
+                  ? p.a >= 32
+                  : p.a >= 128 && backgroundDistance >= 45;
+              if (isForeground) {
                 b |= (0x80 >> bit);
+                firedDots++;
               }
             }
           }
-          rasterBytes.add(b);
+          // This label printer's TSPL BITMAP dialect uses 0 for a fired
+          // (black) dot and 1 for paper/white. ESC/POS uses the opposite bit
+          // polarity, so invert only at the TSPL serialization boundary.
+          rasterBytes.add(b ^ 0xFF);
         }
+      }
+
+      if (kDebugMode) {
+        final preview = rasterBytes
+            .take(24)
+            .map((value) => value.toRadixString(16).padLeft(2, '0'))
+            .join(' ');
+        debugPrint(
+          '[TSPL_LOGO] ${targetWidth}x$targetHeight bytes=${rasterBytes.length} '
+          'blackDots=$firedDots canvas=${transparentCanvas ? 'transparent' : 'opaque'} '
+          'polarity=zero-is-black first=$preview',
+        );
       }
 
       return <int>[

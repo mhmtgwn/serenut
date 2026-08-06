@@ -6,6 +6,8 @@ set -e
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="${BACKUP_DIR:-/tmp}"
 BACKUP_FILE="serenut_db_${TIMESTAMP}.dump"
+LOGO_BACKUP_FILE="serenut_company_logos_${TIMESTAMP}.tar.gz"
+LOGO_DIR="${COMPANY_LOGOS_DIR:-/var/lib/serenut/company-logos}"
 GPG_PASS="${BACKUP_PASSPHRASE:-fallback_passphrase}"
 S3_BUCKET_NAME="${S3_BUCKET:-serenut-backups}"
 
@@ -30,15 +32,30 @@ gpg --symmetric --cipher-algo AES256 \
 # Remove unencrypted local dump
 rm -f "${BACKUP_DIR}/${BACKUP_FILE}"
 
+if [ -d "$LOGO_DIR" ]; then
+  echo "🖼️ Archiving company logos..."
+  tar -czf "${BACKUP_DIR}/${LOGO_BACKUP_FILE}" -C "$LOGO_DIR" .
+  gpg --symmetric --cipher-algo AES256 --passphrase "$GPG_PASS" --batch --yes \
+    -o "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg" "${BACKUP_DIR}/${LOGO_BACKUP_FILE}"
+  rm -f "${BACKUP_DIR}/${LOGO_BACKUP_FILE}"
+fi
+
 # Upload to S3 if aws client is installed, else save locally
 if command -v aws &> /dev/null && [ -n "$S3_BUCKET" ]; then
   echo "☁️ Uploading to S3: s3://${S3_BUCKET_NAME}/backups/${BACKUP_FILE}.gpg"
   aws s3 cp "${BACKUP_DIR}/${BACKUP_FILE}.gpg" "s3://${S3_BUCKET_NAME}/backups/${BACKUP_FILE}.gpg"
+  if [ -f "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg" ]; then
+    aws s3 cp "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg" "s3://${S3_BUCKET_NAME}/backups/${LOGO_BACKUP_FILE}.gpg"
+    rm -f "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg"
+  fi
   rm -f "${BACKUP_DIR}/${BACKUP_FILE}.gpg"
   echo "✅ Backup uploaded successfully to S3."
 else
   echo "⚠️ AWS CLI or S3_BUCKET not found/configured. Storing backup locally in backups/ directory."
   mkdir -p backups
   mv "${BACKUP_DIR}/${BACKUP_FILE}.gpg" backups/
+  if [ -f "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg" ]; then
+    mv "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg" backups/
+  fi
   echo "✅ Backup stored locally in backups/${BACKUP_FILE}.gpg"
 fi

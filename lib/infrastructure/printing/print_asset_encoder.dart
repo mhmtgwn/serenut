@@ -6,6 +6,7 @@ import 'package:image/image.dart' as img;
 
 class PrintAssetEncoder {
   const PrintAssetEncoder();
+  static final Map<String, Uint8List> _remoteLogoCache = {};
 
   Future<Uint8List?> loadLogo(String? source) async {
     try {
@@ -16,6 +17,8 @@ class PrintAssetEncoder {
       if (!kIsWeb &&
           source != null &&
           (source.startsWith('https://') || source.startsWith('http://'))) {
+        final cached = _remoteLogoCache[source];
+        if (cached != null) return cached;
         final client = HttpClient()
           ..connectionTimeout = const Duration(seconds: 5);
         try {
@@ -24,8 +27,16 @@ class PrintAssetEncoder {
           if (response.statusCode < 200 || response.statusCode >= 300) {
             return null;
           }
-          return Uint8List.fromList(await response
+          final bytes = Uint8List.fromList(await response
               .fold<List<int>>([], (all, part) => all..addAll(part)));
+          if (bytes.length > 3 * 1024 * 1024 ||
+              img.decodeImage(bytes) == null) {
+            return null;
+          }
+          _remoteLogoCache
+            ..clear()
+            ..[source] = bytes;
+          return bytes;
         } finally {
           client.close(force: true);
         }

@@ -20,9 +20,9 @@ part 'checkout/pay_buttons.dart';
 part 'checkout/customer_selection.dart';
 
 // ── POS Tema Renkleri (korundu) ───────────────────────────────────────────────
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kGreenLight = Color(0xFFDCFCE7);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kGreenLight = POSColors.greenLight;
 const _kBlue = Color(0xFF2563EB);
 const _kOrange = Color(0xFFEA580C);
 const _kRed = Color(0xFFDC2626);

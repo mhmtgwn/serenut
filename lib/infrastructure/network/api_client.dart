@@ -5,6 +5,8 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/config/environment.dart';
 
@@ -85,6 +87,19 @@ class ApiClient {
     return headers;
   }
 
+  Uri _resolveUri(String path) {
+    var cleanPath = path;
+    if (cleanPath.startsWith('/api/v1') &&
+        _config.apiBaseUrl.endsWith('/api/v1')) {
+      cleanPath = cleanPath.substring(7);
+    }
+    final hasVersionedBase = RegExp(r'/api/v\d+$').hasMatch(_config.apiBaseUrl);
+    final baseUrl = cleanPath.startsWith('/api/v') && hasVersionedBase
+        ? _config.apiBaseUrl.replaceFirst(RegExp(r'/api/v\d+$'), '')
+        : _config.apiBaseUrl;
+    return Uri.parse('$baseUrl$cleanPath');
+  }
+
   /// Sends a request. Automatically processes mock hooks or proceeds with HTTP.
   Future<ApiResponse> send(
     String method,
@@ -98,18 +113,7 @@ class ApiClient {
       resolvedIdempotencyKey = const Uuid().v4();
     }
 
-    String cleanPath = path;
-    if (cleanPath.startsWith('/api/v1') &&
-        _config.apiBaseUrl.endsWith('/api/v1')) {
-      cleanPath = cleanPath.substring(7);
-    }
-    // Most mobile builds use an /api/v1 base URL. Versioned endpoints outside
-    // that prefix (for example Sync v4) must resolve from the server origin.
-    final hasVersionedBase = RegExp(r'/api/v\d+$').hasMatch(_config.apiBaseUrl);
-    final baseUrl = cleanPath.startsWith('/api/v') && hasVersionedBase
-        ? _config.apiBaseUrl.replaceFirst(RegExp(r'/api/v\d+$'), '')
-        : _config.apiBaseUrl;
-    final uri = Uri.parse('$baseUrl$cleanPath');
+    final uri = _resolveUri(path);
     final headers = _buildHeaders(idempotencyKey: resolvedIdempotencyKey);
     final String? bodyString = body != null ? jsonEncode(body) : null;
 
@@ -218,6 +222,41 @@ class ApiClient {
 
   /// Helper for GET requests.
   Future<ApiResponse> get(String path) => send('GET', path);
+
+  Future<ApiResponse> uploadImage(
+    String path, {
+    required Uint8List bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final request = http.MultipartRequest('POST', _resolveUri(path));
+    request.headers.addAll({
+      'Accept': 'application/json',
+      'x-sync-protocol-version': '$syncProtocolVersion',
+      if (_jwtToken != null) 'Authorization': 'Bearer $_jwtToken',
+    });
+    request.files.add(http.MultipartFile.fromBytes(
+      'logo',
+      bytes,
+      filename: filename,
+      contentType: MediaType.parse(mimeType),
+    ));
+    final response =
+        await http.Response.fromStream(await _client.send(request));
+    final result = ApiResponse(
+      statusCode: response.statusCode,
+      body: response.body,
+      headers: response.headers,
+    );
+    if (!result.isSuccess) {
+      throw ApiException(
+        'Logo upload failed with status code ${result.statusCode}',
+        statusCode: result.statusCode,
+        responseBody: result.body,
+      );
+    }
+    return result;
+  }
 
   /// Helper for POST requests.
   Future<ApiResponse> post(String path, Map<String, dynamic> body,

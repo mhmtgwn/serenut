@@ -357,6 +357,10 @@ app.get(['/app/*', '/portal/*', '/admin/*'], (req, res, next) => {
   next();
 });
 
+app.use('/uploads/company-logos', express.static(
+  process.env.COMPANY_LOGOS_DIR || path.join(process.cwd(), 'public/uploads/company-logos'),
+  { immutable: true, maxAge: '365d', fallthrough: false },
+));
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.get(['/admin', '/admin/', '/portal', '/portal/'], (req, res) => {
