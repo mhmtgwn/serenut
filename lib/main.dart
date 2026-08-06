@@ -15,6 +15,8 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
@@ -252,6 +254,32 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         await smsLogRepo.resetStuckJobs();
       } catch (e) {
         debugPrint('Failed to reset stuck SMS jobs at startup: $e');
+      }
+
+      try {
+        // Import the legacy SharedPreferences hardware registry at the
+        // application boundary. SQLite schema migrations intentionally never
+        // depend on platform plugins.
+        await ref.read(hardwareDevicesProvider.future);
+      } catch (e) {
+        // Legacy import is best-effort. A corrupt obsolete registry must not
+        // prevent already-migrated SQLite devices and queued jobs from running.
+        debugPrint('Legacy hardware import failed: $e');
+      }
+
+      try {
+        // Runtime starts after the import attempt, so legacy routes are visible
+        // when available while existing v2 routes remain independently usable.
+        final printRecovery = await ref.read(printingRuntimeProvider).start();
+        if (printRecovery.safelyRequeued > 0 ||
+            printRecovery.awaitingUserCheck > 0) {
+          debugPrint(
+            'Print recovery: ${printRecovery.safelyRequeued} safely requeued, '
+            '${printRecovery.awaitingUserCheck} awaiting user confirmation.',
+          );
+        }
+      } catch (e) {
+        debugPrint('Printing runtime startup failed: $e');
       }
 
       // Pre-warm local SQLite repositories so products & catalog are 100% ready instantly when splash ends

@@ -339,12 +339,14 @@ class SqliteProductRepository implements IProductRepository {
           };
           await _gateway.transaction(() async {
             await _executor.insert('products', payload);
+            final masterPayload = Map<String, dynamic>.from(payload)
+              ..['quantity'] = original.quantity;
             await SyncOutboxV4.enqueue(
               _executor,
               entityType: 'product',
               entityId: productId,
               operation: 'UPSERT',
-              payload: payload,
+              payload: masterPayload,
             );
           });
           return;
@@ -356,15 +358,9 @@ class SqliteProductRepository implements IProductRepository {
         'UPDATE products SET quantity = quantity - ?, updated_at = ?, is_synced = 0 WHERE id = ?',
         [quantity, DateTime.now().toIso8601String(), productId],
       );
-      final rows = await _executor.query('products',
-          where: 'id = ?', whereArgs: [productId], limit: 1);
-      if (rows.isNotEmpty) {
-        await SyncOutboxV4.enqueue(_executor,
-            entityType: 'product',
-            entityId: productId,
-            operation: 'UPSERT',
-            payload: Map<String, dynamic>.from(rows.first));
-      }
+      // Stock is part of the sale aggregate and is materialized by the server
+      // exactly once. Emitting an absolute product quantity here would apply
+      // the same sale twice during sync.
     });
   }
 
@@ -393,12 +389,14 @@ class SqliteProductRepository implements IProductRepository {
           };
           await _gateway.transaction(() async {
             await _executor.insert('products', payload);
+            final masterPayload = Map<String, dynamic>.from(payload)
+              ..['quantity'] = original.quantity;
             await SyncOutboxV4.enqueue(
               _executor,
               entityType: 'product',
               entityId: productId,
               operation: 'UPSERT',
-              payload: payload,
+              payload: masterPayload,
             );
           });
           return;
@@ -410,15 +408,7 @@ class SqliteProductRepository implements IProductRepository {
         'UPDATE products SET quantity = quantity + ?, updated_at = ?, is_synced = 0 WHERE id = ?',
         [quantity, DateTime.now().toIso8601String(), productId],
       );
-      final rows = await _executor.query('products',
-          where: 'id = ?', whereArgs: [productId], limit: 1);
-      if (rows.isNotEmpty) {
-        await SyncOutboxV4.enqueue(_executor,
-            entityType: 'product',
-            entityId: productId,
-            operation: 'UPSERT',
-            payload: Map<String, dynamic>.from(rows.first));
-      }
+      // Refund/cancellation aggregates own their inventory movements.
     });
   }
 

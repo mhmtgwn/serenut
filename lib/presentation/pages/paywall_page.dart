@@ -68,7 +68,8 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
     try {
       final apiBase = EnvironmentConfig.current.apiBaseUrl;
       final uri = Uri.parse(apiBase);
-      final origin = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+      final origin =
+          '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
       return '$origin/app/#billing-center';
     } catch (_) {
       return 'https://serenut.com/app/#billing-center';
@@ -235,8 +236,8 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _launchWebUrl(
-                                'https://serenut.com/register'),
+                            onPressed: () =>
+                                _launchWebUrl('https://serenut.com/register'),
                             icon:
                                 const Icon(Icons.person_add_rounded, size: 18),
                             label: const Text('Kayıt Ol'),
@@ -251,8 +252,8 @@ class _PaywallPageState extends ConsumerState<PaywallPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _launchWebUrl(
-                                'https://serenut.com/login'),
+                            onPressed: () =>
+                                _launchWebUrl('https://serenut.com/login'),
                             icon:
                                 const Icon(Icons.lock_reset_rounded, size: 18),
                             label: const Text('Şifremi Unuttum'),

@@ -129,7 +129,8 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Bu platform rehber erişimini desteklemiyor (VCF içe aktarma seçeneğini kullanabilirsiniz).'),
+            content: Text(
+                'Bu platform rehber erişimini desteklemiyor (VCF içe aktarma seçeneğini kullanabilirsiniz).'),
             backgroundColor: _kPink,
             behavior: SnackBarBehavior.floating,
           ),

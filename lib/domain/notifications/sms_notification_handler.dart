@@ -16,6 +16,7 @@
 // Created: 01 Jul 2026
 
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
 import 'package:serenutos/domain/models/settings.dart';
@@ -228,9 +229,7 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty
-              ? event.orderIdStr
-              : '${event.orderId}',
+          'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -254,9 +253,7 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty
-              ? event.orderIdStr
-              : '${event.orderId}',
+          'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -280,9 +277,7 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty
-              ? event.orderIdStr
-              : '${event.orderId}',
+          'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -306,9 +301,7 @@ class SmsNotificationHandler {
         phone: customer.phone,
         vars: {
           'customer': customer.name,
-          'id': event.orderIdStr.isNotEmpty
-              ? event.orderIdStr
-              : '${event.orderId}',
+          'id': _shortOrderId(event.orderIdStr, event.orderId),
           'business': settings.businessName,
           'date': _todayStr(),
         },
@@ -321,6 +314,11 @@ class SmsNotificationHandler {
   static String _todayStr() {
     final now = DateTime.now();
     return '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${now.year}';
+  }
+
+  static String _shortOrderId(String stringId, Object fallbackId) {
+    final id = stringId.isNotEmpty ? stringId : '$fallbackId';
+    return id.toShortId;
   }
 
   // ── Send + Log ─────────────────────────────────────────────────────────────

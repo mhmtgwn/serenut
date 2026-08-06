@@ -92,7 +92,7 @@ void main() {
         tempDbPath,
         // Current version skips upgrade logic so this test isolates the
         // post-open schema invariant contract.
-        version: 44,
+        version: DatabaseManager.databaseVersion,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -112,8 +112,8 @@ void main() {
       DatabaseManager.overrideDatabasePath = tempDbPath;
       final dbManager = DatabaseManager();
 
-      expect(
-        () => dbManager.getDatabase(),
+      await expectLater(
+        dbManager.getDatabase(),
         throwsA(isA<StateError>().having((e) => e.toString(), 'message',
             contains('Database invariant violation'))),
       );

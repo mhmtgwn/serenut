@@ -149,11 +149,13 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                               const SizedBox(height: 12),
                               const Text('Müşteri bulunamadı.',
                                   style: TextStyle(color: _kTextSecondary)),
-                              if (balanceFilter != CustomerBalanceFilter.all) ...[
+                              if (balanceFilter !=
+                                  CustomerBalanceFilter.all) ...[
                                 const SizedBox(height: 16),
                                 OutlinedButton.icon(
                                   onPressed: () => ref
-                                      .read(customerBalanceFilterProvider.notifier)
+                                      .read(customerBalanceFilterProvider
+                                          .notifier)
                                       .state = CustomerBalanceFilter.all,
                                   icon: const Icon(Icons.filter_alt_off_rounded,
                                       size: 18),

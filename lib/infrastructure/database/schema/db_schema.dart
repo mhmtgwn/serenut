@@ -1,4 +1,6 @@
 // lib/infrastructure/database/schema/db_schema.dart
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseSchema {
@@ -98,6 +100,8 @@ class DatabaseSchema {
         deleted_by TEXT,
         created_by TEXT,
         entitlement_snapshot TEXT,
+        refunded_amount REAL NOT NULL DEFAULT 0,
+        fsm_state TEXT NOT NULL DEFAULT 'completed',
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
@@ -144,10 +148,27 @@ class DatabaseSchema {
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_ft_logical ON financial_transactions (logical_clock, device_id)');
 
+    await db.execute('''CREATE TABLE IF NOT EXISTS refunds (
+      id TEXT PRIMARY KEY, sale_id TEXT NOT NULL, amount REAL NOT NULL CHECK(amount>0),
+      refund_method TEXT NOT NULL, external_reference TEXT, reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'completed', created_at TEXT NOT NULL,
+      FOREIGN KEY(sale_id) REFERENCES sales(id) ON DELETE RESTRICT)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS refund_items (
+      id TEXT PRIMARY KEY, refund_id TEXT NOT NULL, sale_item_id TEXT NOT NULL,
+      product_id TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0),
+      unit_refund_amount REAL NOT NULL, subtotal REAL NOT NULL,
+      UNIQUE(refund_id,sale_item_id),
+      FOREIGN KEY(refund_id) REFERENCES refunds(id) ON DELETE RESTRICT,
+      FOREIGN KEY(sale_item_id) REFERENCES sale_items(id) ON DELETE RESTRICT,
+      FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE RESTRICT)''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_refund_items_sale_item ON refund_items(sale_item_id)');
+
     // Orders table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
+        order_number TEXT NOT NULL UNIQUE,
         customer_id TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'created',
         total_amount REAL,
@@ -267,6 +288,14 @@ class DatabaseSchema {
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)');
     await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)');
+    await db.execute('''CREATE TABLE IF NOT EXISTS order_number_sequence (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      next_value INTEGER NOT NULL CHECK (next_value > 0)
+    )''');
+    await db.insert('order_number_sequence', {'id': 1, 'next_value': 1},
+        conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
@@ -376,6 +405,9 @@ class DatabaseSchema {
         sms_sent_this_month INTEGER NOT NULL DEFAULT 0,
         sms_limit_reset_month INTEGER,
         label_show_brand INTEGER NOT NULL DEFAULT 1,
+        label_show_business_name INTEGER NOT NULL DEFAULT 1,
+        label_show_barcode INTEGER NOT NULL DEFAULT 1,
+        label_show_price INTEGER NOT NULL DEFAULT 1,
         label_show_vat INTEGER NOT NULL DEFAULT 1,
         label_font_size TEXT NOT NULL DEFAULT 'Orta',
         label_order_show_business_name INTEGER NOT NULL DEFAULT 1,
@@ -384,7 +416,9 @@ class DatabaseSchema {
         label_order_show_date INTEGER NOT NULL DEFAULT 1,
         label_order_show_total_amount INTEGER NOT NULL DEFAULT 1,
         label_order_show_items_count INTEGER NOT NULL DEFAULT 1,
-        label_order_font_size TEXT NOT NULL DEFAULT 'Orta'
+        label_order_font_size TEXT NOT NULL DEFAULT 'Orta',
+        active_receipt_printer_id TEXT NOT NULL DEFAULT 'receipt-printer-primary',
+        active_label_printer_id TEXT NOT NULL DEFAULT 'label-printer-primary'
       )
     ''');
 
@@ -452,6 +486,8 @@ class DatabaseSchema {
         created_at TEXT NOT NULL,
         retry_count INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'receipt',
+        device_id TEXT NOT NULL DEFAULT 'receipt-printer-primary',
         last_error TEXT
       )
     ''');
@@ -459,6 +495,8 @@ class DatabaseSchema {
         'CREATE INDEX IF NOT EXISTS idx_print_queue_status ON print_queue(status)');
     await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_print_queue_created ON print_queue(created_at)');
+
+    await _createPrintingV2Tables(db);
 
     // Audit Events table
     await db.execute('''
@@ -547,6 +585,162 @@ class DatabaseSchema {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_terminal_payment_intents_state ON terminal_payment_intents(state, updated_at)',
     );
+  }
+
+  static Future<void> _createPrintingV2Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS print_design_profiles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        schema_version INTEGER NOT NULL,
+        renderer_version TEXT NOT NULL,
+        definition_json TEXT NOT NULL,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_print_design_default
+      ON print_design_profiles(kind) WHERE is_default = 1
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS printer_devices (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        language TEXT NOT NULL,
+        transport TEXT NOT NULL,
+        transport_config_json TEXT NOT NULL,
+        capabilities_json TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_tested_at TEXT,
+        last_test_succeeded INTEGER,
+        last_test_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS printer_routes (
+        kind TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL REFERENCES printer_devices(id),
+        design_profile_id TEXT NOT NULL REFERENCES print_design_profiles(id),
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS print_jobs (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        copies INTEGER NOT NULL DEFAULT 1 CHECK(copies > 0),
+        design_profile_id TEXT NOT NULL,
+        design_snapshot_json TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        transport_snapshot_json TEXT NOT NULL,
+        capability_snapshot_json TEXT NOT NULL,
+        renderer_version TEXT NOT NULL,
+        state TEXT NOT NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        next_attempt_at TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        rendered_checksum TEXT,
+        delivery_observation_json TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_claim
+      ON print_jobs(state, next_attempt_at, created_at)
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_device_state
+      ON print_jobs(device_id, state)
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS print_job_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id TEXT NOT NULL REFERENCES print_jobs(id),
+        attempt_no INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        outcome TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        transport_observation_json TEXT,
+        UNIQUE(job_id, attempt_no)
+      )
+    ''');
+    final now = DateTime.now().toIso8601String();
+    for (final profile in [
+      {
+        'id': 'receipt-default-v1',
+        'name': 'Varsayılan Fiş',
+        'kind': 'receipt',
+        'renderer_version': 'escpos-v1',
+        'definition': {
+          'showLogo': true,
+          'showBarcode': false,
+          'showProductDetails': true,
+          'showCustomerBalance': true,
+          'font': 'a',
+          'textSize': 'normal',
+          'itemLayout': 'auto',
+          'footerText': 'Bizi tercih ettiğiniz için teşekkür ederiz!',
+          'feedLines': 2,
+          'autoCut': true,
+          'openCashDrawer': true,
+        },
+      },
+      {
+        'id': 'product-label-default-v1',
+        'name': 'Varsayılan Ürün Etiketi',
+        'kind': 'productLabel',
+        'renderer_version': 'tspl-product-v1',
+        'definition': {
+          'showBusinessName': true,
+          'showBrand': true,
+          'showBarcode': true,
+          'showPrice': true,
+          'showVat': true,
+          'fontSize': 'Orta',
+        },
+      },
+      {
+        'id': 'order-label-default-v1',
+        'name': 'Varsayılan Sipariş Etiketi',
+        'kind': 'orderLabel',
+        'renderer_version': 'tspl-order-v1',
+        'definition': {
+          'showBusinessName': true,
+          'showCustomerName': true,
+          'showOrderNo': true,
+          'showDate': true,
+          'showTotalAmount': true,
+          'showItemsCount': true,
+          'fontSize': 'Orta',
+        },
+      },
+    ]) {
+      await db.insert(
+        'print_design_profiles',
+        {
+          'id': profile['id'],
+          'name': profile['name'],
+          'kind': profile['kind'],
+          'schema_version': 1,
+          'renderer_version': profile['renderer_version'],
+          'definition_json': jsonEncode(profile['definition']),
+          'is_default': 1,
+          'created_at': now,
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   static Future<void> createAuditLogsTable(Database db) async {

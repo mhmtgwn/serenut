@@ -409,61 +409,7 @@ class SaleDetailsPage extends ConsumerWidget {
           const SizedBox(height: 10),
         ],
 
-        // Satış İptali
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _confirmCancel(context, ref, sale),
-            icon: const Icon(Icons.cancel_outlined),
-            label: const Text('Satışı İptal Et'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red[700],
-              side: BorderSide(color: Colors.red[400]!),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ),
       ],
-    );
-  }
-
-  void _confirmCancel(BuildContext context, WidgetRef ref, SaleEntity sale) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Satışı İptal Et'),
-        content: Text(
-          'Bu satışı iptal etmek istediğinize emin misiniz?\n\n'
-          'Stok ve müşteri bakiyesi geri alınacaktır.\n'
-          'Toplam: ${sale.totalAmount.toStringAsFixed(2)} TL',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Vazgeç')),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref
-                  .read(salesControllerProvider.notifier)
-                  .cancelSale(sale.id);
-              ref.invalidate(saleDetailProvider(sale.id));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Satış iptal edildi.'),
-                      backgroundColor: Colors.red),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text('İptal Et'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -485,8 +431,11 @@ class SaleDetailsPage extends ConsumerWidget {
 
     // Build return items list from sale.items
     final returnItems = sale.items.map((item) {
-      final qty = item['quantity'] as int? ?? 0;
+      final soldQty = (item['quantity'] as num?)?.toInt() ?? 0;
+      final refundedQty = (item['refunded_quantity'] as num?)?.toInt() ?? 0;
+      final qty = soldQty - refundedQty;
       return _ReturnItem(
+        saleItemId: item['id']?.toString() ?? '',
         productId: item['product_id']?.toString() ?? '',
         maxQty: qty,
         unitPrice: (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0,
@@ -494,6 +443,7 @@ class SaleDetailsPage extends ConsumerWidget {
       );
     }).toList();
     String refundMethod = 'balance';
+    String reason = '';
 
     showDialog(
       context: context,
@@ -561,6 +511,14 @@ class SaleDetailsPage extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    TextFormField(
+                      decoration: const InputDecoration(
+                        labelText: 'İade gerekçesi',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) => setDialog(() => reason = value.trim()),
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: refundMethod,
                       decoration: InputDecoration(
@@ -587,12 +545,13 @@ class SaleDetailsPage extends ConsumerWidget {
                   onPressed: () => Navigator.pop(ctx),
                   child: const Text('İptal')),
               ElevatedButton(
-                onPressed: refundTotal > 0
+                onPressed: refundTotal > 0 && reason.length >= 3
                     ? () async {
                         Navigator.pop(ctx);
                         final items = returnItems
                             .where((ri) => ri.returnQty > 0)
                             .map((ri) => SaleItemInput(
+                                  saleItemId: ri.saleItemId,
                                   productId: ri.productId,
                                   quantity: ri.returnQty,
                                   unitPrice: ri.unitPrice,
@@ -604,6 +563,7 @@ class SaleDetailsPage extends ConsumerWidget {
                               saleId: sale.id,
                               itemsToReturn: items,
                               refundMethod: refundMethod,
+                              reason: reason,
                             );
                         ref.invalidate(saleDetailProvider(sale.id));
                         if (context.mounted) {
@@ -632,12 +592,14 @@ class SaleDetailsPage extends ConsumerWidget {
 }
 
 class _ReturnItem {
+  final String saleItemId;
   final String productId;
   final int maxQty;
   final double unitPrice;
   int returnQty;
 
   _ReturnItem({
+    required this.saleItemId,
     required this.productId,
     required this.maxQty,
     required this.unitPrice,
@@ -753,7 +715,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                       contextId: widget.sale.id,
                     );
               } catch (error) {
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text('Kart işlemi onaylanmadı: $error'),
                     backgroundColor: Colors.red,
@@ -762,7 +724,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                 return;
               }
             }
-            if (!mounted) return;
+            if (!context.mounted) return;
             try {
               await ref
                   .read(salesControllerProvider.notifier)
@@ -778,7 +740,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                     .markLocalCommit(cardPayment, contextId: widget.sale.id);
               }
               ref.invalidate(saleDetailProvider(widget.sale.id));
-              if (!mounted) return;
+              if (!context.mounted) return;
               Navigator.pop(context);
               if (widget.parentContext.mounted) {
                 ScaffoldMessenger.of(widget.parentContext).showSnackBar(
@@ -795,7 +757,7 @@ class _PartialPaymentDialogState extends ConsumerState<_PartialPaymentDialog> {
                     .read(physicalCardPaymentServiceProvider)
                     .markUnreconciled(cardPayment, error);
               }
-              if (mounted) {
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content:
                       Text('Ödeme kaydedilemedi; mutabakat gerekiyor: $error'),

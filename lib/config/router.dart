@@ -109,7 +109,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onRegister = state.matchedLocation.startsWith('/register');
       final onForgotPassword = state.matchedLocation == '/forgot-password';
       final onOnboarding = state.matchedLocation.startsWith('/onboarding');
-      final onAuthScreen = onLogin || onLoginForm || onRegister || onForgotPassword || onOnboarding;
+      final onAuthScreen = onLogin ||
+          onLoginForm ||
+          onRegister ||
+          onForgotPassword ||
+          onOnboarding;
 
       if (!loggedIn) {
         if (!onAuthScreen) return AppRoutes.login;

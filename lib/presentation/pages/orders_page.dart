@@ -555,7 +555,7 @@ class _OrderCard extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            'Sipariş #${order.id.toShortId}',
+                            'Sipariş #${order.displayNumber}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,

@@ -27,7 +27,6 @@ final auditLoggerProvider = Provider<AuditLogger>((ref) {
 // Bu provider'lar hiçbir yerde ref.watch/read edilmiyordu (dead code).
 // Gerçek senkronizasyon sync_outbox_v4 SQLite outbox’u üzerinden yürüyür.
 
-
 enum SalesFlowStatus {
   idle,
   customerSelected,

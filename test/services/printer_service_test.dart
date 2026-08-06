@@ -82,6 +82,20 @@ void main() {
           isTrue); // 'Yazıcı'
     });
 
+    test('missing receipt printer is reported instead of silent success',
+        () async {
+      final settings = Settings(
+        businessName: 'Deneme Market',
+        businessPhone: '555',
+        businessAddress: 'Istanbul',
+      );
+
+      await expectLater(
+        printerService.printDiagnosticsTest(settings, 58),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test(
         'printSaleReceipt outputs formatted receipt with items, totals and QR code',
         () async {

@@ -16,7 +16,8 @@ class RsaSha256SignatureVerifier implements SignatureVerifier {
     String? defaultModulus,
     String defaultExponent = '65537',
   })  : _defaultModulus = defaultModulus ??
-            const String.fromEnvironment('RELEASE_RSA_MODULUS', defaultValue: ''),
+            const String.fromEnvironment('RELEASE_RSA_MODULUS',
+                defaultValue: ''),
         _defaultExponent = defaultExponent;
 
   @override
@@ -32,7 +33,8 @@ class RsaSha256SignatureVerifier implements SignatureVerifier {
 
     final modulusStr = publicKeyOverride ?? _defaultModulus;
     if (modulusStr.isEmpty) {
-      debugPrint('[SignatureVerifier] Rejecting manifest verify due to unconfigured RSA public key.');
+      debugPrint(
+          '[SignatureVerifier] Rejecting manifest verify due to unconfigured RSA public key.');
       return false;
     }
 
@@ -65,7 +67,8 @@ class RsaSha256SignatureVerifier implements SignatureVerifier {
     String? publicKeyOverride,
   }) async {
     if (!await file.exists()) {
-      debugPrint('[SignatureVerifier] Artifact file does not exist: ${file.path}');
+      debugPrint(
+          '[SignatureVerifier] Artifact file does not exist: ${file.path}');
       return false;
     }
 
@@ -76,13 +79,15 @@ class RsaSha256SignatureVerifier implements SignatureVerifier {
     final expectedHash = expectedSha256.trim().toLowerCase();
 
     final shaMatches = actualHash == expectedHash;
-    debugPrint('[SignatureVerifier] Artifact SHA-256 match=$shaMatches (expected=$expectedHash actual=$actualHash)');
+    debugPrint(
+        '[SignatureVerifier] Artifact SHA-256 match=$shaMatches (expected=$expectedHash actual=$actualHash)');
     if (!shaMatches) return false;
 
     // 2. RSA Digital Signature verification on the computed SHA-256 hash string
     final modulusStr = publicKeyOverride ?? _defaultModulus;
     if (signature.trim().isEmpty || modulusStr.isEmpty) {
-      debugPrint('[SignatureVerifier] Rejecting artifact verify due to empty signature or missing RSA key.');
+      debugPrint(
+          '[SignatureVerifier] Rejecting artifact verify due to empty signature or missing RSA key.');
       return false;
     }
 

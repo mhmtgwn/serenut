@@ -4,7 +4,8 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/presentation/widgets/revenue_bar_chart.dart';
 import 'package:serenutos/presentation/widgets/reports/shared_report_widgets.dart';
 
@@ -87,11 +88,10 @@ class SalesTab extends ConsumerWidget {
                           return;
                         }
 
-                        final hasPrinter = (settings.printerIp != null &&
-                                settings.printerIp!.isNotEmpty) ||
-                            (settings.printerName != null &&
-                                settings.printerName!.isNotEmpty);
-                        if (!hasPrinter) {
+                        final route = await ref
+                            .read(printingRepositoryProvider)
+                            .getRoute(PrintDocumentKind.receipt);
+                        if (route == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
@@ -104,16 +104,9 @@ class SalesTab extends ConsumerWidget {
                         }
 
                         try {
-                          ref.read(printerServiceProvider).enqueue(
-                                'X Raporu (${range.label})',
-                                () => ref
-                                    .read(printerServiceProvider)
-                                    .printXReport(
-                                      summary,
-                                      categories,
-                                      settings,
-                                    ),
-                              );
+                          await ref
+                              .read(printingApplicationServiceProvider)
+                              .queueReport('X', summary, categories, settings);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content:
@@ -166,11 +159,10 @@ class SalesTab extends ConsumerWidget {
                           return;
                         }
 
-                        final hasPrinter = (settings.printerIp != null &&
-                                settings.printerIp!.isNotEmpty) ||
-                            (settings.printerName != null &&
-                                settings.printerName!.isNotEmpty);
-                        if (!hasPrinter) {
+                        final route = await ref
+                            .read(printingRepositoryProvider)
+                            .getRoute(PrintDocumentKind.receipt);
+                        if (route == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
@@ -183,16 +175,9 @@ class SalesTab extends ConsumerWidget {
                         }
 
                         try {
-                          ref.read(printerServiceProvider).enqueue(
-                                'Z Raporu',
-                                () => ref
-                                    .read(printerServiceProvider)
-                                    .printZReport(
-                                      summary,
-                                      categories,
-                                      settings,
-                                    ),
-                              );
+                          await ref
+                              .read(printingApplicationServiceProvider)
+                              .queueReport('Z', summary, categories, settings);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content:

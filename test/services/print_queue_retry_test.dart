@@ -79,7 +79,7 @@ void main() {
       await expectLater(
         printerService.printDiagnosticsTest(testSettings, 80),
         throwsA(isA<Exception>().having(
-            (e) => e.toString(), 'message', contains('kuyruga alindi'))),
+            (e) => e.toString(), 'message', contains('Kuyruğa alındı'))),
       );
 
       // Verify that print_queue table has 1 pending job

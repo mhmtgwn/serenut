@@ -6,7 +6,9 @@ extension IdShortener on String {
   /// Example: 'order-1782150318456' -> 'O-318456'
   String get toShortId {
     final lower = toLowerCase();
-    if ((lower.startsWith('sale-') || lower.startsWith('sale_')) &&
+    if (RegExp(r'^sp-\d{6,}$').hasMatch(lower)) {
+      return toUpperCase();
+    } else if ((lower.startsWith('sale-') || lower.startsWith('sale_')) &&
         length >= 5) {
       final idx = indexOf(RegExp(r'[-_]'));
       final suffix = substring(idx + 1);

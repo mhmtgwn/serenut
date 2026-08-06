@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 import 'dart:async';
-import 'package:serenutos/config/utils.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
@@ -14,7 +13,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart'
     show paymentServiceProvider;
@@ -736,34 +735,25 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
         // 1. Print main receipt copies
         if (_printReceipt) {
-          for (int i = 0; i < _printCopies; i++) {
-            final suffix = _printCopies > 1 ? ' (Kopya ${i + 1})' : '';
-            ref.read(printerServiceProvider).enqueue(
-                  'Sipariş Fişi #${newOrder.id.toShortId}$suffix',
-                  () => ref.read(printerServiceProvider).printOrderReceipt(
-                        newOrder,
-                        receiptItems,
-                        _selectedCustomer,
-                        settings,
-                        paidAmount: finalPaid,
-                        notes: _notesController.text.trim(),
-                      ),
-                );
-          }
+          await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
+                newOrder,
+                receiptItems,
+                _selectedCustomer,
+                settings,
+                paidAmount: finalPaid,
+                notes: _notesController.text.trim(),
+                copies: _printCopies,
+              );
         }
 
         // 2. Print label stickers if label printer toggle is enabled
         if (_printLabel) {
-          final labelSettings =
-              settings.copyWith(labelPrinterCopies: _labelCopies);
-          ref.read(printerServiceProvider).enqueue(
-                'Sipariş Etiketleri #${newOrder.id.toShortId}',
-                () => ref.read(printerServiceProvider).printOrderLabels(
-                      newOrder,
-                      receiptItems,
-                      labelSettings,
-                      customer: _selectedCustomer,
-                    ),
+          await ref.read(printingApplicationServiceProvider).queueOrderLabel(
+                newOrder,
+                receiptItems,
+                settings,
+                customer: _selectedCustomer,
+                copies: _labelCopies,
               );
         }
       }

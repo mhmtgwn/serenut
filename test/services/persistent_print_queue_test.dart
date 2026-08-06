@@ -2,6 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
+import 'package:serenutos/domain/services/i_printer_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -45,6 +46,28 @@ void main() {
       await queue.markDone(job.id);
       all = await queue.loadAll();
       expect(all.first.status, PrintJobStatus.success);
+    });
+
+    test('label purpose and target device survive persistence', () async {
+      await queue.enqueue(
+        title: 'Siparis etiketi',
+        receiptJson: '1,2,3',
+        purpose: PrintJobKind.orderLabel,
+        deviceId: 'label-kitchen',
+      );
+
+      final persisted = (await queue.loadPending()).single;
+      expect(persisted.purpose, PrintJobKind.orderLabel);
+      expect(persisted.deviceId, 'label-kitchen');
+    });
+
+    test('cancelled job is permanently excluded from retry', () async {
+      final job = await queue.enqueue(title: 'Iptal', receiptJson: '{}');
+
+      await queue.cancelJob(job.id);
+
+      expect(await queue.loadPending(), isEmpty);
+      expect((await queue.loadAll()).single.status, PrintJobStatus.abandoned);
     });
 
     test(

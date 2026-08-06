@@ -86,7 +86,8 @@ class SyncNotifier extends StateNotifier<SyncState>
       );
     } catch (e, st) {
       // Silent — sync will be retried on next foreground
-      TelemetryService().logError(e, st, context: 'SyncNotifier.initSync', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'SyncNotifier.initSync', level: LogLevel.warning);
     }
   }
 
@@ -97,7 +98,8 @@ class SyncNotifier extends StateNotifier<SyncState>
       await db
           ?.delete('sync_cursor_v4', where: 'key = ?', whereArgs: ['global']);
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'SyncNotifier.forceFullSync', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'SyncNotifier.forceFullSync', level: LogLevel.warning);
     }
 
     state = const SyncState();
@@ -132,8 +134,10 @@ class SyncNotifier extends StateNotifier<SyncState>
       }
     }
     if (activationId == null || activationId.isEmpty) {
-      final hasAccessToken = _ref.read(apiClientProvider).jwtToken?.isNotEmpty ?? false;
-      final hasRefreshToken = _ref.read(authServiceProvider).getRefreshToken()?.isNotEmpty ?? false;
+      final hasAccessToken =
+          _ref.read(apiClientProvider).jwtToken?.isNotEmpty ?? false;
+      final hasRefreshToken =
+          _ref.read(authServiceProvider).getRefreshToken()?.isNotEmpty ?? false;
 
       // Only log structured error if the user is authenticated but missing device activation
       if (hasAccessToken || hasRefreshToken) {
@@ -197,7 +201,9 @@ class SyncNotifier extends StateNotifier<SyncState>
         final authService = _ref.read(authServiceProvider);
         await authService.checkCurrentUserSessionOnline();
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'SyncNotifier.checkCurrentUserSessionOnline', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'SyncNotifier.checkCurrentUserSessionOnline',
+            level: LogLevel.warning);
       }
 
       if (result.success) {

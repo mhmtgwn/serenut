@@ -79,7 +79,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           notes: 'Yeni müşteri eklendi: ${customer.name}',
         );
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'customers_controller', level: LogLevel.warning);
       }
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
@@ -100,7 +101,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           'Eski bakiye: ₺${original?.balance}, Yeni bakiye: ₺${customer.balance}',
         );
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'customers_controller', level: LogLevel.warning);
       }
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
@@ -124,7 +126,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
           approvedByUserName: approvedByUserName,
         );
       } catch (e, st) {
-        TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+        TelemetryService().logError(e, st,
+            context: 'customers_controller', level: LogLevel.warning);
       }
       await _paginationService?.refresh();
       return _paginationService?.items ?? [];
@@ -169,7 +172,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
         method,
       );
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'customers_controller', level: LogLevel.warning);
     }
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
@@ -207,7 +211,8 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
             : '${customer?.name ?? 'Müşteri'} için elle borç eklendi',
       );
     } catch (e, st) {
-      TelemetryService().logError(e, st, context: 'customers_controller', level: LogLevel.warning);
+      TelemetryService().logError(e, st,
+          context: 'customers_controller', level: LogLevel.warning);
     }
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));

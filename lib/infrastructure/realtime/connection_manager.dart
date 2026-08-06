@@ -241,7 +241,9 @@ class ConnectionManager {
       } catch (e) {
         _record('ws_refresh_exception', level: LogLevel.warning, error: e);
         if (e is ApiException &&
-            (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
+            (e.statusCode == 400 ||
+                e.statusCode == 401 ||
+                e.statusCode == 403)) {
           _setStatus(RealtimeStatus.disconnected);
           authService.triggerSessionExpired();
         } else {
