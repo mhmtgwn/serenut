@@ -13,10 +13,11 @@ class POSColors {
 
   // ── Ana Renk: Yeşil ──────────────────────────────────────
   // serenut.com tasarım tokenlarıyla birebir aynı marka yeşilleri.
-  static const green = Color(0xFF11875D);
-  static const greenDark = Color(0xFF086B48);
-  static const greenLight = Color(0xFFE9F6EF);
-  static const greenMid = Color(0xFF18A06D);
+  // Canonical application palette: shared with the sales workspace.
+  static const green = Color(0xFF16A34A);
+  static const greenDark = Color(0xFF15803D);
+  static const greenLight = Color(0xFFDCFCE7);
+  static const greenMid = Color(0xFF22C55E);
 
   // ── Vurgu: Sarı / Amber ──────────────────────────────────
   static const amber = Color(0xFFE8BD3F);

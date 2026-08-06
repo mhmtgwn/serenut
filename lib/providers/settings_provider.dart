@@ -85,6 +85,9 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
             businessType: (map['type'] as String?)?.isNotEmpty == true
                 ? map['type'] as String
                 : current.businessType,
+            businessLogo: (map['logo_url'] as String?)?.isNotEmpty == true
+                ? map['logo_url'] as String
+                : current.businessLogo,
           );
 
           await repo.updateSettings(updated);
@@ -102,6 +105,7 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               'city': map['city'] ?? '',
               'district': map['district'] ?? '',
               'currency': map['currency'] ?? '₺',
+              'logo_path': map['logo_url'],
               'tax_included': 1,
               'version': map['version'] ?? 1,
               'created_at': DateTime.now().toIso8601String(),

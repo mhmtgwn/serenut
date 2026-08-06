@@ -22,9 +22,9 @@ import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kGreenLight = Color(0xFFDCFCE7);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kGreenLight = POSColors.greenLight;
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
 const _kAmber = Color(0xFFEAB308);
@@ -178,7 +178,7 @@ class OrderDetailsPage extends ConsumerWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Yazdırma işlemi sıraya eklendi.'),
-                            backgroundColor: Colors.green,
+                            backgroundColor: POSColors.green,
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -247,7 +247,7 @@ class OrderDetailsPage extends ConsumerWidget {
                             content: Text(
                               'Sipariş etiketi yazdırma kuyruğuna alındı.',
                             ),
-                            backgroundColor: Colors.green,
+                            backgroundColor: POSColors.green,
                           ),
                         );
                       } catch (error) {

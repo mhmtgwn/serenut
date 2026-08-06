@@ -11,10 +11,42 @@ import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest, requireActiveEntitlementForMutations } from '../../middleware/auth.middleware';
 import { pgPool } from '../../config/database';
 import { createError } from '../../config/error-codes';
+import multer from 'multer';
+import { decodeDataImage, publicLogoUrl, storeCompanyLogo } from './company-logo.service';
 
 const router = Router();
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => callback(
+    null,
+    ['image/png', 'image/jpeg', 'image/webp'].includes(file.mimetype),
+  ),
+});
 router.use(authenticateUser);
 router.use(requireActiveEntitlementForMutations);
+
+router.post('/company/logo', logoUpload.single('logo'), async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const isOwner = user.roles?.includes('owner') || user.roles?.includes('admin') || user.roles?.includes('sysadmin');
+  if (!isOwner) return res.status(403).json(createError('AUTH005'));
+  if (!req.file) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçerli bir PNG, JPEG veya WebP logo gereklidir.' } });
+  }
+  try {
+    const stored = await storeCompanyLogo(user.company_id, req.file.buffer);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(201).json({
+      hash: stored.hash,
+      original_url: publicLogoUrl(stored.originalPath, `${req.protocol}://${req.get('host')}`),
+      display_url: publicLogoUrl(stored.displayPath, `${req.protocol}://${req.get('host')}`),
+      print_url: publicLogoUrl(stored.printPath, `${req.protocol}://${req.get('host')}`),
+    });
+  } catch (error) {
+    console.error('Company logo upload error:', error);
+    return res.status(400).json({ error: { code: 'INVALID_IMAGE', message: 'Logo dosyası işlenemedi.' } });
+  }
+});
 
 /**
  * @swagger
@@ -129,7 +161,19 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     if (city !== undefined) { updates.push(`city = $${idx++}`); values.push(city); }
     if (district !== undefined) { updates.push(`district = $${idx++}`); values.push(district); }
     if (currency !== undefined) { updates.push(`currency = $${idx++}`); values.push(currency); }
-    if (logo_url !== undefined) { updates.push(`logo_url = $${idx++}`); values.push(logo_url); }
+    if (logo_url !== undefined) {
+      let normalizedLogoUrl = logo_url;
+      if (typeof logo_url === 'string' && logo_url.startsWith('data:image/')) {
+        const legacyBytes = decodeDataImage(logo_url);
+        if (!legacyBytes || legacyBytes.length > 3 * 1024 * 1024) {
+          return res.status(400).json({ error: { code: 'INVALID_IMAGE', message: 'Logo dosyası geçersiz veya 3 MB sınırını aşıyor.' } });
+        }
+        const stored = await storeCompanyLogo(user.company_id, legacyBytes);
+        normalizedLogoUrl = publicLogoUrl(stored.displayPath, `${req.protocol}://${req.get('host')}`);
+      }
+      updates.push(`logo_url = $${idx++}`);
+      values.push(normalizedLogoUrl);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: { code: 'VALIDATION', message: 'Güncellenecek alan belirtilmedi.' } });

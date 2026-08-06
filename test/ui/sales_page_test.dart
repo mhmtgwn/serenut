@@ -38,6 +38,15 @@ void main() {
         category: 'Yiyecek',
         vat: 8,
       ),
+      ProductEntity(
+        id: 'prod-3',
+        name: 'Çok Uzun İsimli Kampanyalı Büyük Boy Test Ürünü',
+        description: 'Dar ekran taşma kontrolü',
+        price: 1234.56,
+        quantity: 12,
+        category: 'Uzun Kategori İsmi',
+        vat: 20,
+      ),
     ]);
 
     // Add dummy customer
@@ -160,6 +169,29 @@ void main() {
       // Verify Test Burger is visible while Test Kola is filtered out
       expect(find.text('Test Burger'), findsOneWidget);
       expect(find.text('Test Kola'), findsNothing);
+    });
+
+    testWidgets('SUNMI 320px görünümünde uzun içerik taşma üretmez',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => resetScreen(tester));
+
+      final overflowErrors = <FlutterErrorDetails>[];
+      final originalOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('overflowed')) {
+          overflowErrors.add(details);
+        }
+        originalOnError?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = originalOnError);
+
+      await tester.pumpWidget(createTestWidget());
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(tester.takeException(), isNull);
+      expect(overflowErrors, isEmpty);
     });
   });
 }

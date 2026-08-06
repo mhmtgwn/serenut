@@ -5,8 +5,8 @@ import 'package:serenutos/config/theme.dart';
 void main() {
   group('Serenut design system', () {
     test('website and mobile share the same brand tokens', () {
-      expect(POSColors.green, const Color(0xFF11875D));
-      expect(POSColors.greenDark, const Color(0xFF086B48));
+      expect(POSColors.green, const Color(0xFF16A34A));
+      expect(POSColors.greenDark, const Color(0xFF15803D));
       expect(POSColors.surface, const Color(0xFFF8FAFC));
       expect(POSColors.text, const Color(0xFF19231F));
       expect(POSColors.border, const Color(0xFFDFE6E1));

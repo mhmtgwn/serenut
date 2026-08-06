@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -299,18 +300,30 @@ class SyncV4Service {
 
   Future<String?> _portableLogo(String? value) async {
     if (value == null || value.trim().isEmpty) return null;
-    if (value.startsWith('data:') ||
-        value.startsWith('http://') ||
-        value.startsWith('https://')) {
+    if (value.startsWith('http://') || value.startsWith('https://')) {
       return value;
     }
-    final file = File(value);
-    if (!await file.exists()) return null;
-    final decoded = img.decodeImage(await file.readAsBytes());
-    if (decoded == null) return null;
-    final resized =
-        decoded.width > 320 ? img.copyResize(decoded, width: 320) : decoded;
-    return 'data:image/jpeg;base64,${base64Encode(img.encodeJpg(resized, quality: 72))}';
+    late final Uint8List bytes;
+    if (value.startsWith('data:image/')) {
+      final comma = value.indexOf(',');
+      if (comma < 0) return null;
+      bytes = base64Decode(value.substring(comma + 1));
+    } else {
+      final file = File(value);
+      if (!await file.exists()) return null;
+      bytes = await file.readAsBytes();
+    }
+    if (bytes.length > 3 * 1024 * 1024 || img.decodeImage(bytes) == null) {
+      return null;
+    }
+    final upload = await _api.uploadImage(
+      '/api/v1/company/logo',
+      bytes: bytes,
+      filename: 'company-logo.png',
+      mimeType: 'image/png',
+    );
+    final json = Map<String, dynamic>.from(upload.json as Map);
+    return json['display_url']?.toString();
   }
 
   /// A customer balance is a ledger projection, not replicated business data.
@@ -541,63 +554,106 @@ class SyncV4Service {
     }
   }
 
-  Future<void> _applyRefund(Transaction db, String id, Map<String, dynamic> payload) async {
-    final existing = await db.query('refunds', columns: const ['id'], where: 'id=?', whereArgs: [id], limit: 1);
+  Future<void> _applyRefund(
+      Transaction db, String id, Map<String, dynamic> payload) async {
+    final existing = await db.query('refunds',
+        columns: const ['id'], where: 'id=?', whereArgs: [id], limit: 1);
     if (existing.isNotEmpty) return;
     final saleId = payload['sale_id']?.toString() ?? '';
-    final sales = await db.query('sales', where: 'id=?', whereArgs: [saleId], limit: 1);
+    final sales =
+        await db.query('sales', where: 'id=?', whereArgs: [saleId], limit: 1);
     if (sales.isEmpty) throw StateError('refund_sale_missing');
     final sale = sales.first;
     final snapshotProjection = payload['_snapshot_projection'] == true;
     final rawItems = payload['items'];
-    if (rawItems is! List || rawItems.isEmpty) throw StateError('refund_items_missing');
+    if (rawItems is! List || rawItems.isEmpty) {
+      throw StateError('refund_items_missing');
+    }
     final normalized = <Map<String, Object?>>[];
     var amount = 0.0;
     for (final value in rawItems) {
       final item = Map<String, dynamic>.from(value as Map);
       final saleItemId = item['sale_item_id']?.toString() ?? '';
       final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
-      final rows = await db.rawQuery('''SELECT si.*,COALESCE((SELECT SUM(ri.quantity)
+      final rows = await db.rawQuery(
+          '''SELECT si.*,COALESCE((SELECT SUM(ri.quantity)
         FROM refund_items ri WHERE ri.sale_item_id=si.id),0) refunded_quantity
-        FROM sale_items si WHERE si.id=? AND si.sale_id=?''', [saleItemId, saleId]);
-      if (rows.isEmpty || quantity <= 0) throw StateError('invalid_refund_item');
+        FROM sale_items si WHERE si.id=? AND si.sale_id=?''',
+          [saleItemId, saleId]);
+      if (rows.isEmpty || quantity <= 0) {
+        throw StateError('invalid_refund_item');
+      }
       final row = rows.first;
       final sold = (row['quantity'] as num).toDouble();
       final refunded = (row['refunded_quantity'] as num).toDouble();
-      if (quantity > sold - refunded) throw StateError('invalid_refund_quantity');
+      if (quantity > sold - refunded) {
+        throw StateError('invalid_refund_quantity');
+      }
       final unit = (row['subtotal'] as num).toDouble() / sold;
       final subtotal = double.parse((unit * quantity).toStringAsFixed(2));
       amount += subtotal;
-      normalized.add({'sale_item_id': saleItemId, 'product_id': row['product_id'],
-        'quantity': quantity, 'unit_refund_amount': unit, 'subtotal': subtotal});
+      normalized.add({
+        'sale_item_id': saleItemId,
+        'product_id': row['product_id'],
+        'quantity': quantity,
+        'unit_refund_amount': unit,
+        'subtotal': subtotal
+      });
     }
     amount = double.parse(amount.toStringAsFixed(2));
     final now = DateTime.now().toUtc().toIso8601String();
     final method = payload['refund_method']?.toString() ?? 'balance';
     final reason = payload['reason']?.toString() ?? '';
-    await db.insert('refunds', {'id': id, 'sale_id': saleId, 'amount': amount,
-      'refund_method': method, 'external_reference': payload['external_reference'],
-      'reason': reason, 'status': 'completed', 'created_at': now});
+    await db.insert('refunds', {
+      'id': id,
+      'sale_id': saleId,
+      'amount': amount,
+      'refund_method': method,
+      'external_reference': payload['external_reference'],
+      'reason': reason,
+      'status': 'completed',
+      'created_at': now
+    });
     for (final row in normalized) {
-      await db.insert('refund_items', {'id': 'sync-$id-${row['sale_item_id']}', 'refund_id': id, ...row});
+      await db.insert('refund_items',
+          {'id': 'sync-$id-${row['sale_item_id']}', 'refund_id': id, ...row});
       if (!snapshotProjection) {
-        await db.rawUpdate('UPDATE products SET quantity=quantity+?,updated_at=? WHERE id=?',
-          [row['quantity'], now, row['product_id']]);
+        await db.rawUpdate(
+            'UPDATE products SET quantity=quantity+?,updated_at=? WHERE id=?',
+            [row['quantity'], now, row['product_id']]);
       }
     }
     final previous = (sale['refunded_amount'] as num?)?.toDouble() ?? 0;
     final total = (sale['total_amount'] as num).toDouble();
     final newRefunded = double.parse((previous + amount).toStringAsFixed(2));
-    await db.update('sales', {'refunded_amount': newRefunded,
-      'fsm_state': newRefunded >= total - 0.01 ? 'refunded' : 'partially_refunded', 'updated_at': now},
-      where: 'id=?', whereArgs: [saleId]);
+    await db.update(
+        'sales',
+        {
+          'refunded_amount': newRefunded,
+          'fsm_state':
+              newRefunded >= total - 0.01 ? 'refunded' : 'partially_refunded',
+          'updated_at': now
+        },
+        where: 'id=?',
+        whereArgs: [saleId]);
     final customerId = sale['customer_id']?.toString();
     if (!snapshotProjection && customerId != null && customerId.isNotEmpty) {
-      await db.insert('financial_transactions', {'id': 'refund-$id', 'type': 'refund',
-        'customer_id': customerId, 'amount': amount, 'paid_amount': method == 'balance' ? 0.0 : amount,
-        'debt_amount': 0.0, 'reference_id': id, 'description': reason,
-        'payment_method': method, 'created_at': now, 'is_synced': 1},
-        conflictAlgorithm: ConflictAlgorithm.ignore);
+      await db.insert(
+          'financial_transactions',
+          {
+            'id': 'refund-$id',
+            'type': 'refund',
+            'customer_id': customerId,
+            'amount': amount,
+            'paid_amount': method == 'balance' ? 0.0 : amount,
+            'debt_amount': 0.0,
+            'reference_id': id,
+            'description': reason,
+            'payment_method': method,
+            'created_at': now,
+            'is_synced': 1
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
