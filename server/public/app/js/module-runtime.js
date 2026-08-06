@@ -68,6 +68,54 @@ async function showSupportTicket(ticketId, isAdmin) {
   if(status)status.onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{await apiFetch(`/support/tickets/${encodeURIComponent(ticketId)}/status`,{method:'PATCH',body:{status:document.getElementById('ticket-status-value').value}});await showSupportTicket(ticketId,true);}catch(x){notice(x.message);b.disabled=false}};
 }
 
+function diagnosticFingerprint(event) {
+  const normalizedMessage = String(event.message || '')
+    .toLowerCase()
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi, '<uuid>')
+    .replace(/\b(?:ord|trans|sale|item|sync)-[a-z0-9-]+\b/gi, '<entity-id>')
+    .replace(/\b\d{13,}\b/g, '<long-id>')
+    .replace(/\d{4}-\d{2}-\d{2}t\d{2}:\d{2}:\d{2}(?:\.\d+)?z?/gi, '<timestamp>');
+  return [
+    event.source,
+    event.severity,
+    event.title,
+    event.error_type,
+    event.context,
+    event.company_id,
+    event.user_id,
+    event.device_id,
+    normalizedMessage,
+  ].map(value => String(value || '').trim().toLowerCase()).join('|');
+}
+
+function groupDiagnosticEvents(events) {
+  const groups = new Map();
+  for (const event of events) {
+    const key = diagnosticFingerprint(event);
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, {
+        ...event,
+        occurrence_count: 1,
+        first_seen_at: event.occurred_at,
+        last_seen_at: event.occurred_at,
+      });
+      continue;
+    }
+    existing.occurrence_count += 1;
+    const occurredAt = Date.parse(event.occurred_at || '');
+    const firstSeenAt = Date.parse(existing.first_seen_at || '');
+    const lastSeenAt = Date.parse(existing.last_seen_at || '');
+    if (Number.isFinite(occurredAt) && (!Number.isFinite(firstSeenAt) || occurredAt < firstSeenAt)) {
+      existing.first_seen_at = event.occurred_at;
+    }
+    if (Number.isFinite(occurredAt) && (!Number.isFinite(lastSeenAt) || occurredAt > lastSeenAt)) {
+      existing.last_seen_at = event.occurred_at;
+    }
+  }
+  return [...groups.values()];
+}
+
 function diagnosticEvent(event) {
   const severity = String(event.severity || 'error').toLowerCase();
   const metadata = event.metadata && Object.keys(event.metadata).length
@@ -87,16 +135,24 @@ function diagnosticEvent(event) {
     event.context ? `Bağlam: ${event.context}` : '',
     event.correlation_id ? `İzleme: ${event.correlation_id}` : '',
   ].filter(Boolean).join(' · ');
+  const occurrenceCount = Number(event.occurrence_count || 1);
+  const occurrence = occurrenceCount > 1
+    ? `<span class="diagnostic-count">${occurrenceCount} tekrar</span>`
+    : '';
+  const seenRange = occurrenceCount > 1
+    ? `<p class="diagnostic-context"><strong>Görülme:</strong> İlk ${esc(date(event.first_seen_at))} · Son ${esc(date(event.last_seen_at))}</p>`
+    : '';
   return `<article class="diagnostic-event diagnostic-${esc(severity)}">
     <div class="diagnostic-head">
-      <div class="diagnostic-badges">${badge(severity)}${badge(event.source || 'unknown')}</div>
-      <time>${esc(date(event.occurred_at))}</time>
+      <div class="diagnostic-badges">${badge(severity)}${badge(event.source || 'unknown')}${occurrence}</div>
+      <time>${esc(date(event.last_seen_at || event.occurred_at))}</time>
     </div>
     <h4>${esc(event.title || 'Tanılama kaydı')}</h4>
     <p class="diagnostic-explanation">${esc(event.explanation || event.message || 'Açıklama bulunamadı.')}</p>
     ${identity ? `<p class="diagnostic-context"><strong>Hesap:</strong> ${esc(identity)}</p>` : ''}
     ${environment ? `<p class="diagnostic-context"><strong>Ortam:</strong> ${esc(environment)}</p>` : ''}
     ${trace ? `<p class="diagnostic-context"><strong>İz:</strong> ${esc(trace)}</p>` : ''}
+    ${seenRange}
     <details class="diagnostic-details">
       <summary>Teknik ayrıntı ve çözüm önerisi</summary>
       <div class="diagnostic-action"><strong>Önerilen işlem</strong><p>${esc(event.suggested_action || 'Kaydın bağlamını ve ilişkili işlemleri inceleyin.')}</p></div>
@@ -503,8 +559,9 @@ Yönetici hesabı oluşturuldu: ${adminEmail}\nTalep: ${result.recovery_request_
     ]);
     const summary=diagnostics.summary||{};
     const companyOptions=companies.map(company=>`<option value="${esc(company.id)}" ${filters.company===String(company.id)?'selected':''}>${esc(company.name)}</option>`).join('');
-    const events=Array.isArray(diagnostics.events)?diagnostics.events:[];
-    set(`<div class="metrics-grid">${metric('Kritik',summary.critical||0)}${metric('Hata',summary.error||0)}${metric('Uyarı',summary.warning||0)}${metric('Gösterilen Kayıt',summary.total||0)}</div>
+    const rawEvents=Array.isArray(diagnostics.events)?diagnostics.events:[];
+    const events=groupDiagnosticEvents(rawEvents);
+    set(`<div class="metrics-grid">${metric('Kritik',summary.critical||0)}${metric('Hata',summary.error||0)}${metric('Toplam Olay',summary.total||0)}${metric('Hata Grubu',events.length)}</div>
       <section class="diagnostic-panel">
         <div class="section-heading"><div><h3>Hata Ayıklama ve Tanılama</h3><p>Sunucu, Windows ve Android kayıtlarını tek zaman akışında gösterir. Hassas bilgiler otomatik maskelenir.</p></div><button class="btn btn-secondary btn-sm" id="diagnostic-refresh">Yenile</button></div>
         <form class="diagnostic-filters" id="diagnostic-filters">
@@ -515,7 +572,7 @@ Yönetici hesabı oluşturuldu: ${adminEmail}\nTalep: ${result.recovery_request_
           <label class="diagnostic-search">Ara<input id="diagnostic-search" value="${esc(filters.search)}" placeholder="Hata, kullanıcı, cihaz, correlation ID…"></label>
           <button class="btn btn-primary" type="submit">Uygula</button>
         </form>
-        <p class="diagnostic-result-note">Bu sayaçlar seçili filtreye uyan ve ekranda gösterilen kayıtları ifade eder.</p>
+        <p class="diagnostic-result-note">${summary.total||0} olay, ${events.length} benzer hata grubunda gösteriliyor. Tekrar sayıları ham kayıt toplamına dahildir.</p>
         <div class="diagnostic-list">${events.length?events.map(diagnosticEvent).join(''):'<div class="state-panel">Seçili filtrelerde tanılama kaydı bulunamadı.</div>'}</div>
       </section>
       <div class="section-heading spaced"><div><h3>Admin Hesapları</h3><p>Sistem sahibi rolüne sahip hesaplar.</p></div></div>

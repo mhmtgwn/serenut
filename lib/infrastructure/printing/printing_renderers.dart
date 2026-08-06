@@ -312,12 +312,14 @@ class TsplProductLabelRenderer implements PrintRenderer {
     final capabilities = _map(job.capabilitySnapshotJson);
     final logo = payload['logoBytesBase64'] as String?;
     final bytes = <int>[];
+    var isFirstLabel = true;
     for (final raw in payload['labels'] as List? ?? const []) {
       bytes.addAll(TsplLabelLayoutEngine.generateLabelBytes(
         LabelModel.fromMap(Map<String, dynamic>.from(raw as Map)),
         widthMm: _integer(capabilities['mediaWidthMm'], 50),
         heightMm: _integer(capabilities['mediaHeightMm'], 30),
         gapMm: _integer(capabilities['gapMm'], 2),
+        autoDetectGap: isFirstLabel && capabilities['autoDetectGap'] == true,
         dpi: _integer(capabilities['dpi'], 203),
         printableWidthDots: capabilities['printableWidthDots'] as int?,
         direction: _integer(capabilities['direction'], 0),
@@ -331,6 +333,7 @@ class TsplProductLabelRenderer implements PrintRenderer {
         fontSize: design['fontSize']?.toString() ?? 'Orta',
         logoBytes: logo == null ? null : base64Decode(logo),
       ));
+      isFirstLabel = false;
     }
     return RenderedPrintDocument(
       bytes: Uint8List.fromList(bytes),
@@ -370,6 +373,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
       widthMm: _integer(capabilities['mediaWidthMm'], 50),
       heightMm: _integer(capabilities['mediaHeightMm'], 30),
       gapMm: _integer(capabilities['gapMm'], 2),
+      autoDetectGap: capabilities['autoDetectGap'] == true,
       dpi: _integer(capabilities['dpi'], 203),
       printableWidthDots: capabilities['printableWidthDots'] as int?,
       direction: _integer(capabilities['direction'], 0),

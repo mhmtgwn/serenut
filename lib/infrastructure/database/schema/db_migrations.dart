@@ -949,6 +949,19 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 50 && newVersion >= 50) {
+          try {
+            await txn.execute(
+                'ALTER TABLE settings ADD COLUMN label_auto_detect_gap INTEGER NOT NULL DEFAULT 0');
+          } catch (e) {
+            handleMigrationError(e, 50);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 50,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

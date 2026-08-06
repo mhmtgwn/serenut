@@ -45,7 +45,7 @@ class DatabaseManager {
 
   /// Authoritative local schema version. Exposed for migration fixtures and
   /// diagnostics so tests do not duplicate a version literal.
-  static const int databaseVersion = 49;
+  static const int databaseVersion = 50;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;
@@ -537,6 +537,7 @@ class DatabaseManager {
       'label_width_mm': 50,
       'label_height_mm': 30,
       'label_gap_mm': 2,
+      'label_auto_detect_gap': 0,
       'label_dpi': 203,
       'admin_pin_code': null,
       'created_at': DateTime.now().toIso8601String(),

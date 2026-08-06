@@ -10,6 +10,7 @@ document.body.dataset.bootStage = 'script-ready';
 let navigationItems = [];
 let selectedModuleId = 'home';
 let realtimeSocket = null;
+let realtimeConnecting = false;
 let realtimeReconnectTimer = null;
 let realtimeRefreshTimer = null;
 let realtimeCompanyId = '';
@@ -244,7 +245,7 @@ async function selectModule(moduleId) {
   const content = document.getElementById('embed-content');
   content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
   try {
-    const { loadModule } = await import('./module-runtime.js?v=20260730-panel-flow5');
+    const { loadModule } = await import('./module-runtime.js?v=20260806-diagnostic-groups1');
     await loadModule(item);
   } catch (error) {
     content.innerHTML = `
@@ -258,15 +259,24 @@ async function selectModule(moduleId) {
   }
 }
 
-function startRealtime() {
-  if (realtimeSocket?.readyState === WebSocket.OPEN || !isAuthenticated()) return;
+async function startRealtime() {
+  if (realtimeConnecting ||
+      realtimeSocket?.readyState === WebSocket.OPEN ||
+      realtimeSocket?.readyState === WebSocket.CONNECTING ||
+      !isAuthenticated()) return;
   clearTimeout(realtimeReconnectTimer);
-  const token = sessionStorage.getItem('app_token') || localStorage.getItem('app_token');
-  if (!token) return;
+  realtimeConnecting = true;
 
-  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${scheme}://${window.location.host}/api/v1/realtime/live?token=${encodeURIComponent(token)}&reconnectCount=0`;
   try {
+    const ticketResponse = await apiFetch('/realtime/ticket', {
+      method: 'POST',
+      body: {},
+    });
+    const ticket = ticketResponse?.ticket;
+    if (!ticket || !isAuthenticated()) throw new Error('realtime_ticket_missing');
+
+    const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const url = `${scheme}://${window.location.host}/api/v1/realtime/live?ticket=${encodeURIComponent(ticket)}&reconnectCount=0`;
     realtimeSocket = new WebSocket(url);
     realtimeSocket.onopen = () => {
       if (!realtimeCompanyId) return;
@@ -285,6 +295,8 @@ function startRealtime() {
     realtimeSocket.onerror = () => realtimeSocket?.close();
   } catch (_) {
     realtimeReconnectTimer = setTimeout(startRealtime, 5000);
+  } finally {
+    realtimeConnecting = false;
   }
 }
 

@@ -75,6 +75,7 @@ class Settings {
   final int labelWidthMm;
   final int labelHeightMm;
   final int labelGapMm;
+  final bool labelAutoDetectGap;
   final int labelDpi;
   // Etiket Taslak Ayarları
   final bool labelShowBrand;
@@ -156,6 +157,7 @@ class Settings {
     this.labelWidthMm = 50,
     this.labelHeightMm = 30,
     this.labelGapMm = 2,
+    this.labelAutoDetectGap = false,
     this.labelDpi = 203,
     this.labelShowBrand = true,
     this.labelShowBusinessName = true,
@@ -258,6 +260,7 @@ class Settings {
       labelWidthMm: (map['label_width_mm'] as int?) ?? 50,
       labelHeightMm: (map['label_height_mm'] as int?) ?? 30,
       labelGapMm: (map['label_gap_mm'] as int?) ?? 2,
+      labelAutoDetectGap: (map['label_auto_detect_gap'] as int? ?? 0) == 1,
       labelDpi: (map['label_dpi'] as int?) ?? 203,
       labelShowBrand: (map['label_show_brand'] as int? ?? 1) == 1,
       labelShowBusinessName: (map['label_show_business_name'] as int? ??
@@ -358,6 +361,7 @@ class Settings {
       'label_width_mm': labelWidthMm,
       'label_height_mm': labelHeightMm,
       'label_gap_mm': labelGapMm,
+      'label_auto_detect_gap': labelAutoDetectGap ? 1 : 0,
       'label_dpi': labelDpi,
       'label_show_brand': labelShowBrand ? 1 : 0,
       'label_show_business_name': labelShowBusinessName ? 1 : 0,
@@ -443,6 +447,7 @@ class Settings {
     int? labelWidthMm,
     int? labelHeightMm,
     int? labelGapMm,
+    bool? labelAutoDetectGap,
     int? labelDpi,
     bool? labelShowBrand,
     bool? labelShowBusinessName,
@@ -527,6 +532,7 @@ class Settings {
       labelWidthMm: labelWidthMm ?? this.labelWidthMm,
       labelHeightMm: labelHeightMm ?? this.labelHeightMm,
       labelGapMm: labelGapMm ?? this.labelGapMm,
+      labelAutoDetectGap: labelAutoDetectGap ?? this.labelAutoDetectGap,
       labelDpi: labelDpi ?? this.labelDpi,
       labelShowBrand: labelShowBrand ?? this.labelShowBrand,
       labelShowBusinessName:

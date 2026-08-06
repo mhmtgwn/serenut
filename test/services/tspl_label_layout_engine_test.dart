@@ -38,6 +38,15 @@ void main() {
     expect(output, isNot(contains('\x1dV')));
   });
 
+  test('gap otomatik algılama etkinse kalibrasyon komutu önce gönderilir', () {
+    final output = latin1.decode(TsplLabelLayoutEngine.generateLabelBytes(
+      productLabel(),
+      autoDetectGap: true,
+    ));
+
+    expect(output, startsWith('GAPDETECT\r\nSIZE 50 mm,30 mm\r\n'));
+  });
+
   test('300 DPI ve farklı rulo ölçüsü komutlara doğru yansır', () {
     final output = latin1.decode(
       TsplLabelLayoutEngine.generateLabelBytes(
@@ -89,7 +98,7 @@ void main() {
       ),
     );
 
-    expect(output, contains('"4",0,1,2,"Kisa Urun"'));
+    expect(output, contains('"2",0,3,3,"Kisa Urun"'));
     expect(output, isNot(contains('Kod:')));
     expect(output, contains('"4",0,1,2,"299,95"'));
     expect(output, contains('"2",0,1,1,"TL"'));

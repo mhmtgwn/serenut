@@ -35,6 +35,31 @@ assert.equal(client.company_name, 'Örnek Firma');
 assert.equal(client.metadata.access_token, '[REDACTED]');
 assert.equal((client.metadata.nested as Record<string, unknown>).password, '[REDACTED]');
 
+const legacyConnected = normalizeClientDiagnostic({
+  id: 'evt-legacy-connected',
+  metric_name: 'ws_connected',
+  occurred_at: '2026-08-06T10:00:00.000Z',
+  metadata: {},
+});
+assert.equal(legacyConnected.severity, 'info');
+assert.equal(legacyConnected.title, 'Canlı bağlantı kuruldu');
+
+const legacyDisconnected = normalizeClientDiagnostic({
+  id: 'evt-legacy-disconnected',
+  metric_name: 'ws_disconnected',
+  occurred_at: '2026-08-06T10:01:00.000Z',
+  metadata: {},
+});
+assert.equal(legacyDisconnected.severity, 'warning');
+
+const legacyFailure = normalizeClientDiagnostic({
+  id: 'evt-legacy-failure',
+  metric_name: 'sync_apply_failed',
+  occurred_at: '2026-08-06T10:02:00.000Z',
+  metadata: {},
+});
+assert.equal(legacyFailure.severity, 'error');
+
 const server = normalizeServerDiagnostic({
   timestamp: '2026-07-29T11:00:00.000Z',
   level: 'error',

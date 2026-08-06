@@ -263,15 +263,17 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
 async function upsertOrder(client: PoolClient, companyId: string, id: string, payload: Record<string, unknown>) {
   const customerId = stringValue(payload, "customer_id");
   if (!customerId) throw new Error("invalid_mutation");
+  const orderNumber = stringValue(payload, "order_number", `SYNC-${id}`);
   const items = Array.isArray(payload.items) ? payload.items : [];
   await client.query(
-    `INSERT INTO customer_orders (id, company_id, customer_id, status, total_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
-     VALUES ($1,$2,$3,$4,$5,COALESCE($6::timestamptz,NOW()),$7::timestamptz,$8::timestamptz,$9,COALESCE($10::timestamptz,NOW()),NOW(),false,$11)
-     ON CONFLICT (id) DO UPDATE SET customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
+    `INSERT INTO customer_orders (id, company_id, order_number, customer_id, status, total_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()),$8::timestamptz,$9::timestamptz,$10,COALESCE($11::timestamptz,NOW()),NOW(),false,$12)
+     ON CONFLICT (id) DO UPDATE SET order_number=EXCLUDED.order_number,
+       customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
        total_amount=EXCLUDED.total_amount, expected_delivery_date=EXCLUDED.expected_delivery_date,
        actual_delivery_date=EXCLUDED.actual_delivery_date, notes=EXCLUDED.notes, is_deleted=false,
        updated_at=NOW() WHERE customer_orders.company_id=EXCLUDED.company_id`,
-    [id, companyId, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
+    [id, companyId, orderNumber, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
       stringValue(payload, "order_date") || stringValue(payload, "created_at") || null,
       stringValue(payload, "expected_delivery_date") || null, stringValue(payload, "actual_delivery_date") || null,
       stringValue(payload, "notes") || null, stringValue(payload, "created_at") || null,
@@ -301,7 +303,7 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
   const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
   const debtAmount = numberValue(payload, "debt_amount", Number.NaN);
   const referenceId = nullableId(stringValue(payload, "reference_id"));
-  if (!["sale","payment","collection"].includes(type) || !customerId ||
+  if (!["sale","payment","collection","manual_debt","cancellation","refund"].includes(type) || !customerId ||
       !Number.isFinite(amount) || !Number.isFinite(paidAmount) || !Number.isFinite(debtAmount) ||
       amount < 0 || paidAmount < 0 || debtAmount < 0) throw new Error("invalid_financial_transaction");
   const prior = await client.query(
@@ -314,9 +316,12 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     const sale = await client.query(
       `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
       [referenceId, companyId]);
+    // The canonical sale may already include later partial payments when an
+    // older device uploads its initial ledger snapshot. Validate the immutable
+    // original fact instead of requiring the current paid projection to match.
     if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
         Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01 ||
-        Math.abs(Number(sale.rows[0].paid_amount)-paidAmount)>0.01 ||
+        Number(sale.rows[0].paid_amount)+0.01 < paidAmount ||
         Math.abs(amount-paidAmount-debtAmount)>0.01) throw new Error("sale_ledger_mismatch");
   } else if (type === "payment") {
     if (!referenceId || amount <= 0 || Math.abs(amount-paidAmount)>0.01) {
@@ -333,8 +338,23 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     await client.query(
       `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
       [newPaid, newPaid >= Number(sale.rows[0].total_amount)-0.01 ? 'completed' : 'partial', referenceId, companyId]);
-  } else if (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId) {
+  } else if (type === "collection" &&
+      (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId)) {
     throw new Error("invalid_collection_transaction");
+  } else if (type === "manual_debt" &&
+      (amount <= 0 || paidAmount !== 0 || Math.abs(amount-debtAmount)>0.01 || referenceId)) {
+    throw new Error("invalid_manual_debt_transaction");
+  } else if ((type === "cancellation" || type === "refund")) {
+    if (!referenceId || amount <= 0 || paidAmount > amount || debtAmount > amount) {
+      throw new Error(`invalid_${type}_transaction`);
+    }
+    const sale = await client.query(
+      `SELECT customer_id,total_amount FROM sales WHERE id=$1 AND company_id=$2`,
+      [referenceId, companyId]);
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+        amount > Number(sale.rows[0].total_amount)+0.01) {
+      throw new Error(`${type}_sale_mismatch`);
+    }
   }
   const description = stringValue(payload, "description") || stringValue(payload, "notes") || null;
   const metadata = typeof payload.metadata === "object" && payload.metadata !== null ? JSON.stringify(payload.metadata) : (stringValue(payload, "metadata") || null);
@@ -804,7 +824,8 @@ router.get("/bootstrap", async (req, res) => {
             is_deleted: deleted, deleted_at: row.deleted_at, deleted_by: row.deleted_by,
             created_by: row.created_by };
         case "order":
-          return { id: row.id, customer_id: row.customer_id, status: row.status, total_amount: row.total_amount,
+          return { id: row.id, order_number: row.order_number ?? `SYNC-${row.id}`,
+            customer_id: row.customer_id, status: row.status, total_amount: row.total_amount,
             order_date: row.order_date, expected_delivery_date: row.expected_delivery_date,
             actual_delivery_date: row.actual_delivery_date, notes: row.notes, created_at: row.created_at,
             updated_at: row.updated_at, is_deleted: deleted, deleted_at: row.deleted_at,

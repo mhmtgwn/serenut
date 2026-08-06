@@ -460,6 +460,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
             widthMm: settings.labelWidthMm,
             heightMm: settings.labelHeightMm,
             gapMm: settings.labelGapMm,
+            autoDetectGap: settings.labelAutoDetectGap,
             dpi: settings.labelDpi,
             showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
@@ -1311,6 +1312,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         widthMm: settings.labelWidthMm,
         heightMm: settings.labelHeightMm,
         gapMm: settings.labelGapMm,
+        autoDetectGap: settings.labelAutoDetectGap,
         dpi: settings.labelDpi,
         copies: settings.labelPrinterCopies,
         showBusinessName: settings.labelOrderShowBusinessName,
@@ -1369,6 +1371,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final effectiveCopies = copies == 1
         ? settings.labelPrinterCopies.clamp(1, 20)
         : copies.clamp(1, 20);
+    var isFirstTsplLabel = true;
     for (final product in products) {
       final model = LabelModel(
         productName: product.name,
@@ -1388,6 +1391,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           widthMm: settings.labelWidthMm,
           heightMm: settings.labelHeightMm,
           gapMm: settings.labelGapMm,
+          autoDetectGap: isFirstTsplLabel && settings.labelAutoDetectGap,
           dpi: settings.labelDpi,
           copies: effectiveCopies,
           showBusinessName: settings.labelShowBusinessName,
@@ -1399,6 +1403,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           logoPath: settings.businessLogo,
           logoBytes: tsplLogoBytes,
         ));
+        isFirstTsplLabel = false;
       } else {
         for (var copy = 0; copy < effectiveCopies; copy++) {
           bytes.addAll(LabelLayoutEngine.generateLabelBytes(
