@@ -102,8 +102,11 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const list = await runWithTenantContext(user.company_id, `
-      SELECT da.id, da.device_name as name, da.device_hash, da.platform, da.status, da.activated_at as created_at, da.last_seen_at as last_active_at 
-      FROM device_activations da 
+      SELECT da.id, da.device_name as name, da.device_hash, da.platform, da.status,
+             da.activated_at as created_at, da.last_seen_at as last_active_at,
+             s.name AS store_name
+      FROM device_activations da
+      LEFT JOIN stores s ON s.id = da.store_id AND s.company_id = da.company_id
       WHERE da.company_id = $1
       ORDER BY da.activated_at DESC
     `, [user.company_id]);

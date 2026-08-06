@@ -6,10 +6,27 @@ import {
   resolveLandingModuleId,
   resolveLandingRoute,
 } from '../config/app-shell';
+import { BillingDomainService } from '../modules/billing/billing-domain.service';
 
 const projectRoot = path.resolve(__dirname, '../..');
 
 async function run() {
+  const quoteFor = async (row: Record<string, unknown>, period: 'monthly' | 'yearly') =>
+    BillingDomainService.quotePlan({ query: async () => ({ rows: [row] }) } as any, 'company-test', 'plan-test', period);
+  const monthlyBase = { id: 'plan-test', name: 'Aylık', price: 100, effective_price: 100,
+    currency: 'TRY', billing_interval: 'monthly', custom_price: null,
+    override_billing_interval: null, device_limit: 1, store_limit: 1, user_limit: 1 };
+  assert.equal((await quoteFor(monthlyBase, 'monthly')).amount, 100);
+  assert.equal((await quoteFor(monthlyBase, 'yearly')).amount, 1020);
+  const yearlyBase = { ...monthlyBase, name: 'Yıllık', price: 1020, effective_price: 1020, billing_interval: 'yearly' };
+  assert.equal((await quoteFor(yearlyBase, 'yearly')).amount, 1020);
+  assert.equal((await quoteFor(yearlyBase, 'monthly')).amount, 100);
+  const lockedCompanyPrice = { ...monthlyBase, effective_price: 900, custom_price: 900,
+    override_billing_interval: 'yearly' };
+  const lockedQuote = await quoteFor(lockedCompanyPrice, 'monthly');
+  assert.equal(lockedQuote.period, 'yearly');
+  assert.equal(lockedQuote.amount, 900);
+
   const serverSource = fs.readFileSync(path.join(projectRoot, 'src/server.ts'), 'utf8');
   const appHtml = fs.readFileSync(path.join(projectRoot, 'public/app/index.html'), 'utf8');
 
@@ -48,6 +65,8 @@ async function run() {
   assert.match(authRuntime, /sessionStorage\.setItem\('serenut_password_reset_token'/, 'reset authorization must stay out of the URL');
   assert.doesNotMatch(authRuntime, /new URLSearchParams\(window\.location\.search\)\.get\('token'\)/, 'reset token must not be read from URL history');
   assert.doesNotMatch(runtime, /body:\{new_password:/, 'admin UI must not set user passwords directly');
+  assert.doesNotMatch(runtime, /Şifre Sıfırlama Linki|Geçici [Şş]ifre|new-user-password|company-admin-pw/, 'SMTP-free activation must not render legacy email or temporary-password controls');
+  assert.match(runtime, /id="new-password"[^>]+minlength="12"/, 'account password form must match the backend password policy');
   assert.match(runtime, /recovery\/admin-assist/, 'tenant admin UI must use canonical recovery requests');
   for (const loader of [
     'company-stores', 'company-devices', 'company-licenses', 'company-downloads',
@@ -58,7 +77,18 @@ async function run() {
   }
   const adminController = fs.readFileSync(path.join(projectRoot, 'src/modules/admin/admin.controller.ts'), 'utf8');
   const billingController = fs.readFileSync(path.join(projectRoot, 'src/modules/billing/billing.controller.ts'), 'utf8');
+  const billingDomain = fs.readFileSync(path.join(projectRoot, 'src/modules/billing/billing-domain.service.ts'), 'utf8');
+  const releaseController = fs.readFileSync(path.join(projectRoot, 'src/modules/release/release.controller.ts'), 'utf8');
   assert.doesNotMatch(billingController, /mock-checkout|ENABLE_MOCK_PAYMENTS|SİMÜLE KART/i, 'mock payment routes and controls must not exist');
+  assert.doesNotMatch(releaseController, /default-windows|default-android/, 'release history must never invent fallback releases');
+  assert.match(billingController, /is_enabled: true/, 'enabled payment methods must expose an explicit enabled state');
+  assert.match(billingController, /requirePermission\('billing:view'\).*request-bank-transfer/s, 'billing mutations must enforce billing permission');
+  assert.match(billingController, /'\/subscribe', authenticateUser, requirePermission\('billing:view'\)/, 'card checkout must enforce billing permission');
+  assert.match(billingController, /monthly_price[\s\S]*yearly_price[\s\S]*locked_billing_period/, 'effective plans must expose canonical period prices');
+  assert.match(billingDomain, /p\.billing_interval/, 'quote calculation must honor the configured plan price interval');
+  assert.match(runtime, /reason:reason\.trim\(\)/, 'manual license creation must submit its audited reason');
+  assert.match(runtime, /quote\.billing_period/, 'checkout summary must display the period returned by the canonical quote');
+  assert.doesNotMatch(runtime, /method=>method\.id==='iyzico' && method\.is_enabled/, 'card availability must not reject the enabled-method API shape');
   assert.match(adminController, /\/maintenance\/preview/, 'maintenance preview endpoint must exist');
   assert.match(adminController, /\/maintenance\/cleanup/, 'maintenance cleanup endpoint must exist');
   assert.match(adminController, /SUNUCUYU TEMIZLE/, 'maintenance cleanup must require an explicit confirmation phrase');
