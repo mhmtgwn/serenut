@@ -126,7 +126,10 @@ export function initRealtimeWebSocket(server: Server) {
 
       const legacyTestToken = process.env.NODE_ENV === 'test' ? query.token : undefined;
       if (!ticket && !legacyTestToken) {
-        logger.warn('WS Upgrade failed: Missing one-time ticket');
+        logger.warn('WS Upgrade failed: Missing one-time ticket', {
+          ip: request.socket.remoteAddress,
+          user_agent: String(request.headers['user-agent'] || 'unknown').slice(0, 300),
+        });
         authErrors++;
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();

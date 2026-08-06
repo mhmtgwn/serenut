@@ -497,6 +497,13 @@ class SyncV4Service {
       return;
     }
     final items = payload.remove('items');
+    if (type == 'order' &&
+        (payload['order_number'] == null ||
+            payload['order_number'].toString().trim().isEmpty)) {
+      // Cloud orders created before schema v80 have no order number. SQLite
+      // requires one, so use a deterministic value that is stable on replay.
+      payload['order_number'] = 'SYNC-$id';
+    }
     final row = await _normalizeRowForLocalSchema(
       db,
       table,

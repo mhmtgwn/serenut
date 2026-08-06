@@ -291,6 +291,8 @@ class ConnectionManager {
   }) {
     final safeError = error == null ? null : _redactSecrets(error.toString());
     final metadata = <String, dynamic>{
+      'event': event,
+      'level': level.name.toUpperCase(),
       'attempt': reconnectManager.attempts,
       'status': _status.name,
       'connection_session_id': _connectionSessionId,

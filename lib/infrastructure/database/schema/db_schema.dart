@@ -397,6 +397,7 @@ class DatabaseSchema {
         label_width_mm INTEGER NOT NULL DEFAULT 50,
         label_height_mm INTEGER NOT NULL DEFAULT 30,
         label_gap_mm INTEGER NOT NULL DEFAULT 2,
+        label_auto_detect_gap INTEGER NOT NULL DEFAULT 0,
         label_dpi INTEGER NOT NULL DEFAULT 203,
         admin_pin_code TEXT,
         sms_sim_subscription_id INTEGER,

@@ -496,6 +496,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   String _labelLanguage = 'tspl';
   int _labelDpi = 203;
   int _printDirection = 0;
+  bool _autoDetectLabelGap = false;
   bool _autoCut = true;
   bool _openDrawer = false;
 
@@ -543,6 +544,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
     _printDirection =
         int.tryParse(config['printDirection']?.toString() ?? '') ?? 0;
+    _autoDetectLabelGap = config['autoDetectLabelGap'] as bool? ?? false;
 
     _autoCut = config['autoCut'] as bool? ?? true;
     _openDrawer = config['openDrawer'] as bool? ?? false;
@@ -966,6 +968,18 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                   '58 mm yazıcı genişliği ile etiketin gerçek en/boy ölçüsü aynı ayar değildir.',
             ),
           ),
+          if (_labelLanguage == 'tspl') ...[
+            const SizedBox(height: 4),
+            SwitchListTile(
+              title: const Text('Gap boşluğunu otomatik algıla'),
+              subtitle: const Text(
+                'Gaplı etiket kullanıldığında yazıcı sensörü etiket aralığını kalibre eder.',
+              ),
+              value: _autoDetectLabelGap,
+              onChanged: (value) => setState(() => _autoDetectLabelGap = value),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _labelCopies,
@@ -1143,6 +1157,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelWidthMm': int.tryParse(_labelWidth.text) ?? 50,
         'labelHeightMm': int.tryParse(_labelHeight.text) ?? 30,
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
+        'autoDetectLabelGap': _labelLanguage == 'tspl' && _autoDetectLabelGap,
         'dpi': _labelDpi,
         'printableWidthDots': int.tryParse(_printableWidthDots.text) ?? 384,
         'printDirection': _printDirection,

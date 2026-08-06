@@ -199,6 +199,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       req.method === 'GET' &&
       !req.path.startsWith('/api') &&
       !req.path.startsWith('/health') &&
+      !req.path.startsWith('/ready') &&
       !req.path.startsWith('/uploads') &&
       !req.path.startsWith('/shared') &&
       !req.path.startsWith('/api-docs')

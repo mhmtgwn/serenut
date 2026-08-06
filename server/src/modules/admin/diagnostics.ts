@@ -75,6 +75,33 @@ export function normalizeSeverity(value: unknown): DiagnosticSeverity {
   return 'error';
 }
 
+function inferClientSeverity(
+  event: string,
+  explicitSeverity: unknown,
+): DiagnosticSeverity {
+  if (optionalText(explicitSeverity)) return normalizeSeverity(explicitSeverity);
+
+  const normalizedEvent = event.toLowerCase();
+  if (
+    normalizedEvent === 'ws_disconnected'
+    || normalizedEvent === 'ws_connection_closed'
+    || normalizedEvent === 'ws_handshake_failed'
+    || normalizedEvent === 'ws_connect_skipped_no_user'
+    || normalizedEvent === 'ws_refresh_rejected'
+  ) return 'warning';
+
+  if (
+    normalizedEvent.includes('failed')
+    || normalizedEvent.includes('failure')
+    || normalizedEvent.includes('exception')
+    || normalizedEvent.includes('error')
+  ) return 'error';
+
+  // Older metric rows did not carry a level. A missing level must not turn
+  // lifecycle, audit and success metrics into incidents.
+  return 'info';
+}
+
 export function explainDiagnostic(input: {
   event?: unknown;
   context?: unknown;
@@ -110,7 +137,32 @@ export function explainDiagnostic(input: {
       suggested_action: 'Cihaz, firma ve correlation ID alanlarını kullanarak aynı oturumdaki ilk hatayı bulun; sonraki tekrar kayıtları ikincil olabilir.',
     };
   }
-  if (haystack.includes('websocket') || haystack.includes('ws_handshake')) {
+  if (event === 'ws_connected' || event === 'ws_handshake_succeeded') {
+    return {
+      title: 'Canlı bağlantı kuruldu',
+      explanation: 'Anlık bildirim kanalı başarıyla bağlandı.',
+      suggested_action: 'İşlem gerekmiyor.',
+    };
+  }
+  if (event === 'ws_connect_started' || event === 'ws_handshake_started') {
+    return {
+      title: 'Canlı bağlantı başlatıldı',
+      explanation: 'İstemci anlık bildirim kanalına bağlanmayı deniyor.',
+      suggested_action: 'Ardından başarı veya bağlantı hatası kaydı gelmedikçe işlem gerekmiyor.',
+    };
+  }
+  if (event === 'ws_reconnect_scheduled') {
+    return {
+      title: 'Canlı bağlantı yeniden denenecek',
+      explanation: 'İstemci bağlantı kesildikten sonra kontrollü bir yeniden deneme planladı.',
+      suggested_action: 'Tekrarlayan bağlantı hataları yoksa işlem gerekmiyor.',
+    };
+  }
+  if (
+    event.startsWith('ws_')
+    || haystack.includes('websocket')
+    || haystack.includes('ws_handshake')
+  ) {
     return {
       title: 'Canlı bağlantı kurulamadı',
       explanation: 'Anlık bildirim kanalı bağlantı kuramadı veya koptu. Periyodik senkronizasyon çalışmaya devam edebilir.',
@@ -159,7 +211,7 @@ export function normalizeClientDiagnostic(row: Record<string, any>): DiagnosticR
   const message = optionalText(metadata.error_message) || optionalText(metadata.message) || event;
   const context = optionalText(metadata.context);
   const errorType = optionalText(metadata.error_type);
-  const severity = normalizeSeverity(metadata.level || row.severity || 'error');
+  const severity = inferClientSeverity(event, metadata.level || row.severity);
   const guidance = explainDiagnostic({
     event,
     context,

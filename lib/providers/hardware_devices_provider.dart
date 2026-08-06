@@ -120,6 +120,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           'labelWidthMm': settings.labelWidthMm,
           'labelHeightMm': settings.labelHeightMm,
           'labelGapMm': settings.labelGapMm,
+          'autoDetectLabelGap': settings.labelAutoDetectGap,
           'dpi': settings.labelDpi,
           'copies': settings.labelPrinterCopies,
         },
@@ -561,6 +562,8 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
                 labelWidthMm: _int(config['labelWidthMm'], 50),
                 labelHeightMm: _int(config['labelHeightMm'], 30),
                 labelGapMm: _int(config['labelGapMm'], 2),
+                labelAutoDetectGap:
+                    config['autoDetectLabelGap'] as bool? ?? false,
                 labelDpi: _int(config['dpi'], 203),
                 labelPrinterCopies:
                     _int(config['copies'], 1).clamp(1, 20).toInt(),
@@ -736,6 +739,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
             'mediaWidthMm': _int(config['labelWidthMm'], 50),
             'mediaHeightMm': _int(config['labelHeightMm'], 30),
             'gapMm': _int(config['labelGapMm'], 2),
+            'autoDetectGap': config['autoDetectLabelGap'] as bool? ?? false,
             'printableWidthDots': _int(config['printableWidthDots'], 384),
             'direction': _int(config['printDirection'], 0),
             'raster': true,
@@ -782,6 +786,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         'labelWidthMm': profile.capabilities['mediaWidthMm'],
         'labelHeightMm': profile.capabilities['mediaHeightMm'],
         'labelGapMm': profile.capabilities['gapMm'],
+        'autoDetectLabelGap': profile.capabilities['autoDetectGap'],
         'printableWidthDots': profile.capabilities['printableWidthDots'],
         'printDirection': profile.capabilities['direction'],
       } else ...{

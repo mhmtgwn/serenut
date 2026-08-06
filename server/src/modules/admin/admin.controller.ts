@@ -182,12 +182,19 @@ router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
     if (source === 'all' || source === 'client') {
       const clientEvents = await runBypassingRLS(
         `SELECT e.id, e.company_id, c.name AS company_name, e.user_id,
-                u.name AS user_name, e.metric_name, e.occurred_at, e.received_at,
+                u.name AS user_name, e.metric_name,
+                CASE
+                  WHEN e.occurred_at > e.received_at + interval '5 minutes'
+                    OR e.occurred_at < e.received_at - interval '7 days'
+                  THEN e.received_at
+                  ELSE e.occurred_at
+                END AS occurred_at,
+                e.received_at,
                 e.metadata, e.ip_address, e.user_agent
            FROM client_telemetry_events e
            LEFT JOIN companies c ON c.id = e.company_id
            LEFT JOIN users u ON u.id = e.user_id
-          WHERE e.occurred_at >= NOW() - ($1::text || ' hours')::interval
+          WHERE e.received_at >= NOW() - ($1::text || ' hours')::interval
             AND ($2 = '' OR e.company_id = $2)
             AND (
               $3 = ''
@@ -198,11 +205,20 @@ router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
             )
             AND (
               $4 = 'all'
-              OR ($4 = 'warning' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('WARNING', 'WARN'))
-              OR ($4 = 'error' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('ERROR', 'CRITICAL', 'FATAL'))
+              OR ($4 = 'warning' AND (
+                UPPER(COALESCE(e.metadata->>'level', '')) IN ('WARNING', 'WARN')
+                OR (NOT (e.metadata ? 'level') AND e.metric_name IN (
+                  'ws_disconnected', 'ws_connection_closed', 'ws_handshake_failed',
+                  'ws_connect_skipped_no_user', 'ws_refresh_rejected'
+                ))
+              ))
+              OR ($4 = 'error' AND (
+                UPPER(COALESCE(e.metadata->>'level', '')) IN ('ERROR', 'CRITICAL', 'FATAL')
+                OR (NOT (e.metadata ? 'level') AND e.metric_name ~* '(failed|failure|exception|error)')
+              ))
               OR ($4 = 'critical' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('CRITICAL', 'FATAL'))
             )
-          ORDER BY e.occurred_at DESC
+          ORDER BY e.received_at DESC
           LIMIT $5`,
         [hours, companyId, search, severity, limit],
       );
