@@ -2,6 +2,8 @@ name: Publish Prepared Client Artifacts
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   actions: read
