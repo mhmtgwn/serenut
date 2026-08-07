@@ -674,6 +674,27 @@ class _LabelTemplateEditorPageState
                   ),
                 ],
               ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Eski borç:',
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * scale,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  Text(
+                    '₺150,00',
+                    style: GoogleFonts.inter(
+                      fontSize: 10 * scale,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red[700],
+                    ),
+                  ),
+                ],
+              ),
             ],
             if (_orderShowDate) ...[
               const SizedBox(height: 4),
@@ -699,26 +720,81 @@ class _LabelTemplateEditorPageState
             const Divider(height: 12, thickness: 0.5),
             if (_orderShowItemsCount) ...[
               Text(
-                'ÜRÜN İÇERİĞİ (3 Parça):',
+                'SİPARİŞ İÇERİĞİ (2 Çeşit):',
                 style: GoogleFonts.inter(
                   fontSize: 10 * scale,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey[700],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '• 2x Taze Çifte Kavrulmuş Fındık 500g\n• 1x Anamur Muz 1kg',
-                style: GoogleFonts.inter(
-                  fontSize: 11 * scale,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
+              const SizedBox(height: 6),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Taze Çifte Kavrulmuş Fındık 500g',
+                    style: GoogleFonts.inter(
+                      fontSize: 11 * scale,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '  2x 200,00 TL',
+                        style: GoogleFonts.inter(
+                          fontSize: 10 * scale,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      Text(
+                        '400,00 TL',
+                        style: GoogleFonts.inter(
+                          fontSize: 10 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Anamur Muz 1kg',
+                    style: GoogleFonts.inter(
+                      fontSize: 11 * scale,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '  1x 20,00 TL',
+                        style: GoogleFonts.inter(
+                          fontSize: 10 * scale,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      Text(
+                        '20,00 TL',
+                        style: GoogleFonts.inter(
+                          fontSize: 10 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
             ],
+            const Divider(height: 10, thickness: 0.5),
             if (_orderShowTotalAmount) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

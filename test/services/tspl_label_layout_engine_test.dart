@@ -202,7 +202,8 @@ void main() {
     expect(output, isNot(contains('Parca Urun / Paket')));
     expect(output, contains('QRCODE '));
     expect(output, isNot(contains('BARCODE ')));
-    expect(output, contains('- 2x Ornek Urun'));
+    expect(output, contains('Ornek Urun'));
+    expect(output, contains('2 adet'));
     expect(output, contains('DIRECTION 0'));
     expect(output, isNot(contains('•')));
     expect(output, endsWith('PRINT 1,1\r\n'));
@@ -239,10 +240,18 @@ void main() {
     expect(date, isNotNull);
     expect(
         int.parse(date!.group(1)!), greaterThan(int.parse(order!.group(1)!)));
-    expect(output, contains('- 2x Elma TL25.00'));
-    expect(output, contains('- 1x Armut TL20.00'));
-    expect(output, contains('- 3x Muz TL30.00'));
-    expect(output, contains('- 1x Erik TL5.00'));
+    expect(output, contains('Elma'));
+    expect(output, contains('2x 12.50 TL'));
+    expect(output, contains('25.00 TL'));
+    expect(output, contains('Armut'));
+    expect(output, contains('1x 20.00 TL'));
+    expect(output, contains('20.00 TL'));
+    expect(output, contains('Muz'));
+    expect(output, contains('3x 10.00 TL'));
+    expect(output, contains('30.00 TL'));
+    expect(output, contains('Erik'));
+    expect(output, contains('1x 5.00 TL'));
+    expect(output, contains('5.00 TL'));
     expect(output, isNot(contains(' +1')));
     expect(output, contains('GAP 0 mm,0 mm'));
     expect(output, isNot(contains('GAPDETECT')));

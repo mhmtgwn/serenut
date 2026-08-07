@@ -53,24 +53,25 @@ android {
             val alias = keystoreProperties["keyAlias"] as String? ?: System.getenv("KEY_ALIAS")
             val keyPass = keystoreProperties["keyPassword"] as String? ?: System.getenv("KEY_PASSWORD")
 
-            if (file(keyFile).exists() && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty()) {
-                storeFile = file(keyFile)
+            val keystoreFile = file(keyFile)
+            if (keystoreFile.exists() && !storePass.isNullOrEmpty() && !alias.isNullOrEmpty()) {
+                storeFile = keystoreFile
                 storePassword = storePass
                 keyAlias = alias
                 keyPassword = keyPass ?: storePass
                 storeType = "PKCS12"
-            } else {
-                throw GradleException(
-                    "Release signing is not configured. Provide android/key.properties " +
-                        "or KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD."
-                )
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val releaseConfig = signingConfigs.findByName("release")
+            if (releaseConfig != null && releaseConfig.storeFile != null) {
+                signingConfig = releaseConfig
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 }

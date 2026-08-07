@@ -258,36 +258,69 @@ class TsplLabelLayoutEngine {
     final noteClean =
         note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
 
-    final itemRows = items != null && items.isNotEmpty ? items.length : 1;
-    final estimatedDotsAt203 = 6 +
-        (showBusinessName ? 23 : 0) +
-        (showOrderNo ? 22 : 0) +
-        (showDate && timestamp != null ? 22 : 0) +
-        (showCustomerName ? 22 : 0) +
-        (customerNoClean.isNotEmpty ? 18 : 0) +
-        (phoneClean.isNotEmpty ? 18 : 0) +
-        18 +
-        6 +
-        (itemRows * 22) +
-        20 +
-        (noteClean != null ? 24 : 0) +
-        80;
-    final requiredHeightMm =
-        (estimatedDotsAt203 * 25.4 / 203).ceil().clamp(20, 1000);
-    final requestedHeightMm = heightMm.clamp(20, 1000);
-    final safeHeight = requestedHeightMm > requiredHeightMm
-        ? requestedHeightMm
-        : requiredHeightMm;
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
     final widthDots = printableWidthDots == null
         ? mediaWidthDots
         : printableWidthDots.clamp(200, mediaWidthDots);
-    final heightDots = (safeHeight * safeDpi / 25.4).round();
+
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * safeDpi / 203).round();
+
     final maxFont1Chars = ((widthDots - sx(32)) ~/ 8).clamp(4, 80);
     final maxFont2Chars = ((widthDots - sx(32)) ~/ 12).clamp(4, 60);
-    final maxFont3Chars = ((widthDots - sx(32)) ~/ 16).clamp(4, 40);
+
+    final custClean = _ascii(customerName.trim());
+    final prodClean = _ascii(productName.trim());
+
+    // ── Pre-calculate Exact Dot Height ────────────────────────────────────────
+    int calculatedDots = sy(6);
+
+    if (showBusinessName) {
+      calculatedDots += logoBytes != null && logoBytes.isNotEmpty ? sy(19) : sy(20);
+    }
+    if (showOrderNo) calculatedDots += sy(22);
+    if (showDate && timestamp != null) calculatedDots += sy(22);
+    if (showCustomerName) calculatedDots += sy(22);
+    if (customerNoClean.isNotEmpty) calculatedDots += sy(18);
+    if (phoneClean.isNotEmpty) calculatedDots += sy(18);
+    if (previousDebt > 0.001) calculatedDots += sy(18);
+
+    calculatedDots += sy(12); // Separator 1
+
+    if (showItemsCount &&
+        itemsCount != null &&
+        (items == null || items.isEmpty)) {
+      calculatedDots += sy(18);
+    }
+
+    if (items != null && items.isNotEmpty) {
+      for (final item in items) {
+        final rawName =
+            _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
+        final nameLines = _splitText(rawName, maxFont1Chars, maxLines: 2);
+        calculatedDots += nameLines.length * sy(20);
+        calculatedDots += sy(20); // Detail / Price line
+        calculatedDots += sy(4); // Item gap
+      }
+    } else {
+      final nameLines = _splitText(prodClean, maxFont2Chars, maxLines: 2);
+      calculatedDots += nameLines.length * sy(22);
+      calculatedDots += sy(20);
+    }
+
+    calculatedDots += sy(12); // Separator 2
+    calculatedDots += sy(20); // Payment status
+    if (noteClean != null) calculatedDots += sy(24);
+    if (showTotalAmount && totalAmount != null) calculatedDots += sy(30);
+    calculatedDots += sy(55); // Footer & QR Code clearance + bottom padding
+
+    final requiredHeightMm =
+        (calculatedDots * 25.4 / safeDpi).ceil() + 6; // 6mm safety margin
+    final requestedHeightMm = heightMm.clamp(20, 1000);
+    final safeHeight = requestedHeightMm > requiredHeightMm
+        ? requestedHeightMm
+        : requiredHeightMm;
+    final heightDots = (safeHeight * safeDpi / 25.4).round();
 
     final timeStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -295,8 +328,6 @@ class TsplLabelLayoutEngine {
     final qtyStr = quantity % 1 == 0
         ? quantity.toInt().toString()
         : quantity.toStringAsFixed(1);
-    final custClean = _ascii(customerName.trim());
-    final prodClean = _ascii(productName.trim());
 
     final safeGap = gapMm.clamp(0, 10);
     final commands = _TsplBuffer()
@@ -304,16 +335,13 @@ class TsplLabelLayoutEngine {
       ..writeln('GAP $safeGap mm,0 mm')
       ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('DENSITY 8')
-      // Product and order labels share the same physical media path. Keeping
-      // one direction prevents order labels from being rotated relative to
-      // product labels on the same routed device.
       ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
       ..writeln('REFERENCE 0,0')
       ..writeln('CLS');
 
     int currentY = sy(6);
 
-    // 1. Business Header (if enabled)
+    // 1. Business Header
     if (showBusinessName) {
       final bitmap = _generateTsplBitmap(
         null,
@@ -337,13 +365,11 @@ class TsplLabelLayoutEngine {
 
     // 2. Header: Sipariş No & Tarih
     if (showOrderNo) {
-      final orderNo = _fit(orderIdShort, (maxFont2Chars - 9).clamp(4, 12));
+      final orderNo = _fit(orderIdShort, (maxFont2Chars - 9).clamp(4, 16));
       commands
           .writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"SIPARIS #$orderNo"');
       currentY += sy(22);
     }
-    // Date/time always owns the next line. Sharing the order-number baseline
-    // caused the two fields to collide on 58 mm printers.
     if (showDate && timeStr.isNotEmpty) {
       final safeTime = _fit(timeStr, maxFont1Chars);
       commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$safeTime"');
@@ -358,7 +384,6 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$whoText"');
       currentY += sy(22);
     }
-    // Customer number (Müşteri No)
     if (customerNoClean.isNotEmpty) {
       commands.writeln(
           'TEXT ${sx(16)},$currentY,"1",0,1,1,"Mus. No: ${_fit(customerNoClean, (maxFont1Chars - 9).clamp(4, 40))}"');
@@ -369,15 +394,17 @@ class TsplLabelLayoutEngine {
           'TEXT ${sx(16)},$currentY,"1",0,1,1,"Tel: ${_fit(phoneClean, (maxFont1Chars - 5).clamp(4, 60))}"');
       currentY += sy(18);
     }
-    commands.writeln(
-        'TEXT ${sx(16)},$currentY,"1",0,1,1,"Eski borc: TL ${previousDebt.toStringAsFixed(2)}"');
-    currentY += sy(18);
+    if (previousDebt > 0.001) {
+      commands.writeln(
+          'TEXT ${sx(16)},$currentY,"1",0,1,1,"Eski borc: TL ${previousDebt.toStringAsFixed(2)}"');
+      currentY += sy(18);
+    }
 
     // 4. Separator Line
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
-    currentY += sy(4);
+    currentY += sy(6);
 
-    // 5. Items Count & Product Quantity / Items List
+    // 5. Items Breakdown (Receipt-Style Layout)
     if (showItemsCount &&
         itemsCount != null &&
         (items == null || items.isEmpty)) {
@@ -387,39 +414,70 @@ class TsplLabelLayoutEngine {
     }
 
     if (items != null && items.isNotEmpty) {
-      for (var index = 0; index < items.length; index++) {
-        final item = items[index];
+      for (final item in items) {
         final rawName =
             _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
         final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
         final itemQtyStr = itemQty % 1 == 0
             ? itemQty.toInt().toString()
             : itemQty.toStringAsFixed(1);
-        final unitPrice = (item['unit_price'] as num?)?.toDouble();
-        final lineTotal = unitPrice == null ? null : unitPrice * itemQty;
-        final suffix =
-            lineTotal == null ? '' : ' TL${lineTotal.toStringAsFixed(2)}';
-        final nameLimit =
-            (maxFont1Chars - itemQtyStr.length - suffix.length - 4)
-                .clamp(4, maxFont1Chars);
-        final lineStr = _fit(
-            '- ${itemQtyStr}x ${_fit(rawName, nameLimit)}$suffix',
-            maxFont1Chars);
-        commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$lineStr"');
-        currentY += sy(22);
+        final unitPrice = (item['unit_price'] as num? ?? item['unitPrice'] as num?)?.toDouble();
+        final lineTotal = item['total'] != null
+            ? (item['total'] as num).toDouble()
+            : item['line_total'] != null
+                ? (item['line_total'] as num).toDouble()
+                : unitPrice == null
+                    ? null
+                    : unitPrice * itemQty;
+
+        // Line 1: Product Name (wrapped if long)
+        final nameLines = _splitText(rawName, maxFont1Chars, maxLines: 2);
+        for (final line in nameLines) {
+          commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$line"');
+          currentY += sy(20);
+        }
+
+        // Line 2: Quantity x Unit Price (Left) & Line Total (Right)
+        final leftDetail = unitPrice == null
+            ? '  ${itemQtyStr} adet'
+            : '  ${itemQtyStr}x ${unitPrice.toStringAsFixed(2)} TL';
+        final rightTotal = lineTotal == null
+            ? ''
+            : '${lineTotal.toStringAsFixed(2)} TL';
+
+        final safeLeft = _fit(leftDetail, (maxFont1Chars - rightTotal.length - 1).clamp(4, maxFont1Chars));
+        commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$safeLeft"');
+
+        if (rightTotal.isNotEmpty) {
+          final rightX = (widthDots - sx(16) - (rightTotal.length * 8))
+              .clamp(sx(16), widthDots - sx(16));
+          commands.writeln('TEXT $rightX,$currentY,"1",0,1,1,"$rightTotal"');
+        }
+        currentY += sy(20);
+        currentY += sy(4);
       }
     } else {
-      final itemTitle = '$qtyStr x $prodClean';
-      if (itemTitle.length <= maxFont3Chars) {
-        commands.writeln('TEXT ${sx(16)},$currentY,"3",0,1,1,"$itemTitle"');
-        currentY += sy(26);
-      } else {
-        commands.writeln(
-            'TEXT ${sx(16)},$currentY,"2",0,1,1,"${_fit(itemTitle, maxFont2Chars)}"');
-        currentY += sy(20);
+      final nameLines = _splitText(prodClean, maxFont2Chars, maxLines: 2);
+      for (final line in nameLines) {
+        commands.writeln('TEXT ${sx(16)},$currentY,"2",0,1,1,"$line"');
+        currentY += sy(22);
       }
+      final detail = '  $qtyStr adet';
+      commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$detail"');
+      if (totalAmount != null) {
+        final totalText = '${totalAmount.toStringAsFixed(2)} TL';
+        final rightX = (widthDots - sx(16) - (totalText.length * 8))
+            .clamp(sx(16), widthDots - sx(16));
+        commands.writeln('TEXT $rightX,$currentY,"1",0,1,1,"$totalText"');
+      }
+      currentY += sy(20);
     }
 
+    // 6. Separator Line
+    commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
+    currentY += sy(6);
+
+    // 7. Payment status & Note
     commands.writeln(
         'TEXT ${sx(16)},$currentY,"1",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxFont1Chars - 7).clamp(4, 60))}"');
     currentY += sy(20);
@@ -430,7 +488,7 @@ class TsplLabelLayoutEngine {
       currentY += sy(24);
     }
 
-    // 6. Total Amount & QR footer positioned dynamically after items
+    // 8. Total Amount & QR Footer
     currentY += sy(4);
     final footerY = currentY;
 
@@ -438,7 +496,7 @@ class TsplLabelLayoutEngine {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
       final footerTextChars = ((widthDots - sx(110)) ~/ 8).clamp(8, 50);
       final safeTotal = _fit(totalStr, footerTextChars);
-      commands.writeln('TEXT ${sx(16)},$footerY,"1",0,1,1,"$safeTotal"');
+      commands.writeln('TEXT ${sx(16)},$footerY,"2",0,1,1,"$safeTotal"');
     }
 
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
@@ -451,6 +509,37 @@ class TsplLabelLayoutEngine {
 
     commands.writeln('PRINT ${copies.clamp(1, 20)},1');
     return commands.bytes;
+  }
+
+  static List<String> _splitText(String text, int maxCharsPerLine, {int maxLines = 2}) {
+    final clean = _ascii(text.trim().replaceAll(RegExp(r'\s+'), ' '))
+        .replaceAll('"', "'");
+    if (clean.length <= maxCharsPerLine) return [clean];
+
+    final words = clean.split(' ');
+    final lines = <String>[];
+    var currentLine = '';
+
+    for (final word in words) {
+      if (currentLine.isEmpty) {
+        currentLine = word;
+      } else if (currentLine.length + word.length + 1 <= maxCharsPerLine) {
+        currentLine = '$currentLine $word';
+      } else {
+        lines.add(currentLine);
+        currentLine = word;
+        if (lines.length == maxLines - 1) break;
+      }
+    }
+    if (currentLine.isNotEmpty && lines.length < maxLines) {
+      lines.add(currentLine);
+    }
+
+    if (lines.length == maxLines && lines.last.length > maxCharsPerLine) {
+      lines.last = '${lines.last.substring(0, maxCharsPerLine - 2)}..';
+    }
+
+    return lines.isEmpty ? [clean] : lines;
   }
 
   static List<String> _wrapProductName(String name, int maxCharsPerLine) {
