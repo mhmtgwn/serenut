@@ -294,11 +294,11 @@ class TsplLabelLayoutEngine {
     final noteClean =
         note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
 
+    final safeGap = gapMm.clamp(0, 10);
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
-      // Order labels use continuous media. GAP 0 disables gap sensing and the
-      // label length above grows with the complete order contents.
-      ..writeln('GAP 0 mm,0 mm')
+      ..writeln('GAP $safeGap mm,0 mm')
+      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('DENSITY 8')
       // Product and order labels share the same physical media path. Keeping
       // one direction prevents order labels from being rotated relative to

@@ -226,6 +226,7 @@ void main() {
         totalAmount: 80,
         widthMm: 58,
         heightMm: 30,
+        gapMm: 0,
         logoBytes: File('assets/logo.png').readAsBytesSync(),
       ),
     );
