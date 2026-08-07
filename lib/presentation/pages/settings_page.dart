@@ -313,7 +313,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildHardwareCenterCard(Settings settings) {
     return _buildCategoryRow(
-      title: 'Cihazlar ve Donanım',
+      title: 'Aygıt Yöneticisi',
       subtitle: 'Cihazları ekleyin, bağlantıları yönetin ve test edin',
       icon: Icons.settings_input_component_rounded,
       color: _kGreen,

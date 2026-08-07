@@ -31,7 +31,7 @@ class PhysicalPrintTestService {
     required this.repository,
     required this.runtime,
     this.assets = const PrintAssetEncoder(),
-    this.timeout = const Duration(seconds: 12),
+    this.timeout = const Duration(seconds: 30),
   });
 
   Future<PhysicalPrintTestDispatch> dispatch({

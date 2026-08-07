@@ -357,6 +357,10 @@ class TsplOrderLabelRenderer implements PrintRenderer {
     final bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
       orderIdShort: payload['orderNo']?.toString() ?? '',
       customerName: payload['customerName']?.toString() ?? '',
+      customerPhone: payload['customerPhone']?.toString(),
+      customerNo: payload['customerNo']?.toString(),
+      previousDebt: _decimal(payload['previousDebt'], 0),
+      paymentStatus: payload['paymentStatus']?.toString() ?? 'Bilinmiyor',
       productName: payload['productName']?.toString() ?? '',
       quantity: _decimal(payload['quantity'], 1),
       items: (payload['items'] as List?)

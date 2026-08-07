@@ -1270,6 +1270,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
   }
 
+  static String _statusLabel(String status) => switch (status.toLowerCase()) {
+        'created' => 'Beklemede',
+        'preparing' => 'Hazirlaniyor',
+        'ready' => 'Hazir',
+        'delivered' => 'Teslim Edildi',
+        'cancelled' => 'Iptal Edildi',
+        _ => status,
+      };
+
   @override
   Future<void> printOrderLabels(
     OrderEntity order,
@@ -1286,6 +1295,13 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final List<int> allBytes = [];
     final isTspl = settings.labelPrinterLanguage == 'tspl';
     final custName = customer?.name ?? order.customerId;
+    final rawCustomerId = customer?.id ?? order.customerId;
+    final shortCustomerId = rawCustomerId.length > 8
+        ? rawCustomerId.substring(0, 8).toUpperCase()
+        : rawCustomerId.toUpperCase();
+    final previousDebt = customer != null && customer.balance < 0
+        ? customer.balance.abs()
+        : 0.0;
 
     final firstItem = items.isEmpty ? null : items.first;
     final summaryName = items.length == 1
@@ -1302,12 +1318,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       allBytes.addAll(TsplLabelLayoutEngine.generateOrderLabelBytes(
         orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
         customerName: custName,
+        customerNo: shortCustomerId,
         productName: summaryName,
         quantity: summaryQuantity,
         items: items,
         note: note,
         timestamp: order.createdAt,
         totalAmount: order.totalAmount,
+        previousDebt: previousDebt,
+        paymentStatus: _statusLabel(order.status),
         itemsCount: items.length,
         widthMm: settings.labelWidthMm,
         heightMm: settings.labelHeightMm,

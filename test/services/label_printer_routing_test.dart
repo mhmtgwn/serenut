@@ -177,7 +177,7 @@ void main() {
       );
     });
 
-    test('one order label summarizes all items without overflowing', () async {
+    test('one continuous order label grows to include every item', () async {
       final settings = Settings(
         businessName: 'Test Market',
         businessPhone: '123456',
@@ -236,11 +236,15 @@ void main() {
 
       final output = String.fromCharCodes(socket.writtenBytes);
       expect('Birinci Urun'.allMatches(output), hasLength(1));
-      expect(output, isNot(contains('Ikinci Urun')));
-      expect(output, isNot(contains('Ucuncu Urun')));
-      expect(output, isNot(contains('Dorduncu Urun')));
-      expect(output, isNot(contains('Besinci Urun')));
-      expect(output, contains('+4 diger urun'));
+      expect('Ikinci Urun'.allMatches(output), hasLength(1));
+      expect('Ucuncu Urun'.allMatches(output), hasLength(1));
+      expect('Dorduncu Urun'.allMatches(output), hasLength(1));
+      expect('Besinci Urun'.allMatches(output), hasLength(1));
+      expect(output, isNot(contains('diger urun')));
+      expect(output, contains('GAP 0 mm,0 mm'));
+      final size = RegExp(r'SIZE 50 mm,(\d+) mm').firstMatch(output);
+      expect(size, isNotNull);
+      expect(int.parse(size!.group(1)!), greaterThan(30));
       expect('PRINT 1,1'.allMatches(output), hasLength(1));
     });
   });

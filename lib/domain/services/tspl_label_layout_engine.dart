@@ -88,51 +88,38 @@ class TsplLabelLayoutEngine {
     // 3. Middle: dominant product name, matching the shelf-label hierarchy.
     final nameClean = _fit(model.productName, 44);
     final usableNameWidth = widthDots - (horizontalPadding * 2);
-    final maxLargeChars = (usableNameWidth / 24).floor().clamp(1, 44);
-    final maxMediumChars = (usableNameWidth / 16).floor().clamp(1, 44);
-    if (nameClean.length <= maxLargeChars) {
-      var f = fontScale < 0.9 ? '3' : '4';
-      var charW = f == '4' ? 24 : 16;
-      var xMultiplier = 1;
-      var yMultiplier = 2;
-      var bestWidth = nameClean.length * charW;
-      for (final candidate in const [
-        (font: '4', charWidth: 24, multiplier: 3),
-        (font: '4', charWidth: 24, multiplier: 2),
-        (font: '2', charWidth: 12, multiplier: 3),
-        (font: '3', charWidth: 16, multiplier: 2),
-      ]) {
-        final candidateWidth =
-            nameClean.length * candidate.charWidth * candidate.multiplier;
-        if (candidateWidth <= usableNameWidth && candidateWidth > bestWidth) {
-          f = candidate.font;
-          charW = candidate.charWidth;
-          xMultiplier = candidate.multiplier;
-          yMultiplier = candidate.font == '2' ? 3 : 2;
-          bestWidth = candidateWidth;
-        }
-      }
-      final textW = nameClean.length * charW * xMultiplier * fontScale;
+    final minSingleLineWidth = nameClean.length * 12;
+    if (minSingleLineWidth <= usableNameWidth) {
+      final layout = _widestTextLayout(nameClean, usableNameWidth);
+      final textW = layout.width;
       final centerX =
           ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
       commands.boldText(
-          centerX, currentY, f, xMultiplier, yMultiplier, nameClean);
+        centerX,
+        currentY,
+        layout.font,
+        layout.xMultiplier,
+        layout.yMultiplier,
+        nameClean,
+      );
       currentY += sy(50 * fontScale).round();
-    } else if (nameClean.length <= maxMediumChars) {
-      final textW = nameClean.length * 16 * fontScale;
-      final centerX =
-          ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
-      commands.boldText(centerX, currentY, '3', 1, 2, nameClean);
-      currentY += sy(42 * fontScale).round();
     } else {
-      final maxLineChars = (usableNameWidth / 16).floor().clamp(4, 44);
+      final maxLineChars = (usableNameWidth / 12).floor().clamp(4, 44);
       final lines = _wrapProductName(nameClean, maxLineChars);
       for (final rawLine in lines) {
         final line = _fit(rawLine, maxLineChars);
-        final textW = line.length * 16 * fontScale;
+        final layout = _widestTextLayout(line, usableNameWidth);
+        final textW = layout.width;
         final centerX =
             ((widthDots - textW) / 2).clamp(10, widthDots - 10).round();
-        commands.boldText(centerX, currentY, '3', 1, 2, line);
+        commands.boldText(
+          centerX,
+          currentY,
+          layout.font,
+          layout.xMultiplier,
+          layout.yMultiplier,
+          line,
+        );
         currentY += sy(34 * fontScale).round();
       }
     }
@@ -147,7 +134,7 @@ class TsplLabelLayoutEngine {
     // 4. Horizontal Separator Line
     commands.writeln(
         'BAR $horizontalPadding,$currentY,${widthDots - (horizontalPadding * 2)},${sy(2)}');
-    currentY += sy(8);
+    currentY += sy(4);
 
     // 5. Bottom Layout (Left: Barcode | Right: Price & KDV)
     final bottomY = currentY;
@@ -159,7 +146,7 @@ class TsplLabelLayoutEngine {
       final barcodeY = bottomY;
       final barcodeHeight = (bottomHeight - sy(6)).clamp(30, sy(72)).round();
       commands.writeln(
-        'BARCODE $horizontalPadding,$barcodeY,"128",$barcodeHeight,0,0,1,1,"$barcode"',
+        'BARCODE $horizontalPadding,$barcodeY,"128",$barcodeHeight,0,0,1,2,"$barcode"',
       );
     }
 
@@ -173,30 +160,32 @@ class TsplLabelLayoutEngine {
       const vatStr = '(KDV Dahil)';
 
       if (showBarcode && barcode.isNotEmpty) {
-        final priceLeft = (widthDots * 0.43).round();
+        final priceLeft = (widthDots * 0.45).round();
         final priceRight = widthDots - horizontalPadding;
         final availablePriceWidth = priceRight - priceLeft;
         final priceText = '$whole,$cents';
         const currencyWidth = 16;
         const gap = 2;
-        final priceFont =
-            currencyWidth + gap + priceText.length * 24 <= availablePriceWidth
-                ? '4'
-                : (currencyWidth + gap + priceText.length * 16 <=
-                        availablePriceWidth
-                    ? '3'
-                    : '2');
-        final priceCharWidth =
-            priceFont == '4' ? 24 : (priceFont == '3' ? 16 : 12);
-        final priceWidth = priceText.length * priceCharWidth;
+        final priceLayout = _widestTextLayout(
+          priceText,
+          availablePriceWidth - currencyWidth - gap,
+        );
+        final priceWidth = priceLayout.width;
         final totalPriceWidth = currencyWidth + gap + priceWidth;
         final currencyX = (priceLeft +
                 ((availablePriceWidth - totalPriceWidth) / 2).clamp(0, 999))
             .round();
         final priceX = currencyX + currencyWidth + gap;
-        final priceY = bottomY + sy(2);
+        final priceY = bottomY;
         commands.writeln('TEXT $currencyX,${priceY + sy(22)},"2",0,1,1,"TL"');
-        commands.boldText(priceX, priceY, priceFont, 1, 2, priceText);
+        commands.boldText(
+          priceX,
+          priceY,
+          priceLayout.font,
+          priceLayout.xMultiplier,
+          2,
+          priceText,
+        );
         if (showVat) {
           final vatY = bottomY + bottomHeight - sy(10);
           commands.writeln('TEXT $currencyX,$vatY,"1",0,1,1,"$vatStr"');
@@ -233,6 +222,10 @@ class TsplLabelLayoutEngine {
   static List<int> generateOrderLabelBytes({
     required String orderIdShort,
     required String customerName,
+    String? customerPhone,
+    String? customerNo,
+    double previousDebt = 0,
+    String paymentStatus = 'Bilinmiyor',
     required String productName,
     required double quantity,
     List<Map<String, dynamic>>? items,
@@ -259,16 +252,33 @@ class TsplLabelLayoutEngine {
     List<int>? logoBytes,
   }) {
     final safeWidth = widthMm.clamp(30, 100);
-    final safeHeight = heightMm.clamp(20, 100);
-    final safeGap = gapMm.clamp(0, 10);
     final safeDpi = dpi == 300 ? 300 : 203;
+    final itemRows = items != null && items.isNotEmpty ? items.length : 1;
+    final estimatedDotsAt203 = 6 +
+        (showBusinessName ? 23 : 0) +
+        (showOrderNo ? 22 : 0) +
+        (showDate && timestamp != null ? 22 : 0) +
+        (showCustomerName ? 22 : 0) +
+        (customerPhone != null && customerPhone.trim().isNotEmpty ? 18 : 0) +
+        18 +
+        6 +
+        (itemRows * 22) +
+        20 +
+        (note != null && note.trim().isNotEmpty ? 24 : 0) +
+        74;
+    final requiredHeightMm =
+        (estimatedDotsAt203 * 25.4 / 203).ceil().clamp(20, 500);
+    final requestedHeightMm = heightMm.clamp(20, 500);
+    final safeHeight = requestedHeightMm > requiredHeightMm
+        ? requestedHeightMm
+        : requiredHeightMm;
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
     final widthDots = printableWidthDots == null
         ? mediaWidthDots
         : printableWidthDots.clamp(200, mediaWidthDots);
     final heightDots = (safeHeight * safeDpi / 25.4).round();
     int sx(num value) => (value * widthDots / 400).round();
-    int sy(num value) => (value * heightDots / 240).round();
+    int sy(num value) => (value * safeDpi / 203).round();
     final maxFont1Chars = ((widthDots - sx(32)) ~/ 8).clamp(4, 80);
     final maxFont2Chars = ((widthDots - sx(32)) ~/ 12).clamp(4, 60);
     final maxFont3Chars = ((widthDots - sx(32)) ~/ 16).clamp(4, 40);
@@ -286,8 +296,9 @@ class TsplLabelLayoutEngine {
 
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
-      ..writeln('GAP $safeGap mm,0 mm')
-      ..writelnIf(autoDetectGap, 'GAPDETECT')
+      // Order labels use continuous media. GAP 0 disables gap sensing and the
+      // label length above grows with the complete order contents.
+      ..writeln('GAP 0 mm,0 mm')
       ..writeln('DENSITY 8')
       // Product and order labels share the same physical media path. Keeping
       // one direction prevents order labels from being rotated relative to
@@ -343,6 +354,22 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$whoText"');
       currentY += sy(22);
     }
+    // Customer number (Müşteri No)
+    final customerNoClean = _ascii(customerNo?.trim() ?? '');
+    if (customerNoClean.isNotEmpty) {
+      commands.writeln(
+          'TEXT ${sx(16)},$currentY,"1",0,1,1,"Mus. No: ${_fit(customerNoClean, (maxFont1Chars - 9).clamp(4, 40))}"');
+      currentY += sy(18);
+    }
+    final phoneClean = _ascii(customerPhone?.trim() ?? '');
+    if (phoneClean.isNotEmpty) {
+      commands.writeln(
+          'TEXT ${sx(16)},$currentY,"1",0,1,1,"Tel: ${_fit(phoneClean, (maxFont1Chars - 5).clamp(4, 60))}"');
+      currentY += sy(18);
+    }
+    commands.writeln(
+        'TEXT ${sx(16)},$currentY,"1",0,1,1,"Eski borc: TL ${previousDebt.toStringAsFixed(2)}"');
+    currentY += sy(18);
 
     // 4. Separator Line
     commands.writeln('BAR ${sx(16)},$currentY,${widthDots - sx(32)},${sy(2)}');
@@ -358,19 +385,8 @@ class TsplLabelLayoutEngine {
     }
 
     final footerY = heightDots - sy(70);
-    // Total and QR share the fixed footer row (left/right), so item rows do
-    // not need to reserve a separate vertical total block.
-    final reservedAfterItems = sy(4);
-    var hiddenItemCount = 0;
-
     if (items != null && items.isNotEmpty) {
-      final availableForItems =
-          (footerY - currentY - reservedAfterItems).clamp(0, heightDots);
-      final maxItemLines = (availableForItems ~/ sy(22)).clamp(0, 3);
-      final visibleCount =
-          items.length <= maxItemLines ? items.length : maxItemLines;
-
-      for (var index = 0; index < visibleCount; index++) {
+      for (var index = 0; index < items.length; index++) {
         final item = items[index];
         final rawName =
             _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
@@ -380,13 +396,8 @@ class TsplLabelLayoutEngine {
             : itemQty.toStringAsFixed(1);
         final unitPrice = (item['unit_price'] as num?)?.toDouble();
         final lineTotal = unitPrice == null ? null : unitPrice * itemQty;
-        final hiddenSuffix =
-            index == visibleCount - 1 && items.length > visibleCount
-                ? ' +${items.length - visibleCount}'
-                : '';
-        final suffix = lineTotal == null
-            ? hiddenSuffix
-            : ' TL${lineTotal.toStringAsFixed(2)}$hiddenSuffix';
+        final suffix =
+            lineTotal == null ? '' : ' TL${lineTotal.toStringAsFixed(2)}';
         final nameLimit =
             (maxFont1Chars - itemQtyStr.length - suffix.length - 4)
                 .clamp(4, maxFont1Chars);
@@ -396,11 +407,6 @@ class TsplLabelLayoutEngine {
         commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$lineStr"');
         currentY += sy(22);
       }
-
-      final remaining = items.length - visibleCount;
-      hiddenItemCount = remaining;
-      // Remaining count is appended to the final visible item. A separate
-      // summary row would collide with the fixed footer on 30 mm media.
     } else {
       final itemTitle = '$qtyStr x $prodClean';
       if (itemTitle.length <= maxFont3Chars) {
@@ -413,9 +419,11 @@ class TsplLabelLayoutEngine {
       }
     }
 
-    if (noteClean != null &&
-        hiddenItemCount == 0 &&
-        currentY + sy(24) <= footerY) {
+    commands.writeln(
+        'TEXT ${sx(16)},$currentY,"1",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxFont1Chars - 7).clamp(4, 60))}"');
+    currentY += sy(20);
+
+    if (noteClean != null && currentY + sy(24) <= footerY) {
       commands.writeln(
           'TEXT ${sx(16)},$currentY,"1",0,1,1,"Not: ${_fit(noteClean, (maxFont1Chars - 5).clamp(4, 60))}"');
       currentY += sy(24);
@@ -485,6 +493,47 @@ class TsplLabelLayoutEngine {
         .replaceAll('"', "'");
     if (normalized.length <= maxLength) return normalized;
     return '${normalized.substring(0, maxLength - 2)}..';
+  }
+
+  /// Selects the widest built-in-font/multiplier combination that remains
+  /// inside [maxWidth]. This avoids leaving unused space to the right of short
+  /// and medium product names or prices while keeping long values printable.
+  static ({
+    String font,
+    int xMultiplier,
+    int yMultiplier,
+    int width,
+  }) _widestTextLayout(String text, int maxWidth) {
+    const candidates = [
+      (font: '4', charWidth: 24, xMultiplier: 3, yMultiplier: 2),
+      (font: '4', charWidth: 24, xMultiplier: 2, yMultiplier: 2),
+      (font: '2', charWidth: 12, xMultiplier: 3, yMultiplier: 3),
+      (font: '3', charWidth: 16, xMultiplier: 2, yMultiplier: 2),
+      (font: '4', charWidth: 24, xMultiplier: 1, yMultiplier: 2),
+      (font: '2', charWidth: 12, xMultiplier: 2, yMultiplier: 2),
+      (font: '3', charWidth: 16, xMultiplier: 1, yMultiplier: 2),
+      (font: '2', charWidth: 12, xMultiplier: 1, yMultiplier: 2),
+      (font: '1', charWidth: 8, xMultiplier: 1, yMultiplier: 2),
+    ];
+
+    var best = (
+      font: '1',
+      xMultiplier: 1,
+      yMultiplier: 2,
+      width: text.length * 8,
+    );
+    for (final candidate in candidates) {
+      final width = text.length * candidate.charWidth * candidate.xMultiplier;
+      if (width <= maxWidth && width > best.width) {
+        best = (
+          font: candidate.font,
+          xMultiplier: candidate.xMultiplier,
+          yMultiplier: candidate.yMultiplier,
+          width: width,
+        );
+      }
+    }
+    return best;
   }
 
   static String _ascii(String value) {

@@ -117,14 +117,37 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
   @override
   Future<PrintJobRecord> queueOrderLabel(
       OrderEntity order, List<Map<String, dynamic>> items, Settings settings,
-      {CustomerEntity? customer, int copies = 1}) async {
+      {CustomerEntity? customer,
+      double? paidAmount,
+      double? previousDebt,
+      String? paymentStatusOverride,
+      int copies = 1}) async {
     final first = items.firstOrNull;
     final logo = await assets.loadLogo(settings.businessLogo);
+    // Derive a short customer identifier from the customer id
+    final rawCustomerId = customer?.id ?? order.customerId;
+    final shortCustomerId = rawCustomerId.length > 8
+        ? rawCustomerId.substring(0, 8).toUpperCase()
+        : rawCustomerId.toUpperCase();
+    final resolvedPaymentStatus = paymentStatusOverride ??
+        (paidAmount == null
+            ? 'Bilinmiyor'
+            : paidAmount >= order.totalAmount - 0.01
+                ? 'Ödendi'
+                : paidAmount <= 0.01
+                    ? 'Ödenmedi'
+                    : 'Kısmi ödendi');
     return _enqueue(
         PrintDocumentKind.orderLabel,
         {
           'orderNo': order.displayNumber,
           'customerName': customer?.name ?? order.customerId,
+          'customerPhone': customer?.phone ?? '',
+          'customerNo': shortCustomerId,
+          'previousDebt': previousDebt ??
+              (customer != null && customer.balance < 0
+                  ? customer.balance.abs()
+                  : 0.0),
           'productName': items.length == 1
               ? _itemName(first ?? const {})
               : '${items.length} Ürün / Paket',
@@ -135,6 +158,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'note': first?['note']?.toString() ?? order.notes,
           'timestamp': order.createdAt.toIso8601String(),
           'totalAmount': order.totalAmount,
+          'paymentStatus': resolvedPaymentStatus,
           'itemsCount': items.length,
           'businessName': settings.businessName,
           if (logo != null) 'logoBytesBase64': base64Encode(logo),

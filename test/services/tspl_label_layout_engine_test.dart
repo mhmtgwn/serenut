@@ -33,7 +33,7 @@ void main() {
 
     expect(output, startsWith('SIZE 50 mm,30 mm\r\nGAP 2 mm,0 mm\r\n'));
     expect(output, contains('CLS\r\n'));
-    expect(output, contains('BARCODE '));
+    expect(output, contains(',0,0,1,2,"869000000001"'));
     expect(output, endsWith('PRINT 2,1\r\n'));
     expect(output, isNot(contains('\x1dV')));
   });
@@ -105,7 +105,7 @@ void main() {
 
     expect(output, contains('"2",0,3,3,"Kisa Urun"'));
     expect(output, isNot(contains('Kod:')));
-    expect(output, contains('"4",0,1,2,"299,95"'));
+    expect(output, contains('"3",0,2,2,"299,95"'));
     expect(output, contains('"2",0,1,1,"TL"'));
     expect(output, isNot(contains('TL 299.95')));
   });
@@ -208,7 +208,7 @@ void main() {
     expect(output, endsWith('PRINT 1,1\r\n'));
   });
 
-  test('58 mm sipariş etiketinde tarih alt satırda ve ürünler detaylıdır', () {
+  test('sipariş etiketi gapsız medyada tüm ürünler için dinamik uzar', () {
     final output = latin1.decode(
       TsplLabelLayoutEngine.generateOrderLabelBytes(
         orderIdShort: 'ORD-2026-42',
@@ -241,7 +241,12 @@ void main() {
     expect(output, contains('- 2x Elma TL25.00'));
     expect(output, contains('- 1x Armut TL20.00'));
     expect(output, contains('- 3x Muz TL30.00'));
-    expect(output, isNot(contains('- 1x Erik TL5.00')));
-    expect(output, contains('- 3x Muz TL30.00 +1'));
+    expect(output, contains('- 1x Erik TL5.00'));
+    expect(output, isNot(contains(' +1')));
+    expect(output, contains('GAP 0 mm,0 mm'));
+    expect(output, isNot(contains('GAPDETECT')));
+    final size = RegExp(r'SIZE 58 mm,(\d+) mm').firstMatch(output);
+    expect(size, isNotNull);
+    expect(int.parse(size!.group(1)!), greaterThan(30));
   });
 }

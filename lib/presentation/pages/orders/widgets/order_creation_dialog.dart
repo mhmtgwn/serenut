@@ -337,7 +337,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       _totalAmount > 0 && MathEngine.areEqual(_karmaTotal, _totalAmount);
 
   void _nextStep() {
-    if (_activeStep < 3) {
+    if (_activeStep < 2) {
       setState(() => _activeStep++);
       if (_activeStep == 1) {
         Future.delayed(const Duration(milliseconds: 100), () {
@@ -455,8 +455,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     final steps = [
       {'icon': Icons.person_outline_rounded},
       {'icon': Icons.grid_view_rounded},
-      {'icon': Icons.shopping_basket_outlined},
-      {'icon': Icons.payments_outlined},
+      {'icon': Icons.shopping_cart_checkout_rounded},
     ];
 
     return Container(
@@ -497,7 +496,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                       : (isCompleted ? _kGreenDark : _kTextSecondary),
                 ),
               ),
-              if (idx < 3)
+              if (idx < 2)
                 Container(
                   width: 20,
                   height: 2,
@@ -518,8 +517,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       case 1:
         return _buildProductStep();
       case 2:
-        return _buildCartStep();
-      case 3:
         return _buildCheckoutStep();
       default:
         return const SizedBox.shrink();
@@ -559,7 +556,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   child: const Text('Kapat'),
                 ),
           // Next / Confirm button
-          _activeStep < 3
+          _activeStep < 2
               ? ElevatedButton.icon(
                   onPressed: nextDisabled ? null : _nextStep,
                   style: ElevatedButton.styleFrom(
@@ -650,6 +647,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       );
 
       // Process customer balance ledger
+      final previousDebt = max(0.0, -_selectedCustomer!.balance);
       double finalPaid = _totalAmount;
       if (_paymentMethod == 'debt') {
         finalPaid = 0.0;
@@ -753,6 +751,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                 receiptItems,
                 settings,
                 customer: _selectedCustomer,
+                paidAmount: finalPaid,
+                previousDebt: previousDebt,
                 copies: _labelCopies,
               );
         }

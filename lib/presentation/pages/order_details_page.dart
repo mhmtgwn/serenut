@@ -240,6 +240,14 @@ class OrderDetailsPage extends ConsumerWidget {
                               items,
                               settings,
                               customer: customer,
+                              paymentStatusOverride: switch (order.status) {
+                                'created' => 'Beklemede',
+                                'preparing' => 'Hazirlaniyor',
+                                'ready' => 'Hazir',
+                                'delivered' => 'Teslim Edildi',
+                                'cancelled' => 'Iptal Edildi',
+                                _ => order.status,
+                              },
                             );
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1415,6 +1423,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 receiptItems,
                 settings,
                 customer: customer,
+                paidAmount: widget.totalPaid +
+                    (_selectedMethod == 'cash'
+                        ? remaining
+                        : (_selectedMethod == 'card'
+                            ? remaining
+                            : (_selectedMethod == 'karma'
+                                ? _karmaCash + _karmaCard
+                                : 0.0))),
                 copies: _labelCopies,
               );
         }

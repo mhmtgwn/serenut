@@ -23,7 +23,11 @@ abstract interface class PrintingApplicationService {
       List<CategoryRevenue> categories, Settings settings);
   Future<PrintJobRecord> queueOrderLabel(
       OrderEntity order, List<Map<String, dynamic>> items, Settings settings,
-      {CustomerEntity? customer, int copies = 1});
+      {CustomerEntity? customer,
+      double? paidAmount,
+      double? previousDebt,
+      String? paymentStatusOverride,
+      int copies = 1});
   Future<List<PrintJobRecord>> queueProductLabels(
       List<ProductEntity> products, Settings settings,
       {int copies = 1});

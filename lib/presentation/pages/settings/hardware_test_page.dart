@@ -18,7 +18,7 @@ class HardwareTestPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final devices = ref.watch(hardwareDevicesProvider);
     return FullScreenSettingsPage(
-      title: 'Cihazlar ve Donanım',
+      title: 'Aygıt Yöneticisi',
       useScrollView: false,
       actions: [
         IconButton(
@@ -267,7 +267,7 @@ class _DeviceList extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: _SummaryCard(
+          child: _HardwareHero(
             total: devices.length,
             ready: ready,
             attention: attention,
@@ -281,20 +281,16 @@ class _DeviceList extends StatelessWidget {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.only(top: 16, bottom: 24),
+            padding: const EdgeInsets.only(top: 20, bottom: 24),
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
-                final columns = constraints.crossAxisExtent >= 900
-                    ? 3
-                    : constraints.crossAxisExtent >= 580
-                        ? 2
-                        : 1;
+                final columns = constraints.crossAxisExtent >= 760 ? 2 : 1;
                 return SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    mainAxisExtent: 244,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    mainAxisExtent: 238,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -318,13 +314,13 @@ class _DeviceList extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _HardwareHero extends StatelessWidget {
   final int total;
   final int ready;
   final int attention;
   final VoidCallback onAdd;
 
-  const _SummaryCard({
+  const _HardwareHero({
     required this.total,
     required this.ready,
     required this.attention,
@@ -333,64 +329,93 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: kBorderColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 18,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const Icon(Icons.devices_other_rounded, color: kGreen, size: 36),
-            _Metric(value: '$total', label: 'Kayıtlı'),
-            _Metric(value: '$ready', label: 'Hazır', color: kGreen),
-            _Metric(
-              value: '$attention',
-              label: 'Dikkat gerekli',
-              color: attention == 0 ? kTextSecondary : kPink,
-            ),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Cihaz ekle'),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF12352B), Color(0xFF1B5A48)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+      ),
+      child: Wrap(
+        spacing: 24,
+        runSpacing: 18,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const SizedBox(
+            width: 300,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('İşletme donanımlarınız',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800)),
+                SizedBox(height: 6),
+                Text(
+                  'Yazıcı, terazi, POS ve okuyucuları tek yerden yönetin.',
+                  style: TextStyle(color: Color(0xFFCDE5DD), height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          _HeroMetric(value: '$total', label: 'Cihaz'),
+          _HeroMetric(value: '$ready', label: 'Hazır'),
+          _HeroMetric(
+            value: '$attention',
+            label: 'Kontrol',
+            alert: attention > 0,
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF174B3D),
+            ),
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Yeni aygıt'),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _Metric extends StatelessWidget {
+class _HeroMetric extends StatelessWidget {
   final String value;
   final String label;
-  final Color color;
+  final bool alert;
 
-  const _Metric({
+  const _HeroMetric({
     required this.value,
     required this.label,
-    this.color = kTextPrimary,
+    this.alert = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 72),
+    return Container(
+      width: 76,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: alert
+            ? const Color(0xFFFFE1E5).withValues(alpha: .16)
+            : Colors.white.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value,
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white)),
           Text(label,
-              style: const TextStyle(fontSize: 11, color: kTextSecondary)),
+              style: const TextStyle(fontSize: 11, color: Color(0xFFCDE5DD))),
         ],
       ),
     );
@@ -425,7 +450,7 @@ class _DeviceCard extends StatelessWidget {
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         side: BorderSide(
           color: isActivePrinter ? kGreen : kBorderColor,
           width: isActivePrinter ? 2 : 1,
@@ -433,19 +458,23 @@ class _DeviceCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onEdit,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor:
-                        _typeColor(device.type).withValues(alpha: .1),
-                    foregroundColor: _typeColor(device.type),
-                    child: Icon(_typeIcon(device.type)),
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: _typeColor(device.type).withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(_typeIcon(device.type),
+                        color: _typeColor(device.type)),
                   ),
                   const Spacer(),
                   if (isActivePrinter) ...[
@@ -472,7 +501,7 @@ class _DeviceCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
                 device.name,
                 maxLines: 1,
@@ -511,13 +540,13 @@ class _DeviceCard extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Expanded(
                 child: Text(
                   device.lastMessage ??
                       device.lastError ??
                       'Bağlantı henüz doğrulanmadı.',
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
@@ -531,23 +560,34 @@ class _DeviceCard extends StatelessWidget {
                   'Son test: ${DateFormat('dd.MM.yyyy HH:mm').format(device.lastTestedAt!)}',
                   style: const TextStyle(fontSize: 10, color: kTextSecondary),
                 ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: device.status == HardwareDeviceStatus.testing
-                      ? null
-                      : onTest,
-                  icon: device.status == HardwareDeviceStatus.testing
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.play_arrow_rounded),
-                  label: Text(device.status == HardwareDeviceStatus.testing
-                      ? 'Test ediliyor'
-                      : _deviceTestLabel(device.type)),
-                ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: const Text('Ayarlar'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: device.status == HardwareDeviceStatus.testing
+                          ? null
+                          : onTest,
+                      icon: device.status == HardwareDeviceStatus.testing
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(device.status == HardwareDeviceStatus.testing
+                          ? 'Bekleyin'
+                          : 'Test et'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -666,75 +706,169 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 14,
-          bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kBorderColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.device == null ? 'Yeni cihaz ekle' : 'Cihazı düzenle',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${_step + 1}/3 · ${_stepLabel(_step)}',
-                style: const TextStyle(fontSize: 12, color: kTextSecondary),
-              ),
-              const SizedBox(height: 10),
-              LinearProgressIndicator(value: (_step + 1) / 3),
-              const SizedBox(height: 22),
-              if (_step == 0) _typeStep(),
-              if (_step == 1) _connectionStep(),
-              if (_step == 2) _detailsStep(),
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                _InlineError(message: _error!),
-              ],
-              const SizedBox(height: 22),
-              Row(
+    final editing = widget.device != null;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 780, maxHeight: 820),
+        child: Material(
+          color: const Color(0xFFF8FAF9),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 12,
+              bottom: MediaQuery.viewInsetsOf(context).bottom + 18,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_step > 0)
-                    TextButton(
-                      onPressed:
-                          _working ? null : () => setState(() => _step--),
-                      child: const Text('Geri'),
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: kBorderColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _working ? null : _continue,
-                    child: _working
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(_step < 2 ? 'Devam' : 'Test et ve kaydet'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: _typeColor(_type).withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(_typeIcon(_type), color: _typeColor(_type)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              editing ? 'Aygıt ayarları' : 'Yeni cihaz ekle',
+                              style: const TextStyle(
+                                  fontSize: 21, fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              editing
+                                  ? '${_step + 1}/3 · ${_stepLabel(_step)} · ${deviceFriendlyIdentity(widget.device!)}'
+                                  : '${_step + 1}/3 · ${_stepLabel(_step)}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: kTextSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Kapat',
+                        onPressed:
+                            _working ? null : () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: List.generate(3, (index) {
+                      final selected = index == _step;
+                      final completed = index < _step;
+                      return Expanded(
+                        child: Container(
+                          margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? const Color(0xFFE5F4EE)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected ? kGreen : kBorderColor,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                completed
+                                    ? Icons.check_circle_rounded
+                                    : index == 0
+                                        ? Icons.category_rounded
+                                        : index == 1
+                                            ? Icons.cable_rounded
+                                            : Icons.tune_rounded,
+                                size: 17,
+                                color: selected || completed
+                                    ? kGreen
+                                    : kTextSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  _stepLabel(index),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: selected
+                                        ? kTextPrimary
+                                        : kTextSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 22),
+                  if (_step == 0) _typeStep(),
+                  if (_step == 1) _connectionStep(),
+                  if (_step == 2) _detailsStep(),
+                  if (_error != null) ...[
+                    const SizedBox(height: 14),
+                    _InlineError(message: _error!),
+                  ],
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      if (_step > 0)
+                        TextButton(
+                          onPressed:
+                              _working ? null : () => setState(() => _step--),
+                          child: const Text('Geri'),
+                        ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: _working ? null : _continue,
+                        child: _working
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(_step < 2
+                                ? 'Devam et'
+                                : editing
+                                    ? 'Ayarları kaydet'
+                                    : 'Test et ve ekle'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -742,39 +876,71 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   }
 
   Widget _typeStep() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: HardwareDeviceType.values.map((type) {
-        final selected = type == _type;
-        return ChoiceChip(
-          avatar: Icon(_typeIcon(type), size: 18),
-          label: Text(_typeLabel(type)),
-          selected: selected,
-          onSelected: (_) {
-            setState(() {
-              _type = type;
-              _connection = _connectionsFor(type).first;
-              _name.text = _typeLabel(type);
-              _port.text = _defaultPort(type).toString();
-            });
-          },
-        );
-      }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Ne eklemek istiyorsunuz?',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Aygıt türünü seçin; uygun bağlantıları biz göstereceğiz.',
+            style: TextStyle(fontSize: 12, color: kTextSecondary)),
+        const SizedBox(height: 14),
+        LayoutBuilder(builder: (context, constraints) {
+          final width = constraints.maxWidth >= 620
+              ? (constraints.maxWidth - 12) / 2
+              : constraints.maxWidth;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: HardwareDeviceType.values.map((type) {
+              final selected = type == _type;
+              return SizedBox(
+                width: width,
+                child: _SelectionCard(
+                  selected: selected,
+                  icon: _typeIcon(type),
+                  color: _typeColor(type),
+                  title: _typeLabel(type),
+                  subtitle: _typeDescription(type),
+                  onTap: () {
+                    setState(() {
+                      _type = type;
+                      _connection = _connectionsFor(type).first;
+                      _name.text = _typeLabel(type);
+                      _port.text = _defaultPort(type).toString();
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          );
+        }),
+      ],
     );
   }
 
   Widget _connectionStep() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: _connectionsFor(_type).map((connection) {
-        return ChoiceChip(
-          label: Text(_connectionLabel(connection)),
-          selected: connection == _connection,
-          onSelected: (_) => setState(() => _connection = connection),
-        );
-      }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${_typeLabel(_type)} nasıl bağlı?',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Bilmiyorsanız en tanıdık seçeneği seçin.',
+            style: TextStyle(fontSize: 12, color: kTextSecondary)),
+        const SizedBox(height: 14),
+        ..._connectionsFor(_type).map((connection) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _SelectionCard(
+                selected: connection == _connection,
+                icon: _connectionIcon(connection),
+                color: kGreen,
+                title: _connectionLabel(connection),
+                subtitle: _connectionDescription(connection),
+                onTap: () => setState(() => _connection = connection),
+              ),
+            )),
+      ],
     );
   }
 
@@ -782,6 +948,14 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text('${_typeLabel(_type)} ayarları',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(
+          '${_connectionLabel(_connection)} için gerekli alanları doldurun.',
+          style: const TextStyle(fontSize: 12, color: kTextSecondary),
+        ),
+        const SizedBox(height: 16),
         TextField(
           controller: _name,
           decoration: const InputDecoration(
@@ -1433,6 +1607,80 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   }
 }
 
+class _SelectionCard extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SelectionCard({
+    required this.selected,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? color.withValues(alpha: .07) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? color : kBorderColor,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, color: kTextPrimary)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 11, height: 1.3, color: kTextSecondary)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected ? color : kBorderColor,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TestResultDialog extends StatefulWidget {
   final HardwareTestResult result;
 
@@ -1643,20 +1891,53 @@ class _LoadError extends StatelessWidget {
   };
 }
 
+String deviceFriendlyIdentity(HardwareDevice device) =>
+    '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}';
+
+String _typeDescription(HardwareDeviceType type) => switch (type) {
+      HardwareDeviceType.receiptPrinter =>
+        'Fiş, mutfak çıktısı ve kasa çekmecesi',
+      HardwareDeviceType.labelPrinter => 'Ürün, raf ve sipariş etiketi',
+      HardwareDeviceType.scale => 'Canlı ağırlık bilgisini satışa aktarır',
+      HardwareDeviceType.paymentTerminal =>
+        'Banka veya ödeme terminali bağlantısı',
+      HardwareDeviceType.barcodeScanner =>
+        'USB, dahili kamera veya el terminali',
+    };
+
+IconData _connectionIcon(HardwareConnectionType connection) =>
+    switch (connection) {
+      HardwareConnectionType.embedded => Icons.smartphone_rounded,
+      HardwareConnectionType.windows => Icons.desktop_windows_rounded,
+      HardwareConnectionType.bluetooth => Icons.bluetooth_rounded,
+      HardwareConnectionType.serial => Icons.usb_rounded,
+      HardwareConnectionType.tcp => Icons.lan_rounded,
+      HardwareConnectionType.keyboard => Icons.keyboard_rounded,
+      HardwareConnectionType.cloud => Icons.cloud_queue_rounded,
+    };
+
+String _connectionDescription(HardwareConnectionType connection) =>
+    switch (connection) {
+      HardwareConnectionType.embedded =>
+        'Sunmi gibi cihazın kendi üzerindeki donanım',
+      HardwareConnectionType.windows =>
+        'Windows’a kurulmuş veya USB ile bağlı yazıcı',
+      HardwareConnectionType.bluetooth => 'Kablosuz eşleştirilen yakın aygıt',
+      HardwareConnectionType.serial =>
+        'USB dönüştürücü veya COM portu kullanan aygıt',
+      HardwareConnectionType.tcp => 'Aynı ağdaki Ethernet veya Wi-Fi aygıtı',
+      HardwareConnectionType.keyboard =>
+        'Okutunca klavye gibi veri gönderen USB aygıt',
+      HardwareConnectionType.cloud =>
+        'Başka bir açık cihaz tarafından paylaşılan aygıt',
+    };
+
 String _typeLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter => 'Fiş yazıcısı',
       HardwareDeviceType.labelPrinter => 'Etiket yazıcısı',
       HardwareDeviceType.scale => 'Terazi',
       HardwareDeviceType.paymentTerminal => 'Fiziksel POS',
       HardwareDeviceType.barcodeScanner => 'Barkod okuyucu',
-    };
-
-String _deviceTestLabel(HardwareDeviceType type) => switch (type) {
-      HardwareDeviceType.receiptPrinter => 'Test fişi bas',
-      HardwareDeviceType.labelPrinter => 'Test etiketi bas',
-      HardwareDeviceType.scale => 'Canlı ağırlığı test et',
-      HardwareDeviceType.paymentTerminal => 'POS bağlantısını test et',
-      HardwareDeviceType.barcodeScanner => 'Barkod okut ve test et',
     };
 
 String _deviceConfigurationSummary(HardwareDevice device) {

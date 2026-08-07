@@ -509,6 +509,9 @@ class SyncV4Service {
       table,
       {...payload, 'id': id, 'is_synced': 1},
     );
+    if (type == 'order') {
+      await _disambiguateOrderNumber(db, row, id);
+    }
     if (type == 'customer') {
       // Server balance is a cache and uses the opposite sign convention.
       // The immutable local ledger is the sole source for this projection.
@@ -559,6 +562,33 @@ class SyncV4Service {
             conflictAlgorithm: ConflictAlgorithm.replace);
       }
     }
+  }
+
+  /// Local order numbers historically came from a device-local sequence, so
+  /// two devices can legitimately create different orders with (for example)
+  /// `SP-000001`. The cloud keeps both records, while the legacy SQLite schema
+  /// has a UNIQUE constraint on [order_number]. Keep both orders locally by
+  /// assigning a stable display suffix to the incoming record.
+  Future<void> _disambiguateOrderNumber(
+    Transaction db,
+    Map<String, Object?> row,
+    String id,
+  ) async {
+    final orderNumber = row['order_number']?.toString().trim() ?? '';
+    if (orderNumber.isEmpty) return;
+
+    final collision = await db.query(
+      'orders',
+      columns: const ['id'],
+      where: 'order_number = ? AND id <> ?',
+      whereArgs: [orderNumber, id],
+      limit: 1,
+    );
+    if (collision.isEmpty) return;
+
+    // Including the globally unique entity ID makes the value deterministic
+    // across retries and avoids silently merging two unrelated orders.
+    row['order_number'] = '$orderNumber-$id';
   }
 
   Future<void> _applyRefund(

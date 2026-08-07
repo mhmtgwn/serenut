@@ -102,6 +102,9 @@ void main() {
       payload: {
         'orderNo': 'ORD-1',
         'customerName': 'Müşteri',
+        'customerPhone': '0555 111 22 33',
+        'previousDebt': 245.50,
+        'paymentStatus': 'Kısmi ödendi',
         'productName': '2 Ürün / Paket',
         'quantity': 1,
         'itemsCount': 2,
@@ -123,5 +126,9 @@ void main() {
     final output = latin1.decode(rendered.bytes);
     expect(RegExp(r'PRINT 1,1').allMatches(output), hasLength(1));
     expect(output, contains('DIRECTION 0'));
+    expect(output, contains('Tel: 0555 111 22 33'));
+    expect(output, contains('Eski borc: TL 245.50'));
+    expect(output, contains('TOPLAM: TL 120.00'));
+    expect(output, contains('Odeme: Kismi odendi'));
   });
 }
