@@ -253,22 +253,28 @@ class TsplLabelLayoutEngine {
   }) {
     final safeWidth = widthMm.clamp(30, 100);
     final safeDpi = dpi == 300 ? 300 : 203;
+    final customerNoClean = _ascii(customerNo?.trim() ?? '');
+    final phoneClean = _ascii(customerPhone?.trim() ?? '');
+    final noteClean =
+        note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
+
     final itemRows = items != null && items.isNotEmpty ? items.length : 1;
     final estimatedDotsAt203 = 6 +
         (showBusinessName ? 23 : 0) +
         (showOrderNo ? 22 : 0) +
         (showDate && timestamp != null ? 22 : 0) +
         (showCustomerName ? 22 : 0) +
-        (customerPhone != null && customerPhone.trim().isNotEmpty ? 18 : 0) +
+        (customerNoClean.isNotEmpty ? 18 : 0) +
+        (phoneClean.isNotEmpty ? 18 : 0) +
         18 +
         6 +
         (itemRows * 22) +
         20 +
-        (note != null && note.trim().isNotEmpty ? 24 : 0) +
-        74;
+        (noteClean != null ? 24 : 0) +
+        80;
     final requiredHeightMm =
-        (estimatedDotsAt203 * 25.4 / 203).ceil().clamp(20, 500);
-    final requestedHeightMm = heightMm.clamp(20, 500);
+        (estimatedDotsAt203 * 25.4 / 203).ceil().clamp(20, 1000);
+    final requestedHeightMm = heightMm.clamp(20, 1000);
     final safeHeight = requestedHeightMm > requiredHeightMm
         ? requestedHeightMm
         : requiredHeightMm;
@@ -291,8 +297,6 @@ class TsplLabelLayoutEngine {
         : quantity.toStringAsFixed(1);
     final custClean = _ascii(customerName.trim());
     final prodClean = _ascii(productName.trim());
-    final noteClean =
-        note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
 
     final safeGap = gapMm.clamp(0, 10);
     final commands = _TsplBuffer()
@@ -355,13 +359,11 @@ class TsplLabelLayoutEngine {
       currentY += sy(22);
     }
     // Customer number (Müşteri No)
-    final customerNoClean = _ascii(customerNo?.trim() ?? '');
     if (customerNoClean.isNotEmpty) {
       commands.writeln(
           'TEXT ${sx(16)},$currentY,"1",0,1,1,"Mus. No: ${_fit(customerNoClean, (maxFont1Chars - 9).clamp(4, 40))}"');
       currentY += sy(18);
     }
-    final phoneClean = _ascii(customerPhone?.trim() ?? '');
     if (phoneClean.isNotEmpty) {
       commands.writeln(
           'TEXT ${sx(16)},$currentY,"1",0,1,1,"Tel: ${_fit(phoneClean, (maxFont1Chars - 5).clamp(4, 60))}"');
@@ -384,7 +386,6 @@ class TsplLabelLayoutEngine {
       currentY += sy(18);
     }
 
-    final footerY = heightDots - sy(70);
     if (items != null && items.isNotEmpty) {
       for (var index = 0; index < items.length; index++) {
         final item = items[index];
@@ -423,14 +424,16 @@ class TsplLabelLayoutEngine {
         'TEXT ${sx(16)},$currentY,"1",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxFont1Chars - 7).clamp(4, 60))}"');
     currentY += sy(20);
 
-    if (noteClean != null && currentY + sy(24) <= footerY) {
+    if (noteClean != null) {
       commands.writeln(
           'TEXT ${sx(16)},$currentY,"1",0,1,1,"Not: ${_fit(noteClean, (maxFont1Chars - 5).clamp(4, 60))}"');
       currentY += sy(24);
     }
 
-    // 6. Total Amount & QR footer. A compact QR is deliberately used here;
-    // Code-128 consumed most of the 58 mm width and was not the order design.
+    // 6. Total Amount & QR footer positioned dynamically after items
+    currentY += sy(4);
+    final footerY = currentY;
+
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
       final footerTextChars = ((widthDots - sx(110)) ~/ 8).clamp(8, 50);

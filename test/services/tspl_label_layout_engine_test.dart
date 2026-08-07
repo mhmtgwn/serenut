@@ -250,4 +250,36 @@ void main() {
     expect(size, isNotNull);
     expect(int.parse(size!.group(1)!), greaterThan(30));
   });
+
+  test('sipariş etiketinde 10+ ürün kesilmeden yazdırılır ve kağıt boyu dinamik uzar', () {
+    final items = List.generate(
+      12,
+      (i) => {
+        'product_name': 'Ürün $i',
+        'quantity': (i + 1).toDouble(),
+        'unit_price': 10.0 * (i + 1),
+      },
+    );
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: 'ORD-MANY-12',
+        customerName: 'Ahmet Yilmaz',
+        productName: '12 Urun',
+        quantity: 1,
+        items: items,
+        itemsCount: 12,
+        totalAmount: 1500,
+        widthMm: 58,
+        heightMm: 30,
+      ),
+    );
+
+    for (var i = 0; i < 12; i++) {
+      expect(output, contains('Urun $i'));
+    }
+    expect(output, contains('TOPLAM: TL 1500.00'));
+    final sizeMatch = RegExp(r'SIZE 58 mm,(\d+) mm').firstMatch(output);
+    expect(sizeMatch, isNotNull);
+    expect(int.parse(sizeMatch!.group(1)!), greaterThan(50));
+  });
 }
