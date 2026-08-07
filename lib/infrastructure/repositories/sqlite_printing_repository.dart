@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/domain/printing/printing_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
@@ -214,8 +216,12 @@ class SqlitePrintingRepository implements PrintingRepository {
       final device = PrinterDeviceProfile.fromMap(devices.first);
       final profile = PrintDesignProfile.fromMap(profiles.first);
       final now = DateTime.now();
+      final jobId = _uuid.v4();
+      final transportConfig = Map<String, Object?>.from(device.transportConfig)
+        ..putIfAbsent('jobId', () => jobId)
+        ..putIfAbsent('documentKind', () => kind.name);
       job = PrintJobRecord(
-        id: _uuid.v4(),
+        id: jobId,
         kind: kind,
         payloadJson: payloadJson,
         copies: copies,
@@ -223,7 +229,7 @@ class SqlitePrintingRepository implements PrintingRepository {
         designSnapshotJson: profiles.first['definition_json']! as String,
         deviceId: device.id,
         transportSnapshotJson: '{"kind":"${device.transport.name}",'
-            '"config":${devices.first['transport_config_json']}}',
+            '"config":${jsonEncode(transportConfig)}}',
         capabilitySnapshotJson: devices.first['capabilities_json']! as String,
         rendererVersion: profile.rendererVersion,
         state: PrintJobState.queued,

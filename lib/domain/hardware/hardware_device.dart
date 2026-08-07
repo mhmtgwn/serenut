@@ -13,6 +13,7 @@ enum HardwareConnectionType {
   serial,
   tcp,
   keyboard,
+  cloud,
 }
 
 enum HardwareDeviceStatus {

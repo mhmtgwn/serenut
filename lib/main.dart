@@ -18,6 +18,7 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/domain/services/license_service.dart';
+import 'package:serenutos/domain/hardware/hardware_device.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -271,6 +272,19 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // Runtime starts after the import attempt, so legacy routes are visible
         // when available while existing v2 routes remain independently usable.
         final printRecovery = await ref.read(printingRuntimeProvider).start();
+        final remoteConfig = ref.read(remoteConfigServiceProvider);
+        await remoteConfig.fetchAndActivate();
+        final localHardware = await ref.read(hardwareDevicesProvider.future);
+        if (remoteConfig.isSharedHardwareEnabled()) {
+          await ref.read(sharedHardwareServiceProvider).publishPresence(
+                localHardware
+                    .where((device) =>
+                        device.connectionType != HardwareConnectionType.cloud)
+                    .toList(growable: false),
+              );
+          ref.read(sharedHardwareWorkerProvider).start();
+          ref.read(sharedHardwarePresenceRuntimeProvider).start();
+        }
         if (printRecovery.safelyRequeued > 0 ||
             printRecovery.awaitingUserCheck > 0) {
           debugPrint(

@@ -4,8 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
+import 'package:serenutos/infrastructure/services/printer_discovery_service.dart';
+import 'package:serenutos/domain/hardware/scale_service.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/hardware_devices_provider.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 
 class HardwareTestPage extends ConsumerWidget {
   const HardwareTestPage({super.key});
@@ -17,6 +21,11 @@ class HardwareTestPage extends ConsumerWidget {
       title: 'Cihazlar ve Donanım',
       useScrollView: false,
       actions: [
+        IconButton(
+          tooltip: 'Ortak yazıcılar',
+          onPressed: () => _openSharedPrinters(context, ref),
+          icon: const Icon(Icons.cloud_queue_rounded),
+        ),
         IconButton(
           tooltip: 'Cihaz ekle',
           onPressed: () => _openEditor(context, ref),
@@ -40,6 +49,91 @@ class HardwareTestPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openSharedPrinters(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    ref.invalidate(sharedHardwareDevicesProvider);
+    final selected = await showDialog<SharedHardwareDevice>(
+      context: context,
+      builder: (dialogContext) => Consumer(
+        builder: (context, ref, _) {
+          final shared = ref.watch(sharedHardwareDevicesProvider);
+          return AlertDialog(
+            title: const Text('Ortak yazıcılar'),
+            content: SizedBox(
+              width: 520,
+              child: shared.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Text(
+                  'Ortak donanımlar alınamadı. Bağlantınızı kontrol edip yeniden deneyin.\n$error',
+                ),
+                data: (items) {
+                  final printers = items
+                      .where((item) =>
+                          !item.isLocal &&
+                          (item.type == HardwareDeviceType.receiptPrinter ||
+                              item.type == HardwareDeviceType.labelPrinter))
+                      .toList(growable: false);
+                  if (printers.isEmpty) {
+                    return const Text(
+                      'Başka bir açık cihaz tarafından paylaşılan yazıcı bulunamadı.',
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: printers.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final printer = printers[index];
+                      return ListTile(
+                        enabled: printer.online,
+                        leading: Icon(
+                          printer.type == HardwareDeviceType.receiptPrinter
+                              ? Icons.receipt_long_rounded
+                              : Icons.label_rounded,
+                        ),
+                        title: Text(printer.name),
+                        subtitle: Text(printer.online
+                            ? 'Çevrimiçi · ${printer.connectionType}'
+                            : 'Sahip cihaz çevrimdışı'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.pop(dialogContext, printer),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Kapat'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    try {
+      await ref
+          .read(hardwareDevicesProvider.notifier)
+          .activateSharedPrinter(selected);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${selected.name} varsayılan ortak yazıcı oldu.'),
+        backgroundColor: kGreen,
+      ));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: kPink,
+      ));
+    }
   }
 
   Future<void> _openEditor(
@@ -503,7 +597,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   int _step = 0;
   bool _working = false;
   bool _discoveringBluetooth = false;
+  bool _discoveringWindows = false;
+  bool _discoveringNetwork = false;
   List<Map<String, String>> _bluetoothDevices = const [];
+  List<DiscoveredPrinter> _discoveredPrinters = const [];
+  List<String> _serialPorts = const [];
   String? _error;
 
   @override
@@ -796,6 +894,40 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
             _connection == HardwareConnectionType.windows) ...[
+          OutlinedButton.icon(
+            onPressed: _discoveringWindows ? null : _discoverWindowsPrinters,
+            icon: _discoveringWindows
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.manage_search_rounded),
+            label: Text(_discoveringWindows
+                ? 'Windows yazıcıları okunuyor…'
+                : 'Windows yazıcılarını bul'),
+          ),
+          if (_discoveredPrinters.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ..._discoveredPrinters
+                .where((item) => item.kind == DiscoveredPrinterKind.windows)
+                .map((printer) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: printer.name,
+                      groupValue: _printerName.text,
+                      onChanged: (value) => setState(() {
+                        _printerName.text = value ?? '';
+                        if (_name.text == _typeLabel(_type)) {
+                          _name.text = printer.name;
+                        }
+                      }),
+                      title: Text(printer.name),
+                      subtitle: Text(printer.isDefault
+                          ? 'Varsayılan Windows yazıcısı'
+                          : 'Windows yazıcı kuyruğu'),
+                    )),
+          ],
+          const SizedBox(height: 10),
           TextField(
             controller: _printerName,
             decoration: const InputDecoration(
@@ -803,6 +935,64 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               helperText: 'Windows yazıcı listesindeki adla aynı olmalıdır.',
             ),
           ),
+        ],
+        if ((_type == HardwareDeviceType.receiptPrinter ||
+                _type == HardwareDeviceType.labelPrinter) &&
+            _connection == HardwareConnectionType.tcp) ...[
+          OutlinedButton.icon(
+            onPressed: _discoveringNetwork ? null : _discoverNetworkPrinters,
+            icon: _discoveringNetwork
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.radar_rounded),
+            label: Text(_discoveringNetwork
+                ? 'Yerel ağ taranıyor…'
+                : 'Aynı ağdaki yazıcıları bul'),
+          ),
+          if (_discoveredPrinters
+              .any((item) => item.kind == DiscoveredPrinterKind.network)) ...[
+            const SizedBox(height: 8),
+            ..._discoveredPrinters
+                .where((item) => item.kind == DiscoveredPrinterKind.network)
+                .map((printer) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: printer.address ?? '',
+                      groupValue: _host.text,
+                      onChanged: (value) => setState(() {
+                        _host.text = value ?? '';
+                        _port.text = '${printer.port ?? 9100}';
+                      }),
+                      title: Text(printer.address ?? printer.name),
+                      subtitle: const Text(
+                        'Yazıcı adayı · Test çıktısıyla doğrulanacak',
+                      ),
+                    )),
+          ],
+          const SizedBox(height: 10),
+        ],
+        if (_connection == HardwareConnectionType.serial) ...[
+          OutlinedButton.icon(
+            onPressed: _discoverSerialPorts,
+            icon: const Icon(Icons.usb_rounded),
+            label: const Text('USB / COM aygıtlarını bul'),
+          ),
+          if (_serialPorts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ..._serialPorts.map((port) => RadioListTile<String>(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: port,
+                  groupValue: _serialPort.text,
+                  onChanged: (value) =>
+                      setState(() => _serialPort.text = value ?? ''),
+                  title: Text(port),
+                  subtitle: const Text('Seri bağlantı noktası'),
+                )),
+            const SizedBox(height: 8),
+          ],
         ],
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
@@ -1074,6 +1264,80 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             'Cihaz bulunamadı. Bluetooth ve yakın cihaz izinlerini verip tekrar tarayın.';
       }
     });
+  }
+
+  Future<void> _discoverWindowsPrinters() async {
+    setState(() {
+      _discoveringWindows = true;
+      _error = null;
+    });
+    final printers = await PrinterDiscoveryService().listWindowsPrinters();
+    if (!mounted) return;
+    setState(() {
+      _discoveringWindows = false;
+      _discoveredPrinters = [
+        ..._discoveredPrinters
+            .where((item) => item.kind != DiscoveredPrinterKind.windows),
+        ...printers,
+      ];
+      if (printers.isEmpty) {
+        _error = 'Windows yazıcısı bulunamadı. Yazıcı sürücüsünü ve Print '
+            'Spooler hizmetini kontrol edin.';
+      } else if (_printerName.text.isEmpty) {
+        final preferred =
+            printers.where((item) => item.isDefault).firstOrNull ??
+                printers.first;
+        _printerName.text = preferred.name;
+      }
+    });
+  }
+
+  Future<void> _discoverNetworkPrinters() async {
+    setState(() {
+      _discoveringNetwork = true;
+      _error = null;
+    });
+    try {
+      final discovery = PrinterDiscoveryService();
+      final subnets = await discovery.localIpv4Subnets();
+      final found = <DiscoveredPrinter>[];
+      for (final subnet in subnets.take(2)) {
+        found.addAll(await discovery.scanSubnet(subnet));
+      }
+      if (!mounted) return;
+      setState(() {
+        _discoveredPrinters = [
+          ..._discoveredPrinters
+              .where((item) => item.kind != DiscoveredPrinterKind.network),
+          ...found,
+        ];
+        if (found.isEmpty) {
+          _error = 'Aynı ağda RAW 9100 yazıcı adayı bulunamadı. '
+              'Yazıcı farklı VLAN üzerindeyse IP adresini manuel girin.';
+        }
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Ağ taraması tamamlanamadı: $error');
+    } finally {
+      if (mounted) setState(() => _discoveringNetwork = false);
+    }
+  }
+
+  void _discoverSerialPorts() {
+    try {
+      final ports = SerialScaleAdapter.availablePorts;
+      setState(() {
+        _serialPorts = ports;
+        _error = ports.isEmpty
+            ? 'USB / COM aygıtı bulunamadı. Sürücünün kurulu olduğunu kontrol edin.'
+            : null;
+        if (_serialPort.text.isEmpty && ports.isNotEmpty) {
+          _serialPort.text = ports.first;
+        }
+      });
+    } catch (error) {
+      setState(() => _error = 'Seri portlar okunamadı: $error');
+    }
   }
 
   String? _validate() {
@@ -1446,6 +1710,7 @@ String _connectionLabel(HardwareConnectionType connection) =>
       HardwareConnectionType.serial => 'COM / USB',
       HardwareConnectionType.tcp => 'TCP / Ağ',
       HardwareConnectionType.keyboard => 'USB klavye',
+      HardwareConnectionType.cloud => 'Ortak / Uzak',
     };
 
 List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {

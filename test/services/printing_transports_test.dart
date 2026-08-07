@@ -46,4 +46,45 @@ void main() {
       )),
     );
   });
+
+  test('cloud relay preserves target, rendered bytes and local idempotency key',
+      () async {
+    late Map<String, Object?> request;
+    final transport = CloudRelayPrintTransport.withQueue(({
+      required hardwareId,
+      required operation,
+      required bytes,
+      required copies,
+      required idempotencyKey,
+    }) async {
+      request = {
+        'hardwareId': hardwareId,
+        'operation': operation,
+        'bytes': bytes,
+        'copies': copies,
+        'idempotencyKey': idempotencyKey,
+      };
+      return 'remote-job-1';
+    });
+
+    final observation = await transport.send(
+      bytes: Uint8List.fromList([27, 64, 10]),
+      copies: 2,
+      configuration: const {
+        'hardwareId': 'activation-1:receipt-primary',
+        'jobId': 'local-job-1',
+        'documentKind': 'receipt',
+      },
+    );
+
+    expect(request, {
+      'hardwareId': 'activation-1:receipt-primary',
+      'operation': 'printReceipt',
+      'bytes': [27, 64, 10],
+      'copies': 2,
+      'idempotencyKey': 'local-job-1',
+    });
+    expect(observation.details['remoteJobId'], 'remote-job-1');
+    expect(observation.physicalConfirmationRequired, isTrue);
+  });
 }

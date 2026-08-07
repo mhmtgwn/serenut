@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 
 class PrintQueuePage extends ConsumerStatefulWidget {
   const PrintQueuePage({super.key});
@@ -24,6 +25,7 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
   }
 
   Future<void> _load() async {
+    ref.invalidate(sharedHardwareJobsProvider);
     if (mounted) {
       setState(() {
         _loading = true;
@@ -59,9 +61,48 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
     await _load();
   }
 
+  Future<void> _sharedAction(
+    SharedHardwareJobSummary job,
+    String action,
+  ) async {
+    if (action == 'confirmNotPrinted') {
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Tekrar yazdırılsın mı?'),
+          content: Text(
+            '${job.hardwareName} çıktısının oluşmadığını doğruluyorsunuz. '
+            'İş yeniden kuyruğa alınacak.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Tekrar yazdır'),
+            ),
+          ],
+        ),
+      );
+      if (approved != true) return;
+    }
+    try {
+      await ref.read(sharedHardwareServiceProvider).actOnJob(job.id, action);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ortak iş güncellenemedi: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final runtime = ref.watch(printingRuntimeSnapshotProvider);
+    final sharedJobs = ref.watch(sharedHardwareJobsProvider);
     final runtimeError = runtime.value?.error ?? runtime.error?.toString();
     ref.listen(printingRuntimeSnapshotProvider, (_, next) {
       if (next.hasValue) _load();
@@ -89,6 +130,16 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
                 style: const TextStyle(color: POSColors.red),
               ),
             ),
+          sharedJobs.when(
+            loading: () => const LinearProgressIndicator(minHeight: 2),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (jobs) => jobs.isEmpty
+                ? const SizedBox.shrink()
+                : _SharedJobsPanel(
+                    jobs: jobs.take(5).toList(),
+                    onAction: _sharedAction,
+                  ),
+          ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -119,6 +170,121 @@ class _PrintQueuePageState extends ConsumerState<PrintQueuePage> {
     );
   }
 }
+
+class _SharedJobsPanel extends StatelessWidget {
+  final List<SharedHardwareJobSummary> jobs;
+  final Future<void> Function(SharedHardwareJobSummary, String) onAction;
+
+  const _SharedJobsPanel({required this.jobs, required this.onAction});
+
+  @override
+  Widget build(BuildContext context) => ExpansionTile(
+        initiallyExpanded: jobs.any((job) =>
+            job.state == 'queued' ||
+            job.state == 'claimed' ||
+            job.state == 'retry_wait' ||
+            job.state == 'failed'),
+        leading: const Icon(Icons.cloud_queue_rounded),
+        title: const Text('Ortak yazdırma işleri'),
+        subtitle: Text('${jobs.length} son işlem'),
+        children: jobs.map((job) {
+          final presentation = _sharedState(job.state);
+          return ListTile(
+            dense: true,
+            leading: Icon(presentation.$2, color: presentation.$3),
+            title: Text(job.hardwareName),
+            subtitle: Text([
+              job.requestedHere ? 'Bu cihazdan gönderildi' : 'Bu cihaz bastı',
+              DateFormat('dd.MM HH:mm:ss').format(job.createdAt),
+              if (job.errorMessage != null) job.errorMessage!,
+            ].join(' · ')),
+            trailing: _SharedJobActions(
+              job: job,
+              label: presentation.$1,
+              onAction: onAction,
+            ),
+          );
+        }).toList(growable: false),
+      );
+}
+
+class _SharedJobActions extends StatelessWidget {
+  final SharedHardwareJobSummary job;
+  final String label;
+  final Future<void> Function(SharedHardwareJobSummary, String) onAction;
+
+  const _SharedJobActions({
+    required this.job,
+    required this.label,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (job.state == 'failed') {
+      return FilledButton.tonalIcon(
+        onPressed: () => onAction(job, 'retry'),
+        icon: const Icon(Icons.replay_rounded),
+        label: const Text('Tekrar dene'),
+      );
+    }
+    if (job.state == 'queued' || job.state == 'retry_wait') {
+      return TextButton(
+        onPressed: () => onAction(job, 'cancel'),
+        child: const Text('İptal et'),
+      );
+    }
+    if (job.state == 'requires_confirmation') {
+      return PopupMenuButton<String>(
+        tooltip: 'Fiziksel sonucu doğrula',
+        onSelected: (action) => onAction(job, action),
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 'confirmPrinted',
+            child: Text('Çıktı basıldı'),
+          ),
+          PopupMenuItem(
+            value: 'confirmNotPrinted',
+            child: Text('Çıktı oluşmadı'),
+          ),
+        ],
+        child: const Chip(label: Text('Sonucu doğrula')),
+      );
+    }
+    return Text(label);
+  }
+}
+
+(String, IconData, Color) _sharedState(String state) => switch (state) {
+      'queued' => ('Bekliyor', Icons.schedule_rounded, POSColors.amber),
+      'claimed' || 'executing' => (
+          'İşleniyor',
+          Icons.sync_rounded,
+          POSColors.blue
+        ),
+      'retry_wait' => (
+          'Tekrar denenecek',
+          Icons.replay_rounded,
+          POSColors.amber
+        ),
+      'succeeded' => (
+          'Yazdırıldı',
+          Icons.check_circle_rounded,
+          POSColors.green
+        ),
+      'requires_confirmation' => (
+          'Kontrol gerekli',
+          Icons.help_rounded,
+          POSColors.amber
+        ),
+      'failed' => ('Başarısız', Icons.error_rounded, POSColors.red),
+      'cancelled' => (
+          'İptal edildi',
+          Icons.cancel_rounded,
+          POSColors.textSecondary
+        ),
+      _ => (state, Icons.info_rounded, POSColors.textSecondary),
+    };
 
 class _JobCard extends StatelessWidget {
   final PrintJobRecord job;

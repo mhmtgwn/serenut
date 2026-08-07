@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
+import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 
 class TcpPrintTransport implements PrintTransport {
   final Future<Socket> Function(String host, int port, {Duration? timeout})
@@ -199,6 +200,72 @@ class EmbeddedPrintTransport implements PrintTransport {
       acceptedAt: DateTime.now(),
       details: {'copies': copies},
     );
+  }
+}
+
+typedef CloudPrintQueue = Future<String> Function({
+  required String hardwareId,
+  required String operation,
+  required List<int> bytes,
+  required int copies,
+  required String idempotencyKey,
+});
+
+class CloudRelayPrintTransport implements PrintTransport {
+  final CloudPrintQueue queue;
+
+  CloudRelayPrintTransport(SharedHardwareService service)
+      : queue = service.queuePrint;
+
+  CloudRelayPrintTransport.withQueue(this.queue);
+
+  @override
+  bool supports(PrinterTransportKind kind) =>
+      kind == PrinterTransportKind.cloudRelay;
+
+  @override
+  Future<PrintTransportObservation> send({
+    required Uint8List bytes,
+    required int copies,
+    required Map<String, Object?> configuration,
+  }) async {
+    final hardwareId = configuration['hardwareId']?.toString() ?? '';
+    final jobId = configuration['jobId']?.toString() ?? '';
+    final documentKind = configuration['documentKind']?.toString() ?? '';
+    if (hardwareId.isEmpty || jobId.isEmpty) {
+      throw const PrintTransportException(
+        code: 'invalid_cloud_relay_configuration',
+        message: 'Ortak yazıcı kimliği eksik.',
+        retryable: false,
+      );
+    }
+    final operation = switch (documentKind) {
+      'receipt' => 'printReceipt',
+      'productLabel' => 'printProductLabel',
+      'orderLabel' => 'printOrderLabel',
+      _ => 'testPrint',
+    };
+    try {
+      final remoteJobId = await queue(
+        hardwareId: hardwareId,
+        operation: operation,
+        bytes: bytes,
+        copies: copies,
+        idempotencyKey: jobId,
+      );
+      return PrintTransportObservation(
+        transport: PrinterTransportKind.cloudRelay.name,
+        acceptedAt: DateTime.now(),
+        details: {'remoteJobId': remoteJobId, 'hardwareId': hardwareId},
+        physicalConfirmationRequired: true,
+      );
+    } catch (error) {
+      throw PrintTransportException(
+        code: 'cloud_relay_unavailable',
+        message: 'Ortak yazdırma kuyruğuna ulaşılamadı: $error',
+        retryable: true,
+      );
+    }
   }
 }
 

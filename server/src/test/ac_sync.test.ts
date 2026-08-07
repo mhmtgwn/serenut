@@ -32,7 +32,7 @@ function tokenForDevice(): string {
       email: 'owner@sync-http.test',
       company_id: companyId,
       roles: ['owner'],
-      permissions: [],
+      permissions: ['settings:printer'],
       token_version: 1,
       entitlement_state: 'active',
       entitlement_valid_until: Date.now() + 60 * 60 * 1000,
@@ -73,10 +73,10 @@ async function setup() {
     );
     await client.query(
       `INSERT INTO device_activations
-        (id, entitlement_id, company_id, device_hash, device_name, platform, status)
+        (id, entitlement_id, company_id, device_hash, device_name, platform, status, last_seen_at)
        VALUES
-        ($1, 'sync-http-entitlement', $2, $3, 'Windows acceptance device', 'windows', 'active'),
-        ($4, 'sync-http-entitlement', $2, $5, 'Android acceptance device', 'android', 'active')`,
+        ($1, 'sync-http-entitlement', $2, $3, 'Windows acceptance device', 'windows', 'active', NOW()),
+        ($4, 'sync-http-entitlement', $2, $5, 'Android acceptance device', 'android', 'active', NOW())`,
       [activationA, companyId, installationA, activationB, installationB],
     );
     await client.query('COMMIT');
@@ -307,6 +307,153 @@ async function run() {
       productSnapshot?.payload?.is_deleted !== 1 ||
       orderSnapshot?.payload?.items?.[0]?.product_id !== productMutation.entity_id) {
     fail(`bootstrap did not preserve a deleted product referenced by history: ${bootstrap.status} ${JSON.stringify(bootstrap.body)}`);
+  }
+
+  const registeredPrinter = await request(app)
+    .put('/api/v4/sync/shared-hardware/presence')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      hardware: [{
+        id: 'receipt-primary', name: 'Ana Kasa Yazıcısı',
+        type: 'receiptPrinter', connection_type: 'windows',
+        language: 'escPos', sharing_scope: 'company', enabled: true,
+        configuration: { printerName: 'Acceptance Printer' },
+        capabilities: { paperWidthMm: 80 },
+      }],
+    });
+  if (registeredPrinter.status !== 200 || registeredPrinter.body.registered !== 1) {
+    fail(`shared printer registration failed: ${registeredPrinter.status} ${JSON.stringify(registeredPrinter.body)}`);
+  }
+
+  const sharedList = await request(app)
+    .post('/api/v4/sync/shared-hardware/list')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationB, device_id: installationB });
+  const sharedPrinter = (sharedList.body.hardware ?? []).find((item: any) =>
+    item.name === 'Ana Kasa Yazıcısı');
+  if (sharedList.status !== 200 || !sharedPrinter?.online || sharedPrinter?.is_local) {
+    fail(`device B cannot discover device A printer: ${sharedList.status} ${JSON.stringify(sharedList.body)}`);
+  }
+
+  const remoteJobBody = {
+    device_activation_id: activationB,
+    device_id: installationB,
+    hardware_id: sharedPrinter.id,
+    operation: 'printReceipt',
+    idempotency_key: 'acceptance-shared-print-1',
+    payload: { bytes_base64: 'G0AK', copies: 1 },
+  };
+  const queuedJob = await request(app)
+    .post('/api/v4/sync/hardware-jobs')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send(remoteJobBody);
+  const duplicateJob = await request(app)
+    .post('/api/v4/sync/hardware-jobs')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send(remoteJobBody);
+  if (queuedJob.status !== 202 || duplicateJob.status !== 202 ||
+      queuedJob.body.job?.id !== duplicateJob.body.job?.id) {
+    fail(`remote print enqueue is not idempotent: ${queuedJob.status}/${duplicateJob.status}`);
+  }
+
+  const claimedJob = await request(app)
+    .post('/api/v4/sync/hardware-jobs/claim')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationA, device_id: installationA });
+  if (claimedJob.status !== 200 || claimedJob.body.job?.id !== queuedJob.body.job.id) {
+    fail(`owner device did not claim its print job: ${claimedJob.status} ${JSON.stringify(claimedJob.body)}`);
+  }
+  const startedJob = await request(app)
+    .post(`/api/v4/sync/hardware-jobs/${claimedJob.body.job.id}/start`)
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationA, device_id: installationA });
+  const completedJob = await request(app)
+    .post(`/api/v4/sync/hardware-jobs/${claimedJob.body.job.id}/result`)
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA, device_id: installationA,
+      state: 'succeeded', result: { transport: 'windowsSpooler' },
+    });
+  if (startedJob.status !== 200 || completedJob.status !== 200 ||
+      completedJob.body.job?.state !== 'succeeded') {
+    fail(`remote print execution lifecycle failed: ${startedJob.status}/${completedJob.status} ${JSON.stringify(completedJob.body)}`);
+  }
+
+  const sharedJobs = await request(app)
+    .post('/api/v4/sync/hardware-jobs/list')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationB, device_id: installationB });
+  if (sharedJobs.status !== 200 || sharedJobs.body.jobs?.[0]?.state !== 'succeeded' ||
+      !sharedJobs.body.jobs?.[0]?.requested_here) {
+    fail(`requester cannot observe physical result: ${sharedJobs.status} ${JSON.stringify(sharedJobs.body)}`);
+  }
+
+  const uncertainJob = await request(app)
+    .post('/api/v4/sync/hardware-jobs')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      ...remoteJobBody,
+      idempotency_key: 'acceptance-shared-print-uncertain',
+    });
+  const uncertainClaim = await request(app)
+    .post('/api/v4/sync/hardware-jobs/claim')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationA, device_id: installationA });
+  const uncertainStart = await request(app)
+    .post(`/api/v4/sync/hardware-jobs/${uncertainJob.body.job.id}/start`)
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationA, device_id: installationA });
+  await pgPool.query(
+    `UPDATE hardware_jobs SET lease_expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1`,
+    [uncertainJob.body.job.id],
+  );
+  const claimAfterCrash = await request(app)
+    .post('/api/v4/sync/hardware-jobs/claim')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationA, device_id: installationA });
+  const uncertainList = await request(app)
+    .post('/api/v4/sync/hardware-jobs/list')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationB, device_id: installationB });
+  const uncertainSummary = (uncertainList.body.jobs ?? []).find((job: any) =>
+    job.id === uncertainJob.body.job.id);
+  if (uncertainJob.status !== 202 || uncertainClaim.body.job?.id !== uncertainJob.body.job.id ||
+      uncertainStart.status !== 200 || claimAfterCrash.body.job != null ||
+      uncertainSummary?.state !== 'requires_confirmation') {
+    fail(`an uncertain physical print could be duplicated: ${JSON.stringify({
+      enqueue: uncertainJob.status,
+      claim: uncertainClaim.body,
+      start: uncertainStart.status,
+      afterCrash: claimAfterCrash.body,
+      summary: uncertainSummary,
+    })}`);
+  }
+  const confirmedPrinted = await request(app)
+    .post(`/api/v4/sync/hardware-jobs/${uncertainJob.body.job.id}/action`)
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationB,
+      device_id: installationB,
+      action: 'confirmPrinted',
+    });
+  if (confirmedPrinted.status !== 200 || confirmedPrinted.body.job?.state !== 'succeeded') {
+    fail(`uncertain print could not be resolved safely: ${confirmedPrinted.status} ${JSON.stringify(confirmedPrinted.body)}`);
   }
 
   console.log('✔ Sync V4 HTTP: push, retry, pull, conflict and poison-batch isolation passed.');

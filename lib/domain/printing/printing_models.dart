@@ -4,7 +4,14 @@ enum PrintDocumentKind { receipt, productLabel, orderLabel }
 
 enum PrinterLanguage { escPos, tspl }
 
-enum PrinterTransportKind { tcp, windowsSpooler, usb, bluetooth, embedded }
+enum PrinterTransportKind {
+  tcp,
+  windowsSpooler,
+  usb,
+  bluetooth,
+  embedded,
+  cloudRelay,
+}
 
 enum PrintJobState {
   created,

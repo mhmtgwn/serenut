@@ -17,6 +17,7 @@ import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/infrastructure/printing/physical_print_test_service.dart';
+import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 
 final deviceHardwareProfileServiceProvider =
     Provider<DeviceHardwareProfileService>((ref) {
@@ -37,6 +38,16 @@ final hardwareDevicesProvider =
     AsyncNotifierProvider<HardwareDevicesNotifier, List<HardwareDevice>>(
   HardwareDevicesNotifier.new,
 );
+
+final sharedHardwarePresenceRuntimeProvider =
+    Provider<SharedHardwarePresenceRuntime>((ref) {
+  final runtime = SharedHardwarePresenceRuntime(
+    service: ref.watch(sharedHardwareServiceProvider),
+    loadDevices: () => ref.read(hardwareDevicesProvider.future),
+  );
+  ref.onDispose(runtime.dispose);
+  return runtime;
+});
 
 class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
   static const _migrationKey = 'hardware_device_registry_migrated_v1';
@@ -250,6 +261,53 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     await _backupRemoteProfile(current);
   }
 
+  Future<void> activateSharedPrinter(SharedHardwareDevice remote) async {
+    if (remote.type != HardwareDeviceType.receiptPrinter &&
+        remote.type != HardwareDeviceType.labelPrinter) {
+      throw StateError('Bu ortak donanım henüz uzaktan kullanılamaz.');
+    }
+    if (!remote.online) {
+      throw StateError('Ortak yazıcının sahibi olan cihaz çevrimdışı.');
+    }
+    final kind = remote.type == HardwareDeviceType.receiptPrinter
+        ? PrinterLanguage.escPos
+        : PrinterLanguage.tspl;
+    final now = DateTime.now();
+    final localProfileId = 'shared:${remote.id}';
+    await ref.read(printingRepositoryProvider).saveDevice(PrinterDeviceProfile(
+          id: localProfileId,
+          name: remote.name,
+          language: kind,
+          transport: PrinterTransportKind.cloudRelay,
+          transportConfig: {
+            'hardwareId': remote.id,
+            'ownerConnection': remote.connectionType,
+          },
+          capabilities: remote.capabilities.isEmpty
+              ? remote.type == HardwareDeviceType.receiptPrinter
+                  ? const {'paperWidthMm': 58, 'printableWidthDots': 384}
+                  : const {
+                      'dpi': 203,
+                      'mediaWidthMm': 50,
+                      'mediaHeightMm': 30,
+                      'gapMm': 2,
+                      'printableWidthDots': 384,
+                    }
+              : remote.capabilities,
+          enabled: true,
+          lastTestedAt: remote.lastSeenAt,
+          lastTestSucceeded: remote.online,
+          lastTestMessage: 'Sahip cihaz üzerinden ortak kullanılıyor.',
+          createdAt: now,
+          updatedAt: now,
+        ));
+    for (final documentKind in _documentKinds(remote.type)) {
+      await _savePrinterRoute(documentKind, localProfileId);
+    }
+    state = AsyncData(await _loadAll());
+    await _backupRemoteProfile(state.requireValue);
+  }
+
   Future<List<HardwareDevice>> _restoreRemoteProfile() async {
     try {
       return ref.read(deviceHardwareProfileServiceProvider).restore();
@@ -260,9 +318,25 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
 
   Future<void> _backupRemoteProfile(List<HardwareDevice> devices) async {
     try {
-      await ref.read(deviceHardwareProfileServiceProvider).backup(devices);
+      await ref.read(deviceHardwareProfileServiceProvider).backup(
+            devices
+                .where((device) =>
+                    device.connectionType != HardwareConnectionType.cloud)
+                .toList(growable: false),
+          );
     } catch (_) {
       // Local hardware remains authoritative while offline; next edit retries.
+    }
+    try {
+      await ref.read(sharedHardwareServiceProvider).publishPresence(
+            devices
+                .where((device) =>
+                    device.connectionType != HardwareConnectionType.cloud)
+                .toList(),
+          );
+      ref.invalidate(sharedHardwareDevicesProvider);
+    } catch (_) {
+      // Presence is retried by the worker startup and the next registry change.
     }
   }
 
@@ -491,6 +565,10 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         }
       case HardwareConnectionType.serial || HardwareConnectionType.keyboard:
         throw StateError('Bu bağlantı türü yazıcı için desteklenmiyor.');
+      case HardwareConnectionType.cloud:
+        throw StateError(
+          'Ortak yazıcı sahibi cihaz üzerinden test edilmelidir.',
+        );
     }
   }
 
@@ -716,6 +794,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         HardwareConnectionType.embedded => PrinterTransportKind.embedded,
         HardwareConnectionType.windows => PrinterTransportKind.windowsSpooler,
         HardwareConnectionType.bluetooth => PrinterTransportKind.bluetooth,
+        HardwareConnectionType.cloud => PrinterTransportKind.cloudRelay,
         _ => PrinterTransportKind.tcp,
       };
 
@@ -726,6 +805,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         PrinterTransportKind.usb => HardwareConnectionType.windows,
         PrinterTransportKind.bluetooth => HardwareConnectionType.bluetooth,
         PrinterTransportKind.tcp => HardwareConnectionType.tcp,
+        PrinterTransportKind.cloudRelay => HardwareConnectionType.cloud,
       };
 
   static PrinterDeviceProfile _toPrinterProfile(HardwareDevice device) {
