@@ -3,6 +3,8 @@
 // UX Redesign v3: 44×44 touch targets, swipe-to-delete, improved empty state
 // Preserved: all callback signatures, no business logic changes
 
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
@@ -42,6 +44,8 @@ class CartPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cartCount = cartQuantities.values.fold(0, (a, b) => a + b);
+    final newestFirstEntries =
+        cartQuantities.entries.toList().reversed.toList();
 
     return Container(
       color: Colors.white,
@@ -122,24 +126,36 @@ class CartPanel extends StatelessWidget {
           Expanded(
             child: cartQuantities.isEmpty
                 ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-                    itemCount: cartQuantities.length,
-                    itemBuilder: (context, index) {
-                      final entry = cartQuantities.entries.elementAt(index);
-                      final prod = cartProducts[entry.key]!;
-                      final qty = entry.value;
-                      return _CartItem(
-                        key: ValueKey(prod.id),
-                        product: prod,
-                        quantity: qty,
-                        onAdd: () => onAddToCart(prod),
-                        onRemove: () => onRemoveFromCart(prod),
-                        onDelete: () => onDeleteFromCart(prod),
-                        onQtyChanged: (newQty) =>
-                            onQuantityChanged(prod, newQty),
-                      );
-                    },
+                : ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context).copyWith(
+                      dragDevices: const {
+                        PointerDeviceKind.touch,
+                        PointerDeviceKind.stylus,
+                        PointerDeviceKind.invertedStylus,
+                        PointerDeviceKind.mouse,
+                        PointerDeviceKind.trackpad,
+                      },
+                    ),
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+                      itemCount: newestFirstEntries.length,
+                      itemBuilder: (context, index) {
+                        final entry = newestFirstEntries[index];
+                        final prod = cartProducts[entry.key]!;
+                        final qty = entry.value;
+                        return _CartItem(
+                          key: ValueKey(prod.id),
+                          product: prod,
+                          quantity: qty,
+                          onAdd: () => onAddToCart(prod),
+                          onRemove: () => onRemoveFromCart(prod),
+                          onDelete: () => onDeleteFromCart(prod),
+                          onQtyChanged: (newQty) =>
+                              onQuantityChanged(prod, newQty),
+                        );
+                      },
+                    ),
                   ),
           ),
 

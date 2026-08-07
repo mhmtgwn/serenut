@@ -38,13 +38,16 @@ void main() {
     expect(output, isNot(contains('\x1dV')));
   });
 
-  test('gap otomatik algılama etkinse kalibrasyon komutu önce gönderilir', () {
+  test('gap otomatik algılama ölçü ve gap tanımından sonra çalıştırılır', () {
     final output = latin1.decode(TsplLabelLayoutEngine.generateLabelBytes(
       productLabel(),
       autoDetectGap: true,
     ));
 
-    expect(output, startsWith('GAPDETECT\r\nSIZE 50 mm,30 mm\r\n'));
+    expect(
+      output,
+      startsWith('SIZE 50 mm,30 mm\r\nGAP 2 mm,0 mm\r\nGAPDETECT\r\n'),
+    );
   });
 
   test('300 DPI ve farklı rulo ölçüsü komutlara doğru yansır', () {

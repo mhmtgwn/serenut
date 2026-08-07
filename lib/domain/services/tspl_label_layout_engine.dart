@@ -51,9 +51,9 @@ class TsplLabelLayoutEngine {
     final barcode = _barcode(model.barcode ?? '');
 
     final commands = _TsplBuffer()
-      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
+      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('DENSITY 8')
       ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
       ..writeln('REFERENCE 0,0')
@@ -65,10 +65,10 @@ class TsplLabelLayoutEngine {
     if (showBusinessName) {
       final bitmapCmd = _generateTsplBitmap(
           logoPath, logoBytes, widthDots, currentY,
-          maxHeight: 40);
+          maxHeight: 44);
       if (bitmapCmd != null) {
-        commands.addAll(bitmapCmd);
-        currentY += sy(44 * fontScale).round();
+        commands.addAll(bitmapCmd.bytes);
+        currentY += bitmapCmd.height + sy(3);
       }
     }
 
@@ -135,6 +135,11 @@ class TsplLabelLayoutEngine {
     }
 
     currentY += sy(4);
+
+    // Keep a guaranteed bottom block for price/barcode so a two-line product
+    // name can never push the price outside the physical label.
+    currentY =
+        currentY.clamp(sy(54), heightDots - sy(showVat ? 78 : 66)).toInt();
 
     // 4. Horizontal Separator Line
     commands.writeln(
@@ -279,9 +284,9 @@ class TsplLabelLayoutEngine {
         note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
 
     final commands = _TsplBuffer()
-      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
+      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('DENSITY 8')
       // Product and order labels share the same physical media path. Keeping
       // one direction prevents order labels from being rotated relative to
@@ -302,8 +307,8 @@ class TsplLabelLayoutEngine {
         maxHeight: 16,
       );
       if (bitmap != null) {
-        commands.addAll(bitmap);
-        currentY += sy(22);
+        commands.addAll(bitmap.bytes);
+        currentY += bitmap.height + sy(3);
       } else if (businessName != null && businessName.trim().isNotEmpty) {
         final bizClean = _fit(businessName, maxFont2Chars);
         final bizX = ((widthDots - bizClean.length * 12) / 2)
@@ -500,7 +505,7 @@ class TsplLabelLayoutEngine {
     return value.split('').map((char) => replacements[char] ?? char).join();
   }
 
-  static List<int>? _generateTsplBitmap(
+  static ({List<int> bytes, int height})? _generateTsplBitmap(
     String? logoPath,
     List<int>? logoBytes,
     int widthDots,
@@ -517,10 +522,11 @@ class TsplLabelLayoutEngine {
         if (!file.existsSync()) return null;
         bytes = file.readAsBytesSync();
       }
-      final decoded = img.decodeImage(Uint8List.fromList(bytes));
-      if (decoded == null) return null;
+      final source = img.decodeImage(Uint8List.fromList(bytes));
+      if (source == null) return null;
+      final decoded = _cropLogoWhitespace(source);
 
-      var targetWidth = (widthDots * 0.44).round().clamp(120, 176).toInt();
+      var targetWidth = (widthDots * 0.54).round().clamp(136, 216).toInt();
       int targetHeight = (decoded.height * (targetWidth / decoded.width))
           .round()
           .clamp(10, maxHeight);
@@ -592,16 +598,52 @@ class TsplLabelLayoutEngine {
         );
       }
 
-      return <int>[
-        ...latin1
-            .encode('BITMAP $centerX,$currentY,$widthBytes,$targetHeight,0,'),
-        ...rasterBytes,
-        13,
-        10,
-      ];
+      return (
+        bytes: <int>[
+          ...latin1
+              .encode('BITMAP $centerX,$currentY,$widthBytes,$targetHeight,0,'),
+          ...rasterBytes,
+          13,
+          10,
+        ],
+        height: targetHeight,
+      );
     } catch (_) {
       return null;
     }
+  }
+
+  static img.Image _cropLogoWhitespace(img.Image source) {
+    final corner = source.getPixel(0, 0);
+    var minX = source.width;
+    var minY = source.height;
+    var maxX = -1;
+    var maxY = -1;
+
+    for (var y = 0; y < source.height; y++) {
+      for (var x = 0; x < source.width; x++) {
+        final pixel = source.getPixel(x, y);
+        final distance = (pixel.r - corner.r).abs() +
+            (pixel.g - corner.g).abs() +
+            (pixel.b - corner.b).abs();
+        final foreground =
+            corner.a < 128 ? pixel.a >= 32 : pixel.a >= 128 && distance >= 30;
+        if (!foreground) continue;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    if (maxX < minX || maxY < minY) return source;
+    return img.copyCrop(
+      source,
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    );
   }
 }
 

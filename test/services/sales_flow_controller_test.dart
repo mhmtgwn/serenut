@@ -47,6 +47,34 @@ void main() {
       expect(notifier.state.total, 90.0);
     });
 
+    test('most recently added product is kept last for newest-first cart UI',
+        () {
+      final first = ProductEntity(
+        id: 'first',
+        name: 'First',
+        description: '',
+        price: 10,
+        quantity: 10,
+        category: 'Test',
+      );
+      final second = ProductEntity(
+        id: 'second',
+        name: 'Second',
+        description: '',
+        price: 20,
+        quantity: 10,
+        category: 'Test',
+      );
+
+      notifier.addToCart(first);
+      notifier.addToCart(second);
+      expect(notifier.state.cartQuantities.keys.toList(), ['first', 'second']);
+
+      notifier.addToCart(first);
+      expect(notifier.state.cartQuantities.keys.toList(), ['second', 'first']);
+      expect(notifier.state.cartQuantities['first'], 2);
+    });
+
     test('Selected customer assignment and payment split configuration', () {
       final customer = CustomerEntity(
         id: 'cust-1',
