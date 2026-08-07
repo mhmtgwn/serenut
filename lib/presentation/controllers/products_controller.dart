@@ -11,6 +11,8 @@ import 'package:serenutos/domain/services/pagination_service.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/providers/audit_provider.dart';
+import 'package:serenutos/presentation/controllers/orders_controller.dart';
+import 'package:serenutos/presentation/controllers/customers_controller.dart';
 
 class ProductsController extends AsyncNotifier<List<ProductEntity>> {
   late IProductRepository _repository;
