@@ -10,6 +10,8 @@ import { pgPool } from '../../config/database';
 import { enqueueNotification } from '../../workers/notification.worker';
 import { emailVerificationEmail } from '../notifications/email.templates';
 import crypto from 'crypto';
+import { CommercialLifecycleService } from '../billing/commercial_lifecycle.service';
+import { PasswordRecoveryService } from './password-recovery.service';
 
 const router = Router();
 // Mail delivery is currently optional. Verification is enabled only when the
@@ -240,8 +242,8 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
   if (!old_password || !new_password) {
     return res.status(400).json({ error: 'missing_passwords', message: 'Eski ve yeni şifre belirtilmelidir.' });
   }
-  if (typeof new_password !== 'string' || new_password.length < 8) {
-    return res.status(400).json({ error: 'weak_password', message: 'Yeni şifre en az 8 karakter olmalıdır.' });
+  if (typeof new_password !== 'string' || !PasswordRecoveryService.isStrongPassword(new_password)) {
+    return res.status(400).json({ error: 'weak_password', message: 'Yeni şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.' });
   }
 
   try {
@@ -251,59 +253,26 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
     if (err.message === 'invalid_old_password') {
       return res.status(400).json({ error: 'invalid_old_password', message: 'Eski şifre hatalı.' });
     }
+    if (err.message === 'password_reuse_not_allowed') {
+      return res.status(400).json({ error: 'password_reuse_not_allowed', message: 'Yeni şifre mevcut şifreyle aynı olamaz.' });
+    }
     logger.error('Change password error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
 });
 
 router.post('/verify-identity', passwordResetLimiter, async (req: Request, res: Response) => {
-  const { email, company_name, tax_number } = req.body;
-  if (!email || !company_name || !tax_number) {
-    return res.status(400).json({
-      error: 'missing_fields',
-      message: 'Kullanıcı adı/e-posta, işletme adı ve vergi no zorunludur.'
-    });
-  }
-
-  try {
-    const token = await AuthService.verifyIdentity(email, company_name, tax_number);
-    if (!token) {
-      return res.status(400).json({
-        error: 'verification_failed',
-        message: 'Girdiğiniz bilgiler kayıtlı hesap detaylarıyla eşleşmedi.'
-      });
-    }
-    return res.json({
-      success: true,
-      token,
-      message: 'Kimlik doğrulama başarılı. Yeni şifrenizi belirleyebilirsiniz.'
-    });
-  } catch (err) {
-    logger.error('Verify identity error:', err);
-    return res.status(500).json({ error: 'server_error', message: 'Sunucu hatası oluştu.' });
-  }
+  return res.status(410).json({
+    error: 'recovery_code_required',
+    message: 'Kayıt bilgileri tek başına şifre sıfırlama yetkisi vermez. Kurtarma kodu veya yönetici destekli kurtarma kullanın.',
+  });
 });
 
 router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: Response) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'missing_email' });
-  }
-
-  if (!emailDeliveryEnabled) {
-    return res.status(503).json({
-      error: 'email_service_unavailable',
-      message: 'E-posta ile şifre sıfırlama henüz aktif değil. Lütfen destek ekibiyle iletişime geçin.'
-    });
-  }
-
-  try {
-    await AuthService.forgotPassword(email);
-    // Return standard success to avoid email enum attacks
-    return res.json({ success: true, message: 'Eğer e-posta adresi kayıtlı ise sıfırlama linki gönderilecektir.' });
-  } catch (err) {
-    return res.status(500).json({ error: 'server_error' });
-  }
+  return res.status(410).json({
+    error: 'email_recovery_removed',
+    message: 'E-posta kurtarma etkin değildir. Kurtarma kodu veya yönetici destekli kurtarma kullanın.',
+  });
 });
 
 router.post('/reset-password', passwordResetLimiter, async (req: Request, res: Response) => {
@@ -311,20 +280,106 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
   if (!token || !newPassword) {
     return res.status(400).json({ error: 'missing_fields', message: 'Token ve yeni şifre zorunludur.' });
   }
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
+  if (newPassword.length < 12) {
+    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 12 karakter olmalıdır.' });
   }
 
   try {
-    const success = await AuthService.resetPassword(token, newPassword);
+    const success = await PasswordRecoveryService.resetPassword(token, newPassword, {
+      ip: req.ip, userAgent: req.headers['user-agent'],
+    });
     if (!success) {
       return res.status(400).json({ error: 'invalid_token', message: 'Geçersiz veya süresi dolmuş token.' });
     }
     return res.json({ success: true, message: 'Şifreniz başarıyla güncellendi.' });
   } catch (err) {
+    if ((err as Error).message === 'weak_password') {
+      return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.' });
+    }
+    if ((err as Error).message === 'password_reuse_not_allowed') {
+      return res.status(400).json({ error: 'password_reuse_not_allowed', message: 'Yeni şifre mevcut şifreyle aynı olamaz.' });
+    }
     logger.error('Reset password error:', err);
     return res.status(500).json({ error: 'server_error' });
   }
+});
+
+router.post('/recovery/authorize-code', passwordResetLimiter, async (req: Request, res: Response) => {
+  const { identifier, company_name, tax_number, recovery_code } = req.body;
+  if (![identifier, company_name, tax_number, recovery_code].every(value => typeof value === 'string' && value.trim())) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Hesap, işletme, TC/VKN ve kurtarma kodu zorunludur.' });
+  }
+  try {
+    const authorization = await PasswordRecoveryService.recoverWithIdentityAndCode({
+      identifier, companyName: company_name, taxNumber: tax_number, recoveryCode: recovery_code,
+      context: { ip: req.ip, userAgent: req.headers['user-agent'] },
+    });
+    if (!authorization) return res.status(400).json({ error: 'recovery_verification_failed', message: 'Bilgiler veya kurtarma kodu doğrulanamadı.' });
+    return res.json({ success: true, reset_token: authorization.resetToken, expires_in: authorization.expiresInSeconds });
+  } catch (error) {
+    logger.error('Recovery-code authorization failed', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.post('/recovery/claim', passwordResetLimiter, async (req: Request, res: Response) => {
+  const { request_id, claim_code } = req.body;
+  if (typeof request_id !== 'string' || typeof claim_code !== 'string') return res.status(400).json({ error: 'missing_fields' });
+  try {
+    const authorization = await PasswordRecoveryService.claimAdminRequest(request_id, claim_code, {
+      ip: req.ip, userAgent: req.headers['user-agent'],
+    });
+    if (!authorization) return res.status(400).json({ error: 'invalid_or_expired_claim' });
+    return res.json({ success: true, reset_token: authorization.resetToken, expires_in: authorization.expiresInSeconds });
+  } catch (error) {
+    logger.error('Recovery claim failed', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.post('/recovery/admin-assist', authenticateUser, passwordResetLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  const { target_user_id, reason } = req.body;
+  if (typeof target_user_id !== 'string' || typeof reason !== 'string') return res.status(400).json({ error: 'missing_fields' });
+  try {
+    const result = await PasswordRecoveryService.createAdminAssistedRequest({
+      targetUserId: target_user_id, actorId: req.user!.id, actorCompanyId: req.user!.company_id,
+      actorRoles: req.user!.roles, reason, context: { ip: req.ip, userAgent: req.headers['user-agent'] },
+    });
+    return res.status(201).json({ success: true, request_id: result.requestId, claim_code: result.claimCode, requires_second_approval: result.requiresSecondApproval });
+  } catch (error: any) {
+    if (['forbidden','self_admin_recovery_forbidden'].includes(error.message)) return res.status(403).json({ error: error.message });
+    if (error.message === 'user_not_found') return res.status(404).json({ error: error.message });
+    if (error.message === 'recovery_reason_required') return res.status(400).json({ error: error.message });
+    logger.error('Admin-assisted recovery request failed', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.post('/recovery/codes/regenerate', authenticateUser, passwordResetLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  const currentPassword = req.body.current_password;
+  if (typeof currentPassword !== 'string') return res.status(400).json({ error: 'current_password_required' });
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls='true'");
+    const user = await client.query('SELECT password_hash FROM users WHERE id=$1 AND company_id=$2 FOR UPDATE', [req.user!.id, req.user!.company_id]);
+    if (!user.rowCount || !(await AuthService.verifyPassword(currentPassword, user.rows[0].password_hash)).valid) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'invalid_current_password' });
+    }
+    const codes = await PasswordRecoveryService.issueRecoveryCodes(client, req.user!.id);
+    await client.query(
+      `INSERT INTO password_security_events(id,user_id,company_id,event_type,actor_id,ip_address,user_agent)
+       VALUES($1,$2,$3,'RECOVERY_CODES_REGENERATED',$2,$4,$5)`,
+      [`pse-${crypto.randomUUID()}`, req.user!.id, req.user!.company_id, req.ip || null, req.headers['user-agent'] || null],
+    );
+    await client.query('COMMIT');
+    return res.json({ success: true, recovery_codes: codes });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Recovery-code regeneration failed', error);
+    return res.status(500).json({ error: 'server_error' });
+  } finally { client.release(); }
 });
 
 // ── SELF-SERVICE REGISTRATION ────────────────────────────────────────────────
@@ -350,10 +405,10 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'legal_consent_required', message: 'Üyelik, gizlilik ve KVKK onayları zorunludur.' });
   }
 
-  if (password.length < 8) {
+  if (!PasswordRecoveryService.isStrongPassword(password)) {
     return res.status(400).json({
       error: 'weak_password',
-      message: 'Şifre en az 8 karakter olmalıdır.'
+      message: 'Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.'
     });
   }
 
@@ -364,6 +419,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   let verificationToken = '';
   let registeredUserId = '';
   let registeredCompanyId = '';
+  let recoveryCodes: string[] = [];
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
@@ -425,6 +481,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
     );
     registeredUserId = userId;
     registeredCompanyId = companyId;
+    recoveryCodes = await PasswordRecoveryService.issueRecoveryCodes(client, userId);
 
     const consentVersion = process.env.LEGAL_DOCUMENT_VERSION || '2026-07';
     const consentRows = [
@@ -453,54 +510,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
 
     // Registration never selects a paid plan. Every company starts with the
     // Starter trial contract; the clock begins on first device activation.
-    const trialPlanId = 'plan-basic';
-    const trialDeviceLimit = 1;
-    const trialStoreLimit = 1;
-
-    // Create subscription with trial_started_at = NULL (AC 1.1)
-    // Trial does NOT start at registration, nor on first login.
-    // It starts on FIRST POS DEVICE ACTIVATION via LicenseService.activate().
-      const subId = `sub-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-      await client.query(
-        `INSERT INTO subscriptions
-           (id, company_id, plan_id, status, current_period_start, current_period_end,
-            trial_started_at, trial_ends_at, payment_retry_count)
-         VALUES ($1, $2, $3, 'trialing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '30 days',
-                 NULL, NULL, 0)`,
-        [subId, companyId, trialPlanId]
-      );
-
-      // Generate a canonical license key and trial entitlement during registration!
-      const parts = [];
-      for (let i = 0; i < 4; i++) {
-        parts.push(crypto.randomBytes(2).toString('hex').toUpperCase());
-      }
-      const licenseKey = `SRNT-${parts.join('-')}`;
-
-      // Insert into license_entitlements (free trial limits enforce authorization boundaries)
-      const entId = `ent-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-      await client.query(`
-        INSERT INTO license_entitlements (
-          id, company_id, subscription_id, plan_id,
-          status, device_limit, store_limit,
-          valid_from, valid_until, token_version,
-          license_key, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, 'trial', $5, $6, NOW(), NOW() + INTERVAL '30 days', 1, $7, NOW(), NOW())
-      `, [entId, companyId, subId, trialPlanId, trialDeviceLimit, trialStoreLimit, licenseKey]);
-
-      // Sync legacy licenses table (start on trial with 1 device)
-      await client.query(`
-        INSERT INTO licenses (
-          id, company_id, license_key, tier,
-          allowed_devices_count, status, expires_at, created_at
-        )
-        VALUES ($1, $2, $3, 'trial', 1, 'active', NOW() + INTERVAL '30 days', NOW())
-      `, [
-        `lic-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
-        companyId,
-        licenseKey
-      ]);
+      await CommercialLifecycleService.provisionPendingTrial(client, { companyId });
 
       if (emailVerificationRequired) {
         verificationToken = crypto.randomBytes(32).toString('hex');
@@ -549,6 +559,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
         return res.status(201).json({
           ...loginResult,
           email_verification_required: false,
+          recovery_codes: recoveryCodes,
           message: 'Hesabınız oluşturuldu ve giriş yapıldı.'
         });
       } catch (loginErr) {
@@ -558,6 +569,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
 
     return res.status(201).json({
       user_id: registeredUserId,
+      recovery_codes: recoveryCodes,
       email_verification_required: emailVerificationRequired,
       message: emailVerificationRequired
         ? 'Hesabınız oluşturuldu. Giriş yapabilmek için e-posta adresinizi doğrulayın.'

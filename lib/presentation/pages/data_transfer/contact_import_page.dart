@@ -108,21 +108,36 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
 
   Future<void> _requestPermission() async {
     if (kIsWeb) return;
-    final status = await Permission.contacts.request();
-    if (status.isGranted) {
-      _loadContacts();
-    } else if (status.isPermanentlyDenied) {
-      openAppSettings();
-    } else {
+    try {
+      final status = await Permission.contacts.request();
+      if (status.isGranted) {
+        _loadContacts();
+      } else if (status.isPermanentlyDenied) {
+        openAppSettings();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Rehbere erişim izni reddedildi.'),
+              backgroundColor: _kPink,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } on MissingPluginException catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Rehbere erişim izni reddedildi.'),
+            content: Text(
+                'Bu platform rehber erişimini desteklemiyor (VCF içe aktarma seçeneğini kullanabilirsiniz).'),
             backgroundColor: _kPink,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
+    } catch (_) {
+      // Catch unexpected permission platform errors
     }
   }
 

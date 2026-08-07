@@ -74,8 +74,29 @@ class SqliteOrderRepository implements IOrderRepository {
               ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
     );
     return _gateway.transaction(() async {
+      final sequenceRows = await _executor.query(
+        'order_number_sequence',
+        columns: const ['next_value'],
+        where: 'id = 1',
+        limit: 1,
+      );
+      if (sequenceRows.isEmpty) {
+        throw StateError('Sipariş numarası sayacı bulunamadı.');
+      }
+      final nextValue = (sequenceRows.single['next_value'] as num).toInt();
+      final orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
+      final sequenceUpdated = await _executor.update(
+        'order_number_sequence',
+        {'next_value': nextValue + 1},
+        where: 'id = 1 AND next_value = ?',
+        whereArgs: [nextValue],
+      );
+      if (sequenceUpdated != 1) {
+        throw StateError('Sipariş numarası eşzamanlı üretilemedi.');
+      }
       final payload = {
         'id': entity.id,
+        'order_number': orderNumber,
         'customer_id': entity.customerId,
         'status': entity.status,
         'total_amount': totalAmount,
@@ -319,9 +340,14 @@ class SqliteOrderRepository implements IOrderRepository {
 
     final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
     if (hasSearch) {
-      conditions.add('(id LIKE ? OR customer_id IN '
+      conditions.add('(id LIKE ? OR order_number LIKE ? OR customer_id IN '
           '(SELECT id FROM customers WHERE name LIKE ? OR phone LIKE ?))');
-      args.addAll(['%$searchQuery%', '%$searchQuery%', '%$searchQuery%']);
+      args.addAll([
+        '%$searchQuery%',
+        '%$searchQuery%',
+        '%$searchQuery%',
+        '%$searchQuery%'
+      ]);
     }
     if (dateFrom != null) {
       conditions.add('created_at >= ?');
@@ -360,9 +386,14 @@ class SqliteOrderRepository implements IOrderRepository {
 
     final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
     if (hasSearch) {
-      conditions.add('(id LIKE ? OR customer_id IN '
+      conditions.add('(id LIKE ? OR order_number LIKE ? OR customer_id IN '
           '(SELECT id FROM customers WHERE name LIKE ? OR phone LIKE ?))');
-      args.addAll(['%$searchQuery%', '%$searchQuery%', '%$searchQuery%']);
+      args.addAll([
+        '%$searchQuery%',
+        '%$searchQuery%',
+        '%$searchQuery%',
+        '%$searchQuery%'
+      ]);
     }
     if (dateFrom != null) {
       conditions.add('created_at >= ?');

@@ -21,9 +21,11 @@ class UpdateTriggerManager {
     required bool isSalesCheckoutActive,
     String? publicKeyOverride,
   }) async {
-    final correlationId = 'upd-trig-${source.name}-${DateTime.now().millisecondsSinceEpoch}';
-    debugPrint('[UpdateTriggerManager] Triggered update check via ${source.name} (Correlation: $correlationId)');
-    
+    final correlationId =
+        'upd-trig-${source.name}-${DateTime.now().millisecondsSinceEpoch}';
+    debugPrint(
+        '[UpdateTriggerManager] Triggered update check via ${source.name} (Correlation: $correlationId)');
+
     return await _coordinator.runUpdateWorkflow(
       correlationId: correlationId,
       rawManifestContent: rawManifestContent,

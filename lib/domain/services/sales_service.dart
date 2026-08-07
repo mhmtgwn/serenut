@@ -24,6 +24,7 @@ class SalesService {
   final IDbTransactionRunner _transactionRunner;
   final SecurityGate _securityGate;
   final DataIntegrityService? _dataIntegrityService;
+  final IRefundMutationStore _refundStore;
 
   /// Standard constructor using IDbTransactionRunner for clean architectural separation
   SalesService({
@@ -33,6 +34,7 @@ class SalesService {
     required EventPublisher eventPublisher,
     required IDbTransactionRunner transactionRunner,
     required SecurityGate securityGate,
+    required IRefundMutationStore refundStore,
     DataIntegrityService? dataIntegrityService,
   })  : _saleRepository = saleRepository,
         _inventoryService = inventoryService,
@@ -40,6 +42,7 @@ class SalesService {
         _eventPublisher = eventPublisher,
         _transactionRunner = transactionRunner,
         _securityGate = securityGate,
+        _refundStore = refundStore,
         _dataIntegrityService = dataIntegrityService;
 
   /// Named alias — kept for backward compat with salesServiceProvider call sites
@@ -49,6 +52,7 @@ class SalesService {
     required PaymentService paymentService,
     required EventPublisher eventPublisher,
     required SecurityGate securityGate,
+    required IRefundMutationStore refundStore,
     IDbTransactionRunner? transactionRunner,
     DataIntegrityService? dataIntegrityService,
   }) =>
@@ -59,6 +63,7 @@ class SalesService {
         eventPublisher: eventPublisher,
         transactionRunner: transactionRunner ?? _DummyTransactionRunner(),
         securityGate: securityGate,
+        refundStore: refundStore,
         dataIntegrityService: dataIntegrityService,
       );
 
@@ -114,7 +119,8 @@ class SalesService {
       totalAmount += item.saleQuantity * item.unitPrice;
     }
 
-    final double finalPaidAmount = paidAmount ?? totalAmount;
+    final double finalPaidAmount =
+        paidAmount ?? (paymentMethod == 'debt' ? 0 : totalAmount);
     if (!totalAmount.isFinite || totalAmount < 0) {
       throw ArgumentError.value(
           totalAmount, 'totalAmount', 'Satış toplamı geçersiz.');
@@ -124,6 +130,15 @@ class SalesService {
         finalPaidAmount > totalAmount) {
       throw ArgumentError.value(finalPaidAmount, 'paidAmount',
           'Ödenen tutar sıfır ile satış toplamı arasında olmalıdır.');
+    }
+    if (paymentMethod == 'debt' && finalPaidAmount != 0) {
+      throw ArgumentError(
+          'Veresiye satışta başlangıç ödemesi sıfır olmalıdır; kısmi ödeme için karma yöntemini kullanın.');
+    }
+    if ((paymentMethod == 'cash' || paymentMethod == 'card') &&
+        (finalPaidAmount - totalAmount).abs() > 0.001) {
+      throw ArgumentError(
+          'Nakit ve kart satışları tam ödenmelidir; kısmi ödeme için karma yöntemini kullanın.');
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -397,219 +412,24 @@ class SalesService {
     });
   }
 
-  /// Cancel a sale — restores stock and reverses customer debt
-  Future<void> cancelSale(String saleId) async {
-    _checkSecurityGate();
-    final sale = await _saleRepository.findById(saleId);
-    if (sale == null) throw SaleNotFoundException('Sale $saleId not found');
-    if (sale.status == 'cancelled') return;
-
-    if (kIsWeb) {
-      // Update sale status to cancelled
-      await _saleRepository.update(SaleEntity(
-        id: sale.id,
-        customerId: sale.customerId,
-        totalAmount: sale.totalAmount,
-        paidAmount: sale.paidAmount,
-        paymentMethod: sale.paymentMethod,
-        status: 'cancelled',
-        createdAt: sale.createdAt,
-        items: sale.items,
-      ));
-
-      // Convert items back to SaleItemInput list
-      final restoredItems = <SaleItemInput>[];
-      for (final item in sale.items) {
-        final productId = item['product_id'] as String?;
-        final double rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-        final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-        if (productId != null && rawQty > 0) {
-          final int intQty =
-              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
-          restoredItems.add(SaleItemInput(
-            productId: productId,
-            quantity: intQty,
-            saleQuantity: rawQty,
-            unitPrice: price,
-          ));
-        }
-      }
-
-      // 1. Restore stock
-      await _inventoryService.increaseStock(restoredItems);
-
-      // 2. Reverse customer balance debt and create cancellation ledger entry
-      await _paymentService.processSaleCancellation(
-        saleId: saleId,
-        customerId: sale.customerId,
-        totalAmount: sale.totalAmount,
-        paidAmount: sale.paidAmount,
-      );
-
-      if (_dataIntegrityService != null) {
-        await _dataIntegrityService!.verifyLedgerInvariant(sale.customerId);
-      }
-      return;
-    }
-
-    await _transactionRunner.transaction(() async {
-      // Update sale status to cancelled
-      await _saleRepository.update(SaleEntity(
-        id: sale.id,
-        customerId: sale.customerId,
-        totalAmount: sale.totalAmount,
-        paidAmount: sale.paidAmount,
-        paymentMethod: sale.paymentMethod,
-        status: 'cancelled',
-        createdAt: sale.createdAt,
-        items: sale.items,
-      ));
-
-      // Convert items back to SaleItemInput list
-      final restoredItems = <SaleItemInput>[];
-      for (final item in sale.items) {
-        final productId = item['product_id'] as String?;
-        final double rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-        final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-        if (productId != null && rawQty > 0) {
-          final int intQty =
-              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
-          restoredItems.add(SaleItemInput(
-            productId: productId,
-            quantity: intQty,
-            saleQuantity: rawQty,
-            unitPrice: price,
-          ));
-        }
-      }
-
-      // 1. Restore stock
-      await _inventoryService.increaseStock(restoredItems);
-
-      // 2. Reverse customer balance debt and create cancellation ledger entry
-      await _paymentService.processSaleCancellation(
-        saleId: saleId,
-        customerId: sale.customerId,
-        totalAmount: sale.totalAmount,
-        paidAmount: sale.paidAmount,
-      );
-
-      if (_dataIntegrityService != null) {
-        await _dataIntegrityService!.verifyLedgerInvariant(sale.customerId);
-      }
-    });
-  }
-
   /// Return items from a completed sale
   Future<void> returnItems({
     required String saleId,
     required List<SaleItemInput> itemsToReturn,
     required String refundMethod, // 'balance' | 'cash'
+    required String reason,
   }) async {
     _checkSecurityGate();
-    final sale = await _saleRepository.findById(saleId);
-    if (sale == null) throw SaleNotFoundException('Sale $saleId not found');
-
-    double refundTotal = 0;
-    for (final item in itemsToReturn) {
-      refundTotal += item.quantity * item.unitPrice;
-    }
-
-    final updatedItems = <Map<String, dynamic>>[];
-    for (final item in sale.items) {
-      final productId = item['product_id'] as String;
-      final originalQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
-      // DÜZELTME: `as` operatörü `??`'den önce bağlanır — parantez eklenerek önce ?? uygulanıyor.
-      final rawPrice = item['unit_price'] ?? item['unitPrice'];
-      final price = (rawPrice as num?)?.toDouble() ?? 0.0;
-
-      final returnMatchIndex =
-          itemsToReturn.indexWhere((ri) => ri.productId == productId);
-      if (returnMatchIndex != -1) {
-        final returnedQty = itemsToReturn[returnMatchIndex].quantity;
-        final newQty = originalQty - returnedQty;
-        if (newQty > 0) {
-          updatedItems.add({
-            ...item,
-            'quantity': newQty,
-            'subtotal': newQty * price,
-          });
-        }
-      } else {
-        updatedItems.add(item);
+    final lines = itemsToReturn.map((item) {
+      final saleItemId = item.saleItemId;
+      if (saleItemId == null || saleItemId.isEmpty) {
+        throw ArgumentError('İade kalemi satış kalemi kimliği içermelidir.');
       }
-    }
-
-    final double newTotalAmount = updatedItems.fold<double>(
-      0.0,
-      (sum, item) =>
-          sum +
-          (((item['quantity'] as num).toDouble()) *
-              ((item['unit_price'] ?? item['unitPrice'] ?? 0.0) as num)
-                  .toDouble()),
+      return RefundLineRequest(saleItemId: saleItemId, quantity: item.quantity);
+    }).toList();
+    await _refundStore.create(
+      saleId: saleId, items: lines, refundMethod: refundMethod, reason: reason,
     );
-
-    double newPaidAmount = sale.paidAmount;
-    if (sale.paymentMethod != 'debt') {
-      newPaidAmount = sale.paidAmount - refundTotal;
-      if (newPaidAmount < 0) newPaidAmount = 0.0;
-    }
-
-    final String newStatus = updatedItems.isEmpty ? 'cancelled' : sale.status;
-
-    final updatedSale = SaleEntity(
-      id: sale.id,
-      customerId: sale.customerId,
-      totalAmount: newTotalAmount,
-      paidAmount: newPaidAmount,
-      paymentMethod: sale.paymentMethod,
-      status: newStatus,
-      createdAt: sale.createdAt,
-      items: updatedItems,
-      idempotencyKey: sale.idempotencyKey,
-      isSynced: sale.isSynced,
-    );
-
-    if (kIsWeb) {
-      // 1. Restore stock levels
-      await _inventoryService.increaseStock(itemsToReturn);
-
-      // 2. Process refund ledger records and balance updates
-      await _paymentService.processRefund(
-        saleId: saleId,
-        customerId: sale.customerId,
-        refundTotal: refundTotal,
-        refundMethod: refundMethod,
-      );
-
-      // 3. Update sale and items
-      await _saleRepository.update(updatedSale);
-
-      if (_dataIntegrityService != null) {
-        await _dataIntegrityService!.verifyLedgerInvariant(sale.customerId);
-      }
-      return;
-    }
-
-    await _transactionRunner.transaction(() async {
-      // 1. Restore stock levels
-      await _inventoryService.increaseStock(itemsToReturn);
-
-      // 2. Process refund ledger records and balance updates
-      await _paymentService.processRefund(
-        saleId: saleId,
-        customerId: sale.customerId,
-        refundTotal: refundTotal,
-        refundMethod: refundMethod,
-      );
-
-      // 3. Update sale and items
-      await _saleRepository.update(updatedSale);
-
-      if (_dataIntegrityService != null) {
-        await _dataIntegrityService!.verifyLedgerInvariant(sale.customerId);
-      }
-    });
   }
 
   /// Get today's sales summary

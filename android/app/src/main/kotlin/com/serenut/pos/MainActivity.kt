@@ -807,18 +807,24 @@ class MainActivity : FlutterActivity() {
 
     private fun printRawData(call: MethodCall, result: Result) {
         try {
-            // Flutter'dan List<int> olarak gelir, ByteArray'e çevir
-            val dataList = call.argument<List<Int>>("data")
-            
-            if (dataList == null || dataList.isEmpty()) {
+            // StandardMessageCodec encodes Dart Uint8List as byte[]; older
+            // callers may still send List<int>. Keep the native contract
+            // backwards compatible without unsafe generic casts.
+            val rawData = call.argument<Any>("data")
+            val data = when (rawData) {
+                is ByteArray -> rawData
+                is List<*> -> rawData.mapNotNull { value ->
+                    (value as? Number)?.toByte()
+                }.toByteArray()
+                else -> null
+            }
+
+            if (data == null || data.isEmpty()) {
                 Log.e("SunmiPrinter", "Raw data boş")
                 result.error("DATA_ERROR", "Yazdırılacak veri boş", null)
                 return
             }
-            
-            // List<Int> -> ByteArray
-            val data = dataList.map { it.toByte() }.toByteArray()
-            
+
             Log.d("SunmiPrinter", "Raw data yazdırılıyor: ${data.size} byte")
             
             if (sunmiPrinterConnected && sunmiPrinter != null) {

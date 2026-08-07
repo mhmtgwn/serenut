@@ -2,14 +2,15 @@
 // Serenut OS — Etiket Tasarımı, Şablonlar & Donanım Ayarları (Canlı Önizlemeli)
 
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/settings.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 
 class LabelTemplateEditorPage extends ConsumerStatefulWidget {
   const LabelTemplateEditorPage({super.key});
@@ -44,19 +45,13 @@ class _LabelTemplateEditorPageState
   // Donanım & Fiziki Boyut Ayarları
   int _labelWidthMm = 50;
   int _labelHeightMm = 30;
-  int _labelGapMm = 2;
-  int _labelDpi = 203;
-  String _labelPrinterLanguage = 'tspl';
-  int _labelPrinterCopies = 1;
-
   bool _initialized = false;
   bool _isSaving = false;
-  bool _isTestingPrinter = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -65,66 +60,90 @@ class _LabelTemplateEditorPageState
     super.dispose();
   }
 
-  void _loadFromSettings(Settings settings) {
+  void _loadFromProfiles(
+    PrintDesignProfile product,
+    PrintDesignProfile order,
+    PrinterDeviceProfile? device,
+  ) {
     if (_initialized) return;
     _initialized = true;
-
-    _productShowBusinessName = settings.printLogo;
-    _productShowBrand = settings.labelShowBrand;
-    _productShowBarcode = settings.printBarcode;
-    _productShowPrice = settings.printProductDetails;
-    _productShowVat = settings.labelShowVat;
-    _productFontSize = settings.labelFontSize;
-
-    _orderShowBusinessName = settings.labelOrderShowBusinessName;
-    _orderShowCustomerName = settings.labelOrderShowCustomerName;
-    _orderShowOrderNo = settings.labelOrderShowOrderNo;
-    _orderShowDate = settings.labelOrderShowDate;
-    _orderShowTotalAmount = settings.labelOrderShowTotalAmount;
-    _orderShowItemsCount = settings.labelOrderShowItemsCount;
-    _orderFontSize = settings.labelOrderFontSize;
-
-    _labelWidthMm = settings.labelWidthMm.clamp(20, 100);
-    _labelHeightMm = settings.labelHeightMm.clamp(15, 100);
-    _labelGapMm = settings.labelGapMm.clamp(0, 10);
-    _labelDpi = settings.labelDpi;
-    _labelPrinterLanguage = settings.labelPrinterLanguage;
-    _labelPrinterCopies = settings.labelPrinterCopies.clamp(1, 20);
+    final p = product.definition;
+    final o = order.definition;
+    _productShowBusinessName = p['showBusinessName'] != false;
+    _productShowBrand = p['showBrand'] != false;
+    _productShowBarcode = p['showBarcode'] != false;
+    _productShowPrice = p['showPrice'] != false;
+    _productShowVat = p['showVat'] != false;
+    _productFontSize = p['fontSize']?.toString() ?? 'Orta';
+    _orderShowBusinessName = o['showBusinessName'] != false;
+    _orderShowCustomerName = o['showCustomerName'] != false;
+    _orderShowOrderNo = o['showOrderNo'] != false;
+    _orderShowDate = o['showDate'] != false;
+    _orderShowTotalAmount = o['showTotalAmount'] != false;
+    _orderShowItemsCount = o['showItemsCount'] != false;
+    _orderFontSize = o['fontSize']?.toString() ?? 'Orta';
+    _labelWidthMm =
+        (device?.capabilities['mediaWidthMm'] as num?)?.toInt() ?? 50;
+    _labelHeightMm =
+        (device?.capabilities['mediaHeightMm'] as num?)?.toInt() ?? 30;
   }
 
   Future<void> _saveSettings() async {
-    final settings = ref.read(settingsNotifierProvider).value;
-    if (settings == null) return;
-
     setState(() => _isSaving = true);
     try {
-      final updated = settings.copyWith(
-        printLogo: _productShowBusinessName,
-        printBarcode: _productShowBarcode,
-        printProductDetails: _productShowPrice,
-        labelShowBrand: _productShowBrand,
-        labelShowVat: _productShowVat,
-        labelFontSize: _productFontSize,
-        labelOrderShowBusinessName: _orderShowBusinessName,
-        labelOrderShowCustomerName: _orderShowCustomerName,
-        labelOrderShowOrderNo: _orderShowOrderNo,
-        labelOrderShowDate: _orderShowDate,
-        labelOrderShowTotalAmount: _orderShowTotalAmount,
-        labelOrderShowItemsCount: _orderShowItemsCount,
-        labelOrderFontSize: _orderFontSize,
-        labelWidthMm: _labelWidthMm,
-        labelHeightMm: _labelHeightMm,
-        labelGapMm: _labelGapMm,
-        labelDpi: _labelDpi,
-        labelPrinterLanguage: _labelPrinterLanguage,
-        labelPrinterCopies: _labelPrinterCopies,
-      );
-      await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
+      final repository = ref.read(printingRepositoryProvider);
+      final product =
+          (await repository.getDesignProfiles(PrintDocumentKind.productLabel))
+              .firstWhere((profile) => profile.isDefault);
+      final order =
+          (await repository.getDesignProfiles(PrintDocumentKind.orderLabel))
+              .firstWhere((profile) => profile.isDefault);
+      final now = DateTime.now();
+      await repository.saveDesignProfile(PrintDesignProfile(
+        id: product.id,
+        name: product.name,
+        kind: product.kind,
+        schemaVersion: product.schemaVersion,
+        rendererVersion: product.rendererVersion,
+        definition: {
+          'showBusinessName': _productShowBusinessName,
+          'showBrand': _productShowBrand,
+          'showBarcode': _productShowBarcode,
+          'showPrice': _productShowPrice,
+          'showVat': _productShowVat,
+          'fontSize': _productFontSize,
+        },
+        isDefault: true,
+        createdAt: product.createdAt,
+        updatedAt: now,
+      ));
+      await repository.saveDesignProfile(PrintDesignProfile(
+        id: order.id,
+        name: order.name,
+        kind: order.kind,
+        schemaVersion: order.schemaVersion,
+        rendererVersion: order.rendererVersion,
+        definition: {
+          'showBusinessName': _orderShowBusinessName,
+          'showCustomerName': _orderShowCustomerName,
+          'showOrderNo': _orderShowOrderNo,
+          'showDate': _orderShowDate,
+          'showTotalAmount': _orderShowTotalAmount,
+          'showItemsCount': _orderShowItemsCount,
+          'fontSize': _orderFontSize,
+        },
+        isDefault: true,
+        createdAt: order.createdAt,
+        updatedAt: now,
+      ));
+      ref.invalidate(
+          printDesignProfilesProvider(PrintDocumentKind.productLabel));
+      ref.invalidate(printDesignProfilesProvider(PrintDocumentKind.orderLabel));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Etiket tasarımı ve ayarları başarıyla kaydedildi.'),
+            content: Text('Etiket tasarımları başarıyla kaydedildi.'),
             backgroundColor: POSColors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -145,59 +164,24 @@ class _LabelTemplateEditorPageState
     }
   }
 
-  Future<void> _testLabelPrinter() async {
-    final settings = ref.read(settingsNotifierProvider).value;
-    if (settings == null) return;
-
-    final candidate = settings.copyWith(
-      printLogo: _productShowBusinessName,
-      printBarcode: _productShowBarcode,
-      printProductDetails: _productShowPrice,
-      labelShowBrand: _productShowBrand,
-      labelShowVat: _productShowVat,
-      labelFontSize: _productFontSize,
-      labelWidthMm: _labelWidthMm,
-      labelHeightMm: _labelHeightMm,
-      labelGapMm: _labelGapMm,
-      labelDpi: _labelDpi,
-      labelPrinterLanguage: _labelPrinterLanguage,
-      labelPrinterCopies: _labelPrinterCopies,
-    );
-
-    setState(() => _isTestingPrinter = true);
-    try {
-      await ref
-          .read(printerServiceProvider)
-          .testLabelPrinterConnection(candidate);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Etiket yazıcısı testi başarılı! Çıktı gönderildi.'),
-            backgroundColor: POSColors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Yazıcı testi başarısız: $e'),
-            backgroundColor: POSColors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isTestingPrinter = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsNotifierProvider).value;
-    if (settings != null) {
-      _loadFromSettings(settings);
+    final productProfiles =
+        ref.watch(printDesignProfilesProvider(PrintDocumentKind.productLabel));
+    final orderProfiles =
+        ref.watch(printDesignProfilesProvider(PrintDocumentKind.orderLabel));
+    final activeDevice =
+        ref.watch(activePrinterDeviceProvider(PrintDocumentKind.productLabel));
+    if (!_initialized &&
+        productProfiles.hasValue &&
+        orderProfiles.hasValue &&
+        activeDevice.hasValue) {
+      _loadFromProfiles(
+        productProfiles.requireValue.firstWhere((item) => item.isDefault),
+        orderProfiles.requireValue.firstWhere((item) => item.isDefault),
+        activeDevice.value,
+      );
     }
 
     return Scaffold(
@@ -240,8 +224,9 @@ class _LabelTemplateEditorPageState
           indicatorWeight: 3,
           tabs: const [
             Tab(icon: Icon(Icons.qr_code_2_rounded), text: 'Ürün Etiketi'),
-            Tab(icon: Icon(Icons.receipt_long_rounded), text: 'Sipariş Etiketi'),
-            Tab(icon: Icon(Icons.aspect_ratio_rounded), text: 'Boyut & Donanım'),
+            Tab(
+                icon: Icon(Icons.receipt_long_rounded),
+                text: 'Sipariş Etiketi'),
           ],
         ),
       ),
@@ -250,7 +235,6 @@ class _LabelTemplateEditorPageState
         children: [
           _buildProductLabelTab(settings),
           _buildOrderLabelTab(settings),
-          _buildHardwareTab(settings),
         ],
       ),
     );
@@ -411,172 +395,10 @@ class _LabelTemplateEditorPageState
     );
   }
 
-  // ── Donanım & Fiziki Boyut Sekmesi ──────────────────────────────────────────
-  Widget _buildHardwareTab(Settings? settings) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Fiziki Etiket & Yazıcı Ayarları',
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: POSColors.text,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: POSColors.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: POSColors.border),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Text('Genişlik (mm): $_labelWidthMm mm',
-                        style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600, fontSize: 14)),
-                    const Spacer(),
-                    Slider(
-                      value: _labelWidthMm.toDouble(),
-                      min: 20,
-                      max: 100,
-                      divisions: 80,
-                      activeColor: POSColors.green,
-                      label: '$_labelWidthMm mm',
-                      onChanged: (val) =>
-                          setState(() => _labelWidthMm = val.round()),
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                Row(
-                  children: [
-                    Text('Yükseklik (mm): $_labelHeightMm mm',
-                        style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600, fontSize: 14)),
-                    const Spacer(),
-                    Slider(
-                      value: _labelHeightMm.toDouble(),
-                      min: 15,
-                      max: 100,
-                      divisions: 85,
-                      activeColor: POSColors.green,
-                      label: '$_labelHeightMm mm',
-                      onChanged: (val) =>
-                          setState(() => _labelHeightMm = val.round()),
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                Row(
-                  children: [
-                    Text('Boşluk (Gap): $_labelGapMm mm',
-                        style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600, fontSize: 14)),
-                    const Spacer(),
-                    Slider(
-                      value: _labelGapMm.toDouble(),
-                      min: 0,
-                      max: 10,
-                      divisions: 10,
-                      activeColor: POSColors.green,
-                      label: '$_labelGapMm mm',
-                      onChanged: (val) =>
-                          setState(() => _labelGapMm = val.round()),
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                Row(
-                  children: [
-                    Text('Çözünürlük (DPI)',
-                        style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600, fontSize: 14)),
-                    const Spacer(),
-                    SegmentedButton<int>(
-                      segments: const [
-                        ButtonSegment(value: 203, label: Text('203 DPI')),
-                        ButtonSegment(value: 300, label: Text('300 DPI')),
-                      ],
-                      selected: {_labelDpi},
-                      onSelectionChanged: (set) {
-                        if (set.isNotEmpty) {
-                          setState(() => _labelDpi = set.first);
-                        }
-                      },
-                      style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: POSColors.greenLight,
-                        selectedForegroundColor: POSColors.greenDark,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                Row(
-                  children: [
-                    Text('Yazıcı Dili',
-                        style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w600, fontSize: 14)),
-                    const Spacer(),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'tspl', label: Text('TSPL')),
-                        ButtonSegment(value: 'escpos', label: Text('ESC/POS')),
-                      ],
-                      selected: {_labelPrinterLanguage},
-                      onSelectionChanged: (set) {
-                        if (set.isNotEmpty) {
-                          setState(() => _labelPrinterLanguage = set.first);
-                        }
-                      },
-                      style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: POSColors.greenLight,
-                        selectedForegroundColor: POSColors.greenDark,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: _isTestingPrinter ? null : _testLabelPrinter,
-              icon: _isTestingPrinter
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.print_rounded),
-              label: const Text('Etiket Yazıcısını Test Et'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: POSColors.green,
-                side: const BorderSide(color: POSColors.green),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── İşletme Bilgisi Banner ──────────────────────────────────────────────
   Widget _buildBusinessInfoBanner(Settings? settings) {
     final hasLogo = settings?.businessLogo != null &&
-        settings!.businessLogo!.trim().isNotEmpty &&
-        File(settings.businessLogo!).existsSync();
+        settings!.businessLogo!.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -598,8 +420,8 @@ class _LabelTemplateEditorPageState
             child: hasLogo
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(7),
-                    child: Image.file(
-                      File(settings.businessLogo!),
+                    child: _logoImage(
+                      settings.businessLogo!,
                       fit: BoxFit.contain,
                     ),
                   )
@@ -647,9 +469,7 @@ class _LabelTemplateEditorPageState
       _ => 1.0,
     };
 
-    final hasLogo = logoPath != null &&
-        logoPath.trim().isNotEmpty &&
-        File(logoPath).existsSync();
+    final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
 
     return Center(
       child: Container(
@@ -672,8 +492,8 @@ class _LabelTemplateEditorPageState
           children: [
             if (_productShowBusinessName) ...[
               if (hasLogo)
-                Image.file(
-                  File(logoPath),
+                _logoImage(
+                  logoPath,
                   height: 26 * scale,
                   fit: BoxFit.contain,
                 )
@@ -772,9 +592,7 @@ class _LabelTemplateEditorPageState
       _ => 1.0,
     };
 
-    final hasLogo = logoPath != null &&
-        logoPath.trim().isNotEmpty &&
-        File(logoPath).existsSync();
+    final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
 
     return Center(
       child: Container(
@@ -799,8 +617,8 @@ class _LabelTemplateEditorPageState
             if (_orderShowBusinessName) ...[
               Center(
                 child: hasLogo
-                    ? Image.file(
-                        File(logoPath),
+                    ? _logoImage(
+                        logoPath,
                         height: 26 * scale,
                         fit: BoxFit.contain,
                       )
@@ -925,6 +743,41 @@ class _LabelTemplateEditorPageState
           ],
         ),
       ),
+    );
+  }
+
+  Widget _logoImage(
+    String source, {
+    double? height,
+    BoxFit fit = BoxFit.contain,
+  }) {
+    Widget fallback(BuildContext _, Object __, StackTrace? ___) =>
+        const Icon(Icons.storefront_rounded, color: POSColors.green);
+    if (source.startsWith('data:image/')) {
+      final comma = source.indexOf(',');
+      if (comma < 0) {
+        return const Icon(Icons.storefront_rounded, color: POSColors.green);
+      }
+      return Image.memory(
+        base64Decode(source.substring(comma + 1)),
+        height: height,
+        fit: fit,
+        errorBuilder: fallback,
+      );
+    }
+    if (source.startsWith('https://') || source.startsWith('http://')) {
+      return Image.network(
+        source,
+        height: height,
+        fit: fit,
+        errorBuilder: fallback,
+      );
+    }
+    return Image.file(
+      File(source),
+      height: height,
+      fit: fit,
+      errorBuilder: fallback,
     );
   }
 

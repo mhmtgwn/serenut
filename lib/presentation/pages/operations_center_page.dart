@@ -5,23 +5,26 @@ import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/sms_settings_sheet.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/sms_provider.dart';
-import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/config/theme.dart';
 
 final _operationPrintSummaryProvider = FutureProvider.autoDispose((ref) async {
-  final jobs = await ref.watch(persistentPrintQueueProvider).loadAll();
+  final jobs = await ref.watch(printingRepositoryProvider).getJobs();
   return (
     pending: jobs
         .where((job) =>
-            job.status == PrintJobStatus.pending ||
-            job.status == PrintJobStatus.printing)
+            job.state == PrintJobState.queued ||
+            job.state == PrintJobState.rendering ||
+            job.state == PrintJobState.sending ||
+            job.state == PrintJobState.retryWait ||
+            job.state == PrintJobState.awaitingUserCheck)
         .length,
     failed: jobs
         .where((job) =>
-            job.status == PrintJobStatus.failed ||
-            job.status == PrintJobStatus.abandoned)
+            job.state == PrintJobState.failed ||
+            job.state == PrintJobState.rejected)
         .length,
   );
 });

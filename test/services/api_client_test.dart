@@ -15,7 +15,9 @@ void main() {
 
     test('Attaches Content-Type and Accept headers', () async {
       apiClient.mockHandler = (request) {
-        expect(request.headers['Content-Type'], 'application/json');
+        // package:http may append the standards-compliant UTF-8 charset when
+        // serializing a String body; the media type contract remains JSON.
+        expect(request.headers['Content-Type'], startsWith('application/json'));
         expect(request.headers['Accept'], 'application/json');
         return const ApiResponse(
           statusCode: 200,

@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
@@ -15,9 +16,9 @@ import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 part 'catalog/catalog_product_card.dart';
 
 // ── Mevcut POS Tema Renkleri (korundu) ───────────────────────────────────────
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kGreenLight = Color(0xFFDCFCE7);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kGreenLight = POSColors.greenLight;
 const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
 const _kRed = Color(0xFFDC2626);

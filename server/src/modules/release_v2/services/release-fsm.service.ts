@@ -1,6 +1,7 @@
 // server/src/modules/release_v2/services/release-fsm.service.ts
 import { Pool } from 'pg';
 import { ReleaseAuditService } from './release-audit.service';
+import crypto from 'crypto';
 
 export class ReleaseFsmService {
   private auditService: ReleaseAuditService;
@@ -25,7 +26,9 @@ export class ReleaseFsmService {
 
       // 1. Fetch current release state
       const relRes = await client.query(
-        'SELECT current_state, manifest_signature FROM releases WHERE release_id = $1',
+        `SELECT r.current_state,r.manifest_signature,s.canonical_manifest_json
+         FROM releases r LEFT JOIN release_manifest_store s ON s.release_id=r.release_id
+         WHERE r.release_id=$1 FOR UPDATE OF r`,
         [releaseId]
       );
       if (relRes.rows.length === 0) {
@@ -58,12 +61,24 @@ export class ReleaseFsmService {
       const guard = guardRes.rows[0];
 
       // 3. Verify Signature Guard
-      if (guard.requires_signature && !release.manifest_signature) {
-        await client.query('ROLLBACK');
-        return {
-          success: false,
-          error: `Transition to "${targetState}" requires valid cryptographic signature.`
-        };
+      if (guard.requires_signature) {
+        const configuredKey = process.env.RELEASE_SIGNING_PUBLIC_KEY;
+        const publicKey = configuredKey?.includes('BEGIN PUBLIC KEY')
+          ? configuredKey.replace(/\\n/g, '\n')
+          : configuredKey ? Buffer.from(configuredKey, 'base64').toString('utf8') : '';
+        let valid = false;
+        try {
+          valid = Boolean(publicKey && release.manifest_signature && release.canonical_manifest_json &&
+            crypto.verify('RSA-SHA256', Buffer.from(release.canonical_manifest_json, 'utf8'),
+              publicKey, Buffer.from(release.manifest_signature, 'base64')));
+        } catch (_) { valid = false; }
+        if (!valid) {
+          await client.query('ROLLBACK');
+          return {
+            success: false,
+            error: `Transition to "${targetState}" requires a verified cryptographic signature.`
+          };
+        }
       }
 
       // 4. Verify Canary Health Guard

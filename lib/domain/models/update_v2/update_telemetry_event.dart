@@ -129,7 +129,8 @@ class UpdateTelemetryEvent {
   factory UpdateTelemetryEvent.fromJson(Map<String, dynamic> json) {
     final schemaVer = json['schemaVersion'] as int?;
     if (schemaVer == null) {
-      throw InvalidManifestException('Missing schemaVersion in telemetry event.');
+      throw InvalidManifestException(
+          'Missing schemaVersion in telemetry event.');
     }
     if (schemaVer > currentSupportedSchemaVersion) {
       throw UnsupportedSchemaException(
@@ -145,11 +146,13 @@ class UpdateTelemetryEvent {
       companyId: json['companyId'] as String?,
       fromVersion: json['fromVersion'] as String? ?? '',
       toVersion: json['toVersion'] as String? ?? '',
-      eventType: UpdateEventTypeExtension.fromSchemaString(json['eventType'] as String? ?? ''),
+      eventType: UpdateEventTypeExtension.fromSchemaString(
+          json['eventType'] as String? ?? ''),
       errorCode: json['errorCode'] as String?,
       errorMessage: json['errorMessage'] as String?,
       systemSpecs: json['systemSpecs'] as Map<String, dynamic>?,
-      timestamp: json['timestamp'] as String? ?? DateTime.now().toIso8601String(),
+      timestamp:
+          json['timestamp'] as String? ?? DateTime.now().toIso8601String(),
     );
   }
 

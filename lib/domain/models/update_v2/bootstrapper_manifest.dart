@@ -31,7 +31,8 @@ class BootstrapperManifest {
   factory BootstrapperManifest.fromJson(Map<String, dynamic> json) {
     final schemaVer = json['schemaVersion'] as int?;
     if (schemaVer == null) {
-      throw InvalidManifestException('Missing schemaVersion in bootstrapper manifest.');
+      throw InvalidManifestException(
+          'Missing schemaVersion in bootstrapper manifest.');
     }
     if (schemaVer > currentSupportedSchemaVersion) {
       throw UnsupportedSchemaException(

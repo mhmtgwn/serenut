@@ -52,12 +52,16 @@ console.log('✅ DATABASE ISOLATION VERIFIED: Running against safe test environm
 
 const testFiles = [
   'security_policy.test.ts',
+  'password_recovery_lifecycle.test.ts',
   'ac_saas_foundation.test.ts',
   'ac_trial.test.ts',
-  'ac_license.test.ts',
-  'ac_billing.test.ts',
   'ac_sync.test.ts',
   'sync_v4_domain_materialization.test.ts',
+  'payment_lifecycle.test.ts',
+  'refund_lifecycle.test.ts',
+  'notification_credit_reservation.test.ts',
+  'web_route_contract.test.ts',
+  'release_registry.test.ts',
   'ac_support.test.ts',
   'ac_monitoring.test.ts',
   'ac_e2e_launch.test.ts',

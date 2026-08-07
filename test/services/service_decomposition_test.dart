@@ -13,6 +13,7 @@ import 'package:serenutos/domain/services/sales_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
 
@@ -78,6 +79,7 @@ void main() {
         eventPublisher: eventPublisher,
         transactionRunner: gateway,
         securityGate: FakeSecurityGate(),
+        refundStore: SqliteRefundMutationStore(gateway),
       );
 
       // Clean start: clear tables and add fresh mock data
@@ -124,13 +126,13 @@ void main() {
         completes,
       );
 
-      // 2. Should complete successfully for quantity 15 (only 10 in stock) because we allow negative stock
+      // 2. Insufficient stock is rejected consistently with the server.
       await expectLater(
         inventoryService.verifyStockAvailability([
           SaleItemInput(
               productId: 'prod-test-1', quantity: 15, unitPrice: 100.0)
         ]),
-        completes,
+        throwsA(isA<InsufficientStockException>()),
       );
 
       // 3. Should throw ProductNotFoundException for unknown product
@@ -151,7 +153,7 @@ void main() {
         items: [
           SaleItemInput(productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
         ],
-        paymentMethod: 'debt',
+        paymentMethod: 'karma',
         paidAmount: 100.0,
       );
 
@@ -185,7 +187,7 @@ void main() {
         items: [
           SaleItemInput(productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
         ],
-        paymentMethod: 'debt',
+        paymentMethod: 'karma',
         paidAmount: 100.0,
       );
 
@@ -212,8 +214,7 @@ void main() {
       expect(paymentTx.referenceId, equals(sale.id));
     });
 
-    test(
-        'SalesService.cancelSale - Reverses stock, customer balance, and records cancellation',
+    test('Full refund uses the refund aggregate for stock and balance reversal',
         () async {
       // Create sale
       final sale = await salesService.createSale(
@@ -222,25 +223,52 @@ void main() {
           SaleItemInput(productId: 'prod-test-1', quantity: 4, unitPrice: 100.0)
         ],
         paymentMethod: 'debt',
-        paidAmount: 100.0, // total: 400, paid: 100, debt: 300
+        paidAmount: 0.0,
       );
-
-      // Cancel the sale
-      await salesService.cancelSale(sale.id);
+      final stored = await saleRepo.findById(sale.id);
+      final outboxBeforeRefund = await db.query('sync_outbox_v4');
+      await salesService.returnItems(
+        saleId: sale.id,
+        itemsToReturn: [SaleItemInput(
+          saleItemId: stored!.items.first['id'] as String,
+          productId: 'prod-test-1', quantity: 4, unitPrice: 100)],
+        refundMethod: 'balance', reason: 'Satışın tamamı iade edildi',
+      );
 
       // Check stock restored to 10 (was 6 after sale, now 10)
       final product = await productRepo.findById('prod-test-1');
       expect(product!.quantity, equals(10));
 
-      // Check customer balance debt reversed (-300 debt restored back by adding 300, balance returns to 0.0)
+      // Check customer debt is fully reversed.
       final customer = await customerRepo.findById('cust-test-1');
       expect(customer!.balance, equals(0.0));
 
-      // Check cancellation transaction is created
+      // Check the single refund reversal is recorded.
       final txs = await transactionRepo.getByCustomerId('cust-test-1');
-      final cancelTx = txs.firstWhere((t) => t.type == 'cancellation');
-      expect(cancelTx.amount, equals(400.0));
-      expect(cancelTx.referenceId, equals(sale.id));
+      final refundTx = txs.firstWhere((t) => t.type == 'refund');
+      expect(refundTx.amount, equals(400.0));
+
+      // A refund is one aggregate mutation. Product, sale and ledger rows are
+      // its local projection and must not be emitted as parallel mutations.
+      final outboxAfterRefund = await db.query('sync_outbox_v4', orderBy: 'id ASC');
+      final refundMutations = outboxAfterRefund.skip(outboxBeforeRefund.length).toList();
+      expect(refundMutations, hasLength(1));
+      expect(refundMutations.single['entity_type'], equals('refund'));
+
+      // Replaying the same local user action cannot restore stock twice or
+      // create a second mutation after the sold quantity is fully refunded.
+      await expectLater(
+        salesService.returnItems(
+          saleId: sale.id,
+          itemsToReturn: [SaleItemInput(
+            saleItemId: stored.items.first['id'] as String,
+            productId: 'prod-test-1', quantity: 4, unitPrice: 100)],
+          refundMethod: 'balance', reason: 'Tekrar iade denemesi',
+        ),
+        throwsStateError,
+      );
+      expect((await productRepo.findById('prod-test-1'))!.quantity, equals(10));
+      expect(await db.query('sync_outbox_v4'), hasLength(outboxAfterRefund.length));
     });
 
     test(
@@ -281,12 +309,16 @@ void main() {
       );
 
       // Return 2 items back to balance
+      final storedSale = await saleRepo.findById(sale.id);
       await salesService.returnItems(
         saleId: sale.id,
         itemsToReturn: [
-          SaleItemInput(productId: 'prod-test-1', quantity: 2, unitPrice: 100.0)
+          SaleItemInput(
+            saleItemId: storedSale!.items.first['id'] as String,
+            productId: 'prod-test-1', quantity: 2, unitPrice: 100.0)
         ],
         refundMethod: 'balance',
+        reason: 'Müşteri ürün iadesi',
       );
 
       // Check stock increased from 7 to 9
@@ -303,7 +335,7 @@ void main() {
       expect(refundTx.amount, equals(200.0));
       expect(refundTx.paidAmount,
           equals(0.0)); // refundMethod is balance, so cash refund is 0
-      expect(refundTx.referenceId, equals(sale.id));
+      expect(refundTx.referenceId, isNot(equals(sale.id)));
     });
     group('v_financial_ledger view integration', () {
       test(
@@ -316,7 +348,7 @@ void main() {
             SaleItemInput(
                 productId: 'prod-test-1', quantity: 3, unitPrice: 100.0)
           ],
-          paymentMethod: 'debt',
+          paymentMethod: 'karma',
           paidAmount: 100.0,
         );
 

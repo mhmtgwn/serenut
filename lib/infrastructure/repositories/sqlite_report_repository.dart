@@ -52,7 +52,8 @@ class SqliteReportRepository implements IReportRepository {
     final Map<String, Map<String, dynamic>> merged = {};
 
     for (final row in salesRows) {
-      final day = row['day'] as String;
+      final day = (row['day'] ?? '').toString();
+      if (day.isEmpty) continue;
       merged[day] = {
         'day': day,
         'total': (row['total'] as num?)?.toDouble() ?? 0.0,
@@ -63,7 +64,8 @@ class SqliteReportRepository implements IReportRepository {
     }
 
     for (final row in ftRows) {
-      final day = row['day'] as String;
+      final day = (row['day'] ?? '').toString();
+      if (day.isEmpty) continue;
       if (merged.containsKey(day)) {
         // Prefer financial_transactions data (more accurate)
         merged[day] = {
@@ -125,7 +127,7 @@ class SqliteReportRepository implements IReportRepository {
       final catRows =
           await _gateway.query('categories', columns: ['id', 'name']);
       for (final r in catRows) {
-        categoryNames[(r['id'] as int).toString()] = r['name'] as String;
+        categoryNames[r['id'].toString()] = r['name'] as String;
       }
     } catch (_) {
       // categories table may be empty or differ in schema
@@ -184,7 +186,7 @@ class SqliteReportRepository implements IReportRepository {
       final catRows =
           await _gateway.query('categories', columns: ['id', 'name']);
       for (final r in catRows) {
-        categoryNames[(r['id'] as int).toString()] = r['name'] as String;
+        categoryNames[r['id'].toString()] = r['name'] as String;
       }
     } catch (_) {}
 

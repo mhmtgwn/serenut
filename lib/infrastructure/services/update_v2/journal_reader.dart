@@ -55,7 +55,8 @@ class DiskJournalReader implements JournalReader {
     final records = <JournalRecord>[];
     try {
       final lines = await _logFile.readAsLines();
-      final tailLines = lines.length <= n ? lines : lines.sublist(lines.length - n);
+      final tailLines =
+          lines.length <= n ? lines : lines.sublist(lines.length - n);
       for (final line in tailLines) {
         final trimmed = line.trim();
         if (trimmed.isEmpty) continue;

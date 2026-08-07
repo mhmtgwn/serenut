@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { authenticateUser } from "../../middleware/auth.middleware";
+import { authenticateUser, requirePermission } from "../../middleware/auth.middleware";
 import { pgPool } from "../../config/database";
 import { syncLimiter } from "../../middleware/rate-limit.middleware";
 import { requireActiveEntitlement } from "../../middleware/auth.middleware";
 import { RealtimeBroadcastService } from "../realtime/broadcast.service";
 import { logger } from "../../config/logger";
 import type { PoolClient } from "pg";
+import { RefundService } from "../order/refund.service";
 
 const router = Router();
 const entityTypes = new Set([
@@ -14,10 +15,11 @@ const entityTypes = new Set([
   "order",
   "sale",
   "financial_transaction",
+  "refund",
 ]);
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const syncProtocolVersion = 5;
+const syncProtocolVersion = 6;
 
 type SyncMutation = {
   entity_type: string;
@@ -62,6 +64,7 @@ export async function applyDomainMutation(
   client: PoolClient,
   companyId: string,
   mutation: SyncMutation,
+  actorId?: string,
 ): Promise<void> {
   const payload = mutation.payload;
   const id = mutation.entity_id;
@@ -87,13 +90,11 @@ export async function applyDomainMutation(
         );
         return;
       case "sale":
-        await client.query(
-          "UPDATE sales SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND company_id = $2",
-          [id, companyId],
-        );
-        return;
+        throw new Error("immutable_sale");
       case "financial_transaction":
         throw new Error("immutable_financial_transaction");
+      case "refund":
+        throw new Error("immutable_refund");
     }
   }
 
@@ -150,6 +151,25 @@ export async function applyDomainMutation(
     case "financial_transaction":
       await upsertFinancialTransaction(client, companyId, id, payload);
       return;
+    case "refund": {
+      if (!actorId) throw new Error("refund_actor_required");
+      const rawItems = Array.isArray(payload.items) ? payload.items : [];
+      await RefundService.create(client, {
+        companyId,
+        saleId: stringValue(payload, "sale_id"),
+        actorId,
+        idempotencyKey: id,
+        refundId: id,
+        reason: stringValue(payload, "reason"),
+        refundMethod: stringValue(payload, "refund_method") as 'cash'|'balance'|'card'|'mixed',
+        externalReference: stringValue(payload, "external_reference") || undefined,
+        items: rawItems.map((item: any) => ({
+          saleItemId: typeof item?.sale_item_id === 'string' ? item.sale_item_id : '',
+          quantity: Number(item?.quantity),
+        })),
+      });
+      return;
+    }
   }
 }
 
@@ -157,32 +177,85 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
   const customerId = nullableId(stringValue(payload, "customer_id"));
   const paymentMethod = stringValue(payload, "payment_method", "cash");
   const items = Array.isArray(payload.items) ? payload.items : [];
-  await client.query(
-    `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10::timestamptz,NOW()),NOW(),false,$11)
-     ON CONFLICT (id) DO UPDATE SET customer_id=EXCLUDED.customer_id, total_amount=EXCLUDED.total_amount,
-       paid_amount=EXCLUDED.paid_amount, payment_method=EXCLUDED.payment_method, status=EXCLUDED.status,
-       fsm_state=EXCLUDED.fsm_state, is_deleted=false, updated_at=NOW() WHERE sales.company_id=EXCLUDED.company_id`,
-    [id, companyId, customerId, numberValue(payload, "total_amount"), numberValue(payload, "paid_amount"),
-      paymentMethod, stringValue(payload, "status", "completed"), stringValue(payload, "status", "completed"),
-      stringValue(payload, "idempotency_key") || null, stringValue(payload, "created_at") || null,
-      stringValue(payload, "created_by") || null],
+  if (!items.length || !["cash", "card", "credit", "mixed", "veresiye", "debt", "karma"].includes(paymentMethod)) {
+    throw new Error("invalid_sale");
+  }
+  const prior = await client.query(
+    "SELECT id FROM sales WHERE id = $1 AND company_id = $2 FOR UPDATE",
+    [id, companyId],
   );
-  await client.query("DELETE FROM sale_items WHERE sale_id = $1 AND company_id = $2", [id, companyId]);
+  // A completed sale is an immutable financial fact. Replayed materialization
+  // is a no-op; later changes must be represented by a refund/reversal.
+  if (prior.rowCount) return;
+  if (customerId) {
+    const customer = await client.query(
+      "SELECT id FROM customers WHERE id = $1 AND company_id = $2 AND is_deleted = false",
+      [customerId, companyId],
+    );
+    if (!customer.rowCount) throw new Error("invalid_customer");
+  }
+  let computedTotal = 0;
+  const normalizedItems: Array<{ id: string; productId: string; productName: string | null; quantity: number; unitPrice: number; subtotal: number; createdAt: string | null }> = [];
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
     if (!item || typeof item !== "object") throw new Error("invalid_mutation");
     const row = item as Record<string, unknown>;
     const productId = stringValue(row, "product_id");
-    if (!productId) throw new Error("invalid_mutation");
-    const quantity = numberValue(row, "quantity");
-    const unitPrice = numberValue(row, "unit_price", numberValue(row, "price"));
+    const quantity = numberValue(row, "quantity", Number.NaN);
+    const unitPrice = numberValue(row, "unit_price", numberValue(row, "price", Number.NaN));
+    if (!productId || !Number.isFinite(quantity) || quantity <= 0 ||
+        !Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("invalid_sale_item");
+    const subtotal = quantity * unitPrice;
+    computedTotal += subtotal;
+    normalizedItems.push({
+      id: stringValue(row, "id", `sync-${id}-${index}`),
+      productId,
+      productName: stringValue(row, "product_name") || null,
+      quantity,
+      unitPrice,
+      subtotal,
+      createdAt: stringValue(row, "created_at") || null,
+    });
+  }
+  const clientTotal = numberValue(payload, "total_amount", Number.NaN);
+  const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
+  if (!Number.isFinite(clientTotal) || Math.abs(clientTotal - computedTotal) > 0.01 ||
+      !Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > computedTotal) {
+    throw new Error("sale_total_mismatch");
+  }
+  if ((paymentMethod === "credit" || paymentMethod === "veresiye" || paymentMethod === "debt") && paidAmount !== 0) {
+    throw new Error("invalid_credit_payment");
+  }
+  if ((paymentMethod === "cash" || paymentMethod === "card") &&
+      Math.abs(paidAmount-computedTotal)>0.01) {
+    throw new Error("invalid_full_payment");
+  }
+  await client.query(
+    `INSERT INTO sales (id, company_id, customer_id, total_amount, paid_amount, payment_method, status, fsm_state, idempotency_key, created_at, updated_at, is_deleted, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,'completed','completed',$7,COALESCE($8::timestamptz,NOW()),NOW(),false,$9)`,
+    [id, companyId, customerId, computedTotal, paidAmount, paymentMethod,
+      stringValue(payload, "idempotency_key") || null, stringValue(payload, "created_at") || null,
+      stringValue(payload, "created_by") || null],
+  );
+  for (const row of normalizedItems) {
+    const stock = await client.query(
+      `UPDATE products SET quantity = quantity - $1, updated_at = NOW()
+       WHERE id = $2 AND company_id = $3 AND is_deleted = false AND quantity >= $1
+       RETURNING id`,
+      [row.quantity, row.productId, companyId],
+    );
+    if (!stock.rowCount) throw new Error("insufficient_stock");
+    await client.query(
+      `INSERT INTO inventory_movements(id,company_id,product_id,movement_type,quantity_delta,reference_type,reference_id,created_by)
+       VALUES($1,$2,$3,'sale',$4,'sale',$5,$6)`,
+      [`mov-${id}-${row.id}`, companyId, row.productId, -row.quantity, id,
+        stringValue(payload, "created_by") || null],
+    );
     await client.query(
       `INSERT INTO sale_items (id, sale_id, product_id, product_name, quantity, unit_price, subtotal, company_id, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9::timestamptz,NOW()))`,
-      [stringValue(row, "id", `sync-${id}-${index}`), id, productId,
-        stringValue(row, "product_name") || null, quantity, unitPrice,
-        numberValue(row, "subtotal", quantity * unitPrice), companyId, stringValue(row, "created_at") || null],
+      [row.id, id, row.productId, row.productName, row.quantity, row.unitPrice,
+        row.subtotal, companyId, row.createdAt],
     );
   }
 }
@@ -190,15 +263,17 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
 async function upsertOrder(client: PoolClient, companyId: string, id: string, payload: Record<string, unknown>) {
   const customerId = stringValue(payload, "customer_id");
   if (!customerId) throw new Error("invalid_mutation");
+  const orderNumber = stringValue(payload, "order_number", `SYNC-${id}`);
   const items = Array.isArray(payload.items) ? payload.items : [];
   await client.query(
-    `INSERT INTO customer_orders (id, company_id, customer_id, status, total_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
-     VALUES ($1,$2,$3,$4,$5,COALESCE($6::timestamptz,NOW()),$7::timestamptz,$8::timestamptz,$9,COALESCE($10::timestamptz,NOW()),NOW(),false,$11)
-     ON CONFLICT (id) DO UPDATE SET customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
+    `INSERT INTO customer_orders (id, company_id, order_number, customer_id, status, total_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()),$8::timestamptz,$9::timestamptz,$10,COALESCE($11::timestamptz,NOW()),NOW(),false,$12)
+     ON CONFLICT (id) DO UPDATE SET order_number=EXCLUDED.order_number,
+       customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
        total_amount=EXCLUDED.total_amount, expected_delivery_date=EXCLUDED.expected_delivery_date,
        actual_delivery_date=EXCLUDED.actual_delivery_date, notes=EXCLUDED.notes, is_deleted=false,
        updated_at=NOW() WHERE customer_orders.company_id=EXCLUDED.company_id`,
-    [id, companyId, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
+    [id, companyId, orderNumber, customerId, stringValue(payload, "status", "created"), numberValue(payload, "total_amount"),
       stringValue(payload, "order_date") || stringValue(payload, "created_at") || null,
       stringValue(payload, "expected_delivery_date") || null, stringValue(payload, "actual_delivery_date") || null,
       stringValue(payload, "notes") || null, stringValue(payload, "created_at") || null,
@@ -223,6 +298,64 @@ async function upsertOrder(client: PoolClient, companyId: string, id: string, pa
 
 async function upsertFinancialTransaction(client: PoolClient, companyId: string, id: string, payload: Record<string, unknown>) {
   const customerId = nullableId(stringValue(payload, "customer_id"));
+  const type = stringValue(payload, "type");
+  const amount = numberValue(payload, "amount", Number.NaN);
+  const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
+  const debtAmount = numberValue(payload, "debt_amount", Number.NaN);
+  const referenceId = nullableId(stringValue(payload, "reference_id"));
+  if (!["sale","payment","collection","manual_debt","cancellation","refund"].includes(type) || !customerId ||
+      !Number.isFinite(amount) || !Number.isFinite(paidAmount) || !Number.isFinite(debtAmount) ||
+      amount < 0 || paidAmount < 0 || debtAmount < 0) throw new Error("invalid_financial_transaction");
+  const prior = await client.query(
+    `SELECT id FROM financial_transactions WHERE id=$1 AND company_id=$2 FOR UPDATE`, [id, companyId]);
+  if (prior.rowCount) return;
+  const customer = await client.query(
+    `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
+  if (!customer.rowCount) throw new Error("invalid_customer");
+  if (type === "sale") {
+    const sale = await client.query(
+      `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+      [referenceId, companyId]);
+    // The canonical sale may already include later partial payments when an
+    // older device uploads its initial ledger snapshot. Validate the immutable
+    // original fact instead of requiring the current paid projection to match.
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+        Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01 ||
+        Number(sale.rows[0].paid_amount)+0.01 < paidAmount ||
+        Math.abs(amount-paidAmount-debtAmount)>0.01) throw new Error("sale_ledger_mismatch");
+  } else if (type === "payment") {
+    if (!referenceId || amount <= 0 || Math.abs(amount-paidAmount)>0.01) {
+      throw new Error("invalid_payment_transaction");
+    }
+    const sale = await client.query(
+      `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+      [referenceId, companyId]);
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+        Number(sale.rows[0].paid_amount)+amount > Number(sale.rows[0].total_amount)+0.01) {
+      throw new Error("payment_exceeds_sale");
+    }
+    const newPaid = Number(sale.rows[0].paid_amount)+amount;
+    await client.query(
+      `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
+      [newPaid, newPaid >= Number(sale.rows[0].total_amount)-0.01 ? 'completed' : 'partial', referenceId, companyId]);
+  } else if (type === "collection" &&
+      (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId)) {
+    throw new Error("invalid_collection_transaction");
+  } else if (type === "manual_debt" &&
+      (amount <= 0 || paidAmount !== 0 || Math.abs(amount-debtAmount)>0.01 || referenceId)) {
+    throw new Error("invalid_manual_debt_transaction");
+  } else if ((type === "cancellation" || type === "refund")) {
+    if (!referenceId || amount <= 0 || paidAmount > amount || debtAmount > amount) {
+      throw new Error(`invalid_${type}_transaction`);
+    }
+    const sale = await client.query(
+      `SELECT customer_id,total_amount FROM sales WHERE id=$1 AND company_id=$2`,
+      [referenceId, companyId]);
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+        amount > Number(sale.rows[0].total_amount)+0.01) {
+      throw new Error(`${type}_sale_mismatch`);
+    }
+  }
   const description = stringValue(payload, "description") || stringValue(payload, "notes") || null;
   const metadata = typeof payload.metadata === "object" && payload.metadata !== null ? JSON.stringify(payload.metadata) : (stringValue(payload, "metadata") || null);
   const paymentMethod = stringValue(payload, "payment_method") || null;
@@ -233,10 +366,10 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
        description = COALESCE(EXCLUDED.description, financial_transactions.description),
        metadata = COALESCE(EXCLUDED.metadata, financial_transactions.metadata),
        payment_method = COALESCE(EXCLUDED.payment_method, financial_transactions.payment_method)`,
-    [id, companyId, stringValue(payload, "type", "payment"), customerId, numberValue(payload, "amount"),
-      numberValue(payload, "paid_amount"), numberValue(payload, "debt_amount"),
+    [id, companyId, type, customerId, amount,
+      paidAmount, debtAmount,
       stringValue(payload, "date") || stringValue(payload, "created_at") || null,
-      stringValue(payload, "reference_id") || null, numberValue(payload, "logical_clock"),
+      referenceId, numberValue(payload, "logical_clock"),
       stringValue(payload, "device_id") || null, description, metadata, paymentMethod],
   );
 }
@@ -320,6 +453,373 @@ router.put("/device-hardware-profile", async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+const sharedHardwareTypes = new Set([
+  "receiptPrinter", "labelPrinter", "scale", "paymentTerminal",
+  "barcodeScanner", "customerDisplay",
+]);
+const sharedPrintOperations = new Set([
+  "printReceipt", "printProductLabel", "printOrderLabel", "testPrint",
+]);
+
+const requireSharedHardwareEnabled = async (_req: any, res: any, next: any) => {
+  try {
+    const result = await pgPool.query(
+      `SELECT COALESCE((value->>'shared_hardware_enabled')::boolean,true) AS enabled
+       FROM remote_configs WHERE key='global_config' LIMIT 1`,
+    );
+    if (result.rows[0]?.enabled === false) {
+      return res.status(503).json({ error: "shared_hardware_temporarily_disabled" });
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+router.use("/shared-hardware", requireSharedHardwareEnabled);
+router.use("/hardware-jobs", requireSharedHardwareEnabled);
+
+function safeHardwareObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    if (/password|secret|api[_-]?key|pin|token/i.test(key)) continue;
+    if (["string", "number", "boolean"].includes(typeof item) || item === null) {
+      result[key] = item;
+    }
+  }
+  return result;
+}
+
+// Registers only hardware physically owned by this activated installation.
+// The cloud id is namespaced so legacy local ids cannot collide across tenants.
+router.put("/shared-hardware/presence", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const hardware = req.body?.hardware;
+  if (!Array.isArray(hardware) || hardware.length > 50) {
+    return res.status(400).json({ error: "invalid_shared_hardware" });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const retainedIds: string[] = [];
+    for (const raw of hardware) {
+      if (!raw || typeof raw !== "object") throw new Error("invalid_shared_hardware");
+      const item = raw as Record<string, unknown>;
+      const localId = stringValue(item, "id");
+      const name = stringValue(item, "name");
+      const hardwareType = stringValue(item, "type");
+      const connectionType = stringValue(item, "connection_type");
+      if (!localId || localId.length > 180 || !name || name.length > 160 ||
+          !sharedHardwareTypes.has(hardwareType) || !connectionType) {
+        throw new Error("invalid_shared_hardware");
+      }
+      const cloudId = `${activationId}:${localId}`;
+      retainedIds.push(cloudId);
+      const configuration = safeHardwareObject(item.configuration);
+      const capabilities = safeHardwareObject(item.capabilities);
+      await client.query(
+        `INSERT INTO shared_hardware
+          (id,company_id,owner_activation_id,owner_device_id,name,hardware_type,
+           connection_type,language,configuration,capabilities,sharing_scope,enabled,online,last_seen_at,updated_at)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,true,NOW(),NOW())
+         ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name, hardware_type=EXCLUDED.hardware_type,
+           connection_type=EXCLUDED.connection_type, language=EXCLUDED.language,
+           configuration=EXCLUDED.configuration, capabilities=EXCLUDED.capabilities,
+           sharing_scope=EXCLUDED.sharing_scope, enabled=EXCLUDED.enabled,
+           online=true,last_seen_at=NOW(),updated_at=NOW()
+         WHERE shared_hardware.company_id=EXCLUDED.company_id
+           AND shared_hardware.owner_activation_id=EXCLUDED.owner_activation_id`,
+        [cloudId,user.company_id,activationId,deviceId,name,hardwareType,connectionType,
+          stringValue(item,"language") || null,JSON.stringify(configuration),JSON.stringify(capabilities),
+          ["owner","branch","company"].includes(stringValue(item,"sharing_scope"))
+            ? stringValue(item,"sharing_scope") : "company",
+          item.enabled !== false],
+      );
+    }
+    await client.query(
+      `UPDATE shared_hardware SET online=false,updated_at=NOW()
+       WHERE company_id=$1 AND owner_activation_id=$2
+         AND NOT (id = ANY($3::text[]))`,
+      [user.company_id, activationId, retainedIds],
+    );
+    await client.query("COMMIT");
+    return res.json({ success: true, registered: retainedIds.length });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "shared_hardware_presence_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : message === "invalid_shared_hardware" ? 400 : 500)
+      .json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/shared-hardware/list", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const result = await client.query(
+      `SELECT h.id,h.name,h.hardware_type AS type,h.connection_type,h.language,h.capabilities,
+              h.sharing_scope,h.enabled,
+              (h.online=true AND a.status='active' AND
+               a.last_seen_at > NOW()-INTERVAL '5 minutes') AS online,
+              COALESCE(a.last_seen_at,h.last_seen_at) AS last_seen_at,
+              h.owner_activation_id,h.owner_device_id,(h.owner_activation_id=$2) AS is_local
+       FROM shared_hardware h
+       JOIN device_activations a ON a.id=h.owner_activation_id AND a.company_id=h.company_id
+       WHERE h.company_id=$1 AND h.enabled=true
+         AND (h.sharing_scope='company' OR h.owner_activation_id=$2)
+       ORDER BY online DESC,h.name ASC`,
+      [user.company_id, activationId],
+    );
+    await client.query("COMMIT");
+    return res.json({ hardware: result.rows });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "shared_hardware_list_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : 500).json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/hardware-jobs", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const hardwareId = req.body?.hardware_id;
+  const operation = req.body?.operation;
+  const payload = req.body?.payload;
+  const idempotencyKey = req.header("idempotency-key") || req.body?.idempotency_key;
+  const encodedPayload = JSON.stringify(payload ?? null);
+  if (typeof hardwareId !== "string" || typeof operation !== "string" ||
+      !sharedPrintOperations.has(operation) || typeof idempotencyKey !== "string" ||
+      !payload || typeof payload !== "object" || encodedPayload.length > 512_000) {
+    return res.status(400).json({ error: "invalid_hardware_job" });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const target = await client.query(
+      `SELECT owner_activation_id,hardware_type,enabled,sharing_scope FROM shared_hardware
+       WHERE id=$1 AND company_id=$2 FOR SHARE`, [hardwareId,user.company_id]);
+    if (!target.rowCount || !target.rows[0].enabled || target.rows[0].sharing_scope === "owner") {
+      throw new Error("hardware_not_available");
+    }
+    const expectedType = operation === "printReceipt" ? "receiptPrinter" : "labelPrinter";
+    if (operation !== "testPrint" && target.rows[0].hardware_type !== expectedType) {
+      throw new Error("hardware_incompatible");
+    }
+    const result = await client.query(
+      `INSERT INTO hardware_jobs
+        (id,company_id,hardware_id,owner_activation_id,requested_by_activation_id,
+         requested_by_user_id,operation,payload,idempotency_key)
+       VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6,$7::jsonb,$8)
+       ON CONFLICT(company_id,idempotency_key) DO UPDATE SET updated_at=hardware_jobs.updated_at
+       RETURNING id,state,created_at`,
+      [user.company_id,hardwareId,target.rows[0].owner_activation_id,activationId,user.id,
+        operation,encodedPayload,idempotencyKey.substring(0,180)],
+    );
+    await client.query("COMMIT");
+    return res.status(202).json({ job: result.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "hardware_job_create_failed";
+    const status = message === "invalid_device_activation" ? 403 :
+      ["hardware_not_available","hardware_incompatible"].includes(message) ? 409 : 500;
+    return res.status(status).json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/hardware-jobs/claim", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    await client.query(
+      `UPDATE hardware_jobs SET state='requires_confirmation',lease_owner=NULL,
+         lease_expires_at=NULL,error_code='owner_interrupted_during_delivery',
+         error_message='Sahip cihaz yazdırma sırasında kapandı; çift baskıyı önlemek için otomatik tekrar durduruldu.',
+         updated_at=NOW(),completed_at=NOW()
+       WHERE company_id=$1 AND owner_activation_id=$2 AND state='executing'
+         AND lease_expires_at<NOW()`,
+      [user.company_id, activationId],
+    );
+    const result = await client.query(
+      `WITH candidate AS (
+         SELECT id FROM hardware_jobs
+         WHERE company_id=$1 AND owner_activation_id=$2
+           AND (state='queued' OR (state='retry_wait' AND next_attempt_at<=NOW())
+                OR (state='claimed' AND lease_expires_at<NOW()))
+           AND attempt_count<5
+         ORDER BY created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1
+       )
+       UPDATE hardware_jobs j SET state='claimed',attempt_count=attempt_count+1,
+         lease_owner=$3,lease_expires_at=NOW()+INTERVAL '45 seconds',updated_at=NOW()
+       FROM candidate WHERE j.id=candidate.id
+       RETURNING j.id,j.hardware_id,j.operation,j.payload,j.attempt_count,j.lease_expires_at`,
+      [user.company_id,activationId,deviceId],
+    );
+    await client.query("COMMIT");
+    return res.json({ job: result.rows[0] ?? null });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "hardware_job_claim_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : 500).json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/hardware-jobs/:id/start", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const result = await client.query(
+      `UPDATE hardware_jobs SET state='executing',updated_at=NOW(),
+         lease_expires_at=NOW()+INTERVAL '45 seconds'
+       WHERE id=$1 AND company_id=$2 AND owner_activation_id=$3
+         AND lease_owner=$4 AND state='claimed' AND lease_expires_at>NOW()
+       RETURNING id,state`,
+      [req.params.id,user.company_id,activationId,deviceId],
+    );
+    if (!result.rowCount) throw new Error("hardware_job_lease_lost");
+    await client.query("COMMIT");
+    return res.json({ job: result.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "hardware_job_start_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : message === "hardware_job_lease_lost" ? 409 : 500)
+      .json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/hardware-jobs/list", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const result = await client.query(
+      `SELECT j.id,j.hardware_id,h.name AS hardware_name,j.operation,j.state,
+              j.attempt_count,j.error_code,j.error_message,j.created_at,j.updated_at,
+              j.completed_at,(j.requested_by_activation_id=$2) AS requested_here,
+              (j.owner_activation_id=$2) AS executed_here
+       FROM hardware_jobs j JOIN shared_hardware h ON h.id=j.hardware_id
+       WHERE j.company_id=$1 AND
+         (j.requested_by_activation_id=$2 OR j.owner_activation_id=$2)
+       ORDER BY j.created_at DESC LIMIT 200`,
+      [user.company_id, activationId],
+    );
+    await client.query("COMMIT");
+    return res.json({ jobs: result.rows });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "hardware_job_list_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : 500).json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/hardware-jobs/:id/action", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const action = req.body?.action;
+  if (!["retry","cancel","confirmPrinted","confirmNotPrinted"].includes(action)) {
+    return res.status(400).json({ error: "invalid_hardware_job_action" });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const current = await client.query(
+      `SELECT state FROM hardware_jobs WHERE id=$1 AND company_id=$2
+         AND (requested_by_activation_id=$3 OR owner_activation_id=$3) FOR UPDATE`,
+      [req.params.id,user.company_id,activationId],
+    );
+    if (!current.rowCount) throw new Error("hardware_job_not_found");
+    const state = current.rows[0].state as string;
+    let nextState: string;
+    if (action === "retry" && ["failed"].includes(state)) nextState = "queued";
+    else if (action === "cancel" && ["queued","retry_wait","failed"].includes(state)) nextState = "cancelled";
+    else if (action === "confirmPrinted" && state === "requires_confirmation") nextState = "succeeded";
+    else if (action === "confirmNotPrinted" && state === "requires_confirmation") nextState = "queued";
+    else throw new Error("invalid_hardware_job_transition");
+    const result = await client.query(
+      `UPDATE hardware_jobs SET state=$1::varchar,attempt_count=CASE WHEN $1::varchar='queued' THEN 0 ELSE attempt_count END,
+         lease_owner=NULL,lease_expires_at=NULL,next_attempt_at=NULL,
+         error_code=NULL,error_message=NULL,updated_at=NOW(),
+         completed_at=CASE WHEN $1::varchar IN ('succeeded','cancelled') THEN NOW() ELSE NULL END
+       WHERE id=$2 AND company_id=$3 RETURNING id,state`,
+      [nextState,req.params.id,user.company_id],
+    );
+    await client.query("COMMIT");
+    return res.json({ job: result.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "hardware_job_action_failed";
+    const status = message === "invalid_device_activation" ? 403 :
+      message === "hardware_job_not_found" ? 404 :
+      message === "invalid_hardware_job_transition" ? 409 : 500;
+    return res.status(status).json({ error: message });
+  } finally { client.release(); }
+});
+
+router.post("/hardware-jobs/:id/result", requirePermission("settings:printer") as any, async (req, res) => {
+  const user = (req as any).user;
+  const activationId = req.body?.device_activation_id;
+  const deviceId = req.body?.device_id;
+  const state = req.body?.state;
+  if (!["succeeded","failed","requires_confirmation","retry_wait"].includes(state)) {
+    return res.status(400).json({ error: "invalid_hardware_job_result" });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+    await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+    const result = await client.query(
+      `UPDATE hardware_jobs SET state=$1::varchar,result=$2::jsonb,error_code=$3,error_message=$4,
+         next_attempt_at=CASE WHEN $1::varchar='retry_wait' THEN NOW()+INTERVAL '10 seconds' ELSE NULL END,
+         lease_owner=NULL,lease_expires_at=NULL,updated_at=NOW(),
+         completed_at=CASE WHEN $1::varchar IN ('succeeded','failed','requires_confirmation') THEN NOW() ELSE NULL END
+       WHERE id=$5 AND company_id=$6 AND owner_activation_id=$7 AND lease_owner=$8
+       RETURNING id,state`,
+      [state,JSON.stringify(req.body?.result ?? {}),req.body?.error_code ?? null,
+        String(req.body?.error_message ?? "").substring(0,500) || null,req.params.id,
+        user.company_id,activationId,deviceId],
+    );
+    if (!result.rowCount) throw new Error("hardware_job_lease_lost");
+    await client.query("COMMIT");
+    return res.json({ job: result.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    const message = error instanceof Error ? error.message : "hardware_job_result_failed";
+    return res.status(message === "invalid_device_activation" ? 403 : message === "hardware_job_lease_lost" ? 409 : 500)
+      .json({ error: message });
+  } finally { client.release(); }
 });
 
 router.post("/push", async (req, res) => {
@@ -435,7 +935,7 @@ router.post("/push", async (req, res) => {
       };
       // The domain write and the durable replication record are atomic. Never
       // acknowledge a mutation that cannot be materialized for another device.
-      await applyDomainMutation(client, user.company_id, domainMutation);
+      await applyDomainMutation(client, user.company_id, domainMutation, user.id);
       const inserted = await client.query(
         `INSERT INTO sync_v4_changes (tenant_id, mutation_id, device_id, device_activation_id, entity_type, entity_id, operation, payload)
          VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8::jsonb)
@@ -628,13 +1128,16 @@ router.get("/bootstrap", async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
-    const [products, customers, sales, saleItems, orders, orderItems, financial, revision] = await Promise.all([
+    const [products, customers, sales, saleItems, orders, orderItems, refunds, refundItems, financial, revision] = await Promise.all([
       client.query("SELECT * FROM products WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customers WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM sales WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM sale_items WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customer_orders WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
       client.query("SELECT * FROM customer_order_items WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query("SELECT * FROM refunds WHERE company_id = $1 ORDER BY created_at", [user.company_id]),
+      client.query(`SELECT ri.* FROM refund_items ri JOIN refunds r ON r.id=ri.refund_id
+        WHERE r.company_id=$1 ORDER BY r.created_at,ri.id`, [user.company_id]),
       client.query("SELECT * FROM financial_transactions WHERE company_id = $1 ORDER BY date", [user.company_id]),
       client.query("SELECT COALESCE(MAX(revision), 0) AS cursor FROM sync_v4_changes WHERE tenant_id = $1", [user.company_id]),
     ]);
@@ -663,6 +1166,7 @@ router.get("/bootstrap", async (req, res) => {
     });
     const saleItemsBySale = itemsFor(saleItems.rows.map(localItem), "sale_id");
     const orderItemsByOrder = itemsFor(orderItems.rows.map(localItem), "order_id");
+    const refundItemsByRefund = itemsFor(refundItems.rows, "refund_id");
     const localPayload = (entityType: string, row: Record<string, unknown>) => {
       const deleted = row.is_deleted === true ? 1 : 0;
       switch (entityType) {
@@ -687,11 +1191,17 @@ router.get("/bootstrap", async (req, res) => {
             is_deleted: deleted, deleted_at: row.deleted_at, deleted_by: row.deleted_by,
             created_by: row.created_by };
         case "order":
-          return { id: row.id, customer_id: row.customer_id, status: row.status, total_amount: row.total_amount,
+          return { id: row.id, order_number: row.order_number ?? `SYNC-${row.id}`,
+            customer_id: row.customer_id, status: row.status, total_amount: row.total_amount,
             order_date: row.order_date, expected_delivery_date: row.expected_delivery_date,
             actual_delivery_date: row.actual_delivery_date, notes: row.notes, created_at: row.created_at,
             updated_at: row.updated_at, is_deleted: deleted, deleted_at: row.deleted_at,
             deleted_by: row.deleted_by, created_by: row.created_by };
+        case "refund":
+          return { id: row.id, sale_id: row.sale_id, amount: row.amount,
+            refund_method: row.refund_method, external_reference: row.external_reference,
+            reason: row.reason, status: row.status, created_at: row.created_at,
+            _snapshot_projection: true };
         default:
           return { id: row.id, type: row.type, customer_id: row.customer_id ?? "", amount: row.amount,
             paid_amount: row.paid_amount, debt_amount: row.debt_amount, reference_id: row.reference_id,
@@ -715,6 +1225,7 @@ router.get("/bootstrap", async (req, res) => {
       ...customers.rows.map((row) => change("customer", row)),
       ...orders.rows.map((row) => change("order", row, orderItemsByOrder.get(String(row.id)) ?? [])),
       ...sales.rows.map((row) => change("sale", row, saleItemsBySale.get(String(row.id)) ?? [])),
+      ...refunds.rows.map((row) => change("refund", row, refundItemsByRefund.get(String(row.id)) ?? [])),
       ...financial.rows.map((row) => change("financial_transaction", row)),
     ];
     return res.json({ changes, next_cursor: Number(revision.rows[0].cursor) });

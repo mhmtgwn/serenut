@@ -38,7 +38,8 @@ class RemoteConfigService {
         'sync_interval_seconds': 300,
         'log_level': 'info',
         'telemetry_interval_seconds': 600,
-        'enable_payment_retry': true
+        'enable_payment_retry': true,
+        'shared_hardware_enabled': true,
       };
     }
     try {
@@ -66,5 +67,9 @@ class RemoteConfigService {
 
   bool isPaymentRetryEnabled() {
     return _getConfigMap()['enable_payment_retry'] as bool? ?? true;
+  }
+
+  bool isSharedHardwareEnabled() {
+    return _getConfigMap()['shared_hardware_enabled'] as bool? ?? true;
   }
 }

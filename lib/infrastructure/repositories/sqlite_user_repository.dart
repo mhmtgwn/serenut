@@ -52,10 +52,11 @@ class SqliteUserRepository implements IUserRepository {
 
   @override
   Future<AuthUser?> findByUsername(String username) async {
+    final queryVal = username.trim();
     final rows = await _executor.query(
       'users',
-      where: '(email = ? OR name = ?) AND is_active = 1',
-      whereArgs: [username.trim(), username.trim()],
+      where: '(username = ? OR email = ? OR name = ?) AND is_active = 1',
+      whereArgs: [queryVal, queryVal, queryVal],
     );
     if (rows.isEmpty) return null;
     return _mapRowToAuthUser(rows.first);

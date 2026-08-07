@@ -12,7 +12,7 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/providers/repository_providers.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/presentation/widgets/app_shell.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
@@ -195,11 +195,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       );
       return;
     }
-    final printer = ref.read(printerServiceProvider);
-    printer.enqueue(
-      '${selected.length} raf etiketi',
-      () => printer.printShelfLabels(selected, settings),
-    );
+    await ref
+        .read(printingApplicationServiceProvider)
+        .queueProductLabels(selected, settings);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content:

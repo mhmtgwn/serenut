@@ -20,11 +20,10 @@ class SqliteSaleRepository implements ISaleRepository {
 
     final saleIds = rows.map((r) => r['id'] as String).toList();
     final placeholders = List.filled(saleIds.length, '?').join(',');
-    final itemRows = await _executor.query(
-      'sale_items',
-      where: 'sale_id IN ($placeholders)',
-      whereArgs: saleIds,
-    );
+    final itemRows = await _executor.rawQuery('''
+      SELECT si.*,COALESCE((SELECT SUM(ri.quantity) FROM refund_items ri
+        WHERE ri.sale_item_id=si.id),0) AS refunded_quantity
+      FROM sale_items si WHERE si.sale_id IN ($placeholders)''', saleIds);
 
     // Group items by sale_id for O(1) lookup
     final itemsBySaleId = <String, List<Map<String, dynamic>>>{};
@@ -159,11 +158,12 @@ class SqliteSaleRepository implements ISaleRepository {
       final salePayload = Map<String, dynamic>.from(payload)..remove('items');
       await _executor.insert('sales', salePayload);
 
+      int itemIndex = 0;
       for (final item in entity.items) {
         final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
         final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
         await _executor.insert('sale_items', {
-          'id': 'item-${entity.id}-${item['product_id']}',
+          'id': 'item-${entity.id}-${item['product_id']}-${++itemIndex}',
           'sale_id': entity.id,
           'product_id': item['product_id'] as String,
           'product_name': item['product_name'],
@@ -206,13 +206,14 @@ class SqliteSaleRepository implements ISaleRepository {
         whereArgs: [entity.id],
       );
 
+      int itemIndex = 0;
       for (final item in entity.items) {
         final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
         final price =
             (item['unit_price'] ?? item['unitPrice'] as num?)?.toDouble() ??
                 0.0;
         await _executor.insert('sale_items', {
-          'id': 'item-${entity.id}-${item['product_id']}',
+          'id': 'item-${entity.id}-${item['product_id']}-${++itemIndex}',
           'sale_id': entity.id,
           'product_id': item['product_id'] as String,
           'product_name': item['product_name'],

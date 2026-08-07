@@ -8,7 +8,7 @@ class HashValidationService {
   /// JSON (Canonical) çıktısını oluşturup SHA-256 checksum özetini döner.
   Future<String> calculateLocalChecksum() async {
     final db = await DatabaseManager().getDatabase();
-    
+
     // Determinism için dikkate alınacak tablolar
     final tables = [
       'products',
@@ -17,7 +17,7 @@ class HashValidationService {
       'sale_items',
       'financial_transactions'
     ];
-    
+
     final Map<String, List<Map<String, dynamic>>> canonicalData = {};
 
     for (final table in tables) {
@@ -28,14 +28,14 @@ class HashValidationService {
 
     // Canonical Serialization: Key'leri A'dan Z'ye sıralayarak oluştur
     final sortedData = _sortMapKeys(canonicalData);
-    
+
     // Json stringine çevir (boşluksuz, canonical form)
     final jsonString = jsonEncode(sortedData);
-    
+
     // SHA-256 hash hesaplaması
     final bytes = utf8.encode(jsonString);
     final digest = sha256.convert(bytes);
-    
+
     return digest.toString();
   }
 

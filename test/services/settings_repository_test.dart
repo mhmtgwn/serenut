@@ -64,6 +64,7 @@ void main() {
         paperWidth: 58,
         printCopies: 2,
         smsEnabled: true,
+        labelAutoDetectGap: true,
       );
 
       // 3. Save modifications
@@ -79,6 +80,7 @@ void main() {
       expect(updated.paperWidth, equals(58));
       expect(updated.printCopies, equals(2));
       expect(updated.smsEnabled, isTrue);
+      expect(updated.labelAutoDetectGap, isTrue);
     });
   });
 }

@@ -10,6 +10,7 @@ import 'package:serenutos/domain/services/sales_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_repositories.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_refund_repository.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/security_gate.dart';
 
@@ -76,6 +77,7 @@ void main() {
         eventPublisher: eventPublisher,
         transactionRunner: gateway,
         securityGate: FakeSecurityGate(),
+        refundStore: SqliteRefundMutationStore(gateway),
       );
 
       // Clear all tables to be 100% clean
@@ -173,28 +175,22 @@ void main() {
       expect(prod2!.quantity, equals(8));
     });
 
-    test('Should allow out-of-stock sale and set negative stock', () async {
+    test('Should reject out-of-stock sale without changing stock', () async {
       final events = <DomainEvent>[];
       eventPublisher.subscribe<SaleCreatedEvent>((e) => events.add(e));
 
-      final sale = await salesService.createSale(
-        customerId: 'cust-1',
-        items: [
-          SaleItemInput(productId: 'prod-1', quantity: 15, unitPrice: 50.0)
-        ],
-        paymentMethod: 'cash',
-        paidAmount: 750.0,
+      await expectLater(
+        salesService.createSale(
+          customerId: 'cust-1',
+          items: [SaleItemInput(productId: 'prod-1', quantity: 15, unitPrice: 50.0)],
+          paymentMethod: 'cash', paidAmount: 750.0,
+        ),
+        throwsA(isA<InsufficientStockException>()),
       );
-
-      expect(sale.id, startsWith('sale-'));
-
-      // Verify stock is now -5 (decremented from 10 to -5)
       final prod = await productRepo.findById('prod-1');
-      expect(prod!.quantity, equals(-5));
-
-      // Verify sale was recorded in DB
+      expect(prod!.quantity, equals(10));
       final allSales = await saleRepo.findAll();
-      expect(allSales.length, equals(1));
+      expect(allSales, isEmpty);
     });
 
     test(

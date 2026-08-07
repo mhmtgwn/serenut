@@ -28,9 +28,10 @@ import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
-import 'package:serenutos/presentation/pages/settings/label_template_editor_page.dart';
 import 'package:serenutos/presentation/pages/settings/support_page.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 
 part 'settings/widgets/backup_settings_card.dart';
 part 'settings/widgets/user_management_dialog.dart';
@@ -312,7 +313,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Widget _buildHardwareCenterCard(Settings settings) {
     return _buildCategoryRow(
-      title: 'Cihazlar ve Donanım',
+      title: 'Aygıt Yöneticisi',
       subtitle: 'Cihazları ekleyin, bağlantıları yönetin ve test edin',
       icon: Icons.settings_input_component_rounded,
       color: _kGreen,
@@ -364,47 +365,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ── Gruplanmış Ayarlar Menüsü ────────────────────────────────────────────────
   List<Widget> _buildGroupedSettings(Settings settings, AuthUser? currentUser) {
     final List<Widget> groups = [];
-
+    // Device discovery is asynchronous and can legitimately be unavailable
+    // while the database is opening (or in widget-test/repair environments).
+    // A settings shell must remain usable in that state; the hardware screens
+    // expose the actionable repository/runtime error when opened.
     // Grup 1: İşletme Ayarları
     final group1 = <Widget>[];
     final groupData = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsReceipt) &&
-        _matchesQuery('işletme', 'bilgiler', settings.businessName)) {
-      group1.add(_buildCategoryRow(
-        title: 'İşletme Bilgileri',
-        subtitle: settings.businessName.isNotEmpty
-            ? settings.businessName
-            : 'Ayarlanmadı',
-        icon: Icons.storefront_rounded,
-        color: _kGreen,
-        onTap: () => _runGuardedAction(
-            Permission.settingsReceipt, () => _showBusinessInfoSheet(settings),
-            title: 'İşletme Bilgileri'),
-      ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Fiş Tasarımı',
-        subtitle:
-            '${settings.paperWidth} mm • Font ${settings.receiptFont.toUpperCase()}',
-        icon: Icons.receipt_long_rounded,
-        color: _kBlue,
-        onTap: () => _runGuardedAction(
-            Permission.settingsReceipt, () => _showReceiptSettings(settings),
-            title: 'Fiş Tasarımı'),
-      ));
-      group1.add(const _IOSDivider());
-      group1.add(_buildCategoryRow(
-        title: 'Etiket Tasarımı',
-        subtitle:
-            '${settings.labelWidthMm}×${settings.labelHeightMm} mm • ${settings.labelDpi} DPI • Canlı önizleme & boyutlar',
-        icon: Icons.label_rounded,
-        color: _kOrange,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const LabelTemplateEditorPage(),
-          ),
-        ),
-      ));
+    if (_hasPermission(currentUser, Permission.settingsReceipt) ||
+        _hasPermission(currentUser, Permission.settingsPrinter)) {
+      if (_matchesQuery(
+          'işletme', 'bilgiler', 'firma', settings.businessName)) {
+        group1.add(_buildCategoryRow(
+          title: 'İşletme Bilgileri',
+          subtitle: settings.businessName.isNotEmpty
+              ? settings.businessName
+              : 'Ayarlanmadı',
+          icon: Icons.storefront_rounded,
+          color: _kGreen,
+          onTap: () => _runGuardedAction(Permission.settingsReceipt,
+              () => _showBusinessInfoSheet(settings),
+              title: 'İşletme Bilgileri'),
+        ));
+      }
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {

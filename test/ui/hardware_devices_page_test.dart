@@ -40,7 +40,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Cihazlar ve Donanım'), findsOneWidget);
+    expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
     expect(find.text('Kasa Terazisi'), findsOneWidget);
     expect(find.text('Hazır'), findsWidgets);
 

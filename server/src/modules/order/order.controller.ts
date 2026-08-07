@@ -18,6 +18,7 @@ import { logger } from '../../config/logger';
 import crypto from 'crypto';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
 import { resolvePaidAmount } from './order.policy';
+import { RefundService } from './refund.service';
 
 const router = Router();
 router.use(authenticateUser);
@@ -202,6 +203,12 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: { code: 'INSUFFICIENT_STOCK', message: `Product ${item.productId} is out of stock or insufficient.` } });
       }
+      await client.query(
+        `INSERT INTO inventory_movements
+           (id,company_id,product_id,movement_type,quantity_delta,reference_type,reference_id,created_by)
+         VALUES($1,$2,$3,'sale',$4,'sale',$5,$6)`,
+        [crypto.randomUUID(), user.company_id, item.productId, -item.qty, orderId, user.id]
+      );
     }
 
     await client.query('COMMIT');
@@ -284,68 +291,70 @@ router.post('/:id/refund', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const { id } = req.params;
-  const { amount, reason } = req.body;
+  const { items, refundMethod, externalReference, reason } = req.body;
+  const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
+  if (!idempotencyKey) {
+    return res.status(400).json({ error: { code: 'IDEMPOTENCY_REQUIRED', message: 'İade için idempotency-key zorunludur.' } });
+  }
 
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-    const saleRes = await client.query(
-      `SELECT id, total_amount, refunded_amount, fsm_state FROM sales
-       WHERE id = $1 AND company_id = $2`,
-      [id, user.company_id]
-    );
-
-    if (saleRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Sipariş bulunamadı.' } });
-    }
-
-    const sale = saleRes.rows[0];
-
-    if (!['completed', 'partially_refunded'].includes(sale.fsm_state)) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({
-        error: { code: 'INVALID_STATE', message: `${sale.fsm_state} durumundaki sipariş iade edilemez.` },
-      });
-    }
-
-    const maxRefundable = parseFloat(sale.total_amount) - parseFloat(sale.refunded_amount ?? 0);
-    const refundAmount = amount ?? maxRefundable;
-
-    if (refundAmount <= 0 || refundAmount > maxRefundable) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        error: { code: 'VALIDATION', message: `İade tutarı 0 ile ${maxRefundable} arasında olmalıdır.` },
-      });
-    }
-
-    const newRefunded = parseFloat(sale.refunded_amount ?? 0) + refundAmount;
-    const isFullRefund = newRefunded >= parseFloat(sale.total_amount);
-    const newState = isFullRefund ? 'refunded' : 'partially_refunded';
-
-    const refundId = `ref-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
-
-    await client.query(
-      `UPDATE sales
-       SET fsm_state = $1, refunded_amount = $2, refund_reason = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND company_id = $5`,
-      [newState, newRefunded, reason ?? null, id, user.company_id]
-    );
+    const result = await RefundService.create(client, {
+      companyId: user.company_id,
+      saleId: id,
+      actorId: user.id,
+      idempotencyKey,
+      reason: typeof reason === 'string' ? reason : '',
+      refundMethod,
+      externalReference,
+      items: Array.isArray(items)
+        ? items.map((item: any) => ({ saleItemId: item.saleItemId, quantity: item.quantity }))
+        : undefined,
+    });
 
     await client.query('COMMIT');
 
+    RealtimeBroadcastService.publishEvent(user.company_id, 'OrderRefunded', {
+      sale_id: id,
+      refund_id: result.refundId,
+      amount: result.amount,
+      status: result.status,
+    }).catch(() => {});
+
     return res.json({
-      refundId,
+      refundId: result.refundId,
       orderId: id,
-      refundedAmount: refundAmount,
-      totalRefunded: newRefunded,
-      status: newState,
+      refundedAmount: result.amount,
+      totalRefunded: result.totalRefunded,
+      status: result.status,
+      idempotent: result.idempotent === true,
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
     logger.error('Refund error:', err);
+    const statusByError: Record<string, number> = {
+      sale_not_found: 404,
+      sale_not_refundable: 409,
+      invalid_refund_quantity: 409,
+      duplicate_refund_item: 400,
+      refund_product_missing: 409,
+      refund_amount_exceeds_sale: 409,
+      idempotency_key_required: 400,
+      refund_reason_required: 400,
+      invalid_refund_method: 400,
+      external_refund_reference_required: 400,
+      refund_items_required: 400,
+      sale_items_missing: 409,
+    };
+    if (statusByError[err.message]) {
+      return res.status(statusByError[err.message]).json({ error: { code: err.message.toUpperCase(), message: err.message } });
+    }
+    if (err.code === '23505') {
+      return res.status(409).json({ error: { code: 'REFUND_CONFLICT', message: 'İade eşzamanlı olarak işlendi; tekrar sorgulayın.' } });
+    }
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'İade işlemi gerçekleştirilemedi.' } });
   } finally {
     client.release();

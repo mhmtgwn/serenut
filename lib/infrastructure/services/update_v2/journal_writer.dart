@@ -70,7 +70,7 @@ class DiskJournalWriter implements JournalWriter {
         );
 
         final line = jsonEncode(record.toJson()) + '\n';
-        
+
         // Ensure parent directory exists
         final parent = _logFile.parent;
         if (!await parent.exists()) {
@@ -78,7 +78,7 @@ class DiskJournalWriter implements JournalWriter {
         }
 
         await _logFile.writeAsString(line, mode: FileMode.append, flush: true);
-        
+
         final currentSeq = _nextSequenceNumber;
         _nextSequenceNumber++;
         completer.complete(currentSeq);

@@ -10,6 +10,10 @@ services:
       - PORT=3000
       - DATABASE_URL=postgres://postgres:postgres@db:5432/serenut_pos
       - REDIS_URL=redis://redis:6379
+      - PUBLIC_BASE_URL=http://localhost:3000
+      - COMPANY_LOGOS_DIR=/var/lib/serenut/company-logos
+    volumes:
+      - ./company-logos:/var/lib/serenut/company-logos
     depends_on:
       - db
       - redis

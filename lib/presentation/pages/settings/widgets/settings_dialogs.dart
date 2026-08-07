@@ -13,6 +13,8 @@ extension _SettingsPageDialogs on _SettingsPageState {
     final emailCtrl = TextEditingController(text: settings.businessEmail ?? '');
     final taxIdCtrl = TextEditingController(text: settings.businessTaxId ?? '');
     final addressCtrl = TextEditingController(text: settings.businessAddress);
+    final receiptFooterCtrl =
+        TextEditingController(text: settings.receiptFooterText);
     String? selectedLogoPath = settings.businessLogo;
 
     // Local dropdown values
@@ -43,11 +45,22 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             final picker = ImagePicker();
                             final pickedFile = await picker.pickImage(
                               source: ImageSource.gallery,
-                              maxWidth: 512,
-                              maxHeight: 512,
                             );
                             if (!context.mounted) return;
                             if (pickedFile != null) {
+                              final size = await pickedFile.length();
+                              if (size > 3 * 1024 * 1024) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                          Text('Logo en fazla 3 MB olabilir.'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
                               setModalState(() {
                                 selectedLogoPath = pickedFile.path;
                               });
@@ -257,6 +270,13 @@ extension _SettingsPageDialogs on _SettingsPageState {
                         icon: Icons.location_on_rounded,
                         maxLines: 2,
                       ),
+                      const SizedBox(height: 12),
+                      _buildFormTextField(
+                        controller: receiptFooterCtrl,
+                        label: 'Fiş Sonu Notu',
+                        icon: Icons.notes_rounded,
+                        maxLines: 3,
+                      ),
                       const SizedBox(height: 24),
                       _buildModalSaveButton(onTap: () async {
                         if (formKey.currentState!.validate()) {
@@ -275,6 +295,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             businessCity: localCity ?? '',
                             businessDistrict: localDistrict ?? '',
                             businessType: '',
+                            receiptFooterText: receiptFooterCtrl.text.trim(),
                           );
                           await _updateSettingField(updated);
                           if (context.mounted) Navigator.pop(context);
@@ -396,20 +417,31 @@ extension _SettingsPageDialogs on _SettingsPageState {
     );
   }
 
-  void _showReceiptSettings(Settings settings) {
-    var paperWidth = settings.paperWidth;
-    var font = settings.receiptFont;
-    var textSize = settings.receiptTextSize;
-    var itemLayout = settings.receiptItemLayout;
-    var printLogo = settings.printLogo;
-    var printBalance = settings.printCustomerBalance;
-    var printQr = settings.printQRCode;
-    var printBarcode = settings.printBarcode;
-    var autoCut = settings.autoCutReceipt;
-    var openDrawer = settings.openCashDrawer;
-    var feedLines = settings.receiptFeedLines.clamp(0, 8);
-    var copies = settings.printCopies.clamp(1, 10);
-    final footerCtrl = TextEditingController(text: settings.receiptFooterText);
+  void _showReceiptSettings(Settings settings) async {
+    final repository = ref.read(printingRepositoryProvider);
+    final profiles =
+        await repository.getDesignProfiles(PrintDocumentKind.receipt);
+    if (!mounted || profiles.isEmpty) return;
+    final profile = profiles.firstWhere((item) => item.isDefault);
+    final definition = profile.definition;
+    final device = await ref
+        .read(activePrinterDeviceProvider(PrintDocumentKind.receipt).future);
+    if (!mounted) return;
+    final paperWidth =
+        (device?.capabilities['paperWidthMm'] as num?)?.toInt() ?? 58;
+    var font = definition['font']?.toString() ?? 'a';
+    var textSize = definition['textSize']?.toString() ?? 'normal';
+    var itemLayout = definition['itemLayout']?.toString() ?? 'auto';
+    var printLogo = definition['showLogo'] != false;
+    var printBalance = definition['showCustomerBalance'] != false;
+    var printQr = definition['showQrCode'] == true;
+    var autoCut = definition['autoCut'] != false;
+    var openDrawer = definition['openCashDrawer'] == true;
+    var feedLines =
+        ((definition['feedLines'] as num?)?.toInt() ?? 2).clamp(0, 8);
+    final footerCtrl = TextEditingController(
+      text: definition['footerText']?.toString() ?? '',
+    );
 
     Navigator.of(context)
         .push(MaterialPageRoute(
@@ -429,15 +461,14 @@ extension _SettingsPageDialogs on _SettingsPageState {
               title: 'Fiş Tasarımı',
               child: SingleChildScrollView(
                 child: Column(children: [
-                  _buildFormDropdown<int>(
-                    label: 'Kağıt genişliği',
-                    icon: Icons.straighten_rounded,
-                    value: paperWidth,
-                    items: const [
-                      DropdownMenuItem(value: 58, child: Text('58 mm')),
-                      DropdownMenuItem(value: 80, child: Text('80 mm')),
-                    ],
-                    onChanged: (v) => setModalState(() => paperWidth = v ?? 80),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.straighten_rounded),
+                    title: const Text('Fiziksel kağıt genişliği'),
+                    subtitle: const Text(
+                      'Bu değer aktif yazıcının donanım kartından yönetilir.',
+                    ),
+                    trailing: Text('$paperWidth mm'),
                   ),
                   const SizedBox(height: 12),
                   _buildFormDropdown<String>(
@@ -499,79 +530,53 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             : null,
                         icon: const Icon(Icons.add_circle_outline)),
                   ]),
-                  Row(children: [
-                    Expanded(child: Text('Kopya sayısı: $copies')),
-                    IconButton(
-                        onPressed: copies > 1
-                            ? () => setModalState(() => copies--)
-                            : null,
-                        icon: const Icon(Icons.remove_circle_outline)),
-                    IconButton(
-                        onPressed: copies < 10
-                            ? () => setModalState(() => copies++)
-                            : null,
-                        icon: const Icon(Icons.add_circle_outline)),
-                  ]),
                   toggle('İşletme logosunu yazdır', printLogo,
                       (v) => setModalState(() => printLogo = v)),
                   toggle('Müşteri bakiyesini yazdır', printBalance,
                       (v) => setModalState(() => printBalance = v)),
                   toggle('QR kod yazdır', printQr,
                       (v) => setModalState(() => printQr = v)),
-                  toggle('Ürün barkodu yazdır', printBarcode,
-                      (v) => setModalState(() => printBarcode = v)),
                   toggle('Fiş sonunda otomatik kes', autoCut,
                       (v) => setModalState(() => autoCut = v)),
                   toggle('Nakit satışta çekmeceyi aç', openDrawer,
                       (v) => setModalState(() => openDrawer = v)),
                   const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final candidate = settings.copyWith(
-                        paperWidth: paperWidth,
-                        receiptFont: font,
-                        receiptTextSize: textSize,
-                      );
-                      try {
-                        await ref
-                            .read(printerServiceProvider)
-                            .testPrinterConnection(candidate);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Fiş yazıcısı testi başarılı.')),
-                          );
-                        }
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content:
-                                    Text('Yazıcı testi başarısız: $error')),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.print_rounded),
-                    label: const Text('Fiş yazıcısını test et'),
+                  const ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.print_rounded),
+                    title: Text('Fiziksel yazıcı testi'),
+                    subtitle: Text(
+                      'Bağlantı, logo, Türkçe karakter, barkod ve sağ kenar testi cihaz kartından yapılır.',
+                    ),
                   ),
                   const SizedBox(height: 10),
                   _buildModalSaveButton(onTap: () async {
-                    await _updateSettingField(settings.copyWith(
-                      paperWidth: paperWidth,
-                      receiptFont: font,
-                      receiptTextSize: textSize,
-                      receiptItemLayout: itemLayout,
-                      receiptFooterText: footerCtrl.text.trim(),
-                      receiptFeedLines: feedLines,
-                      printCopies: copies,
-                      printLogo: printLogo,
-                      printCustomerBalance: printBalance,
-                      printQRCode: printQr,
-                      printBarcode: printBarcode,
-                      autoCutReceipt: autoCut,
-                      openCashDrawer: openDrawer,
+                    await repository.saveDesignProfile(PrintDesignProfile(
+                      id: profile.id,
+                      name: profile.name,
+                      kind: profile.kind,
+                      schemaVersion: profile.schemaVersion,
+                      rendererVersion: profile.rendererVersion,
+                      definition: {
+                        'font': font,
+                        'textSize': textSize,
+                        'itemLayout': itemLayout,
+                        'footerText': footerCtrl.text.trim(),
+                        'feedLines': feedLines,
+                        'showLogo': printLogo,
+                        'showCustomerBalance': printBalance,
+                        'showQrCode': printQr,
+                        'showProductDetails':
+                            definition['showProductDetails'] != false,
+                        'autoCut': autoCut,
+                        'openCashDrawer': openDrawer,
+                      },
+                      isDefault: true,
+                      createdAt: profile.createdAt,
+                      updatedAt: DateTime.now(),
                     ));
+                    ref.invalidate(
+                        printDesignProfilesProvider(PrintDocumentKind.receipt));
                     if (context.mounted) Navigator.pop(context);
                   }),
                   const SizedBox(height: 24),

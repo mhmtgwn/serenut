@@ -6,6 +6,7 @@ import { ReleaseFsmService } from '../modules/release_v2/services/release-fsm.se
 import { ReleaseAuditService } from '../modules/release_v2/services/release-audit.service';
 import { ReleaseManifestDTO } from '../modules/release_v2/models/release-manifest.dto';
 import assert from 'assert';
+import crypto from 'crypto';
 
 async function setup() {
   console.log('🔄 Setting up database for Release Registry V2 Test...');
@@ -25,6 +26,8 @@ async function runTests() {
   const registryService = new ReleaseRegistryService(pgPool);
   const fsmService = new ReleaseFsmService(pgPool);
   const auditService = new ReleaseAuditService(pgPool);
+  const keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  process.env.RELEASE_SIGNING_PUBLIC_KEY = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString();
 
   const testManifest: ReleaseManifestDTO = {
     schemaVersion: 1,
@@ -61,13 +64,20 @@ async function runTests() {
         downloadUrl: '/api/v1/releases/artifacts/SerenutOSSetup-1.2.0.exe',
         sizeBytes: 48120890,
         sha256: '4dd4c7b462651ee66f2529bb561a5b17417d32095220cf1908ad94362407503c',
-        signature: 'MEUCIQDx7TESTVECTORBASE64SIG'
+        signature: ''
       }
     ]
   };
 
+  testManifest.artifacts[0].signature = crypto.sign(
+    'RSA-SHA256',
+    Buffer.from(testManifest.artifacts[0].sha256.toLowerCase(), 'utf8'),
+    keys.privateKey,
+  ).toString('base64');
   const canonicalManifestJson = JSON.stringify(testManifest);
-  const manifestSig = 'RSA-MANIFEST-SIGNATURE-EXAMPLE-BASE64';
+  const manifestSig = crypto.sign(
+    'RSA-SHA256', Buffer.from(canonicalManifestJson, 'utf8'), keys.privateKey,
+  ).toString('base64');
 
   console.log('\n======================================================');
   console.log('🧪 ENTERPRISE RELEASE MANAGEMENT — INTEGRATION TESTS');

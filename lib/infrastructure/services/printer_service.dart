@@ -56,6 +56,7 @@ class EscPosCommands {
 }
 
 /// Service to handle connection, receipt formatting, and binary transmission
+@Deprecated('Use SqlitePrintingApplicationService and PrintingRuntime.')
 class PrinterService with ChangeNotifier implements IPrinterService {
   // Socket connector abstraction for mock tests
   final Future<Socket> Function(String, int, {Duration? timeout})?
@@ -177,16 +178,14 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     return PrinterBackend.none;
   }
 
-  /// Settings helper based on purpose
+  /// Settings helper based on purpose with fallback to main printer
   Settings _getSettingsForPurpose(Settings settings, PrinterPurpose purpose) {
     if (purpose == PrinterPurpose.label) {
-      final labelIp = settings.labelPrinterIp ?? '';
-      final labelPort = settings.labelPrinterPort;
       return settings.copyWith(
-        printerName:
-            labelIp.isNotEmpty ? 'network' : (settings.labelPrinterName ?? ''),
-        printerIp: labelIp,
-        printerPort: labelPort,
+        printerName: settings.labelPrinterName ?? '',
+        printerIp: settings.labelPrinterIp ?? '',
+        printerPort:
+            settings.labelPrinterPort > 0 ? settings.labelPrinterPort : 9100,
       );
     }
     return settings;
@@ -194,7 +193,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
   /// Helper to send bytes with Sunmi → Network → Bluetooth → PersistentQueue failover.
   Future<void> _sendBytes(List<int> bytes, Settings settings,
-      {PrinterPurpose purpose = PrinterPurpose.receipt}) async {
+      {PrintJobKind jobKind = PrintJobKind.receipt}) async {
+    final purpose = jobKind.purpose;
     final targetSettings = _getSettingsForPurpose(settings, purpose);
 
     if (_socketConnector != null && _persistentQueue == null) {
@@ -205,7 +205,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
 
     // Failover chain: Network / USB / Bluetooth → PersistentQueue
-    final backends = await _buildFailoverChain(targetSettings, purpose: purpose);
+    final backends =
+        await _buildFailoverChain(targetSettings, purpose: purpose);
 
     final failures = <String>[];
     for (final backend in backends) {
@@ -223,10 +224,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final queue = _persistentQueue;
     if (queue != null) {
       await queue.enqueue(
-        title: purpose == PrinterPurpose.label
-            ? 'Etiket (failover)'
-            : 'Fis (failover)',
+        title: switch (jobKind) {
+          PrintJobKind.receipt => 'Fis (failover)',
+          PrintJobKind.productLabel => 'Urun etiketi (failover)',
+          PrintJobKind.orderLabel => 'Siparis etiketi (failover)',
+        },
         receiptJson: bytes.join(','), // Compact byte list
+        purpose: jobKind,
+        deviceId: purpose == PrinterPurpose.label
+            ? settings.activeLabelPrinterId
+            : settings.activeReceiptPrinterId,
       );
     }
     final jobName = purpose == PrinterPurpose.label ? 'Etiket' : 'Fiş';
@@ -274,7 +281,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       if (!isLabel) chain.add(PrinterBackend.sunmi);
     } else if (ip != null && ip.isNotEmpty) {
       chain.add(PrinterBackend.network);
-      if (!isLabel) chain.add(PrinterBackend.sunmi); // Sunmi as last-resort ONLY for receipts
+      if (!isLabel) {
+        chain.add(
+            PrinterBackend.sunmi); // Sunmi as last-resort ONLY for receipts
+      }
     } else if (printerName != null && printerName.contains(':')) {
       chain.add(PrinterBackend.bluetooth);
       if (!isLabel) chain.add(PrinterBackend.sunmi);
@@ -367,6 +377,14 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         (settings.printerName != null && settings.printerName!.isNotEmpty);
   }
 
+  void _requirePrinter(Settings settings, PrinterPurpose purpose) {
+    final target = _getSettingsForPurpose(settings, purpose);
+    if (_hasPrinter(target)) return;
+    throw StateError(purpose == PrinterPurpose.label
+        ? 'Etiket yazıcısı tanımlı değil.'
+        : 'Fiş yazıcısı tanımlı değil.');
+  }
+
   /// Backward-compatible TCP test (used by printer_service_test.dart).
   /// Sends a minimal test page directly via TCP — bypasses failover chain.
   @override
@@ -432,31 +450,37 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       qrData: 'serenut-label-test',
       timestamp: DateTime.now(),
     );
+    final logoBytes = settings.labelPrinterLanguage == 'tspl' &&
+            settings.labelShowBusinessName
+        ? await _loadLogoSourceBytes(settings.businessLogo)
+        : null;
     final bytes = settings.labelPrinterLanguage == 'tspl'
         ? TsplLabelLayoutEngine.generateLabelBytes(
             model,
             widthMm: settings.labelWidthMm,
             heightMm: settings.labelHeightMm,
             gapMm: settings.labelGapMm,
+            autoDetectGap: settings.labelAutoDetectGap,
             dpi: settings.labelDpi,
-            showBusinessName: settings.printLogo,
+            showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
-            showBarcode: settings.printBarcode,
-            showPrice: settings.printProductDetails,
+            showBarcode: settings.labelShowBarcode,
+            showPrice: settings.labelShowPrice,
             showVat: settings.labelShowVat,
             fontSize: settings.labelFontSize,
             logoPath: settings.businessLogo,
+            logoBytes: logoBytes,
           )
         : LabelLayoutEngine.generateLabelBytes(
             model,
             width: 32,
-            showBusinessName: settings.printLogo,
+            showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
-            showBarcode: settings.printBarcode,
-            showPrice: settings.printProductDetails,
+            showBarcode: settings.labelShowBarcode,
+            showPrice: settings.labelShowPrice,
             showVat: settings.labelShowVat,
           );
-    await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
+    await _sendBytes(bytes, settings, jobKind: PrintJobKind.productLabel);
   }
 
   /// Prints a sale receipt (Fiş)
@@ -467,7 +491,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     CustomerEntity? customer,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = _receiptWidth(settings);
     final List<int> bytes = [];
@@ -565,17 +589,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
       }
-      if (settings.printBarcode) {
-        final barcode =
-            item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
-        final barcodeBytes = _generateCode128Bytes(barcode);
-        if (barcodeBytes.isNotEmpty) {
-          bytes.addAll(EscPosCommands.alignCenter);
-          bytes.addAll(barcodeBytes);
-          bytes.addAll(EscPosCommands.lf);
-          bytes.addAll(EscPosCommands.alignLeft);
-        }
-      }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -622,7 +635,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     double? paidAmount,
     String? notes,
   }) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = _receiptWidth(settings);
     final List<int> bytes = [];
@@ -666,7 +679,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     bytes.addAll(EscPosCommands.boldOn);
     bytes.addAll(_textToBytes('*** SİPARİŞ FİŞİ ***\n'));
     bytes.addAll(EscPosCommands.boldOff);
-    bytes.addAll(_textToBytes('Sipariş No: #${order.id.toShortId}\n'));
+    bytes.addAll(_textToBytes('Sipariş No: #${order.displayNumber}\n'));
     bytes.addAll(_textToBytes(
         'Tarih: ${order.createdAt.toString().substring(0, 16)}\n'));
     if (order.expectedDeliveryDate != null) {
@@ -723,17 +736,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         final subLeft = '  ${_formatQty(qty)} x ${price.toStringAsFixed(2)}';
         bytes.addAll(_textToBytes('${_formatLine(subLeft, right, width)}\n'));
       }
-      if (settings.printBarcode) {
-        final barcode =
-            item['barcode']?.toString() ?? item['product_id']?.toString() ?? '';
-        final barcodeBytes = _generateCode128Bytes(barcode);
-        if (barcodeBytes.isNotEmpty) {
-          bytes.addAll(EscPosCommands.alignCenter);
-          bytes.addAll(barcodeBytes);
-          bytes.addAll(EscPosCommands.lf);
-          bytes.addAll(EscPosCommands.alignLeft);
-        }
-      }
     }
     bytes.addAll(_textToBytes('${"_" * width}\n'));
 
@@ -781,7 +783,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     String? notes,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
@@ -878,7 +880,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<CategoryRevenue> categories,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
@@ -948,7 +950,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<CategoryRevenue> categories,
     Settings settings,
   ) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final width = settings.paperWidth <= 58 ? 32 : 48;
     final List<int> bytes = [];
@@ -1123,54 +1125,73 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       return [];
     }
     try {
-      Uint8List list;
-      if (logoPath != null && logoPath.startsWith('data:image/')) {
-        final comma = logoPath.indexOf(',');
-        if (comma < 0) return [];
-        list = base64Decode(logoPath.substring(comma + 1));
-      } else if (!kIsWeb &&
-          logoPath != null &&
-          (logoPath.startsWith('https://') || logoPath.startsWith('http://'))) {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 5);
-        try {
-          final request = await client.getUrl(Uri.parse(logoPath));
-          final response = await request.close();
-          if (response.statusCode < 200 || response.statusCode >= 300) {
-            throw HttpException('Logo HTTP ${response.statusCode}');
-          }
-          list = Uint8List.fromList(await response
-              .fold<List<int>>([], (all, part) => all..addAll(part)));
-        } finally {
-          client.close(force: true);
-        }
-      } else if (!kIsWeb &&
-          logoPath != null &&
-          logoPath.isNotEmpty &&
-          File(logoPath).existsSync()) {
-        list = await File(logoPath).readAsBytes();
-      } else {
-        final ByteData data = await rootBundle.load('assets/logo.png');
-        list = data.buffer.asUint8List();
-      }
+      final list = await _loadLogoSourceBytes(logoPath);
       final img.Image? decoded = img.decodeImage(list);
       if (decoded != null) {
         // Enforce logo width to be an exact multiple of 8 bytes for ESC/POS GS v 0
-        int rawTargetWidth = decoded.width > maxWidth ? maxWidth : decoded.width;
+        int rawTargetWidth =
+            decoded.width > maxWidth ? maxWidth : decoded.width;
         int targetWidth = (rawTargetWidth ~/ 8) * 8;
         if (targetWidth < 8) targetWidth = 8;
 
-        final img.Image resized = img.copyResize(
+        var resized = img.copyResize(
           decoded,
           width: targetWidth,
           interpolation: img.Interpolation.cubic,
         );
+        final maxHeight = maxWidth <= 320 ? 96 : 128;
+        if (resized.height > maxHeight) {
+          resized = img.copyResize(
+            resized,
+            height: maxHeight,
+            interpolation: img.Interpolation.cubic,
+          );
+          final alignedWidth = (resized.width ~/ 8) * 8;
+          resized = img.copyResize(
+            resized,
+            width: alignedWidth < 8 ? 8 : alignedWidth,
+            interpolation: img.Interpolation.cubic,
+          );
+        }
         return _convertImageToEscPos(resized);
       }
     } catch (e) {
       debugPrint('Logo yukleme hatasi: $e');
     }
     return [];
+  }
+
+  Future<Uint8List> _loadLogoSourceBytes(String? logoPath) async {
+    if (logoPath != null && logoPath.startsWith('data:image/')) {
+      final comma = logoPath.indexOf(',');
+      if (comma < 0) throw const FormatException('Invalid data image logo');
+      return base64Decode(logoPath.substring(comma + 1));
+    }
+    if (!kIsWeb &&
+        logoPath != null &&
+        (logoPath.startsWith('https://') || logoPath.startsWith('http://'))) {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
+      try {
+        final request = await client.getUrl(Uri.parse(logoPath));
+        final response = await request.close();
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw HttpException('Logo HTTP ${response.statusCode}');
+        }
+        return Uint8List.fromList(await response
+            .fold<List<int>>([], (all, part) => all..addAll(part)));
+      } finally {
+        client.close(force: true);
+      }
+    }
+    if (!kIsWeb &&
+        logoPath != null &&
+        logoPath.isNotEmpty &&
+        File(logoPath).existsSync()) {
+      return File(logoPath).readAsBytes();
+    }
+    final ByteData data = await rootBundle.load('assets/logo.png');
+    return data.buffer.asUint8List();
   }
 
   // Converts an Image into ESC/POS GS v 0 raster bit image bytes
@@ -1195,9 +1216,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           final int px = x + bit;
           if (px < width) {
             final pixel = image.getPixel(px, y);
-            // Handle transparent background pixels cleanly (treat alpha < 128 as white)
+            // Use the same proven monochrome conversion as sales receipts.
+            // Transparent pixels stay white and logo colour details retain
+            // their original luminance instead of becoming a solid block.
             if (pixel.a >= 128) {
-              final double luminance =
+              final luminance =
                   0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
               if (luminance < 128) {
                 byte |= (1 << (7 - bit));
@@ -1231,26 +1254,6 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     ];
   }
 
-  /// Common Epson-compatible CODE128 subset B command. Non-ASCII identifiers
-  /// are skipped because silently replacing barcode data would make it scan to
-  /// the wrong product.
-  List<int> _generateCode128Bytes(String value) {
-    final normalized = value.trim();
-    if (normalized.isEmpty ||
-        normalized.length > 120 ||
-        normalized.codeUnits.any((unit) => unit < 0x20 || unit > 0x7E)) {
-      return const [];
-    }
-    final data = <int>[0x7B, 0x42, ...normalized.codeUnits]; // {B + data
-    return [
-      0x1D, 0x48, 0x02, // Human-readable text below
-      0x1D, 0x68, 0x50, // Height: 80 dots
-      0x1D, 0x77, 0x02, // Module width
-      0x1D, 0x6B, 0x49, data.length,
-      ...data,
-    ];
-  }
-
   String _getPaymentLabel(String method) {
     switch (method.toLowerCase()) {
       case 'cash':
@@ -1267,6 +1270,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
   }
 
+  static String _statusLabel(String status) => switch (status.toLowerCase()) {
+        'created' => 'Beklemede',
+        'preparing' => 'Hazirlaniyor',
+        'ready' => 'Hazir',
+        'delivered' => 'Teslim Edildi',
+        'cancelled' => 'Iptal Edildi',
+        _ => status,
+      };
+
   @override
   Future<void> printOrderLabels(
     OrderEntity order,
@@ -1276,67 +1288,81 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   }) async {
     final targetSettings =
         _getSettingsForPurpose(settings, PrinterPurpose.label);
-    if (!_hasPrinter(targetSettings)) return;
+    if (!_hasPrinter(targetSettings)) {
+      throw StateError('Etiket yazıcısı tanımlı değil.');
+    }
 
     final List<int> allBytes = [];
     final isTspl = settings.labelPrinterLanguage == 'tspl';
     final custName = customer?.name ?? order.customerId;
+    final rawCustomerId = customer?.id ?? order.customerId;
+    final shortCustomerId = rawCustomerId.length > 8
+        ? rawCustomerId.substring(0, 8).toUpperCase()
+        : rawCustomerId.toUpperCase();
+    final previousDebt = customer != null && customer.balance < 0
+        ? customer.balance.abs()
+        : 0.0;
 
-    for (final item in items) {
-      final name = item['product_name']?.toString().trim().isNotEmpty == true
-          ? item['product_name'].toString()
-          : item['product_id']?.toString() ?? 'Ürün';
-      final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
-      final note = item['note']?.toString() ?? order.notes;
+    final firstItem = items.isEmpty ? null : items.first;
+    final summaryName = items.length == 1
+        ? (firstItem?['product_name']?.toString().trim().isNotEmpty == true
+            ? firstItem!['product_name'].toString()
+            : firstItem?['product_id']?.toString() ?? 'Urun')
+        : '${items.length} Urun / Paket';
+    final summaryQuantity = items.length == 1
+        ? (firstItem?['quantity'] as num?)?.toDouble() ?? 1.0
+        : 1.0;
+    final note = firstItem?['note']?.toString() ?? order.notes;
 
-      if (isTspl) {
-        final labelBytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
-          orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
-          customerName: custName,
-          productName: name,
-          quantity: qty,
-          items: items,
-          note: note,
-          timestamp: order.createdAt,
-          totalAmount: order.totalAmount,
-          itemsCount: items.length,
-          widthMm: settings.labelWidthMm,
-          heightMm: settings.labelHeightMm,
-          gapMm: settings.labelGapMm,
-          dpi: settings.labelDpi,
-          copies: settings.labelPrinterCopies,
-          showBusinessName: settings.labelOrderShowBusinessName,
-          showCustomerName: settings.labelOrderShowCustomerName,
-          showOrderNo: settings.labelOrderShowOrderNo,
-          showDate: settings.labelOrderShowDate,
-          showTotalAmount: settings.labelOrderShowTotalAmount,
-          showItemsCount: settings.labelOrderShowItemsCount,
-          fontSize: settings.labelOrderFontSize,
-          businessName: settings.businessName,
-        );
-        allBytes.addAll(labelBytes);
-      } else {
-        final labelModel = LabelModel(
-          productName: name,
-          weight: qty,
-          price: (item['unit_price'] as num?)?.toDouble() ?? 0.0,
-          barcode: order.id,
-          businessName: settings.businessName,
-          qrData: 'item|${order.id}|${item['product_id']}|$qty',
-          timestamp: order.createdAt,
-        );
-        final labelBytes = LabelLayoutEngine.generateLabelBytes(
-          labelModel,
-          width: targetSettings.paperWidth <= 58 ? 32 : 48,
-          showBusinessName: settings.labelOrderShowBusinessName,
-          showBarcode: settings.labelOrderShowOrderNo,
-          showPrice: settings.labelOrderShowTotalAmount,
-        );
-        allBytes.addAll(labelBytes);
-      }
+    if (isTspl) {
+      allBytes.addAll(TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+        customerName: custName,
+        customerNo: shortCustomerId,
+        productName: summaryName,
+        quantity: summaryQuantity,
+        items: items,
+        note: note,
+        timestamp: order.createdAt,
+        totalAmount: order.totalAmount,
+        previousDebt: previousDebt,
+        paymentStatus: _statusLabel(order.status),
+        itemsCount: items.length,
+        widthMm: settings.labelWidthMm,
+        heightMm: settings.labelHeightMm,
+        gapMm: settings.labelGapMm,
+        autoDetectGap: settings.labelAutoDetectGap,
+        dpi: settings.labelDpi,
+        copies: settings.labelPrinterCopies,
+        showBusinessName: settings.labelOrderShowBusinessName,
+        showCustomerName: settings.labelOrderShowCustomerName,
+        showOrderNo: settings.labelOrderShowOrderNo,
+        showDate: settings.labelOrderShowDate,
+        showTotalAmount: settings.labelOrderShowTotalAmount,
+        showItemsCount: settings.labelOrderShowItemsCount,
+        fontSize: settings.labelOrderFontSize,
+        businessName: settings.businessName,
+      ));
+    } else {
+      final labelModel = LabelModel(
+        productName: summaryName,
+        weight: summaryQuantity,
+        price: order.totalAmount,
+        barcode: order.id,
+        businessName: settings.businessName,
+        qrData: 'order|${order.id}',
+        timestamp: order.createdAt,
+      );
+      allBytes.addAll(LabelLayoutEngine.generateLabelBytes(
+        labelModel,
+        width: targetSettings.paperWidth <= 58 ? 32 : 48,
+        showBusinessName: settings.labelOrderShowBusinessName,
+        showBarcode: settings.labelOrderShowOrderNo,
+        showPrice: settings.labelOrderShowTotalAmount,
+      ));
     }
 
-    await _sendBytes(allBytes, settings, purpose: PrinterPurpose.label);
+    await _sendBytes(allBytes, settings, jobKind: PrintJobKind.orderLabel);
   }
 
   @override
@@ -1353,7 +1379,10 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     }
     final isTspl = settings.labelPrinterLanguage == 'tspl';
     final width = targetSettings.paperWidth <= 58 ? 32 : 48;
-    final logo = !isTspl && settings.printLogo
+    final tsplLogoBytes = isTspl && settings.labelShowBusinessName
+        ? await _loadLogoSourceBytes(settings.businessLogo)
+        : null;
+    final logo = !isTspl && settings.labelShowBusinessName
         ? await _getLogoBytes(settings.businessLogo,
             maxWidth: targetSettings.paperWidth <= 58 ? 240 : 360)
         : <int>[];
@@ -1361,6 +1390,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final effectiveCopies = copies == 1
         ? settings.labelPrinterCopies.clamp(1, 20)
         : copies.clamp(1, 20);
+    var isFirstTsplLabel = true;
     for (final product in products) {
       final model = LabelModel(
         productName: product.name,
@@ -1380,32 +1410,35 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           widthMm: settings.labelWidthMm,
           heightMm: settings.labelHeightMm,
           gapMm: settings.labelGapMm,
+          autoDetectGap: isFirstTsplLabel && settings.labelAutoDetectGap,
           dpi: settings.labelDpi,
           copies: effectiveCopies,
-          showBusinessName: settings.printLogo,
+          showBusinessName: settings.labelShowBusinessName,
           showBrand: settings.labelShowBrand,
-          showBarcode: settings.printBarcode,
-          showPrice: settings.printProductDetails,
+          showBarcode: settings.labelShowBarcode,
+          showPrice: settings.labelShowPrice,
           showVat: settings.labelShowVat,
           fontSize: settings.labelFontSize,
           logoPath: settings.businessLogo,
+          logoBytes: tsplLogoBytes,
         ));
+        isFirstTsplLabel = false;
       } else {
         for (var copy = 0; copy < effectiveCopies; copy++) {
           bytes.addAll(LabelLayoutEngine.generateLabelBytes(
             model,
             width: width,
             logoBytes: logo,
-            showBusinessName: settings.printLogo,
+            showBusinessName: settings.labelShowBusinessName,
             showBrand: settings.labelShowBrand,
-            showBarcode: settings.printBarcode,
-            showPrice: settings.printProductDetails,
+            showBarcode: settings.labelShowBarcode,
+            showPrice: settings.labelShowPrice,
             showVat: settings.labelShowVat,
           ));
         }
       }
     }
-    await _sendBytes(bytes, settings, purpose: PrinterPurpose.label);
+    await _sendBytes(bytes, settings, jobKind: PrintJobKind.productLabel);
   }
 
   String _formatQty(double qty) {
@@ -1417,7 +1450,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
   @override
   Future<void> printDiagnosticsTest(Settings settings, int paperWidth) async {
-    if (!_hasPrinter(settings)) return;
+    _requirePrinter(settings, PrinterPurpose.receipt);
 
     final backend = await _detectBackend(settings);
     final width = paperWidth == 58 ? 32 : 48;
@@ -1493,6 +1526,16 @@ class PrinterService with ChangeNotifier implements IPrinterService {
   @override
   Future<void> retryPersistedJob(dynamic job, Settings settings) async {
     final persistedJob = job as PersistedPrintJob;
+    final purpose = persistedJob.purpose.purpose;
+    final activeDeviceId = purpose == PrinterPurpose.label
+        ? settings.activeLabelPrinterId
+        : settings.activeReceiptPrinterId;
+    if (persistedJob.deviceId != activeDeviceId) {
+      throw StateError(
+          'Kuyruk işi ${persistedJob.deviceId} cihazına ait; aktif cihaz $activeDeviceId. Hedef cihaz değiştirilmeden yeniden gönderilemez.');
+    }
+    final targetSettings = _getSettingsForPurpose(settings, purpose);
+    _requirePrinter(settings, purpose);
     final bytes = persistedJob.receiptJson
         .split(',')
         .map((s) => int.parse(s.trim()))
@@ -1505,14 +1548,15 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     try {
       if (_socketConnector != null) {
         // Test mode — use mock socket directly
-        await _sendViaTcp(
-            bytes, settings.printerIp ?? '127.0.0.1', settings.printerPort);
+        await _sendViaTcp(bytes, targetSettings.printerIp ?? '127.0.0.1',
+            targetSettings.printerPort);
       } else {
-        final backends = await _buildFailoverChain(settings);
+        final backends =
+            await _buildFailoverChain(targetSettings, purpose: purpose);
         bool sent = false;
         for (final backend in backends) {
           try {
-            await _sendViaBackend(bytes, backend, settings);
+            await _sendViaBackend(bytes, backend, targetSettings);
             sent = true;
             break;
           } catch (_) {

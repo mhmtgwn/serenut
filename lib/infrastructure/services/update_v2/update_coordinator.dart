@@ -87,7 +87,8 @@ class UpdateCoordinator {
         return CoordinatorCheckResult(
           hasUpdate: false,
           errorCode: policyResult.errorCode ?? 'UPD-005',
-          errorMessage: policyResult.reason ?? 'Policy constraints check failed.',
+          errorMessage:
+              policyResult.reason ?? 'Policy constraints check failed.',
         );
       }
 

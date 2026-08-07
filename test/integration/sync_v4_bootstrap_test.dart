@@ -28,6 +28,16 @@ void main() {
       'created_at': '2026-01-01T00:00:00.000Z',
       'updated_at': '2026-01-01T00:00:00.000Z',
     });
+    await db.insert('orders', {
+      'id': 'local-order-1',
+      'order_number': 'SP-000001',
+      'customer_id': 'cust-1',
+      'status': 'created',
+      'total_amount': 10,
+      'order_date': '2026-01-01T00:00:00.000Z',
+      'created_at': '2026-01-01T00:00:00.000Z',
+      'updated_at': '2026-01-01T00:00:00.000Z',
+    });
     final api = ApiClient();
     api.mockHandler = (request) {
       if (request.url.path.endsWith('/api/v4/sync/bootstrap')) {
@@ -39,6 +49,8 @@ void main() {
             "changes": [
               {"entity_type":"product","entity_id":"prod-1","operation":"UPSERT","payload":{"id":"prod-1","name":"Çay","description":"","price":15,"quantity":20,"category":"İçecek","sku":"prod-1","vat":10,"is_active":1,"is_deleted":0,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","image_url":""}},
               {"entity_type":"customer","entity_id":"cust-1","operation":"UPSERT","payload":{"id":"cust-1","name":"Ayşe","email":"","phone":"","balance":-1748,"credit_limit":0,"status":"active","is_active":1,"is_deleted":0,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z"}},
+              {"entity_type":"order","entity_id":"legacy-order-1","operation":"UPSERT","payload":{"id":"legacy-order-1","customer_id":"cust-1","status":"preparing","total_amount":"40.00","order_date":"2026-01-01T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","items":[]}},
+              {"entity_type":"order","entity_id":"remote-order-1","operation":"UPSERT","payload":{"id":"remote-order-1","order_number":"SP-000001","customer_id":"cust-1","status":"created","total_amount":"20.00","order_date":"2026-01-01T00:00:00.000Z","created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","items":[]}},
               {"entity_type":"sale","entity_id":"sale-1","operation":"UPSERT","payload":{"id":"sale-1","customer_id":"cust-1","total_amount":"874.00","paid_amount":"0.00","payment_method":"debt","status":"completed","is_deleted":0,"created_at":"2026-01-01T00:00:00.000Z","future_server_field":"ignored","items":[{"id":"sale-item-1","product_id":"prod-1","product_name":"Çay (Satış Anı)","quantity":"2.000","unit_price":"437.00","subtotal":"874.00","created_at":"2026-01-01T00:00:00.000Z"}]}},
               {"entity_type":"financial_transaction","entity_id":"tx-1","operation":"UPSERT","payload":{"id":"tx-1","type":"sale","customer_id":"cust-1","amount":874,"paid_amount":0,"debt_amount":874,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z"}}
             ]
@@ -70,7 +82,7 @@ void main() {
 
     expect(result.success, isTrue);
     expect(result.reconciled, 1);
-    expect(result.pulled, 4);
+    expect(result.pulled, 6);
     expect(
         (await db.query('products', where: 'id = ?', whereArgs: ['prod-1']))
             .single['name'],
@@ -111,6 +123,21 @@ void main() {
                 where: 'sale_id = ?', whereArgs: ['sale-1']))
             .single['unit_price'],
         437.0);
+    expect(
+        (await db.query('orders',
+                where: 'id = ?', whereArgs: ['legacy-order-1']))
+            .single['order_number'],
+        'SYNC-legacy-order-1');
+    expect(
+        (await db.query('orders',
+                where: 'id = ?', whereArgs: ['remote-order-1']))
+            .single['order_number'],
+        'SP-000001-remote-order-1');
+    expect(
+        (await db
+                .query('orders', where: 'id = ?', whereArgs: ['local-order-1']))
+            .single['order_number'],
+        'SP-000001');
     expect(
         (await db.query('financial_transactions',
                 where: 'id = ?', whereArgs: ['tx-1']))

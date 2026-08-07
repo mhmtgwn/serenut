@@ -27,7 +27,6 @@ final auditLoggerProvider = Provider<AuditLogger>((ref) {
 // Bu provider'lar hiçbir yerde ref.watch/read edilmiyordu (dead code).
 // Gerçek senkronizasyon sync_outbox_v4 SQLite outbox’u üzerinden yürüyür.
 
-
 enum SalesFlowStatus {
   idle,
   customerSelected,
@@ -262,6 +261,11 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     final newQuantities = Map<String, int>.from(state.cartQuantities);
     final newProducts = Map<String, ProductEntity>.from(state.cartProducts);
 
+    // LinkedHashMap insertion order is used by the cart UI. Reinsert an
+    // existing product so the most recently scanned/selected item is last in
+    // state and therefore rendered at the top of the reversed cart list.
+    newQuantities.remove(product.id);
+    newProducts.remove(product.id);
     newQuantities[product.id] = currentQty + 1;
     newProducts[product.id] = product;
 
@@ -293,7 +297,10 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     _dispatch(SalesFlowEvent.addProduct);
     final quantities = Map<String, int>.from(state.cartQuantities);
     final products = Map<String, ProductEntity>.from(state.cartProducts);
-    quantities[product.id] = (quantities[product.id] ?? 0) + netGrams;
+    final currentGrams = quantities[product.id] ?? 0;
+    quantities.remove(product.id);
+    products.remove(product.id);
+    quantities[product.id] = currentGrams + netGrams;
     products[product.id] = product;
     state = state.copyWith(
       cartQuantities: quantities,

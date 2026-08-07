@@ -49,13 +49,41 @@ class UpdateStateMachine {
   final Map<UpdateState, List<UpdateState>> _allowedTransitions = {
     UpdateState.idle: [UpdateState.checking],
     UpdateState.checking: [UpdateState.precheck, UpdateState.failed],
-    UpdateState.precheck: [UpdateState.downloading, UpdateState.failed, UpdateState.idle],
-    UpdateState.downloading: [UpdateState.verifying, UpdateState.failed, UpdateState.rollback],
-    UpdateState.verifying: [UpdateState.draining, UpdateState.failed, UpdateState.rollback],
-    UpdateState.draining: [UpdateState.handshake, UpdateState.failed, UpdateState.rollback],
-    UpdateState.handshake: [UpdateState.postInstall, UpdateState.failed, UpdateState.rollback],
-    UpdateState.postInstall: [UpdateState.healthCheck, UpdateState.failed, UpdateState.rollback],
-    UpdateState.healthCheck: [UpdateState.completed, UpdateState.rollback, UpdateState.failed],
+    UpdateState.precheck: [
+      UpdateState.downloading,
+      UpdateState.failed,
+      UpdateState.idle
+    ],
+    UpdateState.downloading: [
+      UpdateState.verifying,
+      UpdateState.failed,
+      UpdateState.rollback
+    ],
+    UpdateState.verifying: [
+      UpdateState.draining,
+      UpdateState.failed,
+      UpdateState.rollback
+    ],
+    UpdateState.draining: [
+      UpdateState.handshake,
+      UpdateState.failed,
+      UpdateState.rollback
+    ],
+    UpdateState.handshake: [
+      UpdateState.postInstall,
+      UpdateState.failed,
+      UpdateState.rollback
+    ],
+    UpdateState.postInstall: [
+      UpdateState.healthCheck,
+      UpdateState.failed,
+      UpdateState.rollback
+    ],
+    UpdateState.healthCheck: [
+      UpdateState.completed,
+      UpdateState.rollback,
+      UpdateState.failed
+    ],
     UpdateState.completed: [UpdateState.idle],
     UpdateState.failed: [UpdateState.idle],
     UpdateState.rollback: [UpdateState.failed, UpdateState.idle],
@@ -86,7 +114,8 @@ class UpdateStateMachine {
   }
 
   /// Triggers a state transition, executing exit/entry hooks and publishing events.
-  Future<void> transitionTo(UpdateContext context, UpdateState targetState) async {
+  Future<void> transitionTo(
+      UpdateContext context, UpdateState targetState) async {
     final fromState = context.currentState;
 
     if (fromState == targetState) return;
@@ -97,7 +126,8 @@ class UpdateStateMachine {
       throw InvalidStateTransitionException(fromState, targetState);
     }
 
-    debugPrint('[FSM] Transitioning ${fromState.name} -> ${targetState.name} (Corr: ${context.correlationId})');
+    debugPrint(
+        '[FSM] Transitioning ${fromState.name} -> ${targetState.name} (Corr: ${context.correlationId})');
 
     // B. Run Exit Lifecycle of Current State
     if (_stateActions.containsKey(fromState)) {
@@ -130,12 +160,14 @@ class UpdateStateMachine {
       final timeoutDuration = _stateTimeouts[targetState];
       if (timeoutDuration != null) {
         try {
-          await _executeWithTimeoutAndRetry(context, targetState, timeoutDuration);
+          await _executeWithTimeoutAndRetry(
+              context, targetState, timeoutDuration);
         } catch (e) {
-          debugPrint('[FSM] State execution exception in ${targetState.name}: $e');
+          debugPrint(
+              '[FSM] State execution exception in ${targetState.name}: $e');
           context.errorCode = 'UPD-005';
           context.errorMessage = e.toString();
-          
+
           if (targetState == UpdateState.downloading ||
               targetState == UpdateState.verifying ||
               targetState == UpdateState.draining ||
@@ -161,7 +193,8 @@ class UpdateStateMachine {
 
     while (attempt <= maxRetries) {
       try {
-        await _stateActions[state]!.execute(context).timeout(timeout, onTimeout: () {
+        await _stateActions[state]!.execute(context).timeout(timeout,
+            onTimeout: () {
           throw StateTimeoutException(state, timeout);
         });
         return; // Success
@@ -170,7 +203,8 @@ class UpdateStateMachine {
         if (attempt > maxRetries) {
           rethrow; // Reached limit, propagate error
         }
-        debugPrint('[FSM] Retry triggered for state ${state.name} (Attempt $attempt/$maxRetries) due to: $e');
+        debugPrint(
+            '[FSM] Retry triggered for state ${state.name} (Attempt $attempt/$maxRetries) due to: $e');
         context.retryCount = attempt;
       }
     }

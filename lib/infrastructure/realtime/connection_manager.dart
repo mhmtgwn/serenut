@@ -241,7 +241,9 @@ class ConnectionManager {
       } catch (e) {
         _record('ws_refresh_exception', level: LogLevel.warning, error: e);
         if (e is ApiException &&
-            (e.statusCode == 400 || e.statusCode == 401 || e.statusCode == 403)) {
+            (e.statusCode == 400 ||
+                e.statusCode == 401 ||
+                e.statusCode == 403)) {
           _setStatus(RealtimeStatus.disconnected);
           authService.triggerSessionExpired();
         } else {
@@ -289,6 +291,8 @@ class ConnectionManager {
   }) {
     final safeError = error == null ? null : _redactSecrets(error.toString());
     final metadata = <String, dynamic>{
+      'event': event,
+      'level': level.name.toUpperCase(),
       'attempt': reconnectManager.attempts,
       'status': _status.name,
       'connection_session_id': _connectionSessionId,

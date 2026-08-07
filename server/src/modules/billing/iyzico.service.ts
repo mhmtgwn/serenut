@@ -124,24 +124,24 @@ export interface IyzicoCallbackResult {
  * İyzico API imzası: HMAC-SHA256(apiKey + randomString + secretKey + request_body, secretKey)
  * Base64 encoded.
  */
-function generateAuthorizationHeader(requestBody: string): string {
-  const randomString = crypto.randomBytes(12).toString('base64');
-  const hashStr = `${IYZICO_API_KEY}${randomString}${IYZICO_SECRET}${requestBody}`;
-  const hash = crypto
+function generateAuthorizationHeader(uriPath: string, requestBody: string): { authorization: string; randomKey: string } {
+  const randomKey = `${Date.now()}${crypto.randomBytes(8).toString('hex')}`;
+  const signature = crypto
     .createHmac('sha256', IYZICO_SECRET)
-    .update(hashStr)
-    .digest('base64');
-
-  const authStr = `${IYZICO_API_KEY}:${randomString}:${hash}`;
-  return `IYZWSv2 ${Buffer.from(authStr).toString('base64')}`;
+    .update(`${randomKey}${uriPath}${requestBody}`)
+    .digest('hex');
+  const authString = `apiKey:${IYZICO_API_KEY}&randomKey:${randomKey}&signature:${signature}`;
+  return {
+    authorization: `IYZWSv2 ${Buffer.from(authString).toString('base64')}`,
+    randomKey,
+  };
 }
 
 // ── HTTP İSTEK YARDIMCISI ─────────────────────────────────────────────────────
 async function iyzicoPost<T>(endpoint: string, body: object): Promise<T> {
   const bodyStr = JSON.stringify(body);
-  const authHeader = generateAuthorizationHeader(bodyStr);
-
   const url = new URL(endpoint, IYZICO_BASE_URL);
+  const auth = generateAuthorizationHeader(url.pathname, bodyStr);
 
   return new Promise<T>((resolve, reject) => {
     const options = {
@@ -151,8 +151,8 @@ async function iyzicoPost<T>(endpoint: string, body: object): Promise<T> {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': authHeader,
-        'x-iyzi-rnd': crypto.randomBytes(12).toString('base64'),
+        'Authorization': auth.authorization,
+        'x-iyzi-rnd': auth.randomKey,
         'Content-Length': Buffer.byteLength(bodyStr),
       },
     };
@@ -176,6 +176,20 @@ async function iyzicoPost<T>(endpoint: string, body: object): Promise<T> {
     req.write(bodyStr);
     req.end();
   });
+}
+
+function verifyCheckoutResultSignature(response: any): boolean {
+  if (!response.signature) return false;
+  const decimal = (value: unknown) => Number(value).toString();
+  const payload = [
+    response.paymentStatus, response.paymentId, response.currency,
+    response.basketId, response.conversationId,
+    decimal(response.paidPrice), decimal(response.price), response.token,
+  ].join(':');
+  const expected = crypto.createHmac('sha256', IYZICO_SECRET).update(payload).digest('hex');
+  const actual = String(response.signature).toLowerCase();
+  return actual.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
 }
 
 // ── ANA SERVİS ────────────────────────────────────────────────────────────────
@@ -220,10 +234,14 @@ export class IyzicoService {
       }
 
       logger.info(`[Iyzico] Checkout session oluşturuldu: token=${response.token}`);
+      const rawForm = String(response.checkoutFormContent || '');
+      const checkoutFormContent = rawForm.includes('<')
+        ? rawForm
+        : Buffer.from(rawForm, 'base64').toString('utf8');
 
       return {
         status: 'success',
-        checkoutFormContent: response.checkoutFormContent,
+        checkoutFormContent,
         token: response.token,
         tokenExpireTime: response.tokenExpireTime,
         conversationId: request.conversationId,
@@ -262,17 +280,30 @@ export class IyzicoService {
         };
       }
 
-      const payment = response.payment;
-      logger.info(`[Iyzico] Ödeme onaylandı: paymentId=${payment?.paymentId} amount=${payment?.paidPrice}`);
+      if (!verifyCheckoutResultSignature(response)) {
+        logger.error('[Iyzico] Checkout result signature validation failed.');
+        return {
+          status: 'failure', conversationId: response.conversationId || '', token,
+          errorMessage: 'invalid_response_signature',
+        };
+      }
+
+      if (response.paymentStatus !== 'SUCCESS') {
+        return {
+          status: 'failure', conversationId: response.conversationId || '', token,
+          errorMessage: `payment_status_${response.paymentStatus || 'unknown'}`,
+        };
+      }
+      logger.info(`[Iyzico] Ödeme onaylandı: paymentId=${response.paymentId} amount=${response.paidPrice}`);
 
       return {
         status: 'success',
         conversationId: response.conversationId,
         token,
-        paymentId: payment?.paymentId,
-        price: payment?.price,
-        paidPrice: payment?.paidPrice,
-        currency: payment?.currency,
+        paymentId: response.paymentId,
+        price: response.price,
+        paidPrice: response.paidPrice,
+        currency: response.currency,
       };
     } catch (err: any) {
       logger.error('[Iyzico] retrieveCheckoutResult exception:', err.message);

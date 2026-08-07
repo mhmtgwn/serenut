@@ -77,7 +77,8 @@ class ReleaseCompatibility {
   factory ReleaseCompatibility.fromJson(Map<String, dynamic> json) {
     return ReleaseCompatibility(
       minClientVersion: json['minClientVersion'] as String? ?? '1.0.0',
-      minimumUpdaterVersion: json['minimumUpdaterVersion'] as String? ?? '1.0.0',
+      minimumUpdaterVersion:
+          json['minimumUpdaterVersion'] as String? ?? '1.0.0',
       requiredBootstrapper: json['requiredBootstrapper'] as String? ?? '1',
       requiredPreVersion: json['requiredPreVersion'] as String?,
       migrationRequired: json['migrationRequired'] as bool? ?? false,
@@ -113,7 +114,8 @@ class ReleaseRules {
 
   factory ReleaseRules.fromJson(Map<String, dynamic> json) {
     final rawArch = json['supportedArchitectures'];
-    final archList = rawArch is List ? rawArch.map((e) => e.toString()).toList() : ['x64'];
+    final archList =
+        rawArch is List ? rawArch.map((e) => e.toString()).toList() : ['x64'];
     return ReleaseRules(
       isMandatory: json['isMandatory'] as bool? ?? false,
       allowRollback: json['allowRollback'] as bool? ?? true,
@@ -217,7 +219,8 @@ class ReleaseManifest {
 
     final rawArtifacts = json['artifacts'];
     if (rawArtifacts == null || rawArtifacts is! List || rawArtifacts.isEmpty) {
-      throw InvalidManifestException('Manifest must contain at least one artifact.');
+      throw InvalidManifestException(
+          'Manifest must contain at least one artifact.');
     }
 
     return ReleaseManifest(
@@ -227,9 +230,12 @@ class ReleaseManifest {
       version: json['version'] as String? ?? '',
       channel: json['channel'] as String? ?? 'stable',
       publishedAt: json['publishedAt'] as String? ?? '',
-      buildMetadata: BuildMetadata.fromJson(json['buildMetadata'] as Map<String, dynamic>? ?? {}),
-      compatibility: ReleaseCompatibility.fromJson(json['compatibility'] as Map<String, dynamic>? ?? {}),
-      rules: ReleaseRules.fromJson(json['rules'] as Map<String, dynamic>? ?? {}),
+      buildMetadata: BuildMetadata.fromJson(
+          json['buildMetadata'] as Map<String, dynamic>? ?? {}),
+      compatibility: ReleaseCompatibility.fromJson(
+          json['compatibility'] as Map<String, dynamic>? ?? {}),
+      rules:
+          ReleaseRules.fromJson(json['rules'] as Map<String, dynamic>? ?? {}),
       artifacts: rawArtifacts
           .map((e) => ReleaseArtifact.fromJson(e as Map<String, dynamic>))
           .toList(),

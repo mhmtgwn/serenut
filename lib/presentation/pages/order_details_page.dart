@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
@@ -10,7 +11,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/config/utils.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -21,9 +22,9 @@ import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
-const _kGreen = Color(0xFF16A34A);
-const _kGreenDark = Color(0xFF15803D);
-const _kGreenLight = Color(0xFFDCFCE7);
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kGreenLight = POSColors.greenLight;
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
 const _kAmber = Color(0xFFEAB308);
@@ -79,7 +80,8 @@ class OrderDetailsPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: _kSurface,
       appBar: AppBar(
-        title: Text('Sipariş Detayı #${orderId.toShortId}'),
+        title: Text(
+            'Sipariş Detayı #${orderVal.valueOrNull?.displayNumber ?? orderId.toShortId}'),
         backgroundColor: Colors.white,
         foregroundColor: _kText,
         elevation: 0,
@@ -103,10 +105,11 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      final hasPrinter = (settings.printerIp != null &&
-                              settings.printerIp!.isNotEmpty) ||
-                          (settings.printerName != null &&
-                              settings.printerName!.isNotEmpty);
+                      final hasPrinter = await ref
+                              .read(printingRepositoryProvider)
+                              .getRoute(PrintDocumentKind.receipt) !=
+                          null;
+                      if (!context.mounted) return;
                       if (!hasPrinter) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -160,33 +163,107 @@ class OrderDetailsPage extends ConsumerWidget {
                           };
                         }).toList();
 
-                        ref.read(printerServiceProvider).enqueue(
-                              'Hazırlama Fişi #${order.id.toShortId}',
-                              () => ref
-                                  .read(printerServiceProvider)
-                                  .printOrderReceipt(
-                                    order,
-                                    receiptItems,
-                                    customer != null && customer.id.isNotEmpty
-                                        ? customer
-                                        : null,
-                                    settings,
-                                  ),
+                        await ref
+                            .read(printingApplicationServiceProvider)
+                            .queueOrderReceipt(
+                              order,
+                              receiptItems,
+                              customer != null && customer.id.isNotEmpty
+                                  ? customer
+                                  : null,
+                              settings,
                             );
 
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Yazdırma işlemi sıraya eklendi.'),
-                            backgroundColor: Colors.green,
+                            backgroundColor: POSColors.green,
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
                       } catch (e) {
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Yazdirma hatası: $e'),
                             backgroundColor: Colors.red,
                             behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon:
+                        const Icon(Icons.local_offer_outlined, color: _kGreen),
+                    tooltip: 'Sipariş Etiketi Yazdır',
+                    onPressed: () async {
+                      final settings = settingsAsync.valueOrNull;
+                      if (settings == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Ayarlar yüklenemedi.')),
+                        );
+                        return;
+                      }
+                      final route = await ref
+                          .read(printingRepositoryProvider)
+                          .getRoute(PrintDocumentKind.orderLabel);
+                      if (!context.mounted) return;
+                      if (route == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Sipariş etiketi için aktif yazıcı rotası seçilmedi.',
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        return;
+                      }
+                      final customer = customersVal.valueOrNull
+                          ?.where((value) => value.id == order.customerId)
+                          .firstOrNull;
+                      final items = order.items.map((item) {
+                        final normalized = Map<String, dynamic>.from(item);
+                        final productId = item['product_id']?.toString() ?? '';
+                        normalized['product_name'] = item['product_name'] ??
+                            productNameMap[productId] ??
+                            productId;
+                        return normalized;
+                      }).toList(growable: false);
+                      try {
+                        await ref
+                            .read(printingApplicationServiceProvider)
+                            .queueOrderLabel(
+                              order,
+                              items,
+                              settings,
+                              customer: customer,
+                              paymentStatusOverride: switch (order.status) {
+                                'created' => 'Beklemede',
+                                'preparing' => 'Hazirlaniyor',
+                                'ready' => 'Hazir',
+                                'delivered' => 'Teslim Edildi',
+                                'cancelled' => 'Iptal Edildi',
+                                _ => order.status,
+                              },
+                            );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Sipariş etiketi yazdırma kuyruğuna alındı.',
+                            ),
+                            backgroundColor: POSColors.green,
+                          ),
+                        );
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Sipariş etiketi hatası: $error'),
+                            backgroundColor: Colors.red,
                           ),
                         );
                       }
@@ -989,9 +1066,10 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
   final settingsAsync = ref.read(settingsNotifierProvider);
   final settings = settingsAsync.value;
   if (settings == null) return;
-  final hasPrinter =
-      (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-          (settings.printerName != null && settings.printerName!.isNotEmpty);
+  final hasPrinter = await ref
+          .read(printingRepositoryProvider)
+          .getRoute(PrintDocumentKind.receipt) !=
+      null;
   if (!hasPrinter) return;
 
   try {
@@ -1032,14 +1110,11 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
       };
     }).toList();
 
-    ref.read(printerServiceProvider).enqueue(
-          'Hazırlama Fişi #${order.id.toShortId}',
-          () => ref.read(printerServiceProvider).printOrderReceipt(
-                order,
-                receiptItems,
-                customer != null && customer.id.isNotEmpty ? customer : null,
-                settings,
-              ),
+    await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
+          order,
+          receiptItems,
+          customer != null && customer.id.isNotEmpty ? customer : null,
+          settings,
         );
   } catch (e) {
     debugPrint('Printing error in delivery: $e');
@@ -1235,10 +1310,10 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final settingsAsync = ref.read(settingsNotifierProvider);
         final settings = settingsAsync.value;
         if (settings != null) {
-          final hasPrinter =
-              (settings.printerIp != null && settings.printerIp!.isNotEmpty) ||
-                  (settings.printerName != null &&
-                      settings.printerName!.isNotEmpty);
+          final hasPrinter = await ref
+                  .read(printingRepositoryProvider)
+                  .getRoute(PrintDocumentKind.receipt) !=
+              null;
           if (hasPrinter) {
             final customersVal = ref.read(customersControllerProvider);
             final customer = customersVal.maybeWhen(
@@ -1286,22 +1361,17 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                             ? _karmaCash + _karmaCard
                             : 0.0)));
 
-            for (int i = 0; i < _printCopies; i++) {
-              final suffix = _printCopies > 1 ? ' (Kopya ${i + 1})' : '';
-              ref.read(printerServiceProvider).enqueue(
-                    'Sipariş Fişi #${widget.order.id.toShortId}$suffix',
-                    () => ref.read(printerServiceProvider).printOrderReceipt(
-                          widget.order,
-                          receiptItems,
-                          customer != null && customer.id.isNotEmpty
-                              ? customer
-                              : null,
-                          settings,
-                          paidAmount: currentFinalPaid,
-                          notes: widget.order.notes?.trim(),
-                        ),
-                  );
-            }
+            await ref
+                .read(printingApplicationServiceProvider)
+                .queueOrderReceipt(
+                  widget.order,
+                  receiptItems,
+                  customer != null && customer.id.isNotEmpty ? customer : null,
+                  settings,
+                  paidAmount: currentFinalPaid,
+                  notes: widget.order.notes?.trim(),
+                  copies: _printCopies,
+                );
           }
         }
       }
@@ -1348,16 +1418,20 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             };
           }).toList();
 
-          final labelSettings =
-              settings.copyWith(labelPrinterCopies: _labelCopies);
-          ref.read(printerServiceProvider).enqueue(
-                'Sipariş Etiketleri #${widget.order.id.toShortId}',
-                () => ref.read(printerServiceProvider).printOrderLabels(
-                      widget.order,
-                      receiptItems,
-                      labelSettings,
-                      customer: customer,
-                    ),
+          await ref.read(printingApplicationServiceProvider).queueOrderLabel(
+                widget.order,
+                receiptItems,
+                settings,
+                customer: customer,
+                paidAmount: widget.totalPaid +
+                    (_selectedMethod == 'cash'
+                        ? remaining
+                        : (_selectedMethod == 'card'
+                            ? remaining
+                            : (_selectedMethod == 'karma'
+                                ? _karmaCash + _karmaCard
+                                : 0.0))),
+                copies: _labelCopies,
               );
         }
       }
@@ -1623,7 +1697,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               ),
             ),
             Text(
-              'Sipariş #${widget.order.id.toShortId}',
+              'Sipariş #${widget.order.displayNumber}',
               style: const TextStyle(
                 fontSize: 11,
                 color: _kTextSecondary,

@@ -75,9 +75,13 @@ class Settings {
   final int labelWidthMm;
   final int labelHeightMm;
   final int labelGapMm;
+  final bool labelAutoDetectGap;
   final int labelDpi;
   // Etiket Taslak Ayarları
   final bool labelShowBrand;
+  final bool labelShowBusinessName;
+  final bool labelShowBarcode;
+  final bool labelShowPrice;
   final bool labelShowVat;
   final String labelFontSize;
   final bool labelOrderShowBusinessName;
@@ -87,6 +91,8 @@ class Settings {
   final bool labelOrderShowTotalAmount;
   final bool labelOrderShowItemsCount;
   final String labelOrderFontSize;
+  final String activeReceiptPrinterId;
+  final String activeLabelPrinterId;
   final String? adminPinCode;
 
   // SMS SIM ve Limit Ayarları (Sprint 10)
@@ -151,8 +157,12 @@ class Settings {
     this.labelWidthMm = 50,
     this.labelHeightMm = 30,
     this.labelGapMm = 2,
+    this.labelAutoDetectGap = false,
     this.labelDpi = 203,
     this.labelShowBrand = true,
+    this.labelShowBusinessName = true,
+    this.labelShowBarcode = true,
+    this.labelShowPrice = true,
     this.labelShowVat = true,
     this.labelFontSize = 'Orta',
     this.labelOrderShowBusinessName = true,
@@ -162,6 +172,8 @@ class Settings {
     this.labelOrderShowTotalAmount = true,
     this.labelOrderShowItemsCount = true,
     this.labelOrderFontSize = 'Orta',
+    this.activeReceiptPrinterId = 'receipt-printer-primary',
+    this.activeLabelPrinterId = 'label-printer-primary',
     this.adminPinCode,
     this.smsSimSubscriptionId,
     this.smsSimSlotIndex,
@@ -248,17 +260,39 @@ class Settings {
       labelWidthMm: (map['label_width_mm'] as int?) ?? 50,
       labelHeightMm: (map['label_height_mm'] as int?) ?? 30,
       labelGapMm: (map['label_gap_mm'] as int?) ?? 2,
+      labelAutoDetectGap: (map['label_auto_detect_gap'] as int? ?? 0) == 1,
       labelDpi: (map['label_dpi'] as int?) ?? 203,
       labelShowBrand: (map['label_show_brand'] as int? ?? 1) == 1,
+      labelShowBusinessName: (map['label_show_business_name'] as int? ??
+              map['print_logo'] as int? ??
+              1) ==
+          1,
+      labelShowBarcode: (map['label_show_barcode'] as int? ??
+              map['print_barcode'] as int? ??
+              1) ==
+          1,
+      labelShowPrice: (map['label_show_price'] as int? ??
+              map['print_product_details'] as int? ??
+              1) ==
+          1,
       labelShowVat: (map['label_show_vat'] as int? ?? 1) == 1,
       labelFontSize: map['label_font_size'] as String? ?? 'Orta',
-      labelOrderShowBusinessName: (map['label_order_show_business_name'] as int? ?? 1) == 1,
-      labelOrderShowCustomerName: (map['label_order_show_customer_name'] as int? ?? 1) == 1,
-      labelOrderShowOrderNo: (map['label_order_show_order_no'] as int? ?? 1) == 1,
+      labelOrderShowBusinessName:
+          (map['label_order_show_business_name'] as int? ?? 1) == 1,
+      labelOrderShowCustomerName:
+          (map['label_order_show_customer_name'] as int? ?? 1) == 1,
+      labelOrderShowOrderNo:
+          (map['label_order_show_order_no'] as int? ?? 1) == 1,
       labelOrderShowDate: (map['label_order_show_date'] as int? ?? 1) == 1,
-      labelOrderShowTotalAmount: (map['label_order_show_total_amount'] as int? ?? 1) == 1,
-      labelOrderShowItemsCount: (map['label_order_show_items_count'] as int? ?? 1) == 1,
+      labelOrderShowTotalAmount:
+          (map['label_order_show_total_amount'] as int? ?? 1) == 1,
+      labelOrderShowItemsCount:
+          (map['label_order_show_items_count'] as int? ?? 1) == 1,
       labelOrderFontSize: map['label_order_font_size'] as String? ?? 'Orta',
+      activeReceiptPrinterId: map['active_receipt_printer_id'] as String? ??
+          'receipt-printer-primary',
+      activeLabelPrinterId:
+          map['active_label_printer_id'] as String? ?? 'label-printer-primary',
       adminPinCode: map['admin_pin_code'] as String?,
 
       // Sprint 10 SIM SMS and Limits
@@ -327,8 +361,12 @@ class Settings {
       'label_width_mm': labelWidthMm,
       'label_height_mm': labelHeightMm,
       'label_gap_mm': labelGapMm,
+      'label_auto_detect_gap': labelAutoDetectGap ? 1 : 0,
       'label_dpi': labelDpi,
       'label_show_brand': labelShowBrand ? 1 : 0,
+      'label_show_business_name': labelShowBusinessName ? 1 : 0,
+      'label_show_barcode': labelShowBarcode ? 1 : 0,
+      'label_show_price': labelShowPrice ? 1 : 0,
       'label_show_vat': labelShowVat ? 1 : 0,
       'label_font_size': labelFontSize,
       'label_order_show_business_name': labelOrderShowBusinessName ? 1 : 0,
@@ -338,6 +376,8 @@ class Settings {
       'label_order_show_total_amount': labelOrderShowTotalAmount ? 1 : 0,
       'label_order_show_items_count': labelOrderShowItemsCount ? 1 : 0,
       'label_order_font_size': labelOrderFontSize,
+      'active_receipt_printer_id': activeReceiptPrinterId,
+      'active_label_printer_id': activeLabelPrinterId,
       'admin_pin_code': adminPinCode,
       'sms_sim_subscription_id': smsSimSubscriptionId,
       'sms_sim_slot_index': smsSimSlotIndex,
@@ -407,8 +447,12 @@ class Settings {
     int? labelWidthMm,
     int? labelHeightMm,
     int? labelGapMm,
+    bool? labelAutoDetectGap,
     int? labelDpi,
     bool? labelShowBrand,
+    bool? labelShowBusinessName,
+    bool? labelShowBarcode,
+    bool? labelShowPrice,
     bool? labelShowVat,
     String? labelFontSize,
     bool? labelOrderShowBusinessName,
@@ -418,6 +462,8 @@ class Settings {
     bool? labelOrderShowTotalAmount,
     bool? labelOrderShowItemsCount,
     String? labelOrderFontSize,
+    String? activeReceiptPrinterId,
+    String? activeLabelPrinterId,
     Object? adminPinCode = const _Unset(),
     int? smsSimSubscriptionId,
     int? smsSimSlotIndex,
@@ -486,8 +532,13 @@ class Settings {
       labelWidthMm: labelWidthMm ?? this.labelWidthMm,
       labelHeightMm: labelHeightMm ?? this.labelHeightMm,
       labelGapMm: labelGapMm ?? this.labelGapMm,
+      labelAutoDetectGap: labelAutoDetectGap ?? this.labelAutoDetectGap,
       labelDpi: labelDpi ?? this.labelDpi,
       labelShowBrand: labelShowBrand ?? this.labelShowBrand,
+      labelShowBusinessName:
+          labelShowBusinessName ?? this.labelShowBusinessName,
+      labelShowBarcode: labelShowBarcode ?? this.labelShowBarcode,
+      labelShowPrice: labelShowPrice ?? this.labelShowPrice,
       labelShowVat: labelShowVat ?? this.labelShowVat,
       labelFontSize: labelFontSize ?? this.labelFontSize,
       labelOrderShowBusinessName:
@@ -502,6 +553,9 @@ class Settings {
       labelOrderShowItemsCount:
           labelOrderShowItemsCount ?? this.labelOrderShowItemsCount,
       labelOrderFontSize: labelOrderFontSize ?? this.labelOrderFontSize,
+      activeReceiptPrinterId:
+          activeReceiptPrinterId ?? this.activeReceiptPrinterId,
+      activeLabelPrinterId: activeLabelPrinterId ?? this.activeLabelPrinterId,
       adminPinCode:
           adminPinCode is _Unset ? this.adminPinCode : adminPinCode as String?,
       smsSimSubscriptionId: smsSimSubscriptionId ?? this.smsSimSubscriptionId,

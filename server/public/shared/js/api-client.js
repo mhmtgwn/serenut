@@ -9,7 +9,12 @@ const BASE_URL = '/api/v1';
  * @returns {string}
  */
 export function getAuthToken() {
-  return sessionStorage.getItem('app_token') || localStorage.getItem('app_token') || '';
+  return sessionStorage.getItem('app_token') ||
+         localStorage.getItem('app_token') ||
+         sessionStorage.getItem('admin_token') ||
+         localStorage.getItem('admin_token') ||
+         sessionStorage.getItem('portal_token') ||
+         localStorage.getItem('portal_token') || '';
 }
 
 /**
@@ -28,7 +33,10 @@ let refreshPromise = null;
 
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
-  const refreshToken = sessionStorage.getItem('app_refresh_token') || localStorage.getItem('app_refresh_token');
+  const refreshToken = sessionStorage.getItem('app_refresh_token') ||
+                        localStorage.getItem('app_refresh_token') ||
+                        sessionStorage.getItem('admin_refresh_token') ||
+                        localStorage.getItem('admin_refresh_token');
   if (!refreshToken) return false;
   refreshPromise = fetch(`${BASE_URL}/auth/refresh`, {
     method: 'POST',

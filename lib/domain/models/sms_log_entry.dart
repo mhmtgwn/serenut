@@ -64,17 +64,21 @@ class SmsLogEntry {
       };
 
   factory SmsLogEntry.fromMap(Map<String, dynamic> map) => SmsLogEntry(
-        id: map['id'] as String,
-        phone: map['phone'] as String,
-        eventType: map['event_type'] as String,
-        message: map['message'] as String,
-        status: SmsLogStatus.fromValue(map['status'] as String? ?? 'pending'),
-        createdAt: DateTime.parse(map['created_at'] as String),
+        id: (map['id'] ?? '').toString(),
+        phone: (map['phone'] ?? '').toString(),
+        eventType: (map['event_type'] ?? 'unknown').toString(),
+        message: (map['message'] ?? '').toString(),
+        status: SmsLogStatus.fromValue((map['status'] ?? 'pending').toString()),
+        createdAt: map['created_at'] != null
+            ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+            : DateTime.now(),
         sentAt: map['sent_at'] != null
-            ? DateTime.parse(map['sent_at'] as String)
+            ? DateTime.tryParse(map['sent_at'].toString())
             : null,
-        errorMessage: map['error_message'] as String?,
-        retryCount: (map['retry_count'] as int?) ?? 0,
+        errorMessage: map['error_message']?.toString(),
+        retryCount: (map['retry_count'] is num)
+            ? (map['retry_count'] as num).toInt()
+            : (int.tryParse((map['retry_count'] ?? '0').toString()) ?? 0),
       );
 
   @override

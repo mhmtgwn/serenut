@@ -4,12 +4,14 @@ import { pgPool, redisClient } from '../../config/database';
 import os from 'os';
 import crypto from 'crypto';
 import { AuthService } from '../auth/auth.service';
+import { PasswordRecoveryService } from '../auth/password-recovery.service';
 import { execSync } from 'child_process';
 import { getNotificationQueue } from '../../workers/notification.worker';
 import { getBillingQueue } from '../../workers/billing.scheduler';
 import { enqueueNotification } from '../../workers/notification.worker';
 import { getActiveWebSocketCount } from '../analytics/analytics.ws';
 import { loadIyzicoConfig, IyzicoService } from '../billing/iyzico.service';
+import { CommercialLifecycleService } from '../billing/commercial_lifecycle.service';
 import { logger } from '../../config/logger';
 import { encryptSecret } from '../../crypto_helper';
 import fs from 'fs';
@@ -180,12 +182,19 @@ router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
     if (source === 'all' || source === 'client') {
       const clientEvents = await runBypassingRLS(
         `SELECT e.id, e.company_id, c.name AS company_name, e.user_id,
-                u.name AS user_name, e.metric_name, e.occurred_at, e.received_at,
+                u.name AS user_name, e.metric_name,
+                CASE
+                  WHEN e.occurred_at > e.received_at + interval '5 minutes'
+                    OR e.occurred_at < e.received_at - interval '7 days'
+                  THEN e.received_at
+                  ELSE e.occurred_at
+                END AS occurred_at,
+                e.received_at,
                 e.metadata, e.ip_address, e.user_agent
            FROM client_telemetry_events e
            LEFT JOIN companies c ON c.id = e.company_id
            LEFT JOIN users u ON u.id = e.user_id
-          WHERE e.occurred_at >= NOW() - ($1::text || ' hours')::interval
+          WHERE e.received_at >= NOW() - ($1::text || ' hours')::interval
             AND ($2 = '' OR e.company_id = $2)
             AND (
               $3 = ''
@@ -196,11 +205,20 @@ router.get('/diagnostics', async (req: AuthenticatedRequest, res: Response) => {
             )
             AND (
               $4 = 'all'
-              OR ($4 = 'warning' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('WARNING', 'WARN'))
-              OR ($4 = 'error' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('ERROR', 'CRITICAL', 'FATAL'))
+              OR ($4 = 'warning' AND (
+                UPPER(COALESCE(e.metadata->>'level', '')) IN ('WARNING', 'WARN')
+                OR (NOT (e.metadata ? 'level') AND e.metric_name IN (
+                  'ws_disconnected', 'ws_connection_closed', 'ws_handshake_failed',
+                  'ws_connect_skipped_no_user', 'ws_refresh_rejected'
+                ))
+              ))
+              OR ($4 = 'error' AND (
+                UPPER(COALESCE(e.metadata->>'level', '')) IN ('ERROR', 'CRITICAL', 'FATAL')
+                OR (NOT (e.metadata ? 'level') AND e.metric_name ~* '(failed|failure|exception|error)')
+              ))
               OR ($4 = 'critical' AND UPPER(COALESCE(e.metadata->>'level', 'INFO')) IN ('CRITICAL', 'FATAL'))
             )
-          ORDER BY e.occurred_at DESC
+          ORDER BY e.received_at DESC
           LIMIT $5`,
         [hours, companyId, search, severity, limit],
       );
@@ -486,12 +504,15 @@ router.get('/subscriptions', async (_req: AuthenticatedRequest, res: Response) =
   try {
     const result = await runBypassingRLS(`
       SELECT s.id, s.company_id, c.name AS company_name, c.email AS company_email,
-             p.name AS plan_name, p.price, p.currency, s.status,
+             p.name AS plan_name, COALESCE(o.custom_price,p.price) AS price, p.currency, s.status,
+             s.billing_interval,
              s.current_period_start, s.current_period_end, s.cancel_at_period_end,
              s.current_period_start AS created_at
       FROM subscriptions s
       JOIN companies c ON c.id = s.company_id
       JOIN plans p ON p.id = s.plan_id
+      LEFT JOIN subscription_overrides o ON o.company_id=s.company_id AND o.base_plan_id=s.plan_id
+       AND o.is_active=TRUE AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
       ORDER BY s.current_period_start DESC NULLS LAST
     `);
     return res.json(result.rows);
@@ -501,17 +522,10 @@ router.get('/subscriptions', async (_req: AuthenticatedRequest, res: Response) =
 });
 
 router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
-  const { name, tax_number, tax_office, phone, email, address, admin_name, admin_email, admin_password } = req.body;
+  const { name, tax_number, tax_office, phone, email, address, admin_name, admin_email } = req.body;
   if (!name || !tax_number) {
     return res.status(400).json({ error: 'missing_fields' });
   }
-  if (admin_email && !admin_password) {
-    return res.status(400).json({ error: 'missing_admin_password', message: 'Admin kullanıcı oluşturmak için şifre zorunludur.' });
-  }
-  if (admin_password && admin_password.length < 8) {
-    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
-  }
-
   const id = `comp-${Date.now()}`;
   const client = await pgPool.connect();
   try {
@@ -535,42 +549,23 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
       [defaultBranchId, id, defaultStoreId, address || null]
     );
 
-    // Auto generate seed plans and trial license for the new company
-    const licenseId = `lic-${Date.now()}`;
-    const licenseKey = `KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days trial
-
-    await client.query(
-      `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [licenseId, id, licenseKey, 'trial', 2, 'active', expiresAt]
+    const pendingTrial = await CommercialLifecycleService.provisionPendingTrial(
+      client, { companyId: id },
     );
+    const licenseKey = pendingTrial.licenseKey;
 
-    const entitlementId = `ent-${Date.now()}`;
-    const subscriptionId = `sub-${Date.now()}`;
-    await client.query(
-      `INSERT INTO subscriptions (id, company_id, plan_id, status, current_period_start, current_period_end)
-       VALUES ($1, $2, 'plan-free', 'trialing', NOW(), $3) ON CONFLICT (id) DO NOTHING`,
-      [subscriptionId, id, expiresAt]
-    );
-    await client.query(
-      `INSERT INTO license_entitlements (id, company_id, subscription_id, plan_id, status, device_limit, store_limit, valid_from, valid_until, license_key)
-       VALUES ($1, $2, $3, 'plan-free', 'trial', 2, 1, NOW(), $4, $5)`,
-      [entitlementId, id, subscriptionId, expiresAt, licenseKey]
-    );
-
-    // Optional: Create admin user for the company if email+password provided
+    // Optional owner account. Its unknown random credential is never disclosed;
+    // the user activates it through the same one-time recovery state machine.
     let createdUserId: string | null = null;
-    if (admin_email && admin_password) {
+    let initialClaim: { requestId: string; claimCode: string } | null = null;
+    if (admin_email) {
       const normalizedEmail = String(admin_email).trim().toLowerCase();
       const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
       if (existingUser.rowCount && existingUser.rowCount > 0) {
         await client.query('ROLLBACK');
-        client.release();
         return res.status(400).json({ error: 'email_exists', message: 'Bu e-posta adresi zaten kullanılıyor.' });
       }
-      const passwordHash = await AuthService.hashPassword(admin_password);
+      const passwordHash = await AuthService.hashPassword(crypto.randomBytes(48).toString('base64url'));
       const userId = `usr-${crypto.randomUUID()}`;
       await client.query(
         `INSERT INTO users (id, company_id, name, email, password_hash, is_active, is_email_verified)
@@ -578,7 +573,7 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
         [userId, id, admin_name || name, normalizedEmail, passwordHash]
       );
       // Assign owner role
-      const ownerRole = await client.query(`SELECT id FROM roles WHERE name = 'owner' AND company_id = $1 LIMIT 1`, [id]);
+      const ownerRole = await client.query(`SELECT id FROM roles WHERE name = 'owner' LIMIT 1`);
       if (ownerRole.rowCount && ownerRole.rowCount > 0) {
         await client.query(
           `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -586,12 +581,22 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
         );
       }
       createdUserId = userId;
+      initialClaim = await PasswordRecoveryService.createInitialClaim(client, {
+        targetUserId: userId,
+        companyId: id,
+        actorId: req.user!.id,
+        reason: 'Platform yöneticisi tarafından yeni firma sahibi hesabı oluşturuldu',
+        context: { ip: req.ip, userAgent: req.get('user-agent') },
+      });
     }
 
     await client.query('COMMIT');
     await writeAdminAudit(req.user!.id, 'CREATE_COMPANY', 'companies', id, null, { name, tax_number, admin_email: admin_email || null });
 
-    return res.status(201).json({ success: true, company_id: id, license_key: licenseKey, user_id: createdUserId });
+    return res.status(201).json({
+      success: true, company_id: id, license_key: licenseKey, user_id: createdUserId,
+      recovery_request_id: initialClaim?.requestId, claim_code: initialClaim?.claimCode,
+    });
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Create company error:', err);
@@ -606,6 +611,12 @@ router.post('/companies', async (req: AuthenticatedRequest, res: Response) => {
 
 router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) => {
   const { status, name, phone, email, address } = req.body;
+  if (status != null) {
+    return res.status(400).json({
+      error: 'company_status_requires_lifecycle_action',
+      message: 'Firma durumu gerekçeli askıya alma/geri yükleme işlemiyle değiştirilmelidir.',
+    });
+  }
   try {
     const original = await runBypassingRLS('SELECT * FROM companies WHERE id = $1', [req.params.id]);
     if (original.rows.length === 0) {
@@ -614,17 +625,16 @@ router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
 
     await runBypassingRLS(
       `UPDATE companies 
-       SET status = COALESCE($1, status),
-           name = COALESCE($2, name),
-           phone = COALESCE($3, phone),
-           email = COALESCE($4, email),
-           address = COALESCE($5, address),
+       SET name = COALESCE($1, name),
+           phone = COALESCE($2, phone),
+           email = COALESCE($3, email),
+           address = COALESCE($4, address),
            updated_at = NOW()
-       WHERE id = $6`,
-      [status || null, name || null, phone || null, email || null, address || null, req.params.id]
+       WHERE id = $5`,
+      [name || null, phone || null, email || null, address || null, req.params.id]
     );
 
-    await writeAdminAudit(req.user!.id, 'UPDATE_COMPANY', 'companies', req.params.id, original.rows[0], { status, name }, req.ip);
+    await writeAdminAudit(req.user!.id, 'UPDATE_COMPANY', 'companies', req.params.id, original.rows[0], { name, phone, email, address }, req.ip);
 
     return res.json({ success: true });
   } catch (err) {
@@ -632,21 +642,32 @@ router.put('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
   }
 });
 
-// Firma sahibine şifre sıfırlama linki gönder
-router.post('/companies/:id/send-reset-password', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/companies/:id/password-recovery', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const company = await runBypassingRLS('SELECT * FROM companies WHERE id = $1', [req.params.id]);
+    const company = await runBypassingRLS('SELECT id,email FROM companies WHERE id = $1', [req.params.id]);
     if (company.rows.length === 0) {
       return res.status(404).json({ error: 'company_not_found' });
     }
-    // Firmanın sahibi/yönetici kullanıcısını bul (en eski aktif kullanıcı veya belirtilen e-posta)
     const targetEmail = req.body.email || company.rows[0].email;
-    if (!targetEmail) {
-      return res.status(400).json({ error: 'no_email', message: 'Firmaya ait e-posta adresi bulunamadı.' });
+    const reason = String(req.body.reason || '').trim();
+    if (!targetEmail || reason.length < 10) {
+      return res.status(400).json({ error: 'missing_fields', message: 'Hedef kullanıcı ve en az 10 karakterlik gerekçe zorunludur.' });
     }
-    await AuthService.forgotPassword(targetEmail);
-    await writeAdminAudit(req.user!.id, 'SEND_RESET_PASSWORD_LINK', 'companies', req.params.id, null, { email: targetEmail }, req.ip);
-    return res.json({ success: true, message: `${targetEmail} adresine şifre sıfırlama linki gönderildi.` });
+    const user = await runBypassingRLS(
+      `SELECT id FROM users WHERE company_id=$1 AND LOWER(email)=LOWER($2) AND is_active=TRUE AND deleted_at IS NULL`,
+      [req.params.id, targetEmail],
+    );
+    if (!user.rowCount) return res.status(404).json({ error: 'user_not_found' });
+    const recovery = await PasswordRecoveryService.createAdminAssistedRequest({
+      targetUserId: user.rows[0].id, actorId: req.user!.id, actorCompanyId: req.user!.company_id,
+      actorRoles: req.user!.roles, reason, context: { ip: req.ip, userAgent: req.headers['user-agent'] },
+    });
+    await writeAdminAudit(req.user!.id, 'CREATE_PASSWORD_RECOVERY', 'users', user.rows[0].id, null, { reason, request_id: recovery.requestId }, req.ip);
+    return res.status(201).json({
+      success: true, request_id: recovery.requestId, claim_code: recovery.claimCode,
+      requires_second_approval: recovery.requiresSecondApproval,
+      message: recovery.requiresSecondApproval ? 'İkinci sysadmin onayı bekleniyor.' : 'Tek kullanımlık kurtarma kodu oluşturuldu.',
+    });
   } catch (err: any) {
     logger.error('Send reset password for company failed:', err);
     return res.status(500).json({ error: 'server_error', message: 'Link gönderilemedi.' });
@@ -685,75 +706,57 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   try {
-    // 1. Verify company exists
-    const company = await runBypassingRLS('SELECT id FROM companies WHERE id = $1', [company_id]);
-    if (company.rows.length === 0) {
-      return res.status(400).json({ error: 'company_not_found', message: 'Şirket bulunamadı.' });
-    }
-
-    const id = `lic-${Date.now()}`;
-    const licenseKey = `KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + days);
-
-    // Resolve plan ID & limits
-    let planId = 'plan-basic';
-    let storeLimit = 1;
-    if (tier === 'trial') {
-      planId = 'plan-free';
-      storeLimit = 1;
-    } else if (tier === 'pro') {
-      planId = 'plan-pro';
-      storeLimit = 3;
-    } else if (tier === 'pro_plus') {
-      planId = 'plan-enterprise';
-      storeLimit = 99;
-    }
-
-    const entitlementId = `ent-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-
-    // Write to both tables inside a transaction
+    const planId = tier === 'trial' ? 'plan-free' : tier === 'pro_plus' ? 'plan-enterprise' : 'plan-pro';
+    const storeLimit = tier === 'pro_plus' ? 99 : tier === 'pro' ? 3 : 1;
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-      // Insert legacy license
-      await client.query(
-        `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
-         VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
-        [id, company_id, licenseKey, tier, limit, expiresAt]
+      const company = await client.query('SELECT id FROM companies WHERE id=$1 FOR UPDATE', [company_id]);
+      if (!company.rowCount) throw new Error('company_not_found');
+      const activation = await CommercialLifecycleService.grantManualEntitlement(client, {
+        companyId: company_id,
+        planId,
+        adminUserId: req.user!.id,
+        grantDays: days,
+        deviceLimitOverride: limit,
+        storeLimitOverride: storeLimit,
+        grantReason: reason.trim(),
+      });
+      const license = await client.query(
+        'SELECT id,license_key FROM licenses WHERE company_id=$1 ORDER BY created_at DESC LIMIT 1',
+        [company_id],
       );
-
-      // Insert new entitlement
-      await client.query(
-        `INSERT INTO license_entitlements (id, company_id, plan_id, status, device_limit, store_limit, valid_from, valid_until, token_version, license_key, created_at, updated_at)
-         VALUES ($1, $2, $3, 'active', $4, $5, NOW(), $6, 1, $7, NOW(), NOW())`,
-        [entitlementId, company_id, planId, limit, storeLimit, expiresAt, licenseKey]
-      );
-
       await client.query('COMMIT');
+      return res.status(201).json({ success: true, license_id: license.rows[0].id,
+        license_key: license.rows[0].license_key, entitlement_id: activation.entitlementId,
+        valid_until: activation.validUntil });
     } catch (txErr) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       throw txErr;
-    } finally {
-      client.release();
-    }
-
-    await writeAdminAudit(req.user!.id, 'CREATE_MANUAL_LICENSE_EXCEPTION', 'licenses', id, null, { licenseKey, tier, company_id, reason: reason.trim() }, req.ip);
-
-    return res.status(201).json({ success: true, license_id: id, license_key: licenseKey });
+    } finally { client.release(); }
   } catch (err) {
     console.error('Create manual license error:', err);
+    if ((err as Error).message === 'company_not_found') return res.status(404).json({ error: 'company_not_found' });
     return res.status(500).json({ error: 'server_error' });
   }
 });
 
+router.post('/companies/:id/send-reset-password', async (_req: AuthenticatedRequest, res: Response) => {
+  return res.status(410).json({
+    error: 'email_recovery_removed',
+    message: 'E-posta bağlantısı kaldırıldı. Gerekçeli password-recovery endpointini kullanın.',
+  });
+});
+
 router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Response) => {
-  const { additional_days } = req.body;
+  const { additional_days, reason } = req.body;
   const days = additional_days ? parseInt(additional_days, 10) : 365;
   if (isNaN(days) || days <= 0) {
     return res.status(400).json({ error: 'invalid_days', message: 'Geçersiz yenileme süresi gün değeri.' });
+  }
+  if (!String(reason || '').trim()) {
+    return res.status(400).json({ error: 'renewal_reason_required', message: 'Manuel uzatma gerekçesi zorunludur.' });
   }
 
   try {
@@ -762,28 +765,27 @@ router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ error: 'license_not_found' });
     }
 
-    const licenseKey = license.rows[0].license_key;
-    const currentExpiry = new Date(license.rows[0].expires_at);
-    const newExpiry = new Date(Math.max(currentExpiry.getTime(), Date.now()));
-    newExpiry.setDate(newExpiry.getDate() + days);
-
-    // Update both tables inside transaction
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-      await client.query(
-        'UPDATE licenses SET expires_at = $1, status = \'active\' WHERE id = $2',
-        [newExpiry, req.params.id]
+      const entitlement = await client.query(
+        `SELECT plan_id,device_limit,store_limit FROM license_entitlements
+         WHERE company_id=$1 ORDER BY valid_until DESC NULLS LAST LIMIT 1 FOR UPDATE`,
+        [license.rows[0].company_id],
       );
-
-      await client.query(
-        "UPDATE license_entitlements SET valid_until = $1, status = 'active', token_version = token_version + 1, updated_at = NOW() WHERE license_key = $2",
-        [newExpiry, licenseKey]
-      );
-
+      if (!entitlement.rowCount) throw new Error('entitlement_not_found');
+      const activation = await CommercialLifecycleService.grantManualEntitlement(client, {
+        companyId: license.rows[0].company_id,
+        planId: entitlement.rows[0].plan_id,
+        adminUserId: req.user!.id, grantDays: days,
+        deviceLimitOverride: Number(entitlement.rows[0].device_limit),
+        storeLimitOverride: Number(entitlement.rows[0].store_limit),
+        grantReason: String(reason).trim(),
+      });
       await client.query('COMMIT');
+      return res.json({ success: true, new_expiry: activation.validUntil,
+        entitlement_id: activation.entitlementId });
     } catch (txErr) {
       await client.query('ROLLBACK');
       throw txErr;
@@ -791,9 +793,6 @@ router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Respon
       client.release();
     }
 
-    await writeAdminAudit(req.user!.id, 'RENEW_LICENSE', 'licenses', req.params.id, license.rows[0], { new_expiry: newExpiry }, req.ip);
-
-    return res.json({ success: true, new_expiry: newExpiry });
   } catch (err) {
     console.error('Renew license error:', err);
     return res.status(500).json({ error: 'server_error' });
@@ -801,31 +800,26 @@ router.post('/licenses/:id/renew', async (req: AuthenticatedRequest, res: Respon
 });
 
 router.post('/licenses/:id/suspend', async (req: AuthenticatedRequest, res: Response) => {
-  const { suspend } = req.body; // boolean
+  const { suspend, reason } = req.body;
   const newStatus = suspend ? 'suspended' : 'active';
+  if (!String(reason || '').trim()) return res.status(400).json({ error: 'status_reason_required' });
   try {
     const license = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
     if (license.rows.length === 0) {
       return res.status(404).json({ error: 'license_not_found' });
     }
 
-    const licenseKey = license.rows[0].license_key;
-
-    // Update both tables inside transaction
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-      await client.query(
-        'UPDATE licenses SET status = $1 WHERE id = $2',
-        [newStatus, req.params.id]
-      );
-
-      await client.query(
-        "UPDATE license_entitlements SET status = $1, token_version = token_version + 1, updated_at = NOW() WHERE license_key = $2",
-        [newStatus, licenseKey]
-      );
+      await CommercialLifecycleService.setEntitlementStatus(client, {
+        companyId: license.rows[0].company_id,
+        status: newStatus,
+        actorId: req.user!.id,
+        reason: String(reason).trim(),
+      });
 
       await client.query('COMMIT');
     } catch (txErr) {
@@ -845,13 +839,14 @@ router.post('/licenses/:id/suspend', async (req: AuthenticatedRequest, res: Resp
 });
 
 router.post('/licenses/:id/revoke', async (req: AuthenticatedRequest, res: Response) => {
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) return res.status(400).json({ error: 'revocation_reason_required' });
   try {
     const license = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
     if (license.rows.length === 0) {
       return res.status(404).json({ error: 'license_not_found' });
     }
 
-    const licenseKey = license.rows[0].license_key;
     const companyId = license.rows[0].company_id;
 
     // Update licenses, license_entitlements, and device_activations inside transaction
@@ -860,20 +855,9 @@ router.post('/licenses/:id/revoke', async (req: AuthenticatedRequest, res: Respo
       await client.query('BEGIN');
       await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-      await client.query(
-        'UPDATE licenses SET status = \'revoked\' WHERE id = $1',
-        [req.params.id]
-      );
-
-      await client.query(
-        "UPDATE license_entitlements SET status = 'revoked', token_version = token_version + 1, updated_at = NOW() WHERE license_key = $1",
-        [licenseKey]
-      );
-
-      await client.query(
-        "UPDATE device_activations SET status = 'revoked', revoked_at = NOW(), revoked_by = 'sysadmin' WHERE company_id = $1",
-        [companyId]
-      );
+      await CommercialLifecycleService.setEntitlementStatus(client, {
+        companyId, status: 'revoked', actorId: req.user!.id, reason,
+      });
 
       await client.query('COMMIT');
     } catch (txErr) {
@@ -1218,58 +1202,10 @@ router.get('/dashboard/commercial', async (req: AuthenticatedRequest, res: Respo
 
 // ── 12. LICENSE MANAGEMENT ACTIONS (Sprint 12) ───────────────────────────────
 router.post('/licenses/:id/manage', async (req: AuthenticatedRequest, res: Response) => {
-  const { action, value } = req.body; // value can be days to extend, or new tier name
-  if (!action) {
-    return res.status(400).json({ error: 'missing_action' });
-  }
-
-  try {
-    const licRes = await runBypassingRLS('SELECT * FROM licenses WHERE id = $1', [req.params.id]);
-    if (licRes.rows.length === 0) {
-      return res.status(404).json({ error: 'license_not_found' });
-    }
-    const currentLic = licRes.rows[0];
-
-    let query = '';
-    let params: any[] = [];
-    let logMessage = '';
-
-    if (action === 'activate') {
-      query = "UPDATE licenses SET status = 'active', updated_at = NOW() WHERE id = $1";
-      params = [req.params.id];
-      logMessage = 'ACTIVATED';
-    } else if (action === 'deactivate') {
-      query = "UPDATE licenses SET status = 'inactive', updated_at = NOW() WHERE id = $1";
-      params = [req.params.id];
-      logMessage = 'DEACTIVATED';
-    } else if (action === 'suspend') {
-      query = "UPDATE licenses SET status = 'suspended', updated_at = NOW() WHERE id = $1";
-      params = [req.params.id];
-      logMessage = 'SUSPENDED';
-    } else if (action === 'extend_duration' || action === 'extend_trial') {
-      const days = parseInt(value || '30', 10);
-      query = "UPDATE licenses SET expires_at = expires_at + ($2 || ' day')::interval, status = 'active', updated_at = NOW() WHERE id = $1";
-      params = [req.params.id, days];
-      logMessage = `EXTENDED_${days}_DAYS`;
-    } else if (action === 'change_package') {
-      const newTier = value || 'pro';
-      query = "UPDATE licenses SET tier = $2, updated_at = NOW() WHERE id = $1";
-      params = [req.params.id, newTier];
-      logMessage = `CHANGED_PACKAGE_TO_${newTier.toUpperCase()}`;
-    } else {
-      return res.status(400).json({ error: 'invalid_action' });
-    }
-
-    await runBypassingRLS(query, params);
-    
-    // Write admin audit log
-    await writeAdminAudit(req.user!.id, logMessage, 'licenses', req.params.id, currentLic, { ...currentLic, action });
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('License management action error:', err);
-    return res.status(500).json({ error: 'server_error' });
-  }
+  return res.status(410).json({
+    error: 'legacy_license_management_removed',
+    message: 'Lisans durumu yalnızca ticari yaşam döngüsü işlemleri üzerinden değiştirilebilir.',
+  });
 });
 
 // ── 13. SUPPORT TOOLS MULTI-CRITERIA SEARCH (Sprint 12) ──────────────────────
@@ -1439,7 +1375,10 @@ router.get('/billing/intel', async (req: AuthenticatedRequest, res: Response) =>
 
 // ── 17. TENANT LIFE-CYCLE MANAGEMENT ─────────────────────────────────────────
 router.post('/companies/:id/suspend', async (req: AuthenticatedRequest, res: Response) => {
-  const { suspend } = req.body;
+  const { suspend, reason } = req.body;
+  if (typeof reason !== 'string' || reason.trim().length < 3) {
+    return res.status(400).json({ error: 'reason_required' });
+  }
   const newStatus = suspend ? 'suspended' : 'active';
   const isActive = !suspend;
 
@@ -1460,11 +1399,12 @@ router.post('/companies/:id/suspend', async (req: AuthenticatedRequest, res: Res
       [newStatus, req.params.id]
     );
 
-    // Update license status
-    await client.query(
-      "UPDATE licenses SET status = $1, updated_at = NOW() WHERE company_id = $2 AND status != 'revoked'",
-      [newStatus, req.params.id]
-    );
+    await CommercialLifecycleService.setEntitlementStatus(client, {
+      companyId: req.params.id,
+      status: suspend ? 'suspended' : 'active',
+      actorId: req.user!.id,
+      reason: reason.trim(),
+    });
 
     // Suspend all users of this company
     await client.query(
@@ -1495,6 +1435,8 @@ router.post('/companies/:id/suspend', async (req: AuthenticatedRequest, res: Res
 });
 
 router.delete('/companies/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 3) return res.status(400).json({ error: 'reason_required' });
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
@@ -1521,6 +1463,9 @@ router.delete('/companies/:id', async (req: AuthenticatedRequest, res: Response)
       'UPDATE sessions SET is_revoked = true, updated_at = NOW() WHERE company_id = $1',
       [req.params.id]
     );
+    await CommercialLifecycleService.setEntitlementStatus(client, {
+      companyId: req.params.id, status: 'suspended', actorId: req.user!.id, reason,
+    });
 
     await client.query('COMMIT');
 
@@ -1537,6 +1482,8 @@ router.delete('/companies/:id', async (req: AuthenticatedRequest, res: Response)
 });
 
 router.post('/companies/:id/restore', async (req: AuthenticatedRequest, res: Response) => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (reason.length < 3) return res.status(400).json({ error: 'reason_required' });
   const client = await pgPool.connect();
   try {
     await client.query('BEGIN');
@@ -1553,10 +1500,9 @@ router.post('/companies/:id/restore', async (req: AuthenticatedRequest, res: Res
       [req.params.id]
     );
 
-    await client.query(
-      "UPDATE licenses SET status = 'active', updated_at = NOW() WHERE company_id = $1 AND status = 'suspended'",
-      [req.params.id]
-    );
+    await CommercialLifecycleService.setEntitlementStatus(client, {
+      companyId: req.params.id, status: 'active', actorId: req.user!.id, reason,
+    });
 
     await client.query(
       'UPDATE users SET is_active = true, updated_at = NOW() WHERE company_id = $1',
@@ -1712,57 +1658,10 @@ router.post('/licenses/:id/offline-activation', async (req: AuthenticatedRequest
 
 // ── 20. TOPLU LISANS URETIMI (Bulk Licenses) ──────────────────────────────────
 router.post('/licenses/bulk', async (req: AuthenticatedRequest, res: Response) => {
-  const { company_id, count, tier, allowed_devices_count, expires_in_days } = req.body;
-
-  if (!company_id || !count || !tier) {
-    return res.status(400).json({ error: 'missing_fields' });
-  }
-
-  const bulkCount = parseInt(count, 10);
-  if (isNaN(bulkCount) || bulkCount < 1 || bulkCount > 100) {
-    return res.status(400).json({ error: 'invalid_count', message: 'Üretilecek lisans adedi 1 ile 100 arasında olmalıdır.' });
-  }
-
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-    const generatedLicenses: string[] = [];
-    const days = expires_in_days ? parseInt(expires_in_days, 10) : 365;
-
-    for (let i = 0; i < bulkCount; i++) {
-      const id = `lic-bulk-${crypto.randomUUID()}`;
-      const licenseKey = `KEY-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-      
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + days);
-
-      await client.query(
-        `INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
-         VALUES ($1, $2, $3, $4, $5, 'active', $6)`,
-        [id, company_id, licenseKey, tier, allowed_devices_count || 1, expiresAt]
-      );
-
-      generatedLicenses.push(licenseKey);
-    }
-
-    await client.query('COMMIT');
-
-    await writeAdminAudit(req.user!.id, 'CREATE_BULK_LICENSES', 'licenses', company_id, null, { count: bulkCount, tier });
-
-    return res.status(201).json({
-      success: true,
-      count: bulkCount,
-      licenses: generatedLicenses,
-    });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Bulk license creation failed:', err);
-    return res.status(500).json({ error: 'server_error' });
-  } finally {
-    client.release();
-  }
+  return res.status(410).json({
+    error: 'bulk_license_generation_removed',
+    message: 'Bağımsız lisans anahtarı üretimi kaldırıldı; her hak denetlenen bir abonelik veya yönetici istisnasına bağlı olmalıdır.',
+  });
 });
 
 // ── 21. CANLI SİSTEM MONITORING ──────────────────────────────────────────────
@@ -2054,30 +1953,42 @@ router.post('/security/users/:id/force-logout', async (req: AuthenticatedRequest
 });
 
 router.post('/security/users/:id/reset-password', async (req: AuthenticatedRequest, res: Response) => {
+  return res.status(410).json({
+    error: 'direct_password_reset_removed',
+    message: 'Yönetici kullanıcı parolası belirleyemez. Gerekçeli kurtarma talebi oluşturun.',
+  });
+});
+
+router.get('/security/password-recovery/pending', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    const { new_password } = req.body;
-    if (!new_password || typeof new_password !== 'string' || new_password.length < 8) {
-      return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
-    }
-
-    const hash = await AuthService.hashPassword(new_password);
-    const userRes = await runBypassingRLS(
-      `UPDATE users 
-       SET password_hash = $1, failed_login_attempts = 0, locked_until = NULL, is_active = true, token_version = token_version + 1, updated_at = NOW() 
-       WHERE id = $2 
-       RETURNING id, name, email`,
-      [hash, req.params.id]
+    const requests = await runBypassingRLS(
+      `SELECT pr.id,pr.user_id,pr.initiated_by,pr.reason,pr.expires_at,pr.created_at,
+              target.name AS target_name,target.email AS target_email,
+              initiator.name AS initiator_name
+       FROM password_recovery_requests pr
+       JOIN users target ON target.id=pr.user_id
+       LEFT JOIN users initiator ON initiator.id=pr.initiated_by
+       WHERE pr.state='pending_second_approval' AND pr.expires_at>NOW()
+       ORDER BY pr.created_at ASC`,
     );
+    return res.json(requests.rows);
+  } catch (error) {
+    logger.error('Pending password recovery list failed', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
 
-    if (userRes.rows.length === 0) {
-      return res.status(404).json({ error: 'user_not_found', message: 'Kullanıcı bulunamadı.' });
-    }
-
-    await writeAdminAudit(req.user!.id, 'RESET_USER_PASSWORD', 'users', req.params.id, null, { email: userRes.rows[0].email });
-
-    return res.json({ success: true, message: 'Şifre başarıyla güncellendi.', user: userRes.rows[0] });
-  } catch (err: any) {
-    console.error('Admin reset user password error:', err);
+router.post('/security/password-recovery/:id/approve', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await PasswordRecoveryService.approveSysadminRequest(
+      req.params.id, req.user!.id, { ip: req.ip, userAgent: req.headers['user-agent'] },
+    );
+    await writeAdminAudit(req.user!.id, 'APPROVE_SYSADMIN_PASSWORD_RECOVERY', 'password_recovery_requests', req.params.id, null, null, req.ip);
+    return res.json({ success: true, claim_code: result.claimCode });
+  } catch (error: any) {
+    if (error.message === 'independent_approval_required') return res.status(403).json({ error: error.message });
+    if (error.message === 'recovery_request_not_found') return res.status(404).json({ error: error.message });
+    logger.error('Sysadmin recovery approval failed', error);
     return res.status(500).json({ error: 'server_error' });
   }
 });
@@ -2361,87 +2272,10 @@ router.post('/audit-logs/archive', async (req: AuthenticatedRequest, res: Respon
 
 // [ADMIN-7] Tenant full onboarding — firma + lisans + kullanıcı + email
 router.post('/companies/:id/onboard', async (req: AuthenticatedRequest, res: Response) => {
-  const { licenseKey, tier, allowedDevices, durationDays, ownerEmail, ownerName, ownerPassword } = req.body;
-
-  if (!licenseKey || !ownerEmail || !ownerName || !ownerPassword) {
-    return res.status(400).json({ error: 'missing_required_fields' });
-  }
-
-  const client = await pgPool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query("SET LOCAL app.bypass_rls = 'true'");
-
-    // Verify company exists
-    const compRes = await client.query('SELECT * FROM companies WHERE id = $1', [req.params.id]);
-    if (compRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'company_not_found' });
-    }
-    const company = compRes.rows[0];
-
-    // Create license
-    const licId = `lic-${crypto.randomUUID()}`;
-    const expiresAt = new Date(Date.now() + (durationDays || 30) * 24 * 60 * 60 * 1000);
-    await client.query(`
-      INSERT INTO licenses (id, company_id, license_key, tier, allowed_devices_count, status, expires_at)
-      VALUES ($1, $2, $3, $4, $5, 'active', $6)
-    `, [licId, req.params.id, licenseKey, tier || 'pro', allowedDevices || 1, expiresAt]);
-
-    // Create owner user
-    const bcrypt = require('bcrypt');
-    const passwordHash = await bcrypt.hash(ownerPassword, 10);
-    const userId = `user-${crypto.randomUUID()}`;
-    await client.query(`
-      INSERT INTO users (id, company_id, name, email, password_hash, is_active)
-      VALUES ($1, $2, $3, $4, $5, true)
-    `, [userId, req.params.id, ownerName, ownerEmail, passwordHash]);
-
-    // Assign owner role if roles table exists
-    try {
-      const roleRes = await client.query("SELECT id FROM roles WHERE name = 'owner' LIMIT 1");
-      if (roleRes.rows.length > 0) {
-        await client.query(
-          'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [userId, roleRes.rows[0].id]
-        );
-      }
-    } catch (_) {}
-
-    await client.query('COMMIT');
-
-    // Enqueue welcome email notification (non-blocking)
-    try {
-      await enqueueNotification({
-        notification_id: `notif-${crypto.randomUUID()}`,
-        company_id: req.params.id,
-        channel: 'email',
-        recipient: ownerEmail,
-        title: `${company.name} - Serenut OS Hesabınız Hazır`,
-        body: `Merhaba ${ownerName}, hesabınız oluşturulmuştur. Lisans anahtarınız: ${licenseKey}. Başarılar dileriz!`
-      });
-    } catch (_) {}
-
-    await writeAdminAudit(req.user!.id, 'TENANT_ONBOARDED', 'companies', req.params.id, null, {
-      licenseKey, ownerEmail, tier, allowedDevices
-    });
-
-    return res.status(201).json({
-      success: true,
-      companyId: req.params.id,
-      licenseId: licId,
-      userId,
-      licenseKey,
-      expiresAt
-    });
-  } catch (err: any) {
-    await client.query('ROLLBACK');
-    console.error('Tenant onboarding failed:', err);
-    if (err.code === '23505') return res.status(409).json({ error: 'duplicate_entry', detail: err.detail });
-    return res.status(500).json({ error: 'server_error' });
-  } finally {
-    client.release();
-  }
+  return res.status(410).json({
+    error: 'legacy_onboarding_removed',
+    message: 'Firma kurulumu standart kayıt ve ticari yaşam döngüsü üzerinden yapılmalıdır.',
+  });
 });
 
 // [ADMIN-11] SLA escalation — destek bileti SLA aşımı kontrolü + eskalasyon bildirimi

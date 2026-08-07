@@ -111,6 +111,12 @@ class FakeEventPublisher implements EventPublisher {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class FakeRefundStore implements IRefundMutationStore {
+  @override
+  Future<String> create({required String saleId, required List<RefundLineRequest> items,
+    required String refundMethod, required String reason, String? externalReference}) async => 'refund-1';
+}
+
 void main() {
   group('SalesService License Gate Tests', () {
     late SharedPreferences prefs;
@@ -134,6 +140,7 @@ void main() {
         paymentService: FakePaymentService(),
         eventPublisher: FakeEventPublisher(),
         securityGate: securityGate,
+        refundStore: FakeRefundStore(),
       );
 
       // Seed a test sale
@@ -176,26 +183,29 @@ void main() {
       );
     });
 
-    test('Allowed to cancel sale when license is valid', () async {
+    test('Allowed to refund sale when license is valid', () async {
       licenseService.statusResult = 'valid';
       await expectLater(
-        salesService.cancelSale('sale-1'),
+        salesService.returnItems(saleId: 'sale-1', itemsToReturn: const [],
+            refundMethod: 'cash', reason: 'Test iadesi'),
         completes,
       );
     });
 
-    test('Fails to cancel sale when license is revoked', () async {
+    test('Fails to refund sale when license is revoked', () async {
       licenseService.statusResult = 'revoked';
       expect(
-        () => salesService.cancelSale('sale-1'),
+        () => salesService.returnItems(saleId: 'sale-1', itemsToReturn: const [],
+            refundMethod: 'cash', reason: 'Test iadesi'),
         throwsA(isA<LicenseException>()),
       );
     });
 
-    test('Fails to cancel sale when license is tampered', () async {
+    test('Fails to refund sale when license is tampered', () async {
       licenseService.statusResult = 'tampered';
       expect(
-        () => salesService.cancelSale('sale-1'),
+        () => salesService.returnItems(saleId: 'sale-1', itemsToReturn: const [],
+            refundMethod: 'cash', reason: 'Test iadesi'),
         throwsA(isA<LicenseException>()),
       );
     });

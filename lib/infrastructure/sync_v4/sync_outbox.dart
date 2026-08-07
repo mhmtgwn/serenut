@@ -97,6 +97,16 @@ final class _SqfliteExecutor implements DbExecutor {
   final DatabaseExecutor _delegate;
 
   @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _SqfliteExecutor &&
+          runtimeType == other.runtimeType &&
+          _delegate == other._delegate;
+
+  @override
+  int get hashCode => _delegate.hashCode;
+
+  @override
   Future<int> delete(String table, {String? where, List<Object?>? whereArgs}) =>
       _delegate.delete(table, where: where, whereArgs: whereArgs);
   @override

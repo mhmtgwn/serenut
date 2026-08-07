@@ -4,9 +4,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const root = document.getElementById('downloads-container');
   if (!root) return;
 
+  function cleanVer(v) {
+    if (!v) return '';
+    const s = String(v).split('+')[0].trim();
+    return s.startsWith('v') ? s : `v${s}`;
+  }
+
   function renderCards(windows, android) {
-    const winVer  = windows ? `v${esc(windows.version_code)}` : '';
-    const apkVer  = android ? `v${esc(android.version_code)}` : '';
+    const winVer  = windows ? esc(cleanVer(windows.version_code)) : '';
+    const apkVer  = android ? esc(cleanVer(android.version_code)) : '';
     const winNote = windows ? esc(windows.release_notes  || 'Masaüstü kurulum paketi.') : 'Masaüstü kurulum paketi.';
     const apkNote = android ? esc(android.release_notes  || 'Android uygulama paketi.') : 'Android uygulama paketi.';
     root.innerHTML = `
@@ -14,13 +20,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="eyebrow">Windows</div>
         <h3>Serenut OS ${winVer}</h3>
         <p>${winNote}</p>
-        <a class="btn btn-primary" href="/download/windows" download>İndir</a>
+        <a class="btn btn-primary" href="/download/windows" download>Windows için indir</a>
       </article>
       <article class="feature-card">
         <div class="eyebrow">Android APK</div>
         <h3>Serenut OS ${apkVer}</h3>
         <p>${apkNote}</p>
-        <a class="btn btn-primary" href="/download/android" download>İndir</a>
+        <a class="btn btn-primary" href="/download/android" download>Android için indir</a>
       </article>
       <article class="feature-card">
         <div class="eyebrow">Aktivasyon</div>
@@ -48,8 +54,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           seen.add(p);
           return true;
         });
-        const windows = rows.find(r => r.platform === 'windows') || null;
-        const android = rows.find(r => r.platform === 'android') || null;
+        const windows = rows.find(r => String(r.platform).toLowerCase() === 'windows') || null;
+        const android = rows.find(r => String(r.platform).toLowerCase() === 'android') || null;
         renderCards(windows, android);
         return;
       }
@@ -62,8 +68,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (res2.ok) {
       const meta = await res2.json();
       if (Array.isArray(meta) && meta.length > 0) {
-        const windows = meta.find(r => r.platform === 'windows') || null;
-        const android = meta.find(r => r.platform === 'android') || null;
+        const windows = meta.find(r => String(r.platform).toLowerCase() === 'windows') || null;
+        const android = meta.find(r => String(r.platform).toLowerCase() === 'android') || null;
         renderCards(windows, android);
         return;
       }

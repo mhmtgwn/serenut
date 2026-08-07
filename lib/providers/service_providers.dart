@@ -6,13 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/domain/services/i_backup_service.dart';
 import 'package:serenutos/domain/services/i_hash_service.dart';
-import 'package:serenutos/domain/services/i_printer_service.dart';
 import 'package:serenutos/domain/services/i_scanner_service.dart';
 import 'package:serenutos/infrastructure/services/backup_service.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
-import 'package:serenutos/infrastructure/services/printer_service.dart';
 import 'package:serenutos/infrastructure/services/unified_scanner_service.dart';
-import 'package:serenutos/infrastructure/services/persistent_print_queue.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/infrastructure/services/device_fingerprint_service.dart';
@@ -37,17 +34,6 @@ import 'package:serenutos/domain/services/audit_log_service.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-
-/// Persistent print queue — singleton shared across providers.
-final persistentPrintQueueProvider = Provider<PersistentPrintQueue>((ref) {
-  return PersistentPrintQueue();
-});
-
-/// Provides IPrinterService instance with persistent queue injected.
-final printerServiceProvider = Provider<IPrinterService>((ref) {
-  final queue = ref.watch(persistentPrintQueueProvider);
-  return PrinterService(null, queue);
-});
 
 /// Provides IBackupService instance.
 final backupServiceProvider = Provider<IBackupService>((ref) {

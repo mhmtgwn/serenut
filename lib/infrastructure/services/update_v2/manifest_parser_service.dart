@@ -44,7 +44,8 @@ class ManifestParserService {
     try {
       final decodedJson = jsonDecode(rawManifestContent);
       if (decodedJson is! Map<String, dynamic>) {
-        return ManifestValidationResult.failure('Manifest root must be a JSON object.');
+        return ManifestValidationResult.failure(
+            'Manifest root must be a JSON object.');
       }
 
       // 1. Parse into strongly-typed DTO (validates schemaVersion & SHA formats)
@@ -79,7 +80,8 @@ class ManifestParserService {
     } on InvalidManifestException catch (e) {
       return ManifestValidationResult.failure(e.toString());
     } catch (e) {
-      return ManifestValidationResult.failure('Unexpected manifest parse failure: $e');
+      return ManifestValidationResult.failure(
+          'Unexpected manifest parse failure: $e');
     }
   }
 }

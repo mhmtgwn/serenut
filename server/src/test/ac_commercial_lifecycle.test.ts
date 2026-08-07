@@ -97,10 +97,12 @@ async function runAdversarialTest() {
     console.log('🌱 Step 4: Simulating Admin Bank Wire Approval of Subscription upgrade...');
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
-    await CommercialLifecycleService.activatePaidSubscription(client, {
+    await CommercialLifecycleService.grantManualEntitlement(client, {
       companyId,
       planId: 'plan-pro',
-      grantType: 'bank_transfer',
+      adminUserId: userId,
+      grantReason: 'Acceptance test: audited administrative upgrade',
+      grantDays: 30,
     });
     await client.query('COMMIT');
     console.log('  ✔️ Admin approval simulation complete.');

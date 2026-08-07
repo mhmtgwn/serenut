@@ -30,7 +30,7 @@ class ErrorBoundary {
     // ── 1. Flutter framework errors (widget build, layout, rendering) ────────
     FlutterError.onError = (FlutterErrorDetails details) async {
       final isMissingPlugin = details.exception is MissingPluginException;
-      
+
       // Enrich with additional context from FlutterErrorDetails
       final enrichedContext = [
         'FlutterError',
@@ -44,7 +44,7 @@ class ErrorBoundary {
         context: enrichedContext,
         level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
       );
-      
+
       // Do not show red screen for MissingPluginException
       if (kDebugMode && !isMissingPlugin) {
         FlutterError.presentError(details);
@@ -54,16 +54,16 @@ class ErrorBoundary {
     // ── 2. Platform-level / unhandled async errors ────────────────────────────
     PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
       final isMissingPlugin = error is MissingPluginException;
-      
+
       _telemetry.logError(
         error,
         stack,
         context: 'PlatformDispatcher.onError',
         level: isMissingPlugin ? LogLevel.warning : LogLevel.critical,
       );
-      
+
       if (isMissingPlugin) return true; // Handled gracefully, do not crash
-      
+
       return !kDebugMode; // propagate in debug for visibility
     };
 

@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
+import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
+import 'package:serenutos/infrastructure/services/printer_discovery_service.dart';
+import 'package:serenutos/domain/hardware/scale_service.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/providers/hardware_devices_provider.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 
 class HardwareTestPage extends ConsumerWidget {
   const HardwareTestPage({super.key});
@@ -13,9 +18,14 @@ class HardwareTestPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final devices = ref.watch(hardwareDevicesProvider);
     return FullScreenSettingsPage(
-      title: 'Cihazlar ve Donanım',
+      title: 'Aygıt Yöneticisi',
       useScrollView: false,
       actions: [
+        IconButton(
+          tooltip: 'Ortak yazıcılar',
+          onPressed: () => _openSharedPrinters(context, ref),
+          icon: const Icon(Icons.cloud_queue_rounded),
+        ),
         IconButton(
           tooltip: 'Cihaz ekle',
           onPressed: () => _openEditor(context, ref),
@@ -32,11 +42,98 @@ class HardwareTestPage extends ConsumerWidget {
           devices: items,
           onAdd: () => _openEditor(context, ref),
           onEdit: (device) => _openEditor(context, ref, device: device),
+          onActivate: (device) =>
+              ref.read(hardwareDevicesProvider.notifier).activate(device),
           onTest: (device) => _testDevice(context, ref, device),
           onDelete: (device) => _deleteDevice(context, ref, device),
         ),
       ),
     );
+  }
+
+  Future<void> _openSharedPrinters(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    ref.invalidate(sharedHardwareDevicesProvider);
+    final selected = await showDialog<SharedHardwareDevice>(
+      context: context,
+      builder: (dialogContext) => Consumer(
+        builder: (context, ref, _) {
+          final shared = ref.watch(sharedHardwareDevicesProvider);
+          return AlertDialog(
+            title: const Text('Ortak yazıcılar'),
+            content: SizedBox(
+              width: 520,
+              child: shared.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Text(
+                  'Ortak donanımlar alınamadı. Bağlantınızı kontrol edip yeniden deneyin.\n$error',
+                ),
+                data: (items) {
+                  final printers = items
+                      .where((item) =>
+                          !item.isLocal &&
+                          (item.type == HardwareDeviceType.receiptPrinter ||
+                              item.type == HardwareDeviceType.labelPrinter))
+                      .toList(growable: false);
+                  if (printers.isEmpty) {
+                    return const Text(
+                      'Başka bir açık cihaz tarafından paylaşılan yazıcı bulunamadı.',
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: printers.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final printer = printers[index];
+                      return ListTile(
+                        enabled: printer.online,
+                        leading: Icon(
+                          printer.type == HardwareDeviceType.receiptPrinter
+                              ? Icons.receipt_long_rounded
+                              : Icons.label_rounded,
+                        ),
+                        title: Text(printer.name),
+                        subtitle: Text(printer.online
+                            ? 'Çevrimiçi · ${printer.connectionType}'
+                            : 'Sahip cihaz çevrimdışı'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.pop(dialogContext, printer),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Kapat'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    try {
+      await ref
+          .read(hardwareDevicesProvider.notifier)
+          .activateSharedPrinter(selected);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${selected.name} varsayılan ortak yazıcı oldu.'),
+        backgroundColor: kGreen,
+      ));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: kPink,
+      ));
+    }
   }
 
   Future<void> _openEditor(
@@ -59,13 +156,56 @@ class HardwareTestPage extends ConsumerWidget {
     WidgetRef ref,
     HardwareDevice device,
   ) async {
-    final result =
-        await ref.read(hardwareDevicesProvider.notifier).test(device);
+    PrintDocumentKind? kind;
+    if (device.type == HardwareDeviceType.labelPrinter) {
+      kind = await showDialog<PrintDocumentKind>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Test etiketi türü'),
+          content: const Text(
+            'Aynı fiziksel cihaz farklı tasarım profilleri kullanır. '
+            'Fiziksel olarak sınanacak belgeyi seçin.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                PrintDocumentKind.productLabel,
+              ),
+              child: const Text('Ürün etiketi'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                PrintDocumentKind.orderLabel,
+              ),
+              child: const Text('Sipariş etiketi'),
+            ),
+          ],
+        ),
+      );
+      if (kind == null || !context.mounted) return;
+    }
+    final result = await ref
+        .read(hardwareDevicesProvider.notifier)
+        .test(device, printKind: kind);
     if (!context.mounted) return;
-    await showDialog<void>(
+    final physicalResult = await showDialog<bool>(
       context: context,
       builder: (_) => _TestResultDialog(result: result),
     );
+    if (result.requiresPhysicalConfirmation && physicalResult != null) {
+      await ref
+          .read(hardwareDevicesProvider.notifier)
+          .confirmPhysicalPrintTest(result, passed: physicalResult);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(physicalResult
+            ? 'Yazıcı fiziksel olarak doğrulandı.'
+            : 'Test reddedildi; cihaz kontrol edilmeli.'),
+        backgroundColor: physicalResult ? kGreen : kPink,
+      ));
+    }
   }
 
   Future<void> _deleteDevice(
@@ -101,6 +241,7 @@ class _DeviceList extends StatelessWidget {
   final List<HardwareDevice> devices;
   final VoidCallback onAdd;
   final ValueChanged<HardwareDevice> onEdit;
+  final ValueChanged<HardwareDevice> onActivate;
   final ValueChanged<HardwareDevice> onTest;
   final ValueChanged<HardwareDevice> onDelete;
 
@@ -108,6 +249,7 @@ class _DeviceList extends StatelessWidget {
     required this.devices,
     required this.onAdd,
     required this.onEdit,
+    required this.onActivate,
     required this.onTest,
     required this.onDelete,
   });
@@ -125,7 +267,7 @@ class _DeviceList extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: _SummaryCard(
+          child: _HardwareHero(
             total: devices.length,
             ready: ready,
             attention: attention,
@@ -139,20 +281,16 @@ class _DeviceList extends StatelessWidget {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.only(top: 16, bottom: 24),
+            padding: const EdgeInsets.only(top: 20, bottom: 24),
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
-                final columns = constraints.crossAxisExtent >= 900
-                    ? 3
-                    : constraints.crossAxisExtent >= 580
-                        ? 2
-                        : 1;
+                final columns = constraints.crossAxisExtent >= 760 ? 2 : 1;
                 return SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    mainAxisExtent: 244,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    mainAxisExtent: 238,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -160,6 +298,7 @@ class _DeviceList extends StatelessWidget {
                       return _DeviceCard(
                         device: device,
                         onEdit: () => onEdit(device),
+                        onActivate: () => onActivate(device),
                         onTest: () => onTest(device),
                         onDelete: () => onDelete(device),
                       );
@@ -175,13 +314,13 @@ class _DeviceList extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _HardwareHero extends StatelessWidget {
   final int total;
   final int ready;
   final int attention;
   final VoidCallback onAdd;
 
-  const _SummaryCard({
+  const _HardwareHero({
     required this.total,
     required this.ready,
     required this.attention,
@@ -190,64 +329,93 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: kBorderColor),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Wrap(
-          spacing: 18,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const Icon(Icons.devices_other_rounded, color: kGreen, size: 36),
-            _Metric(value: '$total', label: 'Kayıtlı'),
-            _Metric(value: '$ready', label: 'Hazır', color: kGreen),
-            _Metric(
-              value: '$attention',
-              label: 'Dikkat gerekli',
-              color: attention == 0 ? kTextSecondary : kPink,
-            ),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Cihaz ekle'),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF12352B), Color(0xFF1B5A48)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+      ),
+      child: Wrap(
+        spacing: 24,
+        runSpacing: 18,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const SizedBox(
+            width: 300,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('İşletme donanımlarınız',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800)),
+                SizedBox(height: 6),
+                Text(
+                  'Yazıcı, terazi, POS ve okuyucuları tek yerden yönetin.',
+                  style: TextStyle(color: Color(0xFFCDE5DD), height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          _HeroMetric(value: '$total', label: 'Cihaz'),
+          _HeroMetric(value: '$ready', label: 'Hazır'),
+          _HeroMetric(
+            value: '$attention',
+            label: 'Kontrol',
+            alert: attention > 0,
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF174B3D),
+            ),
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Yeni aygıt'),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _Metric extends StatelessWidget {
+class _HeroMetric extends StatelessWidget {
   final String value;
   final String label;
-  final Color color;
+  final bool alert;
 
-  const _Metric({
+  const _HeroMetric({
     required this.value,
     required this.label,
-    this.color = kTextPrimary,
+    this.alert = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 72),
+    return Container(
+      width: 76,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: alert
+            ? const Color(0xFFFFE1E5).withValues(alpha: .16)
+            : Colors.white.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value,
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white)),
           Text(label,
-              style: const TextStyle(fontSize: 11, color: kTextSecondary)),
+              style: const TextStyle(fontSize: 11, color: Color(0xFFCDE5DD))),
         ],
       ),
     );
@@ -257,12 +425,14 @@ class _Metric extends StatelessWidget {
 class _DeviceCard extends StatelessWidget {
   final HardwareDevice device;
   final VoidCallback onEdit;
+  final VoidCallback onActivate;
   final VoidCallback onTest;
   final VoidCallback onDelete;
 
   const _DeviceCard({
     required this.device,
     required this.onEdit,
+    required this.onActivate,
     required this.onTest,
     required this.onDelete,
   });
@@ -270,101 +440,158 @@ class _DeviceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = _statusPresentation(device.status);
+    final activeFor = (device.configuration['activeFor'] as List?)
+            ?.map((value) => value.toString())
+            .toList(growable: false) ??
+        const <String>[];
+    final isActivePrinter = activeFor.isNotEmpty;
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: kBorderColor),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isActivePrinter ? kGreen : kBorderColor,
+          width: isActivePrinter ? 2 : 1,
+        ),
       ),
       child: InkWell(
         onTap: onEdit,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor:
-                      _typeColor(device.type).withValues(alpha: .1),
-                  foregroundColor: _typeColor(device.type),
-                  child: Icon(_typeIcon(device.type)),
-                ),
-                const Spacer(),
-                _StatusBadge(label: status.$1, color: status.$2),
-                PopupMenuButton<String>(
-                  tooltip: 'Diğer işlemler',
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Düzenle')),
-                    PopupMenuItem(value: 'delete', child: Text('Kaldır')),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: _typeColor(device.type).withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(_typeIcon(device.type),
+                        color: _typeColor(device.type)),
+                  ),
+                  const Spacer(),
+                  if (isActivePrinter) ...[
+                    const _StatusBadge(label: 'Aktif', color: kGreen),
+                    const SizedBox(width: 6),
                   ],
+                  _StatusBadge(label: status.$1, color: status.$2),
+                  PopupMenuButton<String>(
+                    tooltip: 'Diğer işlemler',
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'activate') onActivate();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (_) => [
+                      if (!isActivePrinter)
+                        const PopupMenuItem(
+                            value: 'activate', child: Text('Aktif cihaz yap')),
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('Düzenle')),
+                      const PopupMenuItem(
+                          value: 'delete', child: Text('Kaldır')),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                device.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}',
+                style: const TextStyle(fontSize: 12, color: kTextSecondary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _deviceConfigurationSummary(device),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: kTextPrimary,
+                ),
+              ),
+              if (isActivePrinter) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _activeRouteLabel(activeFor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: kGreen,
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              device.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}',
-              style: const TextStyle(fontSize: 12, color: kTextSecondary),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Text(
-                device.lastMessage ??
-                    device.lastError ??
-                    'Bağlantı henüz doğrulanmadı.',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.35,
-                  color: device.lastError == null ? kTextSecondary : kPink,
+              const SizedBox(height: 10),
+              Expanded(
+                child: Text(
+                  device.lastMessage ??
+                      device.lastError ??
+                      'Bağlantı henüz doğrulanmadı.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: device.lastError == null ? kTextSecondary : kPink,
+                  ),
                 ),
               ),
-            ),
-            if (device.lastTestedAt != null)
-              Text(
-                'Son test: ${DateFormat('dd.MM.yyyy HH:mm').format(device.lastTestedAt!)}',
-                style: const TextStyle(fontSize: 10, color: kTextSecondary),
+              if (device.lastTestedAt != null)
+                Text(
+                  'Son test: ${DateFormat('dd.MM.yyyy HH:mm').format(device.lastTestedAt!)}',
+                  style: const TextStyle(fontSize: 10, color: kTextSecondary),
+                ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: const Text('Ayarlar'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: device.status == HardwareDeviceStatus.testing
+                          ? null
+                          : onTest,
+                      icon: device.status == HardwareDeviceStatus.testing
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(device.status == HardwareDeviceStatus.testing
+                          ? 'Bekleyin'
+                          : 'Test et'),
+                    ),
+                  ),
+                ],
               ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
-                onPressed: device.status == HardwareDeviceStatus.testing
-                    ? null
-                    : onTest,
-                icon: device.status == HardwareDeviceStatus.testing
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_arrow_rounded),
-                label: Text(device.status == HardwareDeviceStatus.testing
-                    ? 'Test ediliyor'
-                    : 'Bağlantıyı test et'),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -392,6 +619,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   late final TextEditingController _labelHeight;
   late final TextEditingController _labelGap;
   late final TextEditingController _labelCopies;
+  late final TextEditingController _printableWidthDots;
   String _vendor = 'generic';
   String _protocol = 'vendor_sdk';
   int _dataBits = 8;
@@ -401,16 +629,19 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   int _paperWidth = 80;
   String _labelLanguage = 'tspl';
   int _labelDpi = 203;
+  int _printDirection = 0;
+  bool _autoDetectLabelGap = false;
   bool _autoCut = true;
   bool _openDrawer = false;
-  bool _printLogo = true;
-  bool _printBarcode = true;
-  bool _printQr = false;
-  
+
   int _step = 0;
   bool _working = false;
   bool _discoveringBluetooth = false;
+  bool _discoveringWindows = false;
+  bool _discoveringNetwork = false;
   List<Map<String, String>> _bluetoothDevices = const [];
+  List<DiscoveredPrinter> _discoveredPrinters = const [];
+  List<String> _serialPorts = const [];
   String? _error;
 
   @override
@@ -438,21 +669,23 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         TextEditingController(text: config['labelGapMm']?.toString() ?? '2');
     _labelCopies =
         TextEditingController(text: config['copies']?.toString() ?? '1');
+    _printableWidthDots = TextEditingController(
+        text: config['printableWidthDots']?.toString() ?? '384');
     _vendor = config['vendor']?.toString() ?? 'generic';
     _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
     _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
     _stopBits = int.tryParse(config['stopBits']?.toString() ?? '') ?? 1;
     _parity = config['parity']?.toString() ?? 'none';
     _scaleUnit = config['defaultUnit']?.toString() ?? 'kg';
-    _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 80;
+    _paperWidth = int.tryParse(config['paperWidth']?.toString() ?? '') ?? 58;
     _labelLanguage = config['language']?.toString() ?? 'tspl';
     _labelDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
-    
+    _printDirection =
+        int.tryParse(config['printDirection']?.toString() ?? '') ?? 0;
+    _autoDetectLabelGap = config['autoDetectLabelGap'] as bool? ?? false;
+
     _autoCut = config['autoCut'] as bool? ?? true;
     _openDrawer = config['openDrawer'] as bool? ?? false;
-    _printLogo = config['printLogo'] as bool? ?? true;
-    _printBarcode = config['printBarcode'] as bool? ?? true;
-    _printQr = config['printQr'] as bool? ?? false;
   }
 
   @override
@@ -467,80 +700,175 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelHeight.dispose();
     _labelGap.dispose();
     _labelCopies.dispose();
+    _printableWidthDots.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 14,
-          bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kBorderColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.device == null ? 'Yeni cihaz ekle' : 'Cihazı düzenle',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${_step + 1}/3 · ${_stepLabel(_step)}',
-                style: const TextStyle(fontSize: 12, color: kTextSecondary),
-              ),
-              const SizedBox(height: 10),
-              LinearProgressIndicator(value: (_step + 1) / 3),
-              const SizedBox(height: 22),
-              if (_step == 0) _typeStep(),
-              if (_step == 1) _connectionStep(),
-              if (_step == 2) _detailsStep(),
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                _InlineError(message: _error!),
-              ],
-              const SizedBox(height: 22),
-              Row(
+    final editing = widget.device != null;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 780, maxHeight: 820),
+        child: Material(
+          color: const Color(0xFFF8FAF9),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 12,
+              bottom: MediaQuery.viewInsetsOf(context).bottom + 18,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_step > 0)
-                    TextButton(
-                      onPressed:
-                          _working ? null : () => setState(() => _step--),
-                      child: const Text('Geri'),
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: kBorderColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _working ? null : _continue,
-                    child: _working
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(_step < 2 ? 'Devam' : 'Doğrula ve kaydet'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: _typeColor(_type).withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(_typeIcon(_type), color: _typeColor(_type)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              editing ? 'Aygıt ayarları' : 'Yeni cihaz ekle',
+                              style: const TextStyle(
+                                  fontSize: 21, fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              editing
+                                  ? '${_step + 1}/3 · ${_stepLabel(_step)} · ${deviceFriendlyIdentity(widget.device!)}'
+                                  : '${_step + 1}/3 · ${_stepLabel(_step)}',
+                              style: const TextStyle(
+                                  fontSize: 12, color: kTextSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Kapat',
+                        onPressed:
+                            _working ? null : () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: List.generate(3, (index) {
+                      final selected = index == _step;
+                      final completed = index < _step;
+                      return Expanded(
+                        child: Container(
+                          margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? const Color(0xFFE5F4EE)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected ? kGreen : kBorderColor,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                completed
+                                    ? Icons.check_circle_rounded
+                                    : index == 0
+                                        ? Icons.category_rounded
+                                        : index == 1
+                                            ? Icons.cable_rounded
+                                            : Icons.tune_rounded,
+                                size: 17,
+                                color: selected || completed
+                                    ? kGreen
+                                    : kTextSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  _stepLabel(index),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: selected
+                                        ? kTextPrimary
+                                        : kTextSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 22),
+                  if (_step == 0) _typeStep(),
+                  if (_step == 1) _connectionStep(),
+                  if (_step == 2) _detailsStep(),
+                  if (_error != null) ...[
+                    const SizedBox(height: 14),
+                    _InlineError(message: _error!),
+                  ],
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      if (_step > 0)
+                        TextButton(
+                          onPressed:
+                              _working ? null : () => setState(() => _step--),
+                          child: const Text('Geri'),
+                        ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: _working ? null : _continue,
+                        child: _working
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(_step < 2
+                                ? 'Devam et'
+                                : editing
+                                    ? 'Ayarları kaydet'
+                                    : 'Test et ve ekle'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -548,39 +876,71 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   }
 
   Widget _typeStep() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: HardwareDeviceType.values.map((type) {
-        final selected = type == _type;
-        return ChoiceChip(
-          avatar: Icon(_typeIcon(type), size: 18),
-          label: Text(_typeLabel(type)),
-          selected: selected,
-          onSelected: (_) {
-            setState(() {
-              _type = type;
-              _connection = _connectionsFor(type).first;
-              _name.text = _typeLabel(type);
-              _port.text = _defaultPort(type).toString();
-            });
-          },
-        );
-      }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Ne eklemek istiyorsunuz?',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Aygıt türünü seçin; uygun bağlantıları biz göstereceğiz.',
+            style: TextStyle(fontSize: 12, color: kTextSecondary)),
+        const SizedBox(height: 14),
+        LayoutBuilder(builder: (context, constraints) {
+          final width = constraints.maxWidth >= 620
+              ? (constraints.maxWidth - 12) / 2
+              : constraints.maxWidth;
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: HardwareDeviceType.values.map((type) {
+              final selected = type == _type;
+              return SizedBox(
+                width: width,
+                child: _SelectionCard(
+                  selected: selected,
+                  icon: _typeIcon(type),
+                  color: _typeColor(type),
+                  title: _typeLabel(type),
+                  subtitle: _typeDescription(type),
+                  onTap: () {
+                    setState(() {
+                      _type = type;
+                      _connection = _connectionsFor(type).first;
+                      _name.text = _typeLabel(type);
+                      _port.text = _defaultPort(type).toString();
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          );
+        }),
+      ],
     );
   }
 
   Widget _connectionStep() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: _connectionsFor(_type).map((connection) {
-        return ChoiceChip(
-          label: Text(_connectionLabel(connection)),
-          selected: connection == _connection,
-          onSelected: (_) => setState(() => _connection = connection),
-        );
-      }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${_typeLabel(_type)} nasıl bağlı?',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Bilmiyorsanız en tanıdık seçeneği seçin.',
+            style: TextStyle(fontSize: 12, color: kTextSecondary)),
+        const SizedBox(height: 14),
+        ..._connectionsFor(_type).map((connection) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _SelectionCard(
+                selected: connection == _connection,
+                icon: _connectionIcon(connection),
+                color: kGreen,
+                title: _connectionLabel(connection),
+                subtitle: _connectionDescription(connection),
+                onTap: () => setState(() => _connection = connection),
+              ),
+            )),
+      ],
     );
   }
 
@@ -588,6 +948,14 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text('${_typeLabel(_type)} ayarları',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(
+          '${_connectionLabel(_connection)} için gerekli alanları doldurun.',
+          style: const TextStyle(fontSize: 12, color: kTextSecondary),
+        ),
+        const SizedBox(height: 16),
         TextField(
           controller: _name,
           decoration: const InputDecoration(
@@ -700,6 +1068,40 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
             _connection == HardwareConnectionType.windows) ...[
+          OutlinedButton.icon(
+            onPressed: _discoveringWindows ? null : _discoverWindowsPrinters,
+            icon: _discoveringWindows
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.manage_search_rounded),
+            label: Text(_discoveringWindows
+                ? 'Windows yazıcıları okunuyor…'
+                : 'Windows yazıcılarını bul'),
+          ),
+          if (_discoveredPrinters.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ..._discoveredPrinters
+                .where((item) => item.kind == DiscoveredPrinterKind.windows)
+                .map((printer) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: printer.name,
+                      groupValue: _printerName.text,
+                      onChanged: (value) => setState(() {
+                        _printerName.text = value ?? '';
+                        if (_name.text == _typeLabel(_type)) {
+                          _name.text = printer.name;
+                        }
+                      }),
+                      title: Text(printer.name),
+                      subtitle: Text(printer.isDefault
+                          ? 'Varsayılan Windows yazıcısı'
+                          : 'Windows yazıcı kuyruğu'),
+                    )),
+          ],
+          const SizedBox(height: 10),
           TextField(
             controller: _printerName,
             decoration: const InputDecoration(
@@ -707,6 +1109,64 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               helperText: 'Windows yazıcı listesindeki adla aynı olmalıdır.',
             ),
           ),
+        ],
+        if ((_type == HardwareDeviceType.receiptPrinter ||
+                _type == HardwareDeviceType.labelPrinter) &&
+            _connection == HardwareConnectionType.tcp) ...[
+          OutlinedButton.icon(
+            onPressed: _discoveringNetwork ? null : _discoverNetworkPrinters,
+            icon: _discoveringNetwork
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.radar_rounded),
+            label: Text(_discoveringNetwork
+                ? 'Yerel ağ taranıyor…'
+                : 'Aynı ağdaki yazıcıları bul'),
+          ),
+          if (_discoveredPrinters
+              .any((item) => item.kind == DiscoveredPrinterKind.network)) ...[
+            const SizedBox(height: 8),
+            ..._discoveredPrinters
+                .where((item) => item.kind == DiscoveredPrinterKind.network)
+                .map((printer) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: printer.address ?? '',
+                      groupValue: _host.text,
+                      onChanged: (value) => setState(() {
+                        _host.text = value ?? '';
+                        _port.text = '${printer.port ?? 9100}';
+                      }),
+                      title: Text(printer.address ?? printer.name),
+                      subtitle: const Text(
+                        'Yazıcı adayı · Test çıktısıyla doğrulanacak',
+                      ),
+                    )),
+          ],
+          const SizedBox(height: 10),
+        ],
+        if (_connection == HardwareConnectionType.serial) ...[
+          OutlinedButton.icon(
+            onPressed: _discoverSerialPorts,
+            icon: const Icon(Icons.usb_rounded),
+            label: const Text('USB / COM aygıtlarını bul'),
+          ),
+          if (_serialPorts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ..._serialPorts.map((port) => RadioListTile<String>(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: port,
+                  groupValue: _serialPort.text,
+                  onChanged: (value) =>
+                      setState(() => _serialPort.text = value ?? ''),
+                  title: Text(port),
+                  subtitle: const Text('Seri bağlantı noktası'),
+                )),
+            const SizedBox(height: 8),
+          ],
         ],
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
@@ -811,18 +1271,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             onChanged: (val) => setState(() => _openDrawer = val),
             contentPadding: EdgeInsets.zero,
           ),
-          SwitchListTile(
-            title: const Text('İşletme Logosunu Bas'),
-            value: _printLogo,
-            onChanged: (val) => setState(() => _printLogo = val),
-            contentPadding: EdgeInsets.zero,
-          ),
-          SwitchListTile(
-            title: const Text('Sipariş Barkodu Bas'),
-            value: _printBarcode,
-            onChanged: (val) => setState(() => _printBarcode = val),
-            contentPadding: EdgeInsets.zero,
-          ),
           const SizedBox(height: 8),
           TextField(
             controller: _labelCopies,
@@ -858,20 +1306,45 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                   controller: _labelWidth,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'Kağıt Genişliği / En (mm)',
-                    helperText: 'Standart etiket uzunluğu 30mm, boşluksuz (sürekli) format.',
+                    labelText: 'Etiket eni (mm)',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _labelHeight,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Etiket boyu (mm)',
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          SwitchListTile(
-            title: const Text('İşletme Logosunu Bas'),
-            value: _printLogo,
-            onChanged: (val) => setState(() => _printLogo = val),
-            contentPadding: EdgeInsets.zero,
+          TextField(
+            controller: _labelGap,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Etiketler arası boşluk (mm)',
+              helperText:
+                  '58 mm yazıcı genişliği ile etiketin gerçek en/boy ölçüsü aynı ayar değildir.',
+            ),
           ),
+          if (_labelLanguage == 'tspl') ...[
+            const SizedBox(height: 4),
+            SwitchListTile(
+              title: const Text('Gap boşluğunu otomatik algıla'),
+              subtitle: const Text(
+                'Gaplı etiket kullanıldığında yazıcı sensörü etiket aralığını kalibre eder.',
+              ),
+              value: _autoDetectLabelGap,
+              onChanged: (value) => setState(() => _autoDetectLabelGap = value),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+          const SizedBox(height: 12),
           TextField(
             controller: _labelCopies,
             keyboardType: TextInputType.number,
@@ -889,9 +1362,28 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             onSelectionChanged: (values) =>
                 setState(() => _labelDpi = values.first),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _printableWidthDots,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Basılabilir genişlik (nokta)',
+              helperText: '58 mm / 203 DPI cihazlarda genellikle 384 noktadır.',
+            ),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('Normal yön')),
+              ButtonSegment(value: 1, label: Text('Ters yön')),
+            ],
+            selected: {_printDirection},
+            onSelectionChanged: (values) =>
+                setState(() => _printDirection = values.first),
+          ),
           const SizedBox(height: 8),
           const Text(
-            'Rulo üzerindeki tek etiketin gerçek ölçüsünü girin. Varsayılan raf etiketi 50×30 mm, etiket aralığı 2 mm’dir.',
+            'Rulo üzerindeki tek etiketin gerçek en ve boy ölçüsünü girin. 58 mm cihaz, en fazla 58 mm medya kullanabildiğini belirtir; örneğin gerçek etiket 50×30 mm olabilir.',
             style: TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
@@ -948,6 +1440,80 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     });
   }
 
+  Future<void> _discoverWindowsPrinters() async {
+    setState(() {
+      _discoveringWindows = true;
+      _error = null;
+    });
+    final printers = await PrinterDiscoveryService().listWindowsPrinters();
+    if (!mounted) return;
+    setState(() {
+      _discoveringWindows = false;
+      _discoveredPrinters = [
+        ..._discoveredPrinters
+            .where((item) => item.kind != DiscoveredPrinterKind.windows),
+        ...printers,
+      ];
+      if (printers.isEmpty) {
+        _error = 'Windows yazıcısı bulunamadı. Yazıcı sürücüsünü ve Print '
+            'Spooler hizmetini kontrol edin.';
+      } else if (_printerName.text.isEmpty) {
+        final preferred =
+            printers.where((item) => item.isDefault).firstOrNull ??
+                printers.first;
+        _printerName.text = preferred.name;
+      }
+    });
+  }
+
+  Future<void> _discoverNetworkPrinters() async {
+    setState(() {
+      _discoveringNetwork = true;
+      _error = null;
+    });
+    try {
+      final discovery = PrinterDiscoveryService();
+      final subnets = await discovery.localIpv4Subnets();
+      final found = <DiscoveredPrinter>[];
+      for (final subnet in subnets.take(2)) {
+        found.addAll(await discovery.scanSubnet(subnet));
+      }
+      if (!mounted) return;
+      setState(() {
+        _discoveredPrinters = [
+          ..._discoveredPrinters
+              .where((item) => item.kind != DiscoveredPrinterKind.network),
+          ...found,
+        ];
+        if (found.isEmpty) {
+          _error = 'Aynı ağda RAW 9100 yazıcı adayı bulunamadı. '
+              'Yazıcı farklı VLAN üzerindeyse IP adresini manuel girin.';
+        }
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Ağ taraması tamamlanamadı: $error');
+    } finally {
+      if (mounted) setState(() => _discoveringNetwork = false);
+    }
+  }
+
+  void _discoverSerialPorts() {
+    try {
+      final ports = SerialScaleAdapter.availablePorts;
+      setState(() {
+        _serialPorts = ports;
+        _error = ports.isEmpty
+            ? 'USB / COM aygıtı bulunamadı. Sürücünün kurulu olduğunu kontrol edin.'
+            : null;
+        if (_serialPort.text.isEmpty && ports.isNotEmpty) {
+          _serialPort.text = ports.first;
+        }
+      });
+    } catch (error) {
+      setState(() => _error = 'Seri portlar okunamadı: $error');
+    }
+  }
+
   String? _validate() {
     if (_name.text.trim().isEmpty) return 'Cihaz adı gereklidir.';
     if (_connection == HardwareConnectionType.tcp) {
@@ -977,6 +1543,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       final height = int.tryParse(_labelHeight.text);
       final gap = int.tryParse(_labelGap.text);
       final copies = int.tryParse(_labelCopies.text);
+      final printableDots = int.tryParse(_printableWidthDots.text);
       if (width == null || width < 30 || width > 100) {
         return 'Etiket eni 30-100 mm arasında olmalıdır.';
       }
@@ -988,6 +1555,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       }
       if (copies == null || copies < 1 || copies > 20) {
         return 'Etiket adedi 1-20 arasında olmalıdır.';
+      }
+      if (printableDots == null ||
+          printableDots < 200 ||
+          printableDots > 1200) {
+        return 'Basılabilir genişlik 200-1200 nokta arasında olmalıdır.';
       }
     }
     return null;
@@ -1023,32 +1595,139 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelWidthMm': int.tryParse(_labelWidth.text) ?? 50,
         'labelHeightMm': int.tryParse(_labelHeight.text) ?? 30,
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
+        'autoDetectLabelGap': _labelLanguage == 'tspl' && _autoDetectLabelGap,
         'dpi': _labelDpi,
+        'printableWidthDots': int.tryParse(_printableWidthDots.text) ?? 384,
+        'printDirection': _printDirection,
         'copies': int.tryParse(_labelCopies.text) ?? 1,
         'autoCut': _autoCut,
         'openDrawer': _openDrawer,
-        'printLogo': _printLogo,
-        'printBarcode': _printBarcode,
-        'printQr': _printQr,
       },
     );
   }
 }
 
-class _TestResultDialog extends StatelessWidget {
+class _SelectionCard extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SelectionCard({
+    required this.selected,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? color.withValues(alpha: .07) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? color : kBorderColor,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, color: kTextPrimary)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 11, height: 1.3, color: kTextSecondary)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected ? color : kBorderColor,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TestResultDialog extends StatefulWidget {
   final HardwareTestResult result;
 
   const _TestResultDialog({required this.result});
 
   @override
+  State<_TestResultDialog> createState() => _TestResultDialogState();
+}
+
+class _TestResultDialogState extends State<_TestResultDialog> {
+  bool _confirmationEnabled = false;
+
+  HardwareTestResult get result => widget.result;
+
+  @override
+  void initState() {
+    super.initState();
+    if (result.requiresPhysicalConfirmation) {
+      Future<void>.delayed(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() => _confirmationEnabled = true);
+      });
+    } else {
+      _confirmationEnabled = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AlertDialog(
       icon: Icon(
-        result.success ? Icons.check_circle_rounded : Icons.error_rounded,
-        color: result.success ? kGreen : kPink,
+        result.requiresPhysicalConfirmation
+            ? Icons.fact_check_rounded
+            : result.success
+                ? Icons.check_circle_rounded
+                : Icons.error_rounded,
+        color: result.requiresPhysicalConfirmation
+            ? kOrange
+            : result.success
+                ? kGreen
+                : kPink,
         size: 48,
       ),
-      title: Text(result.success ? 'Bağlantı hazır' : 'Bağlantı kurulamadı'),
+      title: Text(result.requiresPhysicalConfirmation
+          ? 'Çıktıyı kontrol edin'
+          : result.success
+              ? 'Bağlantı hazır'
+              : 'Bağlantı kurulamadı'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1069,10 +1748,24 @@ class _TestResultDialog extends StatelessWidget {
         ],
       ),
       actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Tamam'),
-        ),
+        if (result.requiresPhysicalConfirmation) ...[
+          TextButton(
+            onPressed: _confirmationEnabled
+                ? () => Navigator.pop(context, false)
+                : null,
+            child: const Text('Hayır, hatalı'),
+          ),
+          FilledButton(
+            onPressed: _confirmationEnabled
+                ? () => Navigator.pop(context, true)
+                : null,
+            child: const Text('Evet, doğru'),
+          ),
+        ] else
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tamam'),
+          ),
       ],
     );
   }
@@ -1198,6 +1891,47 @@ class _LoadError extends StatelessWidget {
   };
 }
 
+String deviceFriendlyIdentity(HardwareDevice device) =>
+    '${_typeLabel(device.type)} · ${_connectionLabel(device.connectionType)}';
+
+String _typeDescription(HardwareDeviceType type) => switch (type) {
+      HardwareDeviceType.receiptPrinter =>
+        'Fiş, mutfak çıktısı ve kasa çekmecesi',
+      HardwareDeviceType.labelPrinter => 'Ürün, raf ve sipariş etiketi',
+      HardwareDeviceType.scale => 'Canlı ağırlık bilgisini satışa aktarır',
+      HardwareDeviceType.paymentTerminal =>
+        'Banka veya ödeme terminali bağlantısı',
+      HardwareDeviceType.barcodeScanner =>
+        'USB, dahili kamera veya el terminali',
+    };
+
+IconData _connectionIcon(HardwareConnectionType connection) =>
+    switch (connection) {
+      HardwareConnectionType.embedded => Icons.smartphone_rounded,
+      HardwareConnectionType.windows => Icons.desktop_windows_rounded,
+      HardwareConnectionType.bluetooth => Icons.bluetooth_rounded,
+      HardwareConnectionType.serial => Icons.usb_rounded,
+      HardwareConnectionType.tcp => Icons.lan_rounded,
+      HardwareConnectionType.keyboard => Icons.keyboard_rounded,
+      HardwareConnectionType.cloud => Icons.cloud_queue_rounded,
+    };
+
+String _connectionDescription(HardwareConnectionType connection) =>
+    switch (connection) {
+      HardwareConnectionType.embedded =>
+        'Sunmi gibi cihazın kendi üzerindeki donanım',
+      HardwareConnectionType.windows =>
+        'Windows’a kurulmuş veya USB ile bağlı yazıcı',
+      HardwareConnectionType.bluetooth => 'Kablosuz eşleştirilen yakın aygıt',
+      HardwareConnectionType.serial =>
+        'USB dönüştürücü veya COM portu kullanan aygıt',
+      HardwareConnectionType.tcp => 'Aynı ağdaki Ethernet veya Wi-Fi aygıtı',
+      HardwareConnectionType.keyboard =>
+        'Okutunca klavye gibi veri gönderen USB aygıt',
+      HardwareConnectionType.cloud =>
+        'Başka bir açık cihaz tarafından paylaşılan aygıt',
+    };
+
 String _typeLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter => 'Fiş yazıcısı',
       HardwareDeviceType.labelPrinter => 'Etiket yazıcısı',
@@ -1205,6 +1939,33 @@ String _typeLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.paymentTerminal => 'Fiziksel POS',
       HardwareDeviceType.barcodeScanner => 'Barkod okuyucu',
     };
+
+String _deviceConfigurationSummary(HardwareDevice device) {
+  final config = device.configuration;
+  int value(String key, int fallback) =>
+      int.tryParse(config[key]?.toString() ?? '') ?? fallback;
+  return switch (device.type) {
+    HardwareDeviceType.receiptPrinter =>
+      '${value('paperWidth', 58)} mm fiş · ${config['autoCut'] == true ? 'otomatik kesim' : 'kesimsiz'}',
+    HardwareDeviceType.labelPrinter =>
+      '${value('labelWidthMm', 50)}×${value('labelHeightMm', 30)} mm · ${value('dpi', 203)} DPI · ${(config['language'] ?? 'tspl').toString().toUpperCase()}',
+    HardwareDeviceType.scale =>
+      '${value('baudRate', 9600)} baud · ${(config['defaultUnit'] ?? 'kg').toString()}',
+    HardwareDeviceType.paymentTerminal =>
+      '${(config['vendor'] ?? 'generic').toString()} · ${(config['protocol'] ?? 'vendor_sdk').toString().toUpperCase()}',
+    HardwareDeviceType.barcodeScanner => 'Okutma ile doğrulama',
+  };
+}
+
+String _activeRouteLabel(List<String> activeFor) {
+  final labels = activeFor.map((kind) => switch (kind) {
+        'receipt' => 'Fiş',
+        'productLabel' => 'Ürün etiketi',
+        'orderLabel' => 'Sipariş etiketi',
+        _ => kind,
+      });
+  return 'Aktif rota: ${labels.join(', ')}';
+}
 
 IconData _typeIcon(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter => Icons.print_rounded,
@@ -1230,6 +1991,7 @@ String _connectionLabel(HardwareConnectionType connection) =>
       HardwareConnectionType.serial => 'COM / USB',
       HardwareConnectionType.tcp => 'TCP / Ağ',
       HardwareConnectionType.keyboard => 'USB klavye',
+      HardwareConnectionType.cloud => 'Ortak / Uzak',
     };
 
 List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {

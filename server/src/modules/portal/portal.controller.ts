@@ -12,6 +12,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import { logger } from '../../config/logger';
 import crypto from 'crypto';
+import { PasswordRecoveryService } from '../auth/password-recovery.service';
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res: Response) => {
     const stores = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM branches WHERE company_id = $1 AND is_active = TRUE', [user.company_id]);
     const devices = await runWithTenantContext(user.company_id, "SELECT COUNT(*) FROM device_activations WHERE company_id = $1 AND status = 'active'", [user.company_id]);
     const licenses = await runWithTenantContext(user.company_id, 'SELECT id, plan_id as tier, status, valid_until as expires_at, license_key, device_limit as allowed_devices_count FROM license_entitlements WHERE company_id = $1 ORDER BY valid_until DESC', [user.company_id]);
-    const invoices = await runWithTenantContext(user.company_id, 'SELECT COUNT(*) FROM invoices WHERE status = \'unpaid\' AND company_id = $1', [user.company_id]);
+    const invoices = await runWithTenantContext(user.company_id, "SELECT COUNT(*) FROM invoices WHERE status IN ('pending','unpaid') AND company_id = $1", [user.company_id]);
     const recentSales = await runWithTenantContext(user.company_id, 'SELECT SUM(total_amount) FROM sales WHERE created_at >= NOW() - INTERVAL \'30 days\' AND company_id = $1', [user.company_id]);
 
     return res.json({
@@ -101,8 +102,11 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const list = await runWithTenantContext(user.company_id, `
-      SELECT da.id, da.device_name as name, da.device_hash, da.platform, da.status, da.activated_at as created_at, da.last_seen_at as last_active_at 
-      FROM device_activations da 
+      SELECT da.id, da.device_name as name, da.device_hash, da.platform, da.status,
+             da.activated_at as created_at, da.last_seen_at as last_active_at,
+             s.name AS store_name
+      FROM device_activations da
+      LEFT JOIN stores s ON s.id = da.store_id AND s.company_id = da.company_id
       WHERE da.company_id = $1
       ORDER BY da.activated_at DESC
     `, [user.company_id]);
@@ -259,9 +263,9 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: 'forbidden', message: 'Sadece yetkili yöneticiler kullanıcı oluşturabilir.' });
   }
 
-  const { name, email, password, role_id } = req.body;
-  if (!name || !email || !password || !role_id) {
-    return res.status(400).json({ error: 'missing_fields', message: 'Ad, e-posta, şifre ve rol zorunludur.' });
+  const { name, email, role_id } = req.body;
+  if (!name || !email || !role_id) {
+    return res.status(400).json({ error: 'missing_fields', message: 'Ad, e-posta ve rol zorunludur.' });
   }
 
   // Prevent assigning 'sysadmin' role unless the requester is also a sysadmin
@@ -277,10 +281,6 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
   );
   if (assignableRole.rows.length === 0) {
     return res.status(400).json({ error: 'invalid_role', message: 'Bu rol firmaya atanamaz.' });
-  }
-
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
   }
 
   const id = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -303,23 +303,34 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(409).json({ error: 'user_limit_reached', message: 'Planınızdaki kullanıcı sınırına ulaştınız.' });
     }
 
-    const passwordHash = await AuthService.hashPassword(password);
-
-    await runWithTenantContext(
-      user.company_id,
-      'INSERT INTO users (id, company_id, name, email, password_hash, is_active) VALUES ($1, $2, $3, $4, $5, true)',
-      [id, user.company_id, name.trim(), email.trim().toLowerCase(), passwordHash]
-    );
-
-    await runWithTenantContext(
-      user.company_id,
-      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
-      [id, role_id]
-    );
+    const passwordHash = await AuthService.hashPassword(crypto.randomBytes(32).toString('base64url'));
+    const client = await pgPool.connect();
+    let initialClaim: { requestId: string; claimCode: string };
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.current_company_id',$1,true)", [user.company_id]);
+      await client.query(
+        'INSERT INTO users (id,company_id,name,email,password_hash,is_active) VALUES($1,$2,$3,$4,$5,TRUE)',
+        [id, user.company_id, name.trim(), email.trim().toLowerCase(), passwordHash],
+      );
+      await client.query('INSERT INTO user_roles(user_id,role_id) VALUES($1,$2)', [id, role_id]);
+      initialClaim = await PasswordRecoveryService.createInitialClaim(client, {
+        targetUserId: id, companyId: user.company_id, actorId: user.id,
+        reason: 'Firma yöneticisi tarafından yeni kullanıcı aktivasyonu',
+        context: { ip: req.ip, userAgent: req.headers['user-agent'] },
+      });
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally { client.release(); }
 
     await writeTenantAudit(user.company_id, user.id, 'CREATE_USER', 'users', id, null, { name, email, role_id });
 
-    return res.status(201).json({ success: true, user_id: id });
+    return res.status(201).json({
+      success: true, user_id: id, recovery_request_id: initialClaim.requestId,
+      claim_code: initialClaim.claimCode,
+    });
   } catch (err: any) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'email_exists', message: 'Bu e-posta adresi bu firmada zaten kayıtlı.' });
@@ -329,7 +340,7 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
-// PATCH /portal/users/:id — Update name, email, active status or reset password
+// PATCH /portal/users/:id — Update identity, role or active status.
 router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const isOwner = user.roles?.includes('owner') || user.roles?.includes('admin') || user.roles?.includes('sysadmin');
@@ -338,6 +349,12 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const { name, email, is_active, new_password, role_id } = req.body;
+  if (new_password !== undefined) {
+    return res.status(410).json({
+      error: 'direct_password_reset_removed',
+      message: 'Yönetici parola belirleyemez. Tek kullanımlık kurtarma talebi oluşturun.',
+    });
+  }
   const targetId = req.params.id;
   if (targetId === user.id && is_active === false) {
     return res.status(400).json({ error: 'cannot_deactivate_self', message: 'Kendi hesabınızı devre dışı bırakamazsınız.' });
@@ -383,17 +400,6 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
     if (name !== undefined) { updates.push(`name = $${idx++}`); values.push(name.trim()); }
     if (email !== undefined) { updates.push(`email = $${idx++}`); values.push(email.trim().toLowerCase()); }
     if (is_active !== undefined) { updates.push(`is_active = $${idx++}`); values.push(Boolean(is_active)); }
-    if (new_password !== undefined) {
-      if (new_password.length < 8) {
-        await client.query('ROLLBACK');
-        client.release();
-        return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 8 karakter olmalıdır.' });
-      }
-      const hash = await AuthService.hashPassword(new_password);
-      updates.push(`password_hash = $${idx++}`);
-      values.push(hash);
-    }
-
     if (updates.length > 0) {
       updates.push(`token_version = token_version + 1`);
       updates.push(`updated_at = CURRENT_TIMESTAMP`);

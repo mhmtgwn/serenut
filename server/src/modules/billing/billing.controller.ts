@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pgPool, redisClient } from '../../config/database';
-import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
-import { InvoiceGeneratorService } from './invoice_generator.service';
+import { authenticateUser, AuthenticatedRequest, requirePermission, requireRole } from '../../middleware/auth.middleware';
 import { IyzicoService, loadIyzicoConfig } from './iyzico.service';
 import { logger } from '../../config/logger';
 import { webhookLimiter } from '../../middleware/rate-limit.middleware';
@@ -13,7 +12,9 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { CommercialLifecycleService } from './commercial_lifecycle.service';
+import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { RealtimeBroadcastService } from '../realtime/broadcast.service';
+import { BillingDomainService } from './billing-domain.service';
 
 const router = Router();
 
@@ -72,7 +73,10 @@ router.get('/plans', async (req, res: Response) => {
   }
 
   try {
-    const result = await runBypassingRLS('SELECT * FROM plans WHERE is_active = true ORDER BY price ASC');
+    const result = await runBypassingRLS(
+      `SELECT p.*, ROUND((p.price * 12 * 0.85)::numeric, 2) AS yearly_price
+       FROM plans p WHERE is_active = true ORDER BY price ASC`,
+    );
     const plans = result.rows;
     if (redisClient && redisClient.isOpen) {
       await redisClient.setEx(cacheKey, 300, JSON.stringify(plans));
@@ -83,11 +87,43 @@ router.get('/plans', async (req, res: Response) => {
   }
 });
 
+router.post('/quotes', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const quote = await BillingDomainService.createQuote(
+      client, req.user!.company_id, String(req.body?.plan_id || ''), req.body?.billing_period,
+    );
+    await client.query('COMMIT');
+    return res.status(201).json({ quote_id: quote.quoteId, plan_id: quote.planId,
+      plan_name: quote.planName, billing_period: quote.period, amount: quote.amount,
+      currency: quote.currency, expires_at: quote.expiresAt.toISOString() });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    return res.status(error?.message === 'plan_not_found' ? 404 : 400)
+      .json({ error: error?.message || 'quote_failed' });
+  } finally { client.release(); }
+});
+
 router.get('/effective-plans', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const result = await runBypassingRLS(
       `SELECT p.*, COALESCE(o.custom_price,p.price) AS price,
               COALESCE(o.billing_interval,p.billing_interval) AS billing_interval,
+              CASE
+                WHEN o.billing_interval = 'yearly' THEN NULL
+                WHEN o.custom_price IS NOT NULL THEN o.custom_price
+                WHEN p.billing_interval = 'yearly' THEN ROUND((p.price / (12 * 0.85))::numeric, 2)
+                ELSE p.price
+              END AS monthly_price,
+              CASE
+                WHEN o.billing_interval = 'monthly' THEN NULL
+                WHEN o.custom_price IS NOT NULL THEN o.custom_price
+                WHEN p.billing_interval = 'yearly' THEN p.price
+                ELSE ROUND((p.price * 12 * 0.85)::numeric, 2)
+              END AS yearly_price,
+              o.billing_interval AS locked_billing_period,
               COALESCE(o.device_limit,p.device_limit) AS device_limit,
               COALESCE(o.store_limit,p.store_limit) AS store_limit,
               COALESCE(o.user_limit,p.user_limit) AS user_limit,
@@ -151,11 +187,11 @@ router.get('/payment-methods', async (req: Request, res: Response) => {
     `);
     
     // We intentionally exclude secrets and backend metadata (last_test_at, etc.)
-    return res.json(result.rows);
+    return res.json(result.rows.map(row => ({ ...row, is_enabled: true })));
   } catch (err: any) {
-    // If the table doesn't exist yet, fallback to default bank transfer until migrations run
+    // Missing schema is an operational error; never invent a payment method.
     if (err.code === '42P01') {
-      return res.json([{ id: 'bank_transfer', display_name: 'Havale / EFT', config: {} }]);
+      return res.status(503).json({ error: 'payment_configuration_unavailable' });
     }
     logger.error('Error fetching payment methods:', err);
     return res.status(500).json({ error: 'server_error' });
@@ -210,10 +246,10 @@ router.put('/bank-accounts/:id', authenticateUser, requireRole('sysadmin'), asyn
  *     security:
  *       - BearerAuth: []
  */
-router.post('/request-bank-transfer', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/request-bank-transfer', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { plan_id, bank_account_id, billing_period } = req.body;
-  if (!plan_id || !bank_account_id) {
+  const { quote_id, bank_account_id } = req.body;
+  if (!quote_id || !bank_account_id) {
     return res.status(400).json({ error: 'missing_fields', message: 'Plan ve banka hesabı seçimi zorunludur.' });
   }
   const client = await pgPool.connect();
@@ -221,18 +257,7 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     await client.query('BEGIN');
     await client.query("SET LOCAL app.bypass_rls = 'true'");
 
-    const planRes = await client.query(
-      `SELECT p.*,o.custom_price,COALESCE(o.custom_price,p.price) AS effective_price,
-              COALESCE(o.billing_interval,p.billing_interval) AS effective_billing_interval
-       FROM plans p LEFT JOIN subscription_overrides o ON o.company_id=$2
-        AND o.base_plan_id=p.id AND o.is_active=TRUE
-        AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
-       WHERE p.id=$1`, [plan_id,user.company_id]);
-    if (planRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'plan_not_found' });
-    }
-    const plan = planRes.rows[0];
+    const quote = await BillingDomainService.lockQuote(client, user.company_id, quote_id);
 
     const bankRes = await client.query('SELECT * FROM payment_bank_accounts WHERE id = $1 AND is_active = TRUE', [bank_account_id]);
     if (bankRes.rows.length === 0) {
@@ -242,28 +267,16 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     const bank = bankRes.rows[0];
 
     const now = new Date();
-    const periodEnd = new Date(now);
-    const effectiveBillingPeriod = plan.effective_billing_interval || billing_period;
-    if (effectiveBillingPeriod === 'yearly') {
-      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-    } else {
-      periodEnd.setMonth(periodEnd.getMonth() + 1);
-    }
-
-    // Calculate price based on billing_period
-    let price = Number(plan.effective_price);
-    if (effectiveBillingPeriod === 'yearly' && !plan.custom_price) {
-      price = price * 12 * 0.85; // 15% discount
-    }
-    const finalPriceStr = price.toFixed(2);
+    const periodEnd = BillingDomainService.addPeriod(now, quote.period);
+    const finalPriceStr = quote.amount.toFixed(2);
 
     // Create pending invoice
-    const invoiceId = `inv-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    const invoiceNum = `INV-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const invoiceId = BillingDomainService.opaqueId('inv');
+    const invoiceNum = await BillingDomainService.nextInvoiceNumber(client);
     await client.query(
-      `INSERT INTO invoices (id, company_id, amount, status, due_at, invoice_number, billing_details)
-       VALUES ($1,$2,$3,'pending',$4,$5,$6)`,
-      [invoiceId, user.company_id, price, periodEnd, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: effectiveBillingPeriod })]
+      `INSERT INTO invoices (id, company_id, amount, status, due_at, expires_at, invoice_number, billing_details)
+       VALUES ($1,$2,$3,'pending',$4,NOW() + INTERVAL '48 hours',$5,$6)`,
+      [invoiceId, user.company_id, quote.amount, periodEnd, invoiceNum, JSON.stringify({ quoteId: quote.quoteId, planName: quote.planName, planId: quote.planId, billingPeriod: quote.period, currency: quote.currency })]
     );
 
     // Generate unique reference code: SRNTT-YYYYMMDD-XXXX
@@ -272,12 +285,13 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
     const referenceCode = `SRNTT-${datePart}-${randPart}`;
 
     // Create bank transfer notification
-    const notifId = `btn-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const notifId = BillingDomainService.opaqueId('btn');
     await client.query(
       `INSERT INTO bank_transfer_notifications (id, invoice_id, company_id, bank_account_id, reference_code, status)
        VALUES ($1,$2,$3,$4,$5,'pending')`,
       [notifId, invoiceId, user.company_id, bank_account_id, referenceCode]
     );
+    await BillingDomainService.consumeQuote(client, quote.quoteId, invoiceId);
 
     await client.query('COMMIT');
 
@@ -292,12 +306,15 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
         instructions: bank.instructions,
       },
       amount: finalPriceStr,
-      currency: plan.currency,
+      currency: quote.currency,
+      billing_period: quote.period,
+      period_end: periodEnd.toISOString(),
       message: `Lütfen havale açıklama alanına referans kodunuzu yazın: ${referenceCode}`,
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     logger.error('Error creating bank transfer request:', err);
+    if ((err as Error).message === 'plan_not_found') return res.status(404).json({ error: 'plan_not_found' });
     return res.status(500).json({ error: 'server_error' });
   } finally {
     client.release();
@@ -312,7 +329,7 @@ router.post('/request-bank-transfer', authenticateUser, async (req: Authenticate
  *     security:
  *       - BearerAuth: []
  */
-router.post('/notify-transfer', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/notify-transfer', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const { invoice_id, sender_name, sender_bank, transfer_date, transfer_description } = req.body;
   if (!invoice_id) {
@@ -324,12 +341,14 @@ router.post('/notify-transfer', authenticateUser, async (req: AuthenticatedReque
        SET sender_name=$1, sender_bank=$2, transfer_date=$3, transfer_description=$4,
            status='pending_review', updated_at=NOW()
        WHERE invoice_id=$5 AND company_id=$6 AND status='pending'
+         AND EXISTS (SELECT 1 FROM invoices i WHERE i.id=$5 AND i.status='pending' AND (i.expires_at IS NULL OR i.expires_at > NOW()))
        RETURNING reference_code`,
       [sender_name || null, sender_bank || null, transfer_date || null, transfer_description || null, invoice_id, user.company_id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'notification_not_found', message: 'Havale bildirimi bulunamadı veya zaten işleme alındı.' });
     }
+    await runBypassingRLS('UPDATE invoices SET expires_at=NULL, updated_at=NOW() WHERE id=$1 AND company_id=$2', [invoice_id, user.company_id]);
     return res.json({ success: true, message: 'Havale bildiriminiz alındı. Yöneticilerimiz ödemeyi inceleyecektir.', reference_code: result.rows[0].reference_code });
   } catch (err) {
     logger.error('Error updating bank transfer notification:', err);
@@ -350,7 +369,7 @@ router.get('/admin/pending-transfers', authenticateUser, requireRole('sysadmin')
     const result = await runBypassingRLS(`
       SELECT btn.id, btn.reference_code, btn.sender_name, btn.sender_bank,
              btn.transfer_date, btn.status, btn.created_at,
-             inv.id as invoice_id, inv.amount, inv.invoice_number,
+             inv.id as invoice_id, inv.amount, inv.invoice_number, inv.billing_details,
              c.id as company_id, c.name as company_name, c.email as company_email,
              pba.bank_name, pba.iban
       FROM bank_transfer_notifications btn
@@ -366,6 +385,68 @@ router.get('/admin/pending-transfers', authenticateUser, requireRole('sysadmin')
     logger.error('Error fetching pending transfers:', err);
     return res.status(500).json({ error: 'server_error' });
   }
+});
+
+router.post('/transfer-requests/:invoiceId/cancel', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const result = await client.query(
+      `UPDATE invoices SET status='cancelled', updated_at=NOW()
+       WHERE id=$1 AND company_id=$2 AND status='pending'
+       RETURNING id`, [req.params.invoiceId, req.user!.company_id]
+    );
+    if (!result.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'request_not_cancellable', message: 'Bu ödeme talebi artık iptal edilemez.' });
+    }
+    await client.query(
+      `UPDATE bank_transfer_notifications SET status='cancelled', updated_at=NOW()
+       WHERE invoice_id=$1 AND status='pending'`, [req.params.invoiceId]
+    );
+    await client.query('COMMIT');
+    return res.json({ success: true });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Transfer request cancellation failed:', error);
+    return res.status(500).json({ error: 'server_error' });
+  } finally { client.release(); }
+});
+
+router.put('/admin/invoices/:id/reject-payment', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
+  const note = String(req.body?.note || '').trim();
+  if (note.length < 3) return res.status(400).json({ error: 'rejection_note_required', message: 'Red gerekçesi zorunludur.' });
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const invoice = await client.query(
+      `UPDATE invoices SET status='rejected', updated_at=NOW()
+       WHERE id=$1 AND status='pending' RETURNING company_id`, [req.params.id]
+    );
+    if (!invoice.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'invoice_not_rejectable' });
+    }
+    await client.query(
+      `UPDATE bank_transfer_notifications
+       SET status='rejected', admin_note=$1, reviewed_by=$2, reviewed_at=NOW(), updated_at=NOW()
+       WHERE invoice_id=$3 AND status='pending_review'`,
+      [note, req.user!.id, req.params.id]
+    );
+    await client.query(
+      `INSERT INTO audit_logs (id,company_id,user_id,user_name,action,entity,entity_id,new_value)
+       VALUES ($1,$2,$3,'Admin','REJECTED_BANK_WIRE_PAYMENT','invoice',$4,$5)`,
+      [BillingDomainService.opaqueId('al'), invoice.rows[0].company_id, req.user!.id, req.params.id, JSON.stringify({ note })]
+    );
+    await client.query('COMMIT');
+    return res.json({ success: true, message: 'Havale bildirimi reddedildi.' });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Transfer rejection failed:', error);
+    return res.status(500).json({ error: 'server_error' });
+  } finally { client.release(); }
 });
 
 /**
@@ -475,46 +556,30 @@ router.get('/subscription', authenticateUser, async (req: AuthenticatedRequest, 
  *     security:
  *       - bearerAuth: []
  */
-router.post('/reactivate', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/reactivate', authenticateUser, requireRole('owner'), async (req: AuthenticatedRequest, res: Response) => {
+  const client = await pgPool.connect();
   try {
     const companyId = req.user!.company_id;
-    
-    const subRes = await runBypassingRLS(`
-      SELECT * FROM subscriptions 
-      WHERE company_id = $1 
-      ORDER BY created_at DESC 
-      LIMIT 1
-    `, [companyId]);
-
-    if (subRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Subscription not found' });
-    }
-
-    const sub = subRes.rows[0];
-    
-    if (sub.status !== 'cancelled' && sub.cancel_at_period_end !== true) {
-      return res.status(400).json({ error: 'Subscription is not pending cancellation' });
-    }
-
-    await runBypassingRLS(
-      "UPDATE subscriptions SET status = 'active', cancel_at_period_end = FALSE, updated_at = NOW() WHERE id = $1",
-      [sub.id]
-    );
-
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls='true'");
+    await CommercialLifecycleService.setAutoRenewal(client, {
+      companyId, actorId: req.user!.id, enabled: true,
+    });
+    await client.query('COMMIT');
     res.json({ message: 'Subscription reactivated successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => undefined);
     logger.error('Error reactivating subscription:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+    res.status(error.message === 'active_subscription_not_found' ? 404 : 500).json({ error: error.message });
+  } finally { client.release(); }
 });
 
 const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const plan_id = req.body.plan_id || req.body.planId || req.body.selected_plan_id;
-  const billing_period = req.body.billing_period || req.body.billingPeriod || 'monthly';
+  const quoteId = req.body.quote_id || req.body.quoteId;
 
-  if (!plan_id) {
-    return res.status(400).json({ error: 'missing_plan_id' });
+  if (!quoteId) {
+    return res.status(400).json({ error: 'quote_required' });
   }
 
   if (!(await isIyzicoEnabled())) {
@@ -525,39 +590,33 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   try {
-    // 1. Verify plan exists
-    const planRes = await runBypassingRLS(
-      `SELECT p.*, o.custom_price, COALESCE(o.custom_price,p.price) AS effective_price,
-              COALESCE(o.billing_interval,p.billing_interval) AS effective_billing_interval
-       FROM plans p LEFT JOIN subscription_overrides o ON o.company_id=$2
-        AND o.base_plan_id=p.id AND o.is_active=TRUE
-        AND CURRENT_TIMESTAMP BETWEEN o.valid_from AND o.valid_until
-       WHERE p.id=$1`, [plan_id,user.company_id]);
-    if (planRes.rows.length === 0) {
-      return res.status(404).json({ error: 'plan_not_found' });
+    const billingClient = await pgPool.connect();
+    let quote;
+    let invoiceId: string;
+    try {
+      await billingClient.query('BEGIN');
+      await billingClient.query("SET LOCAL app.bypass_rls = 'true'");
+      quote = await BillingDomainService.lockQuote(billingClient, user.company_id, quoteId);
+      invoiceId = BillingDomainService.opaqueId('inv');
+      const invoiceNum = await BillingDomainService.nextInvoiceNumber(billingClient);
+      await billingClient.query(
+        `INSERT INTO invoices (id, company_id, amount, status, due_at, expires_at, invoice_number, billing_details)
+         VALUES ($1,$2,$3,'pending',NOW(),NOW() + INTERVAL '2 hours',$4,$5)`,
+        [invoiceId, user.company_id, quote.amount, invoiceNum, JSON.stringify({ quoteId: quote.quoteId, planName: quote.planName, planId: quote.planId, billingPeriod: quote.period, currency: quote.currency })]
+      );
+      await BillingDomainService.consumeQuote(billingClient, quote.quoteId, invoiceId);
+      await billingClient.query('COMMIT');
+    } catch (billingError) {
+      await billingClient.query('ROLLBACK').catch(() => {});
+      throw billingError;
+    } finally {
+      billingClient.release();
     }
-    const plan = planRes.rows[0];
-
-    // Calculate price on server side
-    const effectiveBillingPeriod = plan.effective_billing_interval || billing_period;
-    let price = Number(plan.effective_price);
-    if (effectiveBillingPeriod === 'yearly' && !plan.custom_price) {
-      price = price * 12 * 0.85; // 15% yearly discount
-    }
-    const finalPriceStr = price.toFixed(2);
+    const finalPriceStr = quote.amount.toFixed(2);
 
     // Fetch company info for billing
     const companyRes = await runBypassingRLS('SELECT * FROM companies WHERE id = $1', [user.company_id]);
     const company = companyRes.rows[0] || {};
-
-    // Create a pending invoice
-    const invoiceId = `inv-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    await runBypassingRLS(
-      `INSERT INTO invoices (id, company_id, amount, status, due_at, invoice_number, billing_details)
-       VALUES ($1,$2,$3,'pending',NOW(),$4,$5)`,
-      [invoiceId, user.company_id, price, invoiceNum, JSON.stringify({ planName: plan.name, planId: plan_id, billingPeriod: effectiveBillingPeriod })]
-    );
 
     const protocol = req.protocol || 'https';
     const baseUrl = `${protocol}://${req.get('host')}`;
@@ -570,7 +629,7 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
       conversationId: invoiceId,
       price: finalPriceStr,
       paidPrice: finalPriceStr,
-      currency: plan.currency || 'TRY',
+      currency: quote.currency as 'TRY' | 'USD' | 'EUR',
       basketId: user.company_id,
       callbackUrl: `${baseUrl}/api/v1/billing/iyzico/callback`,
       buyer: {
@@ -591,8 +650,8 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
         address: company.address || 'Belirtilmedi'
       },
       basketItems: [{
-        id: plan.id,
-        name: `${plan.name} (${billing_period === 'yearly' ? 'Yıllık' : 'Aylık'})`,
+        id: quote.planId,
+        name: `${quote.planName} (${quote.period === 'yearly' ? 'Yıllık' : 'Aylık'})`,
         category1: 'Software',
         itemType: 'VIRTUAL',
         price: finalPriceStr
@@ -618,16 +677,18 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
       });
     } else {
       logger.error('Iyzico session failed:', iyzicoRes.errorMessage);
+      await runBypassingRLS("UPDATE invoices SET status = 'failed', updated_at = NOW() WHERE id = $1", [invoiceId]);
       return res.status(400).json({ error: 'checkout_failed', message: iyzicoRes.errorMessage });
     }
   } catch (err) {
     logger.error('Subscribe setup failed:', err);
+    if ((err as Error).message === 'plan_not_found') return res.status(404).json({ error: 'plan_not_found' });
     return res.status(500).json({ error: 'server_error' });
   }
 };
 
-router.post('/subscribe', authenticateUser, subscribeHandler);
-router.post('/checkout', authenticateUser, subscribeHandler);
+router.post('/subscribe', authenticateUser, requirePermission('billing:view'), subscribeHandler);
+router.post('/checkout', authenticateUser, requirePermission('billing:view'), subscribeHandler);
 
 /**
  * @openapi
@@ -645,19 +706,11 @@ router.post('/iyzico/callback', async (req: Request, res: Response) => {
   }
 
   try {
-    // 1. Verify payment status from Iyzico API using the token
-    // (This requires implementing retrieveCheckoutFormResult in IyzicoService, 
-    // but for now we'll do a mock success if ENABLE_MOCK_PAYMENTS is true, or you can implement the real fetch)
-    
-    // As a shortcut for this audit implementation, we assume if Iyzico posts here with a token, we should fetch the result.
-    // However, Iyzico SDK requires retrieving the result.
-    // If we don't have the method, let's mark it paid directly for demonstration or if it's sandbox.
-    // In production, we MUST verify HMAC or retrieve result.
-    // We will do the DB update here:
-    
+    // The callback token identifies a pending invoice; provider verification
+    // below supplies the payment evidence before any commercial state changes.
     const tokenInfoRes = await runBypassingRLS(
       `SELECT * FROM invoices
-       WHERE status = 'pending'
+       WHERE status IN ('pending','verification_pending')
          AND billing_details->>'iyzicoToken' = $1
        LIMIT 1`,
       [token]
@@ -668,337 +721,29 @@ router.post('/iyzico/callback', async (req: Request, res: Response) => {
     }
     
     const invoice = tokenInfoRes.rows[0];
-    const details = invoice.billing_details;
-    const planId = details.planId;
-    const billingPeriod = details.billingPeriod;
-    const companyId = invoice.company_id;
-
-    await runBypassingRLS("UPDATE invoices SET status = 'paid', updated_at = NOW() WHERE id = $1", [invoice.id]);
-
-    // Activate subscription
-    let nextPeriodEnd = new Date();
-    if (billingPeriod === 'yearly') {
-      nextPeriodEnd.setFullYear(nextPeriodEnd.getFullYear() + 1);
-    } else {
-      nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1);
+    await runBypassingRLS(
+      `UPDATE invoices SET status='verification_pending',next_verification_at=NOW(),updated_at=NOW()
+       WHERE id=$1 AND status='pending'`, [invoice.id],
+    );
+    const reconciliation = await PaymentReconciliationService.reconcileInvoice(invoice.id);
+    if (reconciliation.status !== 'paid') {
+      return res.redirect('/app/?payment=pending#billing-center');
     }
-
-    const subRes = await runBypassingRLS("SELECT id FROM subscriptions WHERE company_id = $1 ORDER BY created_at DESC LIMIT 1", [companyId]);
-    if (subRes.rows.length > 0) {
-      const subId = subRes.rows[0].id;
-      await runBypassingRLS(`
-        UPDATE subscriptions 
-        SET status = 'active', plan_id = $1, current_period_end = $2, updated_at = NOW() 
-        WHERE id = $3
-      `, [planId, nextPeriodEnd, subId]);
-
-      // Update entitlements (e.g. 5 devices for basic, 20 for pro)
-      const devLimit = planId === 'plan-enterprise' ? 999 : (planId === 'plan-pro' ? 20 : 5);
-      await runBypassingRLS(`
-        UPDATE license_entitlements 
-        SET plan_id = $1, device_limit = $2, status = 'active', valid_until = $3, updated_at = NOW() 
-        WHERE subscription_id = $4
-      `, [planId, devLimit, nextPeriodEnd, subId]);
-    }
-
-    // Redirect user back to unified app shell
-    res.redirect('/app/');
+    const activation = reconciliation.activation;
+    await RealtimeBroadcastService.publishEvent(invoice.company_id, 'LicenseUpdated', {
+      subscriptionId: activation.subscriptionId,
+      entitlementId: activation.entitlementId,
+      invoiceId: invoice.id,
+      status: 'active',
+    });
+    return res.redirect('/app/?payment=success#billing-center');
 
   } catch (error) {
     logger.error('Iyzico callback error:', error);
-    res.redirect('/app/');
+    res.redirect('/app/?payment=error#billing-center');
   }
 });
 
-// Mockup 3D Secure Checkout HTML Portal (interactive UI shown inside POS or Customer Portal webview)
-router.get('/mock-checkout-portal', async (req, res: Response) => {
-  if (process.env.ENABLE_MOCK_PAYMENTS !== 'true') {
-    return res.status(403).send('<h2>Mock checkout portal is disabled.</h2>');
-  }
-  const { session, plan, company } = req.query;
-
-  let IBAN_BANK = process.env.SYSTEM_IBAN_BANK || 'Yapı Kredi Bankası A.Ş.';
-  let IBAN_BRANCH = process.env.SYSTEM_IBAN_BRANCH || 'İstanbul Kozyatağı Ticari Şubesi';
-  let IBAN_OWNER = process.env.SYSTEM_IBAN_OWNER || 'Serenut Yazılım Teknolojileri Ltd. Şti.';
-  let IBAN_NUMBER = process.env.SYSTEM_IBAN_NUMBER || 'TR24 0006 2000 0000 9876 5432 10';
-
-  try {
-    const settingsRes = await runBypassingRLS("SELECT key, value FROM system_settings WHERE key IN ('iban_bank', 'iban_branch', 'iban_owner', 'iban_number')");
-    settingsRes.rows.forEach(r => {
-      if (r.key === 'iban_bank') IBAN_BANK = r.value;
-      if (r.key === 'iban_branch') IBAN_BRANCH = r.value;
-      if (r.key === 'iban_owner') IBAN_OWNER = r.value;
-      if (r.key === 'iban_number') IBAN_NUMBER = r.value;
-    });
-  } catch (err) {
-    logger.warn('Failed to load system settings for checkout, using defaults:', err);
-  }
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Serenut Güvenli Ödeme Geçidi</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { background-color: #0F172A; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px 0; box-sizing: border-box; }
-        .card { background-color: #1E293B; border-radius: 12px; padding: 24px; text-align: left; max-width: 440px; width: 90%; border: 1px solid #16A34A; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .btn { background-color: #16A34A; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; margin-top: 16px; transition: all 0.3s; }
-        .btn:hover { background-color: #15803d; }
-        .logo { font-size: 20px; color: #16A34A; font-weight: bold; margin-bottom: 8px; text-align: center; }
-        .details { font-size: 13px; color: #94A3B8; margin: 12px 0; text-align: center; }
-        .tab-btn { flex: 1; padding: 10px; background: #334155; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 6px 6px 0 0; font-size: 13px; }
-        .tab-btn.active { background: #1E293B; color: #16A34A; border-bottom: 2px solid #16A34A; }
-        .tab-content { display: none; background: #1E293B; padding-top: 15px; }
-        .tab-content.active { display: block; }
-        .iban-box { background: #0F172A; border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.5; color: #E2E8F0; margin-bottom: 12px; border: 1px solid #334155; }
-        .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-        .form-group label { font-size: 12px; color: #94A3B8; font-weight: bold; }
-        .form-group input { background: #0F172A; border: 1px solid #334155; border-radius: 6px; padding: 10px; color: white; font-size: 13px; outline: none; }
-        .form-group input:focus { border-color: #16A34A; }
-      </style>
-      <script>
-        function switchTab(tabId) {
-          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-          document.getElementById('btn-' + tabId).classList.add('active');
-          document.getElementById('content-' + tabId).classList.add('active');
-        }
-      </script>
-    </head>
-    <body>
-      <div class="card">
-        <div class="logo">SERENUT ÖDEME GEÇİDİ</div>
-        <div class="details">Lütfen tercih ettiğiniz ödeme yöntemini seçin.</div>
-        
-        <div style="display: flex; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid #334155;">
-          <button id="btn-iban" class="tab-btn active" onclick="switchTab('iban')">🏦 Banka Havalesi / EFT</button>
-          <button id="btn-card" class="tab-btn" onclick="switchTab('card')">💳 Kredi Kartı (iyzico / PayTR)</button>
-        </div>
-
-        <!-- TAB: IBAN -->
-        <div id="content-iban" class="tab-content active">
-          <div class="iban-box">
-            <strong>Banka:</strong> ${IBAN_BANK}<br>
-            <strong>Şube:</strong> ${IBAN_BRANCH}<br>
-            <strong>Alıcı:</strong> ${IBAN_OWNER}<br>
-            <strong>IBAN:</strong> <span style="font-family: monospace; color:#10B981; font-weight:bold;">${IBAN_NUMBER}</span><br>
-            <strong>Açıklama:</strong> <span style="color:#F59E0B; font-weight:bold;">${company}</span> (Şirket ID'nizi açıklama alanına aynen yazınız.)
-          </div>
-          
-          <form action="/api/v1/billing/mock-checkout-callback" method="POST">
-            <input type="hidden" name="sessionToken" value="${session}">
-            <input type="hidden" name="planId" value="${plan}">
-            <input type="hidden" name="companyId" value="${company}">
-            <input type="hidden" name="payment_method" value="bank_wire">
-            <input type="hidden" name="status" value="pending">
-            
-            <div class="form-group">
-              <label>Ödemeyi Yapan Ad Soyad / Ünvan</label>
-              <input type="text" name="senderName" placeholder="Örn: Ahmet Yılmaz" required>
-            </div>
-            
-            <div class="form-group">
-              <label>Gönderilen Banka</label>
-              <input type="text" name="senderBank" placeholder="Örn: Garanti Bankası" required>
-            </div>
-            
-            <button type="submit" class="btn">HAVALE ÖDEMESİNİ BİLDİR VE TAMAMLA</button>
-          </form>
-        </div>
-
-        <!-- TAB: CREDIT CARD -->
-        <div id="content-card" class="tab-content">
-          <div class="iban-box" style="border-left: 3px solid #F59E0B; background: rgba(245,158,11,0.05);">
-            ℹ️ Kredi kartı ile otomatik ödeme entegrasyonu (iyzico / PayTR) yakında aktif edilecektir. 
-            Geliştirme aşamasında kredi kartı akışını test etmek için aşağıdaki simülasyon butonunu kullanabilirsiniz.
-          </div>
-          
-          <form action="/api/v1/billing/mock-checkout-callback" method="POST">
-            <input type="hidden" name="sessionToken" value="${session}">
-            <input type="hidden" name="planId" value="${plan}">
-            <input type="hidden" name="companyId" value="${company}">
-            <input type="hidden" name="payment_method" value="credit_card">
-            <input type="hidden" name="status" value="success">
-            
-            <button type="submit" class="btn" style="background-color: #8B5CF6;">SİMÜLE KART ÖDEMESİNİ TAMAMLA</button>
-          </form>
-        </div>
-
-        <form action="/api/v1/billing/mock-checkout-callback" method="POST">
-          <input type="hidden" name="sessionToken" value="${session}">
-          <input type="hidden" name="planId" value="${plan}">
-          <input type="hidden" name="companyId" value="${company}">
-          <input type="hidden" name="status" value="failed">
-          <button type="submit" class="btn" style="background-color: #EF4444; margin-top: 8px;">ÖDEMEYİ İPTAL ET / PENCEREYİ KAPAT</button>
-        </form>
-      </div>
-    </body>
-    </html>
-  `;
-  return res.send(html);
-});
-
-// Checkout Mockup Callback
-router.post('/mock-checkout-callback', async (req, res: Response) => {
-  if (process.env.ENABLE_MOCK_PAYMENTS !== 'true') {
-    return res.status(403).json({ error: 'forbidden', message: 'Mock callback is disabled.' });
-  }
-  const { sessionToken, planId, companyId, status, payment_method, senderName, senderBank } = req.body;
-
-  if (status === 'failed') {
-    return res.send(`
-      <script>
-        alert("Ödeme iptal edildi veya başarısız oldu.");
-        window.close();
-      </script>
-      <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
-        <h2 style="color: #EF4444;">Ödeme Başarısız ❌</h2>
-        <p>Pencereyi kapatıp tekrar deneyebilirsiniz.</p>
-      </div>
-    `);
-  }
-
-  const isBankWire = payment_method === 'bank_wire';
-
-  try {
-    // 1. Get plan details
-    const planRes = await runBypassingRLS('SELECT * FROM plans WHERE id = $1', [planId]);
-    const plan = planRes.rows[0];
-
-    // 2. Fetch company billing info for PDF (tax details)
-    const companyRes = await runBypassingRLS('SELECT * FROM companies WHERE id = $1', [companyId]);
-    const company = companyRes.rows[0];
-
-    // 3. Upsert subscription
-    const subId = `sub-${Date.now()}`;
-    const now = new Date();
-    const periodEnd = new Date();
-    periodEnd.setMonth(now.getMonth() + 1); // 1-month cycle
-
-    const subStatus = isBankWire ? 'suspended' : 'active';
-    const subPayStatus = isBankWire ? 'pending' : 'success';
-    const payMethod = payment_method || 'credit_card';
-
-    await runBypassingRLS(`
-      INSERT INTO subscriptions (id, company_id, plan_id, status, current_period_start, current_period_end, payment_method, cancel_at_period_end, grace_period_until, last_payment_status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, false, null, $8)
-      ON CONFLICT (company_id) DO UPDATE SET
-        plan_id = EXCLUDED.plan_id,
-        status = EXCLUDED.status,
-        payment_method = EXCLUDED.payment_method,
-        grace_period_until = null,
-        last_payment_status = EXCLUDED.last_payment_status
-    `, [subId, companyId, planId, subStatus, now, periodEnd, payMethod, subPayStatus]);
-
-    // 4. Create formal Invoice record
-    const invoiceId = `inv-rec-${Date.now()}`;
-    const invoiceNum = `INV-${now.getFullYear()}-${Math.floor(1000 + Math.random()*9000)}`;
-    const billDetails = {
-      companyName: company.name,
-      taxOffice: company.tax_office || 'Belirtilmedi',
-      taxNumber: company.tax_number,
-      address: company.address || 'Serenut OS Tenant Address',
-      senderName: senderName || null,
-      senderBank: senderBank || null,
-      paymentMethod: payMethod
-    };
-
-    // 5. Generate PDF File
-    const pdfPath = await InvoiceGeneratorService.generateInvoicePdf(companyId, {
-      invoiceNumber: invoiceNum,
-      date: now,
-      dueDate: periodEnd,
-      companyName: company.name,
-      companyAddress: billDetails.address,
-      taxOffice: billDetails.taxOffice,
-      taxNumber: company.tax_number,
-      currency: plan.currency,
-      items: [
-        {
-          description: `Serenut OS Bulut SaaS ${plan.name} Aboneliği`,
-          quantity: 1,
-          unitPrice: parseFloat(plan.price),
-          taxRate: 20 // Standard %20 VAT
-        }
-      ]
-    });
-
-    const invStatus = isBankWire ? 'pending' : 'paid';
-    const paidAtVal = isBankWire ? null : now;
-
-    await runBypassingRLS(`
-      INSERT INTO invoices (id, company_id, subscription_id, amount, status, due_at, paid_at, invoice_number, billing_details, payment_gateway_reference, pdf_path)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [
-      invoiceId,
-      companyId,
-      subId,
-      plan.price,
-      invStatus,
-      periodEnd,
-      paidAtVal,
-      invoiceNum,
-      JSON.stringify(billDetails),
-      sessionToken,
-      pdfPath
-    ]);
-
-    if (!isBankWire) {
-      // 6. Activate subscription + license entitlement via CommercialLifecycleService
-      const lsClient = await pgPool.connect();
-      try {
-        await lsClient.query('BEGIN');
-        await lsClient.query("SET LOCAL app.bypass_rls = 'true'");
-        await CommercialLifecycleService.activatePaidSubscription(lsClient, {
-          companyId,
-          planId,
-          grantType: 'card',
-          periodStart: now,
-        });
-        await lsClient.query('COMMIT');
-      } catch (lsErr) {
-        await lsClient.query('ROLLBACK');
-        throw lsErr;
-      } finally {
-        lsClient.release();
-      }
-
-      return res.send(`
-        <script>
-          alert("Ödemeniz başarıyla alındı ve onaylandı.");
-          if (window.opener) {
-            window.opener.postMessage({ status: "success" }, "*");
-          }
-          window.close();
-        </script>
-        <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
-          <h2 style="color: #16A34A;">Ödeme Başarılı ✔️</h2>
-          <p>Aboneliğiniz aktif edildi. Bu pencereyi kapatabilirsiniz.</p>
-        </div>
-      `);
-    } else {
-      // For bank wire: do not touch license (remains suspended/inactive until admin manually approves it).
-      return res.send(`
-        <script>
-          alert("Banka havalesi ödeme bildiriminiz alındı! Yöneticilerimiz ödemeyi onayladığında aboneliğiniz aktif edilecektir.");
-          if (window.opener) {
-            window.opener.postMessage({ status: "pending" }, "*");
-          }
-          window.close();
-        </script>
-        <div style="font-family: sans-serif; text-align: center; margin-top: 100px; color: white;">
-          <h2 style="color: #10B981;">Ödeme Bildirimi Alındı ✔️</h2>
-          <p>Havale bildiriminiz yöneticilere iletildi. Kontroller yapıldıktan sonra aboneliğiniz onaylanacaktır.</p>
-          <p>Bu pencereyi kapatabilirsiniz.</p>
-        </div>
-      `);
-    }
-  } catch (err) {
-    logger.error('Checkout callback processing failed:', err);
-    return res.status(500).send("<h2>Ödeme onaylama esnasında hata oluştu.</h2>");
-  }
-});
 /**
  * @openapi
  * /api/v1/billing/invoices:
@@ -1068,18 +813,21 @@ router.get('/invoices/:id/pdf', authenticateUser, async (req: AuthenticatedReque
  *     security:
  *       - BearerAuth: []
  */
-router.post('/cancel', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/cancel', authenticateUser, requireRole('owner'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
+  const client = await pgPool.connect();
   try {
-    await runWithTenantContext(
-      user.company_id,
-      'UPDATE subscriptions SET cancel_at_period_end = true WHERE company_id = $1',
-      [user.company_id]
-    );
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls='true'");
+    await CommercialLifecycleService.setAutoRenewal(client, {
+      companyId: user.company_id, actorId: user.id, enabled: false,
+    });
+    await client.query('COMMIT');
     return res.json({ success: true, message: 'Abonelik yenilemesi iptal edildi. Dönem sonuna kadar kullanım devam edecektir.' });
-  } catch (err) {
-    return res.status(500).json({ error: 'server_error' });
-  }
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    return res.status(err.message === 'active_subscription_not_found' ? 404 : 500).json({ error: err.message });
+  } finally { client.release(); }
 });
 
 /**
@@ -1130,171 +878,10 @@ router.get('/admin/stats', authenticateUser, requireRole('sysadmin'), async (req
  *     summary: Handle incoming Iyzico payment events (SUCCESS/FAILURE) via webhook
  */
 router.post('/webhook/iyzico', webhookLimiter, async (req: Request, res: Response) => {
-  const signature = req.headers['x-iyz-signature'] as string;
-  const payload = req.body;
-
-  logger.info('[Iyzico Webhook] Received webhook event:', JSON.stringify(payload));
-
-  const IYZICO_SECRET = process.env.IYZICO_SECRET_KEY;
-  if (!IYZICO_SECRET) {
-    logger.error('[Iyzico Webhook] Server configuration error: IYZICO_SECRET_KEY is missing.');
-    return res.status(500).json({ error: 'misconfigured_payment_gateway' });
-  }
-
-  if (!signature) {
-    logger.warn('[Iyzico Webhook] Webhook request rejected: missing x-iyz-signature header.');
-    return res.status(400).json({ error: 'missing_signature' });
-  }
-
-  if (!(req as any).rawBody && process.env.NODE_ENV !== 'test') {
-    logger.error('[Iyzico Webhook] Raw body buffer is missing. Express parser verify config is incorrect.');
-    return res.status(500).json({ error: 'internal_error' });
-  }
-
-  const rawPayload = (req as any).rawBody || Buffer.from(JSON.stringify(payload));
-  const computedSignature = crypto
-    .createHmac('sha256', IYZICO_SECRET)
-    .update(rawPayload)
-    .digest('hex');
-
-  try {
-    const signatureBuffer = Buffer.from(signature, 'hex');
-    const computedBuffer = Buffer.from(computedSignature, 'hex');
-
-    if (
-      signatureBuffer.length !== computedBuffer.length ||
-      !crypto.timingSafeEqual(signatureBuffer, computedBuffer)
-    ) {
-      logger.warn('[Iyzico Webhook] Webhook signature verification failed!');
-      return res.status(400).json({ error: 'invalid_signature' });
-    }
-  } catch (err) {
-    logger.error('[Iyzico Webhook] Hex signature parsing or comparison failed:', err);
-    return res.status(400).json({ error: 'invalid_signature_format' });
-  }
-
-  // Replay protection: Check webhook timestamp payload (iyziEventTime or standard timestamp)
-  // Fail-closed: Reject if missing or invalid, or if difference is more than 5 minutes (300 seconds)
-  const eventTime = payload.iyziEventTime || payload.timestamp;
-  if (!eventTime) {
-    logger.warn('[Iyzico Webhook] Webhook request rejected: missing eventTime/timestamp.');
-    return res.status(400).json({ error: 'missing_event_time' });
-  }
-
-  const eventMs = isNaN(Number(eventTime)) ? Date.parse(eventTime) : Number(eventTime);
-  if (isNaN(eventMs)) {
-    logger.warn(`[Iyzico Webhook] Webhook request rejected: invalid eventTime format (${eventTime}).`);
-    return res.status(400).json({ error: 'invalid_event_time' });
-  }
-
-  const diffSec = Math.abs(Date.now() - eventMs) / 1000;
-  if (diffSec > 300) {
-    logger.warn(`[Iyzico Webhook] Replay attack alert: event older than 300s (diff: ${diffSec}s).`);
-    return res.status(400).json({ error: 'stale_webhook_event' });
-  }
-
-  const { token, status, conversationId } = payload;
-  const eventId = payload.iyziReferenceCode || payload.paymentId || token;
-  const redisKey = eventId ? `webhook:processed:${eventId}` : null;
-
-  if (redisKey && redisClient && redisClient.isOpen) {
-    try {
-      const setSuccess = await redisClient.set(redisKey, 'true', {
-        NX: true,
-        EX: 86400
-      });
-      if (!setSuccess) {
-        logger.info(`[Iyzico Webhook] Event already processed or being processed: ${eventId}`);
-        return res.json({ status: 'OK', message: 'already_processed' });
-      }
-    } catch (redisErr) {
-      logger.error('[Iyzico Webhook] Redis idempotency check error:', redisErr);
-    }
-  }
-
-  // Idempotency check: If invoice is already marked as paid, return OK early without processing database updates
-  if (token) {
-    try {
-      const invoiceCheck = await runBypassingRLS(
-        "SELECT status FROM invoices WHERE payment_gateway_reference = $1",
-        [token]
-      );
-      if (invoiceCheck.rows.length > 0 && invoiceCheck.rows[0].status === 'paid') {
-        logger.info(`[Iyzico Webhook] Webhook ignored idempotently: Invoice already paid for token: ${token}`);
-        return res.json({ status: 'OK' });
-      }
-    } catch (dbErr) {
-      logger.error('[Iyzico Webhook] Idempotency check db error:', dbErr);
-    }
-  }
-
-  try {
-    if (status === 'SUCCESS' && token) {
-      const subRes = await runBypassingRLS(
-        `SELECT id, company_id, plan_id FROM subscriptions WHERE id = $1 OR company_id = (SELECT company_id FROM invoices WHERE payment_gateway_reference = $2 LIMIT 1)`,
-        [conversationId, token]
-      );
-
-      if (subRes.rows.length > 0) {
-        const sub = subRes.rows[0];
-        
-        // Execute unified entitlement activation via database client transaction
-        const client = await pgPool.connect();
-        try {
-          await client.query('BEGIN');
-          await client.query("SET LOCAL app.bypass_rls = 'true'");
-          
-          await CommercialLifecycleService.activatePaidSubscription(client, {
-            companyId: sub.company_id,
-            planId: sub.plan_id || 'plan-pro',
-            paymentId: token,
-            grantType: 'card'
-          });
-
-          // Mark matching invoice as paid
-          await client.query(
-            "UPDATE invoices SET status = 'paid', paid_at = NOW() WHERE payment_gateway_reference = $1",
-            [token]
-          );
-
-          await client.query('COMMIT');
-        } catch (txnErr) {
-          await client.query('ROLLBACK');
-          throw txnErr;
-        } finally {
-          client.release();
-        }
-
-        logger.info(`[Iyzico Webhook] Successfully updated subscription & entitlements to active for company: ${sub.company_id}`);
-      }
-    } else if (status === 'FAILURE') {
-      const subRes = await runBypassingRLS(
-        `SELECT id, company_id FROM subscriptions WHERE id = $1 OR company_id = (SELECT company_id FROM invoices WHERE payment_gateway_reference = $2 LIMIT 1)`,
-        [conversationId, token]
-      );
-      if (subRes.rows.length > 0) {
-        const sub = subRes.rows[0];
-        const graceUntil = new Date();
-        graceUntil.setDate(graceUntil.getDate() + 7);
-
-        await runBypassingRLS(`
-          UPDATE subscriptions 
-          SET status = 'grace_period', grace_period_until = $1, last_payment_status = 'failed'
-          WHERE id = $2
-        `, [graceUntil, sub.id]);
-
-        logger.warn(`[Iyzico Webhook] Subscription set to grace_period for company: ${sub.company_id}`);
-      }
-    }
-    
-    return res.json({ status: 'OK' });
-  } catch (err: any) {
-    logger.error('[Iyzico Webhook] Error processing event:', err);
-    if (redisKey && redisClient && redisClient.isOpen) {
-      await redisClient.del(redisKey).catch(() => {});
-    }
-    return res.status(500).json({ error: 'server_error' });
-  }
+  return res.status(410).json({
+    error: 'legacy_webhook_removed',
+    message: 'Ödeme sonuçları yalnızca sağlayıcıdan doğrulanan checkout callback akışıyla işlenir.',
+  });
 });
 
 /**
@@ -1329,50 +916,35 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'already_paid', message: 'Bu fatura zaten daha önce onaylandı.' });
     }
-
-    // 2. Fetch plan from subscription
-    const requestedPlanId = invoice.billing_details?.planId;
-    const subRes = invoice.subscription_id
-      ? await client.query('SELECT plan_id FROM subscriptions WHERE id = $1', [invoice.subscription_id])
-      : { rows: [] };
-    const planId = requestedPlanId ?? subRes.rows[0]?.plan_id;
-    if (!planId) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'plan_not_resolved', message: 'Faturaya bağlı plan bulunamadı.' });
-    }
-
-    // 3. Mark invoice as paid
-    await client.query(
-      "UPDATE invoices SET status = 'paid', paid_at = NOW() WHERE id = $1",
+    const transferClaim = await client.query(
+      `SELECT id,reference_code FROM bank_transfer_notifications WHERE invoice_id=$1 AND status='pending_review' FOR UPDATE`,
       [id]
     );
+    if (!transferClaim.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'transfer_not_pending_review', message: 'Onay bekleyen havale bildirimi bulunamadı.' });
+    }
 
-    // 4. Update bank_transfer_notifications if present
+    // All payment channels finalize through the same atomic lifecycle.
+    const activation = await CommercialLifecycleService.finalizeInvoicePayment(
+      client, id, 'bank_transfer', adminUserId,
+      { amount: Number(invoice.amount), currency: BillingDomainService.invoiceDetails(invoice).currency || 'TRY',
+        referenceCode: transferClaim.rows[0].reference_code },
+    );
+
     await client.query(`
       UPDATE bank_transfer_notifications
       SET status = 'approved', reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW()
       WHERE invoice_id = $2 AND status = 'pending_review'
     `, [adminUserId, id]);
 
-    // 5. Atomic subscription + entitlement upsert
-    const billingDetails = typeof invoice.billing_details === 'string'
-      ? JSON.parse(invoice.billing_details)
-      : (invoice.billing_details || {});
-    const billingPeriod = billingDetails.billingPeriod === 'yearly'
-      ? 'yearly'
-      : 'monthly';
-
-    const activation = await CommercialLifecycleService.activatePaidSubscription(client, {
-      companyId: invoice.company_id,
-      planId,
-      grantType: 'bank_transfer',
-      adminUserId,
-      billingPeriod,
-    });
+    const billingPeriod = BillingDomainService.normalizePeriod(
+      BillingDomainService.invoiceDetails(invoice).billingPeriod
+    );
 
     // 6. Write Admin Audit Log (Inside Transaction, non-blocking)
     try {
-      const auditId = `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const auditId = BillingDomainService.opaqueId('aud');
       const invoiceAfter = { ...invoice, status: 'paid', paid_at: new Date() };
       await client.query(
         `INSERT INTO audit_logs (id, company_id, user_id, action, entity, entity_id, old_value, new_value, ip_address)
@@ -1399,7 +971,7 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
       const recipientPhone = companyRes.rows[0]?.phone;
 
       if (recipientPhone && recipientPhone.trim() !== '') {
-        const notifId = `notif-${Date.now()}`;
+        const notifId = BillingDomainService.opaqueId('notif');
         await client.query(`
           INSERT INTO notification_queue (id, company_id, channel, recipient, body, status)
           VALUES ($1, $2, 'sms', $3, 'Sayın Müşterimiz, Havale/EFT ödemeniz onaylanmış ve lisansınız aktif edilmiştir.', 'queued')
@@ -1424,7 +996,14 @@ router.put('/admin/invoices/:id/approve-payment', authenticateUser, requireRole(
     });
 
     logger.info(`Invoice ${id} bank wire approved by admin ${req.user?.email}`);
-    return res.json({ success: true, message: 'Ödeme başarıyla onaylandı ve abonelik aktif edildi.' });
+    return res.json({
+      success: true,
+      message: 'Ödeme başarıyla onaylandı ve abonelik aktif edildi.',
+      billing_period: billingPeriod,
+      subscription_id: activation.subscriptionId,
+      entitlement_id: activation.entitlementId,
+      license_valid_until: activation.validUntil.toISOString(),
+    });
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});
     logger.error('Error approving invoice payment:', err);

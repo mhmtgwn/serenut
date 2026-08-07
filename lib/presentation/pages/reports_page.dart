@@ -328,7 +328,7 @@ class _CloudBiTab extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.15),
+                      color: POSColors.green.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -338,14 +338,14 @@ class _CloudBiTab extends ConsumerWidget {
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Colors.green,
+                            color: POSColors.green,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
                         const Text('WebSocket Gerçek Zamanlı Bulut BI Aktif',
                             style: TextStyle(
-                                color: Colors.green,
+                                color: POSColors.green,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold)),
                       ],
@@ -383,7 +383,7 @@ class _CloudBiTab extends ConsumerWidget {
                       title: 'Bugün Ciro',
                       value: '${data.todayRevenue.toStringAsFixed(0)} TL',
                       icon: Icons.monetization_on_rounded,
-                      color: Colors.green,
+                      color: POSColors.green,
                       subtitle:
                           '${data.todayOrders} Sipariş | E.Fiş: ${data.avgBasket} TL',
                     ),
@@ -455,7 +455,7 @@ class _CloudBiTab extends ConsumerWidget {
                                   centerSpaceRadius: 30,
                                   sections: [
                                     PieChartSectionData(
-                                      color: Colors.green,
+                                      color: POSColors.green,
                                       value:
                                           data.paymentBreakdown.cash.toDouble(),
                                       title: '%${data.paymentBreakdown.cash}',
@@ -497,7 +497,7 @@ class _CloudBiTab extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _ChartLegend(
-                                    color: Colors.green, label: 'Nakit'),
+                                    color: POSColors.green, label: 'Nakit'),
                                 SizedBox(height: 6),
                                 _ChartLegend(color: Colors.blue, label: 'Kart'),
                                 SizedBox(height: 6),
@@ -725,13 +725,13 @@ class _CloudSalesTrendWidgetState extends State<_CloudSalesTrendWidget> {
                                 index.toDouble(), trendPoints[index].revenue),
                           ),
                           isCurved: true,
-                          color: Colors.green,
+                          color: POSColors.green,
                           barWidth: 3,
                           isStrokeCapRound: true,
                           dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: Colors.green.withValues(alpha: 0.1),
+                            color: POSColors.green.withValues(alpha: 0.1),
                           ),
                         ),
                       ],
@@ -895,7 +895,7 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                                         '${branch.revenue.toStringAsFixed(0)} TL',
                                         style: const TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.green)),
+                                            color: POSColors.green)),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
@@ -909,7 +909,7 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                                     backgroundColor:
                                         Colors.grey.withValues(alpha: 0.2),
                                     valueColor: const AlwaysStoppedAnimation(
-                                        Colors.green),
+                                        POSColors.green),
                                     minHeight: 8,
                                   ),
                                 ),
@@ -1004,7 +1004,7 @@ class _CloudStaffBranchTab extends ConsumerWidget {
                                           style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,
-                                              color: Colors.green))),
+                                              color: POSColors.green))),
                                 ],
                               )),
                         ],
@@ -1245,7 +1245,7 @@ class _ProductsTab extends ConsumerWidget {
                           '${_fmt(product.totalRevenue)} TL',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
+                            color: POSColors.greenDark,
                             fontSize: 14,
                           ),
                         ),
@@ -1353,7 +1353,7 @@ class _DebtTab extends ConsumerWidget {
                 child: _AgingBucket(
               label: '0–30 gün',
               amount: s.total0to30,
-              color: Colors.green[600]!,
+              color: POSColors.green,
               icon: Icons.check_circle_outline,
             )),
             const SizedBox(width: 8),
@@ -1433,7 +1433,7 @@ class _DebtTab extends ConsumerWidget {
                     child: Text('Müşteri',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 12))),
-                _tableHeader('0-30', Colors.green[700]!),
+                _tableHeader('0-30', POSColors.greenDark),
                 _tableHeader('31-60', Colors.orange[700]!),
                 _tableHeader('61-90', Colors.deepOrange[700]!),
                 _tableHeader('90+', Colors.red[700]!),
@@ -1479,7 +1479,7 @@ class _DebtTab extends ConsumerWidget {
                     const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
                 overflow: TextOverflow.ellipsis),
           ),
-          _amountCell(row.current, Colors.green[700]!),
+          _amountCell(row.current, POSColors.greenDark),
           _amountCell(row.days31to60, Colors.orange[700]!),
           _amountCell(row.days61to90, Colors.deepOrange[700]!),
           _amountCell(row.over90, Colors.red[700]!, bold: row.over90 > 0),

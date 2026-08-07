@@ -135,9 +135,7 @@ class _BrandedSplashScreenState extends State<BrandedSplashScreen>
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 220),
                         child: Text(
-                          hasError
-                              ? 'Başlatma tamamlanamadı'
-                              : widget.status,
+                          hasError ? 'Başlatma tamamlanamadı' : widget.status,
                           key: ValueKey('$hasError-${widget.status}'),
                           textAlign: TextAlign.center,
                           style: Theme.of(context)

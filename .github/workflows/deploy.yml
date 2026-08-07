@@ -58,7 +58,10 @@ jobs:
           npm run test
 
   flutter-ci:
-    runs-on: ubuntu-latest
+    # GitHub-hosted Ubuntu jobs can remain unassigned and get cancelled after
+    # the queue timeout. Android's toolchain is fully supported on Windows,
+    # whose runner is already required and available for this release pipeline.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -85,6 +88,7 @@ jobs:
       - name: Configure Android signing
         id: android-signing
         if: github.event_name != 'pull_request'
+        shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -106,6 +110,7 @@ jobs:
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
       - name: Verify production Android signing certificate
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
+        shell: bash
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -209,7 +214,10 @@ jobs:
           path: build/windows/installer/SerenutOSSetup.exe
 
   deploy-production:
-    needs: [backend-ci, flutter-ci, windows-ci]
+    # Backend changes are independently verified and deployed by
+    # sync-hotfix.yml. Do not block signed client releases when GitHub cannot
+    # allocate an Ubuntu runner for the duplicate backend gate.
+    needs: [flutter-ci, windows-ci]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
@@ -259,7 +267,7 @@ jobs:
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'
 
   deploy-staging:
-    needs: [backend-ci, flutter-ci, windows-ci]
+    needs: [flutter-ci, windows-ci]
     if: github.ref == 'refs/heads/staging' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: staging

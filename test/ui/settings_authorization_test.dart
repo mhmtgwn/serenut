@@ -284,7 +284,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Settings screen and safe printer settings visible
-      expect(find.text('Cihazlar ve Donanım'), findsOneWidget);
+      expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
       expect(find.text('Operasyon Merkezi'), findsOneWidget);
 
       // Admin actions hidden
@@ -338,7 +338,7 @@ void main() {
       // Printer options are hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
       expect(find.text('Etiket Yazıcı Ayarları'), findsNothing);
-      expect(find.text('Cihazlar ve Donanım'), findsNothing);
+      expect(find.text('Aygıt Yöneticisi'), findsNothing);
 
       await tester.pump();
     });
@@ -387,7 +387,7 @@ void main() {
 
       // Sensitive modules hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);
-      expect(find.text('Cihazlar ve Donanım'), findsNothing);
+      expect(find.text('Aygıt Yöneticisi'), findsNothing);
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
 
       await tester.pump();

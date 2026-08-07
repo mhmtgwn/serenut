@@ -532,7 +532,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           child: IconButton(
                             tooltip: 'Kamerayla barkod okut',
                             onPressed: _scanBarcode,
-                            icon: const Icon(Icons.qr_code_scanner_rounded, color: _kGreen),
+                            icon: const Icon(Icons.qr_code_scanner_rounded,
+                                color: _kGreen),
                           ),
                         ),
                         border: OutlineInputBorder(

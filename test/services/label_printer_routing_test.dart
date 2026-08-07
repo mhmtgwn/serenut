@@ -5,8 +5,10 @@ import 'package:serenutos/infrastructure/services/printer_service.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 
 class MockSocket implements Socket {
+  final List<int> writtenBytes = [];
+
   @override
-  void add(List<int> data) {}
+  void add(List<int> data) => writtenBytes.addAll(data);
   @override
   Future<void> flush() async {}
   @override
@@ -109,6 +111,141 @@ void main() {
       // Verify it connected to label printer IP (192.168.1.150) instead of receipt IP (192.168.1.50)
       expect(connectedIp, '192.168.1.150');
       expect(connectedPort, 9100);
+    });
+
+    test('PrinterService never sends label bytes to the receipt printer',
+        () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        printerName: 'network',
+        printerIp: '192.168.1.50',
+        printerPort: 9200,
+        createdAt: DateTime.now(),
+      );
+
+      final service = PrinterService((ip, port, {timeout}) async {
+        return MockSocket();
+      }, null);
+
+      final order = OrderEntity(
+        id: 'order-fallback',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: [
+          {'product_id': 'prod-1', 'quantity': 1.0, 'unit_price': 10.0}
+        ],
+      );
+
+      await expectLater(
+        service.printOrderLabels(order, order.items, settings),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('PrinterService reports a missing label and main printer', () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        createdAt: DateTime.now(),
+      );
+      final service = PrinterService((ip, port, {timeout}) async {
+        return MockSocket();
+      }, null);
+      final order = OrderEntity(
+        id: 'order-no-printer',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: [
+          {'product_id': 'prod-1', 'quantity': 1.0, 'unit_price': 10.0}
+        ],
+      );
+
+      await expectLater(
+        service.printOrderLabels(order, order.items, settings),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'Etiket yazıcısı tanımlı değil.',
+          ),
+        ),
+      );
+    });
+
+    test('one continuous order label grows to include every item', () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        labelPrinterEnabled: true,
+        labelPrinterName: 'network',
+        labelPrinterIp: '192.168.1.150',
+        labelPrinterPort: 9100,
+        labelPrinterLanguage: 'tspl',
+        createdAt: DateTime.now(),
+      );
+      final socket = MockSocket();
+      final service =
+          PrinterService((ip, port, {timeout}) async => socket, null);
+      final items = <Map<String, dynamic>>[
+        {
+          'product_id': 'prod-1',
+          'product_name': 'Birinci Urun',
+          'quantity': 1.0,
+          'unit_price': 10.0,
+        },
+        {
+          'product_id': 'prod-2',
+          'product_name': 'Ikinci Urun',
+          'quantity': 2.0,
+          'unit_price': 20.0,
+        },
+        {
+          'product_id': 'prod-3',
+          'product_name': 'Ucuncu Urun',
+          'quantity': 3.0,
+          'unit_price': 30.0,
+        },
+        {
+          'product_id': 'prod-4',
+          'product_name': 'Dorduncu Urun',
+          'quantity': 4.0,
+          'unit_price': 40.0,
+        },
+        {
+          'product_id': 'prod-5',
+          'product_name': 'Besinci Urun',
+          'quantity': 5.0,
+          'unit_price': 50.0,
+        },
+      ];
+      final order = OrderEntity(
+        id: 'order-two-items',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: items,
+      );
+
+      await service.printOrderLabels(order, items, settings);
+
+      final output = String.fromCharCodes(socket.writtenBytes);
+      expect('Birinci Urun'.allMatches(output), hasLength(1));
+      expect('Ikinci Urun'.allMatches(output), hasLength(1));
+      expect('Ucuncu Urun'.allMatches(output), hasLength(1));
+      expect('Dorduncu Urun'.allMatches(output), hasLength(1));
+      expect('Besinci Urun'.allMatches(output), hasLength(1));
+      expect(output, isNot(contains('diger urun')));
+      expect(output, contains('GAP 0 mm,0 mm'));
+      final size = RegExp(r'SIZE 50 mm,(\d+) mm').firstMatch(output);
+      expect(size, isNotNull);
+      expect(int.parse(size!.group(1)!), greaterThan(30));
+      expect('PRINT 1,1'.allMatches(output), hasLength(1));
     });
   });
 }

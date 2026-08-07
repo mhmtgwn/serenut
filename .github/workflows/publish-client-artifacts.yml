@@ -1,0 +1,48 @@
+name: Publish Prepared Client Artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: serenut-os-android-apk
+          path: release-artifacts/android
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 31124045475
+      - uses: actions/download-artifact@v4
+        with:
+          name: serenut-os-windows-installer
+          path: release-artifacts/windows
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 31124045475
+      - name: Upload and publish 1.2.9+72
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          key="$RUNNER_TEMP/serenut_vps_key"
+          printf '%s\n' "$VPS_SSH_KEY" > "$key"
+          chmod 600 "$key"
+          remote="$VPS_USER@$VPS_HOST"
+          ssh -i "$key" -p "$VPS_PORT" -o StrictHostKeyChecking=accept-new "$remote" \
+            'mkdir -p /var/www/serenut/server/releases/_incoming/android /var/www/serenut/server/releases/_incoming/windows'
+          scp -i "$key" -P "$VPS_PORT" release-artifacts/android/app-release.apk \
+            "$remote:/var/www/serenut/server/releases/_incoming/android/app-release.apk"
+          scp -i "$key" -P "$VPS_PORT" release-artifacts/windows/SerenutOSSetup.exe \
+            "$remote:/var/www/serenut/server/releases/_incoming/windows/SerenutOSSetup.exe"
+          ssh -i "$key" -p "$VPS_PORT" "$remote" \
+            "cd /var/www/serenut && git fetch origin main && git reset --hard origin/main && sh server/scripts/deploy_production_ci.sh '1.2.9+72'"
