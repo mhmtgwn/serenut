@@ -37,7 +37,8 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 $COMPOSE build backend maintenance-agent
-$COMPOSE up -d --force-recreate maintenance-agent
+docker ps -a -q --filter "name=serenut-maintenance-agent" | xargs -r docker rm -f 2>/dev/null || true
+$COMPOSE up -d --force-recreate --remove-orphans maintenance-agent
 $COMPOSE run --rm backend node dist/scripts/run-migrations.js
 
 # SCP writes incoming artifacts as the SSH user while the API runs as the
