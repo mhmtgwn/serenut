@@ -118,6 +118,95 @@ void main() {
         final allProductsAfterDelete = await productRepo.findAll();
         expect(allProductsAfterDelete.length, equals(0));
       });
+
+      test('ürün fiyatı güncellendiğinde açık sipariş ve vadeli satış fiyatları da güncellenir', () async {
+        final prod = ProductEntity(
+          id: 'prod-price-test',
+          name: 'Peynir',
+          description: '',
+          price: 100.0,
+          quantity: 50,
+          category: 'Sut',
+        );
+        await productRepo.create(prod);
+
+        // 1. Open Order with 2x Peynir at 100 TL = 200 TL
+        final orderId = 'ord-test-1';
+        await db.insert('orders', {
+          'id': orderId,
+          'order_number': 'ORD-1001',
+          'customer_id': 'cust-1',
+          'status': 'created',
+          'total_amount': 200.0,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('order_items', {
+          'id': 'oi-1',
+          'order_id': orderId,
+          'product_id': 'prod-price-test',
+          'product_name': 'Peynir',
+          'quantity': 2.0,
+          'unit_price': 100.0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        // 2. Open/Deferred Sale (debt) with 3x Peynir at 100 TL = 300 TL
+        final saleId = 'sale-test-1';
+        await db.insert('sales', {
+          'id': saleId,
+          'customer_id': 'cust-1',
+          'total_amount': 300.0,
+          'paid_amount': 0.0,
+          'payment_method': 'debt',
+          'status': 'completed',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('sale_items', {
+          'id': 'si-1',
+          'sale_id': saleId,
+          'product_id': 'prod-price-test',
+          'product_name': 'Peynir',
+          'quantity': 3.0,
+          'unit_price': 100.0,
+          'subtotal': 300.0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('financial_transactions', {
+          'id': 'ft-1',
+          'type': 'sale',
+          'customer_id': 'cust-1',
+          'amount': 300.0,
+          'paid_amount': 0.0,
+          'debt_amount': 300.0,
+          'reference_id': saleId,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        // Update product price from 100 TL to 150 TL
+        final updatedProd = prod.copyWith(price: 150.0);
+        await productRepo.update(updatedProd);
+
+        // Verify order item and order total
+        final orderItems = await db.query('order_items', where: 'order_id = ?', whereArgs: [orderId]);
+        expect(orderItems.first['unit_price'], equals(150.0));
+
+        final orderRows = await db.query('orders', where: 'id = ?', whereArgs: [orderId]);
+        expect(orderRows.first['total_amount'], equals(300.0)); // 2x 150 = 300
+
+        // Verify sale item, sale total, and financial transaction
+        final saleItems = await db.query('sale_items', where: 'sale_id = ?', whereArgs: [saleId]);
+        expect(saleItems.first['unit_price'], equals(150.0));
+        expect(saleItems.first['subtotal'], equals(450.0)); // 3x 150 = 450
+
+        final saleRows = await db.query('sales', where: 'id = ?', whereArgs: [saleId]);
+        expect(saleRows.first['total_amount'], equals(450.0));
+
+        final ftRows = await db.query('financial_transactions', where: 'reference_id = ?', whereArgs: [saleId]);
+        expect(ftRows.first['amount'], equals(450.0));
+        expect(ftRows.first['debt_amount'], equals(450.0));
+      });
     });
 
     group('CustomerRepository CRUD', () {

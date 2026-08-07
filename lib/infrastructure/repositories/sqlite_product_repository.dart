@@ -218,6 +218,7 @@ class SqliteProductRepository implements IProductRepository {
           where: 'product_id = ?',
           whereArgs: [oldId],
         );
+        await _updateDeferredPricesAndOrders(product.id, product.price);
       });
       return 1;
     }
@@ -235,8 +236,125 @@ class SqliteProductRepository implements IProductRepository {
           entityId: targetId,
           operation: 'UPSERT',
           payload: payload);
+
+      await _updateDeferredPricesAndOrders(targetId, product.price);
       return result;
     });
+  }
+
+  Future<void> _updateDeferredPricesAndOrders(
+      String productId, double newPrice) async {
+    final nowStr = DateTime.now().toIso8601String();
+
+    // 1. Update open order items & order totals
+    final affectedOrderRows = await _executor.rawQuery('''
+      SELECT DISTINCT oi.order_id
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      WHERE oi.product_id = ? AND o.status IN ('created', 'preparing', 'ready') AND o.is_deleted = 0
+    ''', [productId]);
+
+    if (affectedOrderRows.isNotEmpty) {
+      await _executor.rawUpdate('''
+        UPDATE order_items
+        SET unit_price = ?
+        WHERE product_id = ? AND order_id IN (
+          SELECT id FROM orders WHERE status IN ('created', 'preparing', 'ready') AND is_deleted = 0
+        )
+      ''', [newPrice, productId]);
+
+      for (final row in affectedOrderRows) {
+        final orderId = row['order_id'] as String;
+        final totalResult = await _executor.rawQuery('''
+          SELECT SUM(quantity * unit_price) as total FROM order_items WHERE order_id = ?
+        ''', [orderId]);
+        final newTotal =
+            (totalResult.first['total'] as num?)?.toDouble() ?? 0.0;
+        await _executor.rawUpdate('''
+          UPDATE orders
+          SET total_amount = ?, updated_at = ?, is_synced = 0
+          WHERE id = ?
+        ''', [newTotal, nowStr, orderId]);
+      }
+    }
+
+    // 2. Update open/deferred sale items & sale totals & customer debt/balances
+    final affectedSaleRows = await _executor.rawQuery('''
+      SELECT DISTINCT si.sale_id, s.customer_id, s.paid_amount
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      WHERE si.product_id = ? AND s.status != 'cancelled' AND s.is_deleted = 0
+        AND (s.payment_method = 'debt' OR s.paid_amount < s.total_amount)
+    ''', [productId]);
+
+    if (affectedSaleRows.isNotEmpty) {
+      await _executor.rawUpdate('''
+        UPDATE sale_items
+        SET unit_price = ?, subtotal = quantity * ?
+        WHERE product_id = ? AND sale_id IN (
+          SELECT id FROM sales WHERE status != 'cancelled' AND is_deleted = 0 AND (payment_method = 'debt' OR paid_amount < total_amount)
+        )
+      ''', [newPrice, newPrice, productId]);
+
+      final affectedCustomerIds = <String>{};
+
+      await _executor.update('ledger_bypass_flag', {'active': 1});
+      try {
+        for (final row in affectedSaleRows) {
+          final saleId = row['sale_id'] as String;
+          final customerId = row['customer_id'] as String;
+          final paidAmount = (row['paid_amount'] as num?)?.toDouble() ?? 0.0;
+
+          if (customerId.isNotEmpty) affectedCustomerIds.add(customerId);
+
+          final totalResult = await _executor.rawQuery('''
+            SELECT SUM(subtotal) as total FROM sale_items WHERE sale_id = ?
+          ''', [saleId]);
+          final newTotal =
+              (totalResult.first['total'] as num?)?.toDouble() ?? 0.0;
+          final newDebt = (newTotal - paidAmount).clamp(0.0, double.infinity);
+
+          await _executor.rawUpdate('''
+            UPDATE sales
+            SET total_amount = ?, updated_at = ?, is_synced = 0
+            WHERE id = ?
+          ''', [newTotal, nowStr, saleId]);
+
+          await _executor.rawUpdate('''
+            UPDATE financial_transactions
+            SET amount = ?, debt_amount = ?
+            WHERE reference_id = ? AND type = 'sale'
+          ''', [newTotal, newDebt, saleId]);
+        }
+      } finally {
+        await _executor.update('ledger_bypass_flag', {'active': 0});
+      }
+
+      for (final customerId in affectedCustomerIds) {
+        final debtResult = await _executor.rawQuery('''
+          SELECT SUM(debt_amount) as total_debt
+          FROM financial_transactions
+          WHERE customer_id = ? AND is_deleted = 0
+        ''', [customerId]);
+        final totalDebt =
+            (debtResult.first['total_debt'] as num?)?.toDouble() ?? 0.0;
+
+        final paymentsResult = await _executor.rawQuery('''
+          SELECT SUM(amount) as total_payments
+          FROM financial_transactions
+          WHERE customer_id = ? AND type = 'collection' AND is_deleted = 0
+        ''', [customerId]);
+        final totalPayments =
+            (paymentsResult.first['total_payments'] as num?)?.toDouble() ?? 0.0;
+
+        final newBalance = totalPayments - totalDebt;
+        await _executor.rawUpdate('''
+          UPDATE customers
+          SET balance = ?, updated_at = ?, is_synced = 0
+          WHERE id = ?
+        ''', [newBalance, nowStr, customerId]);
+      }
+    }
   }
 
   @override

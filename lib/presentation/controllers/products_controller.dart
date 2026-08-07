@@ -175,6 +175,8 @@ class ProductsController extends AsyncNotifier<List<ProductEntity>> {
       ref.invalidate(salesProductsControllerProvider);
       ref.invalidate(ordersProductsControllerProvider);
       ref.invalidate(productInventorySummaryProvider);
+      ref.invalidate(ordersCustomersControllerProvider);
+      ref.invalidate(ordersControllerProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
       return _paginationService?.items ?? [];
     });
