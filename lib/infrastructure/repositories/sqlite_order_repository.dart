@@ -80,19 +80,44 @@ class SqliteOrderRepository implements IOrderRepository {
         where: 'id = 1',
         limit: 1,
       );
-      if (sequenceRows.isEmpty) {
-        throw StateError('Sipariş numarası sayacı bulunamadı.');
+      int nextValue = 1;
+      if (sequenceRows.isNotEmpty) {
+        nextValue = (sequenceRows.single['next_value'] as num).toInt();
       }
-      final nextValue = (sequenceRows.single['next_value'] as num).toInt();
-      final orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
-      final sequenceUpdated = await _executor.update(
-        'order_number_sequence',
-        {'next_value': nextValue + 1},
-        where: 'id = 1 AND next_value = ?',
-        whereArgs: [nextValue],
-      );
-      if (sequenceUpdated != 1) {
-        throw StateError('Sipariş numarası eşzamanlı üretilemedi.');
+
+      final maxOrderRows = await _executor.rawQuery('''
+        SELECT MAX(CAST(SUBSTR(order_number, 4) AS INTEGER)) as max_num
+        FROM orders
+        WHERE order_number LIKE 'SP-%'
+      ''');
+      if (maxOrderRows.isNotEmpty && maxOrderRows.first['max_num'] != null) {
+        final maxExisting = (maxOrderRows.first['max_num'] as num).toInt();
+        if (maxExisting >= nextValue) {
+          nextValue = maxExisting + 1;
+        }
+      }
+
+      String orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
+      while (true) {
+        final existsRows = await _executor.rawQuery(
+          'SELECT 1 FROM orders WHERE order_number = ? LIMIT 1',
+          [orderNumber],
+        );
+        if (existsRows.isEmpty) break;
+        nextValue++;
+        orderNumber = 'SP-${nextValue.toString().padLeft(6, '0')}';
+      }
+
+      if (sequenceRows.isEmpty) {
+        await _executor.insert('order_number_sequence', {
+          'id': 1,
+          'next_value': nextValue + 1,
+        });
+      } else {
+        await _executor.rawUpdate(
+          'UPDATE order_number_sequence SET next_value = ? WHERE id = 1',
+          [nextValue + 1],
+        );
       }
       final payload = {
         'id': entity.id,

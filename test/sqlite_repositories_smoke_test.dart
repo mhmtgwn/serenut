@@ -346,7 +346,34 @@ void main() {
         expect(foundAfterDelete, isNull);
 
         final allOrdersAfterDelete = await orderRepo.findAll();
-        expect(allOrdersAfterDelete.isEmpty, isTrue);
+        expect(allOrdersAfterDelete.length, equals(0));
+      });
+
+      test('çakışan sipariş numarasında benzersiz sipariş numarası üretir', () async {
+        await db.insert('orders', {
+          'id': 'existing-ord-1',
+          'order_number': 'SP-000001',
+          'customer_id': 'cust-1',
+          'status': 'created',
+          'total_amount': 100.0,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+
+        final newOrder = OrderEntity(
+          id: 'test-order-collision',
+          customerId: 'cust-1',
+          status: 'created',
+          createdAt: DateTime.now(),
+          items: [],
+        );
+
+        final result = await orderRepo.create(newOrder);
+        expect(result, greaterThan(0));
+
+        final saved = await orderRepo.findById(newOrder.id);
+        expect(saved, isNotNull);
+        expect(saved!.orderNumber, equals('SP-000002'));
       });
     });
 
