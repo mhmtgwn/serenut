@@ -116,10 +116,14 @@ async function prepareRelease(
     if (fs.existsSync(finalPath)) {
       const existingHash = await sha256(finalPath);
       if (existingHash !== hash) {
-        throw new Error(`Release ${platform} ${versionCode} already exists with different content`);
+        console.warn(
+          `[publish-release] Updating release ${platform} ${versionCode}: file content changed, overwriting existing file.`,
+        );
+        fs.unlinkSync(finalPath);
+      } else {
+        fs.unlinkSync(temporaryPath);
+        reusedExistingFile = true;
       }
-      fs.unlinkSync(temporaryPath);
-      reusedExistingFile = true;
     }
     return {
       platform,
