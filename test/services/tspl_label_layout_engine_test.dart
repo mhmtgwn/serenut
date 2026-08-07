@@ -46,7 +46,9 @@ void main() {
 
     expect(
       output,
-      startsWith('SIZE 50 mm,30 mm\r\nGAP 2 mm,0 mm\r\nGAPDETECT\r\n'),
+      startsWith(
+        'SIZE 50 mm,30 mm\r\nGAP 2 mm,0 mm\r\nGAPDETECT 240,16\r\n',
+      ),
     );
   });
 

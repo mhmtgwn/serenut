@@ -39,6 +39,7 @@ class TsplLabelLayoutEngine {
         ? mediaWidthDots
         : printableWidthDots.clamp(200, mediaWidthDots);
     final heightDots = (safeHeight * safeDpi / 25.4).round();
+    final gapDots = (safeGap * safeDpi / 25.4).round();
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
     final horizontalPadding = sx(8).clamp(4, 16).toInt();
@@ -53,7 +54,9 @@ class TsplLabelLayoutEngine {
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
-      ..writelnIf(autoDetectGap, 'GAPDETECT')
+      // Supplying approximate media dimensions is more reliable on TSPL
+      // compatible printer firmware than the parameterless calibration form.
+      ..writelnIf(autoDetectGap, 'GAPDETECT $heightDots,$gapDots')
       ..writeln('DENSITY 8')
       ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
       ..writeln('REFERENCE 0,0')
@@ -191,8 +194,7 @@ class TsplLabelLayoutEngine {
                 ((availablePriceWidth - totalPriceWidth) / 2).clamp(0, 999))
             .round();
         final priceX = currencyX + currencyWidth + gap;
-        final priceY =
-            bottomY + ((bottomHeight - sy(48)) ~/ 2).clamp(0, 999).toInt();
+        final priceY = bottomY + sy(2);
         commands.writeln('TEXT $currencyX,${priceY + sy(22)},"2",0,1,1,"TL"');
         commands.boldText(priceX, priceY, priceFont, 1, 2, priceText);
         if (showVat) {
@@ -211,8 +213,7 @@ class TsplLabelLayoutEngine {
         final priceX = ((widthDots - textW) / 2)
             .clamp(horizontalPadding, widthDots - horizontalPadding)
             .round();
-        final priceY =
-            bottomY + ((bottomHeight - sy(32)) ~/ 2).clamp(0, 999).toInt();
+        final priceY = bottomY + sy(2);
         commands.boldText(priceX, priceY, priceFont, 1, 1, priceStr);
         if (showVat) {
           final vatW = vatStr.length * 8 * fontScale;
@@ -266,6 +267,7 @@ class TsplLabelLayoutEngine {
         ? mediaWidthDots
         : printableWidthDots.clamp(200, mediaWidthDots);
     final heightDots = (safeHeight * safeDpi / 25.4).round();
+    final gapDots = (safeGap * safeDpi / 25.4).round();
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
     final maxFont1Chars = ((widthDots - sx(32)) ~/ 8).clamp(4, 80);
@@ -286,7 +288,7 @@ class TsplLabelLayoutEngine {
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
-      ..writelnIf(autoDetectGap, 'GAPDETECT')
+      ..writelnIf(autoDetectGap, 'GAPDETECT $heightDots,$gapDots')
       ..writeln('DENSITY 8')
       // Product and order labels share the same physical media path. Keeping
       // one direction prevents order labels from being rotated relative to
