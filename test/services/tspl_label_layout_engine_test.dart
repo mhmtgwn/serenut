@@ -38,7 +38,7 @@ void main() {
     expect(output, isNot(contains('\x1dV')));
   });
 
-  test('gap otomatik algılama ölçü ve gap tanımından sonra çalıştırılır', () {
+  test('gap otomatik algılama yazıcının kendi ölçümüne bırakılır', () {
     final output = latin1.decode(TsplLabelLayoutEngine.generateLabelBytes(
       productLabel(),
       autoDetectGap: true,
@@ -47,7 +47,7 @@ void main() {
     expect(
       output,
       startsWith(
-        'SIZE 50 mm,30 mm\r\nGAP 2 mm,0 mm\r\nGAPDETECT 240,16\r\n',
+        'SIZE 50 mm,30 mm\r\nGAP 2 mm,0 mm\r\nGAPDETECT\r\n',
       ),
     );
   });

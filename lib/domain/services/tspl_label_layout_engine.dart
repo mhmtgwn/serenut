@@ -39,7 +39,6 @@ class TsplLabelLayoutEngine {
         ? mediaWidthDots
         : printableWidthDots.clamp(200, mediaWidthDots);
     final heightDots = (safeHeight * safeDpi / 25.4).round();
-    final gapDots = (safeGap * safeDpi / 25.4).round();
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
     final horizontalPadding = sx(8).clamp(4, 16).toInt();
@@ -54,9 +53,10 @@ class TsplLabelLayoutEngine {
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
-      // Supplying approximate media dimensions is more reliable on TSPL
-      // compatible printer firmware than the parameterless calibration form.
-      ..writelnIf(autoDetectGap, 'GAPDETECT $heightDots,$gapDots')
+      // Let the printer measure the stock itself. Some TSPL-compatible
+      // firmware ignores GAPDETECT when approximate dot values do not match
+      // the sensor reading closely enough.
+      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('DENSITY 8')
       ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
       ..writeln('REFERENCE 0,0')
@@ -267,7 +267,6 @@ class TsplLabelLayoutEngine {
         ? mediaWidthDots
         : printableWidthDots.clamp(200, mediaWidthDots);
     final heightDots = (safeHeight * safeDpi / 25.4).round();
-    final gapDots = (safeGap * safeDpi / 25.4).round();
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * heightDots / 240).round();
     final maxFont1Chars = ((widthDots - sx(32)) ~/ 8).clamp(4, 80);
@@ -288,7 +287,7 @@ class TsplLabelLayoutEngine {
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
-      ..writelnIf(autoDetectGap, 'GAPDETECT $heightDots,$gapDots')
+      ..writelnIf(autoDetectGap, 'GAPDETECT')
       ..writeln('DENSITY 8')
       // Product and order labels share the same physical media path. Keeping
       // one direction prevents order labels from being rotated relative to
