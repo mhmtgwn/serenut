@@ -98,8 +98,9 @@ async function run(): Promise<void> {
       email: 'owner@recovery.test', company_name: 'Recovery Market', tax_number: '1234567890',
     });
     assert.equal(legacyIdentity.status, 410, 'Identity-only legacy route must remain closed');
-    const legacyEmail = await request(app).post('/api/v1/auth/forgot-password').send({ email: 'owner@recovery.test' });
-    assert.equal(legacyEmail.status, 410, 'Email-only legacy route must remain closed');
+    const emailRecovery = await request(app).post('/api/v1/auth/forgot-password').send({ email: 'owner@recovery.test' });
+    assert.equal(emailRecovery.status, 200, 'Verified-email recovery must accept a generic request');
+    assert.match(emailRecovery.body.message, /eşleşen doğrulanmış bir hesap varsa/, 'Email recovery must not disclose account existence');
 
     const httpAuthorization = await request(app).post('/api/v1/auth/recovery/authorize-code').send({
       identifier: 'owner@recovery.test', company_name: 'Recovery Market', tax_number: '1234567890', recovery_code: ownerCodes[1],
