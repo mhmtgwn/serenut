@@ -1,22 +1,35 @@
-part of '../checkout_section.dart';
+import 'package:flutter/material.dart';
+import 'package:serenutos/config/theme.dart';
+
+// ── POS Tema Renkleri ───────────────────────────────────────────────────────
+const _kGreen = POSColors.green;
+const _kGreenDark = POSColors.greenDark;
+const _kGreenLight = POSColors.greenLight;
+const _kRed = POSColors.red;
+const _kRedLight = POSColors.redLight;
+const _kSurface = POSColors.surface;
+const _kBorder = POSColors.border;
+const _kText = POSColors.text;
+const _kTextSecondary = POSColors.textSecondary;
 
 // ── Nakit Ödeme Dialog ─────────────────────────────────────────────────────────
-// Sayısal klavye + para üstü hesaplama + Tam Tutar kısayol butonu
+// Sayısal klavye + para üstü hesaplama + Tam Tutar kısayol + Akıllı TL banknot chipleri
 
-class _CashPaymentDialog extends StatefulWidget {
+class CashPaymentDialog extends StatefulWidget {
   final double total;
   final void Function(double givenAmount) onComplete;
 
-  const _CashPaymentDialog({
+  const CashPaymentDialog({
+    super.key,
     required this.total,
     required this.onComplete,
   });
 
   @override
-  State<_CashPaymentDialog> createState() => _CashPaymentDialogState();
+  State<CashPaymentDialog> createState() => CashPaymentDialogState();
 }
 
-class _CashPaymentDialogState extends State<_CashPaymentDialog> {
+class CashPaymentDialogState extends State<CashPaymentDialog> {
   String _input = '';
 
   double get _given => double.tryParse(_input.replaceAll(',', '.')) ?? 0.0;
@@ -26,7 +39,6 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
 
   void _append(String ch) {
     setState(() {
-      // Ondalık nokta kontrolü
       if (ch == '.') {
         if (_input.isEmpty) {
           _input = '0.';
@@ -35,12 +47,10 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
         }
         return;
       }
-      // Ondalık basamak sınırı (maks 2)
       if (_input.contains('.')) {
         final parts = _input.split('.');
         if (parts[1].length >= 2) return;
       }
-      // Başta sıfır engeli
       if (_input == '0') {
         _input = ch;
         return;
@@ -74,7 +84,6 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
 
   void _submitExact() {
     _setExact();
-    // Kısa gecikme ile tutarı göster, sonra tamamla
     Future.delayed(const Duration(milliseconds: 250), _submit);
   }
 
@@ -177,17 +186,14 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        // Tutar göstergesi
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            const Text(
                               'Alınan',
                               style: TextStyle(
                                   fontSize: 11,
-                                  color: _hasInput
-                                      ? _kTextSecondary
-                                      : _kTextSecondary,
+                                  color: _kTextSecondary,
                                   fontWeight: FontWeight.w500),
                             ),
                             Text(
@@ -201,7 +207,6 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
                             ),
                           ],
                         ),
-                        // Para üstü / eksik göstergesi
                         if (_hasInput) ...[
                           const SizedBox(height: 6),
                           AnimatedContainer(
@@ -351,8 +356,7 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         onTap: isBack ? _backspace : () => _append(key),
-                        onLongPress:
-                            isBack ? _clearAll : null,
+                        onLongPress: isBack ? _clearAll : null,
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
                           decoration: BoxDecoration(
@@ -437,14 +441,10 @@ class _CashPaymentDialogState extends State<_CashPaymentDialog> {
     );
   }
 
-  /// Kasa tutarına göre Türk Lirası banknot kombinasyonlarını (5, 10, 20, 50, 100, 200 TL)
-  /// ve katlarını esas alarak toplamdan BÜYÜK akıllı hızlı ödeme tutarları üretir.
-  /// Örn: 1235 TL kasa -> [₺1240, ₺1250, ₺1300, ₺1400 (7x200), ₺1500]
   List<double> _calculateQuickCashOptions(double total) {
     if (total <= 0) return [];
     final Set<double> set = {};
 
-    // TL banknot ve yuvarlama adımları: 5, 10, 20, 50, 100, 200, 500
     const steps = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0];
 
     for (final step in steps) {

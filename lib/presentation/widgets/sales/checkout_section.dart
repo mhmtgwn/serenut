@@ -14,11 +14,11 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'checkout/cash_dialog.dart';
 
 part 'checkout/karma_fields.dart';
 part 'checkout/pay_buttons.dart';
 part 'checkout/customer_selection.dart';
-part 'checkout/cash_dialog.dart';
 
 // ── POS Tema Renkleri (korundu) ───────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -153,7 +153,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => _CashPaymentDialog(
+      builder: (ctx) => CashPaymentDialog(
         total: widget.total,
         onComplete: (double givenAmount) {
           Navigator.of(ctx).pop();

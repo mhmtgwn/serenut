@@ -21,6 +21,7 @@ import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
+import 'package:serenutos/presentation/widgets/sales/checkout/cash_dialog.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
