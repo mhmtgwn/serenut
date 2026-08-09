@@ -210,12 +210,13 @@ document.getElementById('recovery-claim-form')?.addEventListener('submit', async
 
 document.getElementById('email-recovery-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
+  const form = event.currentTarget;
   const button = event.submitter;
   button.disabled = true;
   try {
     const data = await post('forgot-password', { email: document.getElementById('recovery-email').value.trim() });
     message(data.message || 'Hesap varsa sıfırlama bağlantısı gönderildi.', true);
-    event.currentTarget.reset();
+    form.reset();
   } catch (error) {
     message(error.message);
   } finally { button.disabled = false; }

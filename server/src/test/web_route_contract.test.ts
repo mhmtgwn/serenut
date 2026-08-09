@@ -64,6 +64,8 @@ async function run() {
   assert.match(forgotHtml, /id="email-recovery-form"/, 'verified-email recovery must have a request UI');
   assert.match(authRuntime, /sessionStorage\.setItem\('serenut_password_reset_token'/, 'reset authorization must stay out of the URL');
   assert.match(authRuntime, /history\.replaceState/, 'email reset token must be removed from browser history immediately');
+  assert.match(authRuntime, /const form = event\.currentTarget;/, 'async recovery submission must retain its form reference');
+  assert.doesNotMatch(authRuntime, /event\.currentTarget\.reset\(\)/, 'async recovery submission must not dereference a cleared event currentTarget');
   assert.doesNotMatch(runtime, /body:\{new_password:/, 'admin UI must not set user passwords directly');
   assert.doesNotMatch(runtime, /Şifre Sıfırlama Linki|Geçici [Şş]ifre|new-user-password|company-admin-pw/, 'SMTP-free activation must not render legacy email or temporary-password controls');
   assert.match(runtime, /id="new-password"[^>]+minlength="10"/, 'account password form must match the backend password policy');
