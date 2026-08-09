@@ -469,7 +469,8 @@ router.put('/admin/invoices/:id/reject-payment', authenticateUser, requireRole('
  */
 router.put('/plans/:id', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const { name, price, currency, billing_interval, features } = req.body;
+  const { name, price, currency, billing_interval, features, device_limit, store_limit,
+    user_limit, trial_days, is_active } = req.body;
 
   if (!name || price === undefined) {
     return res.status(400).json({ error: 'missing_fields', message: 'Plan adı ve fiyatı zorunludur.' });
@@ -478,8 +479,9 @@ router.put('/plans/:id', authenticateUser, requireRole('sysadmin'), async (req: 
   try {
     const query = `
       UPDATE plans 
-      SET name = $1, price = $2, currency = $3, billing_interval = $4, features = $5
-      WHERE id = $6
+      SET name = $1, price = $2, currency = $3, billing_interval = $4, features = $5,
+          device_limit=$6, store_limit=$7, user_limit=$8, trial_days=$9, is_active=$10
+      WHERE id = $11
       RETURNING *
     `;
     const params = [
@@ -488,7 +490,8 @@ router.put('/plans/:id', authenticateUser, requireRole('sysadmin'), async (req: 
       currency || 'TRY',
       billing_interval || 'monthly',
       typeof features === 'string' ? features : JSON.stringify(features),
-      id
+      Number(device_limit || 1), Number(store_limit || 1), Number(user_limit || 1),
+      Number(trial_days || 0), is_active !== false, id
     ];
     
     const result = await runBypassingRLS(query, params);
@@ -510,6 +513,30 @@ router.put('/plans/:id', authenticateUser, requireRole('sysadmin'), async (req: 
   } catch (err) {
     logger.error('Error updating plan:', err);
     return res.status(500).json({ error: 'server_error', message: 'Plan güncellenirken sunucu hatası oluştu.' });
+  }
+});
+
+router.post('/plans', authenticateUser, requireRole('sysadmin'), async (req: AuthenticatedRequest, res: Response) => {
+  const { name, price, currency, billing_interval, features, device_limit, store_limit,
+    user_limit, trial_days } = req.body;
+  const limits = [device_limit, store_limit, user_limit].map(Number);
+  if (!String(name || '').trim() || !Number.isFinite(Number(price)) || Number(price) < 0 ||
+      limits.some(value => !Number.isInteger(value) || value < 1 || value > 1000)) {
+    return res.status(400).json({ error: 'invalid_plan', message: 'Plan adı, fiyat ve 1-1000 arasındaki limitler zorunludur.' });
+  }
+  const id = `plan-${crypto.randomUUID()}`;
+  try {
+    const result = await runBypassingRLS(
+      `INSERT INTO plans(id,name,price,currency,billing_interval,features,device_limit,store_limit,user_limit,trial_days,is_active)
+       VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,TRUE) RETURNING *`,
+      [id, String(name).trim(), Number(price), currency || 'TRY', billing_interval === 'yearly' ? 'yearly' : 'monthly',
+       JSON.stringify(features || {}), limits[0], limits[1], limits[2], Math.max(0, Number(trial_days || 0))],
+    );
+    if (redisClient?.isOpen) await redisClient.del('plans:list').catch(() => undefined);
+    return res.status(201).json({ success: true, plan: result.rows[0] });
+  } catch (error) {
+    logger.error('Error creating plan:', error);
+    return res.status(500).json({ error: 'server_error', message: 'Plan oluşturulamadı.' });
   }
 });
 

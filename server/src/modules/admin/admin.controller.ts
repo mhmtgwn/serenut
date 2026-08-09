@@ -742,6 +742,39 @@ router.post('/licenses', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+router.post('/companies/:id/manual-subscription', async (req: AuthenticatedRequest, res: Response) => {
+  const { plan_id, grant_days, device_limit, store_limit, reason } = req.body;
+  const days = Number(grant_days);
+  if (!plan_id || !Number.isInteger(days) || days < 1 || days > 3660 || String(reason || '').trim().length < 10) {
+    return res.status(400).json({ error: 'invalid_manual_subscription', message: 'Plan, 1-3660 gün arası süre ve en az 10 karakterlik gerekçe zorunludur.' });
+  }
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+    const company = await client.query('SELECT id FROM companies WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!company.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'company_not_found' }); }
+    const activation = await CommercialLifecycleService.grantManualEntitlement(client, {
+      companyId: req.params.id, planId: String(plan_id), adminUserId: req.user!.id,
+      grantDays: days,
+      deviceLimitOverride: device_limit == null || device_limit === '' ? undefined : Number(device_limit),
+      storeLimitOverride: store_limit == null || store_limit === '' ? undefined : Number(store_limit),
+      grantReason: String(reason).trim(),
+    });
+    await client.query('COMMIT');
+    await writeAdminAudit(req.user!.id, 'GRANT_MANUAL_SUBSCRIPTION', 'companies', req.params.id, null,
+      { plan_id, grant_days: days, device_limit, store_limit, reason: String(reason).trim() }, req.ip);
+    return res.status(201).json({ success: true, subscription_id: activation.subscriptionId,
+      entitlement_id: activation.entitlementId, valid_until: activation.validUntil });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    if (String(error?.message || '').startsWith('plan_not_found')) return res.status(404).json({ error: 'plan_not_found' });
+    if (['invalid_admin_grant_days','invalid_entitlement_limits'].includes(error?.message)) return res.status(400).json({ error: error.message });
+    logger.error('Manual subscription grant failed:', error);
+    return res.status(500).json({ error: 'server_error', message: 'Manuel abonelik tanımlanamadı.' });
+  } finally { client.release(); }
+});
+
 router.post('/companies/:id/send-reset-password', async (_req: AuthenticatedRequest, res: Response) => {
   return res.status(410).json({
     error: 'email_recovery_removed',
@@ -1878,7 +1911,9 @@ router.get('/security/admin-users', async (_req: AuthenticatedRequest, res: Resp
   try {
     const users = await runBypassingRLS(`
       SELECT u.id, u.name, u.email, u.is_active, u.last_login_at, u.updated_at,
-             COALESCE(ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.id IS NOT NULL), '{}') AS roles
+             COALESCE(ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.id IS NOT NULL), '{}') AS roles,
+             (SELECT COUNT(*) FROM user_recovery_codes rc
+               WHERE rc.user_id=u.id AND rc.used_at IS NULL AND rc.revoked_at IS NULL) AS unused_recovery_codes
       FROM users u
       JOIN user_roles ur ON ur.user_id = u.id
       JOIN roles r ON r.id = ur.role_id

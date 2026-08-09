@@ -86,6 +86,7 @@ async function run() {
   assert.match(billingController, /is_enabled: true/, 'enabled payment methods must expose an explicit enabled state');
   assert.match(billingController, /requirePermission\('billing:view'\).*request-bank-transfer/s, 'billing mutations must enforce billing permission');
   assert.match(billingController, /'\/subscribe', authenticateUser, requirePermission\('billing:view'\)/, 'card checkout must enforce billing permission');
+  assert.match(billingController, /router\.post\('\/plans', authenticateUser, requireRole\('sysadmin'\)/, 'sysadmin must be able to create sales plans');
   assert.match(billingController, /monthly_price[\s\S]*yearly_price[\s\S]*locked_billing_period/, 'effective plans must expose canonical period prices');
   assert.match(billingDomain, /p\.billing_interval/, 'quote calculation must honor the configured plan price interval');
   assert.match(runtime, /reason:reason\.trim\(\)/, 'manual license creation must submit its audited reason');
@@ -93,6 +94,9 @@ async function run() {
   assert.doesNotMatch(runtime, /method=>method\.id==='iyzico' && method\.is_enabled/, 'card availability must not reject the enabled-method API shape');
   assert.match(adminController, /\/maintenance\/preview/, 'maintenance preview endpoint must exist');
   assert.match(adminController, /\/maintenance\/cleanup/, 'maintenance cleanup endpoint must exist');
+  assert.match(adminController, /\/companies\/:id\/manual-subscription/, 'sysadmin must be able to grant an audited subscription without a payment event');
+  assert.match(runtime, /id="package-plan" required/, 'company package editor must expose its base plan selection');
+  assert.match(runtime, /id="manual-subscription-form"/, 'company detail must distinguish manual activation from a payment-backed offer');
   assert.match(adminController, /SUNUCUYU TEMIZLE/, 'maintenance cleanup must require an explicit confirmation phrase');
 
   const appSource = fs.readFileSync(path.join(projectRoot, 'public/app/js/app.js'), 'utf8');
