@@ -92,3 +92,9 @@
 .auth-launcher a:hover{background:var(--soft-green);color:var(--green)}
 .auth-launcher a:last-child:hover{background:var(--green-dark);color:#fff}
 @media(max-width:600px){.auth-launcher a{min-height:32px;padding:0 8px;font-size:.68rem}}
+
+/* Footer üstündeki ortak CTA, temel başlık renklerinden etkilenmemeli. */
+.cta-box h2{color:#fff!important}
+.cta-box .eyebrow{color:#9ff3ca!important}
+.cta-box .eyebrow:before{background:#f4cc57}
+.cta-box .btn-secondary{border-color:#91a59a!important}
