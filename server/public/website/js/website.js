@@ -33,7 +33,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!siteFooter) { siteFooter = document.createElement('footer'); siteFooter.className='site-footer'; document.body.append(siteFooter); }
   siteFooter.innerHTML = `<div class="container"><div class="footer-grid"><div><a class="footer-brand" href="/">Serenut</a><p class="footer-intro">Satış, canlı tartım, fiziksel POS doğrulaması, yazıcı, sipariş, stok ve müşteri yönetimini bir araya getiren işletme sistemi.</p></div><div class="footer-column"><strong>Ürün</strong><a href="/platform">Özellikler</a><a href="/platform#hardware">Donanım</a><a href="/plans">Planlar</a><a href="/downloads">Uygulamayı indir</a></div><div class="footer-column"><strong>Destek</strong><a href="/contact">İletişim</a><a href="/login">Müşteri paneli</a><a href="/register?flow=account">Ücretsiz hesap</a></div><div class="footer-column"><strong>Yasal</strong><a href="/privacy">Gizlilik</a><a href="/kvkk">KVKK</a><a href="/terms">Kullanım koşulları</a></div></div><div class="footer-bottom"><span>© 2026 Serenut. Tüm hakları saklıdır.</span><span>Türkiye'de geliştirildi.</span></div></div>`;
 
-  if (['/', '/platform'].includes(window.location.pathname)) {
+  const heroAppImage = document.getElementById('hero-app-image');
+  if (heroAppImage) {
+    const heroScenes = [
+      { src: '/media/windows-dashboard.png', alt: 'Serenut OS Windows işletme özeti ekranı', label: 'Serenut OS · İşletme özeti' },
+      { src: '/media/windows-sales.png', alt: 'Serenut OS Windows satış ekranı', label: 'Serenut OS · Satış ekranı' }
+    ];
+    let heroScene = 0;
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) window.setInterval(() => {
+      heroScene = (heroScene + 1) % heroScenes.length;
+      const scene = heroScenes[heroScene];
+      heroAppImage.src = scene.src;
+      heroAppImage.alt = scene.alt;
+      document.getElementById('hero-app-label').textContent = scene.label;
+    }, 5000);
+  }
+
+  if (window.location.pathname === '/platform') {
     const main = document.querySelector('main');
     const anchor = main?.querySelector('.cta-section');
     if (main && anchor) {
