@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const heroAppImage = document.getElementById('hero-app-image');
   if (heroAppImage) {
     const heroScenes = [
-      { src: '/media/windows-dashboard.png', alt: 'Serenut OS Windows işletme özeti ekranı', label: 'Serenut OS · İşletme özeti' },
-      { src: '/media/windows-sales.png', alt: 'Serenut OS Windows satış ekranı', label: 'Serenut OS · Satış ekranı' }
+      { src: '/media/windows-dashboard.png', alt: 'Serenut OS Windows işletme özeti ekranı', mobileSrc: '/media/mobile-dashboard.png', mobileAlt: 'Serenut OS mobil işletme özeti ekranı', label: 'Serenut OS · İşletme özeti' },
+      { src: '/media/windows-sales.png', alt: 'Serenut OS Windows satış ekranı', mobileSrc: '/media/mobile-sales.png', mobileAlt: 'Serenut OS mobil satış ekranı', label: 'Serenut OS · Satış ekranı' }
     ];
     let heroScene = 0;
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) window.setInterval(() => {
@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const scene = heroScenes[heroScene];
       heroAppImage.src = scene.src;
       heroAppImage.alt = scene.alt;
+      const heroMobileImage = document.getElementById('hero-mobile-image');
+      heroMobileImage.src = scene.mobileSrc;
+      heroMobileImage.alt = scene.mobileAlt;
       document.getElementById('hero-app-label').textContent = scene.label;
     }, 5000);
   }
