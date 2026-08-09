@@ -3,6 +3,7 @@ part of '../order_creation_dialog.dart';
 // Extracted Checkout Step widgets for OrderCreationDialog
 extension OrderCreationCheckoutStep on OrderCreationDialogState {
   Widget _buildCheckoutStep() {
+    final isCash = _paymentMethod == 'cash';
     final isKarma = _paymentMethod == 'karma';
 
     final leftSummaryColumn = Column(
@@ -121,6 +122,10 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         ),
         const SizedBox(height: 12),
         _buildPaymentSelectionGrid(),
+        if (isCash) ...[
+          const SizedBox(height: 16),
+          _buildCashChangeFields(),
+        ],
         if (isKarma) ...[
           const SizedBox(height: 16),
           _buildKarmaFields(),
@@ -251,24 +256,175 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
     );
   }
 
+  Widget _buildCashChangeFields() {
+    final givenCash =
+        double.tryParse(_givenCashController.text.replaceAll(',', '.')) ?? 0.0;
+    final change = givenCash - _totalAmount;
+
+    return Container(
+      key: _cashFieldsKey,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: change >= 0 && givenCash > 0
+              ? _kGreen.withValues(alpha: 0.4)
+              : _kBorder,
+          width: change >= 0 && givenCash > 0 ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.payments_rounded, size: 16, color: _kGreenDark),
+              const SizedBox(width: 6),
+              const Text(
+                'Alınan Nakit & Para Üstü',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+              ),
+              const Spacer(),
+              if (givenCash > 0 && change >= 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _kGreenLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Para Üstü: ₺${change.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: _kGreenDark,
+                        fontWeight: FontWeight.w800),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _givenCashController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
+            ],
+            decoration: InputDecoration(
+              labelText: 'Alınan Miktar (₺)',
+              hintText: 'Örn: 200',
+              isDense: true,
+              border: const OutlineInputBorder(),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: _kGreen, width: 2),
+              ),
+              prefixIcon: const Icon(Icons.money_rounded, size: 18),
+              suffixIcon: givenCash > 0
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 16),
+                      onPressed: () {
+                        _givenCashController.clear();
+                        updateState(() {});
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (_) => updateState(() {}),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildQuickCashChip('Tam Tutar (₺${_totalAmount.toStringAsFixed(2)})', _totalAmount),
+              _buildQuickCashChip('₺50', 50),
+              _buildQuickCashChip('₺100', 100),
+              _buildQuickCashChip('₺200', 200),
+              _buildQuickCashChip('₺500', 500),
+            ],
+          ),
+          if (givenCash > 0 && change < 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '₺${(-change).toStringAsFixed(2)} eksik',
+              style: const TextStyle(
+                  color: _kRed, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCashChip(String label, double amount) {
+    return InkWell(
+      onTap: () {
+        _givenCashController.text = amount.toStringAsFixed(2);
+        updateState(() {});
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _kBorder),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: _kText),
+        ),
+      ),
+    );
+  }
+
   Widget _buildKarmaFields() {
     final remaining = _totalAmount;
     final hasCustomer = _selectedCustomer != null;
 
     return Container(
+      key: _karmaFieldsKey,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _kSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
+        border: Border.all(
+          color: _karmaValid ? _kGreen.withValues(alpha: 0.4) : _kBorder,
+          width: _karmaValid ? 1.5 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Karma Ödeme Tutarları',
-            style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+          Row(
+            children: [
+              const Icon(Icons.call_split_rounded,
+                  size: 16, color: _kTextSecondary),
+              const SizedBox(width: 6),
+              const Text(
+                'Karma Ödeme Tutarları',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 13, color: _kText),
+              ),
+              const Spacer(),
+              if (_karmaValid)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _kGreenLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('✓ Tutar Eşleşti',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: _kGreenDark,
+                          fontWeight: FontWeight.w800)),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
           _buildSplitField(
@@ -305,7 +461,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Dağıtılan Toplam:',
+              const Text('Girilen Toplam:',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
               Text('₺${_karmaTotal.toStringAsFixed(2)}',
                   style: TextStyle(
@@ -318,13 +474,19 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Kalan Tutar:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text('₺${_karmaRemainder.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: _kText)),
+              Text(
+                _karmaTotal > _totalAmount ? 'Fazla Girilen:' : 'Kalan Tutar:',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              Text(
+                _karmaTotal > _totalAmount
+                    ? '₺${(_karmaTotal - _totalAmount).toStringAsFixed(2)}'
+                    : '₺${_karmaRemainder.toStringAsFixed(2)}',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: _karmaTotal > _totalAmount ? _kRed : _kText),
+              ),
             ],
           ),
         ],
@@ -334,38 +496,6 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
 
   void _onSplitFieldChanged(
       String field, String valStr, double remaining, bool hasCustomer) {
-    final val = double.tryParse(valStr.replaceAll(',', '.')) ?? 0.0;
-
-    if (!hasCustomer) {
-      _debtSplitController.text = '0.00';
-      if (field == 'cash') {
-        final cardVal = (remaining - val).clamp(0.0, remaining);
-        _cardSplitController.text = cardVal.toStringAsFixed(2);
-      } else if (field == 'card') {
-        final cashVal = (remaining - val).clamp(0.0, remaining);
-        _cashSplitController.text = cashVal.toStringAsFixed(2);
-      }
-    } else {
-      if (field == 'cash') {
-        final currentCard =
-            double.tryParse(_cardSplitController.text.replaceAll(',', '.')) ??
-                0.0;
-        final debtVal = (remaining - (val + currentCard)).clamp(0.0, remaining);
-        _debtSplitController.text = debtVal.toStringAsFixed(2);
-      } else if (field == 'card') {
-        final currentCash =
-            double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ??
-                0.0;
-        final debtVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
-        _debtSplitController.text = debtVal.toStringAsFixed(2);
-      } else if (field == 'debt') {
-        final currentCash =
-            double.tryParse(_cashSplitController.text.replaceAll(',', '.')) ??
-                0.0;
-        final cardVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
-        _cardSplitController.text = cardVal.toStringAsFixed(2);
-      }
-    }
     updateState(() {});
   }
 
@@ -391,8 +521,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                   color: isEnabled ? _kText : Colors.grey)),
         ),
         SizedBox(
-          width: 100,
-          height: 32,
+          width: 125,
+          height: 36,
           child: TextField(
             controller: controller,
             enabled: isEnabled,
@@ -402,10 +532,40 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
                 color: isEnabled ? _kText : Colors.grey),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              border: OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              border: const OutlineInputBorder(),
+              suffixIcon: isEnabled
+                  ? IconButton(
+                      icon: const Icon(Icons.download_rounded,
+                          size: 14, color: Colors.grey),
+                      tooltip: 'Kalan tutarı doldur',
+                      onPressed: () {
+                        final currentCash = fieldId == 'cash'
+                            ? 0.0
+                            : double.tryParse(_cashSplitController.text
+                                    .replaceAll(',', '.')) ??
+                                0.0;
+                        final currentCard = fieldId == 'card'
+                            ? 0.0
+                            : double.tryParse(_cardSplitController.text
+                                    .replaceAll(',', '.')) ??
+                                0.0;
+                        final currentDebt = fieldId == 'debt'
+                            ? 0.0
+                            : double.tryParse(_debtSplitController.text
+                                    .replaceAll(',', '.')) ??
+                                0.0;
+                        final otherTotal =
+                            currentCash + currentCard + currentDebt;
+                        final rem = (remaining - otherTotal)
+                            .clamp(0.0, double.infinity);
+                        controller.text = rem > 0 ? rem.toStringAsFixed(2) : '';
+                        updateState(() {});
+                      },
+                    )
+                  : null,
             ),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
@@ -438,86 +598,72 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
       if (_selectedCustomer != null)
         {
           'id': 'debt',
-          'label': 'Veresiye / Cari',
-          'icon': Icons.people_outline_rounded,
-          'color': _kRed,
-          'enabled': true,
+          'label': 'Vadeli',
+          'icon': Icons.account_balance_wallet_rounded,
+          'color': _kOrange,
         },
       {
         'id': 'karma',
         'label': 'Karma Ödeme',
-        'icon': Icons.account_balance_wallet_rounded,
-        'color': _kAmberDark,
-        'enabled': true,
+        'icon': Icons.call_split_rounded,
+        'color': Colors.purple,
       },
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 520 ? methods.length : 2;
-        final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        return GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 2.8,
           children: methods.map((m) {
-            final id = m['id'] as String;
-            final isSel = _paymentMethod == id;
-            final color = m['color'] as Color;
+            final isSel = _paymentMethod == m['id'];
             final enabled = m['enabled'] as bool? ?? true;
-            return SizedBox(
-              width: width,
-              height: 48,
-              child: Material(
-                color: isSel ? color : Colors.white,
-                shape: RoundedRectangleBorder(
+            final color = m['color'] as Color;
+            return GestureDetector(
+              onTap: enabled
+                  ? () => updateState(() => _paymentMethod = m['id'] as String)
+                  : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                decoration: BoxDecoration(
+                  color: isSel ? color : Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(
-                    color: isSel ? color : _kBorder,
+                  border: Border.all(
+                    color: isSel ? color : (enabled ? color.withOpacity(0.4) : Colors.grey.shade300),
+                    width: isSel ? 2 : 1.5,
                   ),
+                  boxShadow: isSel
+                      ? [BoxShadow(color: color.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3))]
+                      : [],
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: !enabled
-                      ? null
-                      : () {
-                          updateState(() {
-                            _paymentMethod = id;
-                            if (id == 'karma') {
-                              _cashSplitController.text =
-                                  _totalAmount.toStringAsFixed(2);
-                              _cardSplitController.text = '0.00';
-                              _debtSplitController.text = '0.00';
-                            }
-                          });
-                        },
-                  child: Opacity(
-                    opacity: enabled ? 1 : .45,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            m['icon'] as IconData,
-                            color: isSel ? Colors.white : color,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              m['label'] as String,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11,
-                                color: isSel ? Colors.white : _kText,
-                              ),
-                            ),
-                          ),
-                        ],
+                child: Opacity(
+                  opacity: enabled ? 1.0 : 0.45,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        m['icon'] as IconData,
+                        color: isSel ? Colors.white : color,
+                        size: 18,
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          m['label'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            color: isSel ? Colors.white : _kText,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

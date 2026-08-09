@@ -5,7 +5,7 @@
 ; ============================================================
 
 #define MyAppName "Serenut OS"
-#define MyAppVersion "1.2.9+72"
+#define MyAppVersion "1.3.7"
 #define MyAppPublisher "Serenut Software Technologies"
 #define MyAppURL "https://serenut.com"
 #define MyAppExeName "serenutos.exe"
@@ -27,7 +27,7 @@ AllowNoIcons=yes
 CloseApplications=yes
 ; Installer output
 OutputDir=..\server\public\website\downloads
-OutputBaseFilename=SerenutOSSetup
+OutputBaseFilename=SerenutOS-v1.3.7
 SetupIconFile=..\windows\runner\resources\app_icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

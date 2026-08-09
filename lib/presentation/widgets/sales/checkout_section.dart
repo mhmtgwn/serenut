@@ -67,13 +67,15 @@ class CheckoutSection extends ConsumerStatefulWidget {
 }
 
 class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
-  // KARMA split payment controllers
+  final TextEditingController _givenCashController = TextEditingController();
   final TextEditingController _cashSplitController = TextEditingController();
   final TextEditingController _cardSplitController = TextEditingController();
   final TextEditingController _debtSplitController = TextEditingController();
+  final GlobalKey _cashSectionKey = GlobalKey();
 
   @override
   void dispose() {
+    _givenCashController.dispose();
     _cashSplitController.dispose();
     _cardSplitController.dispose();
     _debtSplitController.dispose();
@@ -94,9 +96,23 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
   bool get _karmaValid =>
       widget.total > 0 && (_karmaTotal - widget.total).abs() < 0.01;
 
+  final GlobalKey _karmaSectionKey = GlobalKey();
+
   void _handlePayment(String method) {
     widget.onPaymentMethodChanged(method);
-    if (method == 'cash' || method == 'card') {
+    if (method == 'cash') {
+      widget.onPaidAmountChanged(widget.total);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_cashSectionKey.currentContext != null) {
+          Scrollable.ensureVisible(
+            _cashSectionKey.currentContext!,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+      return;
+    } else if (method == 'card') {
       widget.onPaidAmountChanged(widget.total);
     } else if (method == 'debt') {
       if (widget.selectedCustomer == null) {
@@ -111,7 +127,15 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
       }
       widget.onPaidAmountChanged(0.0);
     } else if (method == 'karma') {
-      // Will be submitted via _handleKarmaSubmit
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_karmaSectionKey.currentContext != null) {
+          Scrollable.ensureVisible(
+            _karmaSectionKey.currentContext!,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
       return;
     }
     Future.microtask(() => widget.onSubmitSale());
@@ -136,6 +160,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
 
   @override
   Widget build(BuildContext context) {
+    final isCash = widget.paymentMethod == 'cash';
     final isKarma = widget.paymentMethod == 'karma';
     final hasPos =
         ref.watch(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
@@ -158,6 +183,12 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
             // ── TOPLAM TUTAR BOX ────────────────────────────────────────────
             _buildTotalBox(),
             const SizedBox(height: 12),
+
+            // ── NAKİT PARA ÜSTÜ ALANI ──────────────────────────────────────
+            if (isCash) ...[
+              _buildCashChangeFields(),
+              const SizedBox(height: 12),
+            ],
 
             // ── KARMA SPLIT ALANLAR (yalnızca karma seçiliyken) ────────────
             if (isKarma) ...[
@@ -427,6 +458,136 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
     );
   }
 
+  // ── NAKİT PARA ÜSTÜ ALANI ──────────────────────────────────────────────────
+  Widget _buildCashChangeFields() {
+    final givenCash =
+        double.tryParse(_givenCashController.text.replaceAll(',', '.')) ?? 0.0;
+    final change = givenCash - widget.total;
+
+    return Container(
+      key: _cashSectionKey,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: change >= 0 && givenCash > 0
+              ? _kGreen.withValues(alpha: 0.4)
+              : _kBorder,
+          width: change >= 0 && givenCash > 0 ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.payments_rounded,
+                  size: 14, color: _kGreenDark),
+              const SizedBox(width: 6),
+              const Text(
+                'Alınan Nakit & Para Üstü',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700, color: _kText),
+              ),
+              const Spacer(),
+              if (givenCash > 0 && change >= 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _kGreenLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Para Üstü: ₺${change.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: _kGreenDark,
+                        fontWeight: FontWeight.w800),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _givenCashController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
+            ],
+            decoration: InputDecoration(
+              labelText: 'Alınan Miktar (₺)',
+              hintText: 'Örn: 200',
+              isDense: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _kGreen, width: 2),
+              ),
+              prefixIcon: const Icon(Icons.money_rounded, size: 18),
+              suffixIcon: givenCash > 0
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 16),
+                      onPressed: () {
+                        setState(() {
+                          _givenCashController.clear();
+                        });
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildQuickCashChip('Tam Tutar (₺${widget.total.toStringAsFixed(2)})', widget.total),
+              _buildQuickCashChip('₺50', 50),
+              _buildQuickCashChip('₺100', 100),
+              _buildQuickCashChip('₺200', 200),
+              _buildQuickCashChip('₺500', 500),
+            ],
+          ),
+          if (givenCash > 0 && change < 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              '₺${(-change).toStringAsFixed(2)} eksik',
+              style: const TextStyle(
+                  color: _kRed, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCashChip(String label, double amount) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _givenCashController.text = amount.toStringAsFixed(2);
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: _kSurface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _kBorder),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: _kText),
+        ),
+      ),
+    );
+  }
+
   // ── KARMA Split Alanlar ────────────────────────────────────────────────────
 
   Widget _buildKarmaSplit() {
@@ -438,6 +599,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
         (widget.total - _karmaCash - _karmaCard).clamp(0.0, double.infinity);
 
     return Container(
+      key: _karmaSectionKey,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
