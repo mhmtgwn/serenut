@@ -8,18 +8,99 @@
 //   PATCH /api/v1/support/tickets/:id/status — Transition FSM
 
 import { Router, Response } from 'express';
+import { Webhook } from 'svix';
 import { authenticateUser, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { SupportService } from './support.service';
 import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
+import { MailService } from '../mail/mail.service';
 
 const router = Router();
 
+function plainTextFromHtml(value: string): string {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Resend inbound webhook. Signature verification must use the untouched body.
+router.post('/webhooks/resend', async (req: any, res) => {
+  const secret = process.env.RESEND_WEBHOOK_SECRET;
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!secret || !apiKey) {
+    logger.error('Resend inbound webhook is not configured.');
+    return res.status(503).json({ error: 'webhook_not_configured' });
+  }
+  try {
+    const rawBody = req.rawBody instanceof Buffer ? req.rawBody.toString('utf8') : '';
+    if (!rawBody) return res.status(400).json({ error: 'raw_body_required' });
+    const event: any = new Webhook(secret).verify(rawBody, {
+      'svix-id': String(req.headers['svix-id'] || ''),
+      'svix-timestamp': String(req.headers['svix-timestamp'] || ''),
+      'svix-signature': String(req.headers['svix-signature'] || ''),
+    });
+    if (event.type !== 'email.received') {
+      await MailService.updateDeliveryStatus(String(event.data?.email_id || ''), String(event.type || ''));
+      return res.status(200).json({ accepted: true, ignored: true });
+    }
+
+    const data = event.data || {};
+    const recipients = Array.isArray(data.to) ? data.to.map((v: unknown) => String(v).toLowerCase()) : [];
+    if (!recipients.some((address: string) => address.endsWith('@serenut.com'))) {
+      return res.status(200).json({ accepted: true, ignored: true });
+    }
+    const response = await fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(String(data.email_id))}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!response.ok) throw new Error(`resend_retrieve_failed:${response.status}`);
+    const email: any = await response.json();
+    const rawSender = String(email.from || data.from || '').trim();
+    const senderMatch = rawSender.match(/^(.*?)\s*<([^>]+)>$/);
+    const senderEmail = String(senderMatch?.[2] || rawSender).trim().toLowerCase();
+    const senderName = String(senderMatch?.[1] || '').replace(/^['"]|['"]$/g, '').trim().slice(0, 200);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) throw new Error('invalid_sender_email');
+    const subject = String(email.subject || data.subject || '(Konu yok)').trim().slice(0, 500);
+    const message = String(email.text || plainTextFromHtml(String(email.html || '')) || subject).slice(0, 10000);
+    const result = await SupportService.createInboundEmailRequest({
+      eventId: String(req.headers['svix-id']), emailId: String(data.email_id), senderEmail,
+      recipients, subject, message, messageId: email.message_id || data.message_id,
+      attachments: Array.isArray(email.attachments) ? email.attachments.map((a: any) => ({
+        id: a.id, filename: String(a.filename || '').slice(0, 255), content_type: a.content_type, size: a.size,
+      })) : [],
+      receivedAt: email.created_at || data.created_at,
+    });
+    await MailService.persistInbound({
+      emailId: String(data.email_id), senderEmail, senderName: senderName || undefined,
+      recipients, subject, textBody: message, htmlBody: email.html ? String(email.html).slice(0, 200000) : undefined,
+      messageId: email.message_id || data.message_id,
+      inReplyTo: email.headers?.['in-reply-to'] || email.headers?.['In-Reply-To'],
+      attachments: Array.isArray(email.attachments) ? email.attachments.map((a: any) => ({
+        id: a.id, filename: String(a.filename || '').slice(0, 255), content_type: a.content_type, size: a.size,
+      })) : [],
+      guestRequestId: result.requestId, receivedAt: email.created_at || data.created_at,
+    });
+    return res.status(200).json({ accepted: true, duplicate: result.duplicate, reference: result.referenceCode });
+  } catch (error) {
+    logger.warn('Resend inbound webhook rejected', { error: error instanceof Error ? error.message : String(error) });
+    return res.status(400).json({ error: 'invalid_webhook' });
+  }
+});
+
 // Unauthenticated intake is deliberately kept outside the tenant ticket table.
 router.post('/guest-requests', async (req, res) => {
-  const { name, email, phone, company_name, customer_claim, category, subject, message } = req.body;
+  const { name, email, phone, company_name, customer_claim, category, subject, message, privacy_consent, privacy_notice_version } = req.body;
   if (!name || !email || !subject || !message) {
     return res.status(400).json({ error: 'missing_fields', message: 'Lütfen tüm zorunlu alanları doldurun.' });
+  }
+  if (privacy_consent !== true || privacy_notice_version !== '2026-08-09') {
+    return res.status(400).json({ error: 'privacy_consent_required', message: 'KVKK aydınlatma metnini okuyup onaylamanız gerekir.' });
   }
   const normalizedEmail = String(email).trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -35,6 +116,7 @@ router.post('/guest-requests', async (req, res) => {
       companyName: company_name ? String(company_name).trim() : undefined,
       customerClaim: customer_claim, category,
       subject: String(subject).trim(), message: String(message).trim(),
+      privacyNoticeVersion: privacy_notice_version,
     });
     return res.status(201).json({
       request,

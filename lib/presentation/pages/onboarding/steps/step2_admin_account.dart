@@ -278,7 +278,8 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                 obscureText: _obscurePassword,
                                 decoration: InputDecoration(
                                   labelText: 'Şifre',
-                                  hintText: '12+ karakter, büyük/küçük harf, rakam ve sembol',
+                                  hintText:
+                                      '12+ karakter, büyük/küçük harf, rakam ve sembol',
                                   prefixIcon: const Icon(Icons.password_rounded,
                                       size: 20, color: POSColors.textSecondary),
                                   suffixIcon: IconButton(
@@ -294,12 +295,11 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                                 ),
                                 validator: (v) {
                                   final value = v ?? '';
-                                  if (value.length < 12 ||
-                                      !RegExp(r'[a-z]').hasMatch(value) ||
-                                      !RegExp(r'[A-Z]').hasMatch(value) ||
-                                      !RegExp(r'\d').hasMatch(value) ||
-                                      !RegExp(r'[^A-Za-z0-9]').hasMatch(value)) {
-                                    return '12+ karakter; büyük/küçük harf, rakam ve sembol gerekli';
+                                  if (value.length < 10 ||
+                                      !RegExp(r'[A-Za-zÇĞİÖŞÜçğıöşü]')
+                                          .hasMatch(value) ||
+                                      !RegExp(r'\d').hasMatch(value)) {
+                                    return 'En az 10 karakter; harf ve rakam gerekli';
                                   }
                                   return null;
                                 },

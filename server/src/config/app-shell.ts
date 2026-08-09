@@ -237,6 +237,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     roles: ['sysadmin']
   },
   {
+    id: 'platform-mail',
+    label: 'E-posta',
+    section: 'platform',
+    href: '/app/#platform-mail',
+    description: 'Gelen ve gönderilen e-postaları yönetin.',
+    module: 'admin',
+    moduleTab: 'mail',
+    roles: ['sysadmin']
+  },
+  {
     id: 'account-settings',
     label: 'Hesap Ayarları',
     section: 'account',

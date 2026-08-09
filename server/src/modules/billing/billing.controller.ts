@@ -248,9 +248,12 @@ router.put('/bank-accounts/:id', authenticateUser, requireRole('sysadmin'), asyn
  */
 router.post('/request-bank-transfer', authenticateUser, requirePermission('billing:view'), async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { quote_id, bank_account_id } = req.body;
+  const { quote_id, bank_account_id, legal_acceptance, pre_information_version, distance_sales_version } = req.body;
   if (!quote_id || !bank_account_id) {
     return res.status(400).json({ error: 'missing_fields', message: 'Plan ve banka hesabı seçimi zorunludur.' });
+  }
+  if (legal_acceptance !== true || pre_information_version !== '2026-08-09' || distance_sales_version !== '2026-08-09') {
+    return res.status(400).json({ error: 'legal_acceptance_required', message: 'Ön bilgilendirme ve mesafeli satış koşullarını onaylamanız gerekir.' });
   }
   const client = await pgPool.connect();
   try {
@@ -277,6 +280,13 @@ router.post('/request-bank-transfer', authenticateUser, requirePermission('billi
       `INSERT INTO invoices (id, company_id, amount, status, due_at, expires_at, invoice_number, billing_details)
        VALUES ($1,$2,$3,'pending',$4,NOW() + INTERVAL '48 hours',$5,$6)`,
       [invoiceId, user.company_id, quote.amount, periodEnd, invoiceNum, JSON.stringify({ quoteId: quote.quoteId, planName: quote.planName, planId: quote.planId, billingPeriod: quote.period, currency: quote.currency })]
+    );
+    await client.query(
+      `INSERT INTO billing_legal_acceptances
+       (id,user_id,company_id,quote_id,invoice_id,channel,pre_information_version,distance_sales_version,ip_address,user_agent)
+       VALUES($1,$2,$3,$4,$5,'bank_transfer',$6,$7,$8,$9)`,
+      [BillingDomainService.opaqueId('bla'), user.id, user.company_id, quote.quoteId, invoiceId,
+       pre_information_version, distance_sales_version, req.ip || null, req.headers['user-agent'] || null],
     );
 
     // Generate unique reference code: SRNTT-YYYYMMDD-XXXX
@@ -577,9 +587,13 @@ router.post('/reactivate', authenticateUser, requireRole('owner'), async (req: A
 const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const quoteId = req.body.quote_id || req.body.quoteId;
+  const { legal_acceptance, pre_information_version, distance_sales_version } = req.body;
 
   if (!quoteId) {
     return res.status(400).json({ error: 'quote_required' });
+  }
+  if (legal_acceptance !== true || pre_information_version !== '2026-08-09' || distance_sales_version !== '2026-08-09') {
+    return res.status(400).json({ error: 'legal_acceptance_required', message: 'Ön bilgilendirme ve mesafeli satış koşullarını onaylamanız gerekir.' });
   }
 
   if (!(await isIyzicoEnabled())) {
@@ -603,6 +617,13 @@ const subscribeHandler = async (req: AuthenticatedRequest, res: Response) => {
         `INSERT INTO invoices (id, company_id, amount, status, due_at, expires_at, invoice_number, billing_details)
          VALUES ($1,$2,$3,'pending',NOW(),NOW() + INTERVAL '2 hours',$4,$5)`,
         [invoiceId, user.company_id, quote.amount, invoiceNum, JSON.stringify({ quoteId: quote.quoteId, planName: quote.planName, planId: quote.planId, billingPeriod: quote.period, currency: quote.currency })]
+      );
+      await billingClient.query(
+        `INSERT INTO billing_legal_acceptances
+         (id,user_id,company_id,quote_id,invoice_id,channel,pre_information_version,distance_sales_version,ip_address,user_agent)
+         VALUES($1,$2,$3,$4,$5,'card',$6,$7,$8,$9)`,
+        [BillingDomainService.opaqueId('bla'), user.id, user.company_id, quote.quoteId, invoiceId,
+         pre_information_version, distance_sales_version, req.ip || null, req.headers['user-agent'] || null],
       );
       await BillingDomainService.consumeQuote(billingClient, quote.quoteId, invoiceId);
       await billingClient.query('COMMIT');

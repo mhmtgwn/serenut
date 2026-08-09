@@ -505,12 +505,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Şifre zorunludur';
-                  if (v.length < 12 ||
-                      !RegExp(r'[a-z]').hasMatch(v) ||
-                      !RegExp(r'[A-Z]').hasMatch(v) ||
-                      !RegExp(r'\d').hasMatch(v) ||
-                      !RegExp(r'[^A-Za-z0-9]').hasMatch(v)) {
-                    return '12+ karakter; büyük/küçük harf, rakam ve sembol gerekli';
+                  if (v.length < 10 ||
+                      !RegExp(r'[A-Za-zÇĞİÖŞÜçğıöşü]').hasMatch(v) ||
+                      !RegExp(r'\d').hasMatch(v)) {
+                    return 'En az 10 karakter; harf ve rakam gerekli';
                   }
                   return null;
                 },

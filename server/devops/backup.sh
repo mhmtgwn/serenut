@@ -8,7 +8,7 @@ BACKUP_DIR="${BACKUP_DIR:-/tmp}"
 BACKUP_FILE="serenut_db_${TIMESTAMP}.dump"
 LOGO_BACKUP_FILE="serenut_company_logos_${TIMESTAMP}.tar.gz"
 LOGO_DIR="${COMPANY_LOGOS_DIR:-/var/lib/serenut/company-logos}"
-GPG_PASS="${BACKUP_PASSPHRASE:-fallback_passphrase}"
+GPG_PASS="${BACKUP_PASSPHRASE:-}"
 S3_BUCKET_NAME="${S3_BUCKET:-serenut-backups}"
 
 echo "🐘 Starting database backup..."
@@ -38,6 +38,11 @@ if [ -d "$LOGO_DIR" ]; then
   gpg --symmetric --cipher-algo AES256 --passphrase "$GPG_PASS" --batch --yes \
     -o "${BACKUP_DIR}/${LOGO_BACKUP_FILE}.gpg" "${BACKUP_DIR}/${LOGO_BACKUP_FILE}"
   rm -f "${BACKUP_DIR}/${LOGO_BACKUP_FILE}"
+fi
+
+if [ -z "$GPG_PASS" ] || [ "${#GPG_PASS}" -lt 24 ]; then
+  echo "❌ Error: BACKUP_PASSPHRASE must be set and contain at least 24 characters"
+  exit 1
 fi
 
 # Upload to S3 if aws client is installed, else save locally

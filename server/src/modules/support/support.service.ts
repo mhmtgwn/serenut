@@ -40,6 +40,59 @@ function computeSlaDeadline(priority: string): Date {
 }
 
 export class SupportService {
+  static async createInboundEmailRequest(params: {
+    eventId: string;
+    emailId: string;
+    senderEmail: string;
+    recipients: string[];
+    subject: string;
+    message: string;
+    messageId?: string;
+    attachments?: unknown[];
+    receivedAt?: string;
+  }): Promise<{ duplicate: boolean; requestId?: string; referenceCode?: string }> {
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+      const existing = await client.query(
+        'SELECT guest_request_id FROM resend_inbound_events WHERE event_id=$1 OR email_id=$2 FOR UPDATE',
+        [params.eventId, params.emailId],
+      );
+      if (existing.rows.length) {
+        await client.query('COMMIT');
+        return { duplicate: true, requestId: existing.rows[0].guest_request_id || undefined };
+      }
+
+      const id = `GUEST-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      const referenceCode = `SRN-${new Date().getUTCFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+      const senderName = params.senderEmail.split('@')[0].slice(0, 200) || 'E-posta kullanıcısı';
+      await client.query(
+        `INSERT INTO guest_support_requests
+           (id, reference_code, name, email, customer_claim, category, subject, message, status)
+         VALUES ($1,$2,$3,$4,'not_registered','other',$5,$6,'unverified')`,
+        [id, referenceCode, senderName, params.senderEmail, params.subject, params.message],
+      );
+      await client.query(
+        `INSERT INTO resend_inbound_events
+           (event_id,email_id,sender_email,recipients,subject,message_id,attachment_metadata,
+            guest_request_id,received_at)
+         VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9)`,
+        [params.eventId, params.emailId, params.senderEmail, JSON.stringify(params.recipients),
+         params.subject, params.messageId || null, JSON.stringify(params.attachments || []), id,
+         params.receivedAt || null],
+      );
+      await client.query('COMMIT');
+      logger.info('Inbound support email persisted', { eventId: params.eventId, requestId: id });
+      return { duplicate: false, requestId: id, referenceCode };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   /**
    * Creates a new support ticket.
    * Initial state: 'open'. SLA deadline set based on priority.
@@ -330,6 +383,7 @@ export class SupportService {
     category?: string;
     subject: string;
     message: string;
+    privacyNoticeVersion: string;
   }): Promise<{ id: string; referenceCode: string; status: string }> {
     const category = params.category ?? 'other';
     const customerClaim = params.customerClaim ?? 'not_registered';
@@ -345,10 +399,11 @@ export class SupportService {
     await pgPool.query(
       `INSERT INTO guest_support_requests
          (id, reference_code, name, email, phone, company_name, customer_claim,
-          category, subject, message, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unverified')`,
+          category, subject, message, status, privacy_notice_version, privacy_consent_at, intake_source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unverified', $11, NOW(), 'website_contact')`,
       [id, referenceCode, params.name, params.email, params.phone ?? null,
-       params.companyName ?? null, customerClaim, category, params.subject, params.message]
+       params.companyName ?? null, customerClaim, category, params.subject, params.message,
+       params.privacyNoticeVersion]
     );
     logger.info('Guest support request created', { id, referenceCode, category });
     return { id, referenceCode, status: 'unverified' };

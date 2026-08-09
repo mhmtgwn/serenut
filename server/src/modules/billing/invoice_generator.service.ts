@@ -29,11 +29,28 @@ export interface InvoiceMetadata {
 export class InvoiceGeneratorService {
   private static INVOICES_BASE_DIR = process.env.INVOICES_DIR || '/var/www/serenut-api/invoices';
 
+  private static sellerInfo() {
+    const taxNumber = (process.env.SELLER_TAX_NUMBER || '').trim();
+    if (!taxNumber) {
+      throw new Error('SELLER_TAX_NUMBER is required before generating a billing document.');
+    }
+    return {
+      name: process.env.SELLER_LEGAL_NAME || 'Mehmet Güven',
+      addressLine1: process.env.SELLER_ADDRESS_LINE_1 || 'Mustafa Güven Caddesi No: 6',
+      addressLine2: process.env.SELLER_ADDRESS_LINE_2 || 'Ormanlı Merkez, Karadeniz Ereğli/Zonguldak',
+      taxOffice: process.env.SELLER_TAX_OFFICE || 'Ereğli Vergi Dairesi',
+      taxNumber,
+      contact: process.env.SELLER_CONTACT || '0538 028 82 02',
+      documentLabel: process.env.INVOICE_DOCUMENT_LABEL || 'FATURA BİLGİ FORMU',
+    };
+  }
+
   /**
    * Generates a professional PDF invoice and saves it to VPS storage.
    * Returns the absolute path of the created PDF.
    */
   public static async generateInvoicePdf(companyId: string, meta: InvoiceMetadata): Promise<string> {
+    const seller = this.sellerInfo();
     const tenantDir = path.join(this.INVOICES_BASE_DIR, companyId);
     fs.mkdirSync(tenantDir, { recursive: true });
 
@@ -56,7 +73,7 @@ export class InvoiceGeneratorService {
       // Invoice info block (Top-right)
       doc.fillColor('#0F172A')
          .fontSize(14)
-         .text('E-ARŞİV FATURA', 400, 45, { align: 'right' })
+         .text(seller.documentLabel, 400, 45, { align: 'right' })
          .fontSize(9)
          .fillColor('#334155')
          .text(`Fatura No: ${meta.invoiceNumber}`, 400, 65, { align: 'right' })
@@ -85,14 +102,14 @@ export class InvoiceGeneratorService {
          .fontSize(10)
          .text('Gönderici:', 350, 130, { underline: true })
          .fontSize(10)
-         .text('Serenut Teknoloji A.Ş.', 350, 145, { bold: true } as any)
+         .text(seller.name, 350, 145, { bold: true } as any)
          .fontSize(9)
          .fillColor('#475569')
-         .text('Maslak Mh. Büyükdere Cd. No:239', 350, 160)
-         .text('Sarıyer / İstanbul', 350, 175)
-         .text('Vergi Dairesi: Maslak', 350, 190)
-         .text('VKN: 7690184423', 350, 205)
-         .text('destek@serenut.com', 350, 220);
+         .text(seller.addressLine1, 350, 160)
+         .text(seller.addressLine2, 350, 175)
+         .text(`Vergi Dairesi: ${seller.taxOffice}`, 350, 190)
+         .text(`Vergi/T.C. No: ${seller.taxNumber}`, 350, 205)
+         .text(seller.contact, 350, 220);
 
       doc.moveDown(3);
 
@@ -160,7 +177,7 @@ export class InvoiceGeneratorService {
       // ── 5. FOOTER (Legalese & Signature block) ──────────────────────────────
       doc.fillColor('#64748B')
          .fontSize(8)
-         .text('Bu fatura elektronik imza kanununa göre dijital olarak üretilmiştir. e-Fatura / e-Arşiv e-posta adresinize iletilmiştir.', 50, 720, { align: 'center' })
+         .text('Bu belge tahsilat ve abonelik bilgilerini gösterir. Mali değeri, yalnızca yetkili e-Belge sistemi üzerinden düzenlenen resmî belgeyle oluşur.', 50, 720, { align: 'center' })
          .text('Serenut OS platformunu tercih ettiğiniz için teşekkür ederiz.', 50, 735, { align: 'center' });
 
       doc.end();

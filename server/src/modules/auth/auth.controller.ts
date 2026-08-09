@@ -8,7 +8,7 @@ import { createError } from '../../config/error-codes';
 import { logger } from '../../config/logger';
 import { pgPool } from '../../config/database';
 import { enqueueNotification } from '../../workers/notification.worker';
-import { emailVerificationEmail } from '../notifications/email.templates';
+import { emailVerificationEmail, passwordResetEmail } from '../notifications/email.templates';
 import crypto from 'crypto';
 import { CommercialLifecycleService } from '../billing/commercial_lifecycle.service';
 import { PasswordRecoveryService } from './password-recovery.service';
@@ -243,7 +243,7 @@ router.post('/change-password', authenticateUser, async (req: AuthenticatedReque
     return res.status(400).json({ error: 'missing_passwords', message: 'Eski ve yeni şifre belirtilmelidir.' });
   }
   if (typeof new_password !== 'string' || !PasswordRecoveryService.isStrongPassword(new_password)) {
-    return res.status(400).json({ error: 'weak_password', message: 'Yeni şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.' });
+    return res.status(400).json({ error: 'weak_password', message: 'Yeni şifre en az 10 karakter olmalı ve harf ile rakam içermelidir.' });
   }
 
   try {
@@ -269,10 +269,33 @@ router.post('/verify-identity', passwordResetLimiter, async (req: Request, res: 
 });
 
 router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: Response) => {
-  return res.status(410).json({
-    error: 'email_recovery_removed',
-    message: 'E-posta kurtarma etkin değildir. Kurtarma kodu veya yönetici destekli kurtarma kullanın.',
-  });
+  const genericResponse = { message: 'Bu e-posta ile eşleşen doğrulanmış bir hesap varsa sıfırlama bağlantısı gönderildi.' };
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.json(genericResponse);
+  try {
+    const recovery = await PasswordRecoveryService.createEmailReset({
+      email, context: { ip: req.ip, userAgent: req.headers['user-agent'] },
+    });
+    if (recovery) {
+      const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
+      const message = passwordResetEmail({
+        userName: recovery.userName,
+        resetLink: `${publicUrl}/reset-password?token=${encodeURIComponent(recovery.resetToken)}`,
+      });
+      const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      await pgPool.query(
+        `INSERT INTO notification_queue (id,company_id,channel,recipient,title,body,status,scheduled_at)
+         VALUES($1,$2,'email',$3,$4,$5,'pending',NOW())`,
+        [notificationId, recovery.companyId, recovery.email, message.subject, message.html],
+      );
+      await enqueueNotification({ notification_id: notificationId, company_id: recovery.companyId,
+        channel: 'email', recipient: recovery.email, title: message.subject, body: message.html });
+    }
+    return res.json(genericResponse);
+  } catch (error) {
+    logger.error('Email password recovery request failed', error);
+    return res.json(genericResponse);
+  }
 });
 
 router.post('/reset-password', passwordResetLimiter, async (req: Request, res: Response) => {
@@ -280,8 +303,8 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
   if (!token || !newPassword) {
     return res.status(400).json({ error: 'missing_fields', message: 'Token ve yeni şifre zorunludur.' });
   }
-  if (newPassword.length < 12) {
-    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 12 karakter olmalıdır.' });
+  if (newPassword.length < 10) {
+    return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 10 karakter olmalıdır.' });
   }
 
   try {
@@ -294,7 +317,7 @@ router.post('/reset-password', passwordResetLimiter, async (req: Request, res: R
     return res.json({ success: true, message: 'Şifreniz başarıyla güncellendi.' });
   } catch (err) {
     if ((err as Error).message === 'weak_password') {
-      return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.' });
+      return res.status(400).json({ error: 'weak_password', message: 'Şifre en az 10 karakter olmalı ve harf ile rakam içermelidir.' });
     }
     if ((err as Error).message === 'password_reuse_not_allowed') {
       return res.status(400).json({ error: 'password_reuse_not_allowed', message: 'Yeni şifre mevcut şifreyle aynı olamaz.' });
@@ -408,7 +431,7 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   if (!PasswordRecoveryService.isStrongPassword(password)) {
     return res.status(400).json({
       error: 'weak_password',
-      message: 'Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.'
+      message: 'Şifre en az 10 karakter olmalı ve harf ile rakam içermelidir.'
     });
   }
 

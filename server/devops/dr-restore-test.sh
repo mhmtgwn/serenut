@@ -4,7 +4,7 @@
 set -e
 
 BACKUP_FILE=$1
-GPG_PASS="${GPG_PASSPHRASE:-fallback_passphrase}"
+GPG_PASS="${GPG_PASSPHRASE:-}"
 TEMP_CONTAINER="serenut_dr_verify_postgres"
 DB_USER="postgres"
 DB_NAME="serenut_dr_verify"
@@ -14,6 +14,17 @@ if [ -z "$BACKUP_FILE" ]; then
   echo "Usage: ./dr-restore-test.sh /path/to/backup.sql.gz.gpg"
   exit 1
 fi
+
+if [ -z "$GPG_PASS" ]; then
+  echo "❌ Error: GPG_PASSPHRASE is required"
+  exit 1
+fi
+
+cleanup() {
+  docker rm -f "$TEMP_CONTAINER" >/dev/null 2>&1 || true
+  rm -f temp_backup.sql temp_backup.sql.gz
+}
+trap cleanup EXIT
 
 echo "🧪 Starting Disaster Recovery (DR) verification test..."
 echo "📂 Backup File: $BACKUP_FILE"
@@ -25,7 +36,8 @@ gunzip -f temp_backup.sql.gz
 
 # Step 2: Spin up temporary Postgres Container
 echo "🐘 Spinning up temporary isolated Postgres instance..."
-docker run --name "$TEMP_CONTAINER" -e POSTGRES_PASSWORD=verify_secret -d -p 54321:5432 postgres:15
+docker rm -f "$TEMP_CONTAINER" >/dev/null 2>&1 || true
+docker run --name "$TEMP_CONTAINER" -e POSTGRES_PASSWORD=verify_secret -d -p 127.0.0.1:54321:5432 postgres:15
 
 # Wait for postgres to be ready
 echo "⏳ Waiting for PostgreSQL to bootstrap..."
@@ -48,9 +60,8 @@ echo "📊 Licenses count in backup: $CHECK_LICENSES"
 
 # Step 5: Clean up
 echo "🧹 Cleaning up temp containers and decrypted files..."
-docker stop "$TEMP_CONTAINER"
-docker rm "$TEMP_CONTAINER"
-rm -f temp_backup.sql
+cleanup
+trap - EXIT
 
 if [ "$CHECK_COMPANIES" -gt 0 ] && [ "$CHECK_LICENSES" -gt 0 ]; then
   echo "✅ DISASTER RECOVERY RESTORE TEST PASSED! Backup file is valid and integral."

@@ -116,8 +116,8 @@ document.getElementById('register-form')?.addEventListener('submit', async (even
     return;
   }
   const password = document.getElementById('password').value;
-  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-    message('Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.');
+  if (password.length < 10 || !/\p{L}/u.test(password) || !/\d/.test(password)) {
+    message('Şifre en az 10 karakter olmalı ve harf ile rakam içermelidir.');
     return;
   }
 
@@ -208,13 +208,26 @@ document.getElementById('recovery-claim-form')?.addEventListener('submit', async
   }
 });
 
+document.getElementById('email-recovery-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    const data = await post('forgot-password', { email: document.getElementById('recovery-email').value.trim() });
+    message(data.message || 'Hesap varsa sıfırlama bağlantısı gönderildi.', true);
+    event.currentTarget.reset();
+  } catch (error) {
+    message(error.message);
+  } finally { button.disabled = false; }
+});
+
 document.getElementById('reset-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const token = sessionStorage.getItem('serenut_password_reset_token');
   const password = document.getElementById('password').value;
   if (!token) return message('Şifre sıfırlama bağlantısı geçersiz.');
   if (password !== document.getElementById('password-confirm').value) return message('Şifreler eşleşmiyor.');
-  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) return message('Şifre en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.');
+  if (password.length < 10 || !/\p{L}/u.test(password) || !/\d/.test(password)) return message('Şifre en az 10 karakter olmalı ve harf ile rakam içermelidir.');
 
   const button = event.submitter;
   button.disabled = true;
@@ -236,6 +249,10 @@ document.getElementById('reset-form')?.addEventListener('submit', async (event) 
 });
 
 const params = new URLSearchParams(window.location.search);
+if (document.body.dataset.authPage === 'reset-password' && params.get('token')) {
+  sessionStorage.setItem('serenut_password_reset_token', params.get('token'));
+  window.history.replaceState({}, document.title, '/reset-password');
+}
 if (params.get('verified') === '1') message('E-posta adresiniz doğrulandı. Giriş yapabilirsiniz.', true);
 if (params.get('error') === 'portal_access_denied') message('Bu hesabın web yönetim paneline erişim yetkisi yok.');
 if (params.get('error') === 'session_expired') message('Oturumunuz sona erdi. Lütfen yeniden giriş yapın.');

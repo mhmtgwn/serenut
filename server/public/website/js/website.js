@@ -87,10 +87,20 @@ document.getElementById('contact-form')?.addEventListener('submit', async (event
   const status = document.getElementById('contact-status');
   button.disabled = true; button.textContent = 'Gönderiliyor…'; status.textContent = '';
   try {
-    const response = await fetch('/api/v1/support/guest-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('contact-name').value.trim(), email: document.getElementById('contact-email').value.trim(), phone: document.getElementById('contact-phone').value.trim(), company_name: document.getElementById('contact-company').value.trim(), customer_claim: document.getElementById('contact-customer-claim').value, category: document.getElementById('contact-category').value, subject: document.getElementById('contact-subject').value.trim(), message: document.getElementById('contact-message').value.trim() }) });
+    const response = await fetch('/api/v1/support/guest-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('contact-name').value.trim(), email: document.getElementById('contact-email').value.trim(), phone: document.getElementById('contact-phone').value.trim(), company_name: document.getElementById('contact-company').value.trim(), customer_claim: document.getElementById('contact-customer-claim').value, category: document.getElementById('contact-category').value, subject: document.getElementById('contact-subject').value.trim(), message: document.getElementById('contact-message').value.trim(), privacy_consent: document.getElementById('contact-privacy-consent').checked, privacy_notice_version: '2026-08-09' }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Mesaj gönderilemedi.');
     status.className = 'form-status full success'; status.textContent = data.message || 'Mesajınız iletildi.'; form.reset();
   } catch (error) { status.className = 'form-status full error'; status.textContent = error.message; }
   finally { button.disabled = false; button.textContent = 'Mesajı Gönder'; }
 });
+
+if (!document.querySelector('.whatsapp-launcher')) {
+  const whatsapp = document.createElement('a');
+  whatsapp.className = 'whatsapp-launcher';
+  whatsapp.href = 'https://wa.me/905380288202?text=Merhaba%2C%20Serenut%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum.';
+  whatsapp.target = '_blank'; whatsapp.rel = 'noopener noreferrer';
+  whatsapp.setAttribute('aria-label', 'WhatsApp üzerinden Serenut ile iletişime geçin');
+  whatsapp.innerHTML = '<span aria-hidden="true">●</span> WhatsApp';
+  document.body.appendChild(whatsapp);
+}

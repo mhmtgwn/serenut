@@ -61,12 +61,12 @@ async function run() {
   const forgotHtml = fs.readFileSync(path.join(projectRoot, 'public/auth/forgot-password.html'), 'utf8');
   assert.match(forgotHtml, /id="recovery-code"/, 'self-service recovery must require a recovery code');
   assert.match(forgotHtml, /id="recovery-claim-form"/, 'admin-assisted recovery must have a claim UI');
-  assert.doesNotMatch(forgotHtml, /Bağlantı Gönder|e-postayı girin/i, 'email-only recovery copy must be removed');
+  assert.match(forgotHtml, /id="email-recovery-form"/, 'verified-email recovery must have a request UI');
   assert.match(authRuntime, /sessionStorage\.setItem\('serenut_password_reset_token'/, 'reset authorization must stay out of the URL');
-  assert.doesNotMatch(authRuntime, /new URLSearchParams\(window\.location\.search\)\.get\('token'\)/, 'reset token must not be read from URL history');
+  assert.match(authRuntime, /history\.replaceState/, 'email reset token must be removed from browser history immediately');
   assert.doesNotMatch(runtime, /body:\{new_password:/, 'admin UI must not set user passwords directly');
   assert.doesNotMatch(runtime, /Şifre Sıfırlama Linki|Geçici [Şş]ifre|new-user-password|company-admin-pw/, 'SMTP-free activation must not render legacy email or temporary-password controls');
-  assert.match(runtime, /id="new-password"[^>]+minlength="12"/, 'account password form must match the backend password policy');
+  assert.match(runtime, /id="new-password"[^>]+minlength="10"/, 'account password form must match the backend password policy');
   assert.match(runtime, /recovery\/admin-assist/, 'tenant admin UI must use canonical recovery requests');
   for (const loader of [
     'company-stores', 'company-devices', 'company-licenses', 'company-downloads',
