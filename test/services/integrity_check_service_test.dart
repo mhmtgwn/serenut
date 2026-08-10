@@ -62,7 +62,10 @@ class _TestableIntegrityCheckService {
     if (sourceFile == null) return {'success': false, 'source': null};
 
     final dbFile = File(dbPath);
-    const tempPath = '.repair_bak';
+    // Keep the rollback file beside the database. Windows cannot atomically
+    // rename a file across drive boundaries (the CI workspace and system temp
+    // directory may be on different drives).
+    final tempPath = '$dbPath.repair_bak';
     final tempFile = File(tempPath);
     if (await tempFile.exists()) await tempFile.delete();
     if (await dbFile.exists()) await dbFile.copy(tempPath);
