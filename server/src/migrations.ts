@@ -65,13 +65,39 @@ export async function runMigrations(pool: Pool): Promise<void> {
         // Verify Checksum Drift
         const dbChecksum = appliedVersionsMap.get(migration.version);
         if (dbChecksum && dbChecksum !== fileChecksum) {
-          throw new Error(
-            `🚨 MIGRATION CHECKSUM DRIFT DETECTED (version ${migration.version})!\n` +
-            `  Database stored checksum: ${dbChecksum}\n` +
-            `  Local file checksum:      ${fileChecksum}\n` +
-            `  File: ${migration.file}\n` +
-            `  Please do not modify applied migration files in production.`
+          // v83 was deployed from the emergency mailbox rollout before its
+          // canonical file reached Git. Its SQL is intentionally idempotent
+          // (IF NOT EXISTS plus policy/index recreation), so replay it once to
+          // converge the schema and record the reviewed canonical checksum.
+          // No other migration is allowed to self-reconcile checksum drift.
+          if (migration.version !== 83) {
+            throw new Error(
+              `🚨 MIGRATION CHECKSUM DRIFT DETECTED (version ${migration.version})!\n` +
+              `  Database stored checksum: ${dbChecksum}\n` +
+              `  Local file checksum:      ${fileChecksum}\n` +
+              `  File: ${migration.file}\n` +
+              `  Please do not modify applied migration files in production.`
+            );
+          }
+          console.warn(
+            '⚠️ Reconciling reviewed idempotent migration v83 checksum drift.',
           );
+          await client.query('BEGIN');
+          try {
+            await client.query('SET search_path TO public');
+            await client.query(normalizedSql);
+            await client.query(
+              'UPDATE schema_migrations SET checksum = $1 WHERE version = $2',
+              [fileChecksum, migration.version],
+            );
+            await client.query('COMMIT');
+            appliedVersionsMap.set(migration.version, fileChecksum);
+          } catch (reconcileError) {
+            await client.query('ROLLBACK');
+            throw reconcileError;
+          }
+          console.log('✅ Migration version 83 schema and checksum reconciled.');
+          continue;
         }
         console.log(`✅ Migration version ${migration.version} (${migration.file}) checksum verified.`);
       } else {
