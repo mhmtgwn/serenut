@@ -68,7 +68,7 @@ node -e '
   if (!/^[a-f0-9]{64}$/.test(response.sha256_hash || "")) throw new Error("missing/invalid SHA-256");
   if (typeof response.signature !== "string" || response.signature.length < 100) throw new Error("missing release signature");
   // PostgreSQL BIGINT values are intentionally returned by node-postgres as
-  // strings to avoid precision loss. Release artifacts are well below JS's
+  // strings to avoid precision loss. Release artifacts are well below the JS
   // safe integer limit, so normalize the API value before validating it.
   const fileSizeBytes = Number(response.file_size_bytes);
   if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes <= 0) throw new Error("invalid file size");
