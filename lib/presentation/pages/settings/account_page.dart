@@ -86,24 +86,27 @@ class _ProfileCard extends StatelessWidget {
             const SizedBox(height: 12),
             Chip(label: Text(_roleLabel(user.role))),
             const Divider(height: 28),
-            ExpansionTile(
-              title: const Text('Yetkilerim'),
-              subtitle: Text('${user.permissions.length} özel yetki'),
-              children: [
-                if (user.permissions.isEmpty)
-                  const ListTile(
-                    title: Text(
-                        'Bu hesap rolün varsayılan yetkilerini kullanıyor.'),
-                  )
-                else
-                  for (final permission in user.permissions)
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.check_circle_outline_rounded,
-                          color: POSColors.green),
-                      title: Text(permission),
-                    ),
-              ],
+            Material(
+              color: Colors.transparent,
+              child: ExpansionTile(
+                title: const Text('Yetkilerim'),
+                subtitle: Text('${user.permissions.length} özel yetki'),
+                children: [
+                  if (user.permissions.isEmpty)
+                    const ListTile(
+                      title: Text(
+                          'Bu hesap rolün varsayılan yetkilerini kullanıyor.'),
+                    )
+                  else
+                    for (final permission in user.permissions)
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.check_circle_outline_rounded,
+                            color: POSColors.green),
+                        title: Text(permission),
+                      ),
+                ],
+              ),
             ),
           ],
         ),
