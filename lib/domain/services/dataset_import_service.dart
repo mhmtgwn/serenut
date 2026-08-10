@@ -50,7 +50,12 @@ class DatasetImportService {
   static const int _nativeExpandedLimit = 16 * 1024 * 1024 * 1024;
   static const int _singleImageLimit = 100 * 1024 * 1024;
   static const int _excelLimit = 150 * 1024 * 1024;
-  static const int _fileCountLimit = 10000;
+  // In-memory parsing keeps a conservative ceiling for browsers and legacy
+  // byte imports. Native file-backed imports can safely handle substantially
+  // larger catalogues while the size and compression-ratio guards below still
+  // protect against archive bombs.
+  static const int _memoryFileCountLimit = 10000;
+  static const int _nativeFileCountLimit = 250000;
 
   final IProductRepository _productRepository;
 
@@ -167,8 +172,9 @@ class DatasetImportService {
     int fileCount = 0;
     for (final header in zipDirectory.fileHeaders) {
       fileCount++;
-      if (fileCount > 10000) {
-        throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
+      if (fileCount > _memoryFileCountLimit) {
+        throw Exception(
+            'Bellek tabanlı aktarımda dosya sayısı çok fazla (Maks 10.000).');
       }
 
       final filename = header.filename.toLowerCase();
@@ -338,8 +344,9 @@ class DatasetImportService {
     int fileCount = 0;
     for (final header in zipDirectory.fileHeaders) {
       fileCount++;
-      if (fileCount > 10000) {
-        throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
+      if (fileCount > _memoryFileCountLimit) {
+        throw Exception(
+            'Web aktarımında dosya sayısı çok fazla (Maks 10.000).');
       }
 
       final filename = header.filename.toLowerCase();
@@ -610,8 +617,9 @@ class DatasetImportService {
     try {
       final decoder = ZipDecoder();
       final archive = decoder.decodeBuffer(input);
-      if (archive.length > _fileCountLimit) {
-        throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
+      final fileCount = archive.where((entry) => entry.isFile).length;
+      if (fileCount > _nativeFileCountLimit) {
+        throw Exception('Dosya sayısı çok fazla (Maks 250.000).');
       }
       for (final header in decoder.directory.fileHeaders) {
         final compressed = header.compressedSize ?? 0;
