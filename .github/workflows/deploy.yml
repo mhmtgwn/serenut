@@ -104,10 +104,19 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/serenut-release.jks
           printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=serenut-release.jks\n' \
             "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" > android/key.properties
+      - name: Prepare compact Android release verification defines
+        if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
+        shell: powershell
+        run: |
+          $keys = Get-Content config/signing_public_keys.json -Raw | ConvertFrom-Json
+          @{
+            LICENSE_RSA_MODULUS = [string]$keys.LICENSE_RSA_MODULUS
+            RELEASE_RSA_MODULI = [string]$keys.RELEASE_RSA_MODULI
+          } | ConvertTo-Json -Compress | Set-Content .release-dart-defines.json -Encoding utf8
       - name: Build signed Android release with public verification keys
         run: >-
           flutter build apk --release
-          --dart-define-from-file=config/signing_public_keys.json
+          --dart-define-from-file=.release-dart-defines.json
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
       - name: Verify production Android signing certificate
         if: github.event_name != 'pull_request' && steps.android-signing.outputs.configured == 'true'
@@ -167,7 +176,13 @@ jobs:
       - run: flutter pub get
       - name: Build Windows release with public verification keys
         shell: powershell
-        run: flutter build windows --release --dart-define-from-file=config/signing_public_keys.json
+        run: |
+          $keys = Get-Content config/signing_public_keys.json -Raw | ConvertFrom-Json
+          @{
+            LICENSE_RSA_MODULUS = [string]$keys.LICENSE_RSA_MODULUS
+            RELEASE_RSA_MODULI = [string]$keys.RELEASE_RSA_MODULI
+          } | ConvertTo-Json -Compress | Set-Content .release-dart-defines.json -Encoding utf8
+          flutter build windows --release --dart-define-from-file=.release-dart-defines.json
       - name: Configure and sign Windows application binaries
         id: windows-signing
         shell: powershell
