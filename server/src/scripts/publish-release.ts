@@ -3,7 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { pgPool } from '../config/database';
 import {
+  assertReleaseSigningContinuity,
   loadReleaseSigningKey,
+  loadReleaseSigningPolicy,
   signReleaseHash,
   verifyReleaseHashSignature,
 } from '../security/release-signing';
@@ -107,6 +109,17 @@ async function prepareRelease(
 async function main() {
   const args = process.argv.slice(2);
   const privateKey = getReleaseSigningKey();
+  const signingPolicy = loadReleaseSigningPolicy([
+    process.env.RELEASE_SIGNING_POLICY_FILE,
+    path.join(process.cwd(), 'release-signing-policy.json'),
+  ]);
+  assertReleaseSigningContinuity(privateKey, signingPolicy);
+  if (args[0] === 'verify-policy') {
+    console.log(
+      `Release signer continuity policy: PASS (${signingPolicy.trustedSinceVersion})`,
+    );
+    return;
+  }
   const inputs: Array<{
     platform: ReleasePlatform;
     versionCode: string;

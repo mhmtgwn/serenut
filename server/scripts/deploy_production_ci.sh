@@ -42,6 +42,9 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 $COMPOSE build backend maintenance-agent
+# Validate the actual VPS private key against the supported-client policy
+# before migrations, container replacement, or release metadata changes.
+$COMPOSE run --rm backend node dist/scripts/publish-release.js verify-policy
 docker ps -a -q --filter "name=serenut-maintenance-agent" | xargs -r docker rm -f 2>/dev/null || true
 $COMPOSE up -d --force-recreate --remove-orphans maintenance-agent
 $COMPOSE run --rm backend node dist/scripts/run-migrations.js

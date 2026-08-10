@@ -2,6 +2,13 @@ import crypto from 'crypto';
 import fs from 'fs';
 
 const SHA256_HEX = /^[a-f0-9]{64}$/;
+const VERSION_CODE = /^\d+\.\d+\.\d+\+\d+$/;
+
+export type ReleaseSigningPolicy = {
+  requiredUpgradeSignerModulusSha256: string;
+  trustedSinceVersion: string;
+  rotationPhase: 'bridge' | 'stable';
+};
 
 function decodeKeyMaterial(rawValue: string): string | crypto.JsonWebKey {
   const normalized = rawValue.replace(/\\r?\\n/g, '\n').trim();
@@ -51,6 +58,52 @@ export function loadReleaseSigningKey(
       lastError instanceof Error ? lastError.message : 'unknown error'
     }`,
   );
+}
+
+export function releaseSigningModulusSha256(key: crypto.KeyObject): string {
+  const publicJwk = crypto.createPublicKey(key).export({ format: 'jwk' });
+  if (publicJwk.kty !== 'RSA' || !publicJwk.n) {
+    throw new Error('Release signing key must be RSA.');
+  }
+  const modulusHex = Buffer.from(publicJwk.n, 'base64url').toString('hex');
+  const modulusDecimal = BigInt(`0x${modulusHex}`).toString(10);
+  return crypto.createHash('sha256').update(modulusDecimal, 'utf8').digest('hex');
+}
+
+export function loadReleaseSigningPolicy(
+  policyPaths: Array<string | undefined>,
+): ReleaseSigningPolicy {
+  const policyPath = policyPaths
+    .filter((value): value is string => Boolean(value))
+    .find(candidate => fs.existsSync(candidate));
+  if (!policyPath) {
+    throw new Error('Release signing continuity policy is missing.');
+  }
+
+  const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as ReleaseSigningPolicy;
+  if (!SHA256_HEX.test(policy.requiredUpgradeSignerModulusSha256 || '')) {
+    throw new Error('Release signing policy has an invalid signer fingerprint.');
+  }
+  if (!VERSION_CODE.test(policy.trustedSinceVersion || '')) {
+    throw new Error('Release signing policy has an invalid trustedSinceVersion.');
+  }
+  if (policy.rotationPhase !== 'bridge' && policy.rotationPhase !== 'stable') {
+    throw new Error('Release signing policy has an invalid rotationPhase.');
+  }
+  return policy;
+}
+
+export function assertReleaseSigningContinuity(
+  privateKey: crypto.KeyObject,
+  policy: ReleaseSigningPolicy,
+): void {
+  const actualFingerprint = releaseSigningModulusSha256(privateKey);
+  if (actualFingerprint !== policy.requiredUpgradeSignerModulusSha256) {
+    throw new Error(
+      'Release signer is not trusted by the supported upgrade population. ' +
+      'Publish a bridge release with the existing signer before rotating keys.',
+    );
+  }
 }
 
 export function signReleaseHash(hash: string, privateKey: crypto.KeyObject): string {

@@ -12,6 +12,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-key-continuity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prevent incompatible release signer rotation
+        run: node scripts/verify_release_key_continuity.js HEAD^
+
   backend-ci:
     runs-on: ubuntu-latest
     services:
@@ -38,6 +50,8 @@ jobs:
       - run: npm ci --legacy-peer-deps
         working-directory: server
       - run: npm run build
+        working-directory: server
+      - run: npm run test:release-signing
         working-directory: server
       - name: Create isolated acceptance database
         env:
@@ -251,7 +265,7 @@ jobs:
     # Backend changes are independently verified and deployed by
     # sync-hotfix.yml. Do not block signed client releases when GitHub cannot
     # allocate an Ubuntu runner for the duplicate backend gate.
-    needs: [backend-ci, flutter-ci, flutter-full-test, windows-ci]
+    needs: [release-key-continuity, backend-ci, flutter-ci, flutter-full-test, windows-ci]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
@@ -301,7 +315,7 @@ jobs:
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'
 
   deploy-staging:
-    needs: [backend-ci, flutter-ci, flutter-full-test, windows-ci]
+    needs: [release-key-continuity, backend-ci, flutter-ci, flutter-full-test, windows-ci]
     if: github.ref == 'refs/heads/staging' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: staging

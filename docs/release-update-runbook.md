@@ -27,6 +27,9 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
    virgül ayrımlı değer ile `RELEASE_RSA_TRUSTED_MODULI` dizisi aynı sıra ve
    içerikte olmalıdır; güvenli yerel derleme betiği farkı reddeder. Özel
    anahtarı repoya veya artefakta koymayın.
+   `server/release-signing-policy.json` içindeki parmak izi, cihazlarda kurulu
+   desteklenen sürümlerin güvendiği imzalayanı sabitler. Bu dosyayı sıradan bir
+   sürümde değiştirmeyin.
 3. Yerel kritik kontrolleri çalıştırın:
 
    ```powershell
@@ -39,6 +42,11 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
 4. Android/Windows artefaktlarını yalnızca `.github/workflows/deploy.yml`
    üzerinden üretin. Android release secret'ları eksikse yayın yapılmaz;
    debug anahtara geri dönüş yoktur.
+   `release-key-continuity` işi yeni imzalayanı önceki istemci anahtar listesiyle
+   karşılaştırır. Önceki istemcinin tanımadığı bir anahtar seçilirse tüm yayın
+   artefakt yüklenmeden durur. VPS yayınlayıcısı ayrıca gerçek özel anahtarın
+   policy parmak iziyle eşleşmesini zorunlu tutar ve bunu migration/container
+   değişikliklerinden önce çalıştırır.
 5. `main` dalındaki başarılı iş akışı artefaktları VPS'e yükler ve
    `server/scripts/deploy_production_ci.sh <sürüm+build>` komutunu çalıştırır.
    Bu betik, kanonik `dist/scripts/publish-release.js` yayınlayıcısını kullanır.
