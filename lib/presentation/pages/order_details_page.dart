@@ -20,6 +20,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart'
 import 'package:flutter/services.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
+import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -1198,11 +1199,15 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
   double get _karmaDebt =>
       double.tryParse(_karmaDebtController.text.replaceAll(',', '.')) ?? 0.0;
 
-  double get _karmaTotal => _karmaCash + _karmaCard + _karmaDebt;
-  double get _karmaRemainder =>
-      (_remainingAmount - _karmaTotal).clamp(0.0, double.infinity);
-  bool get _karmaValid =>
-      _remainingAmount > 0 && (_karmaTotal - _remainingAmount).abs() < 0.01;
+  MixedPaymentResult get _karmaResult => MixedPaymentCalculator.calculate(
+        total: _remainingAmount,
+        cashTendered: _karmaCash,
+        card: _karmaCard,
+        debt: _karmaDebt,
+      );
+  double get _karmaTotal => _karmaResult.allocatedTotal;
+  double get _karmaRemainder => _karmaResult.remaining;
+  bool get _karmaValid => _karmaResult.isValid;
 
   Future<void> _submitPayment() async {
     setState(() {
@@ -1262,7 +1267,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         }
       } else if (_selectedMethod == 'karma') {
         double currentPaid = widget.totalPaid;
-        final kCash = _karmaCash;
+        final kCash = _karmaResult.cashApplied;
         final kCard = _karmaCard;
 
         if (kCash > 0) {
@@ -1358,7 +1363,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                     : (_selectedMethod == 'card'
                         ? remaining
                         : (_selectedMethod == 'karma'
-                            ? _karmaCash + _karmaCard
+                            ? _karmaResult.paidAmount
                             : 0.0)));
 
             await ref
@@ -1429,7 +1434,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                         : (_selectedMethod == 'card'
                             ? remaining
                             : (_selectedMethod == 'karma'
-                                ? _karmaCash + _karmaCard
+                                ? _karmaResult.paidAmount
                                 : 0.0))),
                 copies: _labelCopies,
               );
@@ -1931,38 +1936,6 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
 
   void _onSplitFieldChanged(
       String field, String valStr, double remaining, bool hasCustomer) {
-    final val = double.tryParse(valStr.replaceAll(',', '.')) ?? 0.0;
-
-    if (!hasCustomer) {
-      _karmaDebtController.text = '0.00';
-      if (field == 'cash') {
-        final cardVal = (remaining - val).clamp(0.0, remaining);
-        _karmaCardController.text = cardVal.toStringAsFixed(2);
-      } else if (field == 'card') {
-        final cashVal = (remaining - val).clamp(0.0, remaining);
-        _karmaCashController.text = cashVal.toStringAsFixed(2);
-      }
-    } else {
-      if (field == 'cash') {
-        final currentCard =
-            double.tryParse(_karmaCardController.text.replaceAll(',', '.')) ??
-                0.0;
-        final debtVal = (remaining - (val + currentCard)).clamp(0.0, remaining);
-        _karmaDebtController.text = debtVal.toStringAsFixed(2);
-      } else if (field == 'card') {
-        final currentCash =
-            double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ??
-                0.0;
-        final debtVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
-        _karmaDebtController.text = debtVal.toStringAsFixed(2);
-      } else if (field == 'debt') {
-        final currentCash =
-            double.tryParse(_karmaCashController.text.replaceAll(',', '.')) ??
-                0.0;
-        final cardVal = (remaining - (currentCash + val)).clamp(0.0, remaining);
-        _karmaCardController.text = cardVal.toStringAsFixed(2);
-      }
-    }
     setState(() {});
   }
 
@@ -2037,7 +2010,7 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               Expanded(
                 child: _buildSplitField(
                   controller: _karmaCashController,
-                  label: 'Nakit',
+                  label: 'Alınan Nakit',
                   icon: Icons.payments_rounded,
                   color: _kGreen,
                   fieldId: 'cash',
@@ -2072,6 +2045,17 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
               ),
             ],
           ),
+          if (_karmaResult.change > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Para üstü: ₺${_karmaResult.change.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: _kGreenDark,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ],
       ),
     );

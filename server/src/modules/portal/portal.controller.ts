@@ -46,6 +46,25 @@ async function runWithTenantContext(companyId: string, sql: string, params: any[
   }
 }
 
+// Global role templates have company_id=NULL. RLS intentionally hides those
+// rows from ordinary tenant queries, so role-catalog reads use a privileged
+// transaction with an explicit company boundary in every SQL statement.
+async function runWithRoleCatalogAccess(sql: string, params: any[] = []) {
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.bypass_rls', 'true', true)");
+    const result = await client.query(sql, params);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 // Write tenant action audit log
 async function writeTenantAudit(companyId: string, userId: string, action: string, entity: string, entityId: string, oldValue: any = null, newValue: any = null) {
   const auditId = `aud-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -200,6 +219,9 @@ router.get('/stores', async (req: AuthenticatedRequest, res: Response) => {
 
 router.post('/stores', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
+  if (!user.roles?.some(role => ['owner', 'admin'].includes(role)) && !user.permissions?.includes('settings:manage')) {
+    return res.status(403).json({ error: 'forbidden', message: 'Şube oluşturma yetkiniz yok.' });
+  }
   const { name, address } = req.body;
   if (!name) {
     return res.status(400).json({ error: 'missing_name' });
@@ -235,8 +257,7 @@ router.post('/stores', async (req: AuthenticatedRequest, res: Response) => {
 router.get('/users', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const list = await runWithTenantContext(
-      user.company_id,
+    const list = await runWithRoleCatalogAccess(
       `SELECT u.id, u.name, u.email, u.is_active, u.created_at,
               COALESCE(ARRAY_AGG(r.name) FILTER (WHERE r.id IS NOT NULL), '{}') AS roles,
               MIN(r.id) AS role_id, MIN(r.name) AS role_name
@@ -273,8 +294,7 @@ router.post('/users', async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ error: 'forbidden', message: 'Sysadmin yetkisi atanamaz.' });
   }
 
-  const assignableRole = await runWithTenantContext(
-    user.company_id,
+  const assignableRole = await runWithRoleCatalogAccess(
     `SELECT id FROM roles WHERE id = $1 AND name <> 'sysadmin'
      AND (company_id IS NULL OR company_id = $2)`,
     [role_id, user.company_id]
@@ -366,8 +386,7 @@ router.patch('/users/:id', async (req: AuthenticatedRequest, res: Response) => {
   }
 
   if (role_id !== undefined) {
-    const assignableRole = await runWithTenantContext(
-      user.company_id,
+    const assignableRole = await runWithRoleCatalogAccess(
       `SELECT id FROM roles WHERE id = $1 AND name <> 'sysadmin'
        AND (company_id IS NULL OR company_id = $2)`,
       [role_id, user.company_id]
@@ -474,8 +493,7 @@ router.delete('/users/:id', async (req: AuthenticatedRequest, res: Response) => 
 router.get('/roles', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
-    const result = await runWithTenantContext(
-      user.company_id,
+    const result = await runWithRoleCatalogAccess(
       `SELECT r.id, r.name, r.description, r.company_id,
               COALESCE(ARRAY_AGG(p.code) FILTER (WHERE p.code IS NOT NULL), '{}') AS permissions
        FROM roles r

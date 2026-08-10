@@ -23,6 +23,7 @@ import 'package:serenutos/presentation/widgets/sales/cart_panel.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout_section.dart';
 import 'package:serenutos/presentation/widgets/sales/live_scale_dialog.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
+import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/config/theme.dart';
 
 part 'sales/animated_cart_tab.dart';
@@ -224,10 +225,23 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     }
 
     AuthorizedCardPayment? cardPayment;
-    if (flowState.paymentMethod == 'card') {
-      cardPayment = await _confirmPhysicalCardPayment(totalAmount);
+    final cardAmount = flowState.paymentMethod == 'card'
+        ? totalAmount
+        : flowState.paymentMethod == 'karma'
+            ? flowState.karmaCard
+            : 0.0;
+    final hasPos =
+        ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
+    if (cardAmount > 0 && hasPos) {
+      cardPayment = await _confirmPhysicalCardPayment(cardAmount);
       if (cardPayment == null || !mounted) return;
     }
+    final cardMetadata = cardAmount <= 0
+        ? null
+        : cardPayment?.ledgerMetadata ??
+            PhysicalCardPaymentService.manualLedgerMetadata(
+              context: 'sale_checkout',
+            );
 
     ref.read(salesFlowProvider.notifier).setSubmitting(true);
 
@@ -262,7 +276,18 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 idempotencyKey: flowState.idempotencyKey.isNotEmpty
                     ? flowState.idempotencyKey
                     : 'checkout-${DateTime.now().microsecondsSinceEpoch}',
-                terminalMetadata: cardPayment?.ledgerMetadata,
+                terminalMetadata: flowState.paymentMethod == 'karma'
+                    ? <String, dynamic>{
+                        'payment_breakdown': {
+                          'cash_tendered': flowState.karmaCashTendered,
+                          'cash_applied': flowState.karmaCashApplied,
+                          'card': flowState.karmaCard,
+                          'debt': flowState.karmaDebt,
+                          'change': flowState.karmaChange,
+                        },
+                        ...?cardMetadata,
+                      }
+                    : cardMetadata,
               );
 
       if (createdSale == null) {
@@ -444,6 +469,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                                 onPaidAmountChanged: (amt) => ref
                                     .read(salesFlowProvider.notifier)
                                     .setPaidAmount(amt),
+                                onMixedPaymentChanged:
+                                    (cashTendered, card, debt) => ref
+                                        .read(salesFlowProvider.notifier)
+                                        .setMixedPayment(
+                                          cashTendered: cashTendered,
+                                          card: card,
+                                          debt: debt,
+                                        ),
                                 onSubmitSale: _submitSale,
                               );
 
@@ -508,6 +541,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                                 onPaidAmountChanged: (amt) => ref
                                     .read(salesFlowProvider.notifier)
                                     .setPaidAmount(amt),
+                                onMixedPaymentChanged:
+                                    (cashTendered, card, debt) => ref
+                                        .read(salesFlowProvider.notifier)
+                                        .setMixedPayment(
+                                          cashTendered: cashTendered,
+                                          card: card,
+                                          debt: debt,
+                                        ),
                                 onSubmitSale: _submitSale,
                               );
 

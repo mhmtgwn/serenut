@@ -1,7 +1,7 @@
 export interface AppNavItem {
   id: string;
   label: string;
-  section: 'overview' | 'operations' | 'commerce' | 'platform' | 'account';
+  section: 'overview' | 'operations' | 'commerce' | 'customers' | 'communication' | 'security' | 'platform' | 'account';
   href: string;
   description: string;
   module: 'home' | 'portal' | 'admin';
@@ -31,13 +31,14 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'sales-operations',
-    label: 'Satış ve Operasyon',
+    label: 'SMS ve Operasyon',
     section: 'operations',
     href: '/app/#sales-operations',
     description: 'Cihaz, şube ve operasyon durumları.',
     module: 'portal',
     moduleTab: 'devices',
-    permissions: ['sales:view']
+    permissions: ['notifications.templates.manage'],
+    roles: ['owner']
   },
   {
     id: 'company-stores',
@@ -46,7 +47,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     href: '/app/#company-stores',
     description: 'Şube kayıtlarını, adreslerini ve durumlarını yönetin.',
     module: 'portal',
-    moduleTab: 'stores'
+    moduleTab: 'stores',
+    permissions: ['settings:manage']
   },
   {
     id: 'company-devices',
@@ -100,7 +102,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'support-center',
     label: 'Destek Merkezi',
-    section: 'commerce',
+    section: 'communication',
     href: '/app/#support-center',
     description: 'Destek talepleri ve yanıt geçmişi.',
     module: 'portal',
@@ -119,7 +121,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-overview',
     label: 'Genel Bakış',
-    section: 'platform',
+    section: 'overview',
     href: '/app/#platform-overview',
     description: 'Kayıt, deneme, abonelik, lisans ve havale özeti.',
     module: 'admin',
@@ -129,7 +131,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-companies',
     label: 'Firmalar',
-    section: 'platform',
+    section: 'customers',
     href: '/app/#platform-companies',
     description: 'Tenant ve müşteri organizasyonlarını yönetin.',
     module: 'admin',
@@ -139,9 +141,9 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-billing',
     label: 'Ödemeler',
-    section: 'platform',
+    section: 'commerce',
     href: '/app/#platform-billing',
-    description: 'Havale onayları, ödeme yöntemleri ve planlar.',
+    description: 'Havale onayları ve ödeme yöntemlerini yönetin.',
     module: 'admin',
     moduleTab: 'transfers',
     roles: ['sysadmin']
@@ -149,7 +151,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-subscriptions',
     label: 'Abonelikler',
-    section: 'platform',
+    section: 'customers',
     href: '/app/#platform-subscriptions',
     description: 'Firma aboneliklerini, dönemlerini ve durumlarını inceleyin.',
     module: 'admin',
@@ -159,7 +161,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-plans',
     label: 'Planlar',
-    section: 'platform',
+    section: 'commerce',
     href: '/app/#platform-plans',
     description: 'Satış planlarını, limitleri ve fiyatları yönetin.',
     module: 'admin',
@@ -169,7 +171,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-releases',
     label: 'Güncellemeler',
-    section: 'platform',
+    section: 'operations',
     href: '/app/#platform-releases',
     description: 'Android ve Windows sürümlerini yayınlayın, kademeli dağıtın veya geri çekin.',
     module: 'admin',
@@ -179,7 +181,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-licenses',
     label: 'Lisanslar',
-    section: 'platform',
+    section: 'customers',
     href: '/app/#platform-licenses',
     description: 'Lisans üretin, yenileyin, askıya alın veya iptal edin.',
     module: 'admin',
@@ -189,7 +191,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-devices',
     label: 'Cihazlar',
-    section: 'platform',
+    section: 'customers',
     href: '/app/#platform-devices',
     description: 'Tüm firmalara bağlı cihazları yönetin ve gerektiğinde değiştirin.',
     module: 'admin',
@@ -199,9 +201,9 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-health',
     label: 'Sistem',
-    section: 'platform',
+    section: 'operations',
     href: '/app/#platform-health',
-    description: 'Telemetri, güvenlik ve olay yönetimi.',
+    description: 'Telemetri, servis sağlığı ve sistem olaylarını izleyin.',
     module: 'admin',
     moduleTab: 'health',
     roles: ['sysadmin']
@@ -209,7 +211,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-maintenance',
     label: 'Sunucu Bakımı',
-    section: 'platform',
+    section: 'operations',
     href: '/app/#platform-maintenance',
     description: 'Disk kullanımını inceleyin ve güvenli bakım görevlerini çalıştırın.',
     module: 'admin',
@@ -219,7 +221,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: 'platform-security',
     label: 'Güvenlik ve Loglar',
-    section: 'platform',
+    section: 'security',
     href: '/app/#platform-security',
     description: 'Admin şifreleri, güvenlik işlemleri ve sistem kayıtları.',
     module: 'admin',
@@ -228,12 +230,22 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: 'platform-support',
-    label: 'Destek',
-    section: 'platform',
+    label: 'Destek Talepleri',
+    section: 'communication',
     href: '/app/#platform-support',
     description: 'Firmalardan gelen destek taleplerini görüntüleyin.',
     module: 'admin',
     moduleTab: 'support',
+    roles: ['sysadmin']
+  },
+  {
+    id: 'platform-mail',
+    label: 'E-posta Kutusu',
+    section: 'communication',
+    href: '/app/#platform-mail',
+    description: 'Gelen ve gönderilen e-postaları yönetin.',
+    module: 'admin',
+    moduleTab: 'mail',
     roles: ['sysadmin']
   },
   {
@@ -250,7 +262,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
 
 export function filterNavByEntitlements(roles: string[] = [], permissions: string[] = []) {
   if (roles.includes('sysadmin')) {
-    return APP_NAV_ITEMS.filter((item) => item.roles?.includes('sysadmin') || item.id === 'account-settings');
+    return APP_NAV_ITEMS.filter((item) => item.roles?.includes('sysadmin'));
   }
   return APP_NAV_ITEMS.filter((item) => {
     const rolePass = !item.roles || item.roles.some((role) => roles.includes(role));

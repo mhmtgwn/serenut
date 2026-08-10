@@ -143,8 +143,10 @@ class CatalogSettingsPage extends ConsumerWidget {
             TextField(
               controller: vat,
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Varsayılan KDV (%)'),
+              decoration: const InputDecoration(
+                labelText: 'Varsayılan KDV (%) (İsteğe bağlı)',
+                hintText: 'Örn: 20',
+              ),
             ),
           ],
         ),
@@ -162,11 +164,14 @@ class CatalogSettingsPage extends ConsumerWidget {
     );
     if (accepted != true || !context.mounted) return;
     final newName = _canonicalName(name.text);
-    final rate = int.tryParse(vat.text.trim());
-    if (newName.isEmpty || rate == null || rate < 0 || rate > 100) {
+    final vatText = vat.text.trim();
+    final rate = vatText.isEmpty ? null : int.tryParse(vatText);
+    if (newName.isEmpty ||
+        (vatText.isNotEmpty && (rate == null || rate < 0 || rate > 100))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Kategori adı ve KDV oranını kontrol edin.')),
+            content: Text(
+                'Lütfen geçerli bir kategori adı ve 0-100 arasında bir KDV oranı girin.')),
       );
       return;
     }

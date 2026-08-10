@@ -530,12 +530,9 @@ export class AuthService {
 
   public static async isTokenBlacklisted(token: string): Promise<boolean> {
     try {
-      console.log('isTokenBlacklisted START', { isOpen: redisClient?.isOpen, isReady: redisClient?.isReady });
       const decoded = jwt.decode(token) as any;
       if (decoded && decoded.jti && redisClient && redisClient.isReady) {
-        console.log('isTokenBlacklisted redisClient.get...');
         const isBlacklisted = await redisClient.get(`bl:${decoded.jti}`);
-        console.log('isTokenBlacklisted redisClient.get DONE');
         return isBlacklisted === '1';
       }
     } catch (_) {}

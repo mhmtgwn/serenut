@@ -75,6 +75,10 @@ services:
     read_only: true
     cap_drop:
       - ALL
+    cap_add:
+      # Release files are written by the unprivileged backend UID. The
+      # allowlisted maintenance agent needs only DAC override to remove them.
+      - DAC_OVERRIDE
     security_opt:
       - no-new-privileges:true
     tmpfs:

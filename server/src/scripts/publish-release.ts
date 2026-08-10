@@ -2,6 +2,11 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { pgPool } from '../config/database';
+import {
+  loadReleaseSigningKey,
+  signReleaseHash,
+  verifyReleaseHashSignature,
+} from '../security/release-signing';
 
 async function sha256(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -13,58 +18,15 @@ async function sha256(filePath: string): Promise<string> {
   });
 }
 
-function loadReleaseSigningKey(): crypto.KeyObject {
-  const values: string[] = [
-    process.env.RELEASE_RSA_PRIVATE_KEY,
-    process.env.RSA_PRIVATE_KEY,
-  ].filter((value): value is string => Boolean(value));
-  const keyPaths = [
+function getReleaseSigningKey(): crypto.KeyObject {
+  return loadReleaseSigningKey(
+    [process.env.RELEASE_RSA_PRIVATE_KEY],
+    [
     process.env.RELEASE_RSA_PRIVATE_KEY_FILE,
     '/run/secrets/serenut_release_private_key',
     path.join(process.cwd(), '.release-private.pem'),
-  ].filter((value): value is string => Boolean(value));
-  for (const keyPath of keyPaths) {
-    try {
-      if (fs.existsSync(keyPath)) values.push(fs.readFileSync(keyPath, 'utf8'));
-    } catch (_) {
-      // Try the remaining configured sources before reporting one clear error.
-    }
-  }
-  let lastError: unknown;
-
-  for (const value of values) {
-    const normalized = value.replace(/\\r?\\n/g, '\n').trim();
-    const candidates = [normalized];
-
-    // Some secret stores persist PEM values as base64. Decode only values that
-    // actually produce a PEM or JWK payload, never arbitrary key material.
-    if (/^[A-Za-z0-9+/=_-]+$/.test(normalized)) {
-      const decoded = Buffer.from(normalized, 'base64').toString('utf8').trim();
-      if (decoded.startsWith('-----BEGIN ') || decoded.startsWith('{')) {
-        candidates.push(decoded);
-      }
-    }
-
-    for (const candidate of candidates) {
-      try {
-        return candidate.startsWith('{')
-            ? crypto.createPrivateKey({ key: JSON.parse(candidate), format: 'jwk' })
-            : crypto.createPrivateKey({ key: candidate, format: 'pem' });
-      } catch (error) {
-        lastError = error;
-      }
-    }
-  }
-
-  if (values.length === 0) {
-    throw new Error(
-      'RELEASE_RSA_PRIVATE_KEY, RSA_PRIVATE_KEY, or RELEASE_RSA_PRIVATE_KEY_FILE is required',
-    );
-  }
-  throw new Error(
-      `Release signing key could not be decoded as PEM, base64 PEM, or JWK: ${
-          lastError instanceof Error ? lastError.message : 'unknown error'
-      }`);
+    ],
+  );
 }
 
 type ReleasePlatform = 'android' | 'windows';
@@ -107,10 +69,10 @@ async function prepareRelease(
   try {
     fs.copyFileSync(incomingPath, temporaryPath, fs.constants.COPYFILE_EXCL);
     const hash = await sha256(temporaryPath);
-    const signer = crypto.createSign('SHA256');
-    signer.update(hash);
-    signer.end();
-    const signature = signer.sign(privateKey, 'base64');
+    const signature = signReleaseHash(hash, privateKey);
+    if (!verifyReleaseHashSignature(hash, signature, crypto.createPublicKey(privateKey))) {
+      throw new Error('Release signature self-check failed; publishing was aborted.');
+    }
     const size = fs.statSync(temporaryPath).size;
     let reusedExistingFile = false;
     if (fs.existsSync(finalPath)) {
@@ -144,7 +106,7 @@ async function prepareRelease(
 
 async function main() {
   const args = process.argv.slice(2);
-  const privateKey = loadReleaseSigningKey();
+  const privateKey = getReleaseSigningKey();
   const inputs: Array<{
     platform: ReleasePlatform;
     versionCode: string;

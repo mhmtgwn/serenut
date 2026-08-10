@@ -8,6 +8,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/services/cart_persistence_service.dart';
 import 'package:serenutos/infrastructure/services/financial_integrity_service.dart';
+import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError(
@@ -58,6 +59,11 @@ class SalesFlowState {
   final CustomerEntity? selectedCustomer;
   final String paymentMethod; // 'cash', 'card', 'debt', 'karma'
   final double paidAmount;
+  final double karmaCashTendered;
+  final double karmaCashApplied;
+  final double karmaCard;
+  final double karmaDebt;
+  final double karmaChange;
   final bool isSubmitting;
   final String idempotencyKey;
 
@@ -68,6 +74,11 @@ class SalesFlowState {
     this.selectedCustomer,
     this.paymentMethod = 'cash',
     this.paidAmount = 0.0,
+    this.karmaCashTendered = 0.0,
+    this.karmaCashApplied = 0.0,
+    this.karmaCard = 0.0,
+    this.karmaDebt = 0.0,
+    this.karmaChange = 0.0,
     this.isSubmitting = false,
     this.idempotencyKey = '',
   });
@@ -91,6 +102,11 @@ class SalesFlowState {
     CustomerEntity? Function()? selectedCustomer,
     String? paymentMethod,
     double? paidAmount,
+    double? karmaCashTendered,
+    double? karmaCashApplied,
+    double? karmaCard,
+    double? karmaDebt,
+    double? karmaChange,
     bool? isSubmitting,
     String? idempotencyKey,
   }) {
@@ -102,6 +118,11 @@ class SalesFlowState {
           selectedCustomer != null ? selectedCustomer() : this.selectedCustomer,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paidAmount: paidAmount ?? this.paidAmount,
+      karmaCashTendered: karmaCashTendered ?? this.karmaCashTendered,
+      karmaCashApplied: karmaCashApplied ?? this.karmaCashApplied,
+      karmaCard: karmaCard ?? this.karmaCard,
+      karmaDebt: karmaDebt ?? this.karmaDebt,
+      karmaChange: karmaChange ?? this.karmaChange,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
     );
@@ -442,12 +463,40 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     state = state.copyWith(
       paymentMethod: method,
       paidAmount: nextPaid,
+      karmaCashTendered: method == 'karma' ? state.karmaCashTendered : 0,
+      karmaCashApplied: method == 'karma' ? state.karmaCashApplied : 0,
+      karmaCard: method == 'karma' ? state.karmaCard : 0,
+      karmaDebt: method == 'karma' ? state.karmaDebt : 0,
+      karmaChange: method == 'karma' ? state.karmaChange : 0,
     );
     _persistState();
   }
 
   void setPaidAmount(double amount) {
     state = state.copyWith(paidAmount: amount);
+    _persistState();
+  }
+
+  void setMixedPayment({
+    required double cashTendered,
+    required double card,
+    required double debt,
+  }) {
+    final result = MixedPaymentCalculator.calculate(
+      total: state.total,
+      cashTendered: cashTendered,
+      card: card,
+      debt: debt,
+    );
+    state = state.copyWith(
+      paymentMethod: 'karma',
+      paidAmount: result.paidAmount,
+      karmaCashTendered: result.cashTendered,
+      karmaCashApplied: result.cashApplied,
+      karmaCard: result.card,
+      karmaDebt: result.debt,
+      karmaChange: result.change,
+    );
     _persistState();
   }
 

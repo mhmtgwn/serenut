@@ -12,6 +12,7 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/math_engine.dart';
+import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
@@ -334,12 +335,15 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       ? (double.tryParse(_debtSplitController.text.replaceAll(',', '.')) ?? 0.0)
       : 0.0;
 
-  double get _karmaTotal =>
-      MathEngine.calculateSplitTotal(_karmaCash, _karmaCard, _karmaDebt);
-  double get _karmaRemainder =>
-      (_totalAmount - _karmaTotal).clamp(0.0, double.infinity);
-  bool get _karmaValid =>
-      _totalAmount > 0 && MathEngine.areEqual(_karmaTotal, _totalAmount);
+  MixedPaymentResult get _karmaResult => MixedPaymentCalculator.calculate(
+        total: _totalAmount,
+        cashTendered: _karmaCash,
+        card: _karmaCard,
+        debt: _karmaDebt,
+      );
+  double get _karmaTotal => _karmaResult.allocatedTotal;
+  double get _karmaRemainder => _karmaResult.remaining;
+  bool get _karmaValid => _karmaResult.isValid;
 
   void _nextStep() {
     if (_activeStep < 2) {
@@ -657,7 +661,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       if (_paymentMethod == 'debt') {
         finalPaid = 0.0;
       } else if (_paymentMethod == 'karma') {
-        finalPaid = _karmaCash + _karmaCard;
+        finalPaid = _karmaResult.paidAmount;
       }
       final cardAmount = _paymentMethod == 'card'
           ? _totalAmount
@@ -679,6 +683,18 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
               PhysicalCardPaymentService.manualLedgerMetadata(
                 context: 'order_creation',
               );
+      final paymentMetadata = _paymentMethod == 'karma'
+          ? <String, dynamic>{
+              'payment_breakdown': {
+                'cash_tendered': _karmaResult.cashTendered,
+                'cash_applied': _karmaResult.cashApplied,
+                'card': _karmaResult.card,
+                'debt': _karmaResult.debt,
+                'change': _karmaResult.change,
+              },
+              ...?cardMetadata,
+            }
+          : cardMetadata;
       if (isEdit) {
         // Save Order to Local Database
         await ref.read(ordersControllerProvider.notifier).updateOrder(newOrder);
@@ -702,7 +718,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           totalAmount: _totalAmount,
           paidAmount: finalPaid,
           paymentMethod: _paymentMethod,
-          terminalMetadata: cardMetadata,
+          terminalMetadata: paymentMetadata,
         );
       }
       if (cardPayment != null) {

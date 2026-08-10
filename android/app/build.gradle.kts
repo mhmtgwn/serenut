@@ -70,7 +70,10 @@ android {
             if (releaseConfig != null && releaseConfig.storeFile != null) {
                 signingConfig = releaseConfig
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                throw GradleException(
+                    "Production signing is not configured. Set KEYSTORE_FILE, " +
+                    "KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD (or android/key.properties)."
+                )
             }
         }
     }

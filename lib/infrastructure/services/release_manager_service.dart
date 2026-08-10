@@ -158,21 +158,45 @@ class ReleaseManagerService {
     'RELEASE_RSA_MODULUS',
     defaultValue: '',
   );
+  static const String _configuredRsaModuli = String.fromEnvironment(
+    'RELEASE_RSA_MODULI',
+    defaultValue: '',
+  );
 
   final EnvironmentConfig _config;
   final http.Client _httpClient;
-  final String _rsaModulus;
+  final List<String> _rsaModuli;
   final String _rsaExponent;
 
   ReleaseManagerService({
     EnvironmentConfig? config,
     http.Client? httpClient,
     String? rsaModulus,
+    List<String>? rsaModuli,
     String rsaExponent = '65537',
   })  : _config = config ?? EnvironmentConfig.current,
         _httpClient = httpClient ?? http.Client(),
-        _rsaModulus = rsaModulus ?? _configuredRsaModulus,
+        _rsaModuli = _resolveTrustedModuli(rsaModulus, rsaModuli),
         _rsaExponent = rsaExponent;
+
+  static List<String> _resolveTrustedModuli(
+    String? rsaModulus,
+    List<String>? rsaModuli,
+  ) {
+    final configured = rsaModuli ??
+        (rsaModulus != null
+            ? <String>[rsaModulus]
+            : _configuredRsaModuli.split(','));
+    final result = configured
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (result.isEmpty && _configuredRsaModulus.trim().isNotEmpty) {
+      return <String>[_configuredRsaModulus.trim()];
+    }
+    return result;
+  }
 
   // ── PUBLIC API ──────────────────────────────────────────────────────────────
 
@@ -384,33 +408,38 @@ class ReleaseManagerService {
         '[ReleaseManager] SHA-256 verify: expected=$expectedHash actual=$actualHash match=$validHash');
     if (!validHash) return false;
 
-    // 2. Verify RSA Digital Signature (optional extra layer over SHA-256)
-    if (signature.isNotEmpty && _rsaModulus.isNotEmpty) {
-      try {
-        final signatureBytes = base64.decode(signature.trim());
-        final payloadBytes =
-            utf8.encode(actualHash); // Signed data is file hash
+    // 2. Production updates fail closed unless the detached RSA signature can
+    // be verified with the public key embedded at build time.
+    if (signature.trim().isEmpty || _rsaModuli.isEmpty) {
+      debugPrint(
+          '[ReleaseManager] Rejecting update: RSA key or signature is missing.');
+      return false;
+    }
+    try {
+      final signatureBytes = base64.decode(signature.trim());
+      final payloadBytes = utf8.encode(actualHash); // Signed data is file hash
 
-        final modulus = BigInt.parse(_rsaModulus);
-        final publicExponent = BigInt.parse(_rsaExponent);
-
-        final publicKey = RSAPublicKey(modulus, publicExponent);
+      final publicExponent = BigInt.parse(_rsaExponent);
+      final rsaSignature = RSASignature(signatureBytes);
+      for (var index = 0; index < _rsaModuli.length; index++) {
+        final publicKey = RSAPublicKey(
+          BigInt.parse(_rsaModuli[index]),
+          publicExponent,
+        );
         final verifier = RSASigner(SHA256Digest(), '0609608648016503040201');
         verifier.init(false, PublicKeyParameter<RSAPublicKey>(publicKey));
-
-        final rsaSignature = RSASignature(signatureBytes);
-        final verified = verifier.verifySignature(payloadBytes, rsaSignature);
-        debugPrint('[ReleaseManager] RSA signature verify match=$verified');
-      } catch (e) {
-        debugPrint('[ReleaseManager] RSA signature verification warning: $e');
+        if (verifier.verifySignature(payloadBytes, rsaSignature)) {
+          debugPrint(
+              '[ReleaseManager] RSA signature verified by trusted key #$index');
+          return true;
+        }
       }
-    } else {
-      debugPrint(
-          '[ReleaseManager] RSA modulus/signature empty, relying on SHA-256 integrity.');
+      debugPrint('[ReleaseManager] RSA signature did not match trusted keys.');
+      return false;
+    } catch (e) {
+      debugPrint('[ReleaseManager] RSA signature verification failed: $e');
+      return false;
     }
-
-    // File SHA-256 integrity is fully verified against server database hash
-    return true;
   }
 
   /// Open and install the downloaded APK / EXE.

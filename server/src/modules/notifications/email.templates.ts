@@ -97,7 +97,7 @@ function wrapEmail(title: string, content: string): string {
   <div class="footer">
     <p>Bu e-postayı almak istemiyorsanız <a href="#">aboneliği iptal edin</a>.</p>
     <p>Sorularınız için: <a href="mailto:destek@serenut.com">destek@serenut.com</a></p>
-    <p style="margin-top:12px;color:#475569">© ${new Date().getFullYear()} Serenut Yazılım A.Ş. — Tüm hakları saklıdır.</p>
+    <p style="margin-top:12px;color:#475569">© ${new Date().getFullYear()} Serenut — Mehmet Güven. Tüm hakları saklıdır.</p>
   </div>
 </div>
 </div>

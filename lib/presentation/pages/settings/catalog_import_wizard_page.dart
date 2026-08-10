@@ -1,6 +1,5 @@
 // lib/presentation/pages/settings/catalog_import_wizard_page.dart
 import 'dart:typed_data';
-import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +34,7 @@ class _CatalogImportWizardPageState
 
   PlatformFile? _selectedFile;
   Uint8List? _fileBytes;
+  String? _filePath;
 
   bool _isAnalyzing = false;
   double _analyzeProgress = 0.0;
@@ -64,7 +64,7 @@ class _CatalogImportWizardPageState
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'xlsx'],
-        withData: false,
+        withData: kIsWeb,
       );
 
       if (result == null || result.files.isEmpty) return;
@@ -74,12 +74,13 @@ class _CatalogImportWizardPageState
       if (kIsWeb) {
         bytes = file.bytes;
       } else {
-        bytes = await File(file.path!).readAsBytes();
+        bytes = null;
       }
 
       setState(() {
         _selectedFile = file;
         _fileBytes = bytes;
+        _filePath = file.path;
         _parseError = null;
       });
     } catch (e) {
@@ -93,7 +94,7 @@ class _CatalogImportWizardPageState
   }
 
   Future<void> _startAnalysis() async {
-    if (_fileBytes == null) return;
+    if (_fileBytes == null && _filePath == null) return;
 
     setState(() {
       _currentStep = 1;
@@ -105,12 +106,19 @@ class _CatalogImportWizardPageState
 
     try {
       final importer = await ref.read(datasetImportServiceProvider.future);
-      final parsed = await importer.analyzeZip(_fileBytes!, (progress, status) {
-        setState(() {
-          _analyzeProgress = progress;
-          _analyzeStatus = status;
-        });
-      });
+      final parsed = kIsWeb
+          ? await importer.analyzeZip(_fileBytes!, (progress, status) {
+              setState(() {
+                _analyzeProgress = progress;
+                _analyzeStatus = status;
+              });
+            })
+          : await importer.analyzeFile(_filePath!, (progress, status) {
+              setState(() {
+                _analyzeProgress = progress;
+                _analyzeStatus = status;
+              });
+            });
 
       setState(() {
         _parsedData = parsed;
@@ -127,7 +135,7 @@ class _CatalogImportWizardPageState
   }
 
   Future<void> _startImport() async {
-    if (_fileBytes == null) return;
+    if (_fileBytes == null && _filePath == null) return;
 
     setState(() {
       _currentStep = 3;
@@ -151,16 +159,24 @@ class _CatalogImportWizardPageState
         syncImages: _syncImages,
       );
 
-      final result = await importer.importFromZip(
-        _fileBytes!,
-        (progress, status) {
-          setState(() {
-            _importProgress = progress;
-            _importStatus = status;
-          });
-        },
-        strategy,
-      );
+      void updateProgress(double progress, String status) {
+        setState(() {
+          _importProgress = progress;
+          _importStatus = status;
+        });
+      }
+
+      final result = kIsWeb
+          ? await importer.importFromZip(
+              _fileBytes!,
+              updateProgress,
+              strategy,
+            )
+          : await importer.importFromFile(
+              _filePath!,
+              updateProgress,
+              strategy,
+            );
 
       // Invalidate the repository so components refresh product list
       ref.invalidate(productRepositoryProvider);

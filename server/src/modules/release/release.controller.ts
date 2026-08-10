@@ -5,6 +5,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { pgPool } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
+import { loadReleaseSigningKey, signReleaseHash } from '../../security/release-signing';
 
 const router = Router();
 
@@ -72,45 +73,17 @@ function computeFileSha256(filePath: string): Promise<string> {
 
 // Helper: sign the computed SHA-256 hash using RSA Private Key
 function signReleaseFile(sha256Hash: string): string {
-  let privateKey = (process.env.RELEASE_RSA_PRIVATE_KEY || '').trim();
-
-  if (!privateKey) {
-    const configuredKeyPath = (process.env.RELEASE_RSA_PRIVATE_KEY_FILE || '').trim();
-    const possiblePaths = [
-      configuredKeyPath,
+  const privateKey = loadReleaseSigningKey(
+    [process.env.RELEASE_RSA_PRIVATE_KEY],
+    [
+      process.env.RELEASE_RSA_PRIVATE_KEY_FILE,
       '/run/secrets/serenut_release_private_key',
       '/var/www/serenut-api/.release-private.pem',
       path.join(process.cwd(), '.release-private.pem'),
-      path.join(__dirname, '../../../.release-private.pem')
-    ].filter(Boolean);
-
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        try {
-          privateKey = fs.readFileSync(p, 'utf8').trim();
-          if (privateKey) break;
-        } catch (_) {}
-      }
-    }
-  }
-
-  if (!privateKey) {
-    throw new Error(
-      'RELEASE_RSA_PRIVATE_KEY or RELEASE_RSA_PRIVATE_KEY_FILE must contain a release signing key.'
-    );
-  }
-
-  const formattedKey = privateKey.replace(/\\n/g, '\n');
-
-  try {
-    const sign = crypto.createSign('SHA256');
-    sign.update(sha256Hash);
-    sign.end();
-    return sign.sign(formattedKey, 'base64');
-  } catch (err: any) {
-    console.error(`🔴 Cryptographic signing failed: ${err.message}`);
-    throw new Error(`Dijital imzalama başarısız: ${err.message}`);
-  }
+      path.join(__dirname, '../../../.release-private.pem'),
+    ],
+  );
+  return signReleaseHash(sha256Hash, privateKey);
 }
 
 // Helper: RLS bypass for admin queries

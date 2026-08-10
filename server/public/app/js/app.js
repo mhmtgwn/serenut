@@ -39,6 +39,7 @@ const iconPaths = {
   'platform-maintenance': '<path d="m14 6 4-4 4 4-4 4"/><path d="M18 2v8M4 14l-2 2 6 6 2-2"/><path d="m9 17 8-8"/>',
   'platform-security': '<path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/>',
   'platform-support': '<path d="M4 13a8 8 0 0 1 16 0"/><path d="M4 13v5h4v-6H4M20 13v5h-4v-6h4"/>',
+  'platform-mail': '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
   'account-settings': '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>'
 };
 const navIcon = (id) => `<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[id] || iconPaths['workspace-home']}</svg>`;
@@ -159,10 +160,10 @@ function normalizeNavigation(navigation) {
 
 function renderNav(items) {
   const nav = document.getElementById('app-nav');
-  const labels = { overview: 'Genel', operations: 'Operasyon', commerce: 'Ticari', platform: 'Yönetim', account: 'Hesap' };
+  const labels = { overview: 'Genel', customers: 'Müşteriler', commerce: 'Ticari', communication: 'İletişim', operations: 'Operasyon', security: 'Güvenlik', platform: 'Yönetim', account: 'Hesap' };
   nav.innerHTML = '';
 
-  ['overview', 'operations', 'commerce', 'platform', 'account'].forEach((section) => {
+  ['overview', 'customers', 'commerce', 'communication', 'operations', 'security', 'platform', 'account'].forEach((section) => {
     const sectionItems = items.filter((item) => item.section === section);
     if (!sectionItems.length) return;
     nav.insertAdjacentHTML('beforeend', `<div class="nav-section-label">${labels[section]}</div>`);
@@ -245,7 +246,7 @@ async function selectModule(moduleId) {
   const content = document.getElementById('embed-content');
   content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
   try {
-    const { loadModule } = await import('./module-runtime.js?v=20260806-diagnostic-groups1');
+    const { loadModule } = await import('./module-runtime.js?v=20260810-flow2');
     await loadModule(item);
   } catch (error) {
     content.innerHTML = `
@@ -258,6 +259,13 @@ async function selectModule(moduleId) {
     document.getElementById('module-retry').onclick = () => selectModule(item.id);
   }
 }
+
+window.addEventListener('hashchange', () => {
+  const hashId = window.location.hash.replace('#', '').trim();
+  if (!hashId || hashId === selectedModuleId) return;
+  const target = navigationItems.find((item) => item.id === hashId || item.href.split('#')[1] === hashId);
+  if (target) selectModule(target.id);
+});
 
 async function startRealtime() {
   if (realtimeConnecting ||

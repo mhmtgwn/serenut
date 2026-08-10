@@ -547,6 +547,55 @@ td small { display:block;color:#64748b;margin-top:3px; }
 .maintenance-confirm input { background:#fff; }
 .maintenance-confirm code { font-weight:800; }
 #maintenance-result { margin-top:12px; }
+.mail-layout { display:grid;grid-template-columns:210px minmax(0,1fr);min-height:620px;border:1px solid #dfe6e1;border-radius:14px;overflow:hidden;background:#fff; }
+.mail-sidebar { display:flex;flex-direction:column;gap:6px;padding:16px;background:#f8faf9;border-right:1px solid #dfe6e1; }
+.mail-sidebar>.btn { margin-bottom:10px; }
+.mail-folder { display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border:0;border-radius:8px;background:transparent;color:#475569;font:inherit;font-weight:700;text-align:left;cursor:pointer; }
+.mail-folder:hover,.mail-folder.active { background:#e9f6ef;color:#0b714d; }
+.mail-folder b { min-width:24px;padding:2px 7px;border-radius:999px;background:#11875d;color:#fff;font-size:.7rem;text-align:center; }
+.mail-main { min-width:0; }
+.mail-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:62px;padding:12px 16px;border-bottom:1px solid #e6ebe8; }
+.mail-toolbar-actions,.mail-compose-actions { display:flex;align-items:center;gap:9px; }
+.mail-search { display:flex;gap:8px;flex:1;max-width:620px; }
+.mail-search input { flex:1; }
+.mail-list { display:flex;flex-direction:column; }
+.mail-row { display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr) auto;align-items:center;gap:18px;width:100%;padding:13px 16px;border:0;border-bottom:1px solid #edf1ee;background:#fff;color:#334155;text-align:left;cursor:pointer; }
+.mail-row:hover { background:#f7faf8; }
+.mail-row.unread { background:#f0fdf7;box-shadow:inset 4px 0 #11875d; }
+.mail-row.unread .mail-row-sender,.mail-row.unread strong { font-weight:800;color:#17211c; }
+.mail-row-sender { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650; }
+.mail-row-copy { display:flex;min-width:0;align-items:baseline;gap:9px;overflow:hidden; }
+.mail-row-copy strong,.mail-row-copy small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.mail-row-copy small { color:#718078; }
+.mail-row time { color:#718078;font-size:.76rem;white-space:nowrap; }
+.mail-compose { display:grid;gap:14px;max-width:900px;padding:22px; }
+.mail-compose label { display:grid;gap:6px;color:#475569;font-size:.8rem;font-weight:750; }
+.mail-compose details { border:1px solid #e2e8e4;border-radius:8px;padding:10px 12px; }
+.mail-compose summary { color:#0b714d;font-weight:750;cursor:pointer; }
+.mail-copy-fields { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px; }
+.mail-compose textarea { resize:vertical;line-height:1.55; }
+.mail-detail { padding:24px; }
+.mail-detail>header { padding-bottom:18px;border-bottom:1px solid #e6ebe8; }
+.mail-detail h3 { margin:0 0 14px;font-size:1.35rem;color:#17211c; }
+.mail-detail header small { display:block;margin-top:6px;color:#718078; }
+.mail-thread { display:grid;gap:14px;margin-top:20px; }
+.mail-thread-message { padding:18px;border:1px solid #dfe6e1;border-radius:12px;background:#fff; }
+.mail-thread-message.outbound { margin-left:7%;background:#f0fdf7;border-color:#bbebd4; }
+.mail-thread-message>header { display:flex;justify-content:space-between;gap:12px;margin-bottom:13px; }
+.mail-thread-message time { color:#718078;font-size:.76rem; }
+.mail-thread-message>div { color:#334155;line-height:1.65;overflow-wrap:anywhere; }
+.mail-attachments { display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid #e6ebe8; }
+.mail-attachments strong { width:100%; }
+.mail-attachments span { padding:8px 10px;border-radius:8px;background:#f1f5f3;color:#334155; }
+.mail-attachment-download { padding:8px 10px;border:1px solid #dfe6e1;border-radius:8px;background:#f1f5f3;color:#0b714d;font:inherit;font-weight:700;cursor:pointer; }
+.mail-attachment-download:hover { background:#e9f6ef;border-color:#9fd8bf; }
+.guest-request-message { margin:20px 0;padding:18px;border:1px solid #dfe6e1;border-radius:12px;background:#f8faf9; }
+.guest-request-message h4 { margin:0 0 10px;color:#17211c; }
+.guest-request-message p { margin:0;color:#334155;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere; }
+.guest-request-actions { display:flex;flex-wrap:wrap;gap:10px;align-items:center; }
+.billing-legal-consent { display:grid;grid-template-columns:auto 1fr;align-items:start;gap:10px;margin:16px 0;padding:15px;border:1px solid #dfe6e1;border-radius:10px;background:#f8faf9;color:#475569;font-size:.82rem;line-height:1.5; }
+.billing-legal-consent input { width:18px;height:18px;margin-top:2px; }
+.billing-legal-consent a { color:#0b714d;font-weight:750;text-decoration:underline; }
 @media (max-width:1080px) {
   .app-menu-toggle { display:inline-flex; }
   .shell-sidebar { position:fixed;inset:0 auto 0 0;width:min(86vw,320px);z-index:50;transform:translateX(-105%);transition:transform .2s ease;box-shadow:20px 0 50px rgba(15,23,42,.2);overflow:auto; }
@@ -557,6 +606,7 @@ td small { display:block;color:#64748b;margin-top:3px; }
   .release-download-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .diagnostic-search { grid-column:1 / -1; }
   .maintenance-task-grid { grid-template-columns:1fr; }
+  .mail-layout { grid-template-columns:170px minmax(0,1fr); }
 }
 @media (max-width:560px) {
   .metrics-grid,.inline-form,.support-form,.plan-grid,.permission-grid { grid-template-columns:1fr; }
@@ -568,6 +618,14 @@ td small { display:block;color:#64748b;margin-top:3px; }
   .diagnostic-search { grid-column:auto; }
   .diagnostic-head { align-items:flex-start;flex-direction:column; }
   .maintenance-confirm { align-items:stretch;flex-direction:column; }
+  .mail-layout { display:block;min-height:0; }
+  .mail-sidebar { flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid #dfe6e1; }
+  .mail-sidebar>.btn { width:100%;margin-bottom:4px; }
+  .mail-row { grid-template-columns:1fr auto;gap:5px 10px; }
+  .mail-row-copy { grid-column:1/-1;grid-row:2; }
+  .mail-copy-fields { grid-template-columns:1fr; }
+  .mail-detail { padding:16px; }
+  .mail-toolbar,.mail-toolbar-actions { align-items:stretch;flex-direction:column; }
 }
 
 /* Final cascade: professional Serenut palette */

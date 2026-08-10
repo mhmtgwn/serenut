@@ -17,10 +17,8 @@ async function runPrecheck() {
   const requiredVars = [
     'DATABASE_URL',
     'JWT_SECRET',
-    'REFRESH_SECRET',
     'APP_SECRET',
     'RSA_PRIVATE_KEY',
-    'RELEASE_RSA_PRIVATE_KEY',
     'NODE_ENV',
   ];
   const missingVars = requiredVars.filter(v => !process.env[v]);
@@ -40,10 +38,18 @@ async function runPrecheck() {
       console.error('❌ [FAIL] NODE_ENV must be production for a production deployment.');
       failed = true;
     }
-    for (const keyName of ['RSA_PRIVATE_KEY', 'RELEASE_RSA_PRIVATE_KEY']) {
+    const keyValues: Record<string, string | undefined> = {
+      RSA_PRIVATE_KEY: process.env.RSA_PRIVATE_KEY,
+      RELEASE_RSA_PRIVATE_KEY:
+        process.env.RELEASE_RSA_PRIVATE_KEY_FILE && fs.existsSync(process.env.RELEASE_RSA_PRIVATE_KEY_FILE)
+          ? fs.readFileSync(process.env.RELEASE_RSA_PRIVATE_KEY_FILE, 'utf8')
+          : process.env.RELEASE_RSA_PRIVATE_KEY,
+    };
+    for (const keyName of Object.keys(keyValues)) {
       try {
+        if (!keyValues[keyName]) throw new Error('missing key');
         const key = crypto.createPrivateKey(
-          process.env[keyName]!.replace(/\\n/g, '\n')
+          keyValues[keyName]!.replace(/\\n/g, '\n')
         );
         const bits = key.asymmetricKeyDetails?.modulusLength ?? 0;
         if (key.asymmetricKeyType !== 'rsa' || bits < 3072) {
@@ -55,6 +61,11 @@ async function runPrecheck() {
         failed = true;
       }
     }
+  }
+
+  if (process.env.NODE_ENV === 'production' && !process.env.MIGRATION_DATABASE_URL) {
+    console.error('❌ [FAIL] MIGRATION_DATABASE_URL is required for privileged migrations.');
+    failed = true;
   }
 
   // 2. Database Connectivity & Migration Version Check
@@ -139,8 +150,7 @@ async function runPrecheck() {
   // 5. External Credentials Validation (SMS & Email)
   const smsKey = process.env.SMS_API_KEY;
   if (!smsKey || smsKey.toLowerCase().includes('mock') || smsKey.toLowerCase().includes('test')) {
-    console.error('❌ [FAIL] SMS Configuration: Mock or missing SMS credentials detected in production.');
-    failed = true;
+    console.warn('⚠️ [WARN] Cloud SMS credentials are missing; only the selected Android SIM gateway can send SMS.');
   } else {
     console.log('✅ [PASS] SMS Configuration: Production SMS credentials present.');
   }

@@ -60,6 +60,7 @@ import crypto from 'crypto';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJSDoc from 'swagger-jsdoc';
+import { Pool } from 'pg';
 import { pgPool, redisClient } from './config/database';
 import { runMigrations } from './migrations';
 import { logger } from './config/logger';
@@ -88,6 +89,7 @@ import billingRouter from './modules/billing/billing.controller';
 import notificationRouter from './modules/notification/notification.controller';
 import telemetryRouter from './modules/analytics/telemetry.controller';
 import supportRouter from './modules/support/support.controller';
+import mailRouter from './modules/mail/mail.controller';
 import branchRouter from './modules/branch/branch.controller';
 import orderRouter from './modules/order/order.controller';
 import remoteConfigRouter from './modules/remote-config/remote-config.controller';
@@ -414,6 +416,7 @@ app.use('/api/v1/app', appRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/portal', portalRouter);
 app.use('/api/v1/support', supportRouter);
+app.use('/api/v1/mail', mailRouter);
 app.use('/api/v1/branches', branchRouter);
 app.use('/api/v1/orders', orderRouter);
 app.use('/api/v1/sales', orderRouter);
@@ -661,7 +664,25 @@ async function warmupCache() {
 // ── BOOTSTRAP ─────────────────────────────────────────────────────────────────
 async function bootstrap() {
   try {
-    await runMigrations(pgPool);
+    logger.info('Starting application bootstrap.');
+    const migrationUrl = process.env.MIGRATION_DATABASE_URL;
+    if (isProduction && !migrationUrl) {
+      throw new Error('MIGRATION_DATABASE_URL is required in production; migrations must not use the restricted application role.');
+    }
+    if (migrationUrl) {
+      const migrationPool = new Pool({
+        connectionString: migrationUrl,
+        max: 1,
+        connectionTimeoutMillis: 10_000,
+      });
+      try {
+        await runMigrations(migrationPool);
+      } finally {
+        await migrationPool.end();
+      }
+    } else {
+      await runMigrations(pgPool);
+    }
     initAnalyticsWebSocket(server);
     initRealtimeWebSocket(server);
 

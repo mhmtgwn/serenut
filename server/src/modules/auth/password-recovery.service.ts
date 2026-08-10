@@ -35,8 +35,52 @@ function randomClaimCode(): string {
 
 export class PasswordRecoveryService {
   static isStrongPassword(value: string): boolean {
-    return typeof value === 'string' && value.length >= 12 && /[a-z]/.test(value)
-      && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
+    return typeof value === 'string' && value.length >= 10 && /\p{L}/u.test(value) && /\d/.test(value);
+  }
+
+  static async createEmailReset(params: { email: string; context?: RequestContext }): Promise<{
+    resetToken: string; userName: string; email: string; companyId: string;
+  } | null> {
+    const email = params.email.trim().toLowerCase();
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls='true'");
+      const user = await client.query(
+        `SELECT id,company_id,name,email FROM users
+         WHERE LOWER(email)=$1 AND is_active=TRUE AND deleted_at IS NULL
+           AND email_verified_at IS NOT NULL
+         LIMIT 1 FOR UPDATE`,
+        [email],
+      );
+      if (!user.rowCount) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const row = user.rows[0];
+      await client.query(
+        `UPDATE password_recovery_requests SET state='cancelled',updated_at=NOW()
+         WHERE user_id=$1 AND state IN ${ACTIVE_STATES}`,
+        [row.id],
+      );
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const requestId = opaque('prr');
+      await client.query(
+        `INSERT INTO password_recovery_requests
+         (id,user_id,company_id,method,state,authorization_hash,expires_at,
+          requested_ip,requested_user_agent,authorized_at)
+         VALUES($1,$2,$3,'email_link','authorized',$4,NOW()+($5||' minutes')::interval,$6,$7,NOW())`,
+        [requestId, row.id, row.company_id, digest(resetToken), RESET_WINDOW_MINUTES,
+          params.context?.ip || null, params.context?.userAgent || null],
+      );
+      await this.securityEvent(client, row.id, row.company_id, requestId,
+        'EMAIL_RECOVERY_LINK_ISSUED', row.id, params.context, { method: 'email_link' });
+      await client.query('COMMIT');
+      return { resetToken, userName: row.name, email: row.email, companyId: row.company_id };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   static async createInitialClaim(

@@ -46,9 +46,8 @@ function readHidden(prompt: string): Promise<string> {
 }
 
 function validatePassword(password: string): void {
-  if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) ||
-      !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-    throw new Error('Parola en az 12 karakter; büyük/küçük harf, rakam ve sembol içermelidir.');
+  if (password.length < 10 || !/\p{L}/u.test(password) || !/\d/.test(password)) {
+    throw new Error('Parola en az 10 karakter olmalı ve harf ile rakam içermelidir.');
   }
 }
 

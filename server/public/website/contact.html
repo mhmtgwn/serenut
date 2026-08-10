@@ -8,7 +8,7 @@
   <meta name="description" content="Serenut OS satış ve ürün mimarisi için iletişim sayfası.">
   <link rel="canonical" href="https://serenut.com/contact">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/website.css?v=20260729-brand-lockup1">
+  <link rel="stylesheet" href="css/website.css?v=20260809-thin-phone4">
 </head>
 <body>
   <header class="site-header" id="site-header">
@@ -47,10 +47,17 @@
 
     <section class="section">
       <div class="container contact-grid">
-        <article class="feature-card">
+        <article class="feature-card contact-details-card">
           <div class="eyebrow">Doğrudan iletişim</div>
-          <h3>Ön destek ve iletişim</h3>
-          <p>Bu formdan gelen kayıtlar doğrulanmamış başvuru olarak işlenir. Kayıtlı müşteriler daha hızlı destek için paneldeki Destek Merkezi'ni kullanmalıdır.</p>
+          <h3>Bize dilediğiniz kanaldan ulaşın</h3>
+          <p>Satış, kurulum ve destek taleplerinizi formdan ya da aşağıdaki kanallardan iletebilirsiniz.</p>
+          <div class="contact-methods">
+            <a href="mailto:destek@serenut.com"><span>E-posta</span><strong>destek@serenut.com</strong></a>
+            <a href="tel:+905380288202"><span>Telefon</span><strong>0538 028 82 02</strong></a>
+            <a class="contact-whatsapp" href="https://wa.me/905380288202?text=Merhaba%2C%20Serenut%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener noreferrer"><span>WhatsApp hızlı destek</span><strong>WhatsApp'tan yazın →</strong></a>
+          </div>
+          <div class="contact-address"><span>Adres</span><strong>Mustafa Güven Caddesi No: 6</strong><p>Ormanlı Merkez, Karadeniz Ereğli / Zonguldak</p></div>
+          <div class="response-note"><strong>Yanıt süresi</strong><p>Mesajlar iş günlerinde sırayla değerlendirilir; genellikle bir iş günü içinde dönüş yapılır.</p></div>
         </article>
         <form class="feature-card contact-form" id="contact-form">
           <label>Ad Soyad<input id="contact-name" required autocomplete="name"></label>
@@ -61,6 +68,7 @@
           <label>Kategori<select id="contact-category" required><option value="sales">Satış ve kurulum</option><option value="account">Hesap ve giriş</option><option value="technical">Teknik sorun</option><option value="license">Lisans</option><option value="billing">Ödeme</option><option value="other">Diğer</option></select></label>
           <label class="full">Konu<input id="contact-subject" required maxlength="500"></label>
           <label class="full">Mesaj<textarea id="contact-message" rows="5" required></textarea></label>
+          <label class="full consent-check"><input id="contact-privacy-consent" type="checkbox" required><span><a href="/kvkk" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</a>'ni okudum. İletişim talebimin yanıtlanması amacıyla bilgilerimin işlenmesini kabul ediyorum.</span></label>
           <div class="form-status full" id="contact-status" role="status" aria-live="polite"></div>
           <button class="btn btn-primary full" type="submit">Mesajı Gönder</button>
         </form>
@@ -80,7 +88,7 @@
     </section>
   </main>
 
-  <script src="js/website.js?v=20260729-auth-routes1"></script>
+  <script src="js/website.js?v=20260809-thin-phone4"></script>
 </body>
 </html>
 

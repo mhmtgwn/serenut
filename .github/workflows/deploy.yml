@@ -85,6 +85,7 @@ jobs:
           test/services/weighed_product_flow_test.dart
           test/services/connection_manager_test.dart
           test/services/portal_repository_test.dart
+
       - name: Configure Android signing
         id: android-signing
         if: github.event_name != 'pull_request'
@@ -135,6 +136,24 @@ jobs:
         with:
           name: serenut-os-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+  flutter-full-test:
+    name: Flutter full suite (shard ${{ matrix.shard }})
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Run complete Flutter test shard
+        run: flutter test --concurrency=4 --total-shards=4 --shard-index=${{ matrix.shard }}
 
   windows-ci:
     if: github.event_name != 'pull_request'
@@ -217,7 +236,7 @@ jobs:
     # Backend changes are independently verified and deployed by
     # sync-hotfix.yml. Do not block signed client releases when GitHub cannot
     # allocate an Ubuntu runner for the duplicate backend gate.
-    needs: [flutter-ci, windows-ci]
+    needs: [backend-ci, flutter-ci, flutter-full-test, windows-ci]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production
@@ -267,7 +286,7 @@ jobs:
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'
 
   deploy-staging:
-    needs: [flutter-ci, windows-ci]
+    needs: [backend-ci, flutter-ci, flutter-full-test, windows-ci]
     if: github.ref == 'refs/heads/staging' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: staging

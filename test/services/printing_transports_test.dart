@@ -1,10 +1,34 @@
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/infrastructure/printing/printing_transports.dart';
 
 void main() {
+  test('tcp transport sends rendered bytes to the configured endpoint',
+      () async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final received = <int>[];
+    final receivedDone = server.first.then((socket) async {
+      await for (final chunk in socket) {
+        received.addAll(chunk);
+      }
+    });
+    final bytes = Uint8List.fromList([27, 64, 10, 29, 86]);
+
+    final observation = await TcpPrintTransport().send(
+      bytes: bytes,
+      copies: 1,
+      configuration: {'host': '127.0.0.1', 'port': server.port},
+    );
+    await receivedDone;
+    await server.close();
+
+    expect(received, bytes);
+    expect(observation.details['bytesAccepted'], bytes.length);
+  });
+
   test('spooler sends the exact rendered bytes for every requested copy',
       () async {
     final received = <List<int>>[];
@@ -45,6 +69,51 @@ void main() {
         isTrue,
       )),
     );
+  });
+
+  test('bluetooth connects once and writes every requested copy', () async {
+    var connections = 0;
+    final writes = <List<int>>[];
+    final transport = BluetoothPrintTransport(
+      connect: (address) async {
+        expect(address, 'AA:BB:CC');
+        connections++;
+        return true;
+      },
+      rawPrint: (bytes) async {
+        writes.add(List<int>.from(bytes));
+        return true;
+      },
+    );
+    final bytes = Uint8List.fromList([1, 2, 3]);
+
+    await transport.send(
+      bytes: bytes,
+      copies: 2,
+      configuration: const {'address': 'AA:BB:CC'},
+    );
+
+    expect(connections, 1);
+    expect(writes, [bytes, bytes]);
+  });
+
+  test('embedded transport writes raw bytes for every copy', () async {
+    final writes = <List<int>>[];
+    final transport = EmbeddedPrintTransport(
+      rawPrint: (bytes) async {
+        writes.add(List<int>.from(bytes));
+        return true;
+      },
+    );
+    final bytes = Uint8List.fromList([27, 64, 10]);
+
+    await transport.send(
+      bytes: bytes,
+      copies: 2,
+      configuration: const {},
+    );
+
+    expect(writes, [bytes, bytes]);
   });
 
   test('cloud relay preserves target, rendered bytes and local idempotency key',

@@ -13,3 +13,12 @@
   - Görünen ve İndirilen Dosya Adı: `SerenutOS-v1.2.3.exe` / `SerenutOS-v1.2.3.apk` (veya ihtiyaç halinde dahili build numarası gerekirse nokta kullanılarak `SerenutOS-v1.2.3.65.exe`).
   - Arka Plan / Sistem: `pubspec.yaml` içerisindeki `+65` yapısı sadece Flutter ve Android `versionCode` derlemesi için dahili olarak kullanılır; yayınlama betikleri (publish script) ve indirme controller'ları bunu otomatik temizleyip semantik formata (`v1.2.3` / `1.2.3`) çevirir.
 
+### 3. Güncelleme Yayınlama ve İmza Standardı
+* Her istemci güncellemesinde `docs/release-update-runbook.md` zorunlu kontrol listesidir.
+* Desteklenen tek production yayınlayıcı `server/src/scripts/publish-release.ts`
+  (`dist/scripts/publish-release.js`) ve bunu çağıran
+  `server/scripts/deploy_production_ci.sh` akışıdır.
+* `scripts/publish_v*.py`, elle SQL ve dosya baytlarını doğrudan imzalayan
+  OpenSSL komutları yeni sürüm yayınlamak için kullanılamaz.
+* OTA RSA-SHA256 imza girdisi, artefaktın kendisi değil küçük harfli 64
+  karakter SHA-256 değerinin UTF-8 metnidir.
