@@ -67,7 +67,11 @@ node -e '
   if (response.latestVersion !== expectedVersion) throw new Error("published version mismatch");
   if (!/^[a-f0-9]{64}$/.test(response.sha256_hash || "")) throw new Error("missing/invalid SHA-256");
   if (typeof response.signature !== "string" || response.signature.length < 100) throw new Error("missing release signature");
-  if (!Number.isInteger(response.file_size_bytes) || response.file_size_bytes <= 0) throw new Error("invalid file size");
+  // PostgreSQL BIGINT values are intentionally returned by node-postgres as
+  // strings to avoid precision loss. Release artifacts are well below JS's
+  // safe integer limit, so normalize the API value before validating it.
+  const fileSizeBytes = Number(response.file_size_bytes);
+  if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes <= 0) throw new Error("invalid file size");
 ' "$metadata" "$1"
 rm -f "$PUBLISH_LOCK"
 trap - EXIT HUP INT TERM
