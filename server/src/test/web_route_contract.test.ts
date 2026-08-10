@@ -78,6 +78,9 @@ async function run() {
     assert.match(runtime, new RegExp(`'${loader}': async`), `${loader} loader must be registered`);
   }
   const adminController = fs.readFileSync(path.join(projectRoot, 'src/modules/admin/admin.controller.ts'), 'utf8');
+  const supportController = fs.readFileSync(path.join(projectRoot, 'src/modules/support/support.controller.ts'), 'utf8');
+  const portalController = fs.readFileSync(path.join(projectRoot, 'src/modules/portal/portal.controller.ts'), 'utf8');
+  const mailController = fs.readFileSync(path.join(projectRoot, 'src/modules/mail/mail.controller.ts'), 'utf8');
   const billingController = fs.readFileSync(path.join(projectRoot, 'src/modules/billing/billing.controller.ts'), 'utf8');
   const billingDomain = fs.readFileSync(path.join(projectRoot, 'src/modules/billing/billing-domain.service.ts'), 'utf8');
   const releaseController = fs.readFileSync(path.join(projectRoot, 'src/modules/release/release.controller.ts'), 'utf8');
@@ -97,6 +100,22 @@ async function run() {
   assert.match(adminController, /\/companies\/:id\/manual-subscription/, 'sysadmin must be able to grant an audited subscription without a payment event');
   assert.match(runtime, /id="package-plan" required/, 'company package editor must expose its base plan selection');
   assert.match(runtime, /id="manual-subscription-form"/, 'company detail must distinguish manual activation from a payment-backed offer');
+  assert.match(portalController, /runWithRoleCatalogAccess/, 'tenant role lists must use their restricted catalog helper');
+  assert.match(portalController, /r\.company_id IS NULL OR r\.company_id = \$1/, 'tenant role lists must explicitly constrain global and company roles');
+  assert.match(portalController, /const list = await runWithRoleCatalogAccess\([\s\S]*FROM users u/, 'tenant user lists must resolve global role names');
+  assert.match(portalController, /Şube oluşturma yetkiniz yok/, 'branch creation must enforce management authorization');
+  assert.doesNotMatch(supportController, /createInboundEmailRequest\(/, 'inbound email must not automatically create a support request');
+  assert.match(mailController, /route-to-support/, 'mailbox must expose explicit support routing');
+  assert.match(mailController, /router\.delete\('\/:id'/, 'mailbox must expose recoverable delete');
+  assert.match(supportController, /guest-requests\/:id\/status/, 'guest support requests must expose workflow actions');
+  assert.match(runtime, /Desteğe Yönlendir/, 'mail UI must make support routing explicit');
+  assert.match(runtime, /Çöp Kutusu/, 'mail UI must expose its trash folder');
+  assert.match(runtime, /id="mail-restore"/, 'mail UI must allow restoring deleted messages');
+  assert.match(runtime, /showGuestRequest\(routed\.request\.id,'platform-mail'\)/, 'support routing must return to the mailbox');
+  assert.match(runtime, /id="guest-email-reply"/, 'guest support replies must use the internal mail composer');
+  assert.doesNotMatch(runtime, /href="#account-settings"/, 'sysadmin security must not link to a hidden company-scoped module');
+  assert.match(runtime, /manual-subscription-form'[\s\S]*catch\(x\)\{notice\(x\.message\);b\.disabled=false\}\}\);/, 'company detail actions must be bound inside the detail click handler');
+  assert.match(runtime, /Ön Destek Başvuruları/, 'support UI must distinguish pre-support intake from the mailbox');
   assert.match(adminController, /SUNUCUYU TEMIZLE/, 'maintenance cleanup must require an explicit confirmation phrase');
 
   const appSource = fs.readFileSync(path.join(projectRoot, 'public/app/js/app.js'), 'utf8');
@@ -104,6 +123,7 @@ async function run() {
   assert.doesNotMatch(appSource, /module:\s*isSysadmin\s*\?/, 'frontend must preserve backend module kinds');
   assert.match(appSource, /item\.module === 'home'/, 'home must be a first-class shell view');
   assert.match(appSource, /landing_module_id/, 'frontend must use the canonical landing module id');
+  assert.match(appSource, /addEventListener\('hashchange'/, 'browser back and forward navigation must update the active module');
   assert.doesNotMatch(appSource, /M5 5h14v14H5z/, 'navigation must not regress to square placeholder icons');
   assert.match(appSource, /const iconPaths = \{/, 'navigation must provide module-specific icons');
   assert.match(themeSource, /\.sidebar-brand:before\s*\{[^}]*content:none!important[^}]*display:none!important/s, 'the sidebar wordmark must not render a second pseudo-element logo');
@@ -129,6 +149,11 @@ async function run() {
   const sysadminNav = filterNavByEntitlements(['sysadmin'], []);
   assert.ok(sysadminNav.some((item) => item.id === 'platform-overview' && item.module === 'admin'));
   assert.ok(sysadminNav.some((item) => item.id === 'platform-maintenance' && item.module === 'admin'));
+  assert.ok(sysadminNav.some((item) => item.id === 'platform-support' && item.section === 'communication'));
+  assert.ok(sysadminNav.some((item) => item.id === 'platform-mail' && item.section === 'communication'));
+  assert.ok(!sysadminNav.some((item) => item.id === 'account-settings'), 'company-scoped account settings must not be shown to sysadmin');
+  const ownerNavigation = filterNavByEntitlements(['owner'], ['billing:view']);
+  assert.ok(ownerNavigation.some((item) => item.id === 'support-center' && item.section === 'communication'), 'customer support must be grouped under communication');
   for (const id of ['platform-subscriptions', 'platform-licenses', 'platform-devices']) {
     assert.ok(sysadminNav.some((item) => item.id === id && item.module === 'admin'), `${id} must be visible to sysadmin`);
   }

@@ -1,7 +1,6 @@
 // lib/presentation/pages/onboarding/steps/step2_admin_account.dart
 // Adım 2 — Admin Hesabı
 // Ad Soyad, Kullanıcı Adı, PIN (4 veya 6 hane), PIN tekrar, opsiyonel şifre
-// Parmak izi: "Yakında" info kartı (çalışmayan toggle değil)
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -309,16 +308,6 @@ class _Step2AdminAccountState extends State<Step2AdminAccount> {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
-
-                      // Parmak izi: Yakında kartı
-                      const _ComingSoonCard(
-                        icon: Icons.fingerprint_rounded,
-                        title: 'Parmak İzi ile Giriş',
-                        message:
-                            'Bu özellik yakında kullanılabilir olacak. Etkinleştirildiğinde PIN yerine parmak izi ile hızlıca giriş yapabileceksiniz.',
-                      ),
-
                       const SizedBox(height: 28),
                     ],
                   ),
@@ -370,83 +359,6 @@ class _PinLengthChip extends StatelessWidget {
             color: selected ? Colors.white : POSColors.text,
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// "Yakında" bilgi kartı
-// ─────────────────────────────────────────────────────────────────────────────
-class _ComingSoonCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-
-  const _ComingSoonCard({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: POSColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: POSColors.border,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 22, color: POSColors.textSecondary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: POSColors.text)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: POSColors.amberLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('Yakında',
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: POSColors.amberDark)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(message,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: POSColors.textSecondary,
-                        height: 1.4)),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

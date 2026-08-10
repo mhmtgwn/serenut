@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/hardware/hardware_device.dart';
@@ -10,6 +11,7 @@ import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.d
 import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
+import 'dart:convert';
 
 class HardwareTestPage extends ConsumerWidget {
   const HardwareTestPage({super.key});
@@ -21,6 +23,11 @@ class HardwareTestPage extends ConsumerWidget {
       title: 'Aygıt Yöneticisi',
       useScrollView: false,
       actions: [
+        IconButton(
+          tooltip: 'Bağlantıları yenile',
+          onPressed: () => _refreshDevices(context, ref),
+          icon: const Icon(Icons.refresh_rounded),
+        ),
         IconButton(
           tooltip: 'Ortak yazıcılar',
           onPressed: () => _openSharedPrinters(context, ref),
@@ -42,8 +49,7 @@ class HardwareTestPage extends ConsumerWidget {
           devices: items,
           onAdd: () => _openEditor(context, ref),
           onEdit: (device) => _openEditor(context, ref, device: device),
-          onActivate: (device) =>
-              ref.read(hardwareDevicesProvider.notifier).activate(device),
+          onActivate: (device) => _activateDevice(context, ref, device),
           onTest: (device) => _testDevice(context, ref, device),
           onDelete: (device) => _deleteDevice(context, ref, device),
         ),
@@ -131,6 +137,23 @@ class HardwareTestPage extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(error.toString()),
+        backgroundColor: kPink,
+      ));
+    }
+  }
+
+  Future<void> _refreshDevices(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(hardwareDevicesProvider.notifier).refreshConnections();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Cihaz bağlantıları yenilendi.'),
+        backgroundColor: kGreen,
+      ));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Bağlantılar yenilenemedi: $error'),
         backgroundColor: kPink,
       ));
     }
@@ -233,11 +256,47 @@ class HardwareTestPage extends ConsumerWidget {
       ),
     );
     if (approved != true) return;
-    await ref.read(hardwareDevicesProvider.notifier).remove(device);
+    try {
+      await ref.read(hardwareDevicesProvider.notifier).remove(device);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${device.name} kaldırıldı.'),
+        backgroundColor: kGreen,
+      ));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Cihaz kaldırılamadı: $error'),
+        backgroundColor: kPink,
+      ));
+    }
+  }
+
+  Future<void> _activateDevice(
+    BuildContext context,
+    WidgetRef ref,
+    HardwareDevice device,
+  ) async {
+    try {
+      await ref.read(hardwareDevicesProvider.notifier).activate(device);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${device.name} aktif cihaz oldu.'),
+        backgroundColor: kGreen,
+      ));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Cihaz aktifleştirilemedi: $error'),
+        backgroundColor: kPink,
+      ));
+    }
   }
 }
 
-class _DeviceList extends StatelessWidget {
+enum _DeviceFilter { all, printers, salesHardware }
+
+class _DeviceList extends StatefulWidget {
   final List<HardwareDevice> devices;
   final VoidCallback onAdd;
   final ValueChanged<HardwareDevice> onEdit;
@@ -255,7 +314,15 @@ class _DeviceList extends StatelessWidget {
   });
 
   @override
+  State<_DeviceList> createState() => _DeviceListState();
+}
+
+class _DeviceListState extends State<_DeviceList> {
+  _DeviceFilter _filter = _DeviceFilter.all;
+
+  @override
   Widget build(BuildContext context) {
+    final devices = widget.devices;
     final ready = devices
         .where((device) => device.status == HardwareDeviceStatus.ready)
         .length;
@@ -264,6 +331,17 @@ class _DeviceList extends StatelessWidget {
             device.status == HardwareDeviceStatus.error ||
             device.status == HardwareDeviceStatus.offline)
         .length;
+    final visible = devices.where((device) {
+      return switch (_filter) {
+        _DeviceFilter.all => true,
+        _DeviceFilter.printers =>
+          device.type == HardwareDeviceType.receiptPrinter ||
+              device.type == HardwareDeviceType.labelPrinter,
+        _DeviceFilter.salesHardware =>
+          device.type != HardwareDeviceType.receiptPrinter &&
+              device.type != HardwareDeviceType.labelPrinter,
+      };
+    }).toList(growable: false);
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
@@ -271,13 +349,52 @@ class _DeviceList extends StatelessWidget {
             total: devices.length,
             ready: ready,
             attention: attention,
-            onAdd: onAdd,
+            onAdd: widget.onAdd,
           ),
         ),
+        if (devices.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: Text('Tümü (${devices.length})'),
+                    selected: _filter == _DeviceFilter.all,
+                    onSelected: (_) =>
+                        setState(() => _filter = _DeviceFilter.all),
+                  ),
+                  ChoiceChip(
+                    label: Text(
+                      'Yazıcılar (${devices.where((device) => device.type == HardwareDeviceType.receiptPrinter || device.type == HardwareDeviceType.labelPrinter).length})',
+                    ),
+                    selected: _filter == _DeviceFilter.printers,
+                    onSelected: (_) =>
+                        setState(() => _filter = _DeviceFilter.printers),
+                  ),
+                  ChoiceChip(
+                    label: Text(
+                      'Satış donanımı (${devices.where((device) => device.type != HardwareDeviceType.receiptPrinter && device.type != HardwareDeviceType.labelPrinter).length})',
+                    ),
+                    selected: _filter == _DeviceFilter.salesHardware,
+                    onSelected: (_) =>
+                        setState(() => _filter = _DeviceFilter.salesHardware),
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (devices.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: _EmptyDevices(onAdd: onAdd),
+            child: _EmptyDevices(onAdd: widget.onAdd),
+          )
+        else if (visible.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: Text('Bu grupta kayıtlı cihaz yok.')),
           )
         else
           SliverPadding(
@@ -294,16 +411,16 @@ class _DeviceList extends StatelessWidget {
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final device = devices[index];
+                      final device = visible[index];
                       return _DeviceCard(
                         device: device,
-                        onEdit: () => onEdit(device),
-                        onActivate: () => onActivate(device),
-                        onTest: () => onTest(device),
-                        onDelete: () => onDelete(device),
+                        onEdit: () => widget.onEdit(device),
+                        onActivate: () => widget.onActivate(device),
+                        onTest: () => widget.onTest(device),
+                        onDelete: () => widget.onDelete(device),
                       );
                     },
-                    childCount: devices.length,
+                    childCount: visible.length,
                   ),
                 );
               },
@@ -356,7 +473,7 @@ class _HardwareHero extends StatelessWidget {
                         fontWeight: FontWeight.w800)),
                 SizedBox(height: 6),
                 Text(
-                  'Yazıcı, terazi, POS ve okuyucuları tek yerden yönetin.',
+                  'Yazıcı, terazi ve POS bağlantılarını tek yerden yönetin.',
                   style: TextStyle(color: Color(0xFFCDE5DD), height: 1.35),
                 ),
               ],
@@ -444,7 +561,11 @@ class _DeviceCard extends StatelessWidget {
             ?.map((value) => value.toString())
             .toList(growable: false) ??
         const <String>[];
-    final isActivePrinter = activeFor.isNotEmpty;
+    final isPrinter = device.type == HardwareDeviceType.receiptPrinter ||
+        device.type == HardwareDeviceType.labelPrinter;
+    final isActive = isPrinter
+        ? activeFor.isNotEmpty
+        : device.configuration['isActive'] as bool? ?? true;
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
@@ -452,8 +573,8 @@ class _DeviceCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: isActivePrinter ? kGreen : kBorderColor,
-          width: isActivePrinter ? 2 : 1,
+          color: isActive ? kGreen : kBorderColor,
+          width: isActive ? 2 : 1,
         ),
       ),
       child: InkWell(
@@ -477,7 +598,7 @@ class _DeviceCard extends StatelessWidget {
                         color: _typeColor(device.type)),
                   ),
                   const Spacer(),
-                  if (isActivePrinter) ...[
+                  if (isActive) ...[
                     const _StatusBadge(label: 'Aktif', color: kGreen),
                     const SizedBox(width: 6),
                   ],
@@ -490,7 +611,7 @@ class _DeviceCard extends StatelessWidget {
                       if (value == 'delete') onDelete();
                     },
                     itemBuilder: (_) => [
-                      if (!isActivePrinter)
+                      if (!isActive)
                         const PopupMenuItem(
                             value: 'activate', child: Text('Aktif cihaz yap')),
                       const PopupMenuItem(
@@ -527,7 +648,7 @@ class _DeviceCard extends StatelessWidget {
                   color: kTextPrimary,
                 ),
               ),
-              if (isActivePrinter) ...[
+              if (isPrinter && isActive) ...[
                 const SizedBox(height: 4),
                 Text(
                   _activeRouteLabel(activeFor),
@@ -643,11 +764,14 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   List<DiscoveredPrinter> _discoveredPrinters = const [];
   List<String> _serialPorts = const [];
   String? _error;
+  HardwareTestResult? _draftTestResult;
+  String? _verifiedFingerprint;
 
   @override
   void initState() {
     super.initState();
     final device = widget.device;
+    if (device != null) _step = 2;
     _type = device?.type ?? HardwareDeviceType.receiptPrinter;
     _connection = device?.connectionType ?? _connectionsFor(_type).first;
     final config = device?.configuration ?? const <String, Object?>{};
@@ -841,15 +965,24 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                     _InlineError(message: _error!),
                   ],
                   const SizedBox(height: 22),
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      if (_step > 0)
+                      if (_step > (editing ? 1 : 0))
                         TextButton(
                           onPressed:
                               _working ? null : () => setState(() => _step--),
                           child: const Text('Geri'),
                         ),
-                      const Spacer(),
+                      if (_step == 2)
+                        OutlinedButton.icon(
+                          onPressed: _working ? null : _testDraft,
+                          icon: const Icon(Icons.cable_rounded, size: 18),
+                          label: const Text('Bağlantıyı kontrol et'),
+                        ),
                       FilledButton(
                         onPressed: _working ? null : _continue,
                         child: _working
@@ -862,7 +995,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                                 ? 'Devam et'
                                 : editing
                                     ? 'Ayarları kaydet'
-                                    : 'Test et ve ekle'),
+                                    : 'Cihazı kaydet'),
                       ),
                     ],
                   ),
@@ -892,7 +1025,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           return Wrap(
             spacing: 12,
             runSpacing: 12,
-            children: HardwareDeviceType.values.map((type) {
+            children: _managedDeviceTypes.map((type) {
               final selected = type == _type;
               return SizedBox(
                 width: width,
@@ -1397,6 +1530,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       setState(() => _step++);
       return;
     }
+    await _saveDevice();
+  }
+
+  Future<void> _testDraft() async {
     final validation = _validate();
     if (validation != null) {
       setState(() => _error = validation);
@@ -1407,37 +1544,91 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     final result =
         await ref.read(hardwareDevicesProvider.notifier).verify(device);
     if (!mounted) return;
-    if (!result.success) {
-      setState(() {
-        _working = false;
-        _error = '${result.message}\n${result.technicalDetail ?? ''}'.trim();
-      });
+    setState(() {
+      _working = false;
+      _draftTestResult = result;
+      _verifiedFingerprint = result.success ? _fingerprint(device) : null;
+      _error = result.success
+          ? null
+          : '${result.message}\n${result.technicalDetail ?? ''}'.trim();
+    });
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(result.message),
+        backgroundColor: kGreen,
+      ));
+    }
+  }
+
+  Future<void> _saveDevice() async {
+    final validation = _validate();
+    if (validation != null) {
+      setState(() => _error = validation);
       return;
     }
-    await ref.read(hardwareDevicesProvider.notifier).save(device.copyWith(
-          status: HardwareDeviceStatus.ready,
-          lastTestedAt: result.completedAt,
-          lastMessage: result.message,
+    setState(() => _working = true);
+    try {
+      var device = _buildDevice().copyWith(
+        status: HardwareDeviceStatus.unverified,
+        lastMessage: 'Ayarlar kaydedildi; bağlantı doğrulaması bekleniyor.',
+        clearLastError: true,
+      );
+      final result = _draftTestResult;
+      if (result?.success == true &&
+          _verifiedFingerprint == _fingerprint(device)) {
+        final isPrinter = device.type == HardwareDeviceType.receiptPrinter ||
+            device.type == HardwareDeviceType.labelPrinter;
+        device = device.copyWith(
+          status: isPrinter
+              ? HardwareDeviceStatus.unverified
+              : HardwareDeviceStatus.ready,
+          lastTestedAt: result!.completedAt,
+          lastMessage: isPrinter
+              ? '${result.message}. Fiziksel çıktı testi bekleniyor.'
+              : result.message,
           clearLastError: true,
-        ));
-    if (mounted) Navigator.pop(context, true);
+        );
+      }
+      await ref.read(hardwareDevicesProvider.notifier).save(device);
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _error = 'Cihaz ayarları kaydedilemedi: $error';
+      });
+    }
   }
+
+  String _fingerprint(HardwareDevice device) => jsonEncode({
+        'name': device.name,
+        'type': device.type.name,
+        'connection': device.connectionType.name,
+        'configuration': device.configuration,
+      });
 
   Future<void> _discoverBluetooth() async {
     setState(() {
       _discoveringBluetooth = true;
       _error = null;
     });
-    final devices = await NativePrinterBridge.scanBluetoothDevices();
-    if (!mounted) return;
-    setState(() {
-      _discoveringBluetooth = false;
-      _bluetoothDevices = devices;
-      if (devices.isEmpty) {
-        _error =
-            'Cihaz bulunamadı. Bluetooth ve yakın cihaz izinlerini verip tekrar tarayın.';
+    try {
+      final devices = await NativePrinterBridge.scanBluetoothDevices();
+      if (!mounted) return;
+      setState(() {
+        _bluetoothDevices = devices;
+        if (devices.isEmpty) {
+          _error =
+              'Cihaz bulunamadı. Bluetooth ve yakın cihaz izinlerini verip tekrar tarayın.';
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = 'Bluetooth taraması başarısız: $error');
       }
-    });
+    } finally {
+      if (mounted) setState(() => _discoveringBluetooth = false);
+    }
   }
 
   Future<void> _discoverWindowsPrinters() async {
@@ -1445,25 +1636,32 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       _discoveringWindows = true;
       _error = null;
     });
-    final printers = await PrinterDiscoveryService().listWindowsPrinters();
-    if (!mounted) return;
-    setState(() {
-      _discoveringWindows = false;
-      _discoveredPrinters = [
-        ..._discoveredPrinters
-            .where((item) => item.kind != DiscoveredPrinterKind.windows),
-        ...printers,
-      ];
-      if (printers.isEmpty) {
-        _error = 'Windows yazıcısı bulunamadı. Yazıcı sürücüsünü ve Print '
-            'Spooler hizmetini kontrol edin.';
-      } else if (_printerName.text.isEmpty) {
-        final preferred =
-            printers.where((item) => item.isDefault).firstOrNull ??
-                printers.first;
-        _printerName.text = preferred.name;
+    try {
+      final printers = await PrinterDiscoveryService().listWindowsPrinters();
+      if (!mounted) return;
+      setState(() {
+        _discoveredPrinters = [
+          ..._discoveredPrinters
+              .where((item) => item.kind != DiscoveredPrinterKind.windows),
+          ...printers,
+        ];
+        if (printers.isEmpty) {
+          _error = 'Windows yazıcısı bulunamadı. Yazıcı sürücüsünü ve Print '
+              'Spooler hizmetini kontrol edin.';
+        } else if (_printerName.text.isEmpty) {
+          final preferred =
+              printers.where((item) => item.isDefault).firstOrNull ??
+                  printers.first;
+          _printerName.text = preferred.name;
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = 'Windows yazıcıları okunamadı: $error');
       }
-    });
+    } finally {
+      if (mounted) setState(() => _discoveringWindows = false);
+    }
   }
 
   Future<void> _discoverNetworkPrinters() async {
@@ -1812,7 +2010,7 @@ class _EmptyDevices extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
           const Text(
-            'Yazıcı, terazi, POS veya barkod okuyucunuzu ekleyin.',
+            'Yazıcı, terazi veya POS bağlantınızı ekleyin. USB barkod okuyucular ve kamera ayrıca ayar gerektirmez.',
             textAlign: TextAlign.center,
             style: TextStyle(color: kTextSecondary),
           ),
@@ -1884,8 +2082,8 @@ class _LoadError extends StatelessWidget {
   return switch (status) {
     HardwareDeviceStatus.unverified => ('Doğrulanmadı', kTextSecondary),
     HardwareDeviceStatus.testing => ('Test ediliyor', kBlue),
-    HardwareDeviceStatus.ready => ('Hazır', kGreen),
-    HardwareDeviceStatus.offline => ('Çevrimdışı', kOrange),
+    HardwareDeviceStatus.ready => ('Test başarılı', kGreen),
+    HardwareDeviceStatus.offline => ('Son kontrolde çevrimdışı', kOrange),
     HardwareDeviceStatus.error => ('Hata', kPink),
     HardwareDeviceStatus.disabled => ('Pasif', kTextSecondary),
   };
@@ -1995,19 +2193,26 @@ String _connectionLabel(HardwareConnectionType connection) =>
     };
 
 List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {
+  final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+  final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   return switch (type) {
-    HardwareDeviceType.receiptPrinter => const [
-        HardwareConnectionType.windows,
-        HardwareConnectionType.tcp,
-        HardwareConnectionType.bluetooth,
-        HardwareConnectionType.embedded,
-      ],
-    HardwareDeviceType.labelPrinter => const [
-        HardwareConnectionType.windows,
-        HardwareConnectionType.tcp,
-        HardwareConnectionType.bluetooth,
-        HardwareConnectionType.embedded,
-      ],
+    HardwareDeviceType.receiptPrinter => isWindows
+        ? const [HardwareConnectionType.windows, HardwareConnectionType.tcp]
+        : isAndroid
+            ? const [
+                HardwareConnectionType.embedded,
+                HardwareConnectionType.bluetooth,
+                HardwareConnectionType.tcp,
+              ]
+            : const [HardwareConnectionType.tcp],
+    HardwareDeviceType.labelPrinter => isWindows
+        ? const [HardwareConnectionType.windows, HardwareConnectionType.tcp]
+        : isAndroid
+            ? const [
+                HardwareConnectionType.bluetooth,
+                HardwareConnectionType.tcp,
+              ]
+            : const [HardwareConnectionType.tcp],
     HardwareDeviceType.scale => const [
         HardwareConnectionType.serial,
         HardwareConnectionType.tcp,
@@ -2019,6 +2224,13 @@ List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {
       ],
   };
 }
+
+const _managedDeviceTypes = <HardwareDeviceType>[
+  HardwareDeviceType.receiptPrinter,
+  HardwareDeviceType.labelPrinter,
+  HardwareDeviceType.scale,
+  HardwareDeviceType.paymentTerminal,
+];
 
 int _defaultPort(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.receiptPrinter ||

@@ -412,15 +412,40 @@ export class SupportService {
   static async listGuestRequests(limit = 100): Promise<any[]> {
     const result = await pgPool.query(
       `SELECT id, reference_code, name, email, phone, company_name, customer_claim,
-              category, subject, status, matched_company_id, converted_ticket_id,
+              category, subject, message, status, intake_source, matched_company_id, converted_ticket_id,
               created_at, updated_at
        FROM guest_support_requests
+       WHERE status <> 'closed'
        ORDER BY CASE status WHEN 'unverified' THEN 1 WHEN 'under_review' THEN 2 ELSE 3 END,
                 created_at DESC
        LIMIT $1`,
       [Math.min(Math.max(limit, 1), 100)]
     );
     return result.rows;
+  }
+
+  static async updateGuestRequestStatus(id: string, status: string): Promise<any> {
+    const result = await pgPool.query(
+      `UPDATE guest_support_requests
+          SET status = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, reference_code, status, updated_at`,
+      [id, status],
+    );
+    if (!result.rows.length) throw new Error('guest_request_not_found');
+    return result.rows[0];
+  }
+
+  static async getGuestRequest(id: string): Promise<any> {
+    const result = await pgPool.query(
+      `SELECT id, reference_code, name, email, phone, company_name, customer_claim,
+              category, subject, message, status, intake_source, matched_company_id,
+              converted_ticket_id, created_at, updated_at
+         FROM guest_support_requests WHERE id=$1`,
+      [id],
+    );
+    if (!result.rows.length) throw new Error('guest_request_not_found');
+    return result.rows[0];
   }
 
   /**

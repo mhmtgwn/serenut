@@ -724,9 +724,16 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ],
           onChanged: (val) async {
             if (val == '__new__') {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CatalogSettingsPage()),
-              );
+              final newCat = await _showNewCategorySheet();
+              if (newCat != null && newCat.isNotEmpty) {
+                final canonical = _canonicalName(newCat);
+                final vatText = _vatCtrl.text.trim();
+                final rate = vatText.isEmpty ? null : int.tryParse(vatText);
+                await _addNewCategoryToSettings(canonical, rate: rate);
+                setState(() {
+                  _selectedCategory = canonical;
+                });
+              }
             } else {
               setState(() {
                 _selectedCategory = val;
@@ -751,8 +758,48 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
+  static String _canonicalName(String value) {
+    return value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .map((part) =>
+            '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  Future<void> _addNewCategoryToSettings(String categoryName, {int? rate}) async {
+    try {
+      final settings = ref.read(settingsNotifierProvider).value;
+      if (settings != null) {
+        List<Map<String, dynamic>> vatList = [];
+        if (settings.vatCategories.isNotEmpty) {
+          final decoded = jsonDecode(settings.vatCategories);
+          if (decoded is List) {
+            vatList = decoded
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+        }
+
+        final index = vatList.indexWhere((e) =>
+            e['name']?.toString().toLowerCase().trim() ==
+            categoryName.toLowerCase());
+        if (index == -1) {
+          vatList.add({'name': categoryName, 'rate': rate});
+          await ref.read(settingsNotifierProvider.notifier).updateSettings(
+                settings.copyWith(vatCategories: jsonEncode(vatList)),
+              );
+        }
+      }
+    } catch (_) {}
+    ref.invalidate(productCategoriesProvider);
+    ref.invalidate(productCategoriesStateProvider);
+  }
+
   Future<String?> _showNewCategorySheet() async {
-    final ctrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final vatCtrl = TextEditingController();
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -765,48 +812,92 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: _kBorder,
-                borderRadius: BorderRadius.circular(2),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _kBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Yeni Kategori',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 16, color: _kText)),
-            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Yeni Kategori',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 17, color: _kText)),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, size: 20),
+                  tooltip: 'Tüm kategorileri yönet',
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const CatalogSettingsPage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             TextField(
-              controller: ctrl,
+              controller: nameCtrl,
               autofocus: true,
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
-                labelText: 'Kategori adı',
+                labelText: 'Kategori adı *',
+                hintText: 'Örn: İçecekler',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: _kGreen, width: 2)),
               ),
-              onSubmitted: (val) => Navigator.pop(ctx, val.trim()),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+            TextField(
+              controller: vatCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Varsayılan KDV (%) (İsteğe bağlı)',
+                hintText: 'Örn: 20',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _kGreen, width: 2)),
+              ),
+            ),
+            const SizedBox(height: 16),
             SizedBox(
               height: 48,
-              width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                onPressed: () {
+                  final catName = nameCtrl.text.trim();
+                  if (catName.isEmpty) return;
+                  final vatText = vatCtrl.text.trim();
+                  final rate = vatText.isEmpty ? null : int.tryParse(vatText);
+                  if (vatText.isNotEmpty && (rate == null || rate < 0 || rate > 100)) {
+                    return;
+                  }
+                  if (rate != null) {
+                    _vatCtrl.text = rate.toString();
+                  }
+                  Navigator.pop(ctx, catName);
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kGreen,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Ekle',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Kategori Ekle',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
           ],

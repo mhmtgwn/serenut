@@ -241,7 +241,10 @@ void main() {
       expect('Dorduncu Urun'.allMatches(output), hasLength(1));
       expect('Besinci Urun'.allMatches(output), hasLength(1));
       expect(output, isNot(contains('diger urun')));
-      expect(output, contains('GAP 0 mm,0 mm'));
+      // A single dynamically growing order label must still respect the
+      // configured physical media gap; "continuous" describes one print job,
+      // not gapless paper.
+      expect(output, contains('GAP ${settings.labelGapMm} mm,0 mm'));
       final size = RegExp(r'SIZE 50 mm,(\d+) mm').firstMatch(output);
       expect(size, isNotNull);
       expect(int.parse(size!.group(1)!), greaterThan(30));

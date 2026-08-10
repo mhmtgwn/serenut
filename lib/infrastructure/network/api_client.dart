@@ -44,12 +44,20 @@ class ApiClient {
   final http.Client _client;
   final EnvironmentConfig _config;
   String? _jwtToken;
+  bool _sessionInvalidated = false;
 
   // Callbacks for dynamic token refresh and session expiration
   Future<bool> Function()? onTokenExpired;
   void Function()? onSessionExpired;
   void Function(String dateHeader)? onDateHeaderReceived;
   Future<bool>? _refreshFuture;
+
+  void _invalidateSession() {
+    if (_sessionInvalidated) return;
+    _sessionInvalidated = true;
+    _jwtToken = null;
+    onSessionExpired?.call();
+  }
 
   // Custom mock handler function for testing/development
   ApiResponse Function(http.BaseRequest request)? mockHandler;
@@ -63,6 +71,7 @@ class ApiClient {
   /// Sets the authentication JWT token.
   void setJwtToken(String? token) {
     _jwtToken = token;
+    if (token != null && token.isNotEmpty) _sessionInvalidated = false;
   }
 
   /// Returns the current JWT token (read-only).
@@ -107,6 +116,21 @@ class ApiClient {
     Map<String, dynamic>? body,
     String? idempotencyKey,
   }) async {
+    const publicPaths = <String>{
+      '/auth/login',
+      '/auth/register',
+      '/auth/refresh',
+      '/api/v1/auth/login',
+      '/api/v1/auth/register',
+      '/api/v1/auth/refresh',
+      '/api/v1/billing/plans',
+      '/api/v1/billing/payment-methods',
+      '/api/v1/releases/history',
+      '/api/v1/updates/latest-metadata',
+    };
+    if (_sessionInvalidated && !publicPaths.contains(path)) {
+      throw const ApiException('Session expired', statusCode: 401);
+    }
     String? resolvedIdempotencyKey = idempotencyKey;
     if (resolvedIdempotencyKey == null &&
         (method == 'POST' || method == 'PUT' || method == 'DELETE')) {
@@ -187,6 +211,10 @@ class ApiClient {
               onDateHeaderReceived!(dateHeader);
             }
           } else {
+            if (retryResponse.statusCode == 401) {
+              _invalidateSession();
+              throw const ApiException('Session expired', statusCode: 401);
+            }
             throw ApiException(
               'HTTP Request failed with status code ${retryResponse.statusCode}',
               statusCode: retryResponse.statusCode,
@@ -195,11 +223,17 @@ class ApiClient {
           }
           return retryApiResponse;
         } else {
-          if (onSessionExpired != null) {
-            onSessionExpired!();
-          }
+          _invalidateSession();
           throw const ApiException('Session expired', statusCode: 401);
         }
+      }
+
+      // Background services can own a lightweight ApiClient without a token
+      // refresh callback. A rejected token must still stop that client's
+      // polling loop instead of sending the same invalid JWT indefinitely.
+      if (response.statusCode == 401 && !path.startsWith('/auth/')) {
+        _invalidateSession();
+        throw const ApiException('Session expired', statusCode: 401);
       }
 
       if (!apiResponse.isSuccess) {

@@ -1,5 +1,7 @@
 // test/services/api_client_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:serenutos/config/environment.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 
@@ -76,6 +78,30 @@ void main() {
         throwsA(
             isA<ApiException>().having((e) => e.statusCode, 'statusCode', 400)),
       );
+    });
+
+    test('invalidates a background client after the first unauthenticated 401',
+        () async {
+      var networkCalls = 0;
+      var expirationCallbacks = 0;
+      final client = ApiClient(
+        config: EnvironmentConfig.fromEnv(AppEnvironment.test),
+        httpClient: MockClient((_) async {
+          networkCalls += 1;
+          return http.Response('{"error":"unauthorized"}', 401);
+        }),
+      );
+      client.setJwtToken('expired-token');
+      client.onSessionExpired = () => expirationCallbacks += 1;
+
+      await expectLater(client.get('/api/v4/sync/hardware-jobs/claim'),
+          throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)));
+      await expectLater(client.get('/api/v4/sync/hardware-jobs/claim'),
+          throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 401)));
+
+      expect(networkCalls, 1);
+      expect(expirationCallbacks, 1);
+      expect(client.jwtToken, isNull);
     });
   });
 }

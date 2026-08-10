@@ -185,16 +185,21 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       await _backupRemoteProfile(state.requireValue);
       return;
     }
-    await _syncLegacy(device);
-    if (device.type != HardwareDeviceType.receiptPrinter &&
-        device.type != HardwareDeviceType.labelPrinter) {
-      for (final duplicate in (await _repository.getAll()).where(
-        (item) => item.type == device.type && item.id != device.id,
-      )) {
-        await _repository.delete(duplicate.id);
-      }
-    }
-    await _repository.save(device);
+    final existing = await _repository.getAll();
+    final previous = existing.where((item) => item.id == device.id).firstOrNull;
+    final siblings = existing
+        .where((item) => item.type == device.type && item.id != device.id)
+        .toList(growable: false);
+    final wasActive =
+        previous == null ? siblings.isEmpty : _isActiveNonPrinter(previous);
+    final saved = device.copyWith(
+      configuration: {
+        ...device.configuration,
+        'isActive': wasActive,
+      },
+    );
+    await _repository.save(saved);
+    if (wasActive) await _syncLegacy(saved);
     final current = await _repository.getAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
@@ -224,16 +229,16 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     final siblings = (await _repository.getAll())
         .where((item) => item.type == device.type && item.id != device.id)
         .toList(growable: false);
-    final settings = await _settings();
-    final removesActivePrinter =
-        (device.type == HardwareDeviceType.receiptPrinter &&
-                settings.activeReceiptPrinterId == device.id) ||
-            (device.type == HardwareDeviceType.labelPrinter &&
-                settings.activeLabelPrinterId == device.id);
-    if (removesActivePrinter && siblings.isNotEmpty) {
-      await _syncLegacy(siblings.first);
+    final wasActive = _isActiveNonPrinter(device);
+    if (wasActive && siblings.isNotEmpty) {
+      final replacement = siblings.first.copyWith(configuration: {
+        ...siblings.first.configuration,
+        'isActive': true,
+      });
+      await _repository.save(replacement);
+      await _syncLegacy(replacement);
     } else {
-      await _disableLegacy(device);
+      if (wasActive) await _disableLegacy(device);
     }
     await _repository.delete(device.id);
     final current = await _repository.getAll();
@@ -254,8 +259,21 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       await _backupRemoteProfile(current);
       return;
     }
-    await _syncLegacy(device);
-    await _repository.save(device.copyWith(enabled: true));
+    final devices = await _repository.getAll();
+    for (final sibling in devices.where(
+      (item) => item.type == device.type && item.id != device.id,
+    )) {
+      await _repository.save(sibling.copyWith(configuration: {
+        ...sibling.configuration,
+        'isActive': false,
+      }));
+    }
+    final active = device.copyWith(
+      enabled: true,
+      configuration: {...device.configuration, 'isActive': true},
+    );
+    await _syncLegacy(active);
+    await _repository.save(active);
     final current = await _repository.getAll();
     state = AsyncData(current);
     await _backupRemoteProfile(current);
@@ -359,6 +377,43 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         completedAt: DateTime.now(),
       );
     }
+  }
+
+  Future<void> refreshConnections() async {
+    final devices = await _loadAll();
+    for (final device in devices) {
+      if (device.type == HardwareDeviceType.barcodeScanner ||
+          device.connectionType == HardwareConnectionType.cloud) {
+        continue;
+      }
+      final result = await verify(device);
+      if (_isPrinter(device)) {
+        await _savePrinter(device.copyWith(
+          status: result.success
+              ? (device.status == HardwareDeviceStatus.ready
+                  ? HardwareDeviceStatus.ready
+                  : HardwareDeviceStatus.unverified)
+              : HardwareDeviceStatus.offline,
+          lastMessage: result.success
+              ? 'Bağlantı erişilebilir. Fiziksel çıktı doğrulaması korunuyor.'
+              : result.message,
+          lastError: result.technicalDetail,
+          clearLastError: result.success,
+        ));
+      } else {
+        await _repository.save(device.copyWith(
+          status: result.success
+              ? HardwareDeviceStatus.ready
+              : HardwareDeviceStatus.offline,
+          lastTestedAt: result.completedAt,
+          lastMessage: result.message,
+          lastError: result.technicalDetail,
+          clearLastError: result.success,
+        ));
+      }
+    }
+    state = AsyncData(await _loadAll());
+    await _backupRemoteProfile(state.requireValue);
   }
 
   Future<HardwareTestResult> test(
@@ -595,6 +650,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           posVendor: current.posVendor,
           posProtocol: current.posProtocol,
         ));
+        ref.invalidate(hardwareConfigProvider);
         return;
       case HardwareDeviceType.paymentTerminal:
         await saveHardwareConfig(HardwareConfig(
@@ -612,6 +668,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           posVendor: config['vendor'] as String? ?? 'generic',
           posProtocol: config['protocol'] as String? ?? 'vendor_sdk',
         ));
+        ref.invalidate(hardwareConfigProvider);
         return;
       case HardwareDeviceType.receiptPrinter:
         final settings = await _settings();
@@ -673,6 +730,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           posVendor: current.posVendor,
           posProtocol: current.posProtocol,
         ));
+        ref.invalidate(hardwareConfigProvider);
         return;
       case HardwareDeviceType.paymentTerminal:
         await saveHardwareConfig(HardwareConfig(
@@ -690,6 +748,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           posVendor: current.posVendor,
           posProtocol: current.posProtocol,
         ));
+        ref.invalidate(hardwareConfigProvider);
         return;
       case HardwareDeviceType.receiptPrinter:
         final settings = await _settings();
@@ -738,6 +797,9 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     });
     return [...printers, ...nonPrinters];
   }
+
+  bool _isActiveNonPrinter(HardwareDevice device) =>
+      device.configuration['isActive'] as bool? ?? true;
 
   Future<void> _savePrinter(
     HardwareDevice device, {

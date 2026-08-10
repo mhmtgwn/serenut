@@ -33,10 +33,13 @@ async function setClientContext(client: PoolClient) {
   if (store) {
     const companyId = store.companyId || '';
     const bypassRls = store.bypassRls ? 'true' : 'false';
-    await client.query(`SELECT set_config('app.current_company_id', $1, true), set_config('app.bypass_rls', $2, true)`, [companyId, bypassRls]);
+    // This setup query runs before the application query, outside an explicit
+    // transaction. Keep the values for the checked-out connection and clear
+    // them in resetClientContext() before returning it to the pool.
+    await client.query(`SELECT set_config('app.current_company_id', $1, false), set_config('app.bypass_rls', $2, false)`, [companyId, bypassRls]);
   } else {
     // Default fallback context
-    await client.query(`SELECT set_config('app.current_company_id', '', true), set_config('app.bypass_rls', 'false', true)`);
+    await client.query(`SELECT set_config('app.current_company_id', '', false), set_config('app.bypass_rls', 'false', false)`);
   }
 }
 

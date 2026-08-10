@@ -6,12 +6,13 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:isolate';
 import 'dart:convert';
-import 'dart:math' show min;
+import 'dart:math' show max, min;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:excel/excel.dart' as ex;
+import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
@@ -25,6 +26,18 @@ class ParsedCatalogData {
   ParsedCatalogData({required this.products, required this.images});
 }
 
+class _PreparedCatalogFile {
+  final Uint8List excelBytes;
+  final Set<String> imageBarcodes;
+  final Map<String, String> extractedImagePaths;
+
+  const _PreparedCatalogFile({
+    required this.excelBytes,
+    required this.imageBarcodes,
+    required this.extractedImagePaths,
+  });
+}
+
 /// Top-level helper function to execute ZIP decoding and Excel parsing in Isolate.
 /// Being top-level prevents the closure from capturing instance scope (like 'this' or 'onProgress').
 Future<ParsedCatalogData> _parseZipInSeparateIsolate(Uint8List bytes) {
@@ -32,6 +45,13 @@ Future<ParsedCatalogData> _parseZipInSeparateIsolate(Uint8List bytes) {
 }
 
 class DatasetImportService {
+  static const int _memoryArchiveLimit = 100 * 1024 * 1024;
+  static const int _nativeArchiveLimit = 8 * 1024 * 1024 * 1024;
+  static const int _nativeExpandedLimit = 16 * 1024 * 1024 * 1024;
+  static const int _singleImageLimit = 100 * 1024 * 1024;
+  static const int _excelLimit = 150 * 1024 * 1024;
+  static const int _fileCountLimit = 10000;
+
   final IProductRepository _productRepository;
 
   DatasetImportService(this._productRepository);
@@ -103,6 +123,40 @@ class DatasetImportService {
   static dynamic _cellAt(List<dynamic> row, int? index) =>
       index != null && index >= 0 && index < row.length ? row[index] : null;
 
+  static bool _isSupportedImageEntry(String name) {
+    final normalized = name.replaceAll('\\', '/').toLowerCase();
+    if (normalized.startsWith('__macosx/') || normalized.endsWith('/')) {
+      return false;
+    }
+    final extension = p.extension(normalized);
+    return const {'.jpg', '.jpeg', '.png', '.webp'}.contains(extension);
+  }
+
+  static Uint8List _optimizeCardImage(List<int> sourceBytes) {
+    final decoded = img.decodeImage(Uint8List.fromList(sourceBytes));
+    if (decoded == null) {
+      throw Exception('Görsel dosyası çözümlenemedi.');
+    }
+    final scale = min(320 / decoded.width, 320 / decoded.height);
+    final width = max(1, (decoded.width * min(1.0, scale)).round());
+    final height = max(1, (decoded.height * min(1.0, scale)).round());
+    final resized = img.copyResize(
+      decoded,
+      width: width,
+      height: height,
+      interpolation: img.Interpolation.average,
+    );
+    final canvas = img.Image(width: 320, height: 320, numChannels: 3);
+    img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+    img.compositeImage(
+      canvas,
+      resized,
+      dstX: (320 - resized.width) ~/ 2,
+      dstY: (320 - resized.height) ~/ 2,
+    );
+    return Uint8List.fromList(img.encodeJpg(canvas, quality: 70));
+  }
+
   /// CPU-heavy ZIP decoding and Excel parsing executed in a background Isolate.
   static ParsedCatalogData _parseZipInIsolate(Uint8List zipBytes) {
     // 1. Pre-decompression limit checks via ZipDirectory (Zip Bomb Mitigation)
@@ -155,7 +209,7 @@ class DatasetImportService {
       if (file.name.endsWith('.xlsx') && !file.name.startsWith('__MACOSX/')) {
         isRawExcel = false;
         excelFile = file;
-      } else if (file.name.startsWith('images/')) {
+      } else if (_isSupportedImageEntry(file.name)) {
         // Extract barcode from filename (e.g., 'images/8690504090106.jpg' -> '8690504090106')
         // DÜZELTME: Path traversal koruması — basename kullanılıyor ve '..' içeren isimler reddediliyor
         final rawName = file.name;
@@ -328,7 +382,7 @@ class DatasetImportService {
       if (file.name.endsWith('.xlsx') && !file.name.startsWith('__MACOSX/')) {
         isRawExcel = false;
         excelFile = file;
-      } else if (file.name.startsWith('images/')) {
+      } else if (_isSupportedImageEntry(file.name)) {
         final filename = p.basename(file.name);
         final dotIndex = filename.lastIndexOf('.');
         final barcode =
@@ -455,12 +509,201 @@ class DatasetImportService {
     Uint8List zipBytes,
     void Function(double progress, String status) onProgress,
   ) async {
-    if (zipBytes.length > 100 * 1024 * 1024) {
+    if (zipBytes.length > _memoryArchiveLimit) {
       throw Exception('Dosya boyutu sınırlandırılmıştır (Maks 100MB).');
     }
     return kIsWeb
         ? await _parseZipAsync(zipBytes, onProgress)
         : await _parseZipInSeparateIsolate(zipBytes);
+  }
+
+  /// Native file-path import avoids loading the complete ZIP and all images
+  /// into memory. The archive directory stays file-backed and image entries
+  /// are read and written one at a time.
+  Future<ParsedCatalogData> analyzeFile(
+    String filePath,
+    void Function(double progress, String status) onProgress,
+  ) async {
+    if (kIsWeb) {
+      throw UnsupportedError(
+          'Dosya yolu ile analiz web üzerinde desteklenmez.');
+    }
+    onProgress(0.04, 'Arşiv dizini okunuyor...');
+    final prepared = await _prepareNativeFile(filePath, extractImages: false);
+    final thinArchive = _excelOnlyArchive(prepared.excelBytes);
+    final parsed = await _parseZipInSeparateIsolate(thinArchive);
+    return ParsedCatalogData(
+      products: parsed.products,
+      // Preview only needs the count; no image bytes are retained in RAM.
+      images: {for (final barcode in prepared.imageBarcodes) barcode: const []},
+    );
+  }
+
+  Future<Map<String, int>> importFromFile(
+    String filePath,
+    void Function(double progress, String status) onProgress, [
+    ImportStrategy strategy = const ImportStrategy(),
+  ]) async {
+    if (kIsWeb) {
+      throw UnsupportedError(
+          'Dosya yolu ile aktarım web üzerinde desteklenmez.');
+    }
+    onProgress(0.03, 'Excel ve görseller hazırlanıyor...');
+    final prepared = await _prepareNativeFile(filePath, extractImages: true);
+    return importFromZip(
+      _excelOnlyArchive(prepared.excelBytes),
+      onProgress,
+      strategy,
+      prepared.extractedImagePaths,
+    );
+  }
+
+  static Uint8List _excelOnlyArchive(Uint8List excelBytes) {
+    final archive = Archive()
+      ..addFile(ArchiveFile(
+        'market_data_catalog.xlsx',
+        excelBytes.length,
+        excelBytes,
+      ));
+    return Uint8List.fromList(ZipEncoder().encode(archive)!);
+  }
+
+  static Future<_PreparedCatalogFile> _prepareNativeFile(
+    String filePath, {
+    required bool extractImages,
+  }) async {
+    String? imageRootPath;
+    if (extractImages) {
+      final docsDir = await getApplicationDocumentsDirectory();
+      imageRootPath = p.join(docsDir.path, 'product_images');
+    }
+    return Isolate.run(
+      () => _prepareNativeFileSync(filePath, imageRootPath),
+    );
+  }
+
+  static _PreparedCatalogFile _prepareNativeFileSync(
+    String filePath,
+    String? imageRootPath,
+  ) {
+    final source = File(filePath);
+    final stat = source.statSync();
+    if (stat.type != FileSystemEntityType.file) {
+      throw Exception('Seçilen katalog dosyası bulunamadı.');
+    }
+    if (stat.size > _nativeArchiveLimit) {
+      throw Exception('Katalog dosyası 8 GB sınırını aşıyor.');
+    }
+
+    if (p.extension(filePath).toLowerCase() == '.xlsx') {
+      if (stat.size > _excelLimit) {
+        throw Exception('Excel dosyası 150 MB sınırını aşıyor.');
+      }
+      return _PreparedCatalogFile(
+        excelBytes: source.readAsBytesSync(),
+        imageBarcodes: const {},
+        extractedImagePaths: const {},
+      );
+    }
+
+    final input = InputFileStream(filePath);
+    try {
+      final decoder = ZipDecoder();
+      final archive = decoder.decodeBuffer(input);
+      if (archive.length > _fileCountLimit) {
+        throw Exception('Dosya sayısı çok fazla (Maks 10.000).');
+      }
+      for (final header in decoder.directory.fileHeaders) {
+        final compressed = header.compressedSize ?? 0;
+        final uncompressed = header.uncompressedSize ?? 0;
+        if (compressed > 0 && uncompressed / compressed > 100) {
+          throw Exception(
+              'Yüksek sıkıştırma oranı tespit edildi. Geçersiz arşiv.');
+        }
+      }
+
+      int expandedSize = 0;
+      ArchiveFile? excelFile;
+      final imageFiles = <String, ArchiveFile>{};
+      for (final entry in archive) {
+        if (!entry.isFile) continue;
+        final normalized = entry.name.replaceAll('\\', '/');
+        final lower = normalized.toLowerCase();
+        if (normalized.contains('..') || normalized.contains('\x00')) {
+          throw Exception('Geçersiz arşiv yolu tespit edildi.');
+        }
+        if (lower.endsWith('.zip') ||
+            lower.endsWith('.tar') ||
+            lower.endsWith('.gz')) {
+          throw Exception('İç içe arşiv dosyaları desteklenmiyor.');
+        }
+        expandedSize += entry.size.toInt();
+        if (expandedSize > _nativeExpandedLimit) {
+          throw Exception('Açılmış katalog içeriği 16 GB sınırını aşıyor.');
+        }
+        if (lower.endsWith('.xlsx') && !lower.startsWith('__macosx/')) {
+          excelFile ??= entry;
+          continue;
+        }
+        if (!_isSupportedImageEntry(lower)) continue;
+        if (entry.size > _singleImageLimit) {
+          throw Exception('Bir ürün görseli 100 MB sınırını aşıyor.');
+        }
+        final filename = p.basename(normalized);
+        final dot = filename.lastIndexOf('.');
+        final barcode = dot > 0 ? filename.substring(0, dot) : filename;
+        if (barcode.isNotEmpty && !filename.startsWith('.')) {
+          imageFiles[barcode] = entry;
+        }
+      }
+      if (excelFile == null) {
+        throw Exception('ZIP arşivinde Excel (.xlsx) dosyası bulunamadı.');
+      }
+      if (excelFile.size > _excelLimit) {
+        throw Exception('Excel dosyası 150 MB sınırını aşıyor.');
+      }
+      final excelContent = excelFile.content as List<int>?;
+      if (excelContent == null) {
+        throw Exception('Excel dosyası arşivden okunamadı.');
+      }
+
+      final extracted = <String, String>{};
+      if (imageRootPath != null && imageFiles.isNotEmpty) {
+        // Each import owns a unique image directory. A failed import can roll
+        // back its files without deleting a previously active product image.
+        final destination = Directory(p.join(
+          imageRootPath,
+          'import_${DateTime.now().microsecondsSinceEpoch}',
+        ));
+        destination.createSync(recursive: true);
+        try {
+          for (final image in imageFiles.entries) {
+            final content = image.value.content as List<int>?;
+            if (content == null) continue;
+            final target = p.join(destination.path, '${image.key}.jpg');
+            final optimized = _optimizeCardImage(content);
+            File(target).writeAsBytesSync(optimized, flush: false);
+            extracted[image.key] = target;
+          }
+        } catch (_) {
+          for (final path in extracted.values) {
+            try {
+              File(path).deleteSync();
+            } catch (_) {
+              // Best-effort rollback; preserve the original extraction error.
+            }
+          }
+          rethrow;
+        }
+      }
+      return _PreparedCatalogFile(
+        excelBytes: Uint8List.fromList(excelContent),
+        imageBarcodes: imageFiles.keys.toSet(),
+        extractedImagePaths: extracted,
+      );
+    } finally {
+      input.closeSync();
+    }
   }
 
   /// Imports product catalog and images from a ZIP archive bytes.
@@ -471,8 +714,9 @@ class DatasetImportService {
     Uint8List zipBytes,
     void Function(double progress, String status) onProgress, [
     ImportStrategy strategy = const ImportStrategy(),
+    Map<String, String> preparedImagePaths = const {},
   ]) async {
-    if (zipBytes.length > 100 * 1024 * 1024) {
+    if (zipBytes.length > _memoryArchiveLimit) {
       throw Exception('Dosya boyutu sınırlandırılmıştır (Maks 100MB).');
     }
     int importedCount = 0;
@@ -489,7 +733,7 @@ class DatasetImportService {
       }
     }
 
-    final List<String> writtenImagePaths = [];
+    final List<String> writtenImagePaths = preparedImagePaths.values.toList();
 
     try {
       onProgress(0.05, 'Katalog ayrıştırılması başlatılıyor...');
@@ -501,6 +745,10 @@ class DatasetImportService {
       onProgress(0.30, 'Katalog dosyaları çözümlendi.');
 
       final imageMap = parsedData.images;
+      final availableImageBarcodes = <String>{
+        ...imageMap.keys,
+        ...preparedImagePaths.keys,
+      };
       final products = parsedData.products;
 
       // Save extracted images
@@ -571,8 +819,9 @@ class DatasetImportService {
                   finalImageUrl = remoteUrl;
                 }
               } else if (localImagesDirPath != null &&
-                  imageMap.containsKey(barcode)) {
-                finalImageUrl = p.join(localImagesDirPath, '$barcode.jpg');
+                  availableImageBarcodes.contains(barcode)) {
+                finalImageUrl = preparedImagePaths[barcode] ??
+                    p.join(localImagesDirPath, '$barcode.jpg');
               } else if (remoteUrl.isNotEmpty) {
                 finalImageUrl = remoteUrl;
               }
@@ -764,8 +1013,9 @@ class DatasetImportService {
               finalImageUrl = remoteUrl;
             }
           } else if (localImagesDirPath != null &&
-              imageMap.containsKey(barcode)) {
-            finalImageUrl = p.join(localImagesDirPath, '$barcode.jpg');
+              availableImageBarcodes.contains(barcode)) {
+            finalImageUrl = preparedImagePaths[barcode] ??
+                p.join(localImagesDirPath, '$barcode.jpg');
           } else if (remoteUrl.isNotEmpty) {
             finalImageUrl = remoteUrl;
           }

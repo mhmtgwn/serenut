@@ -13,6 +13,7 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
+import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:uuid/uuid.dart';
 import 'checkout/cash_dialog.dart';
 
@@ -44,6 +45,8 @@ class CheckoutSection extends ConsumerStatefulWidget {
   final Function(CustomerEntity?) onCustomerChanged;
   final Function(String) onPaymentMethodChanged;
   final Function(double) onPaidAmountChanged;
+  final void Function(double cashTendered, double card, double debt)
+      onMixedPaymentChanged;
   final VoidCallback onSubmitSale;
   final VoidCallback? onQuickCash;
 
@@ -59,6 +62,7 @@ class CheckoutSection extends ConsumerStatefulWidget {
     required this.onCustomerChanged,
     required this.onPaymentMethodChanged,
     required this.onPaidAmountChanged,
+    required this.onMixedPaymentChanged,
     required this.onSubmitSale,
     this.onQuickCash,
   });
@@ -91,11 +95,15 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
       ? (double.tryParse(_debtSplitController.text.replaceAll(',', '.')) ?? 0.0)
       : 0.0;
 
-  double get _karmaTotal => _karmaCash + _karmaCard + _karmaDebt;
-  double get _karmaRemainder =>
-      (widget.total - _karmaTotal).clamp(0.0, double.infinity);
-  bool get _karmaValid =>
-      widget.total > 0 && (_karmaTotal - widget.total).abs() < 0.01;
+  MixedPaymentResult get _karmaResult => MixedPaymentCalculator.calculate(
+        total: widget.total,
+        cashTendered: _karmaCash,
+        card: _karmaCard,
+        debt: _karmaDebt,
+      );
+  double get _karmaTotal => _karmaResult.allocatedTotal;
+  double get _karmaRemainder => _karmaResult.remaining;
+  bool get _karmaValid => _karmaResult.isValid;
 
   void _handlePayment(String method) {
     if (method == 'cash') {
@@ -145,7 +153,7 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
       );
       return;
     }
-    widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+    widget.onMixedPaymentChanged(_karmaCash, _karmaCard, _karmaDebt);
     Future.microtask(() => widget.onSubmitSale());
   }
 
@@ -517,17 +525,19 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
               Expanded(
                 child: _KarmaSplitField(
                   controller: _cashSplitController,
-                  label: 'Nakit',
+                  label: 'Alınan Nakit',
                   icon: Icons.payments_rounded,
                   color: _kGreen,
                   remainder: remainderForCash,
                   onSuffixTap: () => setState(() {
                     _cashSplitController.text =
                         remainderForCash.toStringAsFixed(2);
-                    widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+                    widget.onMixedPaymentChanged(
+                        _karmaCash, _karmaCard, _karmaDebt);
                   }),
                   onChanged: (_) => setState(() {
-                    widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+                    widget.onMixedPaymentChanged(
+                        _karmaCash, _karmaCard, _karmaDebt);
                   }),
                 ),
               ),
@@ -542,10 +552,12 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                   onSuffixTap: () => setState(() {
                     _cardSplitController.text =
                         remainderForCard.toStringAsFixed(2);
-                    widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+                    widget.onMixedPaymentChanged(
+                        _karmaCash, _karmaCard, _karmaDebt);
                   }),
                   onChanged: (_) => setState(() {
-                    widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+                    widget.onMixedPaymentChanged(
+                        _karmaCash, _karmaCard, _karmaDebt);
                   }),
                 ),
               ),
@@ -561,21 +573,33 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                     onSuffixTap: () => setState(() {
                       _debtSplitController.text =
                           remainderForDebt.toStringAsFixed(2);
-                      widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+                      widget.onMixedPaymentChanged(
+                          _karmaCash, _karmaCard, _karmaDebt);
                     }),
                     onChanged: (_) => setState(() {
-                      widget.onPaidAmountChanged(_karmaCash + _karmaCard);
+                      widget.onMixedPaymentChanged(
+                          _karmaCash, _karmaCard, _karmaDebt);
                     }),
                   ),
                 ),
               ],
             ],
           ),
-          if (!_karmaValid && _karmaTotal > 0) ...[
+          if (_karmaResult.change > 0) ...[
             const SizedBox(height: 6),
             Text(
-              _karmaTotal > widget.total
-                  ? '₺${(_karmaTotal - widget.total).toStringAsFixed(2)} fazla girildi'
+              'Para üstü: ₺${_karmaResult.change.toStringAsFixed(2)}',
+              style: const TextStyle(
+                  color: _kGreenDark,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700),
+            ),
+          ] else if (!_karmaValid &&
+              (_karmaCash > 0 || _karmaCard > 0 || _karmaDebt > 0)) ...[
+            const SizedBox(height: 6),
+            Text(
+              _karmaCard + _karmaDebt > widget.total
+                  ? 'Kart ve vadeli toplamı satış tutarını aşıyor'
                   : '₺${_karmaRemainder.toStringAsFixed(2)} eksik',
               style: const TextStyle(
                   color: _kRed, fontSize: 11, fontWeight: FontWeight.w600),

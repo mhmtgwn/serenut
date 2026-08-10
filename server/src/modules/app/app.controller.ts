@@ -42,7 +42,7 @@ router.get('/bootstrap', async (req: AuthenticatedRequest, res: Response) => {
       landing_route: resolveLandingRoute(roles, permissions),
       workspaces: {
         platform: roles.includes('sysadmin'),
-        company: roles.includes('owner') || permissions.includes('portal:access')
+        company: !roles.includes('sysadmin') && (roles.includes('owner') || permissions.includes('portal:access'))
       }
     });
   } catch (err) {

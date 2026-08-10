@@ -64,11 +64,31 @@ router.post('/send', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+router.post('/:id/route-to-support', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    return res.status(201).json({ request: await MailService.routeToSupport(req.params.id) });
+  } catch (error: any) {
+    if (error.message === 'mail_not_found') return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'E-posta bulunamadı.' } });
+    if (error.message === 'inbound_mail_required') return res.status(400).json({ error: { code: 'VALIDATION', message: 'Yalnızca gelen e-postalar desteğe yönlendirilebilir.' } });
+    logger.error('Route email to support failed', error);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'E-posta desteğe yönlendirilemedi.' } });
+  }
+});
+
 router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
-  try { return res.json({ message: await MailService.update(req.params.id, { isRead: req.body.is_read, isArchived: req.body.is_archived }) }); }
+  try { return res.json({ message: await MailService.update(req.params.id, { isRead: req.body.is_read, isArchived: req.body.is_archived, restore: req.body.restore }) }); }
   catch (error: any) {
     if (error.message === 'mail_not_found') return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'E-posta bulunamadı.' } });
     return res.status(400).json({ error: { code: 'VALIDATION', message: 'Değişiklik uygulanamadı.' } });
+  }
+});
+
+router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
+  try { return res.json({ message: await MailService.moveToTrash(req.params.id) }); }
+  catch (error: any) {
+    if (error.message === 'mail_not_found') return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'E-posta bulunamadı.' } });
+    logger.error('Move email to trash failed', error);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'E-posta silinemedi.' } });
   }
 });
 

@@ -50,6 +50,12 @@ const logFormat = winston.format.combine(
   winston.format.json()
 );
 
+const rotatedFileOptions = {
+  maxsize: 10 * 1024 * 1024,
+  maxFiles: 5,
+  tailable: true,
+};
+
 import Transport from 'winston-transport';
 
 class SentryTransport extends Transport {
@@ -90,21 +96,25 @@ export const logger = winston.createLogger({
     }),
     new winston.transports.File({ 
       filename: path.join(process.cwd(), 'logs/error.log'), 
-      level: 'error' 
+      level: 'error',
+      ...rotatedFileOptions,
     }),
     new winston.transports.File({ 
-      filename: path.join(process.cwd(), 'logs/combined.log') 
+      filename: path.join(process.cwd(), 'logs/combined.log'),
+      ...rotatedFileOptions,
     }),
     new SentryTransport({ level: 'error' })
   ],
   exceptionHandlers: [
     new winston.transports.File({
       filename: path.join(process.cwd(), 'logs/exceptions.log'),
+      ...rotatedFileOptions,
     }),
   ],
   rejectionHandlers: [
     new winston.transports.File({
       filename: path.join(process.cwd(), 'logs/rejections.log'),
+      ...rotatedFileOptions,
     }),
   ],
   // A rejected async request must be recorded and returned as an error; it

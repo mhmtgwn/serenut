@@ -9,6 +9,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as ex;
+import 'package:image/image.dart' as img;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -171,6 +172,71 @@ void main() {
       final importedProducts = await productRepo.findAll();
       expect(importedProducts, hasLength(1));
       expect(importedProducts.first.quantity, equals(0));
+    });
+
+    test('native file import streams ZIP images to disk and links by barcode',
+        () async {
+      final excel = ex.Excel.createExcel();
+      final sheet = excel['market_data_catalog'];
+      excel.delete('Sheet1');
+      sheet.appendRow([
+        ex.TextCellValue('Barkod'),
+        ex.TextCellValue('Urun Adi'),
+        ex.TextCellValue('Kategori'),
+        ex.TextCellValue('Marka'),
+        ex.TextCellValue('Fiyat'),
+        ex.TextCellValue('KDV'),
+        ex.TextCellValue('Gorsel Linki'),
+        ex.TextCellValue('Stok'),
+      ]);
+      sheet.appendRow([
+        ex.TextCellValue('8690000000001'),
+        ex.TextCellValue('Dosyadan Ürün'),
+        ex.TextCellValue('Test'),
+        ex.TextCellValue('Serenut'),
+        const ex.DoubleCellValue(25),
+        const ex.IntCellValue(20),
+        ex.TextCellValue(''),
+        const ex.IntCellValue(3),
+      ]);
+      final excelBytes = excel.save()!;
+      final sourceImage = img.Image(width: 1200, height: 600);
+      img.fill(sourceImage, color: img.ColorRgb8(25, 120, 210));
+      final sourceImageBytes = img.encodePng(sourceImage);
+      final archive = Archive()
+        ..addFile(ArchiveFile(
+          'urunler.xlsx',
+          excelBytes.length,
+          excelBytes,
+        ))
+        ..addFile(ArchiveFile(
+          '8690000000001.jpg',
+          sourceImageBytes.length,
+          sourceImageBytes,
+        ));
+      final zipFile = File('${tempDir.path}/native_catalog.zip');
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
+
+      final analysis = await importService.analyzeFile(
+        zipFile.path,
+        (_, __) {},
+      );
+      expect(analysis.products, hasLength(1));
+      expect(analysis.images.keys, contains('8690000000001'));
+
+      final result = await importService.importFromFile(
+        zipFile.path,
+        (_, __) {},
+      );
+      expect(result['success'], 1);
+      final product = await productRepo.findById('8690000000001');
+      expect(product, isNotNull);
+      expect(product!.imageUrl, isNotNull);
+      final optimized =
+          img.decodeJpg(await File(product.imageUrl!).readAsBytes());
+      expect(optimized, isNotNull);
+      expect(optimized!.width, 320);
+      expect(optimized.height, 320);
     });
   });
 }

@@ -96,12 +96,13 @@ export class MailService {
   }
 
   static async list(folder: string, search: string, page: number, limit: number) {
-    const safeFolder = ['inbox', 'sent', 'archive'].includes(folder) ? folder : 'inbox';
+    const safeFolder = ['inbox', 'sent', 'archive', 'trash'].includes(folder) ? folder : 'inbox';
     const conditions: string[] = [];
     const values: unknown[] = [];
-    if (safeFolder === 'inbox') conditions.push("direction='inbound' AND is_archived=FALSE");
-    if (safeFolder === 'sent') conditions.push("direction='outbound' AND is_archived=FALSE");
-    if (safeFolder === 'archive') conditions.push('is_archived=TRUE');
+    if (safeFolder === 'inbox') conditions.push("direction='inbound' AND is_archived=FALSE AND deleted_at IS NULL");
+    if (safeFolder === 'sent') conditions.push("direction='outbound' AND is_archived=FALSE AND deleted_at IS NULL");
+    if (safeFolder === 'archive') conditions.push('is_archived=TRUE AND deleted_at IS NULL');
+    if (safeFolder === 'trash') conditions.push('deleted_at IS NOT NULL');
     if (search.trim()) {
       values.push(`%${search.trim().slice(0, 200)}%`);
       conditions.push(`(subject ILIKE $${values.length} OR sender_email ILIKE $${values.length} OR text_body ILIKE $${values.length})`);
@@ -115,14 +116,14 @@ export class MailService {
       const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
       const rows = await client.query(
         `SELECT id,direction,mailbox,sender_email,sender_name,recipients,subject,
-                LEFT(text_body,240) AS preview,delivery_status,is_read,is_archived,
+                LEFT(text_body,240) AS preview,delivery_status,is_read,is_archived,deleted_at,
                 attachment_metadata,sent_at,received_at,created_at
            FROM admin_mail_messages ${where}
           ORDER BY COALESCE(received_at,sent_at,created_at) DESC
           LIMIT $${values.length - 1} OFFSET $${values.length}`,
         values,
       );
-      const unread = await client.query("SELECT COUNT(*)::int AS count FROM admin_mail_messages WHERE direction='inbound' AND is_read=FALSE AND is_archived=FALSE");
+      const unread = await client.query("SELECT COUNT(*)::int AS count FROM admin_mail_messages WHERE direction='inbound' AND is_read=FALSE AND is_archived=FALSE AND deleted_at IS NULL");
       await client.query('COMMIT');
       return { messages: rows.rows, unread: unread.rows[0].count, page, limit };
     } catch (error) {
@@ -193,12 +194,58 @@ export class MailService {
     return { id, resendEmailId: result.id };
   }
 
-  static async update(id: string, patch: { isRead?: boolean; isArchived?: boolean }) {
+  static async routeToSupport(id: string) {
+    return withAdminDb(async client => {
+      const mailResult = await client.query(
+        `SELECT id, direction, sender_email, sender_name, subject, text_body, guest_request_id
+           FROM admin_mail_messages WHERE id=$1 FOR UPDATE`,
+        [id],
+      );
+      if (!mailResult.rows.length) throw new Error('mail_not_found');
+      const mail = mailResult.rows[0];
+      if (mail.direction !== 'inbound') throw new Error('inbound_mail_required');
+      if (mail.guest_request_id) {
+        const existing = await client.query(
+          'SELECT id, reference_code, status FROM guest_support_requests WHERE id=$1',
+          [mail.guest_request_id],
+        );
+        if (existing.rows.length) return existing.rows[0];
+      }
+
+      const requestId = `GUEST-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      const referenceCode = `SRN-${new Date().getUTCFullYear()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+      await client.query(
+        `INSERT INTO guest_support_requests
+           (id, reference_code, name, email, customer_claim, category, subject, message,
+            status, intake_source)
+         VALUES ($1,$2,$3,$4,'unsure','other',$5,$6,'under_review','inbound_email')`,
+        [requestId, referenceCode, mail.sender_name || mail.sender_email.split('@')[0],
+         mail.sender_email, mail.subject, mail.text_body],
+      );
+      await client.query(
+        'UPDATE admin_mail_messages SET guest_request_id=$2, updated_at=NOW() WHERE id=$1',
+        [id, requestId],
+      );
+      return { id: requestId, reference_code: referenceCode, status: 'under_review' };
+    });
+  }
+
+  static async update(id: string, patch: { isRead?: boolean; isArchived?: boolean; restore?: boolean }) {
     const values: unknown[] = [id]; const sets: string[] = [];
     if (typeof patch.isRead === 'boolean') { values.push(patch.isRead); sets.push(`is_read=$${values.length}`); }
     if (typeof patch.isArchived === 'boolean') { values.push(patch.isArchived); sets.push(`is_archived=$${values.length}`); }
+    if (patch.restore === true) sets.push('deleted_at=NULL');
     if (!sets.length) throw new Error('invalid_patch');
-    const result = await withAdminDb(client => client.query(`UPDATE admin_mail_messages SET ${sets.join(',')},updated_at=NOW() WHERE id=$1 RETURNING id,is_read,is_archived`, values));
+    const result = await withAdminDb(client => client.query(`UPDATE admin_mail_messages SET ${sets.join(',')},updated_at=NOW() WHERE id=$1 RETURNING id,is_read,is_archived,deleted_at`, values));
+    if (!result.rows.length) throw new Error('mail_not_found');
+    return result.rows[0];
+  }
+
+  static async moveToTrash(id: string) {
+    const result = await withAdminDb(client => client.query(
+      'UPDATE admin_mail_messages SET deleted_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING id,deleted_at',
+      [id],
+    ));
     if (!result.rows.length) throw new Error('mail_not_found');
     return result.rows[0];
   }

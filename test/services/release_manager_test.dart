@@ -15,6 +15,7 @@ import '../helpers/rsa_test_keys.dart';
 
 // ── RSA Signature Helper ──────────────────────────────────────────────────────
 final testReleaseKeys = RsaTestKeys.generate();
+final unrelatedReleaseKeys = RsaTestKeys.generate();
 
 String signHash(String hash) {
   return base64.encode(testReleaseKeys.sign(utf8.encode(hash)));
@@ -269,6 +270,66 @@ void main() {
           await svc.verifyDownload(tempFile, 'wrong_hash_value', '');
       expect(isValid, isFalse);
 
+      await tempFile.delete();
+    });
+
+    test('returns false when release signature is missing', () async {
+      final svc = ReleaseManagerService(
+        config: testConfig,
+        rsaModulus: testReleaseKeys.modulus,
+      );
+      final tempFile =
+          File('${Directory.systemTemp.path}/test_verify_unsigned.bin');
+      await tempFile.writeAsBytes([0x01, 0x02, 0x03, 0x04]);
+      final expectedHash =
+          sha256.convert(await tempFile.readAsBytes()).toString();
+
+      expect(await svc.verifyDownload(tempFile, expectedHash, ''), isFalse);
+      await tempFile.delete();
+    });
+
+    test('returns false when release signature is invalid', () async {
+      final svc = ReleaseManagerService(
+        config: testConfig,
+        rsaModulus: testReleaseKeys.modulus,
+      );
+      final tempFile =
+          File('${Directory.systemTemp.path}/test_verify_bad_signature.bin');
+      await tempFile.writeAsBytes([0x01, 0x02, 0x03, 0x04]);
+      final expectedHash =
+          sha256.convert(await tempFile.readAsBytes()).toString();
+
+      expect(
+        await svc.verifyDownload(
+          tempFile,
+          expectedHash,
+          base64.encode(List<int>.filled(384, 0)),
+        ),
+        isFalse,
+      );
+      await tempFile.delete();
+    });
+
+    test('accepts signature from any key in the trusted rotation keyring',
+        () async {
+      final svc = ReleaseManagerService(
+        config: testConfig,
+        rsaModuli: [unrelatedReleaseKeys.modulus, testReleaseKeys.modulus],
+      );
+      final tempFile =
+          File('${Directory.systemTemp.path}/test_verify_keyring.bin');
+      await tempFile.writeAsBytes([0x10, 0x20, 0x30]);
+      final expectedHash =
+          sha256.convert(await tempFile.readAsBytes()).toString();
+
+      expect(
+        await svc.verifyDownload(
+          tempFile,
+          expectedHash,
+          signHash(expectedHash),
+        ),
+        isTrue,
+      );
       await tempFile.delete();
     });
   });

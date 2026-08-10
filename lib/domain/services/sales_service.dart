@@ -267,6 +267,7 @@ class SalesService {
           totalAmount: totalAmount,
           paidAmount: finalPaidAmount,
           paymentMethod: paymentMethod,
+          terminalMetadata: terminalMetadata,
         );
         await _inventoryService.decreaseStock(items);
 
@@ -428,7 +429,10 @@ class SalesService {
       return RefundLineRequest(saleItemId: saleItemId, quantity: item.quantity);
     }).toList();
     await _refundStore.create(
-      saleId: saleId, items: lines, refundMethod: refundMethod, reason: reason,
+      saleId: saleId,
+      items: lines,
+      refundMethod: refundMethod,
+      reason: reason,
     );
   }
 

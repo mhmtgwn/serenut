@@ -68,14 +68,6 @@ router.post('/webhooks/resend', async (req: any, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) throw new Error('invalid_sender_email');
     const subject = String(email.subject || data.subject || '(Konu yok)').trim().slice(0, 500);
     const message = String(email.text || plainTextFromHtml(String(email.html || '')) || subject).slice(0, 10000);
-    const result = await SupportService.createInboundEmailRequest({
-      eventId: String(req.headers['svix-id']), emailId: String(data.email_id), senderEmail,
-      recipients, subject, message, messageId: email.message_id || data.message_id,
-      attachments: Array.isArray(email.attachments) ? email.attachments.map((a: any) => ({
-        id: a.id, filename: String(a.filename || '').slice(0, 255), content_type: a.content_type, size: a.size,
-      })) : [],
-      receivedAt: email.created_at || data.created_at,
-    });
     await MailService.persistInbound({
       emailId: String(data.email_id), senderEmail, senderName: senderName || undefined,
       recipients, subject, textBody: message, htmlBody: email.html ? String(email.html).slice(0, 200000) : undefined,
@@ -84,9 +76,9 @@ router.post('/webhooks/resend', async (req: any, res) => {
       attachments: Array.isArray(email.attachments) ? email.attachments.map((a: any) => ({
         id: a.id, filename: String(a.filename || '').slice(0, 255), content_type: a.content_type, size: a.size,
       })) : [],
-      guestRequestId: result.requestId, receivedAt: email.created_at || data.created_at,
+      receivedAt: email.created_at || data.created_at,
     });
-    return res.status(200).json({ accepted: true, duplicate: result.duplicate, reference: result.referenceCode });
+    return res.status(200).json({ accepted: true });
   } catch (error) {
     logger.warn('Resend inbound webhook rejected', { error: error instanceof Error ? error.message : String(error) });
     return res.status(400).json({ error: 'invalid_webhook' });
@@ -255,6 +247,35 @@ router.get('/guest-requests', async (req: AuthenticatedRequest, res: Response) =
   } catch (err) {
     logger.error('List guest support requests error:', err);
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Misafir başvuruları listelenemedi.' } });
+  }
+});
+
+router.get('/guest-requests/:id', async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user!.roles?.includes('sysadmin')) return res.status(403).json(createError('AUTH005'));
+  try {
+    return res.json({ request: await SupportService.getGuestRequest(req.params.id) });
+  } catch (error: any) {
+    if (error.message === 'guest_request_not_found') {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Başvuru bulunamadı.' } });
+    }
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Başvuru yüklenemedi.' } });
+  }
+});
+
+router.patch('/guest-requests/:id/status', async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user!.roles?.includes('sysadmin')) return res.status(403).json(createError('AUTH005'));
+  const status = String(req.body?.status || '');
+  if (!['under_review', 'routed_to_sales', 'closed'].includes(status)) {
+    return res.status(400).json({ error: { code: 'VALIDATION', message: 'Geçersiz başvuru durumu.' } });
+  }
+  try {
+    return res.json({ request: await SupportService.updateGuestRequestStatus(req.params.id, status) });
+  } catch (error: any) {
+    if (error.message === 'guest_request_not_found') {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Başvuru bulunamadı.' } });
+    }
+    logger.error('Guest support status update failed', error);
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Başvuru güncellenemedi.' } });
   }
 });
 

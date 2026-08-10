@@ -60,6 +60,7 @@ import crypto from 'crypto';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJSDoc from 'swagger-jsdoc';
+import { Pool } from 'pg';
 import { pgPool, redisClient } from './config/database';
 import { runMigrations } from './migrations';
 import { logger } from './config/logger';
@@ -663,7 +664,25 @@ async function warmupCache() {
 // ── BOOTSTRAP ─────────────────────────────────────────────────────────────────
 async function bootstrap() {
   try {
-    await runMigrations(pgPool);
+    logger.info('Starting application bootstrap.');
+    const migrationUrl = process.env.MIGRATION_DATABASE_URL;
+    if (isProduction && !migrationUrl) {
+      throw new Error('MIGRATION_DATABASE_URL is required in production; migrations must not use the restricted application role.');
+    }
+    if (migrationUrl) {
+      const migrationPool = new Pool({
+        connectionString: migrationUrl,
+        max: 1,
+        connectionTimeoutMillis: 10_000,
+      });
+      try {
+        await runMigrations(migrationPool);
+      } finally {
+        await migrationPool.end();
+      }
+    } else {
+      await runMigrations(pgPool);
+    }
     initAnalyticsWebSocket(server);
     initRealtimeWebSocket(server);
 

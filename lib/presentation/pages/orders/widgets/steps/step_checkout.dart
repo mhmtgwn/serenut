@@ -317,7 +317,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
           const SizedBox(height: 12),
           _buildSplitField(
             controller: _cashSplitController,
-            label: 'Nakit Ödeme',
+            label: 'Alınan Nakit',
             icon: Icons.money_rounded,
             color: _kGreen,
             fieldId: 'cash',
@@ -363,17 +363,18 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _karmaTotal > _totalAmount ? 'Fazla Girilen:' : 'Kalan Tutar:',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                _karmaResult.change > 0 ? 'Para Üstü:' : 'Kalan Tutar:',
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               ),
               Text(
-                _karmaTotal > _totalAmount
-                    ? '₺${(_karmaTotal - _totalAmount).toStringAsFixed(2)}'
+                _karmaResult.change > 0
+                    ? '₺${_karmaResult.change.toStringAsFixed(2)}'
                     : '₺${_karmaRemainder.toStringAsFixed(2)}',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: _karmaTotal > _totalAmount ? _kRed : _kText),
+                    color: _karmaResult.change > 0 ? _kGreenDark : _kText),
               ),
             ],
           ),
@@ -422,7 +423,8 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 color: isEnabled ? _kText : Colors.grey),
             decoration: InputDecoration(
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               border: const OutlineInputBorder(),
               suffixIcon: isEnabled
                   ? IconButton(
@@ -527,11 +529,20 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                   color: isSel ? color : Colors.white,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSel ? color : (enabled ? color.withOpacity(0.4) : Colors.grey.shade300),
+                    color: isSel
+                        ? color
+                        : (enabled
+                            ? color.withOpacity(0.4)
+                            : Colors.grey.shade300),
                     width: isSel ? 2 : 1.5,
                   ),
                   boxShadow: isSel
-                      ? [BoxShadow(color: color.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3))]
+                      ? [
+                          BoxShadow(
+                              color: color.withOpacity(0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3))
+                        ]
                       : [],
                 ),
                 child: Opacity(

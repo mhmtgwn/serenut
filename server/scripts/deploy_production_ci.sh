@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -eu
 
+case "${1:-}" in
+  *+*) ;;
+  *) echo "Usage: $0 <semantic-version+build-number> (example: 1.3.10+90)" >&2; exit 2 ;;
+esac
+
 cd "$(dirname "$0")/.."
 COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
 
@@ -54,6 +59,15 @@ fi
 $COMPOSE exec -T backend node dist/scripts/publish-release.js batch "$1" \
   /var/www/serenut-api/releases/_incoming/android/app-release.apk \
   /var/www/serenut-api/releases/_incoming/windows/SerenutOSSetup.exe false
-curl --fail https://api.serenut.com/api/v1/updates/latest-metadata
+metadata=$(curl --fail --silent --show-error \
+  "https://api.serenut.com/api/v1/updates/check?platform=android&current_version=0.0.0%2B0")
+node -e '
+  const response = JSON.parse(process.argv[1]);
+  const expectedVersion = process.argv[2];
+  if (response.latestVersion !== expectedVersion) throw new Error("published version mismatch");
+  if (!/^[a-f0-9]{64}$/.test(response.sha256_hash || "")) throw new Error("missing/invalid SHA-256");
+  if (typeof response.signature !== "string" || response.signature.length < 100) throw new Error("missing release signature");
+  if (!Number.isInteger(response.file_size_bytes) || response.file_size_bytes <= 0) throw new Error("invalid file size");
+' "$metadata" "$1"
 rm -f "$PUBLISH_LOCK"
 trap - EXIT HUP INT TERM

@@ -24,8 +24,15 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     }
 
     const decoded = AuthService.verifyAccessToken(token);
+    const isSysadmin = decoded.roles.includes('sysadmin');
+    const databaseContext = {
+      companyId: decoded.company_id || '',
+      bypassRls: isSysadmin,
+    };
     // Dynamic database check for active status and token version
-    const resUser = await pgPool.query('SELECT is_active, token_version FROM users WHERE id = $1', [decoded.id]);
+    const resUser = await tenantLocalStorage.run(databaseContext, () =>
+      pgPool.query('SELECT is_active, token_version FROM users WHERE id = $1', [decoded.id])
+    );
     if (resUser.rows.length === 0 || !resUser.rows[0].is_active) {
       incrementJwtFailures();
       return res.status(403).json({ error: 'user_suspended', message: 'Hesabınız askıya alınmıştır.' });
@@ -40,7 +47,7 @@ export async function authenticateUser(req: AuthenticatedRequest, res: Response,
     req.user = decoded;
     
     // Bind context of PG RLS for asynchronous callbacks
-    tenantLocalStorage.run({ companyId: decoded.company_id, bypassRls: false }, () => {
+    tenantLocalStorage.run(databaseContext, () => {
       next();
     });
   } catch (err: any) {

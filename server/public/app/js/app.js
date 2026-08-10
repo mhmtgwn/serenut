@@ -160,10 +160,10 @@ function normalizeNavigation(navigation) {
 
 function renderNav(items) {
   const nav = document.getElementById('app-nav');
-  const labels = { overview: 'Genel', operations: 'Operasyon', commerce: 'Ticari', platform: 'Yönetim', account: 'Hesap' };
+  const labels = { overview: 'Genel', customers: 'Müşteriler', commerce: 'Ticari', communication: 'İletişim', operations: 'Operasyon', security: 'Güvenlik', platform: 'Yönetim', account: 'Hesap' };
   nav.innerHTML = '';
 
-  ['overview', 'operations', 'commerce', 'platform', 'account'].forEach((section) => {
+  ['overview', 'customers', 'commerce', 'communication', 'operations', 'security', 'platform', 'account'].forEach((section) => {
     const sectionItems = items.filter((item) => item.section === section);
     if (!sectionItems.length) return;
     nav.insertAdjacentHTML('beforeend', `<div class="nav-section-label">${labels[section]}</div>`);
@@ -246,7 +246,7 @@ async function selectModule(moduleId) {
   const content = document.getElementById('embed-content');
   content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
   try {
-    const { loadModule } = await import('./module-runtime.js?v=20260809-mailbox1');
+    const { loadModule } = await import('./module-runtime.js?v=20260810-flow2');
     await loadModule(item);
   } catch (error) {
     content.innerHTML = `
@@ -259,6 +259,13 @@ async function selectModule(moduleId) {
     document.getElementById('module-retry').onclick = () => selectModule(item.id);
   }
 }
+
+window.addEventListener('hashchange', () => {
+  const hashId = window.location.hash.replace('#', '').trim();
+  if (!hashId || hashId === selectedModuleId) return;
+  const target = navigationItems.find((item) => item.id === hashId || item.href.split('#')[1] === hashId);
+  if (target) selectModule(target.id);
+});
 
 async function startRealtime() {
   if (realtimeConnecting ||
