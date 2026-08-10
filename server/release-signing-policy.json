@@ -1,0 +1,5 @@
+{
+  "requiredUpgradeSignerModulusSha256": "330be910eb5aa1162183154fced1cae3fcf4be3b4c0acf3cd32bae13dfa3dcc9",
+  "trustedSinceVersion": "1.3.10+91",
+  "rotationPhase": "stable"
+}

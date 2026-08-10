@@ -8,6 +8,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
 $keys = Get-Content 'config\signing_public_keys.json' -Raw | ConvertFrom-Json
+$signingPolicy = Get-Content 'server\release-signing-policy.json' -Raw | ConvertFrom-Json
 $licenseModulus = [string]$keys.LICENSE_RSA_MODULUS
 $activeReleaseModulus = [string]$keys.RELEASE_RSA_MODULUS
 $trustedReleaseModuli = @($keys.RELEASE_RSA_TRUSTED_MODULI | ForEach-Object { [string]$_ })
@@ -28,6 +29,13 @@ if (($trustedReleaseModuli | Select-Object -Unique).Count -ne $trustedReleaseMod
 $releaseKeyring = $trustedReleaseModuli -join ','
 if ([string]$keys.RELEASE_RSA_MODULI -ne $releaseKeyring) {
     throw 'RELEASE_RSA_MODULI must exactly match RELEASE_RSA_TRUSTED_MODULI in the same order.'
+}
+$activeModulusBytes = [Text.Encoding]::UTF8.GetBytes($activeReleaseModulus)
+$activeModulusFingerprint = [Convert]::ToHexString(
+    [Security.Cryptography.SHA256]::HashData($activeModulusBytes)
+).ToLowerInvariant()
+if ($activeModulusFingerprint -ne [string]$signingPolicy.requiredUpgradeSignerModulusSha256) {
+    throw 'The active client key does not match the required upgrade signer policy.'
 }
 $defines = @(
     '--dart-define=ENVIRONMENT=prod',

@@ -5,7 +5,12 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { pgPool } from '../../config/database';
 import { authenticateUser, AuthenticatedRequest, requireRole } from '../../middleware/auth.middleware';
-import { loadReleaseSigningKey, signReleaseHash } from '../../security/release-signing';
+import {
+  assertReleaseSigningContinuity,
+  loadReleaseSigningKey,
+  loadReleaseSigningPolicy,
+  signReleaseHash,
+} from '../../security/release-signing';
 
 const router = Router();
 
@@ -83,6 +88,11 @@ function signReleaseFile(sha256Hash: string): string {
       path.join(__dirname, '../../../.release-private.pem'),
     ],
   );
+  const signingPolicy = loadReleaseSigningPolicy([
+    process.env.RELEASE_SIGNING_POLICY_FILE,
+    path.join(process.cwd(), 'release-signing-policy.json'),
+  ]);
+  assertReleaseSigningContinuity(privateKey, signingPolicy);
   return signReleaseHash(sha256Hash, privateKey);
 }
 

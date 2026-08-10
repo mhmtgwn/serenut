@@ -23,6 +23,19 @@ a client that trusts both keys, wait for rollout completion, and only then sign
 the following release with the new key. Remove the retired key in a later
 release after the supported upgrade window closes.
 
+The repository and publisher enforce this sequence:
+
+1. During the bridge phase, keep `requiredUpgradeSignerModulusSha256` pointing
+   to the old signer and add the new public modulus to the client keyring.
+2. Publish and verify the bridge release while it is still signed by the old
+   key. Do not advance the policy based only on a successful CI build.
+3. After the supported upgrade population has received the bridge release,
+   reorder the client keyring and update the policy fingerprint in a separate
+   change. CI verifies that the immediately previous client already trusted the
+   selected signer.
+4. The VPS publisher derives the public modulus from the actual private key and
+   refuses to publish if it does not match the policy fingerprint.
+
 Clients deliberately fail closed when either public modulus is absent. Existing
 licenses and releases signed with the revoked key must be reissued.
 
