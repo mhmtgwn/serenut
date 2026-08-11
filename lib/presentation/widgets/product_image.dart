@@ -61,6 +61,11 @@ class ProductImage extends ConsumerWidget {
 
   static String _resolveLocalPath(String path, String documentsDir) {
     if (p.isAbsolute(path)) {
+      // Current imports live under application support rather than Documents.
+      // Preserve a valid absolute path before attempting legacy relocation.
+      if (File(path).existsSync()) {
+        return path;
+      }
       if (path.contains('product_images')) {
         final relativePart = path.substring(path.indexOf('product_images'));
         return p.join(documentsDir, relativePart);
