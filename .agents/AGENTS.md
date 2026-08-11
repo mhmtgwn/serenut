@@ -22,3 +22,8 @@
   OpenSSL komutları yeni sürüm yayınlamak için kullanılamaz.
 * OTA RSA-SHA256 imza girdisi, artefaktın kendisi değil küçük harfli 64
   karakter SHA-256 değerinin UTF-8 metnidir.
+* Yayınlanmış `version+build` değişmezdir; aynı sürüm koduyla farklı APK/EXE
+  baytları yayınlanamaz. Her yeniden derlemede build numarası artırılmalıdır.
+* İstemci metadata'sı sürüme özel değişmez indirme URL'si kullanmalı ve
+  production yayın `scripts/verify_published_release.js` kontrolü geçmeden
+  tamamlanmış sayılmamalıdır.

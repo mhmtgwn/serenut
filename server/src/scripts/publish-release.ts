@@ -80,10 +80,10 @@ async function prepareRelease(
     if (fs.existsSync(finalPath)) {
       const existingHash = await sha256(finalPath);
       if (existingHash !== hash) {
-        console.warn(
-          `[publish-release] Updating release ${platform} ${versionCode}: file content changed, overwriting existing file.`,
+        throw new Error(
+          `Release ${platform} ${versionCode} already exists with different content. ` +
+          'Increment the version/build number; published release bytes are immutable.',
         );
-        fs.unlinkSync(finalPath);
       } else {
         fs.unlinkSync(temporaryPath);
         reusedExistingFile = true;
@@ -195,7 +195,7 @@ async function main() {
         id,
         release.versionCode,
         release.platform,
-        `/api/v1/updates/download/${release.platform}/latest`,
+        `/api/v1/updates/download/${release.platform}/version/${encodeURIComponent(release.versionCode)}`,
         release.finalPath,
         release.hash,
         release.signature,

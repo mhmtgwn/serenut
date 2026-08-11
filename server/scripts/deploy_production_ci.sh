@@ -76,5 +76,8 @@ node -e '
   const fileSizeBytes = Number(response.file_size_bytes);
   if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes <= 0) throw new Error("invalid file size");
 ' "$metadata" "$1"
+# Verify the bytes delivered by the public URL (not only database metadata),
+# including file size, SHA-256 and the detached RSA signature for both clients.
+node ../scripts/verify_published_release.js "$1"
 rm -f "$PUBLISH_LOCK"
 trap - EXIT HUP INT TERM
