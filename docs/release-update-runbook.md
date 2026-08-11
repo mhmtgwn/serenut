@@ -18,6 +18,11 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
 4. Sunucudaki `sha256_hash`, `signature` ve `file_size_bytes` aynı, son
    artefakttan tek işlemde üretilir. Yayın aracı imzayı veritabanına yazmadan
    önce public key ile tekrar doğrular.
+5. Yayınlanmış bir sürümün baytları değişmezdir. Aynı `version+build` ile farklı
+   APK/EXE yayınlanamaz; her yeniden derlemede build numarası artırılır.
+6. Uygulama güncellemeleri sürüme özel `/version/<version+build>` URL'sinden
+   indirilir. Değişken `/latest` adresi yalnız web sitesindeki elle indirme
+   bağlantılarıyla geriye uyumluluk içindir ve önbelleğe alınmaz.
 
 ## Her sürümde izlenecek akış
 
@@ -50,9 +55,11 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
 5. `main` dalındaki başarılı iş akışı artefaktları VPS'e yükler ve
    `server/scripts/deploy_production_ci.sh <sürüm+build>` komutunu çalıştırır.
    Bu betik, kanonik `dist/scripts/publish-release.js` yayınlayıcısını kullanır.
-6. İşlem ancak Android kontrol API'si aşağıdakilerin tümünü yeni sürüm için
-   döndürürse başarılı sayılır: doğru sürüm, 64 haneli SHA-256, dolu RSA imzası
-   ve pozitif dosya boyutu.
+6. İşlem ancak `scripts/verify_published_release.js` Android ve Windows
+   artefaktlarını public sürüme özel URL'lerden indirip şu kontrollerin tümünü
+   geçerse başarılı sayılır: doğru sürüm, değişmez URL, dosya boyutu, SHA-256
+   ve istemci trusted keyring'iyle RSA imzası. Bu kontrol production dağıtım
+   betiğinin zorunlu son adımıdır; başarısızsa yayın başarılı kabul edilmez.
 7. En az bir Android ve bir Windows test cihazında indirme ve kurulum yapın;
    ardından kademeli dağıtım gerekiyorsa rollout oranını yükseltin.
 
@@ -75,7 +82,8 @@ adımda değiştirilmez. Ayrıntılı iki aşamalı prosedür için
 - `missing release signature`: Kanonik yayınlayıcı atlanmış veya VPS release
   secret'ı bağlanmamıştır. Yayını aktif etmeyin.
 - `SHA-256 mismatch`: Veritabanına kaydedildikten sonra farklı bir dosya servis
-  ediliyordur. Dosyayı yerinde değiştirmeyin; aynı artefaktla yeniden yayınlayın.
+  ediliyordur. Dosyayı yerinde değiştirmeyin. Yanlış yayını durdurun, build
+  numarasını artırın ve kanonik akışla yeni bir sürüm yayınlayın.
 - `RSA signature did not match`: İstemcideki trusted keyring ile VPS'teki
   release private key aynı anahtar ailesinde değildir. Anahtar rotasyonu
   prosedürünü uygulayın.

@@ -22,7 +22,10 @@ jobs:
         with:
           node-version: "22"
       - name: Prevent incompatible release signer rotation
-        run: node scripts/verify_release_key_continuity.js HEAD^
+        run: |
+          node scripts/verify_release_key_continuity.js HEAD^
+          node --check scripts/verify_published_release.js
+          node scripts/test_verify_published_release.js
 
   backend-ci:
     runs-on: ubuntu-latest

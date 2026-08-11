@@ -49,8 +49,109 @@ function resolveReleaseFilePath(filePath: string | null): string | null {
   return null;
 }
 
+type DownloadRelease = {
+  file_path: string;
+  version_code: string;
+  sha256_hash: string | null;
+};
+
+async function sendReleaseFile(
+  req: Request,
+  res: Response,
+  platform: string,
+  release: DownloadRelease,
+  immutable: boolean,
+) {
+  const resolvedPath = resolveReleaseFilePath(release.file_path);
+  if (!resolvedPath) {
+    return res.status(404).json({ error: 'release_file_not_found' });
+  }
+
+  const fileStat = await fs.promises.stat(resolvedPath);
+  const fileSize = fileStat.size;
+  const rangeHeader = req.headers.range;
+  let start = 0;
+  let end = fileSize - 1;
+  let statusCode = 200;
+
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader(
+    'Cache-Control',
+    immutable ? 'public, max-age=31536000, immutable' : 'no-store',
+  );
+  if (release.sha256_hash) {
+    res.setHeader('ETag', `"sha256-${release.sha256_hash}"`);
+    res.setHeader('X-File-SHA256', release.sha256_hash);
+  }
+
+  if (rangeHeader) {
+    const match = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader.trim());
+    if (!match) {
+      res.setHeader('Content-Range', `bytes */${fileSize}`);
+      return res.status(416).end();
+    }
+    start = Number.parseInt(match[1], 10);
+    end = match[2] ? Number.parseInt(match[2], 10) : fileSize - 1;
+    if (start >= fileSize || end < start) {
+      res.setHeader('Content-Range', `bytes */${fileSize}`);
+      return res.status(416).end();
+    }
+    end = Math.min(end, fileSize - 1);
+    statusCode = 206;
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+  }
+
+  res.status(statusCode);
+  res.setHeader('Content-Length', end - start + 1);
+  res.setHeader(
+    'Content-Type',
+    platform === 'windows'
+      ? 'application/vnd.microsoft.portable-executable'
+      : 'application/vnd.android.package-archive',
+  );
+  const ext = path.extname(resolvedPath);
+  const cleanVersion = release.version_code.split('+')[0];
+  const filename = platform === 'windows'
+    ? `SerenutOS-Setup-v${cleanVersion}${ext}`
+    : `SerenutOS-v${cleanVersion}${ext}`;
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  if (req.method === 'HEAD') return res.end();
+
+  const stream = fs.createReadStream(resolvedPath, { start, end });
+  stream.on('error', (streamError) => {
+    console.error('Public download stream error:', streamError);
+    if (!res.headersSent) res.status(500).end();
+    else res.destroy(streamError);
+  });
+  stream.pipe(res);
+}
+
+router.get('/download/:platform/version/:version', async (req: Request, res: Response) => {
+  const { platform, version } = req.params;
+  if (!['android', 'windows'].includes(platform)) {
+    return res.status(400).json({ error: 'invalid_platform' });
+  }
+  try {
+    const result = await pgPool.query<DownloadRelease>(`
+      SELECT file_path, version_code, sha256_hash
+      FROM app_versions
+      WHERE platform = $1 AND version_code = $2
+        AND status = 'active' AND channel = 'stable'
+      LIMIT 1
+    `, [platform, version]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'release_not_found' });
+    }
+    return sendReleaseFile(req, res, platform, result.rows[0], true);
+  } catch (err) {
+    console.error('Versioned public download error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 router.get('/download/:platform/latest', async (req: Request, res: Response) => {
   const { platform } = req.params;
+  res.setHeader('Cache-Control', 'no-store');
   
   if (platform !== 'android' && platform !== 'windows') {
     return res.status(400).json({ error: 'invalid_platform', message: 'Geçersiz platform.' });
@@ -58,7 +159,7 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
 
   try {
     const query = `
-      SELECT file_path, version_code
+      SELECT file_path, version_code, sha256_hash
       FROM app_versions
       WHERE platform = $1 AND status = 'active' AND channel = 'stable'
       ORDER BY created_at DESC
@@ -72,6 +173,9 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
       const release = result.rows[0];
       versionCode = release.version_code || versionCode;
       resolvedPath = resolveReleaseFilePath(release.file_path);
+      if (resolvedPath) {
+        return sendReleaseFile(req, res, platform, release, false);
+      }
     }
 
     // Fallback: check static public downloads folder if DB query returns empty or file is missing on server disk
@@ -169,6 +273,7 @@ router.get('/download/:platform/latest', async (req: Request, res: Response) => 
 });
 
 router.get('/latest-metadata', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     const query = `
       (SELECT id, version_code, platform, sha256_hash, file_size_bytes, release_notes, created_at
@@ -192,6 +297,7 @@ router.get('/latest-metadata', async (req: Request, res: Response) => {
 
 
 router.get('/check', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
   const platform = req.query.platform as string;
   const current_version = req.query.current_version as string;
 
