@@ -393,7 +393,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Hazır ürün kataloğu her iki seçenekte de otomatik yüklenir.',
+                              'Tam ürün kataloğunu daha sonra Ayarlar > Veri İçeri Aktar menüsünden buluttan yükleyebilirsiniz.',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -404,7 +404,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               icon: Icons.play_circle_fill_rounded,
                               title: 'Demo ile başla',
                               subtitle:
-                                  'Katalog ve Mehmet Güven adlı tek örnek müşteriyle sistemi hemen deneyin.',
+                                  '5–10 örnek ürün, Mehmet Güven, 1 sipariş ve 1 satışla sistemi hemen deneyin.',
                               selected: _initialSetup.mode == SetupMode.demo,
                               onTap: () => setState(() {
                                 _initialSetup = _initialSetup.copyWith(
@@ -417,7 +417,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                               icon: Icons.storefront_rounded,
                               title: 'Kendi işletmemle başla',
                               subtitle:
-                                  'Hazır katalog yüklenir, örnek müşteri eklenmez.',
+                                  'Örnek kayıt oluşturmadan boş işletmeyle başlayın.',
                               selected:
                                   _initialSetup.mode == SetupMode.standard,
                               onTap: () => setState(() {

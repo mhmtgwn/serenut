@@ -237,8 +237,8 @@ class InitialSettings {
 
 enum SetupMode { demo, standard }
 
-/// Katalog her iki kurulum tipinde de yüklenir. Demo modu yalnızca kullanıcının
-/// sistemi deneyebilmesi için tek örnek müşteriyi ekler.
+/// Demo modu küçük bir örnek veri seti kurar. Tam katalog kurulumdan sonra
+/// Ayarlar > Veri İçeri Aktar menüsünden isteğe bağlı olarak indirilir.
 class InitialDataSetup {
   final SetupMode mode;
 

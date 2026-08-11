@@ -118,6 +118,17 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             _buildSectionHeader('İÇE AKTARMA SEÇENEKLERİ'),
             _buildRoundedCard([
               _buildTransferRow(
+                title: 'Buluttan Hazır Katalog İçe Aktar',
+                subtitle:
+                    '15.173 ürün ve görsellerden oluşan hazır kataloğu VPS üzerinden indirir.',
+                icon: Icons.cloud_download_rounded,
+                color: _kTeal,
+                onTap: () => context.push(
+                  '${AppRoutes.catalogImportWizard}?source=cloud',
+                ),
+              ),
+              const _Divider(),
+              _buildTransferRow(
                 title: 'Ürün Kataloğu İçe Aktar (.zip / .xlsx)',
                 subtitle:
                     'Excel tablosu veya ZIP arşivi üzerinden ürünleri yükler.',

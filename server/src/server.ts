@@ -96,6 +96,7 @@ import remoteConfigRouter from './modules/remote-config/remote-config.controller
 import logsRouter from './modules/logs/logs.controller';
 import healthRouter from './modules/health/health.controller';
 import realtimeRouter from './modules/realtime/realtime.controller';
+import catalogRouter from './modules/catalog/catalog.controller';
 
 // BullMQ Workers
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
@@ -400,6 +401,7 @@ app.use('/api/licenses', licenseLimiter, licenseRouter);
 // ── ROUTERS — Genel ───────────────────────────────────────────────────────────
 app.use('/api/v1/updates', updateRouter);
 app.use('/api/v1/releases', releaseRouter);
+app.use('/api/v1/catalogs', catalogRouter);
 app.use('/api/v2/releases', releaseV2Router);
 app.use('/api/v4/sync', syncV4Router);
 app.use('/api/v1/telemetry', telemetryRouter);

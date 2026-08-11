@@ -13,6 +13,8 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/infrastructure/services/cloud_catalog_service.dart';
+import 'package:serenutos/providers/service_providers.dart';
 
 const _kPrimary = POSColors.green;
 const _kBackground = POSColors.surface;
@@ -22,7 +24,9 @@ const _kTextMuted = POSColors.textSecondary;
 const _kText = POSColors.text;
 
 class CatalogImportWizardPage extends ConsumerStatefulWidget {
-  const CatalogImportWizardPage({super.key});
+  final bool cloudSource;
+
+  const CatalogImportWizardPage({super.key, this.cloudSource = false});
 
   @override
   ConsumerState<CatalogImportWizardPage> createState() =>
@@ -37,6 +41,11 @@ class _CatalogImportWizardPageState
   PlatformFile? _selectedFile;
   Uint8List? _fileBytes;
   String? _filePath;
+  CloudCatalogService? _cloudCatalogService;
+  String? _cloudTemporaryPath;
+  bool _isDownloadingCloud = false;
+  double _cloudDownloadProgress = 0;
+  String _cloudDownloadStatus = 'Bulut kataloğuna bağlanılıyor...';
 
   bool _isAnalyzing = false;
   double _analyzeProgress = 0.0;
@@ -68,9 +77,62 @@ class _CatalogImportWizardPageState
   String? _importError;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.cloudSource) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _downloadCloudCatalog());
+    }
+  }
+
+  @override
   void dispose() {
     _analysisTicker?.cancel();
+    final path = _cloudTemporaryPath;
+    final service = _cloudCatalogService;
+    if (path != null && service != null) unawaited(service.cleanup(path));
     super.dispose();
+  }
+
+  Future<void> _downloadCloudCatalog() async {
+    setState(() {
+      _isDownloadingCloud = true;
+      _cloudDownloadProgress = 0;
+      _cloudDownloadStatus = 'Bulut kataloğuna bağlanılıyor...';
+      _parseError = null;
+    });
+    try {
+      final service = createCloudCatalogService(ref.read(apiClientProvider));
+      _cloudCatalogService = service;
+      final download = await service.download(onProgress: (progress, status) {
+        if (!mounted) return;
+        setState(() {
+          _cloudDownloadProgress = progress;
+          _cloudDownloadStatus = status;
+        });
+      });
+      if (!mounted) {
+        await service.cleanup(download.path);
+        return;
+      }
+      _cloudTemporaryPath = download.path;
+      setState(() {
+        _selectedFile = PlatformFile(
+          name: 'Serenut-Hazir-Katalog.zip',
+          size: download.sizeBytes,
+          path: download.path,
+        );
+        _filePath = download.path;
+        _isDownloadingCloud = false;
+      });
+      await _startAnalysis();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isDownloadingCloud = false;
+        _parseError = error.toString().replaceFirst('Exception:', '').trim();
+      });
+    }
   }
 
   void _startAnalysisClock() {
@@ -414,8 +476,13 @@ class _CatalogImportWizardPageState
   // ── ROUTE TO CURRENT VIEW ──────────────────────────────────────────────────
   Widget _buildCurrentStepView() {
     if (_parseError != null) {
-      return _buildErrorStateView(
-          _parseError!, () => setState(() => _parseError = null));
+      return _buildErrorStateView(_parseError!, () {
+        if (widget.cloudSource && _filePath == null) {
+          _downloadCloudCatalog();
+        } else {
+          setState(() => _parseError = null);
+        }
+      });
     }
     if (_importError != null) {
       return _buildErrorStateView(
@@ -440,6 +507,44 @@ class _CatalogImportWizardPageState
 
   // ── STATE 1: FILE SELECTION ────────────────────────────────────────────────
   Widget _buildStep1FileSelection() {
+    if (_isDownloadingCloud) {
+      return Column(
+        children: [
+          const Icon(Icons.cloud_download_rounded, color: _kPrimary, size: 56),
+          const SizedBox(height: 20),
+          const Text(
+            'Hazır Katalog Buluttan İndiriliyor',
+            style: TextStyle(
+              color: _kText,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _cloudDownloadStatus,
+            style: const TextStyle(color: _kTextMuted, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          LinearProgressIndicator(
+            value: _cloudDownloadProgress > 0 ? _cloudDownloadProgress : null,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+            backgroundColor: POSColors.surfaceMuted,
+            valueColor: const AlwaysStoppedAnimation(_kPrimary),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _cloudDownloadProgress > 0
+                ? '%${(_cloudDownloadProgress * 100).round()}'
+                : 'Bağlantı kuruluyor',
+            style: const TextStyle(color: _kText, fontWeight: FontWeight.bold),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
