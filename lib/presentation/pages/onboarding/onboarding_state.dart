@@ -233,6 +233,46 @@ class InitialSettings {
       );
 }
 
+// ────────────────────────────────────────────────────────────
+
+enum SetupMode { demo, standard }
+
+/// Katalog her iki kurulum tipinde de yüklenir. Demo modu yalnızca kullanıcının
+/// sistemi deneyebilmesi için tek örnek müşteriyi ekler.
+class InitialDataSetup {
+  final SetupMode mode;
+
+  const InitialDataSetup({this.mode = SetupMode.demo});
+
+  bool get isDemo => mode == SetupMode.demo;
+
+  InitialDataSetup copyWith({SetupMode? mode}) =>
+      InitialDataSetup(mode: mode ?? this.mode);
+
+  Map<String, dynamic> toJson() => {'mode': mode.name};
+
+  factory InitialDataSetup.fromJson(Map<String, dynamic> j) {
+    final modeName = j['mode'] as String?;
+    if (modeName != null) {
+      return InitialDataSetup(
+        mode: SetupMode.values.firstWhere(
+          (value) => value.name == modeName,
+          orElse: () => SetupMode.demo,
+        ),
+      );
+    }
+
+    // Daha önce kaydedilmiş onboarding taslağını yeni modele taşı.
+    final usedDemoCatalog = j['installDemoCatalog'] as bool? ?? true;
+    final keptDemoCustomer = j['keepDemoCustomer'] as bool? ?? true;
+    return InitialDataSetup(
+      mode: usedDemoCatalog && keptDemoCustomer
+          ? SetupMode.demo
+          : SetupMode.standard,
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 
 class LicenseInfo {
@@ -281,12 +321,14 @@ class OnboardingState {
   final AdminInfo admin;
   final InitialSettings settings;
   final LicenseInfo license;
+  final InitialDataSetup initialData;
 
   const OnboardingState({
     this.business = const BusinessInfo(),
     this.admin = const AdminInfo(),
     this.settings = const InitialSettings(),
     this.license = const LicenseInfo(),
+    this.initialData = const InitialDataSetup(),
   });
 
   OnboardingState copyWith({
@@ -294,12 +336,14 @@ class OnboardingState {
     AdminInfo? admin,
     InitialSettings? settings,
     LicenseInfo? license,
+    InitialDataSetup? initialData,
   }) =>
       OnboardingState(
         business: business ?? this.business,
         admin: admin ?? this.admin,
         settings: settings ?? this.settings,
         license: license ?? this.license,
+        initialData: initialData ?? this.initialData,
       );
 
   Map<String, dynamic> toJson() => {
@@ -307,6 +351,7 @@ class OnboardingState {
         'admin': admin.toJson(),
         'settings': settings.toJson(),
         'license': license.toJson(),
+        'initialData': initialData.toJson(),
       };
 
   factory OnboardingState.fromJson(Map<String, dynamic> j) => OnboardingState(
@@ -317,6 +362,11 @@ class OnboardingState {
             j['settings'] as Map<String, dynamic>? ?? {}),
         license:
             LicenseInfo.fromJson(j['license'] as Map<String, dynamic>? ?? {}),
+        initialData: InitialDataSetup.fromJson(
+          j['initialData'] as Map<String, dynamic>? ??
+              j['trialData'] as Map<String, dynamic>? ??
+              {},
+        ),
       );
 }
 
