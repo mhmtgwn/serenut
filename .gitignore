@@ -97,6 +97,7 @@ keystore*.txt
 !.env.staging.example
 telemetry_logs.jsonl
 *.zip
+!market_data_catalog_with_images.zip
 
 # Dependency Caches & Configurations
 node_modules/

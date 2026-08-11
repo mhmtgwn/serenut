@@ -3,6 +3,7 @@
 // Sub-route tabanlı wizard: /onboarding → /onboarding/business → /onboarding/admin → /onboarding/success
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/theme.dart';
@@ -22,9 +23,14 @@ import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'package:serenutos/domain/models/industry_template.dart';
+import 'package:serenutos/domain/models/import_strategy.dart';
+import 'package:serenutos/domain/services/dataset_import_service.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_product_repository.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+
+const String _demoCatalogAsset = 'market_data_catalog_with_images.zip';
+const String _demoCustomerId = 'demo-customer-mehmet-guven';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step wrappers — GoRouter route builder'larında kullanılan widget'lar
@@ -95,8 +101,8 @@ class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
     }
   }
 
-  void _onComplete(BusinessInfo info) {
-    final updated = _state.copyWith(business: info);
+  void _onComplete(BusinessInfo info, InitialDataSetup initialSetup) {
+    final updated = _state.copyWith(business: info, initialData: initialSetup);
     _persistence.saveState(updated);
     _persistence.saveStep(2);
     context.go('/onboarding/admin');
@@ -111,6 +117,7 @@ class _OnboardingStep1PageState extends ConsumerState<OnboardingStep1Page> {
     }
     return Step1BusinessInfo(
       initialData: _state.business,
+      initialSetup: _state.initialData,
       onComplete: _onComplete,
     );
   }
@@ -132,6 +139,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
   OnboardingState _state = const OnboardingState();
   late OnboardingPersistence _persistence;
   bool _saving = false;
+  String _savingStatus = 'Kurulum tamamlanıyor...';
 
   @override
   void initState() {
@@ -199,6 +207,10 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     }
   }
 
+  void _setSavingStatus(String status) {
+    if (mounted) setState(() => _savingStatus = status);
+  }
+
   Future<List<String>> _saveOnboardingData(OnboardingState state) async {
     final prefs = ref.read(sharedPreferencesProvider);
     final dbManager = DatabaseManager();
@@ -207,6 +219,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     // The server owns account, tenant and device entitlement creation.  Do this
     // before persisting a local business so a failed registration cannot leave a
     // device that looks configured but has no tenant to sync with.
+    _setSavingStatus('Hesabınız oluşturuluyor...');
     final rawPassword = state.admin.password;
     final apiClient = ref.read(apiClientProvider);
     final registration = await apiClient.post('/auth/register', {
@@ -247,6 +260,7 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
     debugPrint('Onboarding: Sunucu kaydı ve cihaz aktivasyonu başarılı');
 
     // 1. Admin kimlik bilgilerini kaydet
+    _setSavingStatus('Yerel ayarlar kaydediliyor...');
     // PIN: SQLite settings tablosuna yaz (tek kaynak)
     final pinHash = _hashPin(state.admin.pin);
     // Write admin PIN to SQLite settings table (single source of truth)
@@ -298,26 +312,49 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       currency: state.business.currency,
       createdAt: DateTime.now(),
     ));
-    // 4. Sektör şablonundaki ürünleri SQLite'a tohumla (seed)
-    final template =
-        IndustryTemplateRegistry.getTemplate(state.business.businessType);
-    if (template != null) {
-      final productRepo = SqliteProductRepository(gateway);
-      for (final p in template.products) {
-        final barcode = p.barcode ?? 'BAR-${p.name.hashCode.abs()}';
-        await productRepo.create(ProductEntity(
-          id: barcode,
-          name: p.name,
-          description: '${p.category} kategorisinden hazır ürün.',
-          price: p.price,
-          quantity: 100,
-          category: p.category,
-          vat: p.vatRate.toInt(),
+    // 4. Görselli hazır katalog her kurulum tipinde otomatik yüklenir.
+    _setSavingStatus('Ürün kataloğu hazırlanıyor...');
+    final productRepo = SqliteProductRepository(gateway);
+    final catalogData = await rootBundle.load(_demoCatalogAsset);
+    final catalogBytes = catalogData.buffer.asUint8List(
+      catalogData.offsetInBytes,
+      catalogData.lengthInBytes,
+    );
+    final importer = DatasetImportService(productRepo);
+    await importer.importFromZip(
+      catalogBytes,
+      (progress, status) => _setSavingStatus(
+        'Katalog yükleniyor (%${(progress * 100).round()})\n$status',
+      ),
+      const ImportStrategy(
+        insertNew: true,
+        updateExisting: true,
+        duplicateResolution: DuplicateResolution.update,
+      ),
+    );
+
+    // 5. Demo kurulumda yalnızca tek bir örnek müşteri sunulur. Standart
+    // kurulumda sistemin zorunlu Peşin Müşteri kaydı dışında örnek yoktur.
+    _setSavingStatus('Kurulum modu uygulanıyor...');
+    final customerRepo = SqliteCustomerRepository(gateway);
+    final demoCustomerExists = await customerRepo.exists(_demoCustomerId);
+    if (state.initialData.isDemo) {
+      if (!demoCustomerExists) {
+        await customerRepo.create(CustomerEntity(
+          id: _demoCustomerId,
+          name: 'Mehmet Güven',
+          email: '',
+          phone: '05380288202',
+          balance: 0,
+          createdAt: DateTime.now(),
         ));
       }
+    } else if (demoCustomerExists) {
+      await customerRepo.delete(_demoCustomerId);
     }
 
-    // 5. Onboarding tamamlandı
+    // 6. Onboarding tamamlandı
+    _setSavingStatus('Kurulum tamamlanıyor...');
     await _persistence.markCompleted();
     return recoveryCodes;
   }
@@ -332,16 +369,17 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
   @override
   Widget build(BuildContext context) {
     if (_saving) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: POSColors.surface,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: POSColors.green),
-              SizedBox(height: 20),
-              Text('Kurulum tamamlanıyor...',
-                  style: TextStyle(
+              const CircularProgressIndicator(color: POSColors.green),
+              const SizedBox(height: 20),
+              Text(_savingStatus,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: POSColors.textSecondary)),

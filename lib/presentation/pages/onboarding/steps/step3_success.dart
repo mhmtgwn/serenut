@@ -319,6 +319,16 @@ class _SystemSummaryCard extends StatelessWidget {
               ? state.business.businessType
               : '—'),
       const _SummaryItem(
+          icon: Icons.inventory_2_rounded,
+          label: 'Katalog',
+          value: 'Hazır katalog',
+          isGood: true),
+      _SummaryItem(
+          icon: Icons.rocket_launch_rounded,
+          label: 'Kurulum',
+          value: state.initialData.isDemo ? 'Demo' : 'Standart',
+          isGood: true),
+      const _SummaryItem(
           icon: Icons.storage_rounded,
           label: 'Veritabanı',
           value: 'Hazır',

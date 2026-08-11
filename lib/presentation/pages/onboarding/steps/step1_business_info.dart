@@ -25,11 +25,14 @@ class _BusinessType {
 
 class Step1BusinessInfo extends StatefulWidget {
   final BusinessInfo initialData;
-  final void Function(BusinessInfo data) onComplete;
+  final InitialDataSetup initialSetup;
+  final void Function(BusinessInfo data, InitialDataSetup initialSetup)
+      onComplete;
 
   const Step1BusinessInfo({
     super.key,
     required this.initialData,
+    required this.initialSetup,
     required this.onComplete,
   });
 
@@ -40,6 +43,7 @@ class Step1BusinessInfo extends StatefulWidget {
 class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
   final _formKey = GlobalKey<FormState>();
   late BusinessInfo _data;
+  late InitialDataSetup _initialSetup;
 
   // Controllers
   late final TextEditingController _businessNameCtrl;
@@ -57,6 +61,7 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
   void initState() {
     super.initState();
     _data = widget.initialData;
+    _initialSetup = widget.initialSetup;
     _businessNameCtrl = TextEditingController(text: _data.businessName);
     _ownerNameCtrl = TextEditingController(text: _data.ownerName);
     _phoneCtrl = TextEditingController(text: _data.phone);
@@ -127,13 +132,16 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
       );
       return;
     }
-    widget.onComplete(_data.copyWith(
-      businessName: _businessNameCtrl.text.trim(),
-      ownerName: _ownerNameCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim(),
-      taxNumber: _taxNoCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-    ));
+    widget.onComplete(
+      _data.copyWith(
+        businessName: _businessNameCtrl.text.trim(),
+        ownerName: _ownerNameCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        taxNumber: _taxNoCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+      ),
+      _initialSetup,
+    );
   }
 
   @override
@@ -372,6 +380,56 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
                         ),
                       ),
 
+                      const SizedBox(height: 16),
+
+                      // Kurulum modu kartı
+                      _Card(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SectionTitle(
+                              icon: Icons.science_rounded,
+                              text: 'Kurulum Modu',
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Hazır ürün kataloğu her iki seçenekte de otomatik yüklenir.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: POSColors.textSecondary),
+                            ),
+                            const SizedBox(height: 12),
+                            _SetupModeCard(
+                              icon: Icons.play_circle_fill_rounded,
+                              title: 'Demo ile başla',
+                              subtitle:
+                                  'Katalog ve Mehmet Güven adlı tek örnek müşteriyle sistemi hemen deneyin.',
+                              selected: _initialSetup.mode == SetupMode.demo,
+                              onTap: () => setState(() {
+                                _initialSetup = _initialSetup.copyWith(
+                                  mode: SetupMode.demo,
+                                );
+                              }),
+                            ),
+                            const SizedBox(height: 10),
+                            _SetupModeCard(
+                              icon: Icons.storefront_rounded,
+                              title: 'Kendi işletmemle başla',
+                              subtitle:
+                                  'Hazır katalog yüklenir, örnek müşteri eklenmez.',
+                              selected:
+                                  _initialSetup.mode == SetupMode.standard,
+                              onTap: () => setState(() {
+                                _initialSetup = _initialSetup.copyWith(
+                                  mode: SetupMode.standard,
+                                );
+                              }),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       const SizedBox(height: 28),
                     ],
                   ),
@@ -391,6 +449,85 @@ class _Step1BusinessInfoState extends State<Step1BusinessInfo> {
 // ─────────────────────────────────────────────────────────────────────────────
 // İşletme türü kartı
 // ─────────────────────────────────────────────────────────────────────────────
+class _SetupModeCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SetupModeCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected
+                ? POSColors.green.withValues(alpha: 0.08)
+                : POSColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? POSColors.green : POSColors.border,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: selected ? POSColors.green : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: selected ? Colors.white : POSColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: POSColors.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                color: selected ? POSColors.green : POSColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BusinessTypeCard extends StatelessWidget {
   final IconData icon;
   final String label;
