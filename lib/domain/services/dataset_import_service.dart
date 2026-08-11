@@ -1187,6 +1187,7 @@ class DatasetImportService {
                 products.sublist(i, min(i + chunkLimit, totalProducts));
             final batch = txn.batch();
             final mutatedProductIds = <String>[];
+            final reactivatedProductIds = <String>{};
 
             for (final prodMap in chunk) {
               final barcode = prodMap['barcode'] as String;
@@ -1224,7 +1225,8 @@ class DatasetImportService {
                   'price',
                   'description',
                   'image_url',
-                  'is_active'
+                  'is_active',
+                  'is_deleted',
                 ],
                 where: 'id = ?',
                 whereArgs: [barcode],
@@ -1241,6 +1243,7 @@ class DatasetImportService {
                     'category': category,
                     'vat': vat,
                     'is_active': 1,
+                    'is_deleted': 0,
                     'is_synced': 0,
                     'created_at': DateTime.now().toIso8601String(),
                     'updated_at': DateTime.now().toIso8601String(),
@@ -1263,8 +1266,15 @@ class DatasetImportService {
                   };
 
                   if (strategy.reactivatePassive &&
-                      existing['is_active'] == 0) {
-                    updateFields['is_active'] = 1;
+                      (existing['is_active'] == 0 ||
+                          existing['is_deleted'] == 1)) {
+                    updateFields.addAll({
+                      'is_active': 1,
+                      'is_deleted': 0,
+                      'deleted_at': null,
+                      'deleted_by': null,
+                    });
+                    reactivatedProductIds.add(barcode);
                   }
 
                   if (strategy.syncPrices) {
@@ -1309,12 +1319,20 @@ class DatasetImportService {
               for (final row in mutatedRows) {
                 final id = row['id']?.toString();
                 if (id == null || id.isEmpty) continue;
+                final payload = Map<String, dynamic>.from(row);
+                if (reactivatedProductIds.contains(id)) {
+                  // Sync V4 keeps durable delete tombstones. Reactivation must
+                  // be explicit so a catalogue import can intentionally bring
+                  // a previously deleted barcode back without allowing an
+                  // ordinary stale UPSERT to resurrect it accidentally.
+                  payload['reactivate_deleted'] = true;
+                }
                 await SyncOutboxV4.enqueue(
                   txn,
                   entityType: 'product',
                   entityId: id,
                   operation: 'UPSERT',
-                  payload: Map<String, dynamic>.from(row),
+                  payload: payload,
                 );
               }
             }

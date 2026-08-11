@@ -10,6 +10,7 @@ import 'package:serenutos/providers/dataset_import_provider.dart';
 import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/dataset_import_service.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/config/theme.dart';
 
@@ -55,7 +56,10 @@ class _CatalogImportWizardPageState
   bool _syncDescriptions = true;
   bool _syncImages = true;
   bool _deactivateMissing = false;
-  DuplicateResolution _duplicateResolution = DuplicateResolution.merge;
+  // Re-importing the same catalogue must be idempotent by default. Matching
+  // barcodes update the existing row and replace its stock value; users can
+  // still explicitly choose "Mevcut Stoka Ekle" when that is intentional.
+  DuplicateResolution _duplicateResolution = DuplicateResolution.update;
 
   bool _isImporting = false;
   double _importProgress = 0.0;
@@ -224,8 +228,18 @@ class _CatalogImportWizardPageState
               strategy,
             );
 
-      // Invalidate the repository so components refresh product list
+      // Clear stale product-list filters and every product projection. Merely
+      // rebuilding the repository leaves the paginated controller holding its
+      // previous (often empty) page after a reset + catalogue import.
+      ref.read(productSearchQueryProvider.notifier).state = '';
+      ref.read(productCategoryFilterProvider.notifier).state = null;
       ref.invalidate(productRepositoryProvider);
+      ref.invalidate(productsControllerProvider);
+      ref.invalidate(salesProductsControllerProvider);
+      ref.invalidate(ordersProductsControllerProvider);
+      ref.invalidate(productInventorySummaryProvider);
+      ref.invalidate(allProductsProvider);
+      ref.invalidate(lowStockProductsProvider);
       ProductImage.clearCache();
 
       setState(() {

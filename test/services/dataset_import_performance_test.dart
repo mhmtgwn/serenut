@@ -2,6 +2,7 @@
 // Integration tests for DatasetImportService batch transactions and strategy algorithms.
 
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -106,6 +107,66 @@ void main() {
   }
 
   group('DatasetImportService Performance and Strategy Tests', () {
+    test('catalog import explicitly reactivates a soft-deleted product',
+        () async {
+      const barcode = '8690001112299';
+      await productRepo.create(ProductEntity(
+        id: barcode,
+        name: 'Silinmiş Ürün',
+        description: 'Eski marka',
+        price: 10,
+        quantity: 1,
+        category: 'Eski',
+      ));
+      await productRepo.delete(barcode);
+
+      final result = await importService.importFromZip(
+        createMockZip([
+          {
+            'barcode': barcode,
+            'name': 'Yeniden Aktarılan Ürün',
+            'category': 'Yeni',
+            'brand': 'Test',
+            'price': 25.0,
+            'vat': 20,
+            'imageUrl': '',
+            'quantity': 4,
+          },
+        ]),
+        (_, __) {},
+      );
+
+      expect(result['success'], 1);
+      final db = await dbManager.getDatabase();
+      final row = (await db.query(
+        'products',
+        where: 'id = ?',
+        whereArgs: [barcode],
+      ))
+          .single;
+      expect(row['is_active'], 1);
+      expect(row['is_deleted'], 0);
+      expect(row['deleted_at'], isNull);
+      expect(row['quantity'], 4,
+          reason: 'Tekrar import mevcut stok üzerine ekleme yapmamalı');
+      expect(
+        await db.query('products', where: 'id = ?', whereArgs: [barcode]),
+        hasLength(1),
+        reason: 'Aynı barkod ikinci bir ürün satırı oluşturmamalı',
+      );
+
+      final outbox = (await db.query(
+        'sync_outbox_v4',
+        where: 'entity_type = ? AND entity_id = ?',
+        whereArgs: ['product', barcode],
+      ))
+          .single;
+      expect(outbox['operation'], 'UPSERT');
+      final payload = jsonDecode(outbox['payload'] as String) as Map;
+      expect(payload['reactivate_deleted'], isTrue);
+      expect(payload['is_deleted'], 0);
+    });
+
     test('DuplicateResolution.skip preserves existing details', () async {
       // 1. Pre-seed database with a product
       final initial = ProductEntity(
