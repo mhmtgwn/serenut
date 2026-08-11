@@ -66,6 +66,7 @@ class SyncNotifier extends StateNotifier<SyncState>
   SyncStateMachine? _machine;
   Timer? _periodicSyncTimer;
   bool _syncRequestedWhileRunning = false;
+  bool _resetInProgress = false;
   SyncStateMachine? get stateMachine => _machine;
 
   SyncNotifier(this._ref) : super(const SyncState()) {
@@ -106,8 +107,58 @@ class SyncNotifier extends StateNotifier<SyncState>
     await triggerSync();
   }
 
+  Future<void> resetOperationalData() async {
+    await _waitForActiveSync();
+    final service = _syncService;
+    if (service == null) {
+      throw StateError(
+          'Senkronizasyon servisi henüz hazır değil. Lütfen tekrar deneyin.');
+    }
+    _resetInProgress = true;
+    state = state.copyWith(status: SyncStatus.syncing, lastError: null);
+    try {
+      await service.resetOperationalData();
+      state = state.copyWith(
+        status: SyncStatus.success,
+        lastSyncedCount: 0,
+        lastSyncAt: DateTime.now(),
+        lastError: null,
+      );
+    } catch (error) {
+      state =
+          state.copyWith(status: SyncStatus.error, lastError: error.toString());
+      rethrow;
+    } finally {
+      _resetInProgress = false;
+    }
+  }
+
+  /// Prevents a database write from racing with factory-reset file removal.
+  Future<void> prepareForFactoryReset() async {
+    await _waitForActiveSync();
+    _resetInProgress = true;
+    _syncRequestedWhileRunning = false;
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
+    _syncService = null;
+    state = const SyncState();
+  }
+
+  Future<void> _waitForActiveSync() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 30));
+    while (state.status == SyncStatus.syncing &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (state.status == SyncStatus.syncing) {
+      throw StateError(
+          'Senkronizasyon tamamlanamadı. İnternet bağlantısını kontrol edip tekrar deneyin.');
+    }
+  }
+
   /// Trigger sync manually (e.g., after a sale is created).
   Future<void> triggerSync() async {
+    if (_resetInProgress) return;
     final service = _syncService;
     if (service == null) return;
     if (state.status == SyncStatus.syncing) {

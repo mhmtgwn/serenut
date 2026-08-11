@@ -5,11 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
+import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 
 int _syncInt(Object? value, [int fallback = 0]) {
   if (value is num) return value.toInt();
@@ -57,6 +59,34 @@ class SyncV4Service {
       'sync_v4_unsynced_product_recovery_v1';
   static const _companyVersionKey = 'sync_v4_company_version';
   static const _companySyncedAtKey = 'sync_v4_company_synced_at';
+
+  /// Permanently resets the tenant's operational data on the server, then
+  /// applies the returned reset barrier locally. The server revision prevents
+  /// stale offline mutations from resurrecting pre-reset data.
+  Future<int> resetOperationalData() async {
+    final deviceActivationId = await _deviceActivationId();
+    final deviceId = await _deviceId();
+    final response = await _api.post('/api/v4/sync/operational-reset', {
+      'device_activation_id': deviceActivationId,
+      'device_id': deviceId,
+    });
+    final body = Map<String, dynamic>.from(response.json as Map);
+    final revision = _syncInt(body['reset_revision']);
+    if (revision <= 0) throw StateError('invalid_operational_reset_revision');
+
+    if (!kIsWeb) {
+      final db = await DatabaseManager().getDatabase();
+      await db.transaction((txn) async {
+        await DataResetService.clearOperationalTables(txn);
+        await txn.insert(
+          'sync_cursor_v4',
+          {'key': 'global', 'cursor': revision},
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      });
+    }
+    return revision;
+  }
 
   Future<SyncV4Result> sync() async {
     final db = await DatabaseManager().getDatabase();
@@ -454,22 +484,48 @@ class SyncV4Service {
       'refund': 4,
       'financial_transaction': 5,
     };
-    final ordered = List<Map<String, dynamic>>.from(records);
-    ordered.sort((a, b) {
-      final aDelete = a['operation'] == 'DELETE';
-      final bDelete = b['operation'] == 'DELETE';
-      if (aDelete != bDelete) return aDelete ? 1 : -1;
-      final aRank = parentsFirst[a['entity_type']] ?? 99;
-      final bRank = parentsFirst[b['entity_type']] ?? 99;
-      return aDelete ? bRank.compareTo(aRank) : aRank.compareTo(bRank);
-    });
-    return ordered;
+    List<Map<String, dynamic>> orderSegment(
+        List<Map<String, dynamic>> segment) {
+      final ordered = List<Map<String, dynamic>>.from(segment);
+      ordered.sort((a, b) {
+        final aDelete = a['operation'] == 'DELETE';
+        final bDelete = b['operation'] == 'DELETE';
+        if (aDelete != bDelete) return aDelete ? 1 : -1;
+        final aRank = parentsFirst[a['entity_type']] ?? 99;
+        final bRank = parentsFirst[b['entity_type']] ?? 99;
+        return aDelete ? bRank.compareTo(aRank) : aRank.compareTo(bRank);
+      });
+      return ordered;
+    }
+
+    // A server-issued reset is a causal barrier. Preserve its journal position
+    // while still dependency-sorting ordinary changes on either side.
+    final result = <Map<String, dynamic>>[];
+    final segment = <Map<String, dynamic>>[];
+    for (final record in records) {
+      if (record['entity_type'] == 'system_reset') {
+        result.addAll(orderSegment(segment));
+        segment.clear();
+        result.add(record);
+      } else {
+        segment.add(record);
+      }
+    }
+    result.addAll(orderSegment(segment));
+    return result;
   }
 
   Future<void> _apply(Transaction db, Map<String, dynamic> change) async {
     final type = change['entity_type'] as String;
     final payload = Map<String, dynamic>.from(change['payload'] as Map);
     final id = change['entity_id'] as String;
+    if (type == 'system_reset') {
+      if (payload['scope'] != 'operational') {
+        throw StateError('unsupported_system_reset_scope');
+      }
+      await DataResetService.clearOperationalTables(db);
+      return;
+    }
     if (type == 'refund') {
       if (change['operation'] == 'DELETE') throw StateError('immutable_refund');
       await _applyRefund(db, id, payload);

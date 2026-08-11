@@ -1,4 +1,5 @@
 // lib/presentation/pages/settings/catalog_import_wizard_page.dart
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -39,6 +40,9 @@ class _CatalogImportWizardPageState
   bool _isAnalyzing = false;
   double _analyzeProgress = 0.0;
   String _analyzeStatus = 'Hazırlanıyor...';
+  Duration _analyzeElapsed = Duration.zero;
+  DateTime? _analysisStartedAt;
+  Timer? _analysisTicker;
 
   ParsedCatalogData? _parsedData;
   String? _parseError;
@@ -58,6 +62,40 @@ class _CatalogImportWizardPageState
   String _importStatus = 'Hazırlanıyor...';
   Map<String, int>? _importResult;
   String? _importError;
+
+  @override
+  void dispose() {
+    _analysisTicker?.cancel();
+    super.dispose();
+  }
+
+  void _startAnalysisClock() {
+    _analysisTicker?.cancel();
+    _analysisStartedAt = DateTime.now();
+    _analyzeElapsed = Duration.zero;
+    _analysisTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _analysisStartedAt == null) return;
+      setState(() {
+        _analyzeElapsed = DateTime.now().difference(_analysisStartedAt!);
+      });
+    });
+  }
+
+  void _stopAnalysisClock() {
+    _analysisTicker?.cancel();
+    _analysisTicker = null;
+    if (_analysisStartedAt != null) {
+      _analyzeElapsed = DateTime.now().difference(_analysisStartedAt!);
+    }
+  }
+
+  String get _analysisElapsedLabel {
+    final minutes = _analyzeElapsed.inMinutes;
+    final seconds = _analyzeElapsed.inSeconds.remainder(60);
+    return minutes == 0
+        ? '$seconds sn'
+        : '$minutes dk ${seconds.toString().padLeft(2, '0')} sn';
+  }
 
   Future<void> _pickFile() async {
     try {
@@ -103,31 +141,39 @@ class _CatalogImportWizardPageState
       _analyzeStatus = 'Dosya yükleniyor...';
       _parseError = null;
     });
+    _startAnalysisClock();
 
     try {
       final importer = await ref.read(datasetImportServiceProvider.future);
       final parsed = kIsWeb
           ? await importer.analyzeZip(_fileBytes!, (progress, status) {
+              if (!mounted) return;
               setState(() {
                 _analyzeProgress = progress;
                 _analyzeStatus = status;
               });
             })
           : await importer.analyzeFile(_filePath!, (progress, status) {
+              if (!mounted) return;
               setState(() {
                 _analyzeProgress = progress;
                 _analyzeStatus = status;
               });
             });
 
+      _stopAnalysisClock();
+      if (!mounted) return;
       setState(() {
         _parsedData = parsed;
         _isAnalyzing = false;
         _currentStep = 2;
       });
     } catch (e) {
+      _stopAnalysisClock();
+      if (!mounted) return;
       setState(() {
-        _parseError = e.toString().replaceAll('Exception:', '').trim();
+        final detail = e.toString().replaceFirst('Exception:', '').trim();
+        _parseError = 'İşlem “$_analyzeStatus” aşamasında durdu.\n\n$detail';
         _isAnalyzing = false;
         _currentStep = 0;
       });
@@ -480,6 +526,12 @@ class _CatalogImportWizardPageState
 
   // ── STATE 2: ANALYSIS PROGRESS ─────────────────────────────────────────────
   Widget _buildStep2Analysis() {
+    final phases = <({String label, double threshold})>[
+      (label: 'Dosyayı ve arşivi denetle', threshold: 0.02),
+      (label: 'Excel ve görselleri bul', threshold: 0.08),
+      (label: 'Excel tablosunu aç', threshold: 0.62),
+      (label: 'Ürün satırlarını oku', threshold: 0.88),
+    ];
     return Column(
       children: [
         const SizedBox(height: 24),
@@ -513,11 +565,41 @@ class _CatalogImportWizardPageState
         ),
         const SizedBox(height: 8),
         Text(
-          '${(_analyzeProgress * 100).toInt()}%',
+          '${(_analyzeProgress * 100).toInt()}% · Geçen süre: $_analysisElapsedLabel',
           style: const TextStyle(
               color: _kText, fontWeight: FontWeight.bold, fontSize: 13),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
+        ...phases.map((phase) {
+          final completed = _analyzeProgress >= phase.threshold + 0.14;
+          final active = !completed && _analyzeProgress >= phase.threshold;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(
+                  completed
+                      ? Icons.check_circle_rounded
+                      : active
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                  color: completed || active ? _kPrimary : _kTextMuted,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  phase.label,
+                  style: TextStyle(
+                    color: active ? _kText : _kTextMuted,
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 12),
       ],
     );
   }
@@ -526,6 +608,7 @@ class _CatalogImportWizardPageState
   Widget _buildStep3Preview() {
     final productsCount = _parsedData?.products.length ?? 0;
     final imagesCount = _parsedData?.images.length ?? 0;
+    final imageWarnings = _parsedData?.imageWarnings ?? 0;
 
     // Build categories set
     final categories = <String>{};
@@ -566,6 +649,13 @@ class _CatalogImportWizardPageState
           ],
         ),
         const SizedBox(height: 24),
+
+        if (imageWarnings > 0) ...[
+          _buildWarningBanner(
+            '$imageWarnings bozuk veya desteklenmeyen görsel atlandı. Ürünler yine de içe aktarılabilir.',
+          ),
+          const SizedBox(height: 16),
+        ],
 
         const Divider(color: _kBorderColor),
         const SizedBox(height: 16),
@@ -737,6 +827,7 @@ class _CatalogImportWizardPageState
   Widget _buildStep5ResultsReport() {
     final successCount = _importResult?['success'] ?? 0;
     final errorCount = _importResult?['error'] ?? 0;
+    final imageErrorCount = _importResult?['imageError'] ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -761,6 +852,12 @@ class _CatalogImportWizardPageState
           style: TextStyle(color: _kTextMuted, fontSize: 13),
           textAlign: TextAlign.center,
         ),
+        if (imageErrorCount > 0) ...[
+          const SizedBox(height: 16),
+          _buildWarningBanner(
+            '$imageErrorCount bozuk görsel atlandı; kalan ürün ve görseller başarıyla aktarıldı.',
+          ),
+        ],
         const SizedBox(height: 28),
 
         // Statistics Box
@@ -862,6 +959,29 @@ class _CatalogImportWizardPageState
             style: TextStyle(
                 color: valueColor, fontSize: 14, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  Widget _buildWarningBanner(String message) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: _kText, fontSize: 12, height: 1.35),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

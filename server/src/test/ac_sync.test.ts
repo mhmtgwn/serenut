@@ -32,7 +32,7 @@ function tokenForDevice(): string {
       email: 'owner@sync-http.test',
       company_id: companyId,
       roles: ['owner'],
-      permissions: ['settings:printer'],
+      permissions: ['settings:printer', 'settings:database'],
       token_version: 1,
       entitlement_state: 'active',
       entitlement_valid_until: Date.now() + 60 * 60 * 1000,
@@ -456,7 +456,47 @@ async function run() {
     fail(`uncertain print could not be resolved safely: ${confirmedPrinted.status} ${JSON.stringify(confirmedPrinted.body)}`);
   }
 
-  console.log('✔ Sync V4 HTTP: push, retry, pull, conflict and poison-batch isolation passed.');
+  const operationalReset = await request(app)
+    .post('/api/v4/sync/operational-reset')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({ device_activation_id: activationA, device_id: installationA });
+  if (operationalReset.status !== 200 ||
+      !Number.isSafeInteger(Number(operationalReset.body.reset_revision))) {
+    fail(`operational reset failed: ${operationalReset.status} ${JSON.stringify(operationalReset.body)}`);
+  }
+  const resetRevision = Number(operationalReset.body.reset_revision);
+  const staleAfterReset = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationB,
+      device_id: installationB,
+      mutations: [{
+        mutation_id: '30000000-0000-4000-8000-000000000001',
+        entity_type: 'product', entity_id: 'stale-after-reset', operation: 'UPSERT',
+        base_revision: Math.max(0, resetRevision - 1),
+        payload: { name: 'Stale Product', price: 1, quantity: 1 },
+      }],
+    });
+  if (staleAfterReset.status !== 200 ||
+      staleAfterReset.body.rejected?.[0]?.error !== 'stale_before_operational_reset') {
+    fail(`pre-reset offline mutation was not rejected: ${staleAfterReset.status} ${JSON.stringify(staleAfterReset.body)}`);
+  }
+  const resetRows = await pgPool.query(
+    `SELECT
+      (SELECT COUNT(*) FROM products WHERE company_id=$1) AS products,
+      (SELECT COUNT(*) FROM sales WHERE company_id=$1) AS sales,
+      (SELECT COUNT(*) FROM financial_transactions WHERE company_id=$1) AS financial_transactions`,
+    [companyId],
+  );
+  if (Number(resetRows.rows[0].products) !== 0 || Number(resetRows.rows[0].sales) !== 0 ||
+      Number(resetRows.rows[0].financial_transactions) !== 0) {
+    fail(`operational reset left business rows behind: ${JSON.stringify(resetRows.rows[0])}`);
+  }
+
+  console.log('✔ Sync V4 HTTP: push, retry, pull, conflict, reset barrier and poison-batch isolation passed.');
 }
 
 run()
