@@ -149,6 +149,54 @@ async function run() {
     fail(`idempotent retry was not acknowledged: ${duplicate.status}`);
   }
 
+  const deleteProduct = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      mutations: [{
+        mutation_id: '11111111-1111-4111-8111-111111111112',
+        entity_type: 'product', entity_id: productMutation.entity_id,
+        operation: 'DELETE', base_revision: Number(pushed.body.results[0].revision),
+        payload: { is_deleted: 1 },
+      }],
+    });
+  const deleteRevision = Number(deleteProduct.body.results?.[0]?.revision);
+  if (deleteProduct.status !== 200 || !Number.isSafeInteger(deleteRevision)) {
+    fail(`product tombstone was not accepted: ${deleteProduct.status} ${JSON.stringify(deleteProduct.body)}`);
+  }
+
+  const reactivateProduct = await request(app)
+    .post('/api/v4/sync/push')
+    .set('Authorization', bearer)
+    .set(syncProtocolHeader)
+    .send({
+      device_activation_id: activationA,
+      device_id: installationA,
+      mutations: [{
+        ...productMutation,
+        mutation_id: '11111111-1111-4111-8111-111111111113',
+        base_revision: deleteRevision,
+        payload: {
+          ...productMutation.payload,
+          is_deleted: 0,
+          reactivate_deleted: true,
+        },
+      }],
+    });
+  const reactivatedRow = await pgPool.query(
+    'SELECT status,is_deleted FROM products WHERE company_id=$1 AND id=$2',
+    [companyId, productMutation.entity_id],
+  );
+  if (reactivateProduct.status !== 200 ||
+      reactivateProduct.body.results?.length !== 1 ||
+      reactivatedRow.rows[0]?.status !== 'active' ||
+      reactivatedRow.rows[0]?.is_deleted !== false) {
+    fail(`explicit catalogue reactivation failed: ${reactivateProduct.status} ${JSON.stringify(reactivateProduct.body)}`);
+  }
+
   const pulled = await request(app)
     .get(`/api/v4/sync/pull?cursor=0&limit=200&device_activation_id=${activationB}&device_id=${installationB}`)
     .set('Authorization', bearer)

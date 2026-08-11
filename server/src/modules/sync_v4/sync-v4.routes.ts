@@ -1032,8 +1032,16 @@ router.post("/push", async (req, res) => {
           continue;
         }
       }
+      const explicitlyReactivatesDeletedProduct =
+        mutation.entity_type === "product" &&
+        mutation.operation === "UPSERT" &&
+        mutation.payload.reactivate_deleted === true &&
+        mutation.payload.is_deleted !== true &&
+        mutation.payload.is_deleted !== 1;
       const effectiveOperation =
-        entity.rows[0]?.is_deleted === true ? "DELETE" : mutation.operation;
+        entity.rows[0]?.is_deleted === true && !explicitlyReactivatesDeletedProduct
+          ? "DELETE"
+          : mutation.operation;
       const domainMutation: SyncMutation = {
         entity_type: mutation.entity_type,
         entity_id: mutation.entity_id,
