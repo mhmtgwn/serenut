@@ -40,8 +40,70 @@ class _PreparedCatalogFile {
 
 /// Top-level helper function to execute ZIP decoding and Excel parsing in Isolate.
 /// Being top-level prevents the closure from capturing instance scope (like 'this' or 'onProgress').
-Future<ParsedCatalogData> _parseZipInSeparateIsolate(Uint8List bytes) {
-  return Isolate.run(() => DatasetImportService._parseZipInIsolate(bytes));
+Future<ParsedCatalogData> _parseZipInSeparateIsolate(
+  Uint8List bytes, [
+  void Function(double progress, String status)? onProgress,
+]) async {
+  if (onProgress == null) {
+    return Isolate.run(() => DatasetImportService._parseZipInIsolate(bytes));
+  }
+
+  final receivePort = ReceivePort();
+  final isolate = await Isolate.spawn<List<Object?>>(
+    _parseZipInProgressIsolate,
+    <Object?>[
+      receivePort.sendPort,
+      TransferableTypedData.fromList([bytes]),
+    ],
+  );
+
+  try {
+    await for (final rawMessage in receivePort) {
+      final message = rawMessage as Map<dynamic, dynamic>;
+      switch (message['kind']) {
+        case 'progress':
+          onProgress(
+            message['progress'] as double,
+            message['status'] as String,
+          );
+          break;
+        case 'result':
+          return message['data'] as ParsedCatalogData;
+        case 'error':
+          throw Exception(message['error'] as String);
+      }
+    }
+    throw Exception('Katalog çözümleme işlemi beklenmedik biçimde sonlandı.');
+  } finally {
+    receivePort.close();
+    isolate.kill(priority: Isolate.immediate);
+  }
+}
+
+void _parseZipInProgressIsolate(List<Object?> args) {
+  final sendPort = args[0] as SendPort;
+  final zipData = args[1] as TransferableTypedData;
+
+  try {
+    final parsed = DatasetImportService._parseZipInIsolate(
+      zipData.materialize().asUint8List(),
+      (progress, status) => sendPort.send(<String, Object>{
+        'kind': 'progress',
+        'progress': progress,
+        'status': status,
+      }),
+    );
+    sendPort.send(<String, Object>{
+      'kind': 'result',
+      'data': parsed,
+    });
+  } catch (error, stackTrace) {
+    sendPort.send(<String, Object>{
+      'kind': 'error',
+      'error': error.toString(),
+      'stackTrace': stackTrace.toString(),
+    });
+  }
 }
 
 class DatasetImportService {
@@ -90,7 +152,7 @@ class DatasetImportService {
   /// Resolves familiar Turkish/English catalogue headers. Files without a
   /// header row keep the original column order for backwards compatibility.
   static Map<String, int> _resolveColumns(List<dynamic> headerRow) {
-    final columns = <String, int>{
+    const legacyColumns = <String, int>{
       'barcode': 0,
       'name': 1,
       'category': 2,
@@ -100,15 +162,41 @@ class DatasetImportService {
       'remoteUrl': 6,
       'quantity': 7,
     };
+    final columns = <String, int>{};
     final aliases = <String, List<String>>{
       'barcode': ['barkod', 'barkod no', 'barcode', 'ean', 'sku'],
       'name': ['urun adi', 'ürün adı', 'urun', 'ürün', 'product name', 'name'],
       'category': ['kategori', 'category'],
       'brand': ['marka', 'brand'],
-      'price': ['fiyat', 'satis fiyati', 'satış fiyatı', 'price'],
-      'vat': ['kdv', 'vat'],
-      'remoteUrl': ['resim url', 'gorsel url', 'görsel url', 'image url'],
-      'quantity': ['stok', 'miktar', 'adet', 'quantity', 'stock'],
+      'price': ['fiyat', 'fiyat (tl)', 'satis fiyati', 'satış fiyatı', 'price'],
+      'vat': [
+        'kdv',
+        'kdv orani',
+        'kdv oranı',
+        'kdv orani (%)',
+        'kdv oranı (%)',
+        'vat'
+      ],
+      'remoteUrl': [
+        'resim url',
+        'gorsel url',
+        'görsel url',
+        'gorsel yolu',
+        'görsel yolu',
+        'gorsel linki',
+        'görsel linki',
+        'image url',
+        'image path'
+      ],
+      'quantity': [
+        'stok',
+        'stok miktari',
+        'stok miktarı',
+        'miktar',
+        'adet',
+        'quantity',
+        'stock'
+      ],
     };
     for (var index = 0; index < headerRow.length; index++) {
       final header = _staticParseString(headerRow[index])
@@ -122,7 +210,12 @@ class DatasetImportService {
         }
       }
     }
-    return columns;
+    // Once a real header row is recognized, leave absent optional columns
+    // unresolved instead of accidentally reading a neighbouring column. The
+    // legacy positional layout remains supported for files without headers.
+    return columns.containsKey('barcode') && columns.containsKey('name')
+        ? columns
+        : Map<String, int>.from(legacyColumns);
   }
 
   static dynamic _cellAt(List<dynamic> row, int? index) =>
@@ -163,7 +256,11 @@ class DatasetImportService {
   }
 
   /// CPU-heavy ZIP decoding and Excel parsing executed in a background Isolate.
-  static ParsedCatalogData _parseZipInIsolate(Uint8List zipBytes) {
+  static ParsedCatalogData _parseZipInIsolate(
+    Uint8List zipBytes, [
+    void Function(double progress, String status)? onProgress,
+  ]) {
+    onProgress?.call(0.02, 'Arşiv yapısı denetleniyor...');
     // 1. Pre-decompression limit checks via ZipDirectory (Zip Bomb Mitigation)
     final inputStream = InputStream(zipBytes);
     final zipDirectory = ZipDirectory.read(inputStream);
@@ -201,15 +298,27 @@ class DatasetImportService {
           'Sıkıştırılmamış toplam dosya boyutu sınırı aşıldı (Maks 100MB).');
     }
 
+    onProgress?.call(0.12, 'Arşiv içeriği açılıyor...');
     // Decode ZIP archive after checks
     final archive = ZipDecoder().decodeBuffer(InputStream(zipBytes));
 
     // 2. Identify Excel file and images
+    onProgress?.call(0.24, 'Excel ve görsel dosyaları bulunuyor...');
     bool isRawExcel = true;
     ArchiveFile? excelFile;
     final Map<String, List<int>> imageMap = {};
 
+    var inspectedFiles = 0;
+    final inspectUpdateInterval = max(1, archive.length ~/ 100);
     for (final file in archive) {
+      inspectedFiles++;
+      if (inspectedFiles % inspectUpdateInterval == 0 ||
+          inspectedFiles == archive.length) {
+        onProgress?.call(
+          0.24 + (inspectedFiles / max(1, archive.length)) * 0.16,
+          'Dosyalar inceleniyor: $inspectedFiles / ${archive.length}...',
+        );
+      }
       if (!file.isFile) continue;
 
       if (file.name.endsWith('.xlsx') && !file.name.startsWith('__MACOSX/')) {
@@ -242,6 +351,7 @@ class DatasetImportService {
       excelBytes = Uint8List.fromList(excelFile.content as List<int>);
     }
 
+    onProgress?.call(0.44, 'Excel dosyası hazırlanıyor...');
     // 3. Fix Excel relationships XML in-memory (reuse archive if isRawExcel to avoid double decoding)
     final innerArchive =
         isRawExcel ? archive : ZipDecoder().decodeBytes(excelBytes);
@@ -269,6 +379,7 @@ class DatasetImportService {
       throw Exception('Excel ilişkileri düzeltilemedi.');
     }
 
+    onProgress?.call(0.58, 'Excel tablosu açılıyor...');
     // 4. Decode Excel sheet
     final excel = ex.Excel.decodeBytes(Uint8List.fromList(encodedExcelBytes));
     if (excel.tables.isEmpty) {
@@ -281,14 +392,22 @@ class DatasetImportService {
       throw Exception('Excel sayfası boş.');
     }
 
+    onProgress?.call(0.70, 'Excel satırları okunuyor...');
     // 5. Parse sheet rows into transfer maps
     final rows = sheet.rows;
     final totalRows = rows.length;
     final columns = _resolveColumns(rows.first);
     final List<Map<String, dynamic>> parsedProducts = [];
+    final rowUpdateInterval = max(1, totalRows ~/ 100);
 
     for (int i = 1; i < totalRows; i++) {
       final row = rows[i];
+      if (i % rowUpdateInterval == 0 || i == totalRows - 1) {
+        onProgress?.call(
+          0.70 + (i / max(1, totalRows - 1)) * 0.28,
+          'Excel satırları okunuyor: $i / ${totalRows - 1}...',
+        );
+      }
       if (row.isEmpty) continue;
 
       final barcode = _staticParseString(_cellAt(row, columns['barcode']));
@@ -324,6 +443,7 @@ class DatasetImportService {
       });
     }
 
+    onProgress?.call(1.0, 'Katalog dosyası çözümlendi.');
     return ParsedCatalogData(products: parsedProducts, images: imageMap);
   }
 
@@ -334,7 +454,7 @@ class DatasetImportService {
     void Function(double progress, String status) onProgress,
   ) async {
     // Step 1: Pre-decompression checks & Decode ZIP
-    onProgress(0.06, 'Dosya açılıyor...');
+    onProgress(0.05, 'Dosya açılıyor...');
     await Future.delayed(const Duration(milliseconds: 50));
 
     final inputStream = InputStream(zipBytes);
@@ -376,7 +496,7 @@ class DatasetImportService {
     final archive = ZipDecoder().decodeBuffer(InputStream(zipBytes));
 
     // Step 2: Identify files & images
-    onProgress(0.12, 'Katalog dosyaları ve görseller ayrıştırılıyor...');
+    onProgress(0.20, 'Katalog dosyaları ve görseller ayrıştırılıyor...');
     await Future.delayed(const Duration(milliseconds: 50));
 
     bool isRawExcel = true;
@@ -412,7 +532,7 @@ class DatasetImportService {
     }
 
     // Step 3: Fix Excel relations XML (reuse archive if isRawExcel to avoid double decoding)
-    onProgress(0.18, 'Excel ilişkileri optimize ediliyor...');
+    onProgress(0.38, 'Excel ilişkileri optimize ediliyor...');
     await Future.delayed(const Duration(milliseconds: 50));
     final innerArchive =
         isRawExcel ? archive : ZipDecoder().decodeBytes(excelBytes);
@@ -440,7 +560,7 @@ class DatasetImportService {
     }
 
     // Step 4: Decode Excel
-    onProgress(0.24,
+    onProgress(0.56,
         'Excel tablosu çözümleniyor (Bu işlem birkaç saniye sürebilir)...');
     await Future.delayed(const Duration(milliseconds: 100));
     final excel = ex.Excel.decodeBytes(Uint8List.fromList(encodedExcelBytes));
@@ -455,7 +575,7 @@ class DatasetImportService {
     }
 
     // Step 5: Parse sheet rows
-    onProgress(0.28, 'Excel satırları okunuyor...');
+    onProgress(0.70, 'Excel satırları okunuyor...');
     await Future.delayed(const Duration(milliseconds: 50));
     final rows = sheet.rows;
     final totalRows = rows.length;
@@ -501,13 +621,14 @@ class DatasetImportService {
       // Periodically yield to prevent browser from completely locking up during Excel row looping
       if (i % 200 == 0) {
         onProgress(
-          0.28 + (i / totalRows) * 0.12,
+          0.70 + (i / totalRows) * 0.28,
           'Excel satırları okunuyor: $i / $totalRows ürün...',
         );
         await Future.delayed(Duration.zero);
       }
     }
 
+    onProgress(1.0, 'Katalog dosyası çözümlendi.');
     return ParsedCatalogData(products: parsedProducts, images: imageMap);
   }
 
@@ -521,7 +642,7 @@ class DatasetImportService {
     }
     return kIsWeb
         ? await _parseZipAsync(zipBytes, onProgress)
-        : await _parseZipInSeparateIsolate(zipBytes);
+        : await _parseZipInSeparateIsolate(zipBytes, onProgress);
   }
 
   /// Native file-path import avoids loading the complete ZIP and all images
@@ -535,10 +656,23 @@ class DatasetImportService {
       throw UnsupportedError(
           'Dosya yolu ile analiz web üzerinde desteklenmez.');
     }
-    onProgress(0.04, 'Arşiv dizini okunuyor...');
-    final prepared = await _prepareNativeFile(filePath, extractImages: false);
+    onProgress(0.02, 'Katalog dosyası hazırlanıyor...');
+    final prepared = await _prepareNativeFile(
+      filePath,
+      extractImages: false,
+      onProgress: (progress, status) {
+        onProgress(0.02 + (progress * 0.58), status);
+      },
+    );
+    onProgress(0.62, 'Excel tablosu çözümleniyor...');
     final thinArchive = _excelOnlyArchive(prepared.excelBytes);
-    final parsed = await _parseZipInSeparateIsolate(thinArchive);
+    final parsed = await _parseZipInSeparateIsolate(
+      thinArchive,
+      (progress, status) {
+        onProgress(0.62 + (progress * 0.38), status);
+      },
+    );
+    onProgress(1.0, 'Çözümleme tamamlandı.');
     return ParsedCatalogData(
       products: parsed.products,
       // Preview only needs the count; no image bytes are retained in RAM.
@@ -555,11 +689,19 @@ class DatasetImportService {
       throw UnsupportedError(
           'Dosya yolu ile aktarım web üzerinde desteklenmez.');
     }
-    onProgress(0.03, 'Excel ve görseller hazırlanıyor...');
-    final prepared = await _prepareNativeFile(filePath, extractImages: true);
+    onProgress(0.01, 'Excel ve görseller hazırlanıyor...');
+    final prepared = await _prepareNativeFile(
+      filePath,
+      extractImages: true,
+      onProgress: (progress, status) {
+        onProgress(0.01 + (progress * 0.29), status);
+      },
+    );
     return importFromZip(
       _excelOnlyArchive(prepared.excelBytes),
-      onProgress,
+      (progress, status) {
+        onProgress(0.30 + (progress * 0.70), status);
+      },
       strategy,
       prepared.extractedImagePaths,
     );
@@ -578,21 +720,86 @@ class DatasetImportService {
   static Future<_PreparedCatalogFile> _prepareNativeFile(
     String filePath, {
     required bool extractImages,
+    required void Function(double progress, String status) onProgress,
   }) async {
     String? imageRootPath;
     if (extractImages) {
-      final docsDir = await getApplicationDocumentsDirectory();
-      imageRootPath = p.join(docsDir.path, 'product_images');
+      final supportDir = await getApplicationSupportDirectory();
+      imageRootPath = p.join(supportDir.path, 'product_images');
     }
-    return Isolate.run(
-      () => _prepareNativeFileSync(filePath, imageRootPath),
+    final receivePort = ReceivePort();
+    final isolate = await Isolate.spawn<List<Object?>>(
+      _prepareNativeFileInIsolate,
+      <Object?>[receivePort.sendPort, filePath, imageRootPath],
     );
+
+    try {
+      await for (final rawMessage in receivePort) {
+        final message = rawMessage as Map<dynamic, dynamic>;
+        switch (message['kind']) {
+          case 'progress':
+            onProgress(
+              message['progress'] as double,
+              message['status'] as String,
+            );
+            break;
+          case 'result':
+            final excelData = message['excelBytes'] as TransferableTypedData;
+            return _PreparedCatalogFile(
+              excelBytes: excelData.materialize().asUint8List(),
+              imageBarcodes:
+                  Set<String>.from(message['imageBarcodes'] as List<dynamic>),
+              extractedImagePaths: Map<String, String>.from(
+                message['extractedImagePaths'] as Map<dynamic, dynamic>,
+              ),
+            );
+          case 'error':
+            throw Exception(message['error'] as String);
+        }
+      }
+      throw Exception('Katalog hazırlama işlemi beklenmedik biçimde sonlandı.');
+    } finally {
+      receivePort.close();
+      isolate.kill(priority: Isolate.immediate);
+    }
+  }
+
+  static void _prepareNativeFileInIsolate(List<Object?> args) {
+    final sendPort = args[0] as SendPort;
+    final filePath = args[1] as String;
+    final imageRootPath = args[2] as String?;
+
+    try {
+      final prepared = _prepareNativeFileSync(
+        filePath,
+        imageRootPath,
+        (progress, status) => sendPort.send(<String, Object>{
+          'kind': 'progress',
+          'progress': progress,
+          'status': status,
+        }),
+      );
+      sendPort.send(<String, Object>{
+        'kind': 'result',
+        'excelBytes': TransferableTypedData.fromList([prepared.excelBytes]),
+        'imageBarcodes': prepared.imageBarcodes.toList(growable: false),
+        'extractedImagePaths': prepared.extractedImagePaths,
+      });
+    } catch (error, stackTrace) {
+      sendPort.send(<String, Object>{
+        'kind': 'error',
+        'error': error.toString(),
+        'stackTrace': stackTrace.toString(),
+      });
+    }
   }
 
   static _PreparedCatalogFile _prepareNativeFileSync(
     String filePath,
     String? imageRootPath,
+    void Function(double progress, String status) onProgress,
   ) {
+    onProgress(0.02, 'Dosya denetleniyor...');
     final source = File(filePath);
     final stat = source.statSync();
     if (stat.type != FileSystemEntityType.file) {
@@ -606,15 +813,19 @@ class DatasetImportService {
       if (stat.size > _excelLimit) {
         throw Exception('Excel dosyası 150 MB sınırını aşıyor.');
       }
-      return _PreparedCatalogFile(
+      onProgress(0.35, 'Excel dosyası okunuyor...');
+      final prepared = _PreparedCatalogFile(
         excelBytes: source.readAsBytesSync(),
         imageBarcodes: const {},
         extractedImagePaths: const {},
       );
+      onProgress(1.0, 'Excel dosyası hazırlandı.');
+      return prepared;
     }
 
     final input = InputFileStream(filePath);
     try {
+      onProgress(0.06, 'ZIP arşivi açılıyor...');
       final decoder = ZipDecoder();
       final archive = decoder.decodeBuffer(input);
       final fileCount = archive.where((entry) => entry.isFile).length;
@@ -633,7 +844,18 @@ class DatasetImportService {
       int expandedSize = 0;
       ArchiveFile? excelFile;
       final imageFiles = <String, ArchiveFile>{};
+      var scannedEntries = 0;
+      final scanUpdateInterval = max(1, archive.length ~/ 100);
       for (final entry in archive) {
+        scannedEntries++;
+        if (scannedEntries == 1 ||
+            scannedEntries % scanUpdateInterval == 0 ||
+            scannedEntries == archive.length) {
+          onProgress(
+            0.10 + (scannedEntries / max(1, archive.length)) * 0.20,
+            'Arşiv taranıyor: $scannedEntries / ${archive.length} dosya...',
+          );
+        }
         if (!entry.isFile) continue;
         final normalized = entry.name.replaceAll('\\', '/');
         final lower = normalized.toLowerCase();
@@ -685,13 +907,26 @@ class DatasetImportService {
         ));
         destination.createSync(recursive: true);
         try {
+          var preparedImages = 0;
+          final totalImages = imageFiles.length;
+          final imageUpdateInterval = max(1, totalImages ~/ 200);
           for (final image in imageFiles.entries) {
             final content = image.value.content as List<int>?;
-            if (content == null) continue;
-            final target = p.join(destination.path, '${image.key}.jpg');
-            final optimized = _optimizeCardImage(content);
-            File(target).writeAsBytesSync(optimized, flush: false);
-            extracted[image.key] = target;
+            if (content != null) {
+              final target = p.join(destination.path, '${image.key}.jpg');
+              final optimized = _optimizeCardImage(content);
+              File(target).writeAsBytesSync(optimized, flush: false);
+              extracted[image.key] = target;
+            }
+            preparedImages++;
+            if (preparedImages == 1 ||
+                preparedImages % imageUpdateInterval == 0 ||
+                preparedImages == totalImages) {
+              onProgress(
+                0.32 + (preparedImages / totalImages) * 0.66,
+                'Görseller optimize ediliyor: $preparedImages / $totalImages...',
+              );
+            }
           }
         } catch (_) {
           for (final path in extracted.values) {
@@ -704,6 +939,7 @@ class DatasetImportService {
           rethrow;
         }
       }
+      onProgress(1.0, 'Excel ve görseller hazırlandı.');
       return _PreparedCatalogFile(
         excelBytes: Uint8List.fromList(excelContent),
         imageBarcodes: imageFiles.keys.toSet(),
@@ -747,9 +983,13 @@ class DatasetImportService {
       onProgress(0.05, 'Katalog ayrıştırılması başlatılıyor...');
 
       // Execute parsing asynchronously on web, or in a background Isolate on native platforms
+      void updateParseProgress(double progress, String status) {
+        onProgress(0.05 + (progress * 0.25), status);
+      }
+
       final parsedData = kIsWeb
-          ? await _parseZipAsync(zipBytes, onProgress)
-          : await _parseZipInSeparateIsolate(zipBytes);
+          ? await _parseZipAsync(zipBytes, updateParseProgress)
+          : await _parseZipInSeparateIsolate(zipBytes, updateParseProgress);
       onProgress(0.30, 'Katalog dosyaları çözümlendi.');
 
       final imageMap = parsedData.images;
@@ -762,9 +1002,9 @@ class DatasetImportService {
       // Save extracted images
       String? localImagesDirPath;
       if (!kIsWeb) {
-        final docsDir = await getApplicationDocumentsDirectory();
+        final supportDir = await getApplicationSupportDirectory();
         final localImagesDir =
-            Directory(p.join(docsDir.path, 'product_images'));
+            Directory(p.join(supportDir.path, 'product_images'));
         if (!await localImagesDir.exists()) {
           await localImagesDir.create(recursive: true);
         }

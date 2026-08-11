@@ -224,4 +224,50 @@ void main() {
     expect(find.text('Dahili'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets('manager and editor stay overflow-free on a compact scaled UI',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hardwareDevicesProvider
+              .overrideWith(_FakeHardwareDevicesNotifier.new),
+        ],
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.25),
+            ),
+            child: child!,
+          ),
+          home: const HardwareTestPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.pumpAndSettle();
+    expect(find.text('Yeni cihaz ekle'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cihazı kaydet'), findsOneWidget);
+    expect(find.text('Bağlantıyı kontrol et'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
 }

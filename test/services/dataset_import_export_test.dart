@@ -22,7 +22,8 @@ void main() {
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
       (MethodCall methodCall) async {
-        if (methodCall.method == 'getApplicationDocumentsDirectory') {
+        if (methodCall.method == 'getApplicationDocumentsDirectory' ||
+            methodCall.method == 'getApplicationSupportDirectory') {
           return tempDir.path;
         }
         return null;
@@ -174,6 +175,47 @@ void main() {
       expect(importedProducts.first.quantity, equals(0));
     });
 
+    test('imports five-column catalog layout with TL price and image path',
+        () async {
+      final excel = ex.Excel.createExcel();
+      final sheet = excel['Tüm Ürünler (Master)'];
+      excel.delete('Sheet1');
+      sheet.appendRow([
+        ex.TextCellValue('Barkod'),
+        ex.TextCellValue('Ürün Adı'),
+        ex.TextCellValue('Kategori'),
+        ex.TextCellValue('Fiyat (TL)'),
+        ex.TextCellValue('Görsel Yolu'),
+      ]);
+      sheet.appendRow([
+        ex.TextCellValue('5000299010031'),
+        ex.TextCellValue('Absolut Citron Votka 70 cl'),
+        ex.TextCellValue('Alkol & Tekel'),
+        const ex.DoubleCellValue(1200),
+        ex.TextCellValue('images/products/5000299010031.jpg'),
+      ]);
+
+      final excelBytes = excel.save()!;
+      final archive = Archive()
+        ..addFile(ArchiveFile(
+          'Urun_Katalogu.xlsx',
+          excelBytes.length,
+          excelBytes,
+        ));
+
+      final result = await importService.importFromZip(
+        Uint8List.fromList(ZipEncoder().encode(archive)!),
+        (_, __) {},
+      );
+
+      expect(result['success'], 1);
+      final product = await productRepo.findById('5000299010031');
+      expect(product, isNotNull);
+      expect(product!.price, 1200);
+      expect(product.description, 'Bilinmiyor');
+      expect(product.quantity, 0);
+    });
+
     test('native file import streams ZIP images to disk and links by barcode',
         () async {
       final excel = ex.Excel.createExcel();
@@ -217,18 +259,43 @@ void main() {
       final zipFile = File('${tempDir.path}/native_catalog.zip');
       await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
 
+      final analysisProgress = <double>[];
+      final analysisStatuses = <String>[];
       final analysis = await importService.analyzeFile(
         zipFile.path,
-        (_, __) {},
+        (progress, status) {
+          analysisProgress.add(progress);
+          analysisStatuses.add(status);
+        },
       );
       expect(analysis.products, hasLength(1));
       expect(analysis.images.keys, contains('8690000000001'));
+      expect(analysisProgress.last, 1.0);
+      expect(
+        analysisProgress,
+        orderedEquals([...analysisProgress]..sort()),
+      );
+      expect(
+        analysisStatuses,
+        contains(contains('Excel satırları okunuyor')),
+      );
 
+      final importProgress = <double>[];
+      final importStatuses = <String>[];
       final result = await importService.importFromFile(
         zipFile.path,
-        (_, __) {},
+        (progress, status) {
+          importProgress.add(progress);
+          importStatuses.add(status);
+        },
       );
       expect(result['success'], 1);
+      expect(importProgress.last, 1.0);
+      expect(importProgress, orderedEquals([...importProgress]..sort()));
+      expect(
+        importStatuses,
+        contains(contains('Görseller optimize ediliyor')),
+      );
       final product = await productRepo.findById('8690000000001');
       expect(product, isNotNull);
       expect(product!.imageUrl, isNotNull);

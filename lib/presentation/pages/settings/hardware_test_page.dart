@@ -164,13 +164,31 @@ class HardwareTestPage extends ConsumerWidget {
     WidgetRef ref, {
     HardwareDevice? device,
   }) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _DeviceEditor(device: device),
-    );
+    final desktop = MediaQuery.sizeOf(context).width >= 720;
+    final saved = desktop
+        ? await showDialog<bool>(
+            context: context,
+            barrierColor: Colors.black.withValues(alpha: .42),
+            builder: (_) => Dialog(
+              insetPadding: const EdgeInsets.all(24),
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(maxWidth: 820, maxHeight: 860),
+                child: _DeviceEditor(device: device, desktopDialog: true),
+              ),
+            ),
+          )
+        : await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => _DeviceEditor(device: device),
+          );
     if (saved == true) ref.invalidate(hardwareDevicesProvider);
   }
 
@@ -407,7 +425,7 @@ class _DeviceListState extends State<_DeviceList> {
                     crossAxisCount: columns,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
-                    mainAxisExtent: 238,
+                    mainAxisExtent: 268,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -720,8 +738,9 @@ class _DeviceCard extends StatelessWidget {
 
 class _DeviceEditor extends ConsumerStatefulWidget {
   final HardwareDevice? device;
+  final bool desktopDialog;
 
-  const _DeviceEditor({this.device});
+  const _DeviceEditor({this.device, this.desktopDialog = false});
 
   @override
   ConsumerState<_DeviceEditor> createState() => _DeviceEditorState();
@@ -831,181 +850,189 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.device != null;
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780, maxHeight: 820),
-        child: Material(
-          color: const Color(0xFFF8FAF9),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 12,
-              bottom: MediaQuery.viewInsetsOf(context).bottom + 18,
+    final content = Material(
+      color: const Color(0xFFF8FAF9),
+      borderRadius: BorderRadius.circular(widget.desktopDialog ? 24 : 28),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          if (!widget.desktopDialog) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: kBorderColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: kBorderColor,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
+          ],
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              widget.desktopDialog ? 28 : 18,
+              widget.desktopDialog ? 24 : 14,
+              widget.desktopDialog ? 20 : 10,
+              16,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _typeColor(_type).withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(13),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
+                  child: Icon(_typeIcon(_type), color: _typeColor(_type)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: _typeColor(_type).withValues(alpha: .1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(_typeIcon(_type), color: _typeColor(_type)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              editing ? 'Aygıt ayarları' : 'Yeni cihaz ekle',
-                              style: const TextStyle(
-                                  fontSize: 21, fontWeight: FontWeight.w800),
-                            ),
-                            Text(
-                              editing
-                                  ? '${_step + 1}/3 · ${_stepLabel(_step)} · ${deviceFriendlyIdentity(widget.device!)}'
-                                  : '${_step + 1}/3 · ${_stepLabel(_step)}',
-                              style: const TextStyle(
-                                  fontSize: 12, color: kTextSecondary),
-                            ),
-                          ],
+                      Text(
+                        editing ? 'Aygıt ayarları' : 'Yeni cihaz ekle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: kTextPrimary,
                         ),
                       ),
-                      IconButton(
-                        tooltip: 'Kapat',
-                        onPressed:
-                            _working ? null : () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
+                      Text(
+                        editing
+                            ? '${_step + 1}/3 · ${deviceFriendlyIdentity(widget.device!)}'
+                            : '${_step + 1}/3 · İşletmenize yeni bir donanım bağlayın',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: kTextSecondary,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: List.generate(3, (index) {
-                      final selected = index == _step;
-                      final completed = index < _step;
-                      return Expanded(
-                        child: Container(
-                          margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? const Color(0xFFE5F4EE)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: selected ? kGreen : kBorderColor,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                completed
-                                    ? Icons.check_circle_rounded
-                                    : index == 0
-                                        ? Icons.category_rounded
-                                        : index == 1
-                                            ? Icons.cable_rounded
-                                            : Icons.tune_rounded,
-                                size: 17,
-                                color: selected || completed
-                                    ? kGreen
-                                    : kTextSecondary,
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  _stepLabel(index),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: selected
-                                        ? kTextPrimary
-                                        : kTextSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 22),
+                ),
+                IconButton(
+                  tooltip: 'Kapat',
+                  onPressed: _working ? null : () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                widget.desktopDialog ? 28 : 18,
+                20,
+                widget.desktopDialog ? 28 : 18,
+                28,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _EditorProgress(step: _step),
+                  const SizedBox(height: 24),
                   if (_step == 0) _typeStep(),
                   if (_step == 1) _connectionStep(),
                   if (_step == 2) _detailsStep(),
                   if (_error != null) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     _InlineError(message: _error!),
                   ],
-                  const SizedBox(height: 22),
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      if (_step > (editing ? 1 : 0))
-                        TextButton(
-                          onPressed:
-                              _working ? null : () => setState(() => _step--),
-                          child: const Text('Geri'),
-                        ),
-                      if (_step == 2)
-                        OutlinedButton.icon(
-                          onPressed: _working ? null : _testDraft,
-                          icon: const Icon(Icons.cable_rounded, size: 18),
-                          label: const Text('Bağlantıyı kontrol et'),
-                        ),
-                      FilledButton(
-                        onPressed: _working ? null : _continue,
-                        child: _working
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : Text(_step < 2
-                                ? 'Devam et'
-                                : editing
-                                    ? 'Ayarları kaydet'
-                                    : 'Cihazı kaydet'),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
           ),
+          const Divider(height: 1),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              widget.desktopDialog ? 28 : 18,
+              14,
+              widget.desktopDialog ? 28 : 18,
+              16,
+            ),
+            child: _editorActions(editing),
+          ),
+        ],
+      ),
+    );
+
+    if (widget.desktopDialog) return content;
+    final height = MediaQuery.sizeOf(context).height;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SizedBox(
+          height: height * .92,
+          child: content,
         ),
       ),
     );
+  }
+
+  Widget _editorActions(bool editing) {
+    final back = _step > (editing ? 1 : 0)
+        ? TextButton.icon(
+            onPressed: _working ? null : () => setState(() => _step--),
+            icon: const Icon(Icons.arrow_back_rounded, size: 18),
+            label: const Text('Geri'),
+          )
+        : const SizedBox.shrink();
+    final test = _step == 2
+        ? OutlinedButton.icon(
+            onPressed: _working ? null : _testDraft,
+            icon: const Icon(Icons.cable_rounded, size: 18),
+            label: const Text('Bağlantıyı kontrol et'),
+          )
+        : const SizedBox.shrink();
+    final primary = FilledButton.icon(
+      onPressed: _working ? null : _continue,
+      icon: _working
+          ? const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white),
+            )
+          : Icon(_step < 2 ? Icons.arrow_forward_rounded : Icons.save_rounded),
+      label: Text(_step < 2
+          ? 'Devam et'
+          : editing
+              ? 'Ayarları kaydet'
+              : 'Cihazı kaydet'),
+    );
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < 520) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            primary,
+            if (_step == 2) ...[const SizedBox(height: 8), test],
+            if (_step > (editing ? 1 : 0)) ...[
+              const SizedBox(height: 4),
+              back,
+            ],
+          ],
+        );
+      }
+      return Row(
+        children: [
+          back,
+          const Spacer(),
+          test,
+          if (_step == 2) const SizedBox(width: 10),
+          primary,
+        ],
+      );
+    });
   }
 
   Widget _typeStep() {
@@ -1098,88 +1125,74 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         ),
         const SizedBox(height: 12),
         if (_connection == HardwareConnectionType.tcp) ...[
-          Row(
+          _ResponsiveFieldRow(
+            flexes: const [3, 1],
             children: [
-              Expanded(
-                flex: 3,
-                child: TextField(
-                  controller: _host,
-                  decoration: const InputDecoration(labelText: 'IP adresi'),
-                ),
+              TextField(
+                controller: _host,
+                decoration: const InputDecoration(labelText: 'IP adresi'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _port,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Port'),
-                ),
+              TextField(
+                controller: _port,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Port'),
               ),
             ],
           ),
         ],
         if (_connection == HardwareConnectionType.serial) ...[
-          Row(
+          _ResponsiveFieldRow(
+            flexes: const [2, 1],
             children: [
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _serialPort,
-                  decoration: const InputDecoration(labelText: 'COM portu'),
-                ),
+              TextField(
+                controller: _serialPort,
+                decoration: const InputDecoration(labelText: 'COM portu'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _baudRate,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Baud'),
-                ),
+              TextField(
+                controller: _baudRate,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Baud'),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          _ResponsiveFieldRow(
+            breakpoint: 620,
             children: [
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: _dataBits,
-                  decoration: const InputDecoration(labelText: 'Veri biti'),
-                  items: const [7, 8]
-                      .map((value) => DropdownMenuItem(
-                          value: value, child: Text('$value bit')))
-                      .toList(),
-                  onChanged: (value) => _dataBits = value ?? 8,
-                ),
+              DropdownButtonFormField<int>(
+                value: _dataBits,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Veri biti'),
+                items: const [7, 8]
+                    .map((value) => DropdownMenuItem(
+                        value: value, child: Text('$value bit')))
+                    .toList(),
+                onChanged: (value) => _dataBits = value ?? 8,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: _stopBits,
-                  decoration: const InputDecoration(labelText: 'Stop biti'),
-                  items: const [1, 2]
-                      .map((value) =>
-                          DropdownMenuItem(value: value, child: Text('$value')))
-                      .toList(),
-                  onChanged: (value) => _stopBits = value ?? 1,
-                ),
+              DropdownButtonFormField<int>(
+                value: _stopBits,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Stop biti'),
+                items: const [1, 2]
+                    .map((value) =>
+                        DropdownMenuItem(value: value, child: Text('$value')))
+                    .toList(),
+                onChanged: (value) => _stopBits = value ?? 1,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _parity,
-                  decoration: const InputDecoration(labelText: 'Parite'),
-                  items: const {
-                    'none': 'Yok',
-                    'even': 'Çift',
-                    'odd': 'Tek',
-                  }
-                      .entries
-                      .map((entry) => DropdownMenuItem(
-                          value: entry.key, child: Text(entry.value)))
-                      .toList(),
-                  onChanged: (value) => _parity = value ?? 'none',
-                ),
+              DropdownButtonFormField<String>(
+                value: _parity,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Parite'),
+                items: const {
+                  'none': 'Yok',
+                  'even': 'Çift',
+                  'odd': 'Tek',
+                }
+                    .entries
+                    .map((entry) => DropdownMenuItem(
+                        value: entry.key, child: Text(entry.value)))
+                    .toList(),
+                onChanged: (value) => _parity = value ?? 'none',
               ),
             ],
           ),
@@ -1188,6 +1201,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _scaleUnit,
+            isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Terazinin gönderdiği varsayılan birim',
             ),
@@ -1348,6 +1362,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _vendor,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Üretici'),
             items: const {
               'generic': 'Genel POS',
@@ -1366,6 +1381,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _protocol,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Protokol'),
             items: const [
               DropdownMenuItem(value: 'vendor_sdk', child: Text('Üretici SDK')),
@@ -1417,6 +1433,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _labelLanguage,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Yazıcı dili'),
             items: const [
               DropdownMenuItem(
@@ -1432,25 +1449,20 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 setState(() => _labelLanguage = value ?? 'tspl'),
           ),
           const SizedBox(height: 12),
-          Row(
+          _ResponsiveFieldRow(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _labelWidth,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Etiket eni (mm)',
-                  ),
+              TextField(
+                controller: _labelWidth,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Etiket eni (mm)',
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _labelHeight,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Etiket boyu (mm)',
-                  ),
+              TextField(
+                controller: _labelHeight,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Etiket boyu (mm)',
                 ),
               ),
             ],
@@ -1804,6 +1816,157 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     );
   }
 }
+
+class _EditorProgress extends StatelessWidget {
+  final int step;
+
+  const _EditorProgress({required this.step});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < 560) {
+        return Semantics(
+          label: '${step + 1}/3 · ${_stepLabel(step)}',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: List.generate(5, (index) {
+                  if (index.isOdd) {
+                    final connector = index ~/ 2;
+                    return Expanded(
+                      child: Container(
+                        height: 2,
+                        color: connector < step ? kGreen : kBorderColor,
+                      ),
+                    );
+                  }
+                  final item = index ~/ 2;
+                  final active = item == step;
+                  final complete = item < step;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: active ? 32 : 26,
+                    height: active ? 32 : 26,
+                    decoration: BoxDecoration(
+                      color: active || complete ? kGreen : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: active || complete ? kGreen : kBorderColor,
+                      ),
+                    ),
+                    child: Icon(
+                      complete ? Icons.check_rounded : _stepIcon(item),
+                      size: active ? 17 : 14,
+                      color: active || complete ? Colors.white : kTextSecondary,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${step + 1}/3 · ${_stepLabel(step)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return Row(
+        children: List.generate(3, (index) {
+          final active = index == step;
+          final complete = index < step;
+          return Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: EdgeInsets.only(right: index == 2 ? 0 : 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFFE5F4EE) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: active ? kGreen : kBorderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    complete ? Icons.check_circle_rounded : _stepIcon(index),
+                    size: 18,
+                    color: active || complete ? kGreen : kTextSecondary,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      _stepLabel(index),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? kTextPrimary : kTextSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      );
+    });
+  }
+}
+
+class _ResponsiveFieldRow extends StatelessWidget {
+  final List<Widget> children;
+  final List<int>? flexes;
+  final double breakpoint;
+
+  const _ResponsiveFieldRow({
+    required this.children,
+    this.flexes,
+    this.breakpoint = 500,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < breakpoint) {
+        return Column(
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              if (index > 0) const SizedBox(height: 12),
+              children[index],
+            ],
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            if (index > 0) const SizedBox(width: 10),
+            Expanded(
+              flex:
+                  flexes != null && index < flexes!.length ? flexes![index] : 1,
+              child: children[index],
+            ),
+          ],
+        ],
+      );
+    });
+  }
+}
+
+IconData _stepIcon(int step) => switch (step) {
+      0 => Icons.category_rounded,
+      1 => Icons.cable_rounded,
+      _ => Icons.tune_rounded,
+    };
 
 class _SelectionCard extends StatelessWidget {
   final bool selected;
