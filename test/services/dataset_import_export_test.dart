@@ -2,6 +2,7 @@
 // Unit and integration tests for DatasetImportService import and export pipelines.
 
 import 'dart:io';
+import 'dart:math' show Random;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/services/dataset_import_service.dart';
@@ -304,6 +305,121 @@ void main() {
       expect(optimized, isNotNull);
       expect(optimized!.width, 320);
       expect(optimized.height, 320);
+    });
+
+    test('native import skips a damaged image without cancelling products',
+        () async {
+      final excel = ex.Excel.createExcel();
+      final sheet = excel['market_data_catalog'];
+      excel.delete('Sheet1');
+      sheet.appendRow([
+        ex.TextCellValue('Barkod'),
+        ex.TextCellValue('Urun Adi'),
+        ex.TextCellValue('Kategori'),
+        ex.TextCellValue('Gorsel Yolu'),
+      ]);
+      sheet.appendRow([
+        ex.TextCellValue('8690000000042'),
+        ex.TextCellValue('Bozuk Görselli Ürün'),
+        ex.TextCellValue('Test'),
+        ex.TextCellValue('images/8690000000042.jpg'),
+      ]);
+      final excelBytes = excel.save()!;
+      final archive = Archive()
+        ..addFile(ArchiveFile('urunler.xlsx', excelBytes.length, excelBytes))
+        ..addFile(ArchiveFile(
+          'images/8690000000042.jpg',
+          8,
+          <int>[0, 1, 2, 3, 4, 5, 6, 7],
+        ));
+      final zipFile = File('${tempDir.path}/damaged_image_catalog.zip');
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
+
+      final statuses = <String>[];
+      final result = await importService.importFromFile(
+        zipFile.path,
+        (_, status) => statuses.add(status),
+      );
+
+      expect(result['success'], 1);
+      expect(result['imageError'], 1);
+      expect(statuses, contains(contains('1 bozuk görsel atlandı')));
+      final product = await productRepo.findById('8690000000042');
+      expect(product, isNotNull);
+      expect(product!.imageUrl, isNull);
+    });
+
+    test('native analysis deterministically prefers the root Excel workbook',
+        () async {
+      List<int> workbook(String barcode, String name) {
+        final excel = ex.Excel.createExcel();
+        final sheet = excel['market_data_catalog'];
+        excel.delete('Sheet1');
+        sheet.appendRow([
+          ex.TextCellValue('Barkod'),
+          ex.TextCellValue('Urun Adi'),
+        ]);
+        sheet.appendRow([
+          ex.TextCellValue(barcode),
+          ex.TextCellValue(name),
+        ]);
+        return excel.save()!;
+      }
+
+      final nested = workbook('111', 'Yanlış Yedek');
+      final root = workbook('222', 'Doğru Katalog');
+      final archive = Archive()
+        // Put the nested workbook first to verify ZIP order is irrelevant.
+        ..addFile(ArchiveFile('images/backup.xlsx', nested.length, nested))
+        ..addFile(ArchiveFile('urun_katalogu.xlsx', root.length, root));
+      final zipFile = File('${tempDir.path}/multiple_excel_catalog.zip');
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
+
+      final parsed = await importService.analyzeFile(zipFile.path, (_, __) {});
+
+      expect(parsed.products, hasLength(1));
+      expect(parsed.products.single['barcode'], '222');
+      expect(parsed.products.single['name'], 'Doğru Katalog');
+    });
+
+    test('native ZIP analysis uses RAM across archive reader buffer boundaries',
+        () async {
+      final excel = ex.Excel.createExcel();
+      final sheet = excel['market_data_catalog'];
+      excel.delete('Sheet1');
+      sheet.appendRow([
+        ex.TextCellValue('Barkod'),
+        ex.TextCellValue('Urun Adi'),
+      ]);
+      sheet.appendRow([
+        ex.TextCellValue('8690000000777'),
+        ex.TextCellValue('Tampon Sınırı Ürünü'),
+      ]);
+
+      // Put an incompressible entry before the workbook so its compressed data
+      // starts beyond archive's default 1 MB file-reader window.
+      final random = Random(77);
+      final padding = List<int>.generate(
+        1100 * 1024,
+        (_) => random.nextInt(256),
+        growable: false,
+      );
+      final excelBytes = excel.save()!;
+      final archive = Archive()
+        ..addFile(ArchiveFile('padding.bin', padding.length, padding))
+        ..addFile(ArchiveFile('urunler.xlsx', excelBytes.length, excelBytes));
+      final zipFile = File('${tempDir.path}/buffer_boundary_catalog.zip');
+      await zipFile.writeAsBytes(ZipEncoder().encode(archive)!);
+
+      final statuses = <String>[];
+      final parsed = await importService.analyzeFile(
+        zipFile.path,
+        (_, status) => statuses.add(status),
+      );
+
+      expect(statuses, contains(contains('belleğe alınıyor')));
+      expect(parsed.products, hasLength(1));
+      expect(parsed.products.single['barcode'], '8690000000777');
     });
 
     test('native file analysis accepts catalog archives above 10,000 files',

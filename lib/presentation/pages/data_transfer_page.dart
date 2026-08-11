@@ -17,8 +17,10 @@ import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/settings/backup_manage_page.dart';
+import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/models/permission.dart' as app_permission;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:convert';
@@ -365,7 +367,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                                   fontWeight: FontWeight.bold, fontSize: 15)),
                           SizedBox(height: 2),
                           Text(
-                            'Satışlar, siparişler, müşteriler ve ürünler silinir. Ayarlar ve yedekler korunur.',
+                            'Tüm cihazlardaki satışlar, siparişler, müşteriler ve ürünler silinir. Ayarlar ve yedekler korunur. İnternet bağlantısı gerekir.',
                             style: TextStyle(
                                 color: Color(0xFF64748B), fontSize: 12),
                           ),
@@ -434,7 +436,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
         ? 'Standart Sıfırlama Onayı'
         : 'Tam Temizlik Onayı';
     final desc = resetType == 'standard'
-        ? 'Tüm satışlar, siparişler, müşteriler ve ürünler kalıcı olarak silinecek. Ayarlarınız ve yedekleriniz korunacak.\n\nBu işlem geri alınamaz!'
+        ? 'Bu firmaya ait satışlar, siparişler, müşteriler ve ürünler sunucudan ve tüm cihazlardan kalıcı olarak silinecek. Ayarlarınız ve yedekleriniz korunacak. İnternet bağlantısı zorunludur.\n\nBu işlem geri alınamaz!'
         : 'Tüm veriler, ayarlar, PIN kodu, kullanıcılar ve yedekler silinecek. Cihaz ilk kurulum ekranına dönecek.\n\nBu işlem KESİNLİKLE geri alınamaz!';
 
     final confirmed = await showDialog<bool>(
@@ -470,7 +472,9 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
     if (confirmed != true || !mounted) return;
 
-    requireAdminAccess(context, title: 'Sıfırlama Yetkisi',
+    requirePermissionAccess(context,
+        permission: app_permission.Permission.settingsDatabase,
+        title: 'Sıfırlama Yetkisi',
         onGranted: (approvedByUserId, approvedByUserName) async {
       // Show loading
       showDialog(
@@ -492,43 +496,11 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           approvedByUserName: approvedByUserName,
         );
         if (resetType == 'standard') {
-          // ── Standart Sıfırlama: Sadece operasyonel veri ──
-          // KRİTİK C DÜZELTMESİ: Tüm silme işlemleri tek bir SQLite transaction
-          // içinde yapılır. Herhangi bir adım hata verirse işlemin tamamı geri alınır.
-          if (!kIsWeb) {
-            final db = await DatabaseManager().getDatabase();
-            await db.transaction((txn) async {
-              try {
-                // Enable ledger bypass flag to allow deletion of financial_transactions
-                await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 1');
-                // 1. Satış kalemleri (sales'den önce — FK kısıtlaması)
-                await txn.rawDelete('DELETE FROM sale_items');
-                // 2. Satışlar
-                await txn.rawDelete('DELETE FROM sales');
-                // 3. Sipariş kalemleri (orders'dan önce — FK kısıtlaması)
-                await txn.rawDelete('DELETE FROM order_items');
-                try {
-                  await txn.rawDelete('DELETE FROM customer_order_items');
-                } catch (_) {}
-                // 4. Siparişler
-                await txn.rawDelete('DELETE FROM orders');
-                // 5. Ürünler
-                await txn.rawDelete('DELETE FROM products');
-                // 6. Finansal işlemler (borç/tahsilat)
-                await txn.rawDelete('DELETE FROM financial_transactions');
-                // 7. Müşteriler — peşin müşteri (id='' veya id='default') korunur
-                await txn.rawDelete(
-                    "DELETE FROM customers WHERE id != '' AND id != 'default'");
-
-                // 8. Atomik olarak yerel outbox ve cursor'ı temizle (sunucuya bayat mutation gitmesini engeller)
-                await txn.rawDelete('DELETE FROM sync_outbox_v4');
-                await txn.rawDelete('DELETE FROM sync_cursor_v4');
-              } finally {
-                // Disable ledger bypass flag to restore immutability
-                await txn.rawUpdate('UPDATE ledger_bypass_flag SET active = 0');
-              }
-            });
-          } else {
+          // Sunucu reset bariyerini oluşturur; yerel SQLite temizliği aynı
+          // revizyona atomik olarak taşınır. Eski çevrimdışı mutation'lar bu
+          // bariyerin ardından verileri yeniden oluşturamaz.
+          await ref.read(syncProvider.notifier).resetOperationalData();
+          if (kIsWeb) {
             // Web: Sadece operasyonel tabloları sıfırla
             InMemoryDb.products.clear();
             InMemoryDb.sales.clear();
@@ -556,10 +528,6 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           ref.invalidate(dashboardProvider);
           ref.read(productCategoriesStateProvider.notifier).state = [];
 
-          // Senkronizasyon provider'ını invalidate et ve temiz bootstrap çekimini başlat
-          ref.invalidate(syncProvider);
-          ref.read(syncProvider.notifier).triggerSync();
-
           if (mounted) Navigator.pop(context);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -573,11 +541,17 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
           }
         } else {
           // ── Tam Temizlik: Her şey silinir ──
+          await ref.read(syncProvider.notifier).prepareForFactoryReset();
+          // Sunucu oturumunu yenileme belirteci hâlâ mevcutken kapat. Aksi
+          // halde SharedPreferences temizliği sunucu oturumunu açık bırakır.
+          await ref.read(authNotifierProvider.notifier).logout();
+          ref.invalidate(syncProvider);
           if (!kIsWeb) {
             final dbManager = DatabaseManager();
             await dbManager.resetDatabase();
             final backupService = ref.read(backupServiceProvider);
             await backupService.clearAllBackups();
+            await DataResetService.clearProductImages();
           } else {
             InMemoryDb.reset();
           }
@@ -589,8 +563,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
             await prefs.remove(key);
           }
 
-          // Logout + cache sıfırlama
-          await ref.read(authNotifierProvider.notifier).logout();
+          // Cache sıfırlama
           ref.invalidate(currentUserProvider);
           ref.invalidate(settingsProvider);
           ref.invalidate(productRepositoryProvider);

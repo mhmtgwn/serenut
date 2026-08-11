@@ -22,19 +22,26 @@ import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 class ParsedCatalogData {
   final List<Map<String, dynamic>> products;
   final Map<String, List<int>> images;
+  final int imageWarnings;
 
-  ParsedCatalogData({required this.products, required this.images});
+  ParsedCatalogData({
+    required this.products,
+    required this.images,
+    this.imageWarnings = 0,
+  });
 }
 
 class _PreparedCatalogFile {
   final Uint8List excelBytes;
   final Set<String> imageBarcodes;
   final Map<String, String> extractedImagePaths;
+  final int skippedImages;
 
   const _PreparedCatalogFile({
     required this.excelBytes,
     required this.imageBarcodes,
     required this.extractedImagePaths,
+    this.skippedImages = 0,
   });
 }
 
@@ -108,6 +115,7 @@ void _parseZipInProgressIsolate(List<Object?> args) {
 
 class DatasetImportService {
   static const int _memoryArchiveLimit = 100 * 1024 * 1024;
+  static const int _nativeRamArchiveLimit = 1024 * 1024 * 1024;
   static const int _nativeArchiveLimit = 8 * 1024 * 1024 * 1024;
   static const int _nativeExpandedLimit = 16 * 1024 * 1024 * 1024;
   static const int _singleImageLimit = 100 * 1024 * 1024;
@@ -230,7 +238,27 @@ class DatasetImportService {
     return const {'.jpg', '.jpeg', '.png', '.webp'}.contains(extension);
   }
 
+  static String? _externalImageReference(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final normalized = trimmed.replaceAll('\\', '/').toLowerCase();
+    // These are references to files inside the selected ZIP, not usable URLs
+    // after the import. If that packaged image was damaged, leave the product
+    // image empty instead of saving a permanently broken relative path.
+    if (normalized.startsWith('images/') ||
+        normalized.startsWith('./images/') ||
+        normalized.startsWith('image/')) {
+      return null;
+    }
+    return trimmed;
+  }
+
   static Uint8List _optimizeCardImage(List<int> sourceBytes) {
+    if (_isReadyCardJpeg(sourceBytes)) {
+      return sourceBytes is Uint8List
+          ? sourceBytes
+          : Uint8List.fromList(sourceBytes);
+    }
     final decoded = img.decodeImage(Uint8List.fromList(sourceBytes));
     if (decoded == null) {
       throw Exception('Görsel dosyası çözümlenemedi.');
@@ -253,6 +281,56 @@ class DatasetImportService {
       dstY: (320 - resized.height) ~/ 2,
     );
     return Uint8List.fromList(img.encodeJpg(canvas, quality: 70));
+  }
+
+  /// Reads JPEG segment headers without decoding pixels. Exported catalogues
+  /// already contain 320x320 JPEG card images; decoding and re-encoding all of
+  /// them made a 15k-image import take more than five minutes.
+  static bool _isReadyCardJpeg(List<int> bytes) {
+    if (bytes.length < 16 || bytes[0] != 0xff || bytes[1] != 0xd8) {
+      return false;
+    }
+    var hasEndMarker = false;
+    for (var index = bytes.length - 2;
+        index >= max(0, bytes.length - 32);
+        index--) {
+      if (bytes[index] == 0xff && bytes[index + 1] == 0xd9) {
+        hasEndMarker = true;
+        break;
+      }
+    }
+    if (!hasEndMarker) return false;
+
+    var offset = 2;
+    while (offset + 8 < bytes.length) {
+      if (bytes[offset] != 0xff) {
+        offset++;
+        continue;
+      }
+      while (offset < bytes.length && bytes[offset] == 0xff) {
+        offset++;
+      }
+      if (offset >= bytes.length) return false;
+      final marker = bytes[offset++];
+      if (marker == 0xd8 || marker == 0xd9 || marker == 0x01) continue;
+      if (offset + 1 >= bytes.length) return false;
+      final segmentLength = (bytes[offset] << 8) | bytes[offset + 1];
+      if (segmentLength < 2 || offset + segmentLength > bytes.length) {
+        return false;
+      }
+      final isStartOfFrame = (marker >= 0xc0 && marker <= 0xc3) ||
+          (marker >= 0xc5 && marker <= 0xc7) ||
+          (marker >= 0xc9 && marker <= 0xcb) ||
+          (marker >= 0xcd && marker <= 0xcf);
+      if (isStartOfFrame && segmentLength >= 7) {
+        final height = (bytes[offset + 3] << 8) | bytes[offset + 4];
+        final width = (bytes[offset + 5] << 8) | bytes[offset + 6];
+        return width == 320 && height == 320;
+      }
+      if (marker == 0xda) return false;
+      offset += segmentLength;
+    }
+    return false;
   }
 
   /// CPU-heavy ZIP decoding and Excel parsing executed in a background Isolate.
@@ -677,6 +755,7 @@ class DatasetImportService {
       products: parsed.products,
       // Preview only needs the count; no image bytes are retained in RAM.
       images: {for (final barcode in prepared.imageBarcodes) barcode: const []},
+      imageWarnings: prepared.skippedImages,
     );
   }
 
@@ -697,7 +776,7 @@ class DatasetImportService {
         onProgress(0.01 + (progress * 0.29), status);
       },
     );
-    return importFromZip(
+    final result = await importFromZip(
       _excelOnlyArchive(prepared.excelBytes),
       (progress, status) {
         onProgress(0.30 + (progress * 0.70), status);
@@ -705,6 +784,8 @@ class DatasetImportService {
       strategy,
       prepared.extractedImagePaths,
     );
+    result['imageError'] = prepared.skippedImages;
+    return result;
   }
 
   static Uint8List _excelOnlyArchive(Uint8List excelBytes) {
@@ -752,6 +833,7 @@ class DatasetImportService {
               extractedImagePaths: Map<String, String>.from(
                 message['extractedImagePaths'] as Map<dynamic, dynamic>,
               ),
+              skippedImages: message['skippedImages'] as int? ?? 0,
             );
           case 'error':
             throw Exception(message['error'] as String);
@@ -784,6 +866,7 @@ class DatasetImportService {
         'excelBytes': TransferableTypedData.fromList([prepared.excelBytes]),
         'imageBarcodes': prepared.imageBarcodes.toList(growable: false),
         'extractedImagePaths': prepared.extractedImagePaths,
+        'skippedImages': prepared.skippedImages,
       });
     } catch (error, stackTrace) {
       sendPort.send(<String, Object>{
@@ -818,14 +901,29 @@ class DatasetImportService {
         excelBytes: source.readAsBytesSync(),
         imageBarcodes: const {},
         extractedImagePaths: const {},
+        skippedImages: 0,
       );
       onProgress(1.0, 'Excel dosyası hazırlandı.');
       return prepared;
     }
 
-    final input = InputFileStream(filePath);
+    // archive 3.x's file-backed reader can reload a window one byte past its
+    // valid range when a compressed entry crosses the internal 1 MB buffer
+    // boundary. This surfaced as e.g. `RangeError (length): ... 7061` while
+    // reading an otherwise valid workbook. Keep normal-sized native catalogues
+    // in RAM so ZIP entries use the stable memory stream. Very large archives
+    // retain the file-backed path to avoid an unbounded allocation.
+    final useRamArchive = stat.size <= _nativeRamArchiveLimit;
+    final input = useRamArchive
+        ? InputStream(source.readAsBytesSync())
+        : InputFileStream(filePath);
     try {
-      onProgress(0.06, 'ZIP arşivi açılıyor...');
+      onProgress(
+        0.06,
+        useRamArchive
+            ? 'ZIP arşivi güvenli biçimde belleğe alınıyor...'
+            : 'Büyük ZIP arşivi dosyadan açılıyor...',
+      );
       final decoder = ZipDecoder();
       final archive = decoder.decodeBuffer(input);
       final fileCount = archive.where((entry) => entry.isFile).length;
@@ -842,7 +940,7 @@ class DatasetImportService {
       }
 
       int expandedSize = 0;
-      ArchiveFile? excelFile;
+      final excelFiles = <ArchiveFile>[];
       final imageFiles = <String, ArchiveFile>{};
       var scannedEntries = 0;
       final scanUpdateInterval = max(1, archive.length ~/ 100);
@@ -872,7 +970,7 @@ class DatasetImportService {
           throw Exception('Açılmış katalog içeriği 16 GB sınırını aşıyor.');
         }
         if (lower.endsWith('.xlsx') && !lower.startsWith('__macosx/')) {
-          excelFile ??= entry;
+          excelFiles.add(entry);
           continue;
         }
         if (!_isSupportedImageEntry(lower)) continue;
@@ -886,9 +984,33 @@ class DatasetImportService {
           imageFiles[barcode] = entry;
         }
       }
-      if (excelFile == null) {
+      if (excelFiles.isEmpty) {
         throw Exception('ZIP arşivinde Excel (.xlsx) dosyası bulunamadı.');
       }
+      // ZIP entry order is not stable. Prefer a root-level workbook, then the
+      // shallowest path and finally a deterministic name. This prevents the
+      // same catalogue from occasionally selecting a backup workbook stored
+      // under an images/subfolder directory.
+      excelFiles.sort((left, right) {
+        int score(ArchiveFile file) {
+          final normalized = file.name.replaceAll('\\', '/').toLowerCase();
+          final depth = '/'.allMatches(normalized).length;
+          final basename = p.basename(normalized);
+          final catalogName = basename.contains('katalog') ||
+                  basename.contains('catalog') ||
+                  basename.contains('urun') ||
+                  basename.contains('ürün')
+              ? 0
+              : 1;
+          return (depth * 10) + catalogName;
+        }
+
+        final byScore = score(left).compareTo(score(right));
+        return byScore != 0
+            ? byScore
+            : left.name.toLowerCase().compareTo(right.name.toLowerCase());
+      });
+      final excelFile = excelFiles.first;
       if (excelFile.size > _excelLimit) {
         throw Exception('Excel dosyası 150 MB sınırını aşıyor.');
       }
@@ -898,6 +1020,7 @@ class DatasetImportService {
       }
 
       final extracted = <String, String>{};
+      var skippedImages = 0;
       if (imageRootPath != null && imageFiles.isNotEmpty) {
         // Each import owns a unique image directory. A failed import can roll
         // back its files without deleting a previously active product image.
@@ -911,12 +1034,20 @@ class DatasetImportService {
           final totalImages = imageFiles.length;
           final imageUpdateInterval = max(1, totalImages ~/ 200);
           for (final image in imageFiles.entries) {
-            final content = image.value.content as List<int>?;
-            if (content != null) {
-              final target = p.join(destination.path, '${image.key}.jpg');
-              final optimized = _optimizeCardImage(content);
-              File(target).writeAsBytesSync(optimized, flush: false);
-              extracted[image.key] = target;
+            try {
+              final content = image.value.content as List<int>?;
+              if (content == null || content.isEmpty) {
+                skippedImages++;
+              } else {
+                final target = p.join(destination.path, '${image.key}.jpg');
+                final optimized = _optimizeCardImage(content);
+                File(target).writeAsBytesSync(optimized, flush: false);
+                extracted[image.key] = target;
+              }
+            } catch (_) {
+              // A single damaged/unsupported image must not cancel a catalogue
+              // containing thousands of otherwise valid products and images.
+              skippedImages++;
             }
             preparedImages++;
             if (preparedImages == 1 ||
@@ -924,7 +1055,9 @@ class DatasetImportService {
                 preparedImages == totalImages) {
               onProgress(
                 0.32 + (preparedImages / totalImages) * 0.66,
-                'Görseller optimize ediliyor: $preparedImages / $totalImages...',
+                skippedImages == 0
+                    ? 'Görseller optimize ediliyor: $preparedImages / $totalImages...'
+                    : 'Görseller optimize ediliyor: $preparedImages / $totalImages · $skippedImages atlandı...',
               );
             }
           }
@@ -939,11 +1072,19 @@ class DatasetImportService {
           rethrow;
         }
       }
-      onProgress(1.0, 'Excel ve görseller hazırlandı.');
+      onProgress(
+        1.0,
+        skippedImages == 0
+            ? 'Excel ve görseller hazırlandı.'
+            : 'Görseller hazırlandı; $skippedImages bozuk görsel atlandı.',
+      );
       return _PreparedCatalogFile(
         excelBytes: Uint8List.fromList(excelContent),
-        imageBarcodes: imageFiles.keys.toSet(),
+        imageBarcodes: imageRootPath == null
+            ? imageFiles.keys.toSet()
+            : extracted.keys.toSet(),
         extractedImagePaths: extracted,
+        skippedImages: skippedImages,
       );
     } finally {
       input.closeSync();
@@ -1063,15 +1204,15 @@ class DatasetImportService {
                 if (imageMap.containsKey(barcode)) {
                   finalImageUrl =
                       'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
-                } else if (remoteUrl.isNotEmpty) {
-                  finalImageUrl = remoteUrl;
+                } else {
+                  finalImageUrl = _externalImageReference(remoteUrl);
                 }
               } else if (localImagesDirPath != null &&
                   availableImageBarcodes.contains(barcode)) {
                 finalImageUrl = preparedImagePaths[barcode] ??
                     p.join(localImagesDirPath, '$barcode.jpg');
-              } else if (remoteUrl.isNotEmpty) {
-                finalImageUrl = remoteUrl;
+              } else {
+                finalImageUrl = _externalImageReference(remoteUrl);
               }
 
               // Query existing product using txn
@@ -1257,15 +1398,15 @@ class DatasetImportService {
             if (imageMap.containsKey(barcode)) {
               finalImageUrl =
                   'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
-            } else if (remoteUrl.isNotEmpty) {
-              finalImageUrl = remoteUrl;
+            } else {
+              finalImageUrl = _externalImageReference(remoteUrl);
             }
           } else if (localImagesDirPath != null &&
               availableImageBarcodes.contains(barcode)) {
             finalImageUrl = preparedImagePaths[barcode] ??
                 p.join(localImagesDirPath, '$barcode.jpg');
-          } else if (remoteUrl.isNotEmpty) {
-            finalImageUrl = remoteUrl;
+          } else {
+            finalImageUrl = _externalImageReference(remoteUrl);
           }
 
           final existing = await _productRepository.findById(barcode);
