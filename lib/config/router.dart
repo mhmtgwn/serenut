@@ -224,7 +224,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.catalogImportWizard,
         name: 'catalogImportWizard',
-        builder: (context, state) => const CatalogImportWizardPage(),
+        builder: (context, state) => CatalogImportWizardPage(
+          cloudSource: state.uri.queryParameters['source'] == 'cloud',
+        ),
         redirect: (context, state) =>
             _roleOrPermissionRedirect(context, Permission.settingsDatabase),
       ),

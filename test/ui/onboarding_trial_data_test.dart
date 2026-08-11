@@ -38,6 +38,8 @@ void main() {
     expect(find.text('Demo ile başla'), findsOneWidget);
     expect(find.text('Kendi işletmemle başla'), findsOneWidget);
     expect(find.textContaining('Mehmet Güven'), findsOneWidget);
+    expect(find.textContaining('1 sipariş ve 1 satış'), findsOneWidget);
+    expect(find.textContaining('Veri İçeri Aktar'), findsOneWidget);
     expect(find.text('Müşteriyi sıfırla'), findsNothing);
   });
 }

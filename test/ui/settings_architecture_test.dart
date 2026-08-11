@@ -25,6 +25,7 @@ void main() {
     }
 
     await pump(DataManagementMode.transfer);
+    expect(find.text('Buluttan Hazır Katalog İçe Aktar'), findsOneWidget);
     expect(find.text('Ürün Kataloğu İçe Aktar (.zip / .xlsx)'), findsOneWidget);
     expect(find.text('Tüm Verileri Sıfırla (Fabrika Ayarları)'), findsNothing);
 

@@ -3,7 +3,6 @@
 // Sub-route tabanlı wizard: /onboarding → /onboarding/business → /onboarding/admin → /onboarding/success
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/theme.dart';
@@ -23,14 +22,11 @@ import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'package:serenutos/domain/models/import_strategy.dart';
-import 'package:serenutos/domain/services/dataset_import_service.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_customer_repository.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_product_repository.dart';
-import 'package:serenutos/domain/repositories/base_repository.dart';
-
-const String _demoCatalogAsset = 'market_data_catalog_with_images.zip';
-const String _demoCustomerId = 'demo-customer-mehmet-guven';
+import 'package:serenutos/infrastructure/repositories/sqlite_order_repository.dart';
+import 'package:serenutos/infrastructure/repositories/sqlite_payment_repository.dart';
+import 'package:serenutos/domain/services/demo_data_seeder.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step wrappers — GoRouter route builder'larında kullanılan widget'lar
@@ -312,48 +308,19 @@ class _OnboardingStep2PageState extends ConsumerState<OnboardingStep2Page> {
       currency: state.business.currency,
       createdAt: DateTime.now(),
     ));
-    // 4. Görselli hazır katalog her kurulum tipinde otomatik yüklenir.
-    _setSavingStatus('Ürün kataloğu hazırlanıyor...');
-    final productRepo = SqliteProductRepository(gateway);
-    final catalogData = await rootBundle.load(_demoCatalogAsset);
-    final catalogBytes = catalogData.buffer.asUint8List(
-      catalogData.offsetInBytes,
-      catalogData.lengthInBytes,
-    );
-    final importer = DatasetImportService(productRepo);
-    await importer.importFromZip(
-      catalogBytes,
-      (progress, status) => _setSavingStatus(
-        'Katalog yükleniyor (%${(progress * 100).round()})\n$status',
-      ),
-      const ImportStrategy(
-        insertNew: true,
-        updateExisting: true,
-        duplicateResolution: DuplicateResolution.update,
-      ),
-    );
-
-    // 5. Demo kurulumda yalnızca tek bir örnek müşteri sunulur. Standart
-    // kurulumda sistemin zorunlu Peşin Müşteri kaydı dışında örnek yoktur.
+    // 4. Tam katalog isteğe bağlı olarak Ayarlar > Veri İçeri Aktar ekranından
+    // buluttan alınır. Demo kurulum yalnız küçük ve anlaşılır örnekler üretir.
     _setSavingStatus('Kurulum modu uygulanıyor...');
-    final customerRepo = SqliteCustomerRepository(gateway);
-    final demoCustomerExists = await customerRepo.exists(_demoCustomerId);
     if (state.initialData.isDemo) {
-      if (!demoCustomerExists) {
-        await customerRepo.create(CustomerEntity(
-          id: _demoCustomerId,
-          name: 'Mehmet Güven',
-          email: '',
-          phone: '05380288202',
-          balance: 0,
-          createdAt: DateTime.now(),
-        ));
-      }
-    } else if (demoCustomerExists) {
-      await customerRepo.delete(_demoCustomerId);
+      await DemoDataSeeder(
+        productRepository: SqliteProductRepository(gateway),
+        customerRepository: SqliteCustomerRepository(gateway),
+        orderRepository: SqliteOrderRepository(gateway),
+        saleRepository: SqliteSaleRepository(gateway),
+      ).seed(businessType: state.business.businessType);
     }
 
-    // 6. Onboarding tamamlandı
+    // 5. Onboarding tamamlandı
     _setSavingStatus('Kurulum tamamlanıyor...');
     await _persistence.markCompleted();
     return recoveryCodes;

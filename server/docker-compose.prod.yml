@@ -26,6 +26,7 @@ services:
       - ./public:/app/public
       - ./logs:/app/logs
       - ./releases:/var/www/serenut-api/releases
+      - ./catalogs:/app/catalogs:ro
       - ./company-logos:/var/lib/serenut/company-logos
       - ./.release-private.pem:/run/secrets/serenut_release_private_key:ro
       - ./.maintenance-token:/run/secrets/maintenance_agent_token:ro
