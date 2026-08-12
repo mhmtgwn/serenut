@@ -82,7 +82,9 @@ void main() {
       await Future.wait(futures);
       stopwatch.stop();
 
-      print('Executed 1000 operations in ${stopwatch.elapsedMilliseconds} ms');
+      printOnFailure(
+        'Executed 1000 operations in ${stopwatch.elapsedMilliseconds} ms',
+      );
 
       // Verify count
       final count = await db.rawQuery(

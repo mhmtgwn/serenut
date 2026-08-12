@@ -13,6 +13,7 @@ import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/domain/services/barcode_standard.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -130,13 +131,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     setState(() => _isSaving = true);
     try {
       final oldId = widget.isEditing ? widget.existingProduct!.id : null;
-      final id = widget.isEditing
+      final rawId = widget.isEditing
           ? (_barcodeCtrl.text.trim().isNotEmpty
               ? _barcodeCtrl.text.trim()
               : widget.existingProduct!.id)
           : (_barcodeCtrl.text.trim().isNotEmpty
               ? _barcodeCtrl.text.trim()
               : const Uuid().v4());
+      final id = BarcodeStandard.normalize(rawId);
 
       final product = ProductEntity(
         id: id,
@@ -768,7 +770,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         .join(' ');
   }
 
-  Future<void> _addNewCategoryToSettings(String categoryName, {int? rate}) async {
+  Future<void> _addNewCategoryToSettings(String categoryName,
+      {int? rate}) async {
     try {
       final settings = ref.read(settingsNotifierProvider).value;
       if (settings != null) {
@@ -830,7 +833,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               children: [
                 const Text('Yeni Kategori',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 17, color: _kText)),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: _kText)),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, size: 20),
                   tooltip: 'Tüm kategorileri yönet',
@@ -882,7 +887,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   if (catName.isEmpty) return;
                   final vatText = vatCtrl.text.trim();
                   final rate = vatText.isEmpty ? null : int.tryParse(vatText);
-                  if (vatText.isNotEmpty && (rate == null || rate < 0 || rate > 100)) {
+                  if (vatText.isNotEmpty &&
+                      (rate == null || rate < 0 || rate > 100)) {
                     return;
                   }
                   if (rate != null) {
@@ -897,7 +903,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       borderRadius: BorderRadius.circular(10)),
                 ),
                 child: const Text('Kategori Ekle',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
           ],

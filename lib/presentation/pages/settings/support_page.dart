@@ -271,8 +271,9 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                       ),
                     ),
                     validator: (v) {
-                      if (v?.trim().isEmpty ?? true)
+                      if (v?.trim().isEmpty ?? true) {
                         return 'Açıklama zorunludur';
+                      }
                       if (v!.trim().length < 10) {
                         return 'Lütfen sorunu en az 10 karakterle açıklayın';
                       }

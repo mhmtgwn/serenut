@@ -26,7 +26,6 @@ import 'package:serenutos/presentation/widgets/sales/checkout/cash_dialog.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
-part 'steps/step_cart_summary.dart';
 part 'steps/step_checkout.dart';
 
 // Color and layout constants
@@ -35,7 +34,6 @@ const _kGreenDark = Color(0xFF15803D);
 const _kGreenLight = Color(0xFFDCFCE7);
 const _kAmber = Color(0xFFEAB308);
 const _kAmberLight = Color(0xFFFEF9C3);
-const _kAmberDark = Color(0xFFB45309);
 const _kOrange = Color(0xFFEA580C);
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
@@ -85,7 +83,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   // Step 4: Checkout
   String _paymentMethod = '';
   final GlobalKey _karmaFieldsKey = GlobalKey();
-  final GlobalKey _cashFieldsKey = GlobalKey();
   final TextEditingController _givenCashController = TextEditingController();
   final TextEditingController _cashSplitController = TextEditingController();
   final TextEditingController _cardSplitController = TextEditingController();

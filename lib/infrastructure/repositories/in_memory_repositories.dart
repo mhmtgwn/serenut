@@ -3,6 +3,7 @@
 // Generated: 21 Jun 2026
 
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/services/barcode_standard.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart';
@@ -112,8 +113,9 @@ class InMemoryProductRepository implements IProductRepository {
 
   @override
   Future<ProductEntity?> findById(dynamic id) async {
+    final candidates = BarcodeStandard.lookupCandidates(id.toString());
     try {
-      return InMemoryDb.products.firstWhere((p) => p.id == id);
+      return InMemoryDb.products.firstWhere((p) => candidates.contains(p.id));
     } catch (_) {
       return null;
     }
@@ -121,7 +123,14 @@ class InMemoryProductRepository implements IProductRepository {
 
   @override
   Future<int> create(ProductEntity entity) async {
-    InMemoryDb.products.add(entity);
+    final candidates = BarcodeStandard.lookupCandidates(entity.id);
+    if (InMemoryDb.products.any((p) => candidates.contains(p.id))) {
+      throw Exception(
+          'Bu barkod (${BarcodeStandard.normalize(entity.id)}) mevcut bir ürünle aynı ürünü temsil ediyor.');
+    }
+    InMemoryDb.products.add(
+      entity.copyWith(id: BarcodeStandard.normalize(entity.id)),
+    );
     return 1;
   }
 
@@ -153,7 +162,8 @@ class InMemoryProductRepository implements IProductRepository {
 
   @override
   Future<bool> exists(dynamic id) async {
-    return InMemoryDb.products.any((p) => p.id == id);
+    final candidates = BarcodeStandard.lookupCandidates(id.toString());
+    return InMemoryDb.products.any((p) => candidates.contains(p.id));
   }
 
   @override

@@ -14,6 +14,7 @@ import 'package:archive/archive_io.dart';
 import 'package:excel/excel.dart' as ex;
 import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/services/barcode_standard.dart';
 import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
@@ -137,6 +138,23 @@ class DatasetImportService {
     final val = cell.value;
     if (val == null) return '';
     return val.toString().trim();
+  }
+
+  /// UPC-A is represented by 12 digits. Its EAN-13 representation is the
+  /// exact same value prefixed with a zero. Treat only that well-defined pair
+  /// as equivalent; arbitrary leading zeroes may be meaningful product codes.
+  static String? _upcEanEquivalentBarcode(String barcode) {
+    return BarcodeStandard.equivalent(barcode);
+  }
+
+  static String _barcodeIdentity(String barcode) {
+    return BarcodeStandard.normalize(barcode);
+  }
+
+  static String? _matchingBarcodeKey(Set<String> keys, String barcode) {
+    if (keys.contains(barcode)) return barcode;
+    final equivalent = _upcEanEquivalentBarcode(barcode);
+    return equivalent != null && keys.contains(equivalent) ? equivalent : null;
   }
 
   /// Helper to convert cell value to double safely
@@ -490,7 +508,9 @@ class DatasetImportService {
       }
       if (row.isEmpty) continue;
 
-      final barcode = _staticParseString(_cellAt(row, columns['barcode']));
+      final barcode = BarcodeStandard.normalize(
+        _staticParseString(_cellAt(row, columns['barcode'])),
+      );
       final name = _staticParseString(_cellAt(row, columns['name']));
 
       if (barcode.isEmpty || name.isEmpty) {
@@ -666,7 +686,9 @@ class DatasetImportService {
       final row = rows[i];
       if (row.isEmpty) continue;
 
-      final barcode = _staticParseString(_cellAt(row, columns['barcode']));
+      final barcode = BarcodeStandard.normalize(
+        _staticParseString(_cellAt(row, columns['barcode'])),
+      );
       final name = _staticParseString(_cellAt(row, columns['name']));
 
       if (barcode.isEmpty || name.isEmpty) {
@@ -1140,7 +1162,15 @@ class DatasetImportService {
         ...imageMap.keys,
         ...preparedImagePaths.keys,
       };
-      final products = parsedData.products;
+      // A catalogue may contain the same UPC once as 12 digits and once in
+      // its zero-prefixed EAN-13 form. Keep the last row, matching the normal
+      // update semantics, and never create two products for that pair.
+      final productsByIdentity = <String, Map<String, dynamic>>{};
+      for (final product in parsedData.products) {
+        final barcode = product['barcode'] as String;
+        productsByIdentity[_barcodeIdentity(barcode)] = product;
+      }
+      final products = productsByIdentity.values.toList(growable: false);
 
       // Save extracted images
       String? localImagesDirPath;
@@ -1203,35 +1233,39 @@ class DatasetImportService {
 
               // Resolve image URL
               String? finalImageUrl;
+              final imageBarcode = _matchingBarcodeKey(
+                availableImageBarcodes,
+                barcode,
+              );
               if (kIsWeb) {
-                if (imageMap.containsKey(barcode)) {
+                if (imageBarcode != null &&
+                    imageMap.containsKey(imageBarcode)) {
                   finalImageUrl =
-                      'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
+                      'data:image/jpeg;base64,${base64Encode(imageMap[imageBarcode]!)}';
                 } else {
                   finalImageUrl = _externalImageReference(remoteUrl);
                 }
-              } else if (localImagesDirPath != null &&
-                  availableImageBarcodes.contains(barcode)) {
-                finalImageUrl = preparedImagePaths[barcode] ??
-                    p.join(localImagesDirPath, '$barcode.jpg');
+              } else if (localImagesDirPath != null && imageBarcode != null) {
+                finalImageUrl = preparedImagePaths[imageBarcode] ??
+                    p.join(localImagesDirPath, '$imageBarcode.jpg');
               } else {
                 finalImageUrl = _externalImageReference(remoteUrl);
               }
 
               // Query existing product using txn
-              final existingRows = await txn.query(
-                'products',
-                columns: [
-                  'id',
-                  'quantity',
-                  'price',
-                  'description',
-                  'image_url',
-                  'is_active',
-                  'is_deleted',
-                ],
-                where: 'id = ?',
-                whereArgs: [barcode],
+              final equivalentBarcode = _upcEanEquivalentBarcode(barcode);
+              final existingRows = await txn.rawQuery(
+                '''
+                SELECT id, quantity, price, description, image_url,
+                       is_active, is_deleted
+                FROM products
+                WHERE id = ?${equivalentBarcode == null ? '' : ' OR id = ?'}
+                ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END
+                LIMIT 1
+                ''',
+                equivalentBarcode == null
+                    ? [barcode, barcode]
+                    : [barcode, equivalentBarcode, barcode],
               );
 
               if (existingRows.isEmpty) {
@@ -1256,6 +1290,7 @@ class DatasetImportService {
                 }
               } else {
                 final existing = existingRows.first;
+                final existingBarcode = existing['id'] as String;
 
                 if (strategy.duplicateResolution == DuplicateResolution.skip) {
                   continue;
@@ -1276,7 +1311,7 @@ class DatasetImportService {
                       'deleted_at': null,
                       'deleted_by': null,
                     });
-                    reactivatedProductIds.add(barcode);
+                    reactivatedProductIds.add(existingBarcode);
                   }
 
                   if (strategy.syncPrices) {
@@ -1301,9 +1336,9 @@ class DatasetImportService {
                     'products',
                     updateFields,
                     where: 'id = ?',
-                    whereArgs: [barcode],
+                    whereArgs: [existingBarcode],
                   );
-                  mutatedProductIds.add(barcode);
+                  mutatedProductIds.add(existingBarcode);
                   importedCount++;
                 }
               }
@@ -1356,8 +1391,13 @@ class DatasetImportService {
 
           // Deactivate missing products if enabled and enqueue sync mutations
           if (strategy.deactivateMissing) {
-            final excelBarcodes =
-                products.map((p) => p['barcode'] as String).toList();
+            final excelBarcodes = <String>{
+              for (final product in products) product['barcode'] as String,
+              for (final product in products)
+                if (_upcEanEquivalentBarcode(product['barcode'] as String)
+                    case final equivalent?)
+                  equivalent,
+            }.toList(growable: false);
             if (excelBarcodes.isNotEmpty) {
               const int sqliteParamLimit = 999;
               for (int k = 0; k < excelBarcodes.length; k += sqliteParamLimit) {
@@ -1414,22 +1454,29 @@ class DatasetImportService {
           final quantity = prodMap['quantity'] as int? ?? 0;
 
           String? finalImageUrl;
+          final imageBarcode = _matchingBarcodeKey(
+            availableImageBarcodes,
+            barcode,
+          );
           if (kIsWeb) {
-            if (imageMap.containsKey(barcode)) {
+            if (imageBarcode != null && imageMap.containsKey(imageBarcode)) {
               finalImageUrl =
-                  'data:image/jpeg;base64,${base64Encode(imageMap[barcode]!)}';
+                  'data:image/jpeg;base64,${base64Encode(imageMap[imageBarcode]!)}';
             } else {
               finalImageUrl = _externalImageReference(remoteUrl);
             }
-          } else if (localImagesDirPath != null &&
-              availableImageBarcodes.contains(barcode)) {
-            finalImageUrl = preparedImagePaths[barcode] ??
-                p.join(localImagesDirPath, '$barcode.jpg');
+          } else if (localImagesDirPath != null && imageBarcode != null) {
+            finalImageUrl = preparedImagePaths[imageBarcode] ??
+                p.join(localImagesDirPath, '$imageBarcode.jpg');
           } else {
             finalImageUrl = _externalImageReference(remoteUrl);
           }
 
-          final existing = await _productRepository.findById(barcode);
+          final equivalentBarcode = _upcEanEquivalentBarcode(barcode);
+          final existing = await _productRepository.findById(barcode) ??
+              (equivalentBarcode == null
+                  ? null
+                  : await _productRepository.findById(equivalentBarcode));
 
           if (existing == null) {
             if (strategy.insertNew) {
@@ -1460,7 +1507,7 @@ class DatasetImportService {
               }
 
               final updatedProd = ProductEntity(
-                id: barcode,
+                id: existing.id,
                 name: name,
                 description:
                     strategy.syncDescriptions ? brand : existing.description,

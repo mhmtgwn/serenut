@@ -170,7 +170,7 @@ class _LedgerExplainabilitySheetState
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: _kPurple.withOpacity(0.1),
+                      color: _kPurple.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.history_toggle_off_rounded,
@@ -330,10 +330,11 @@ class _LedgerExplainabilitySheetState
 
   Widget _buildStatusCard() {
     final isValid = _isInvariantValid ?? true;
-    final cardBg =
-        isValid ? _kGreen.withOpacity(0.04) : _kRed.withOpacity(0.04);
+    final cardBg = isValid
+        ? _kGreen.withValues(alpha: 0.04)
+        : _kRed.withValues(alpha: 0.04);
     final borderCol =
-        isValid ? _kGreen.withOpacity(0.2) : _kRed.withOpacity(0.2);
+        isValid ? _kGreen.withValues(alpha: 0.2) : _kRed.withValues(alpha: 0.2);
     final iconColor = isValid ? _kGreen : _kRed;
     final title =
         isValid ? 'Veri Bütünlüğü Doğrulandı' : 'Bakiye Sapması Tespit Edildi';
@@ -408,7 +409,7 @@ class _LedgerExplainabilitySheetState
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.3),
+                      color: color.withValues(alpha: 0.3),
                       blurRadius: 4,
                       spreadRadius: 1,
                     ),

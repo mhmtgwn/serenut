@@ -825,15 +825,15 @@ class DatabaseMigrations {
         }
         if (oldVersion < 45) {
           for (final statement in [
-            "ALTER TABLE settings ADD COLUMN label_show_brand INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_show_vat INTEGER NOT NULL DEFAULT 1",
+            'ALTER TABLE settings ADD COLUMN label_show_brand INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_show_vat INTEGER NOT NULL DEFAULT 1',
             "ALTER TABLE settings ADD COLUMN label_font_size TEXT NOT NULL DEFAULT 'Orta'",
-            "ALTER TABLE settings ADD COLUMN label_order_show_business_name INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_order_show_customer_name INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_order_show_order_no INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_order_show_date INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_order_show_total_amount INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_order_show_items_count INTEGER NOT NULL DEFAULT 1",
+            'ALTER TABLE settings ADD COLUMN label_order_show_business_name INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_order_show_customer_name INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_order_show_order_no INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_order_show_date INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_order_show_total_amount INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_order_show_items_count INTEGER NOT NULL DEFAULT 1',
             "ALTER TABLE settings ADD COLUMN label_order_font_size TEXT NOT NULL DEFAULT 'Orta'",
           ]) {
             try {
@@ -850,9 +850,9 @@ class DatabaseMigrations {
         }
         if (oldVersion < 46) {
           for (final statement in [
-            "ALTER TABLE settings ADD COLUMN label_show_business_name INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_show_barcode INTEGER NOT NULL DEFAULT 1",
-            "ALTER TABLE settings ADD COLUMN label_show_price INTEGER NOT NULL DEFAULT 1",
+            'ALTER TABLE settings ADD COLUMN label_show_business_name INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_show_barcode INTEGER NOT NULL DEFAULT 1',
+            'ALTER TABLE settings ADD COLUMN label_show_price INTEGER NOT NULL DEFAULT 1',
             "ALTER TABLE settings ADD COLUMN active_receipt_printer_id TEXT NOT NULL DEFAULT 'receipt-printer-primary'",
             "ALTER TABLE settings ADD COLUMN active_label_printer_id TEXT NOT NULL DEFAULT 'label-printer-primary'",
             "ALTER TABLE print_queue ADD COLUMN purpose TEXT NOT NULL DEFAULT 'receipt'",

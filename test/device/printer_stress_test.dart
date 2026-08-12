@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use_from_same_package
+
 // test/device/printer_stress_test.dart
 // Serenut OS — Printer Stress & Resilience Tests
 // Tests: 100-receipt loop, mid-print disconnect, network outage recovery,

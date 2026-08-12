@@ -58,13 +58,14 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
       final type = _tabs[_tabController.index]['id']!;
       final repo = ref.read(recoveryRepositoryProvider);
       final items = await repo.getDeletedItems(type);
+      if (!mounted) return;
       setState(() {
         _deletedItems = items;
       });
     } catch (_) {
       // Fail-safe
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -105,6 +106,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         // Invalidate corresponding controller to sync UI
         _invalidateControllerForType(type);
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('$name başarıyla kurtarıldı.'),
@@ -112,13 +114,14 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         );
         _loadDeletedItems();
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Kurtarma hatası: $e'),
               backgroundColor: Colors.redAccent),
         );
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     });
   }
@@ -144,6 +147,7 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         // Invalidate corresponding controller to sync UI
         _invalidateControllerForType(type);
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('$name kalıcı olarak silindi (Purged).'),
@@ -151,13 +155,14 @@ class _RecoveryCenterPageState extends ConsumerState<RecoveryCenterPage>
         );
         _loadDeletedItems();
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Silme hatası: $e'),
               backgroundColor: Colors.redAccent),
         );
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     });
   }

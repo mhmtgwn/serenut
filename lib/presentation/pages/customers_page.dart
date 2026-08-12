@@ -376,7 +376,6 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       case CustomerBalanceFilter.clear:
         return 'Bakiyesi yok';
       case CustomerBalanceFilter.all:
-      default:
         return 'Tümü';
     }
   }

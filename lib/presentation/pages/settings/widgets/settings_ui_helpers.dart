@@ -1,6 +1,6 @@
 part of '../../settings_page.dart';
 
-extension SettingsPageUiHelpers on _SettingsPageState {
+extension _SettingsPageUiHelpers on _SettingsPageState {
   // �”€�”€ Helper UI Metotları �”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€�”€
   bool _matchesQuery(String f1,
       [String f2 = '',
@@ -139,6 +139,7 @@ extension SettingsPageUiHelpers on _SettingsPageState {
     try {
       await ref.read(settingsNotifierProvider.notifier).updateSettings(updated);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Ayarlar güncellenirken hata oluştu: $e'),

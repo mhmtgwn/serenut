@@ -1,405 +1,427 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/config/theme.dart';
-import 'package:serenutos/presentation/controllers/report_controller.dart';
-import 'package:serenutos/infrastructure/repositories/report_repository.dart';
-import 'package:serenutos/providers/settings_provider.dart';
-import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
-import 'package:serenutos/presentation/widgets/revenue_bar_chart.dart';
+import 'package:serenutos/infrastructure/repositories/report_repository.dart';
+import 'package:serenutos/presentation/controllers/report_controller.dart';
 import 'package:serenutos/presentation/widgets/reports/shared_report_widgets.dart';
+import 'package:serenutos/presentation/widgets/revenue_bar_chart.dart';
+import 'package:serenutos/providers/printing_providers.dart';
+import 'package:serenutos/providers/settings_provider.dart';
 
 class SalesTab extends ConsumerWidget {
-  final DateRange range;
-
   const SalesTab({super.key, required this.range});
+
+  final DateRange range;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summaryVal = ref.watch(reportSummaryProvider(range));
-    final dailyVal = ref.watch(dailyRevenueProvider(range));
-    final categoryVal = ref.watch(categoryRevenueProvider(range));
+    final summary = ref.watch(reportSummaryProvider(range));
+    final daily = ref.watch(dailyRevenueProvider(range));
+    final categories = ref.watch(categoryRevenueProvider(range));
 
-    return RefreshIndicator(
+    return ReportScrollView(
       onRefresh: () async {
         ref.invalidate(reportSummaryProvider(range));
         ref.invalidate(dailyRevenueProvider(range));
         ref.invalidate(categoryRevenueProvider(range));
       },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary Cards
-            summaryVal.when(
-              data: (s) => _buildSummaryGrid(s),
-              loading: () => _shimmerGrid(),
-              error: (e, _) => buildErrorReportCard('Özet yüklenemedi: $e'),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              color: Colors.white,
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey[200]!),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.print_outlined, color: POSColors.green),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Yazıcı Raporları',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          Text(
-                            'Termal yazıcıdan gün içi (X) veya gün sonu (Z) raporu alın.',
-                            style: TextStyle(fontSize: 11, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final summary = summaryVal.value;
-                        final categories = categoryVal.value;
-                        final settings =
-                            ref.read(settingsNotifierProvider).value;
-
-                        if (summary == null ||
-                            categories == null ||
-                            settings == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Veriler yukleniyor, lutfen bekleyin...'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final route = await ref
-                            .read(printingRepositoryProvider)
-                            .getRoute(PrintDocumentKind.receipt);
-                        if (route == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
-                              backgroundColor: Colors.orange,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
-                        }
-
-                        try {
-                          await ref
-                              .read(printingApplicationServiceProvider)
-                              .queueReport('X', summary, categories, settings);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('X Raporu yazdırma sırasına eklendi.'),
-                              backgroundColor: POSColors.green,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Yazdirma hatasi: $e'),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: POSColors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.print_outlined, size: 16),
-                      label: const Text('X Raporu',
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final summary = summaryVal.value;
-                        final categories = categoryVal.value;
-                        final settings =
-                            ref.read(settingsNotifierProvider).value;
-
-                        if (summary == null ||
-                            categories == null ||
-                            settings == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Veriler yukleniyor, lutfen bekleyin...'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final route = await ref
-                            .read(printingRepositoryProvider)
-                            .getRoute(PrintDocumentKind.receipt);
-                        if (route == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Lütfen Ayarlar sayfasından bir yazıcı tanımlayın.'),
-                              backgroundColor: Colors.orange,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
-                        }
-
-                        try {
-                          await ref
-                              .read(printingApplicationServiceProvider)
-                              .queueReport('Z', summary, categories, settings);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Z Raporu yazdırma sırasına eklendi.'),
-                              backgroundColor: POSColors.green,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Yazdirma hatasi: $e'),
-                              backgroundColor: Colors.red,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E293B),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.print_outlined, size: 16),
-                      label: const Text('Z Raporu',
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Bar Chart
-            ReportSectionHeader(
-              title: 'Günlük Gelir',
-              subtitle: range.label,
-              icon: Icons.bar_chart,
-            ),
-            const SizedBox(height: 8),
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: dailyVal.when(
-                  data: (data) => RevenueBarChart(data: data, height: 180),
-                  loading: () => const SizedBox(
-                    height: 220,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (e, _) =>
-                      buildErrorReportCard('Grafik yüklenemedi: $e'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Category breakdown
-            const ReportSectionHeader(
-              title: 'Kategori Dağılımı',
-              icon: Icons.donut_large,
-            ),
-            const SizedBox(height: 8),
-            categoryVal.when(
-              data: (cats) => cats.isEmpty
-                  ? buildEmptyReportState('Kategori verisi yok')
-                  : _buildCategoryList(cats),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => buildErrorReportCard('Kategori yüklenemedi: $e'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryGrid(ReportSummary s) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.6,
       children: [
-        ReportMetricCard(
-          label: 'Toplam Gelir',
-          value: '${formatReportCurrency(s.totalRevenue)} TL',
-          icon: Icons.attach_money,
-          color: POSColors.greenDark,
-          bg: POSColors.greenLight,
+        ReportSectionHeader(
+          eyebrow: 'Dönem özeti',
+          title: 'Satış performansı',
+          subtitle: '${range.label} için temel işletme göstergeleri',
+          icon: Icons.point_of_sale_rounded,
+          trailing: ReportPill(
+            label: range.label,
+            icon: Icons.calendar_today_outlined,
+          ),
         ),
-        ReportMetricCard(
-          label: 'Satış Adedi',
-          value: '${s.totalSales}',
-          icon: Icons.receipt_long_outlined,
-          color: POSColors.green,
-          bg: POSColors.greenLight,
+        const SizedBox(height: 14),
+        summary.when(
+          data: (data) => _SummaryMetrics(summary: data),
+          loading: () => const ReportLoadingCard(height: 150),
+          error: (error, _) => ReportErrorCard(
+            message: 'Satış özeti yüklenemedi.',
+            onRetry: () => ref.invalidate(reportSummaryProvider(range)),
+          ),
         ),
-        ReportMetricCard(
-          label: 'Ortalama Sepet',
-          value: '${formatReportCurrency(s.avgBasket)} TL',
-          icon: Icons.shopping_basket_outlined,
-          color: POSColors.amberDark,
-          bg: POSColors.amberLight,
+        const SizedBox(height: 18),
+        _PrintActions(
+          onPrintX: () => _printReport(
+            context,
+            ref,
+            'X',
+            summary.value,
+            categories.value,
+          ),
+          onPrintZ: () => _printReport(
+            context,
+            ref,
+            'Z',
+            summary.value,
+            categories.value,
+          ),
         ),
-        ReportMetricCard(
-          label: 'Tahsilat Oranı',
-          value: '%${s.collectionRate.toStringAsFixed(1)}',
-          icon: Icons.percent,
-          color: s.collectionRate >= 80
-              ? POSColors.greenDark
-              : POSColors.amberDark,
-          bg: s.collectionRate >= 80
-              ? POSColors.greenLight
-              : POSColors.amberLight,
-          subtitle: 'Toplam Borç: ${formatReportCurrency(s.totalDebt)} TL',
+        const SizedBox(height: 24),
+        const ReportSectionHeader(
+          eyebrow: 'Ciro',
+          title: 'Günlük satış hareketi',
+          subtitle: 'Seçili dönemde gün bazında gerçekleşen toplam gelir',
+          icon: Icons.bar_chart_rounded,
+        ),
+        const SizedBox(height: 14),
+        daily.when(
+          data: (data) => data.isEmpty
+              ? const ReportEmptyState(
+                  icon: Icons.bar_chart_rounded,
+                  title: 'Satış hareketi yok',
+                  message: 'Bu dönem için grafik oluşturacak veri bulunamadı.',
+                )
+              : ReportPanel(
+                  child: RevenueBarChart(data: data, height: 230),
+                ),
+          loading: () => const ReportLoadingCard(height: 260),
+          error: (error, _) => ReportErrorCard(
+            message: 'Günlük satış grafiği yüklenemedi.',
+            onRetry: () => ref.invalidate(dailyRevenueProvider(range)),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const ReportSectionHeader(
+          eyebrow: 'Kategoriler',
+          title: 'Ciro dağılımı',
+          subtitle: 'Hangi kategorinin toplam satışa ne kadar katkı verdiği',
+          icon: Icons.category_outlined,
+        ),
+        const SizedBox(height: 14),
+        categories.when(
+          data: (data) => data.isEmpty
+              ? const ReportEmptyState(
+                  icon: Icons.category_outlined,
+                  title: 'Kategori verisi yok',
+                  message: 'Seçili dönem için kategori satışı bulunamadı.',
+                )
+              : _CategoryList(categories: data),
+          loading: () => const ReportLoadingCard(height: 260),
+          error: (error, _) => ReportErrorCard(
+            message: 'Kategori dağılımı yüklenemedi.',
+            onRetry: () => ref.invalidate(categoryRevenueProvider(range)),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildCategoryList(List<CategoryRevenue> cats) {
-    final maxAmount =
-        cats.fold<double>(0, (m, c) => c.totalAmount > m ? c.totalAmount : m);
-    final colors = [
-      POSColors.green,
-      POSColors.amber,
-      Colors.teal,
-      Colors.orange,
-      Colors.indigo,
-      Colors.purple,
-      Colors.red,
-    ];
+  Future<void> _printReport(
+    BuildContext context,
+    WidgetRef ref,
+    String type,
+    ReportSummary? summary,
+    List<CategoryRevenue>? categories,
+  ) async {
+    final settings = ref.read(settingsNotifierProvider).value;
+    if (summary == null || categories == null || settings == null) {
+      _showMessage(context, 'Rapor verileri henüz hazır değil.');
+      return;
+    }
 
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: cats.asMap().entries.map((entry) {
-            final i = entry.key;
-            final cat = entry.value;
-            final color = colors[i % colors.length];
-            final barFrac = maxAmount == 0 ? 0.0 : cat.totalAmount / maxAmount;
+    final route = await ref
+        .read(printingRepositoryProvider)
+        .getRoute(PrintDocumentKind.receipt);
+    if (!context.mounted) return;
+    if (route == null) {
+      _showMessage(
+        context,
+        'Önce Ayarlar bölümünden bir yazıcı tanımlayın.',
+        warning: true,
+      );
+      return;
+    }
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration:
-                            BoxDecoration(color: color, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(cat.categoryName,
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w500)),
-                      ),
-                      Text(
-                        '%${cat.percentage.toStringAsFixed(1)}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '${formatReportCurrency(cat.totalAmount)} TL',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: barFrac,
-                      minHeight: 5,
-                      backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
+    try {
+      await ref
+          .read(printingApplicationServiceProvider)
+          .queueReport(type, summary, categories, settings);
+      if (context.mounted) {
+        _showMessage(context, '$type raporu yazdırma sırasına eklendi.');
+      }
+    } catch (error) {
+      if (context.mounted) {
+        _showMessage(context, 'Yazdırma işlemi başlatılamadı: $error',
+            warning: true);
+      }
+    }
+  }
+
+  void _showMessage(
+    BuildContext context,
+    String message, {
+    bool warning = false,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: warning ? POSColors.orange : POSColors.green,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
+}
 
-  Widget _shimmerGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.6,
-      children: List.generate(
-          4,
-          (_) => Container(
+class _SummaryMetrics extends StatelessWidget {
+  const _SummaryMetrics({required this.summary});
+
+  final ReportSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = [
+      ReportMetricCard(
+        label: 'Toplam ciro',
+        value: '${formatReportCurrency(summary.totalRevenue)} TL',
+        icon: Icons.payments_outlined,
+        color: POSColors.green,
+        subtitle: '${summary.totalSales} tamamlanan satış',
+      ),
+      ReportMetricCard(
+        label: 'Ortalama sepet',
+        value: '${formatReportCurrency(summary.avgBasket)} TL',
+        icon: Icons.shopping_basket_outlined,
+        color: POSColors.blue,
+        subtitle: 'Satış başına ortalama',
+      ),
+      ReportMetricCard(
+        label: 'Tahsil edilen',
+        value: '${formatReportCurrency(summary.totalCollected)} TL',
+        icon: Icons.account_balance_wallet_outlined,
+        color: POSColors.greenDark,
+        subtitle:
+            '%${summary.collectionRate.toStringAsFixed(1)} tahsilat oranı',
+      ),
+      ReportMetricCard(
+        label: 'Vadeli satış',
+        value: '${formatReportCurrency(summary.totalDebt)} TL',
+        icon: Icons.schedule_outlined,
+        color: summary.totalDebt > 0 ? POSColors.orange : POSColors.green,
+        subtitle: '${summary.newCustomers} yeni müşteri',
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 980
+            ? 4
+            : constraints.maxWidth >= 520
+                ? 2
+                : 1;
+        const gap = 12.0;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: metrics
+              .map((metric) => SizedBox(width: width, child: metric))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _PrintActions extends StatelessWidget {
+  const _PrintActions({required this.onPrintX, required this.onPrintZ});
+
+  final VoidCallback onPrintX;
+  final VoidCallback onPrintZ;
+
+  @override
+  Widget build(BuildContext context) {
+    return ReportPanel(
+      color: POSColors.darkSurface,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final copy = Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              )),
+                child: const Icon(Icons.print_outlined, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Yazıcı raporları',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Ara toplam için X, gün kapanışı için Z raporu alın.',
+                      style: TextStyle(color: Color(0xFFB9C6C0), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final buttons = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _PrintButton(label: 'X Raporu', onPressed: onPrintX),
+              const SizedBox(width: 8),
+              _PrintButton(
+                label: 'Z Raporu',
+                onPressed: onPrintZ,
+                emphasized: true,
+              ),
+            ],
+          );
+          if (constraints.maxWidth < 620) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                copy,
+                const SizedBox(height: 16),
+                Align(alignment: Alignment.centerRight, child: buttons),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: 18),
+              buttons,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PrintButton extends StatelessWidget {
+  const _PrintButton({
+    required this.label,
+    required this.onPressed,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.print_outlined, size: 16),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: emphasized ? POSColors.darkSurface : Colors.white,
+        backgroundColor: emphasized ? POSColors.amber : Colors.transparent,
+        side: BorderSide(
+          color: emphasized
+              ? POSColors.amber
+              : Colors.white.withValues(alpha: .35),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      ),
+    );
+  }
+}
+
+class _CategoryList extends StatelessWidget {
+  const _CategoryList({required this.categories});
+
+  final List<CategoryRevenue> categories;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxAmount = categories.fold<double>(
+      0,
+      (value, category) => math.max(value, category.totalAmount),
+    );
+    final colors = [
+      POSColors.green,
+      POSColors.amber,
+      POSColors.blue,
+      POSColors.orange,
+      POSColors.greenDark,
+    ];
+    return ReportPanel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: categories.asMap().entries.map((entry) {
+          final category = entry.value;
+          final color = colors[entry.key % colors.length];
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            category.categoryName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Text(
+                          '%${category.percentage.toStringAsFixed(1)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${formatReportCurrency(category.totalAmount)} TL',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 9),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: maxAmount == 0
+                            ? 0
+                            : category.totalAmount / maxAmount,
+                        minHeight: 6,
+                        color: color,
+                        backgroundColor: POSColors.surfaceMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (entry.key != categories.length - 1)
+                const Divider(height: 1, indent: 16, endIndent: 16),
+            ],
+          );
+        }).toList(),
+      ),
     );
   }
 }

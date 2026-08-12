@@ -38,7 +38,6 @@ class HomePage extends ConsumerWidget {
                       wide ? 28 : 16, 16, wide ? 28 : 16, 96),
                   children: [
                     _DashboardHeader(
-                      onReports: () => context.push(AppRoutes.reports),
                       onSettings: () => requirePermissionAccess(
                         context,
                         permission: Permission.settingsView,
@@ -52,6 +51,10 @@ class HomePage extends ConsumerWidget {
                     _KpiGrid(summary: data.summary),
                     const SizedBox(height: 16),
                     _AttentionStrip(data: data),
+                    const SizedBox(height: 16),
+                    _ReportsEntryCard(
+                      onTap: () => context.push(AppRoutes.reports),
+                    ),
                     const SizedBox(height: 16),
                     if (wide)
                       Row(
@@ -105,10 +108,8 @@ class HomePage extends ConsumerWidget {
 
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
-    required this.onReports,
     required this.onSettings,
   });
-  final VoidCallback onReports;
   final VoidCallback onSettings;
 
   @override
@@ -134,13 +135,85 @@ class _DashboardHeader extends StatelessWidget {
           tooltip: 'Ayarlar',
           icon: const Icon(Icons.settings_outlined),
         ),
-        const SizedBox(width: 4),
-        OutlinedButton.icon(
-          onPressed: onReports,
-          icon: const Icon(Icons.analytics_outlined, size: 18),
-          label: const Text('Raporlar'),
-        ),
       ],
+    );
+  }
+}
+
+class _ReportsEntryCard extends StatelessWidget {
+  const _ReportsEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: POSColors.greenDark,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.query_stats_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rapor merkezi',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Satış, ürün ve müşteri alacaklarını dönemsel inceleyin',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Color(0xFFD1FAE5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
