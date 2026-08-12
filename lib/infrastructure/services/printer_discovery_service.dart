@@ -24,6 +24,13 @@ class DiscoveredPrinter {
   });
 }
 
+class DiscoveredSerialDevice {
+  final String port;
+  final String name;
+
+  const DiscoveredSerialDevice({required this.port, required this.name});
+}
+
 class PrinterDiscoveryService {
   final Future<Socket> Function(String host, int port, Duration timeout)
       _connect;
@@ -65,6 +72,52 @@ $default = (Get-CimInstance Win32_Printer | Where-Object Default -eq $true | Sel
       }).toList();
     } catch (_) {
       return const [];
+    }
+  }
+
+  Future<List<DiscoveredSerialDevice>> listSerialDevices(
+    List<String> availablePorts,
+  ) async {
+    if (availablePorts.isEmpty) return const [];
+    if (!Platform.isWindows) {
+      return availablePorts
+          .map((port) => DiscoveredSerialDevice(port: port, name: port))
+          .toList(growable: false);
+    }
+
+    const script = r'''
+@(Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match '\(COM\d+\)' } | ForEach-Object {
+  if ($_.Name -match '\((COM\d+)\)') {
+    [PSCustomObject]@{ port = $Matches[1]; name = $_.Name }
+  }
+}) | ConvertTo-Json -Compress
+''';
+    try {
+      final result = await Process.run(
+        'powershell',
+        ['-NoProfile', '-NonInteractive', '-Command', script],
+      ).timeout(const Duration(seconds: 8));
+      if (result.exitCode != 0 || result.stdout.toString().trim().isEmpty) {
+        throw const FormatException('Seri aygıt listesi boş');
+      }
+      final decoded = jsonDecode(result.stdout.toString());
+      final rows = decoded is List ? decoded : [decoded];
+      final byPort = <String, String>{
+        for (final row in rows)
+          if (row is Map && row['port'] != null)
+            row['port'].toString().toUpperCase():
+                (row['name']?.toString() ?? row['port'].toString()),
+      };
+      return availablePorts
+          .map((port) => DiscoveredSerialDevice(
+                port: port,
+                name: byPort[port.toUpperCase()] ?? port,
+              ))
+          .toList(growable: false);
+    } catch (_) {
+      return availablePorts
+          .map((port) => DiscoveredSerialDevice(port: port, name: port))
+          .toList(growable: false);
     }
   }
 

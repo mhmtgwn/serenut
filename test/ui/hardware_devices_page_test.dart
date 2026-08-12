@@ -181,7 +181,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Windows'), findsWidgets);
     expect(find.text('TCP / Ağ'), findsWidgets);
-    expect(find.text('Bluetooth'), findsNothing);
+    expect(find.text('Bluetooth'), findsWidgets);
     expect(find.text('Dahili'), findsNothing);
     await tester.tap(find.text('Devam et'));
     await tester.pumpAndSettle();
@@ -222,6 +222,83 @@ void main() {
     expect(find.text('Bluetooth'), findsWidgets);
     expect(find.text('TCP / Ağ'), findsWidgets);
     expect(find.text('Dahili'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('scale and POS TCP settings expose type-specific discovery',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    tester.view.physicalSize = const Size(900, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    Future<void> openFor(String typeLabel, String discoveryLabel) async {
+      await tester.tap(find.byTooltip('Cihaz ekle'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(typeLabel).first);
+      await tester.tap(find.text('Devam et'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('TCP / Ağ'));
+      await tester.tap(find.text('Devam et'));
+      await tester.pumpAndSettle();
+      expect(find.text(discoveryLabel), findsOneWidget);
+      await tester.tap(find.byTooltip('Kapat'));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hardwareDevicesProvider
+              .overrideWith(_FakeHardwareDevicesNotifier.new),
+        ],
+        child: const MaterialApp(home: HardwareTestPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await openFor('Terazi', 'Aynı ağdaki terazileri bul');
+    await openFor('Fiziksel POS', 'Aynı ağdaki POS Bridge’leri bul');
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('shared printers are discoverable from the add wizard',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    tester.view.physicalSize = const Size(900, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hardwareDevicesProvider
+              .overrideWith(_FakeHardwareDevicesNotifier.new),
+        ],
+        child: const MaterialApp(home: HardwareTestPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ortak / Uzak'), findsOneWidget);
+    await tester.tap(find.text('Ortak / Uzak'));
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ortak cihazları bul'), findsOneWidget);
+    expect(find.text('Bağlantıyı kontrol et'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
