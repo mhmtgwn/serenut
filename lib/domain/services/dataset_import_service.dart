@@ -198,6 +198,8 @@ class DatasetImportService {
       ],
       'quantity': [
         'stok',
+        'stok adedi',
+        'stok adet',
         'stok miktari',
         'stok miktarı',
         'miktar',
