@@ -962,6 +962,14 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 51 && newVersion >= 51) {
+          await _mergeLegacyReadyCatalogProducts(txn);
+          await txn.insert('app_migration_history', {
+            'version': 51,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing
@@ -984,6 +992,136 @@ class DatabaseMigrations {
     if (oldVersion < 47 && newVersion >= 47) {
       await _migratePrintingDevicesAndRoutes(db);
     }
+  }
+
+  /// Merges products duplicated by the August 2026 ready catalogue, whose
+  /// numeric Excel barcode column dropped the leading zero from EAN-8 values.
+  /// The valid eight-digit identity is retained. Historical references are
+  /// repointed before the malformed seven-digit alias is tombstoned.
+  static Future<void> _mergeLegacyReadyCatalogProducts(Transaction txn) async {
+    const fields = <String>[
+      'name',
+      'description',
+      'price',
+      'purchase_price',
+      'quantity',
+      'min_stock',
+      'brand',
+      'unit',
+      'shelf_code',
+      'category',
+      'vat',
+      'image_url',
+      'sale_type',
+      'minimum_weight_grams',
+      'created_at',
+      'updated_at',
+    ];
+    final projections = fields
+        .expand((field) => [
+              'a.$field AS alias_$field',
+              'c.$field AS canonical_$field',
+            ])
+        .join(',');
+    final pairs = await txn.rawQuery('''
+      SELECT a.id AS alias_id, c.id AS canonical_id, $projections
+      FROM products a
+      JOIN products c ON c.id = '0' || a.id
+      WHERE length(a.id) = 7
+        AND length(c.id) = 8
+        AND a.id NOT GLOB '*[^0-9]*'
+        AND c.id NOT GLOB '*[^0-9]*'
+        AND a.is_active = 1 AND COALESCE(a.is_deleted, 0) = 0
+        AND c.is_active = 1 AND COALESCE(c.is_deleted, 0) = 0
+        AND lower(trim(a.name)) = lower(trim(c.name))
+        AND abs(a.price - c.price) <= 0.01
+      ORDER BY c.id
+    ''');
+    if (pairs.isEmpty) return;
+
+    await txn
+        .execute('''CREATE TEMP TABLE IF NOT EXISTS product_identity_merge (
+      alias_id TEXT PRIMARY KEY,
+      canonical_id TEXT NOT NULL
+    )''');
+    await txn.delete('product_identity_merge');
+    final mapBatch = txn.batch();
+    for (final pair in pairs) {
+      mapBatch.insert('product_identity_merge', {
+        'alias_id': pair['alias_id'],
+        'canonical_id': pair['canonical_id'],
+      });
+    }
+    await mapBatch.commit(noResult: true);
+
+    for (final table in const ['sale_items', 'order_items', 'refund_items']) {
+      await txn.rawUpdate('''
+        UPDATE $table
+        SET product_id = (
+          SELECT canonical_id FROM product_identity_merge
+          WHERE alias_id = $table.product_id
+        )
+        WHERE EXISTS (
+          SELECT 1 FROM product_identity_merge
+          WHERE alias_id = $table.product_id
+        )
+      ''');
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final mergeBatch = txn.batch();
+    for (final pair in pairs) {
+      final aliasId = pair['alias_id']! as String;
+      final canonicalId = pair['canonical_id']! as String;
+      final aliasUpdated = pair['alias_updated_at']?.toString() ?? '';
+      final canonicalUpdated = pair['canonical_updated_at']?.toString() ?? '';
+      final preferAlias = aliasUpdated.compareTo(canonicalUpdated) > 0;
+      Object? chosen(String field) =>
+          pair['${preferAlias ? 'alias' : 'canonical'}_$field'];
+      final canonicalImage =
+          pair['canonical_image_url']?.toString().trim() ?? '';
+      final aliasImage = pair['alias_image_url']?.toString().trim() ?? '';
+      final merged = <String, Object?>{
+        for (final field in fields)
+          if (field != 'created_at' &&
+              field != 'updated_at' &&
+              field != 'image_url')
+            field: chosen(field),
+        'image_url': canonicalImage.isNotEmpty
+            ? canonicalImage
+            : (aliasImage.isNotEmpty ? aliasImage : null),
+        'is_active': 1,
+        'is_deleted': 0,
+        'deleted_at': null,
+        'deleted_by': null,
+        'is_synced': 0,
+        'updated_at': now,
+      };
+      mergeBatch.update('products', merged,
+          where: 'id = ?', whereArgs: [canonicalId]);
+      mergeBatch.update(
+        'products',
+        {
+          'is_active': 0,
+          'is_deleted': 1,
+          'deleted_at': now,
+          'deleted_by': 'migration-v51',
+          'is_synced': 0,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [aliasId],
+      );
+    }
+    await mergeBatch.commit(noResult: true);
+
+    await txn.rawDelete('''
+      DELETE FROM sync_outbox_v4
+      WHERE state = 'PENDING' AND entity_type = 'product'
+        AND (entity_id IN (SELECT alias_id FROM product_identity_merge)
+          OR entity_id IN (SELECT canonical_id FROM product_identity_merge))
+    ''');
+    await txn.execute('DROP TABLE product_identity_merge');
   }
 
   static Future<void> _migratePrintingDevicesAndRoutes(Database db) async {

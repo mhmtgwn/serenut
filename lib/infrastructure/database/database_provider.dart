@@ -45,7 +45,7 @@ class DatabaseManager {
 
   /// Authoritative local schema version. Exposed for migration fixtures and
   /// diagnostics so tests do not duplicate a version literal.
-  static const int databaseVersion = 50;
+  static const int databaseVersion = 51;
 
   static String? overrideDatabasePath;
   static bool isWriteLocked = false;

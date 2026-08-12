@@ -68,7 +68,24 @@ export async function applyDomainMutation(
   actorId?: string,
 ): Promise<void> {
   const payload = mutation.payload;
-  const id = mutation.entity_id;
+  let id = mutation.entity_id;
+
+  // A legacy ready catalogue encoded EAN-8 values as numbers and therefore
+  // dropped their leading zero. Old clients may still replay those aliases.
+  // Resolve only an exact seven/eight-digit, same-name, same-price match; an
+  // arbitrary merchant-defined seven-digit code must remain untouched.
+  if (mutation.entity_type === "product" && mutation.operation === "UPSERT" &&
+      /^\d{7}$/.test(id)) {
+    const canonical = await client.query(
+      `SELECT id FROM products
+       WHERE id = $1 AND company_id = $2
+         AND lower(btrim(name)) = lower(btrim($3))
+         AND abs(price - $4) <= 0.01
+       LIMIT 1`,
+      [`0${id}`, companyId, stringValue(payload, "name"), numberValue(payload, "price")],
+    );
+    if (canonical.rowCount) id = canonical.rows[0].id;
+  }
 
   if (mutation.operation === "DELETE") {
     switch (mutation.entity_type) {
