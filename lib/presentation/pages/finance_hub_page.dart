@@ -143,9 +143,9 @@ class FinanceHubPage extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _kGreen.withOpacity(0.15),
+                  color: _kGreen.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _kGreen.withOpacity(0.3)),
+                  border: Border.all(color: _kGreen.withValues(alpha: 0.3)),
                 ),
                 child: const Row(
                   children: [
@@ -327,7 +327,7 @@ class _ReportTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color, size: 20),
@@ -376,9 +376,9 @@ class _ErrorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _kRed.withOpacity(0.04),
+        color: _kRed.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kRed.withOpacity(0.2)),
+        border: Border.all(color: _kRed.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

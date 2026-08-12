@@ -276,7 +276,8 @@ class TsplLabelLayoutEngine {
     int calculatedDots = sy(6);
 
     if (showBusinessName) {
-      calculatedDots += logoBytes != null && logoBytes.isNotEmpty ? sy(19) : sy(20);
+      calculatedDots +=
+          logoBytes != null && logoBytes.isNotEmpty ? sy(19) : sy(20);
     }
     if (showOrderNo) calculatedDots += sy(22);
     if (showDate && timestamp != null) calculatedDots += sy(22);
@@ -320,8 +321,6 @@ class TsplLabelLayoutEngine {
     final safeHeight = requestedHeightMm > requiredHeightMm
         ? requestedHeightMm
         : requiredHeightMm;
-    final heightDots = (safeHeight * safeDpi / 25.4).round();
-
     final timeStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
         : '';
@@ -421,7 +420,9 @@ class TsplLabelLayoutEngine {
         final itemQtyStr = itemQty % 1 == 0
             ? itemQty.toInt().toString()
             : itemQty.toStringAsFixed(1);
-        final unitPrice = (item['unit_price'] as num? ?? item['unitPrice'] as num?)?.toDouble();
+        final unitPrice =
+            (item['unit_price'] as num? ?? item['unitPrice'] as num?)
+                ?.toDouble();
         final lineTotal = item['total'] != null
             ? (item['total'] as num).toDouble()
             : item['line_total'] != null
@@ -439,13 +440,13 @@ class TsplLabelLayoutEngine {
 
         // Line 2: Quantity x Unit Price (Left) & Line Total (Right)
         final leftDetail = unitPrice == null
-            ? '  ${itemQtyStr} adet'
+            ? '  $itemQtyStr adet'
             : '  ${itemQtyStr}x ${unitPrice.toStringAsFixed(2)} TL';
-        final rightTotal = lineTotal == null
-            ? ''
-            : '${lineTotal.toStringAsFixed(2)} TL';
+        final rightTotal =
+            lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
 
-        final safeLeft = _fit(leftDetail, (maxFont1Chars - rightTotal.length - 1).clamp(4, maxFont1Chars));
+        final safeLeft = _fit(leftDetail,
+            (maxFont1Chars - rightTotal.length - 1).clamp(4, maxFont1Chars));
         commands.writeln('TEXT ${sx(16)},$currentY,"1",0,1,1,"$safeLeft"');
 
         if (rightTotal.isNotEmpty) {
@@ -511,7 +512,8 @@ class TsplLabelLayoutEngine {
     return commands.bytes;
   }
 
-  static List<String> _splitText(String text, int maxCharsPerLine, {int maxLines = 2}) {
+  static List<String> _splitText(String text, int maxCharsPerLine,
+      {int maxLines = 2}) {
     final clean = _ascii(text.trim().replaceAll(RegExp(r'\s+'), ' '))
         .replaceAll('"', "'");
     if (clean.length <= maxCharsPerLine) return [clean];

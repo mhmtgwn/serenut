@@ -167,6 +167,88 @@ void main() {
       expect(payload['is_deleted'], 0);
     });
 
+    test('zero-prefixed EAN-13 updates the existing UPC-A product', () async {
+      const upc = '123456789012';
+      const ean = '0123456789012';
+      await productRepo.create(ProductEntity(
+        id: upc,
+        name: 'Mevcut Ürün',
+        description: 'Eski marka',
+        price: 10,
+        quantity: 1,
+        category: 'Eski',
+      ));
+
+      final result = await importService.importFromZip(
+        createMockZip([
+          {
+            'barcode': ean,
+            'name': 'Güncel Ürün',
+            'category': 'Yeni',
+            'brand': 'Yeni marka',
+            'price': 25.0,
+            'vat': 20,
+            'imageUrl': '',
+            'quantity': 4,
+          },
+        ]),
+        (_, __) {},
+      );
+
+      expect(result['success'], 1);
+      final db = await dbManager.getDatabase();
+      final rows = await db.query(
+        'products',
+        where: 'id = ? OR id = ?',
+        whereArgs: [upc, ean],
+      );
+      expect(rows, hasLength(1),
+          reason: 'UPC-A ve sıfır önekli EAN-13 çift ürün oluşturmamalı');
+      expect(rows.single['id'], upc);
+      expect(rows.single['quantity'], 4);
+      expect(rows.single['price'], 25.0);
+    });
+
+    test('equivalent UPC-A and EAN-13 rows in one file are deduplicated',
+        () async {
+      final result = await importService.importFromZip(
+        createMockZip([
+          {
+            'barcode': '123456789012',
+            'name': 'İlk Satır',
+            'category': 'Test',
+            'brand': 'Test',
+            'price': 10.0,
+            'vat': 20,
+            'imageUrl': '',
+            'quantity': 1,
+          },
+          {
+            'barcode': '0123456789012',
+            'name': 'Son Satır',
+            'category': 'Test',
+            'brand': 'Test',
+            'price': 20.0,
+            'vat': 20,
+            'imageUrl': '',
+            'quantity': 2,
+          },
+        ]),
+        (_, __) {},
+      );
+
+      expect(result['success'], 1);
+      final db = await dbManager.getDatabase();
+      final rows = await db.query(
+        'products',
+        where: 'id = ? OR id = ?',
+        whereArgs: ['123456789012', '0123456789012'],
+      );
+      expect(rows, hasLength(1));
+      expect(rows.single['name'], 'Son Satır');
+      expect(rows.single['quantity'], 2);
+    });
+
     test('DuplicateResolution.skip preserves existing details', () async {
       // 1. Pre-seed database with a product
       final initial = ProductEntity(

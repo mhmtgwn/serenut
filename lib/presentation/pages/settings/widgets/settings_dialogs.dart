@@ -66,6 +66,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                               });
                             }
                           } catch (e) {
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Logo seçilirken hata: $e'),
@@ -422,7 +423,10 @@ extension _SettingsPageDialogs on _SettingsPageState {
     final profiles =
         await repository.getDesignProfiles(PrintDocumentKind.receipt);
     if (!mounted || profiles.isEmpty) return;
-    final profile = profiles.firstWhere((item) => item.isDefault);
+    final profile = profiles.firstWhere(
+      (item) => item.isDefault,
+      orElse: () => profiles.first,
+    );
     final definition = profile.definition;
     final device = await ref
         .read(activePrinterDeviceProvider(PrintDocumentKind.receipt).future);

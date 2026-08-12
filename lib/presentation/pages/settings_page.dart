@@ -478,6 +478,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             'diagnostics', 'barkod')) {
       group2.add(_buildHardwareCenterCard(settings));
     }
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('fiş', 'tasarım', 'yazıcı', 'logo', 'çekmece')) {
+      if (group2.isNotEmpty) group2.add(const _IOSDivider());
+      group2.add(_buildCategoryRow(
+        title: 'Fiş Tasarımı',
+        subtitle: 'Kağıt, logo, QR kod ve kasa çekmecesi ayarları',
+        icon: Icons.receipt_long_rounded,
+        color: _kBlue,
+        onTap: () => _runGuardedAction(
+          Permission.settingsPrinter,
+          () => _showReceiptSettings(settings),
+          title: 'Fiş Tasarımı',
+        ),
+      ));
+    }
     if (_hasPermission(currentUser, Permission.settingsFinance) &&
         _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());

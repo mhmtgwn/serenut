@@ -532,14 +532,14 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                     color: isSel
                         ? color
                         : (enabled
-                            ? color.withOpacity(0.4)
+                            ? color.withValues(alpha: 0.4)
                             : Colors.grey.shade300),
                     width: isSel ? 2 : 1.5,
                   ),
                   boxShadow: isSel
                       ? [
                           BoxShadow(
-                              color: color.withOpacity(0.25),
+                              color: color.withValues(alpha: 0.25),
                               blurRadius: 8,
                               offset: const Offset(0, 3))
                         ]

@@ -1,4 +1,6 @@
 // test/services/printer_service_test.dart
+// ignore_for_file: deprecated_member_use_from_same_package
+
 // Phase 4 — Printer Service and ESC/POS Formatting Tests
 // Generated: 21 Jun 2026
 

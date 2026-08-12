@@ -131,7 +131,7 @@ void main() {
         await productRepo.create(prod);
 
         // 1. Open Order with 2x Peynir at 100 TL = 200 TL
-        final orderId = 'ord-test-1';
+        const orderId = 'ord-test-1';
         await db.insert('orders', {
           'id': orderId,
           'order_number': 'ORD-1001',
@@ -152,7 +152,7 @@ void main() {
         });
 
         // 2. Open/Deferred Sale (debt) with 3x Peynir at 100 TL = 300 TL
-        final saleId = 'sale-test-1';
+        const saleId = 'sale-test-1';
         await db.insert('sales', {
           'id': saleId,
           'customer_id': 'cust-1',

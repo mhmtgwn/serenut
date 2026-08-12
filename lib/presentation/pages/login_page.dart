@@ -47,7 +47,7 @@ class LoginPage extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),
@@ -114,7 +114,7 @@ class LoginPage extends ConsumerWidget {
                     border: Border.all(color: POSColors.border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
+                        color: Colors.black.withValues(alpha: 0.02),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -280,7 +280,9 @@ class _LoginFormPageState extends ConsumerState<LoginFormPage> {
                     decoration: BoxDecoration(
                       color: POSColors.redLight,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: POSColors.red.withOpacity(0.2)),
+                      border: Border.all(
+                        color: POSColors.red.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -463,7 +465,7 @@ class _PrimaryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: POSColors.green.withOpacity(0.25),
+                color: POSColors.green.withValues(alpha: 0.25),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
@@ -514,7 +516,7 @@ class _SecondaryButton extends StatelessWidget {
             border: Border.all(color: POSColors.border, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.01),
+                color: Colors.black.withValues(alpha: 0.01),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

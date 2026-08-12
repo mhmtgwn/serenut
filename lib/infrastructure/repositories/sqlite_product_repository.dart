@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
+import 'package:serenutos/domain/services/barcode_standard.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
@@ -39,6 +40,7 @@ class SqliteProductRepository implements IProductRepository {
         // placeholders (?) aracılığıyla whereArgs/args listesiyle rawQuery'ye parametre olarak güvenle bağlanır.
         String rewrittenWhere = where
             .replaceAll('is_active = 1', '1=1')
+            .replaceAll('id IN', 'p.barcode IN')
             .replaceAll('id = ?', 'p.barcode = ?')
             .replaceAll('category = ?', 'p.category = ?')
             .replaceAll('name LIKE ?', 'p.name LIKE ?');
@@ -148,17 +150,40 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<ProductEntity?> findById(dynamic id) async {
+    final candidates = BarcodeStandard.lookupCandidates(id.toString());
+    final placeholders = List.filled(candidates.length, '?').join(',');
     final list = await _queryProducts(
-        where: 'id = ? AND is_active = 1', whereArgs: [id]);
+      where: 'id IN ($placeholders) AND is_active = 1',
+      whereArgs: candidates,
+    );
     if (list.isEmpty) return null;
-    return list.first;
+    final normalized = candidates.first;
+    return list.firstWhere(
+      (product) => product.id == normalized,
+      orElse: () => list.first,
+    );
   }
 
   @override
   Future<int> create(ProductEntity product) async {
+    final normalizedProduct = product.copyWith(
+      id: BarcodeStandard.normalize(product.id),
+    );
+    final candidates = BarcodeStandard.lookupCandidates(product.id);
+    final placeholders = List.filled(candidates.length, '?').join(',');
+    final duplicates = await _executor.query(
+      'products',
+      where: 'id IN ($placeholders)',
+      whereArgs: candidates,
+      limit: 1,
+    );
+    if (duplicates.isNotEmpty) {
+      throw Exception(
+          'Bu barkod (${normalizedProduct.id}) mevcut bir ürünle aynı ürünü temsil ediyor.');
+    }
     return _gateway.transaction(() async {
       final payload = {
-        ...product.toMap(),
+        ...normalizedProduct.toMap(),
         'is_synced': 0,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String()
@@ -166,7 +191,7 @@ class SqliteProductRepository implements IProductRepository {
       final result = await _executor.insert('products', payload);
       await SyncOutboxV4.enqueue(_executor,
           entityType: 'product',
-          entityId: product.id,
+          entityId: normalizedProduct.id,
           operation: 'UPSERT',
           payload: payload);
       return result;
@@ -394,15 +419,18 @@ class SqliteProductRepository implements IProductRepository {
 
   @override
   Future<bool> exists(dynamic id) async {
+    final candidates = BarcodeStandard.lookupCandidates(id.toString());
+    final placeholders = List.filled(candidates.length, '?').join(',');
     if (_hasDataset) {
-      final result = await _datasetLoader!.activeDb!
-          .rawQuery('SELECT 1 FROM products WHERE barcode = ? LIMIT 1', [id]);
+      final result = await _datasetLoader!.activeDb!.rawQuery(
+          'SELECT 1 FROM products WHERE barcode IN ($placeholders) LIMIT 1',
+          candidates);
       return result.isNotEmpty;
     }
     final result = await _executor.query(
       'products',
-      where: 'id = ? AND is_active = 1',
-      whereArgs: [id],
+      where: 'id IN ($placeholders) AND is_active = 1',
+      whereArgs: candidates,
       limit: 1,
     );
     return result.isNotEmpty;

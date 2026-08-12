@@ -402,9 +402,9 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _kOrange.withOpacity(0.1),
+                color: _kOrange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _kOrange.withOpacity(0.3)),
+                border: Border.all(color: _kOrange.withValues(alpha: 0.3)),
               ),
               child: const Row(
                 children: [
@@ -429,9 +429,9 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _kBlue.withOpacity(0.1),
+                color: _kBlue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _kBlue.withOpacity(0.3)),
+                border: Border.all(color: _kBlue.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -740,7 +740,7 @@ class _ContactImportPageState extends ConsumerState<ContactImportPage> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: _kBlue.withOpacity(0.1),
+                              color: _kBlue.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Center(

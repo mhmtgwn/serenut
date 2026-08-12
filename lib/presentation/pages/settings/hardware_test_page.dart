@@ -165,30 +165,32 @@ class HardwareTestPage extends ConsumerWidget {
     HardwareDevice? device,
   }) async {
     final desktop = MediaQuery.sizeOf(context).width >= 720;
-    final saved = desktop
-        ? await showDialog<bool>(
-            context: context,
-            barrierColor: Colors.black.withValues(alpha: .42),
-            builder: (_) => Dialog(
-              insetPadding: const EdgeInsets.all(24),
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(maxWidth: 820, maxHeight: 860),
-                child: _DeviceEditor(device: device, desktopDialog: true),
-              ),
-            ),
-          )
-        : await showModalBottomSheet<bool>(
-            context: context,
-            isScrollControlled: true,
-            useSafeArea: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => _DeviceEditor(device: device),
-          );
+    final bool? saved;
+    if (desktop) {
+      saved = await showDialog<bool>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: .42),
+        builder: (_) => Dialog(
+          insetPadding: const EdgeInsets.all(24),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 820, maxHeight: 860),
+            child: _DeviceEditor(device: device, desktopDialog: true),
+          ),
+        ),
+      );
+    } else {
+      saved = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _DeviceEditor(device: device),
+      );
+    }
     if (saved == true) ref.invalidate(hardwareDevicesProvider);
   }
 

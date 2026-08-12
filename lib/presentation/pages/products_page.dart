@@ -198,6 +198,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     await ref
         .read(printingApplicationServiceProvider)
         .queueProductLabels(selected, settings);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content:

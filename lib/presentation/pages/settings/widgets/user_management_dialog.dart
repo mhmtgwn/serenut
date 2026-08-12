@@ -1,7 +1,7 @@
 part of '../../settings_page.dart';
 
 // Extracted User Management sheets/dialogs for SettingsPage
-extension SettingsUserManagementSheets on _SettingsPageState {
+extension _SettingsUserManagementSheets on _SettingsPageState {
   void _showUserManagementPage() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -714,7 +714,7 @@ class _AddUserDialogState extends ConsumerState<_AddUserDialog> {
                         '{"id":"${newUser.id}","name":"${newUser.name}","role":"${newUser.role.name}"}',
                   );
               widget.onSaved();
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             }
           },
           style: ElevatedButton.styleFrom(
@@ -959,7 +959,7 @@ class _EditUserDialogState extends ConsumerState<_EditUserDialog> {
                   pin:
                       pinCtrl.text.trim().isEmpty ? null : pinCtrl.text.trim());
               widget.onSaved();
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             }
           },
           style: ElevatedButton.styleFrom(
@@ -1079,16 +1079,16 @@ class _NewPinEntrySheetState extends ConsumerState<_NewPinEntrySheet> {
                               .copyWith(adminPinCode: hashedPin));
                     }
                     widget.pageState._loadAdminPin();
-                    if (mounted) {
-                      Navigator.pop(context);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Yönetici PIN kodu başarıyla güncellendi.')),
-                        );
-                      }
-                    }
+                    if (!context.mounted) return;
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(context);
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Yönetici PIN kodu başarıyla güncellendi.',
+                        ),
+                      ),
+                    );
                   }
                 },
                 child: const Text('PIN Kaydet',

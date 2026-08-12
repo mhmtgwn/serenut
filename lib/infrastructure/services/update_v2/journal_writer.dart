@@ -69,7 +69,7 @@ class DiskJournalWriter implements JournalWriter {
           payload: payload,
         );
 
-        final line = jsonEncode(record.toJson()) + '\n';
+        final line = '${jsonEncode(record.toJson())}\n';
 
         // Ensure parent directory exists
         final parent = _logFile.parent;

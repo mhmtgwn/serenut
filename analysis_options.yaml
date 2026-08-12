@@ -12,6 +12,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - 'third_party/**'
+    - 'lib/infrastructure/services/*_web.dart'
+    - 'server/scratch/**'
 
 
 linter:

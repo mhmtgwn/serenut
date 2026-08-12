@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use_from_same_package
+
 // test/services/persistent_print_queue_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
