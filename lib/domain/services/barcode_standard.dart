@@ -16,6 +16,21 @@ abstract final class BarcodeStandard {
     return barcode;
   }
 
+  /// Repairs the legacy ready-catalogue representation of EAN-8 values.
+  ///
+  /// One published catalogue stored the barcode column as a number, which
+  /// removed the leading zero from valid eight-digit EAN values. This rule is
+  /// intentionally not part of [normalize]: arbitrary seven-digit codes may
+  /// be meaningful when entered by a merchant. Callers must use this only for
+  /// the Serenut-managed ready catalogue or after matching an existing product.
+  static String normalizeReadyCatalog(String rawBarcode) {
+    final barcode = normalize(rawBarcode);
+    if (barcode.length == 7 && _digitsOnly.hasMatch(barcode)) {
+      return '0$barcode';
+    }
+    return barcode;
+  }
+
   static String? equivalent(String rawBarcode) {
     final barcode = rawBarcode.trim();
     if (!_digitsOnly.hasMatch(barcode)) return null;

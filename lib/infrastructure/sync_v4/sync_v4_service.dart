@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:serenutos/domain/services/device_manager.dart';
 import 'package:serenutos/domain/services/license_service.dart';
+import 'package:serenutos/domain/services/barcode_standard.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
@@ -518,7 +519,7 @@ class SyncV4Service {
   Future<void> _apply(Transaction db, Map<String, dynamic> change) async {
     final type = change['entity_type'] as String;
     final payload = Map<String, dynamic>.from(change['payload'] as Map);
-    final id = change['entity_id'] as String;
+    var id = change['entity_id'] as String;
     if (type == 'system_reset') {
       if (payload['scope'] != 'operational') {
         throw StateError('unsupported_system_reset_scope');
@@ -551,6 +552,33 @@ class SyncV4Service {
       }
       await db.update(table, tombstone, where: 'id = ?', whereArgs: [id]);
       return;
+    }
+    if (type == 'product') {
+      final repairedId = BarcodeStandard.normalizeReadyCatalog(id);
+      if (repairedId != id) {
+        final existing = await db.query(
+          'products',
+          columns: const ['id', 'name', 'price', 'image_url'],
+          where: 'id = ?',
+          whereArgs: [repairedId],
+          limit: 1,
+        );
+        final incomingName = payload['name']?.toString().trim().toLowerCase();
+        final incomingPrice = _syncDouble(payload['price']);
+        if (existing.isNotEmpty &&
+            existing.first['name']?.toString().trim().toLowerCase() ==
+                incomingName &&
+            ((_syncDouble(existing.first['price']) - incomingPrice).abs() <=
+                0.01)) {
+          final retainedImage = existing.first['image_url']?.toString() ?? '';
+          if ((payload['image_url']?.toString().trim().isEmpty ?? true) &&
+              retainedImage.isNotEmpty) {
+            payload['image_url'] = retainedImage;
+          }
+          if (payload['sku']?.toString() == id) payload['sku'] = repairedId;
+          id = repairedId;
+        }
+      }
     }
     final items = payload.remove('items');
     if (type == 'order' &&

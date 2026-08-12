@@ -29,6 +29,14 @@ async function run() {
       payload: { name: 'Çay', price: 15, quantity: 20, category: 'İçecek', vat: 10 },
     });
     await applyDomainMutation(client, 'sync-v4-company', {
+      entity_type: 'product', entity_id: '07031652', operation: 'UPSERT', base_revision: 0,
+      payload: { name: '7 Days Çilekli Kruvasan 60 G', price: 29.9, quantity: 0, category: 'Atıştırmalık' },
+    });
+    await applyDomainMutation(client, 'sync-v4-company', {
+      entity_type: 'product', entity_id: '7031652', operation: 'UPSERT', base_revision: 0,
+      payload: { name: '7 Days Çilekli Kruvasan 60 G', price: 29.9, quantity: 200, category: 'Atıştırmalık' },
+    });
+    await applyDomainMutation(client, 'sync-v4-company', {
       entity_type: 'customer', entity_id: 'customer-1', operation: 'UPSERT', base_revision: 0,
       payload: { name: 'Ayşe', balance: 0, credit_limit: 0 },
     });
@@ -80,7 +88,7 @@ async function run() {
     await applyDomainMutation(client, 'sync-v4-company', partialPayment);
     await client.query('COMMIT');
 
-    const [saleRows, saleItemRows, orderRows, orderItemRows, ledgerRows, productRows, refundRows, movementRows, paidSale] = await Promise.all([
+    const [saleRows, saleItemRows, orderRows, orderItemRows, ledgerRows, productRows, refundRows, movementRows, paidSale, repairedCatalogRows, malformedCatalogRows] = await Promise.all([
       pgPool.query("SELECT id FROM sales WHERE company_id = 'sync-v4-company'"),
       pgPool.query("SELECT id FROM sale_items WHERE sale_id = 'sale-1'"),
       pgPool.query("SELECT id FROM customer_orders WHERE company_id = 'sync-v4-company'"),
@@ -90,6 +98,8 @@ async function run() {
       pgPool.query("SELECT id FROM refunds WHERE id='refund-1'"),
       pgPool.query("SELECT movement_type FROM inventory_movements WHERE reference_id IN ('sale-1','refund-1')"),
       pgPool.query("SELECT paid_amount,status FROM sales WHERE id='sale-2'"),
+      pgPool.query("SELECT quantity FROM products WHERE id='07031652' AND company_id='sync-v4-company'"),
+      pgPool.query("SELECT id FROM products WHERE id='7031652' AND company_id='sync-v4-company'"),
     ]);
     if (saleRows.rowCount !== 2 || saleItemRows.rowCount !== 1 || orderRows.rowCount !== 1 ||
         orderItemRows.rowCount !== 1 || ledgerRows.rowCount !== 4 || refundRows.rowCount !== 1 ||
@@ -99,6 +109,9 @@ async function run() {
     }
     if (Number(productRows.rows[0]?.quantity) !== 18) {
       throw new Error('Sync V4 sale/refund did not move stock exactly once.');
+    }
+    if (Number(repairedCatalogRows.rows[0]?.quantity) !== 200 || malformedCatalogRows.rowCount !== 0) {
+      throw new Error('Legacy seven-digit ready-catalogue alias was not resolved to its EAN-8 identity.');
     }
     console.log('✔ Sync V4 materializes product/customer/sale/order/ledger aggregates transactionally.');
   } catch (error) {

@@ -17,5 +17,12 @@ void main() {
       expect(BarcodeStandard.normalize('00012345'), '00012345');
       expect(BarcodeStandard.normalize('URUN-001'), 'URUN-001');
     });
+
+    test('repairs seven-digit codes only for the managed ready catalogue', () {
+      expect(BarcodeStandard.normalize('7031652'), '7031652');
+      expect(BarcodeStandard.normalizeReadyCatalog('7031652'), '07031652');
+      expect(BarcodeStandard.normalizeReadyCatalog('8690000000001'),
+          '8690000000001');
+    });
   });
 }

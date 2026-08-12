@@ -787,6 +787,7 @@ class DatasetImportService {
     String filePath,
     void Function(double progress, String status) onProgress, [
     ImportStrategy strategy = const ImportStrategy(),
+    bool normalizeReadyCatalogCodes = false,
   ]) async {
     if (kIsWeb) {
       throw UnsupportedError(
@@ -807,6 +808,7 @@ class DatasetImportService {
       },
       strategy,
       prepared.extractedImagePaths,
+      normalizeReadyCatalogCodes,
     );
     result['imageError'] = prepared.skippedImages;
     return result;
@@ -1124,6 +1126,7 @@ class DatasetImportService {
     void Function(double progress, String status) onProgress, [
     ImportStrategy strategy = const ImportStrategy(),
     Map<String, String> preparedImagePaths = const {},
+    bool normalizeReadyCatalogCodes = false,
   ]) async {
     if (zipBytes.length > _memoryArchiveLimit) {
       throw Exception('Dosya boyutu sınırlandırılmıştır (Maks 100MB).');
@@ -1167,8 +1170,14 @@ class DatasetImportService {
       // update semantics, and never create two products for that pair.
       final productsByIdentity = <String, Map<String, dynamic>>{};
       for (final product in parsedData.products) {
-        final barcode = product['barcode'] as String;
-        productsByIdentity[_barcodeIdentity(barcode)] = product;
+        final rawBarcode = product['barcode'] as String;
+        final barcode = normalizeReadyCatalogCodes
+            ? BarcodeStandard.normalizeReadyCatalog(rawBarcode)
+            : rawBarcode;
+        productsByIdentity[_barcodeIdentity(barcode)] = {
+          ...product,
+          'barcode': barcode,
+        };
       }
       final products = productsByIdentity.values.toList(growable: false);
 

@@ -249,6 +249,38 @@ void main() {
       expect(rows.single['quantity'], 2);
     });
 
+    test('managed ready catalogue restores a stripped EAN-8 leading zero',
+        () async {
+      final result = await importService.importFromZip(
+        createMockZip([
+          {
+            'barcode': '7031652',
+            'name': '7 Days Çilekli Kruvasan 60 G',
+            'category': 'Atıştırmalık',
+            'brand': '7 Days',
+            'price': 29.90,
+            'vat': 10,
+            'imageUrl': '',
+            'quantity': 200,
+          },
+        ]),
+        (_, __) {},
+        const ImportStrategy(),
+        const {},
+        true,
+      );
+
+      expect(result['success'], 1);
+      final db = await dbManager.getDatabase();
+      expect(
+          await db.query('products', where: 'id = ?', whereArgs: ['7031652']),
+          isEmpty);
+      final canonical =
+          await db.query('products', where: 'id = ?', whereArgs: ['07031652']);
+      expect(canonical, hasLength(1));
+      expect(canonical.single['quantity'], 200);
+    });
+
     test('DuplicateResolution.skip preserves existing details', () async {
       // 1. Pre-seed database with a product
       final initial = ProductEntity(

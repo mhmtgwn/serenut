@@ -283,11 +283,14 @@ class _CatalogImportWizardPageState
               _fileBytes!,
               updateProgress,
               strategy,
+              const {},
+              widget.cloudSource,
             )
           : await importer.importFromFile(
               _filePath!,
               updateProgress,
               strategy,
+              widget.cloudSource,
             );
 
       // Clear stale product-list filters and every product projection. Merely
