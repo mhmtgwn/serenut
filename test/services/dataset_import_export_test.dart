@@ -217,6 +217,46 @@ void main() {
       expect(product.quantity, 0);
     });
 
+    test('imports stock from the ready catalog Stok Adedi column', () async {
+      final excel = ex.Excel.createExcel();
+      final sheet = excel['Sheet1'];
+      sheet.appendRow([
+        ex.TextCellValue('Barkod'),
+        ex.TextCellValue('Ürün Adı'),
+        ex.TextCellValue('Kategori'),
+        ex.TextCellValue('Fiyat (TL)'),
+        ex.TextCellValue('Stok Adedi'),
+        ex.TextCellValue('Görsel Yolu'),
+      ]);
+      sheet.appendRow([
+        const ex.IntCellValue(5000299010031),
+        ex.TextCellValue('Absolut Citron Votka 70 cl'),
+        ex.TextCellValue('Alkol & Tekel'),
+        const ex.DoubleCellValue(1200),
+        const ex.IntCellValue(200),
+        ex.TextCellValue('images/products/5000299010031.jpg'),
+      ]);
+
+      final excelBytes = excel.save()!;
+      final archive = Archive()
+        ..addFile(ArchiveFile(
+          'Ürün Kataloğu.xlsx',
+          excelBytes.length,
+          excelBytes,
+        ));
+
+      final result = await importService.importFromZip(
+        Uint8List.fromList(ZipEncoder().encode(archive)!),
+        (_, __) {},
+      );
+
+      expect(result['success'], 1);
+      final product = await productRepo.findById('5000299010031');
+      expect(product, isNotNull);
+      expect(product!.quantity, 200);
+      expect(product.price, 1200);
+    });
+
     test('native file import streams ZIP images to disk and links by barcode',
         () async {
       final excel = ex.Excel.createExcel();
