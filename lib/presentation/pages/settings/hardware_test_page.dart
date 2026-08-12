@@ -779,9 +779,12 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   bool _discoveringBluetooth = false;
   bool _discoveringWindows = false;
   bool _discoveringNetwork = false;
+  bool _discoveringShared = false;
   List<Map<String, String>> _bluetoothDevices = const [];
   List<DiscoveredPrinter> _discoveredPrinters = const [];
-  List<String> _serialPorts = const [];
+  List<DiscoveredSerialDevice> _serialDevices = const [];
+  List<SharedHardwareDevice> _sharedDevices = const [];
+  SharedHardwareDevice? _selectedSharedDevice;
   String? _error;
   HardwareTestResult? _draftTestResult;
   String? _verifiedFingerprint;
@@ -987,7 +990,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             label: const Text('Geri'),
           )
         : const SizedBox.shrink();
-    final test = _step == 2
+    final test = _step == 2 && _connection != HardwareConnectionType.cloud
         ? OutlinedButton.icon(
             onPressed: _working ? null : _testDraft,
             icon: const Icon(Icons.cable_rounded, size: 18),
@@ -1066,6 +1069,9 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                     setState(() {
                       _type = type;
                       _connection = _connectionsFor(type).first;
+                      _selectedSharedDevice = null;
+                      _sharedDevices = const [];
+                      _discoveredPrinters = const [];
                       _name.text = _typeLabel(type);
                       _port.text = _defaultPort(type).toString();
                     });
@@ -1097,7 +1103,13 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 color: kGreen,
                 title: _connectionLabel(connection),
                 subtitle: _connectionDescription(connection),
-                onTap: () => setState(() => _connection = connection),
+                onTap: () => setState(() {
+                  _connection = connection;
+                  _error = null;
+                  if (connection != HardwareConnectionType.cloud) {
+                    _selectedSharedDevice = null;
+                  }
+                }),
               ),
             )),
       ],
@@ -1257,9 +1269,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             ),
           ),
         ],
-        if ((_type == HardwareDeviceType.receiptPrinter ||
-                _type == HardwareDeviceType.labelPrinter) &&
-            _connection == HardwareConnectionType.tcp) ...[
+        if (_connection == HardwareConnectionType.tcp) ...[
           OutlinedButton.icon(
             onPressed: _discoveringNetwork ? null : _discoverNetworkPrinters,
             icon: _discoveringNetwork
@@ -1270,7 +1280,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 : const Icon(Icons.radar_rounded),
             label: Text(_discoveringNetwork
                 ? 'Yerel ağ taranıyor…'
-                : 'Aynı ağdaki yazıcıları bul'),
+                : 'Aynı ağdaki ${_networkDeviceLabel(_type)} bul'),
           ),
           if (_discoveredPrinters
               .any((item) => item.kind == DiscoveredPrinterKind.network)) ...[
@@ -1286,9 +1296,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                         _host.text = value ?? '';
                         _port.text = '${printer.port ?? 9100}';
                       }),
-                      title: Text(printer.address ?? printer.name),
+                      title: Text(
+                        '${_networkCandidateLabel(_type)} ${printer.address ?? printer.name}:${printer.port ?? _defaultPort(_type)}',
+                      ),
                       subtitle: const Text(
-                        'Yazıcı adayı · Test çıktısıyla doğrulanacak',
+                        'Açık port bulundu · Bağlantı testiyle doğrulanacak',
                       ),
                     )),
           ],
@@ -1300,17 +1312,17 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             icon: const Icon(Icons.usb_rounded),
             label: const Text('USB / COM aygıtlarını bul'),
           ),
-          if (_serialPorts.isNotEmpty) ...[
+          if (_serialDevices.isNotEmpty) ...[
             const SizedBox(height: 8),
-            ..._serialPorts.map((port) => RadioListTile<String>(
+            ..._serialDevices.map((device) => RadioListTile<String>(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  value: port,
+                  value: device.port,
                   groupValue: _serialPort.text,
                   onChanged: (value) =>
                       setState(() => _serialPort.text = value ?? ''),
-                  title: Text(port),
-                  subtitle: const Text('Seri bağlantı noktası'),
+                  title: Text(device.name),
+                  subtitle: Text(device.port),
                 )),
             const SizedBox(height: 8),
           ],
@@ -1319,18 +1331,50 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 _type == HardwareDeviceType.labelPrinter) &&
             _connection == HardwareConnectionType.bluetooth) ...[
           OutlinedButton.icon(
-            onPressed: _discoveringBluetooth ? null : _discoverBluetooth,
-            icon: _discoveringBluetooth
+            onPressed: _usesWindowsBluetoothSpooler
+                ? (_discoveringWindows ? null : _discoverWindowsPrinters)
+                : (_discoveringBluetooth ? null : _discoverBluetooth),
+            icon: (_usesWindowsBluetoothSpooler
+                    ? _discoveringWindows
+                    : _discoveringBluetooth)
                 ? const SizedBox.square(
                     dimension: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.bluetooth_searching_rounded),
-            label: Text(_discoveringBluetooth
-                ? 'Yakındaki cihazlar aranıyor…'
-                : 'Bluetooth cihazlarını tara'),
+            label: Text(_usesWindowsBluetoothSpooler
+                ? (_discoveringWindows
+                    ? 'Windows yazıcıları okunuyor…'
+                    : 'Eşleştirilmiş Bluetooth yazıcılarını bul')
+                : (_discoveringBluetooth
+                    ? 'Yakındaki cihazlar aranıyor…'
+                    : 'Bluetooth cihazlarını tara')),
           ),
-          if (_bluetoothDevices.isNotEmpty) ...[
+          if (_usesWindowsBluetoothSpooler &&
+              _discoveredPrinters.any(
+                  (item) => item.kind == DiscoveredPrinterKind.windows)) ...[
+            const SizedBox(height: 8),
+            ..._discoveredPrinters
+                .where((item) => item.kind == DiscoveredPrinterKind.windows)
+                .map((printer) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      value: printer.name,
+                      groupValue: _printerName.text,
+                      onChanged: (value) => setState(() {
+                        _printerName.text = value ?? '';
+                        if (_name.text == _typeLabel(_type)) {
+                          _name.text = printer.name;
+                        }
+                      }),
+                      title: Text(printer.name),
+                      subtitle: Text(printer.isDefault
+                          ? 'Varsayılan Windows yazıcısı'
+                          : 'Eşleştirilmiş Windows yazıcı kuyruğu'),
+                    )),
+          ],
+          if (!_usesWindowsBluetoothSpooler &&
+              _bluetoothDevices.isNotEmpty) ...[
             const SizedBox(height: 10),
             ..._bluetoothDevices.map((device) {
               final address = device['address'] ?? '';
@@ -1351,11 +1395,53 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           const SizedBox(height: 10),
           TextField(
             controller: _printerName,
-            readOnly: true,
-            decoration: const InputDecoration(
+            readOnly: !_usesWindowsBluetoothSpooler,
+            decoration: InputDecoration(
               labelText: 'Seçilen Bluetooth yazıcı',
-              helperText: 'Bağlantıda cihazın MAC adresi kullanılır.',
+              helperText: _usesWindowsBluetoothSpooler
+                  ? 'Yazıcı önce Windows Bluetooth ayarlarından eşleştirilmiş olmalıdır.'
+                  : 'Bağlantıda cihazın MAC adresi kullanılır.',
             ),
+          ),
+        ],
+        if ((_type == HardwareDeviceType.receiptPrinter ||
+                _type == HardwareDeviceType.labelPrinter) &&
+            _connection == HardwareConnectionType.cloud) ...[
+          OutlinedButton.icon(
+            onPressed: _discoveringShared ? null : _discoverSharedDevices,
+            icon: _discoveringShared
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cloud_sync_rounded),
+            label: Text(_discoveringShared
+                ? 'Ortak cihazlar aranıyor…'
+                : 'Ortak cihazları bul'),
+          ),
+          if (_sharedDevices.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ..._sharedDevices.map((device) => RadioListTile<String>(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: device.id,
+                  groupValue: _selectedSharedDevice?.id,
+                  onChanged: device.online
+                      ? (_) => setState(() {
+                            _selectedSharedDevice = device;
+                            _name.text = device.name;
+                          })
+                      : null,
+                  title: Text(device.name),
+                  subtitle: Text(device.online
+                      ? 'Çevrimiçi · ${device.connectionType}'
+                      : 'Sahip cihaz çevrimdışı'),
+                )),
+          ],
+          const SizedBox(height: 8),
+          const Text(
+            'Aynı işletme hesabındaki açık bir cihazın paylaştığı yazıcı kullanılır.',
+            style: TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
         if (_type == HardwareDeviceType.paymentTerminal) ...[
@@ -1580,6 +1666,13 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     }
     setState(() => _working = true);
     try {
+      if (_connection == HardwareConnectionType.cloud) {
+        await ref
+            .read(hardwareDevicesProvider.notifier)
+            .activateSharedPrinter(_selectedSharedDevice!);
+        if (mounted) Navigator.pop(context, true);
+        return;
+      }
       var device = _buildDevice().copyWith(
         status: HardwareDeviceStatus.unverified,
         lastMessage: 'Ayarlar kaydedildi; bağlantı doğrulaması bekleniyor.',
@@ -1686,7 +1779,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       final subnets = await discovery.localIpv4Subnets();
       final found = <DiscoveredPrinter>[];
       for (final subnet in subnets.take(2)) {
-        found.addAll(await discovery.scanSubnet(subnet));
+        found.addAll(await discovery.scanSubnet(
+          subnet,
+          ports: [_defaultPort(_type)],
+        ));
       }
       if (!mounted) return;
       setState(() {
@@ -1696,8 +1792,9 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           ...found,
         ];
         if (found.isEmpty) {
-          _error = 'Aynı ağda RAW 9100 yazıcı adayı bulunamadı. '
-              'Yazıcı farklı VLAN üzerindeyse IP adresini manuel girin.';
+          _error =
+              'Aynı ağda ${_defaultPort(_type)} portunu kullanan ${_networkCandidateLabel(_type).toLowerCase()} bulunamadı. '
+              'Cihaz farklı VLAN üzerindeyse IP adresini manuel girin.';
         }
       });
     } catch (error) {
@@ -1707,20 +1804,50 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     }
   }
 
-  void _discoverSerialPorts() {
+  Future<void> _discoverSerialPorts() async {
     try {
       final ports = SerialScaleAdapter.availablePorts;
+      final devices = await PrinterDiscoveryService().listSerialDevices(ports);
+      if (!mounted) return;
       setState(() {
-        _serialPorts = ports;
-        _error = ports.isEmpty
+        _serialDevices = devices;
+        _error = devices.isEmpty
             ? 'USB / COM aygıtı bulunamadı. Sürücünün kurulu olduğunu kontrol edin.'
             : null;
-        if (_serialPort.text.isEmpty && ports.isNotEmpty) {
-          _serialPort.text = ports.first;
+        if (_serialPort.text.isEmpty && devices.isNotEmpty) {
+          _serialPort.text = devices.first.port;
         }
       });
     } catch (error) {
       setState(() => _error = 'Seri portlar okunamadı: $error');
+    }
+  }
+
+  Future<void> _discoverSharedDevices() async {
+    setState(() {
+      _discoveringShared = true;
+      _error = null;
+    });
+    try {
+      final devices = await ref.read(sharedHardwareServiceProvider).list();
+      if (!mounted) return;
+      final candidates = devices
+          .where((device) => !device.isLocal && device.type == _type)
+          .toList(growable: false);
+      setState(() {
+        _sharedDevices = candidates;
+        if (candidates.isEmpty) {
+          _error =
+              'Başka bir açık cihaz tarafından paylaşılan ${_typeLabel(_type).toLowerCase()} bulunamadı.';
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error =
+            'Ortak cihazlar alınamadı. Bağlantınızı kontrol edin: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _discoveringShared = false);
     }
   }
 
@@ -1747,6 +1874,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     if (_connection == HardwareConnectionType.bluetooth &&
         _printerName.text.trim().isEmpty) {
       return 'Bluetooth cihaz kimliği gereklidir.';
+    }
+    if (_connection == HardwareConnectionType.cloud &&
+        _selectedSharedDevice == null) {
+      return 'Kullanılacak ortak cihazı seçin.';
     }
     if (_type == HardwareDeviceType.labelPrinter) {
       final width = int.tryParse(_labelWidth.text);
@@ -1815,6 +1946,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       },
     );
   }
+
+  bool get _usesWindowsBluetoothSpooler =>
+      !kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.windows &&
+      _connection == HardwareConnectionType.bluetooth;
 }
 
 class _EditorProgress extends StatelessWidget {
@@ -2301,6 +2437,24 @@ String _typeLabel(HardwareDeviceType type) => switch (type) {
       HardwareDeviceType.barcodeScanner => 'Barkod okuyucu',
     };
 
+String _networkDeviceLabel(HardwareDeviceType type) => switch (type) {
+      HardwareDeviceType.receiptPrinter ||
+      HardwareDeviceType.labelPrinter =>
+        'yazıcıları',
+      HardwareDeviceType.scale => 'terazileri',
+      HardwareDeviceType.paymentTerminal => 'POS Bridge’leri',
+      HardwareDeviceType.barcodeScanner => 'okuyucuları',
+    };
+
+String _networkCandidateLabel(HardwareDeviceType type) => switch (type) {
+      HardwareDeviceType.receiptPrinter ||
+      HardwareDeviceType.labelPrinter =>
+        'Yazıcı adayı',
+      HardwareDeviceType.scale => 'Terazi adayı',
+      HardwareDeviceType.paymentTerminal => 'POS Bridge adayı',
+      HardwareDeviceType.barcodeScanner => 'Okuyucu adayı',
+    };
+
 String _deviceConfigurationSummary(HardwareDevice device) {
   final config = device.configuration;
   int value(String key, int fallback) =>
@@ -2360,22 +2514,40 @@ List<HardwareConnectionType> _connectionsFor(HardwareDeviceType type) {
   final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   return switch (type) {
     HardwareDeviceType.receiptPrinter => isWindows
-        ? const [HardwareConnectionType.windows, HardwareConnectionType.tcp]
+        ? const [
+            HardwareConnectionType.windows,
+            HardwareConnectionType.bluetooth,
+            HardwareConnectionType.tcp,
+            HardwareConnectionType.cloud,
+          ]
         : isAndroid
             ? const [
                 HardwareConnectionType.embedded,
                 HardwareConnectionType.bluetooth,
                 HardwareConnectionType.tcp,
+                HardwareConnectionType.cloud,
               ]
-            : const [HardwareConnectionType.tcp],
+            : const [
+                HardwareConnectionType.tcp,
+                HardwareConnectionType.cloud,
+              ],
     HardwareDeviceType.labelPrinter => isWindows
-        ? const [HardwareConnectionType.windows, HardwareConnectionType.tcp]
+        ? const [
+            HardwareConnectionType.windows,
+            HardwareConnectionType.bluetooth,
+            HardwareConnectionType.tcp,
+            HardwareConnectionType.cloud,
+          ]
         : isAndroid
             ? const [
                 HardwareConnectionType.bluetooth,
                 HardwareConnectionType.tcp,
+                HardwareConnectionType.cloud,
               ]
-            : const [HardwareConnectionType.tcp],
+            : const [
+                HardwareConnectionType.tcp,
+                HardwareConnectionType.cloud,
+              ],
     HardwareDeviceType.scale => const [
         HardwareConnectionType.serial,
         HardwareConnectionType.tcp,

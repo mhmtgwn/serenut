@@ -608,6 +608,10 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
         );
         await socket.close();
       case HardwareConnectionType.bluetooth:
+        if (Platform.isWindows) {
+          await _verifyWindowsPrinter(device);
+          break;
+        }
         final address =
             (config['address'] ?? config['printerName'])?.toString() ?? '';
         if (address.isEmpty ||
@@ -898,7 +902,10 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       id: device.id,
       name: device.name,
       language: _printerLanguage(device.type),
-      transport: _transport(device.connectionType),
+      transport: device.connectionType == HardwareConnectionType.bluetooth &&
+              Platform.isWindows
+          ? PrinterTransportKind.windowsSpooler
+          : _transport(device.connectionType),
       transportConfig: config,
       capabilities: capabilities,
       enabled: device.enabled,
