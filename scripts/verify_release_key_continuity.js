@@ -60,6 +60,36 @@ if (!previousKeyring.some(modulus => fingerprint(modulus) === required)) {
   );
 }
 
+const baselineRef = String(policy.compatibilityBaselineRef || '').trim();
+if (!/^[a-f0-9]{40}$/.test(baselineRef)) {
+  throw new Error('Invalid compatibilityBaselineRef in release signing policy.');
+}
+const baselineRaw = execFileSync(
+  'git',
+  ['show', `${baselineRef}:config/signing_public_keys.json`],
+  { encoding: 'utf8' },
+);
+const baselineKeyring = keyring(JSON.parse(baselineRaw), false);
+if (!baselineKeyring.some(modulus => fingerprint(modulus) === required)) {
+  throw new Error(
+    `Minimum directly supported client ${policy.trustedSinceVersion} does not trust ` +
+      'the active release signer. Publish a bridge release; direct rollout is blocked.',
+  );
+}
+
+const androidCert = String(policy.androidPackageCertificateSha256 || '');
+if (!/^[a-f0-9]{64}$/.test(androidCert)) {
+  throw new Error('Invalid Android package certificate fingerprint in policy.');
+}
+const legacySigner = String(policy.legacyUpgradeSignerModulusSha256 || '');
+if (!/^[a-f0-9]{64}$/.test(legacySigner)) {
+  throw new Error('Invalid legacy upgrade signer fingerprint in policy.');
+}
+if (legacySigner === required) {
+  throw new Error('Legacy and active signer fingerprints must describe distinct keys.');
+}
+
 console.log(
-  `Release key continuity: PASS (${required.slice(0, 12)}…, previous=${previousRef})`,
+  `Release key continuity: PASS (${required.slice(0, 12)}…, previous=${previousRef}, ` +
+    `baseline=${policy.trustedSinceVersion})`,
 );

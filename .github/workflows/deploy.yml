@@ -142,8 +142,8 @@ jobs:
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          EXPECTED_CERT_SHA256: 3806945a82a023a36a91ddcce3ff350d3695da41503b254452375313bd221493
         run: |
+          EXPECTED_CERT_SHA256="$(node -p "require('./server/release-signing-policy.json').androidPackageCertificateSha256")"
           actual_cert_sha256="$(
             keytool -exportcert -rfc \
               -keystore android/app/serenut-release.jks \
