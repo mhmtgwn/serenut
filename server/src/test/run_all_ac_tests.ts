@@ -61,6 +61,7 @@ const testFiles = [
   'payment_lifecycle.test.ts',
   'refund_lifecycle.test.ts',
   'notification_credit_reservation.test.ts',
+  'whatsapp_service.test.ts',
   'web_route_contract.test.ts',
   'release_registry.test.ts',
   'ac_support.test.ts',

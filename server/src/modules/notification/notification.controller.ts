@@ -5,6 +5,7 @@ import { TemplateParserService } from './template_parser.service';
 import { logger } from '../../config/logger';
 import { isNotificationChannelEnabled } from './notification_channels';
 import { enforceNotificationRateLimit, enforceCampaignAbuseLimit } from '../../middleware/rate-limit.middleware';
+import { parseTemplatePayload, WhatsAppProviderError } from '../whatsapp/whatsapp.service';
 
 const router = Router();
 
@@ -115,7 +116,7 @@ async function hasSufficientCredits(companyId: string, channel: string): Promise
  */
 router.post('/send-direct', enforceNotificationRateLimit, async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
-  const { channel, recipient, title, body, template_name, template_payload, scheduled_at } = req.body;
+  const { channel, recipient, title, body, template_name, template_payload, provider_payload, scheduled_at } = req.body;
 
   if (!channel || !recipient) {
     return res.status(400).json({ error: 'missing_fields', message: 'Kanal ve alıcı bilgileri zorunludur.' });
@@ -154,19 +155,28 @@ router.post('/send-direct', enforceNotificationRateLimit, async (req: Authentica
       return res.status(400).json({ error: 'empty_message', message: 'Mesaj içeriği boş olamaz.' });
     }
 
+    const finalProviderPayload = channel === 'whatsapp'
+      ? parseTemplatePayload(provider_payload)
+      : null;
+
     // 3. Insert into queue
     const id = `notif-${Date.now()}-${Math.floor(Math.random()*1000)}`;
     const parsedScheduledAt = scheduled_at ? new Date(scheduled_at) : new Date();
 
     await runWithTenantContext(
       user.company_id,
-      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, scheduled_at, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [id, user.company_id, channel, recipient, title || null, finalBody, parsedScheduledAt, user.id]
+      `INSERT INTO notification_queue
+         (id, company_id, channel, recipient, title, body, provider_payload, scheduled_at, created_by_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
+      [id, user.company_id, channel, recipient, title || null, finalBody,
+        finalProviderPayload ? JSON.stringify(finalProviderPayload) : null, parsedScheduledAt, user.id]
     );
 
     return res.status(201).json({ success: true, queue_id: id });
   } catch (err) {
+    if (err instanceof WhatsAppProviderError) {
+      return res.status(err.httpStatus).json({ error: err.code, message: err.message });
+    }
     logger.error('Failed direct notify queue push:', err);
     return res.status(500).json({ error: 'server_error' });
   }
@@ -376,7 +386,9 @@ router.get('/queue', requireSmsHistoryAccess, async (req: AuthenticatedRequest, 
   try {
     const history = await runWithTenantContext(
       user.company_id,
-      'SELECT id, channel, recipient, title, body, status, retry_count, error_message, delivered_at, created_at FROM notification_queue WHERE created_by_user_id = $1 ORDER BY created_at DESC LIMIT 100',
+      `SELECT id, channel, recipient, title, body, status, retry_count, error_message,
+              provider_message_id,provider_status,provider_error_code,delivered_at,created_at
+       FROM notification_queue WHERE created_by_user_id = $1 ORDER BY created_at DESC LIMIT 100`,
       [user.id]
     );
     return res.json(history.rows);

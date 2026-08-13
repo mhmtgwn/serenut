@@ -109,6 +109,16 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     moduleTab: 'support'
   },
   {
+    id: 'notification-channels',
+    label: 'Bildirim Kanalları',
+    section: 'communication',
+    href: '/app/#notification-channels',
+    description: 'SMS ve şirkete ait WhatsApp Business bağlantısını yönetin.',
+    module: 'portal',
+    moduleTab: 'notifications',
+    roles: ['owner']
+  },
+  {
     id: 'system-diagnostics',
     label: 'Sistem ve Loglar',
     section: 'operations',

@@ -55,6 +55,9 @@ async function run() {
 
   assert.doesNotMatch(publicSources, /\/app\/#register/, 'marketing pages must use /register');
   assert.doesNotMatch(publicSources, /embed=1|auth-modal-iframe/, 'iframe authentication must stay removed');
+  assert.ok(fs.existsSync(path.join(websiteDir, 'data-deletion.html')), 'Meta user-data deletion instructions must exist');
+  assert.match(serverSource, /'data-deletion'/, 'the public data-deletion route must be registered');
+  assert.match(publicSources, /href="\/data-deletion"/, 'the privacy policy must link to data-deletion instructions');
 
   const runtime = fs.readFileSync(path.join(projectRoot, 'public/app/js/module-runtime.js'), 'utf8');
   const authRuntime = fs.readFileSync(path.join(projectRoot, 'public/auth/auth.js'), 'utf8');
@@ -72,6 +75,7 @@ async function run() {
   assert.match(runtime, /recovery\/admin-assist/, 'tenant admin UI must use canonical recovery requests');
   for (const loader of [
     'company-stores', 'company-devices', 'company-licenses', 'company-downloads',
+    'notification-channels',
     'platform-companies', 'platform-subscriptions', 'platform-licenses', 'platform-devices',
     'platform-health', 'platform-maintenance', 'platform-security',
   ]) {
@@ -154,6 +158,7 @@ async function run() {
   assert.ok(!sysadminNav.some((item) => item.id === 'account-settings'), 'company-scoped account settings must not be shown to sysadmin');
   const ownerNavigation = filterNavByEntitlements(['owner'], ['billing:view']);
   assert.ok(ownerNavigation.some((item) => item.id === 'support-center' && item.section === 'communication'), 'customer support must be grouped under communication');
+  assert.ok(ownerNavigation.some((item) => item.id === 'notification-channels' && item.section === 'communication'), 'company owner must be able to manage WhatsApp notification channels');
   for (const id of ['platform-subscriptions', 'platform-licenses', 'platform-devices']) {
     assert.ok(sysadminNav.some((item) => item.id === id && item.module === 'admin'), `${id} must be visible to sysadmin`);
   }

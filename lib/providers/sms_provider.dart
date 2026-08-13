@@ -16,6 +16,7 @@ import 'package:serenutos/domain/models/sms_log_entry.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:serenutos/infrastructure/services/sms_gateway_service.dart';
 import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
+import 'package:serenutos/infrastructure/sync_v4/whatsapp_notification_outbox.dart';
 
 /// Builds SmsConfig from the current app Settings.
 SmsConfig? _buildSmsConfig(Settings? settings) {
@@ -100,12 +101,62 @@ final smsNotificationHandlerProvider =
   final smsService = ref.watch(smsServiceProvider);
   final smsLogRepo = ref.watch(smsLogRepositoryProvider);
   final settings = ref.watch(settingsNotifierProvider).value;
+  final whatsappOutbox =
+      WhatsappNotificationOutbox(ref.watch(apiClientProvider));
+  whatsappOutbox.flush();
 
   final handler = SmsNotificationHandler(
     eventPublisher: eventPublisher,
     customerRepository: customerRepo,
     smsService: smsService,
     smsLogRepository: smsLogRepo,
+    onCloudNotification: ({
+      required clientEventId,
+      required eventType,
+      required phone,
+      required fallbackBody,
+      required variables,
+    }) async {
+      final parameters = switch (eventType) {
+        'sale_created' => [
+            variables['customer'] ?? '',
+            variables['id'] ?? '',
+            variables['amount'] ?? '',
+            variables['business'] ?? '',
+          ],
+        'debt_created' => [
+            variables['customer'] ?? '',
+            variables['id'] ?? '',
+            variables['balance'] ?? '',
+            variables['business'] ?? '',
+          ],
+        'collection_recorded' => [
+            variables['customer'] ?? '',
+            variables['amount'] ?? '',
+            variables['debt'] ?? '',
+            variables['business'] ?? '',
+          ],
+        'order_created' => [
+            variables['customer'] ?? '',
+            variables['id'] ?? '',
+            variables['amount'] ?? '',
+            variables['business'] ?? '',
+          ],
+        _ => [
+            variables['customer'] ?? '',
+            variables['id'] ?? '',
+            variables['business'] ?? '',
+          ],
+      };
+      await whatsappOutbox.enqueue({
+        'client_event_id': clientEventId,
+        'event_key': eventType,
+        'recipient': phone,
+        'parameters': parameters,
+        'fallback_body': fallbackBody,
+      });
+      await whatsappOutbox.flush();
+    },
   );
 
   if (settings != null) {
