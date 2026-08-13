@@ -26,6 +26,7 @@ const iconPaths = {
   'company-licenses': '<path d="M14 4a5 5 0 1 0 3.5 8.5L22 17v3h-3v-2h-2v-2h-2l-1.5-1.5"/><circle cx="9" cy="9" r="1"/>',
   'company-downloads': '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 20h16"/>',
   'support-center': '<path d="M4 13a8 8 0 0 1 16 0"/><path d="M4 13v4a2 2 0 0 0 2 2h2v-7H4M20 13v4a2 2 0 0 1-2 2h-2v-7h4"/>',
+  'notification-channels': '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.5 9.6 9.6 0 0 1-4-.9L3 21l1.7-4.6A8.4 8.4 0 1 1 21 11.5Z"/><path d="M8 10h8M8 14h5"/>',
   'system-diagnostics': '<path d="M4 12h3l2-5 4 10 2-5h5"/><rect x="2" y="3" width="20" height="18" rx="2"/>',
   'platform-overview': '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>',
   'platform-companies': '<path d="M4 21V5h10v16M14 9h6v12M7 9h4M7 13h4M7 17h4M17 13h1M17 17h1"/>',
@@ -246,7 +247,7 @@ async function selectModule(moduleId) {
   const content = document.getElementById('embed-content');
   content.innerHTML = '<div class="module-loading">Modül yükleniyor…</div>';
   try {
-    const { loadModule } = await import('./module-runtime.js?v=20260810-flow2');
+    const { loadModule } = await import('./module-runtime.js?v=20260813-whatsapp1');
     await loadModule(item);
   } catch (error) {
     content.innerHTML = `

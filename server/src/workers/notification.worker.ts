@@ -14,6 +14,12 @@ import { pgPool, redisClient } from '../config/database';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';
 import { assertNotificationChannelEnabled } from '../modules/notification/notification_channels';
+import {
+  decryptAccessToken,
+  parseTemplatePayload,
+  sendTemplateMessage,
+  WhatsAppProviderError,
+} from '../modules/whatsapp/whatsapp.service';
 
 // ── REDIS BAĞLANTI AYARLARI ──────────────────────────────────────────────────
 // BullMQ kendi ioredis bağlantısını yönetir.
@@ -74,6 +80,7 @@ export interface NotificationJobData {
   recipient: string;      // Telefon veya email
   title?: string;
   body: string;
+  provider_payload?: unknown;
   max_retries?: number;
 }
 
@@ -88,7 +95,7 @@ async function dispatchGateway(data: NotificationJobData): Promise<boolean> {
     case 'email':
       return dispatchEmail(recipient, title || 'Serenut OS', body);
     case 'whatsapp':
-      return dispatchWhatsApp(recipient, body);
+      return dispatchWhatsApp(data);
     case 'push':
       return dispatchPush(recipient, title, body);
     default:
@@ -200,8 +207,56 @@ async function dispatchEmail(to: string, subject: string, body: string): Promise
   }
 }
 
-async function dispatchWhatsApp(to: string, body: string): Promise<boolean> {
-  throw new Error('notification_channel_not_enabled:whatsapp');
+async function dispatchWhatsApp(data: NotificationJobData): Promise<boolean> {
+  const existing = await runBypassingRLS(
+    `SELECT provider_message_id FROM notification_queue WHERE id=$1 AND company_id=$2 AND channel='whatsapp'`,
+    [data.notification_id, data.company_id],
+  );
+  if (existing.rows[0]?.provider_message_id) return true;
+
+  const connection = await runBypassingRLS(
+    `SELECT phone_number_id,encrypted_access_token,status
+     FROM company_whatsapp_connections WHERE company_id=$1`,
+    [data.company_id],
+  );
+  const row = connection.rows[0];
+  if (!row || row.status !== 'active') {
+    throw new Error('whatsapp_connection_not_active');
+  }
+
+  const payload = parseTemplatePayload(data.provider_payload);
+  let providerMessageId: string;
+  try {
+    providerMessageId = await sendTemplateMessage({
+      accessToken: decryptAccessToken(row.encrypted_access_token),
+      phoneNumberId: row.phone_number_id,
+      recipient: data.recipient,
+      payload,
+    });
+  } catch (error) {
+    const providerError = error instanceof WhatsAppProviderError ? error : null;
+    const requiresAuthorization = providerError?.code === '190' || providerError?.httpStatus === 401;
+    await runBypassingRLS(
+      `UPDATE company_whatsapp_connections
+       SET status=CASE WHEN $1 THEN 'reauthorization_required' ELSE status END,
+           last_error_code=$2,last_error_message=$3,updated_at=NOW()
+       WHERE company_id=$4`,
+      [requiresAuthorization, providerError?.code || 'send_failed', error instanceof Error ? error.message : String(error), data.company_id],
+    );
+    throw error;
+  }
+  await runBypassingRLS(
+    `WITH message_update AS (
+       UPDATE notification_queue
+       SET provider_message_id=$1,provider_status='accepted',provider_error_code=NULL,updated_at=NOW()
+       WHERE id=$2 AND company_id=$3 AND channel='whatsapp' RETURNING id
+     )
+     UPDATE company_whatsapp_connections
+     SET last_verified_at=NOW(),last_error_code=NULL,last_error_message=NULL,updated_at=NOW()
+     WHERE company_id=$3 AND EXISTS(SELECT 1 FROM message_update)`,
+    [providerMessageId, data.notification_id, data.company_id],
+  );
+  return true;
 }
 
 async function dispatchPush(deviceToken: string, title?: string, body?: string): Promise<boolean> {
@@ -270,7 +325,7 @@ export async function dispatchNotificationOutboxBatch(limit = 100): Promise<numb
   outboxDispatchRunning = true;
   try {
     const result = await runBypassingRLS(
-      `SELECT id, company_id, channel, recipient, title, body, scheduled_at, max_retries
+      `SELECT id, company_id, channel, recipient, title, body, provider_payload, scheduled_at, max_retries
        FROM notification_queue
        WHERE status IN ('pending', 'queued', 'retrying')
          AND (next_retry_at IS NULL OR next_retry_at <= NOW())
@@ -290,6 +345,7 @@ export async function dispatchNotificationOutboxBatch(limit = 100): Promise<numb
           recipient: row.recipient,
           title: row.title || undefined,
           body: row.body,
+          provider_payload: row.provider_payload,
           max_retries: row.max_retries || 3,
         }, Math.max(0, scheduledAt - Date.now()));
         await runBypassingRLS(
@@ -493,11 +549,12 @@ export async function enqueueNotification(data: NotificationJobData, delayMs = 0
   const scheduledAt = new Date(Date.now() + Math.max(0, delayMs));
   await runBypassingRLS(
     `INSERT INTO notification_queue
-       (id,company_id,channel,recipient,title,body,status,scheduled_at,max_retries,updated_at)
-     VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,NOW())
+       (id,company_id,channel,recipient,title,body,provider_payload,status,scheduled_at,max_retries,updated_at)
+     VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,'pending',$8,$9,NOW())
      ON CONFLICT(id) DO NOTHING`,
     [data.notification_id,data.company_id,data.channel,data.recipient,data.title || null,
-      data.body,scheduledAt,data.max_retries || 3],
+      data.body,data.provider_payload ? JSON.stringify(data.provider_payload) : null,
+      scheduledAt,data.max_retries || 3],
   );
 }
 
