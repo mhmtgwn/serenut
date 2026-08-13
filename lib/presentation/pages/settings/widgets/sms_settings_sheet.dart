@@ -47,6 +47,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   bool whatsappStatusLoading = true;
   bool whatsappConnected = false;
   String? whatsappPhone;
+  String selectedChannel = 'sms';
   final Map<String, Map<String, String>> whatsappTemplates = {};
 
   // SIM SMS Specific States
@@ -1032,6 +1033,139 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       }[id] ??
       id;
 
+  String _triggerLabel(String eventId) => const {
+        'sale_created': 'Satış tamamlandığında',
+        'debt_created': 'Vadeli işlem oluşturulduğunda',
+        'collection_recorded': 'Tahsilat kaydedildiğinde',
+        'order_created': 'Sipariş alındığında',
+        'order_preparing': 'Sipariş hazırlanmaya başladığında',
+        'order_ready': 'Sipariş hazır olduğunda',
+        'order_delivered': 'Sipariş teslim edildiğinde',
+        'order_cancelled': 'Sipariş iptal edildiğinde',
+        'balance_reminder': 'Bakiye hatırlatması gönderildiğinde',
+      }[eventId] ??
+      'İşlem gerçekleştiğinde';
+
+  String _whatsappStatusLabel(String status) => switch (status.toLowerCase()) {
+        'approved' || 'active' => 'Meta onaylı',
+        'pending' || 'in_review' => 'Meta incelemesinde',
+        'rejected' => 'Meta tarafından reddedildi',
+        'paused' || 'disabled' => 'Meta tarafından durduruldu',
+        _ => 'Şablon durumu: $status',
+      };
+
+  Widget _buildChannelSelector() {
+    final whatsappColor = whatsappConnected
+        ? const Color(0xFF16A34A)
+        : POSColors.textSecondary;
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: POSColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildChannelTab(
+              id: 'sms',
+              icon: Icons.sms_rounded,
+              title: 'SMS',
+              subtitle: smsEnabled ? 'Etkin' : 'Kapalı',
+              color: POSColors.blue,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _buildChannelTab(
+              id: 'whatsapp',
+              icon: Icons.chat_rounded,
+              title: 'WhatsApp',
+              subtitle: whatsappStatusLoading
+                  ? 'Kontrol ediliyor'
+                  : whatsappConnected
+                      ? 'Bağlı'
+                      : 'Bağlantı gerekli',
+              color: whatsappColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChannelTab({
+    required String id,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    final selected = selectedChannel == id;
+    return Material(
+      color: selected ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => setState(() => selectedChannel = id),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: selected
+                ? Border.all(color: color.withValues(alpha: 0.35))
+                : null,
+            boxShadow: selected
+                ? const [
+                    BoxShadow(
+                      color: Color(0x120F172A),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, color: color, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWhatsAppConnectionCard() {
     final color = whatsappStatusLoading
         ? POSColors.textSecondary
@@ -1259,7 +1393,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         limit != null && limit > 0 ? (sent / limit).clamp(0.0, 1.0) : 0.0;
 
     return FullScreenSettingsPage(
-      title: 'SMS ve WhatsApp Bildirimleri',
+      title: 'Müşteri Bildirimleri',
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -1267,7 +1401,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // limit uyarı banner'ı
-              if (smsEnabled &&
+              if (selectedChannel == 'sms' &&
+                  smsEnabled &&
                   selectedProvider == 'sim' &&
                   isLimitExceeded) ...[
                 Container(
@@ -1317,7 +1452,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               ],
 
               // Interrupted / Stuck SMS warning banner
-              if (smsEnabled && interruptedLogs.isNotEmpty) ...[
+              if (selectedChannel == 'sms' &&
+                  smsEnabled &&
+                  interruptedLogs.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -1425,8 +1562,12 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 ),
               ],
 
-              _buildWhatsAppConnectionCard(),
-              _buildSwitchRow(
+              _buildChannelSelector(),
+              const SizedBox(height: AppSpacing.md),
+              if (selectedChannel == 'whatsapp')
+                _buildWhatsAppConnectionCard(),
+              if (selectedChannel == 'sms') ...[
+                _buildSwitchRow(
                 title: 'SMS Bildirimlerini Etkinleştir',
                 subtitle: 'Android ana cihazın SIM kartından SMS gönderimi',
                 icon: Icons.message_rounded,
@@ -1648,7 +1789,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   ),
                 ],
               ],
-              const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
 
               // Bakiye iletişimi
               const Text(
@@ -1687,7 +1828,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
+              ],
 
               if (widget.operationsOnly) ...[
                 // Müşteri iletişimi
@@ -1788,15 +1930,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Otomatik Bildirim Şablonları',
-                    style: TextStyle(
+                  Text(
+                    selectedChannel == 'sms'
+                        ? 'SMS otomasyonları'
+                        : 'WhatsApp otomasyonları',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: POSColors.text,
                     ),
                   ),
-                  TextButton.icon(
+                  if (selectedChannel == 'sms')
+                    TextButton.icon(
                     icon: const Icon(
                       Icons.add_circle_outline_rounded,
                       size: 18,
@@ -1819,9 +1964,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 ],
               ),
               const Divider(color: POSColors.border),
-              const Text(
-                'SMS metnini burada düzenleyebilirsiniz. WhatsApp, Meta tarafından onaylanan ve olayla eşleştirilen kurumsal şablonu kullanır.',
-                style: TextStyle(
+              Text(
+                selectedChannel == 'sms'
+                    ? 'Hangi işlemlerde otomatik SMS gönderileceğini seçin ve müşteriye gidecek metni düzenleyin.'
+                    : 'Hangi işlemlerde WhatsApp bildirimi gönderileceğini seçin. Yalnız Meta onaylı şablonlar etkinleştirilebilir.',
+                style: const TextStyle(
                   color: POSColors.textSecondary,
                   fontSize: 12,
                 ),
@@ -1868,8 +2015,12 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                           final whatsappStatus = whatsappTemplate?['status'];
                           final whatsappTemplateName =
                               whatsappTemplate?['name'];
-                          final isEnabled =
-                              smsTemplateEnabled || whatsappTemplateEnabled;
+                          final whatsappReady =
+                              whatsappStatus == 'approved' ||
+                                  whatsappStatus == 'active';
+                          final isEnabled = selectedChannel == 'sms'
+                              ? smsTemplateEnabled
+                              : whatsappTemplateEnabled;
                           return Container(
                             padding: const EdgeInsets.all(12),
                             margin: const EdgeInsets.only(bottom: 8),
@@ -1901,7 +2052,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                             : POSColors.textDisabled,
                                       ),
                                     ),
-                                    IconButton(
+                                    if (selectedChannel == 'sms') IconButton(
                                       tooltip: 'Mesaj metnini düzenle',
                                       icon: const Icon(
                                         Icons.edit_rounded,
@@ -1928,7 +2079,14 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  tpl['template'] ?? '',
+                                  selectedChannel == 'sms'
+                                      ? tpl['template'] ?? ''
+                                      : !whatsappSupported
+                                          ? 'Bu işlem için WhatsApp şablonu bulunmuyor.'
+                                          : whatsappTemplateName == null ||
+                                                  whatsappTemplateName.isEmpty
+                                              ? 'Meta şablonu henüz oluşturulmadı.'
+                                              : 'Meta şablonu: $whatsappTemplateName',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isEnabled
@@ -1942,7 +2100,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   runSpacing: 6,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Row(
+                                    if (selectedChannel == 'sms') Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Switch.adaptive(
@@ -1963,14 +2121,15 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                         ),
                                       ],
                                     ),
-                                    Row(
+                                    if (selectedChannel == 'whatsapp') Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Switch.adaptive(
                                           value: whatsappTemplateEnabled,
                                           activeColor: const Color(0xFF16A34A),
                                           onChanged: whatsappConnected &&
-                                                  whatsappSupported
+                                                  whatsappSupported &&
+                                                  whatsappReady
                                               ? (val) => setState(
                                                     () =>
                                                         tpl['whatsapp_enabled'] =
@@ -1980,10 +2139,12 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                         ),
                                         Text(
                                           !whatsappSupported
-                                              ? 'WhatsApp • uygun değil'
+                                              ? 'Kullanılamıyor'
                                               : whatsappStatus == null
-                                                  ? 'WhatsApp • şablon bekliyor'
-                                                  : 'WhatsApp • $whatsappTemplateName • $whatsappStatus',
+                                                  ? 'Meta onayı bekleniyor'
+                                                  : _whatsappStatusLabel(
+                                                      whatsappStatus,
+                                                    ),
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
                                             color: whatsappConnected &&
@@ -2001,31 +2162,16 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isEnabled
-                                            ? POSColors.blue.withValues(
-                                                alpha: 0.08,
-                                              )
-                                            : Colors.grey[100]!,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        tpl['id'] ?? '',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: isEnabled
-                                              ? POSColors.blue
-                                              : POSColors.textDisabled,
-                                        ),
+                                    Text(
+                                      _triggerLabel(eventId),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: POSColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    if (tpl['id'] != 'sale' &&
+                                    if (selectedChannel == 'sms' &&
+                                        tpl['id'] != 'sale' &&
                                         tpl['id'] != 'discount' &&
                                         tpl['id'] != 'debt' &&
                                         tpl['id'] != 'collection' &&

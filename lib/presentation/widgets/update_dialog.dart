@@ -212,6 +212,14 @@ class _UpdateDialogState extends ConsumerState<_UpdateDialog>
 
       if (result == InstallResult.success) {
         // App will terminate automatically via releaseManager service
+      } else if (result == InstallResult.permissionRequired) {
+        if (mounted) {
+          setState(() {
+            _state = _DialogState.error;
+            _errorMessage =
+                'Android izin ekranı açıldı. Serenut OS için “Bu kaynaktan uygulama yüklemeye izin ver” seçeneğini açın, uygulamaya dönün ve Tekrar Dene’ye basın.';
+          });
+        }
       } else {
         // Trigger automated rollback
         await rollback.triggerRollback();
