@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { validateWhatsAppRuntimeConfig } from '../modules/whatsapp/whatsapp.config';
 dotenv.config();
 
 async function runPrecheck() {
@@ -66,6 +67,16 @@ async function runPrecheck() {
   if (process.env.NODE_ENV === 'production' && !process.env.MIGRATION_DATABASE_URL) {
     console.error('❌ [FAIL] MIGRATION_DATABASE_URL is required for privileged migrations.');
     failed = true;
+  }
+
+  const whatsappErrors = validateWhatsAppRuntimeConfig(process.env);
+  if (whatsappErrors.length > 0) {
+    console.error(`❌ [FAIL] WhatsApp configuration: ${whatsappErrors.join('; ')}`);
+    failed = true;
+  } else if ((process.env.NOTIFICATION_ENABLED_CHANNELS || '').split(',').map(v => v.trim()).includes('whatsapp')) {
+    console.log('✅ [PASS] WhatsApp configuration: all required production values are present.');
+  } else {
+    console.log('ℹ️ WhatsApp configuration: channel remains disabled pending Meta approval.');
   }
 
   // 2. Database Connectivity & Migration Version Check

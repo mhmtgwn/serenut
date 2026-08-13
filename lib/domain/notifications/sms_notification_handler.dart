@@ -26,12 +26,21 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/sms_service.dart';
 import 'package:serenutos/infrastructure/repositories/sms_log_repository.dart';
 
+typedef CloudNotificationCallback = Future<void> Function({
+  required String clientEventId,
+  required String eventType,
+  required String phone,
+  required String fallbackBody,
+  required Map<String, String> variables,
+});
+
 class SmsNotificationHandler {
   final EventPublisher _eventPublisher;
   final ICustomerRepository _customerRepository;
   final SmsService _smsService;
   final SmsLogRepository _smsLogRepository;
   final TemplateResolver _templateResolver;
+  final CloudNotificationCallback? _onCloudNotification;
 
   // Listeners kept for unsubscribe on dispose
   late final void Function(SaleCreatedEvent) _saleListener;
@@ -48,11 +57,13 @@ class SmsNotificationHandler {
     required SmsService smsService,
     required SmsLogRepository smsLogRepository,
     TemplateResolver? templateResolver,
+    CloudNotificationCallback? onCloudNotification,
   })  : _eventPublisher = eventPublisher,
         _customerRepository = customerRepository,
         _smsService = smsService,
         _smsLogRepository = smsLogRepository,
-        _templateResolver = templateResolver ?? const TemplateResolver() {
+        _templateResolver = templateResolver ?? const TemplateResolver(),
+        _onCloudNotification = onCloudNotification {
     _saleListener = _onSaleCreated;
     _collectionListener = _onCollectionRecorded;
     _orderCreatedListener = _onOrderCreated;
@@ -334,6 +345,14 @@ class SmsNotificationHandler {
       settings: settings,
       vars: vars,
     );
+    final clientEventId = const Uuid().v4();
+    _onCloudNotification?.call(
+      clientEventId: clientEventId,
+      eventType: eventType,
+      phone: phone,
+      fallbackBody: message ?? eventType,
+      variables: vars,
+    ).ignore();
     if (message == null || message.trim().isEmpty) return;
 
     _sendAndLog(phone: phone, eventType: eventType, message: message);

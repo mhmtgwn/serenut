@@ -1,6 +1,7 @@
 import 'express-async-errors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { validateWhatsAppRuntimeConfig } from './modules/whatsapp/whatsapp.config';
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 const envFile = nodeEnv === 'test' ? '.env.test' : '.env';
@@ -38,12 +39,22 @@ const optionalEnv = [
   'SMTP_API_KEY',
   'RSA_PRIVATE_KEY',
   'APP_SECRET',
+  'META_APP_ID',
+  'META_APP_SECRET',
+  'WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID',
+  'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+  'WHATSAPP_CREDENTIAL_ENCRYPTION_KEY',
 ];
 optionalEnv.forEach(key => {
   if (!process.env[key]) {
     console.warn(`⚠️ Warning: Optional operational key ${key} is not set. Related features may fallback to insecure defaults or fail.`);
   }
 });
+const whatsappConfigErrors = validateWhatsAppRuntimeConfig(process.env);
+if (whatsappConfigErrors.length > 0) {
+  console.error(`🚨 WhatsApp runtime configuration is invalid: ${whatsappConfigErrors.join('; ')}`);
+  if (isProduction) process.exit(1);
+}
 if (!process.env.RELEASE_RSA_PRIVATE_KEY && !process.env.RELEASE_RSA_PRIVATE_KEY_FILE) {
   console.warn(
     '⚠️ Warning: Release signing key is not configured through an environment value or mounted file.',
@@ -97,6 +108,7 @@ import logsRouter from './modules/logs/logs.controller';
 import healthRouter from './modules/health/health.controller';
 import realtimeRouter from './modules/realtime/realtime.controller';
 import catalogRouter from './modules/catalog/catalog.controller';
+import whatsappRouter from './modules/whatsapp/whatsapp.controller';
 
 // BullMQ Workers
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
@@ -171,15 +183,17 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-eval kaldırıldı
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://connect.facebook.net"], // Meta Embedded Signup SDK
       scriptSrcAttr: ["'unsafe-inline'"], // Butonlardaki onclick inline handler'ları için
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.serenut.com"] // Geniş bağlantı kısıtlandı
+      connectSrc: ["'self'", "https://api.serenut.com", "https://graph.facebook.com", "https://www.facebook.com"],
+      frameSrc: ["'self'", "https://www.facebook.com", "https://web.facebook.com"]
     }
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   referrerPolicy: { policy: 'no-referrer' },
   noSniff: true,
   xssFilter: true,
@@ -382,7 +396,7 @@ app.get('/download/android', (req, res) => {
 });
 
 const websiteDir = path.join(process.cwd(), 'public/website');
-const websitePages = ['platform', 'plans', 'downloads', 'contact', 'privacy', 'kvkk', 'terms', '404'];
+const websitePages = ['platform', 'plans', 'downloads', 'contact', 'privacy', 'kvkk', 'terms', 'data-deletion', '404'];
 websitePages.forEach(page => {
   app.get(`/${page}`, (req, res) => {
     res.sendFile(path.join(websiteDir, `${page}.html`));
@@ -409,6 +423,7 @@ app.use('/api/v1/analytics', biRouter);
 app.use('/api/v1/analytics', analyticsRouter);
 app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1/notifications', notificationRouter);
+app.use('/api/v1/whatsapp', whatsappRouter);
 app.use('/api/v1/remote-config', remoteConfigRouter);
 app.use('/api/v1/logs', logsRouter);
 app.use('/api/v1/health', healthRouter);
