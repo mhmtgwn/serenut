@@ -23,8 +23,9 @@ import 'package:serenutos/presentation/pages/settings/widgets/sms_settings_sheet
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/data_transfer_page.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
-import 'package:serenutos/presentation/pages/operations_center_page.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
+import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
+import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
@@ -559,13 +560,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(
         _buildCategoryRow(
-          title: 'Müşteri Bildirimleri',
-          subtitle: settings.smsEnabled
-              ? 'SMS etkin • Kanal bazlı şablon yönetimi'
-              : 'Kanal bazlı şablon yönetimi',
-          icon: Icons.sms_rounded,
+          title: 'Bildirim Ayarları',
+          subtitle: 'SMS ve WhatsApp kanalları, otomatik mesaj şablonları',
+          icon: Icons.tune_rounded,
           color: _kOrange,
           onTap: () => _showSmsSettingsSheet(settings),
+        ),
+      );
+      group2.add(const _IOSDivider());
+      group2.add(
+        _buildCategoryRow(
+          title: 'Mesaj Gönder',
+          subtitle: 'Tanıtım mesajı veya bakiye hatırlatması oluşturun',
+          icon: Icons.campaign_rounded,
+          color: _kGreen,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SmsSettingsSheet(
+                settings: settings,
+                operationsOnly: true,
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -623,7 +639,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       groups.add(const SizedBox(height: 16));
     }
 
-    // Grup 5: Ürün & Operasyon Merkezi (Phase 4-6)
+    // Grup 5: Yönetim araçları
     final group5 = <Widget>[];
 
     if (_hasPermission(currentUser, Permission.settingsRecovery) &&
@@ -655,28 +671,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    if ((_hasPermission(currentUser, Permission.settingsPrinter) ||
-            _hasPermission(currentUser, Permission.settingsFinance)) &&
-        _matchesQuery(
-          'operasyon',
-          'yazıcı',
-          'kuyruk',
-          'sms',
-          'geçmiş',
-          'başarısız',
-        )) {
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('yazıcı', 'baskı', 'kuyruk', 'başarısız')) {
       if (group5.isNotEmpty) group5.add(const _IOSDivider());
       group5.add(
         _buildCategoryRow(
-          title: 'Operasyon Merkezi',
-          subtitle: 'Yazıcı kuyruğu ve SMS gönderim durumları',
-          icon: Icons.monitor_heart_outlined,
+          title: 'Yazdırma Kuyruğu',
+          subtitle: 'Bekleyen ve başarısız baskı işlerini yönetin',
+          icon: Icons.print_rounded,
+          color: _kBlue,
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const PrintQueuePage())),
+        ),
+      );
+    }
+    if (_hasPermission(currentUser, Permission.settingsFinance) &&
+        _matchesQuery('mesaj', 'sms', 'whatsapp', 'geçmiş', 'başarısız')) {
+      if (group5.isNotEmpty) group5.add(const _IOSDivider());
+      group5.add(
+        _buildCategoryRow(
+          title: 'Mesaj Geçmişi',
+          subtitle: 'Gönderilen, bekleyen ve başarısız mesajları inceleyin',
+          icon: Icons.history_rounded,
           color: _kTeal,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const OperationsCenterPage()),
-            );
-          },
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const SmsHistoryPage())),
         ),
       );
     }

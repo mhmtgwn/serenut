@@ -109,6 +109,9 @@ void main() {
       expect(find.text('Denetim Merkezi (Audit Center)'), findsNothing);
       expect(find.text('Veri Kurtarma Merkezi'), findsNothing);
       expect(find.text('Admin Kontrol Merkezi'), findsNothing);
+      expect(find.text('Bildirim Ayarları'), findsOneWidget);
+      expect(find.text('Mesaj Gönder'), findsOneWidget);
+      expect(find.text('Mesaj Geçmişi'), findsOneWidget);
 
       await tester.pump();
     });
@@ -285,7 +288,7 @@ void main() {
 
       // Settings screen and safe printer settings visible
       expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
-      expect(find.text('Operasyon Merkezi'), findsOneWidget);
+      expect(find.text('Yazdırma Kuyruğu'), findsOneWidget);
 
       // Admin actions hidden
       expect(find.text('Kullanıcı Yönetimi'), findsNothing);
@@ -333,7 +336,7 @@ void main() {
       // Safe user settings are visible; debug remains sysadmin-only.
       expect(find.text('Hata Ayıklama Modu (Debug)'), findsNothing);
       expect(find.text('Satışta Sesli Bildirim'), findsOneWidget);
-      expect(find.text('Operasyon Merkezi'), findsNothing);
+      expect(find.text('Yazdırma Kuyruğu'), findsNothing);
 
       // Printer options are hidden
       expect(find.text('Fiş Yazıcı Ayarları'), findsNothing);

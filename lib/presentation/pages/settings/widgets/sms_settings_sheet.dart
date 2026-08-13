@@ -108,13 +108,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           ..addEntries(
             templates.whereType<Map>().map((item) {
               final row = Map<String, dynamic>.from(item);
-              return MapEntry(
-                row['event_key']?.toString() ?? '',
-                {
-                  'status': row['status']?.toString() ?? 'pending',
-                  'name': row['meta_template_name']?.toString() ?? '',
-                },
-              );
+              return MapEntry(row['event_key']?.toString() ?? '', {
+                'status': row['status']?.toString() ?? 'pending',
+                'name': row['meta_template_name']?.toString() ?? '',
+              });
             }),
           );
         whatsappStatusLoading = false;
@@ -362,8 +359,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         // Eski sürümlerde ayrı bir indirim olayı yayınlanmadığı halde bu
         // şablon gösteriliyordu. Hiç tetiklenemeyen ayarı arayüzden kaldır.
-        list.removeWhere((item) =>
-            item['id'] == 'discount' || item['id'] == 'discount_applied');
+        list.removeWhere(
+          (item) =>
+              item['id'] == 'discount' || item['id'] == 'discount_applied',
+        );
         for (final item in list) {
           item['sms_enabled'] ??= item['enabled'] == true;
           item['whatsapp_enabled'] ??= false;
@@ -864,13 +863,6 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   }
 
   Future<void> _sendBulkAnnouncement(BuildContext context) async {
-    final confirmText = await showDialog<String>(
-      context: context,
-      builder: (ctx) => const _BulkAnnouncementDialog(),
-    );
-
-    if (confirmText == null || confirmText.isEmpty) return;
-
     try {
       final customerRepo = await ref.read(customerRepositoryProvider.future);
       final customers = await customerRepo.findAll();
@@ -888,6 +880,15 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         }
         return;
       }
+
+      if (!context.mounted) return;
+      final confirmText = await showDialog<String>(
+        context: context,
+        builder: (ctx) =>
+            _BulkAnnouncementDialog(recipientCount: targets.length),
+      );
+
+      if (confirmText == null || confirmText.isEmpty) return;
 
       final smsService = ref.read(smsServiceProvider);
       final logRepo = ref.read(smsLogRepositoryProvider);
@@ -1033,7 +1034,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       }[id] ??
       id;
 
-  String _triggerLabel(String eventId) => const {
+  String _triggerLabel(String eventId) =>
+      const {
         'sale_created': 'Satış tamamlandığında',
         'debt_created': 'Vadeli işlem oluşturulduğunda',
         'collection_recorded': 'Tahsilat kaydedildiğinde',
@@ -1055,9 +1057,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       };
 
   Widget _buildChannelSelector() {
-    final whatsappColor = whatsappConnected
-        ? const Color(0xFF16A34A)
-        : POSColors.textSecondary;
+    final whatsappColor =
+        whatsappConnected ? const Color(0xFF16A34A) : POSColors.textSecondary;
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
@@ -1143,9 +1144,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
                     Text(
                       subtitle,
                       maxLines: 1,
@@ -1320,61 +1325,149 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   Widget _buildOperationsCenter() {
     return FullScreenSettingsPage(
-      title: 'Müşteri İletişimi',
+      title: 'Mesaj Gönder',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: POSColors.card,
-              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF12352B), Color(0xFF1D5949)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Müşterilerinize ulaşın',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Gönderim türünü seçin; alıcıları ve mesajı onayladıktan sonra gönderin.',
+                  style: TextStyle(color: Color(0xFFD5E7E1), height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _ChannelStatusChip(
+                      icon: Icons.sms_rounded,
+                      label: smsEnabled ? 'SMS hazır' : 'SMS kapalı',
+                      ready: smsEnabled,
+                    ),
+                    _ChannelStatusChip(
+                      icon: Icons.chat_rounded,
+                      label: whatsappStatusLoading
+                          ? 'WhatsApp kontrol ediliyor'
+                          : whatsappConnected
+                              ? 'WhatsApp bağlı'
+                              : 'WhatsApp bağlantısı gerekli',
+                      ready: whatsappConnected,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          const _OperationsSectionLabel('YENİ GÖNDERİM'),
+          const SizedBox(height: 10),
+          _MessageActionCard(
+            icon: Icons.campaign_rounded,
+            color: const Color(0xFF7C3AED),
+            title: 'Tanıtım mesajı',
+            description:
+                'Kampanya, yeni ürün, çalışma saati veya özel gün mesajı gönderin.',
+            actionLabel: 'Tanıtım oluştur',
+            enabled: !isSendingBulk && smsEnabled,
+            onTap: () async {
+              setState(() => isSendingBulk = true);
+              await _sendBulkAnnouncement(context);
+              if (mounted) setState(() => isSendingBulk = false);
+            },
+          ),
+          const SizedBox(height: 12),
+          _MessageActionCard(
+            icon: Icons.account_balance_wallet_rounded,
+            color: const Color(0xFFD97706),
+            title: 'Bakiye hatırlatması',
+            description:
+                'Bakiyesi bulunan müşterileri seçin ve kişiselleştirilmiş hatırlatma gönderin.',
+            actionLabel: 'Müşterileri seç',
+            enabled: !isSendingBulk && smsEnabled,
+            onTap: () async {
+              setState(() => isSendingBulk = true);
+              await _sendBulkDebtReminder(context);
+              if (mounted) setState(() => isSendingBulk = false);
+            },
+          ),
+          const SizedBox(height: 22),
+          const _OperationsSectionLabel('GÖNDERİM YÖNETİMİ'),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: POSColors.border),
             ),
-            child: const Text(
-              'Bakiye hatırlatmalarını ve tanıtım mesajlarını kontrollü alıcı seçimiyle gönderin; sonuçları gönderim geçmişinden takip edin.',
-              style: TextStyle(color: POSColors.textSecondary),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.history_rounded,
+                    color: POSColors.green,
+                  ),
+                  title: const Text(
+                    'Mesaj geçmişi',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: const Text(
+                    'Gönderilen, bekleyen ve başarısız mesajları inceleyin.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SmsHistoryPage(),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  enabled: !isSendingBulk,
+                  leading: const Icon(
+                    Icons.replay_rounded,
+                    color: POSColors.textSecondary,
+                  ),
+                  title: const Text(
+                    'Başarısız hatırlatmaları yeniden dene',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: isSendingBulk
+                      ? null
+                      : () => _retryFailedDebtMessages(context),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: isSendingBulk
-                ? null
-                : () async {
-                    setState(() => isSendingBulk = true);
-                    await _sendBulkDebtReminder(context);
-                    if (mounted) setState(() => isSendingBulk = false);
-                  },
-            icon: const Icon(Icons.people_alt_rounded),
-            label: const Text('Bakiye hatırlatması gönder'),
-          ),
-          const SizedBox(height: 10),
-          FilledButton.tonalIcon(
-            onPressed: isSendingBulk
-                ? null
-                : () async {
-                    setState(() => isSendingBulk = true);
-                    await _sendBulkAnnouncement(context);
-                    if (mounted) setState(() => isSendingBulk = false);
-                  },
-            icon: const Icon(Icons.campaign_rounded),
-            label: const Text('Tanıtım ve duyuru mesajı oluştur'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed:
-                isSendingBulk ? null : () => _retryFailedDebtMessages(context),
-            icon: const Icon(Icons.replay_rounded),
-            label: const Text('Başarısız bakiye mesajlarını yeniden gönder'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SmsHistoryPage()),
+          if (!smsEnabled) ...[
+            const SizedBox(height: 14),
+            const _MessageInfoBanner(
+              icon: Icons.info_outline_rounded,
+              text:
+                  'Gönderim yapabilmek için Bildirim Ayarları bölümünden SMS kanalını etkinleştirin.',
             ),
-            icon: const Icon(Icons.history_rounded),
-            label: const Text('SMS gönderim geçmişi'),
-          ),
+          ],
         ],
       ),
     );
@@ -1564,270 +1657,274 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
               _buildChannelSelector(),
               const SizedBox(height: AppSpacing.md),
-              if (selectedChannel == 'whatsapp')
-                _buildWhatsAppConnectionCard(),
+              if (selectedChannel == 'whatsapp') _buildWhatsAppConnectionCard(),
               if (selectedChannel == 'sms') ...[
                 _buildSwitchRow(
-                title: 'SMS Bildirimlerini Etkinleştir',
-                subtitle: 'Android ana cihazın SIM kartından SMS gönderimi',
-                icon: Icons.message_rounded,
-                color: POSColors.orange,
-                value: smsEnabled,
-                onChanged: (val) {
-                  setState(() => smsEnabled = val);
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
+                  title: 'SMS Bildirimlerini Etkinleştir',
+                  subtitle: 'Android ana cihazın SIM kartından SMS gönderimi',
+                  icon: Icons.message_rounded,
+                  color: POSColors.orange,
+                  value: smsEnabled,
+                  onChanged: (val) {
+                    setState(() => smsEnabled = val);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
 
-              if (smsEnabled) ...[
+                if (smsEnabled) ...[
+                  const Text(
+                    'Yerel SIM Gönderimi',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: POSColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  _buildProviderCard(
+                    providerId: 'sim',
+                    title: 'Cihazın SIM Kartı (Yerel)',
+                    subtitle:
+                        'Android cihazınızdaki hattı kullanarak SMS gönderir.',
+                    icon: Icons.sim_card_rounded,
+                    isSupported: !kIsWeb &&
+                        Theme.of(context).platform == TargetPlatform.android,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Grup 2: Dinamik Sağlayıcı Alanları
+                  if (selectedProvider == 'sim') ...[
+                    // İzin Durumu
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: hasPermissions
+                            ? POSColors.greenLight
+                            : POSColors.amberLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          if (checkingPermissions)
+                            const SizedBox.square(
+                              dimension: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            Icon(
+                              hasPermissions
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.warning_amber_rounded,
+                              color: hasPermissions
+                                  ? POSColors.greenDark
+                                  : POSColors.amberDark,
+                              size: 24,
+                            ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              checkingPermissions
+                                  ? 'İzin durumu kontrol ediliyor…'
+                                  : hasPermissions
+                                      ? 'SMS İzinleri Tanımlı (Gönderime Hazır)'
+                                      : 'SMS gönderebilmek için SMS ve Telefon izinleri gereklidir.',
+                              style: TextStyle(
+                                color: hasPermissions
+                                    ? POSColors.greenDark
+                                    : POSColors.amberDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          if (!hasPermissions && !checkingPermissions)
+                            TextButton(
+                              onPressed: _requestPermissions,
+                              child: const Text(
+                                'İzin Ver',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: POSColors.amberDark,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // SIM Seçici Dropdown
+                    if (hasPermissions && simCards.isNotEmpty) ...[
+                      DropdownButtonFormField<int>(
+                        value: selectedSubscriptionId,
+                        dropdownColor: Colors.white,
+                        style: const TextStyle(
+                          color: POSColors.text,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Gönderici SIM Kart',
+                          prefixIcon: const Icon(
+                            Icons.sim_card_outlined,
+                            size: 18,
+                            color: POSColors.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: POSColors.border,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: POSColors.border,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: POSColors.surface,
+                        ),
+                        items: simCards.map((sim) {
+                          final slot = (sim['simSlotIndex'] as int? ?? 0) + 1;
+                          final op =
+                              sim['displayName'] ?? 'Bilinmeyen Operatör';
+                          return DropdownMenuItem<int>(
+                            value: sim['subscriptionId'] as int?,
+                            child: Text('SIM $slot - $op'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            selectedSubscriptionId = val;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+
+                    // SMS Limit Girişi
+                    _buildFormTextField(
+                      controller: limitCtrl,
+                      label: 'Aylık SMS Gönderim Limiti (Boş = Limitsiz)',
+                      icon: Icons.speed_rounded,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Limit Durum Çubuğu
+                    if (limit != null && limit > 0) ...[
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: POSColors.card,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: POSColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Bu Ayki SMS Kullanımı',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: POSColors.text,
+                                  ),
+                                ),
+                                Text(
+                                  '$sent / $limit SMS',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: isLimitExceeded
+                                        ? POSColors.red
+                                        : POSColors.greenDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: percent,
+                                minHeight: 8,
+                                backgroundColor: POSColors.surface,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isLimitExceeded
+                                      ? POSColors.red
+                                      : (percent >= 0.8
+                                          ? POSColors.amber
+                                          : POSColors.green),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                  ],
+
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.sim_card_rounded, size: 18),
+                      label: const Text('DEBUG: SIM Kartları Listele'),
+                      onPressed: _checkPermissionsAndLoadSims,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: AppSpacing.lg),
+
+                // Bakiye iletişimi
                 const Text(
-                  'Yerel SIM Gönderimi',
+                  'Müşteri Bakiye İletişimi',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                     color: POSColors.text,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-
-                _buildProviderCard(
-                  providerId: 'sim',
-                  title: 'Cihazın SIM Kartı (Yerel)',
+                const Divider(color: POSColors.border),
+                _buildSwitchRow(
+                  title: 'Bakiye Hatırlatma Tercihlerini Kullan',
                   subtitle:
-                      'Android cihazınızdaki hattı kullanarak SMS gönderir.',
-                  icon: Icons.sim_card_rounded,
-                  isSupported: !kIsWeb &&
-                      Theme.of(context).platform == TargetPlatform.android,
+                      'Manuel hatırlatma listesinde belirlediğiniz eşikleri uygular',
+                  icon: Icons.notifications_active_rounded,
+                  color: POSColors.blue,
+                  value: autoDebtReminderEnabled,
+                  onChanged: (val) {
+                    setState(() => autoDebtReminderEnabled = val);
+                  },
                 ),
-                const SizedBox(height: AppSpacing.md),
-
-                // Grup 2: Dinamik Sağlayıcı Alanları
-                if (selectedProvider == 'sim') ...[
-                  // İzin Durumu
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: hasPermissions
-                          ? POSColors.greenLight
-                          : POSColors.amberLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        if (checkingPermissions)
-                          const SizedBox.square(
-                            dimension: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          Icon(
-                            hasPermissions
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.warning_amber_rounded,
-                            color: hasPermissions
-                                ? POSColors.greenDark
-                                : POSColors.amberDark,
-                            size: 24,
-                          ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Text(
-                            checkingPermissions
-                                ? 'İzin durumu kontrol ediliyor…'
-                                : hasPermissions
-                                    ? 'SMS İzinleri Tanımlı (Gönderime Hazır)'
-                                    : 'SMS gönderebilmek için SMS ve Telefon izinleri gereklidir.',
-                            style: TextStyle(
-                              color: hasPermissions
-                                  ? POSColors.greenDark
-                                  : POSColors.amberDark,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        if (!hasPermissions && !checkingPermissions)
-                          TextButton(
-                            onPressed: _requestPermissions,
-                            child: const Text(
-                              'İzin Ver',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: POSColors.amberDark,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // SIM Seçici Dropdown
-                  if (hasPermissions && simCards.isNotEmpty) ...[
-                    DropdownButtonFormField<int>(
-                      value: selectedSubscriptionId,
-                      dropdownColor: Colors.white,
-                      style: const TextStyle(
-                        color: POSColors.text,
-                        fontSize: 14,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Gönderici SIM Kart',
-                        prefixIcon: const Icon(
-                          Icons.sim_card_outlined,
-                          size: 18,
-                          color: POSColors.textSecondary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: POSColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: POSColors.border),
-                        ),
-                        filled: true,
-                        fillColor: POSColors.surface,
-                      ),
-                      items: simCards.map((sim) {
-                        final slot = (sim['simSlotIndex'] as int? ?? 0) + 1;
-                        final op = sim['displayName'] ?? 'Bilinmeyen Operatör';
-                        return DropdownMenuItem<int>(
-                          value: sim['subscriptionId'] as int?,
-                          child: Text('SIM $slot - $op'),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          selectedSubscriptionId = val;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-
-                  // SMS Limit Girişi
-                  _buildFormTextField(
-                    controller: limitCtrl,
-                    label: 'Aylık SMS Gönderim Limiti (Boş = Limitsiz)',
-                    icon: Icons.speed_rounded,
+                if (autoDebtReminderEnabled) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  TextFormField(
+                    controller: minAmountCtrl,
                     keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-
-                  // Limit Durum Çubuğu
-                  if (limit != null && limit > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: POSColors.card,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: POSColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Bu Ayki SMS Kullanımı',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: POSColors.text,
-                                ),
-                              ),
-                              Text(
-                                '$sent / $limit SMS',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: isLimitExceeded
-                                      ? POSColors.red
-                                      : POSColors.greenDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: percent,
-                              minHeight: 8,
-                              backgroundColor: POSColors.surface,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                isLimitExceeded
-                                    ? POSColors.red
-                                    : (percent >= 0.8
-                                        ? POSColors.amber
-                                        : POSColors.green),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                ],
-
-                if (kDebugMode) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.sim_card_rounded, size: 18),
-                    label: const Text('DEBUG: SIM Kartları Listele'),
-                    onPressed: _checkPermissionsAndLoadSims,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Önerilecek Minimum Bakiye (TL)',
+                      helperText:
+                          'Hatırlatma ekranı bu tutarın altındaki müşterileri başlangıçta filtreler.',
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
                 ],
-              ],
-                const SizedBox(height: AppSpacing.lg),
-
-              // Bakiye iletişimi
-              const Text(
-                'Müşteri Bakiye İletişimi',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: POSColors.text,
-                ),
-              ),
-              const Divider(color: POSColors.border),
-              _buildSwitchRow(
-                title: 'Bakiye Hatırlatma Tercihlerini Kullan',
-                subtitle:
-                    'Manuel hatırlatma listesinde belirlediğiniz eşikleri uygular',
-                icon: Icons.notifications_active_rounded,
-                color: POSColors.blue,
-                value: autoDebtReminderEnabled,
-                onChanged: (val) {
-                  setState(() => autoDebtReminderEnabled = val);
-                },
-              ),
-              if (autoDebtReminderEnabled) ...[
-                const SizedBox(height: AppSpacing.sm),
-                TextFormField(
-                  controller: minAmountCtrl,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: 'Önerilecek Minimum Bakiye (TL)',
-                    helperText:
-                        'Hatırlatma ekranı bu tutarın altındaki müşterileri başlangıçta filtreler.',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
                 const SizedBox(height: AppSpacing.lg),
               ],
 
@@ -1942,25 +2039,25 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   ),
                   if (selectedChannel == 'sms')
                     TextButton.icon(
-                    icon: const Icon(
-                      Icons.add_circle_outline_rounded,
-                      size: 18,
-                      color: POSColors.green,
-                    ),
-                    label: const Text(
-                      'Şablon Ekle',
-                      style: TextStyle(
+                      icon: const Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 18,
                         color: POSColors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
                       ),
+                      label: const Text(
+                        'Şablon Ekle',
+                        style: TextStyle(
+                          color: POSColors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      onPressed: () => _showEditTemplateDialog(null, (newTpl) {
+                        setState(() {
+                          listTemplates.add(newTpl);
+                        });
+                      }),
                     ),
-                    onPressed: () => _showEditTemplateDialog(null, (newTpl) {
-                      setState(() {
-                        listTemplates.add(newTpl);
-                      });
-                    }),
-                  ),
                 ],
               ),
               const Divider(color: POSColors.border),
@@ -2015,9 +2112,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                           final whatsappStatus = whatsappTemplate?['status'];
                           final whatsappTemplateName =
                               whatsappTemplate?['name'];
-                          final whatsappReady =
-                              whatsappStatus == 'approved' ||
-                                  whatsappStatus == 'active';
+                          final whatsappReady = whatsappStatus == 'approved' ||
+                              whatsappStatus == 'active';
                           final isEnabled = selectedChannel == 'sms'
                               ? smsTemplateEnabled
                               : whatsappTemplateEnabled;
@@ -2052,29 +2148,30 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                             : POSColors.textDisabled,
                                       ),
                                     ),
-                                    if (selectedChannel == 'sms') IconButton(
-                                      tooltip: 'Mesaj metnini düzenle',
-                                      icon: const Icon(
-                                        Icons.edit_rounded,
-                                        size: 18,
-                                        color: POSColors.blue,
-                                      ),
-                                      onPressed: () {
-                                        _showEditTemplateDialog(tpl, (
-                                          updatedTpl,
-                                        ) {
-                                          setState(() {
-                                            updatedTpl['sms_enabled'] =
-                                                smsTemplateEnabled;
-                                            updatedTpl['whatsapp_enabled'] =
-                                                whatsappTemplateEnabled;
-                                            updatedTpl['enabled'] =
-                                                smsTemplateEnabled;
-                                            listTemplates[i] = updatedTpl;
+                                    if (selectedChannel == 'sms')
+                                      IconButton(
+                                        tooltip: 'Mesaj metnini düzenle',
+                                        icon: const Icon(
+                                          Icons.edit_rounded,
+                                          size: 18,
+                                          color: POSColors.blue,
+                                        ),
+                                        onPressed: () {
+                                          _showEditTemplateDialog(tpl, (
+                                            updatedTpl,
+                                          ) {
+                                            setState(() {
+                                              updatedTpl['sms_enabled'] =
+                                                  smsTemplateEnabled;
+                                              updatedTpl['whatsapp_enabled'] =
+                                                  whatsappTemplateEnabled;
+                                              updatedTpl['enabled'] =
+                                                  smsTemplateEnabled;
+                                              listTemplates[i] = updatedTpl;
+                                            });
                                           });
-                                        });
-                                      },
-                                    ),
+                                        },
+                                      ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
@@ -2100,61 +2197,65 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   runSpacing: 6,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    if (selectedChannel == 'sms') Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Switch.adaptive(
-                                          value: smsTemplateEnabled,
-                                          activeColor: POSColors.green,
-                                          onChanged: smsEnabled
-                                              ? (val) => setState(() {
-                                                    tpl['sms_enabled'] = val;
-                                                    tpl['enabled'] = val;
-                                                  })
-                                              : null,
-                                        ),
-                                        const Text(
-                                          'SMS',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
+                                    if (selectedChannel == 'sms')
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Switch.adaptive(
+                                            value: smsTemplateEnabled,
+                                            activeColor: POSColors.green,
+                                            onChanged: smsEnabled
+                                                ? (val) => setState(() {
+                                                      tpl['sms_enabled'] = val;
+                                                      tpl['enabled'] = val;
+                                                    })
+                                                : null,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (selectedChannel == 'whatsapp') Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Switch.adaptive(
-                                          value: whatsappTemplateEnabled,
-                                          activeColor: const Color(0xFF16A34A),
-                                          onChanged: whatsappConnected &&
-                                                  whatsappSupported &&
-                                                  whatsappReady
-                                              ? (val) => setState(
-                                                    () =>
-                                                        tpl['whatsapp_enabled'] =
-                                                            val,
-                                                  )
-                                              : null,
-                                        ),
-                                        Text(
-                                          !whatsappSupported
-                                              ? 'Kullanılamıyor'
-                                              : whatsappStatus == null
-                                                  ? 'Meta onayı bekleniyor'
-                                                  : _whatsappStatusLabel(
-                                                      whatsappStatus,
-                                                    ),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            color: whatsappConnected &&
-                                                    whatsappSupported
-                                                ? POSColors.text
-                                                : POSColors.textDisabled,
+                                          const Text(
+                                            'SMS',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
+                                    if (selectedChannel == 'whatsapp')
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Switch.adaptive(
+                                            value: whatsappTemplateEnabled,
+                                            activeColor: const Color(
+                                              0xFF16A34A,
+                                            ),
+                                            onChanged: whatsappConnected &&
+                                                    whatsappSupported &&
+                                                    whatsappReady
+                                                ? (val) => setState(
+                                                      () =>
+                                                          tpl['whatsapp_enabled'] =
+                                                              val,
+                                                    )
+                                                : null,
+                                          ),
+                                          Text(
+                                            !whatsappSupported
+                                                ? 'Kullanılamıyor'
+                                                : whatsappStatus == null
+                                                    ? 'Meta onayı bekleniyor'
+                                                    : _whatsappStatusLabel(
+                                                        whatsappStatus,
+                                                      ),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: whatsappConnected &&
+                                                      whatsappSupported
+                                                  ? POSColors.text
+                                                  : POSColors.textDisabled,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
@@ -2634,8 +2735,188 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
   }
 }
 
+class _ChannelStatusChip extends StatelessWidget {
+  const _ChannelStatusChip({
+    required this.icon,
+    required this.label,
+    required this.ready,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool ready;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: .16)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: ready ? const Color(0xFF86EFAC) : Colors.white70,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _OperationsSectionLabel extends StatelessWidget {
+  const _OperationsSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        label,
+        style: const TextStyle(
+          color: POSColors.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: .8,
+        ),
+      );
+}
+
+class _MessageActionCard extends StatelessWidget {
+  const _MessageActionCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.description,
+    required this.actionLabel,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String description;
+  final String actionLabel;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: enabled ? Colors.white : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.all(17),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: POSColors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: POSColors.text,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: POSColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Text(
+                        actionLabel,
+                        style: TextStyle(
+                          color: enabled ? color : POSColors.textDisabled,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: enabled ? color : POSColors.textDisabled,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _MessageInfoBanner extends StatelessWidget {
+  const _MessageInfoBanner({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: POSColors.amberLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: POSColors.amber.withValues(alpha: .3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: POSColors.amberDark),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: POSColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
 class _BulkAnnouncementDialog extends StatefulWidget {
-  const _BulkAnnouncementDialog();
+  const _BulkAnnouncementDialog({required this.recipientCount});
+
+  final int recipientCount;
 
   @override
   State<_BulkAnnouncementDialog> createState() =>
@@ -2645,6 +2926,7 @@ class _BulkAnnouncementDialog extends StatefulWidget {
 class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
   final _formKey = GlobalKey<FormState>();
   final msgCtrl = TextEditingController();
+  bool permissionConfirmed = false;
 
   @override
   void dispose() {
@@ -2655,21 +2937,96 @@ class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Tanıtım ve Duyuru Mesajı'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: msgCtrl,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Tanıtım veya Duyuru Mesajı',
-            hintText:
-                'İletişim izni bulunan müşterilere gönderilecek metni yazın...',
-            border: OutlineInputBorder(),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Tanıtım mesajı oluştur'),
+      content: SizedBox(
+        width: 520,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F3FF),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFEDE9FE)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.groups_rounded,
+                        color: Color(0xFF7C3AED),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${widget.recipientCount} telefon numarası kayıtlı müşteri',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const _DialogChannelBadge(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: msgCtrl,
+                  minLines: 5,
+                  maxLines: 8,
+                  maxLength: 480,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Mesaj',
+                    hintText:
+                        'Merhaba {customer}, bu haftaya özel ürünlerimizi inceleyebilirsiniz.',
+                    helperText:
+                        '{customer} yazarsanız her müşterinin adı otomatik eklenir.',
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (val) => val == null || val.trim().isEmpty
+                      ? 'Mesaj metni zorunludur.'
+                      : null,
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    msgCtrl.text.trim().isEmpty
+                        ? 'Önizleme burada görünecek.'
+                        : msgCtrl.text.trim().replaceAll(
+                              '{customer}',
+                              'Ayşe Hanım',
+                            ),
+                    style: const TextStyle(
+                      color: POSColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: permissionConfirmed,
+                  onChanged: (value) =>
+                      setState(() => permissionConfirmed = value ?? false),
+                  title: const Text(
+                    'Yalnız iletişim izni bulunan müşterilere gönderdiğimi onaylıyorum.',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Boş bırakılamaz' : null,
         ),
       ),
       actions: [
@@ -2680,19 +3037,47 @@ class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
             style: TextStyle(color: POSColors.textSecondary),
           ),
         ),
-        ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Navigator.pop(context, msgCtrl.text.trim());
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: POSColors.text,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Gönder'),
+        FilledButton.icon(
+          onPressed: permissionConfirmed
+              ? () {
+                  if (_formKey.currentState!.validate()) {
+                    Navigator.pop(context, msgCtrl.text.trim());
+                  }
+                }
+              : null,
+          icon: const Icon(Icons.send_rounded, size: 18),
+          label: Text('${widget.recipientCount} kişiye gönder'),
         ),
       ],
     );
   }
+}
+
+class _DialogChannelBadge extends StatelessWidget {
+  const _DialogChannelBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFDDD6FE)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sms_rounded, size: 14, color: Color(0xFF7C3AED)),
+            SizedBox(width: 4),
+            Text(
+              'SMS',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF7C3AED),
+              ),
+            ),
+          ],
+        ),
+      );
 }

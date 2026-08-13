@@ -73,7 +73,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
+    expect(find.text('Aygıtlar'), findsOneWidget);
     expect(find.text('Kasa Terazisi'), findsOneWidget);
     expect(find.text('Test başarılı'), findsWidgets);
 
