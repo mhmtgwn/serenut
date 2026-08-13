@@ -26,6 +26,7 @@ jobs:
           node scripts/verify_release_key_continuity.js HEAD^
           node --check scripts/verify_published_release.js
           node scripts/test_verify_published_release.js
+          node scripts/test_release_pipeline_isolation.js
 
   backend-ci:
     runs-on: ubuntu-latest
@@ -297,7 +298,9 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           source: release-artifacts/*
-          target: /var/www/serenut/server/releases/_incoming
+          # Never share an incoming directory across workflow runs. A cancelled
+          # SSH deployment may continue briefly after a newer main run starts.
+          target: /var/www/serenut/server/releases/_incoming/${{ steps.release-version.outputs.value }}
           strip_components: 1
       - name: Deploy production
         uses: appleboy/ssh-action@v1.2.0
@@ -313,8 +316,11 @@ jobs:
               git init
               git remote add origin https://github.com/mhmtgwn/serenut.git
             fi
+            # Deploy the exact commit that produced the downloaded artifacts;
+            # main may advance while this remote SSH command is still running.
             git fetch origin main
-            git reset --hard origin/main
+            git cat-file -e '${{ github.sha }}^{commit}'
+            git reset --hard '${{ github.sha }}'
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'
 
   deploy-staging:
