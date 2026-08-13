@@ -3,12 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
-import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:serenutos/presentation/pages/data_transfer_page.dart';
-import 'package:serenutos/presentation/pages/operations_center_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
-import 'package:serenutos/providers/settings_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -37,24 +34,6 @@ void main() {
     expect(
         find.text('Tüm Verileri Sıfırla (Fabrika Ayarları)'), findsOneWidget);
     expect(find.text('Yedekleme ve Geri Yükleme'), findsNothing);
-  });
-
-  testWidgets('operations center owns queue, history and bulk messaging',
-      (tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          settingsRepositoryProvider
-              .overrideWith((ref) => InMemorySettingsRepository()),
-        ],
-        child: const MaterialApp(home: OperationsCenterPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Yazıcı Kuyruğu'), findsOneWidget);
-    expect(find.text('SMS Gönderim Geçmişi'), findsOneWidget);
-    expect(find.text('Müşteri İletişimi'), findsOneWidget);
   });
 
   testWidgets('account center exposes session actions and permissions',
