@@ -559,7 +559,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (group2.isNotEmpty) group2.add(const _IOSDivider());
       group2.add(
         _buildCategoryRow(
-          title: 'SMS ve WhatsApp Bildirimleri',
+          title: 'Müşteri Bildirimleri',
           subtitle: settings.smsEnabled
               ? 'SMS etkin • Kanal bazlı şablon yönetimi'
               : 'Kanal bazlı şablon yönetimi',
