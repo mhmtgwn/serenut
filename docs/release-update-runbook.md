@@ -55,6 +55,10 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
 5. `main` dalındaki başarılı iş akışı artefaktları VPS'e yükler ve
    `server/scripts/deploy_production_ci.sh <sürüm+build>` komutunu çalıştırır.
    Bu betik, kanonik `dist/scripts/publish-release.js` yayınlayıcısını kullanır.
+   Her sürüm kendi `_incoming/<sürüm+build>` dizinini kullanır; ortak incoming
+   dizini kullanmak yasaktır. VPS yayınları dosya kilidiyle sıraya alınır ve
+   sunucuda artefaktı üreten kesin Git commit'i dağıtılır. Böylece iptal edilmiş
+   bir SSH işi yeni çalışmanın APK/EXE dosyalarını veya kaynak kodunu alamaz.
 6. İşlem ancak `scripts/verify_published_release.js` Android ve Windows
    artefaktlarını public sürüme özel URL'lerden indirip şu kontrollerin tümünü
    geçerse başarılı sayılır: doğru sürüm, değişmez URL, dosya boyutu, SHA-256
@@ -89,3 +93,8 @@ adımda değiştirilmez. Ayrıntılı iki aşamalı prosedür için
   prosedürünü uygulayın.
 - Android paket imzası hatası: APK farklı keystore ile üretilmiştir. Mevcut
   uygulamanın üzerine kurulamaz; doğru production keystore ile yeniden üretin.
+- `already exists with different content` hatası yeni ve daha önce
+  yayınlanmamış bir sürümde görülürse sürüm artırarak devam etmeyin. Aynı
+  `_incoming` dizinini kullanan eşzamanlı/iptal edilmiş bir yayın vardır.
+  Sürüm bazlı incoming dizinini, VPS yayın kilidini ve kesin commit checkout'unu
+  doğrulayın; ancak ondan sonra yeni build numarasıyla temiz yayın oluşturun.
