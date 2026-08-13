@@ -340,22 +340,30 @@ class SmsNotificationHandler {
     required String phone,
     required Map<String, String> vars,
   }) {
-    final message = _templateResolver.resolve(
+    final smsMessage = _templateResolver.resolve(
       eventType: eventType,
       settings: settings,
       vars: vars,
     );
-    final clientEventId = const Uuid().v4();
-    _onCloudNotification?.call(
-      clientEventId: clientEventId,
+    final whatsappMessage = _templateResolver.resolveWhatsApp(
       eventType: eventType,
-      phone: phone,
-      fallbackBody: message ?? eventType,
-      variables: vars,
-    ).ignore();
-    if (message == null || message.trim().isEmpty) return;
+      settings: settings,
+      vars: vars,
+    );
+    if (whatsappMessage != null && whatsappMessage.trim().isNotEmpty) {
+      _onCloudNotification
+          ?.call(
+            clientEventId: const Uuid().v4(),
+            eventType: eventType,
+            phone: phone,
+            fallbackBody: whatsappMessage,
+            variables: vars,
+          )
+          .ignore();
+    }
+    if (smsMessage == null || smsMessage.trim().isEmpty) return;
 
-    _sendAndLog(phone: phone, eventType: eventType, message: message);
+    _sendAndLog(phone: phone, eventType: eventType, message: smsMessage);
   }
 
   void _sendAndLog({

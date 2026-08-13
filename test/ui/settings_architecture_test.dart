@@ -54,7 +54,7 @@ void main() {
 
     expect(find.text('Yazıcı Kuyruğu'), findsOneWidget);
     expect(find.text('SMS Gönderim Geçmişi'), findsOneWidget);
-    expect(find.text('Toplu SMS İşlemleri'), findsOneWidget);
+    expect(find.text('Müşteri İletişimi'), findsOneWidget);
   });
 
   testWidgets('account center exposes session actions and permissions',
