@@ -98,6 +98,10 @@ numarası artırarak” çözülemez.
 9. `1.3.10+91` altındaki cihazları normal rollout'a dahil etmeyin; köprü sürüm
    prosedürünü uygulayın.
 
+Yalnızca belge, policy veya CI değiştiğinde canlıdaki aynı istemci sürümü yeniden
+yayınlanmaz. Android/Windows istemci dosyaları değişmiş fakat `pubspec.yaml`
+hâlâ canlı sürümü gösteriyorsa CI durur ve sürüm/build artırılmasını zorunlu kılar.
+
 ## Elle kurtarma yayını
 
 Otomatik dağıtımın artefaktları ürettiği fakat yayın aşamasının kesildiği özel

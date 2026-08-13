@@ -17,7 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # The signer policy is checked against a fixed historical compatibility
+          # baseline, so a shallow checkout cannot prove the complete trust chain.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -275,6 +277,8 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Read application release version
         id: release-version
         shell: bash
@@ -282,15 +286,56 @@ jobs:
           version="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
           test -n "$version"
           echo "value=$version" >> "$GITHUB_OUTPUT"
+      - name: Decide whether a client release is required
+        id: client-release
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_VERSION: ${{ steps.release-version.outputs.value }}
+        run: |
+          live_version="$(
+            curl --fail --silent --show-error \
+              'https://api.serenut.com/api/v1/updates/check?platform=android&current_version=0.0.0%2B0' \
+              | jq --exit-status --raw-output '.latestVersion'
+          )"
+
+          client_changed=false
+          if [ "$EVENT_NAME" = "push" ] \
+            && [ -n "$BEFORE_SHA" ] \
+            && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "$BEFORE_SHA^{commit}"; then
+            if ! git diff --quiet "$BEFORE_SHA" HEAD -- \
+              lib android windows assets pubspec.yaml pubspec.lock \
+              config/signing_public_keys.json; then
+              client_changed=true
+            fi
+          fi
+
+          if [ "$live_version" = "$RELEASE_VERSION" ]; then
+            if [ "$client_changed" = "true" ]; then
+              echo "Client files changed, but pubspec.yaml still declares live version $RELEASE_VERSION." >&2
+              echo "Bump version/build before publishing; immutable release bytes cannot be replaced." >&2
+              exit 1
+            fi
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "No new client version: production artifact upload will be skipped."
+          else
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "New client version detected: $live_version -> $RELEASE_VERSION"
+          fi
       - uses: actions/download-artifact@v4
+        if: steps.client-release.outputs.required == 'true'
         with:
           name: serenut-os-android-apk
           path: release-artifacts/android
       - uses: actions/download-artifact@v4
+        if: steps.client-release.outputs.required == 'true'
         with:
           name: serenut-os-windows-installer
           path: release-artifacts/windows
       - name: Upload release files to production
+        if: steps.client-release.outputs.required == 'true'
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -303,6 +348,7 @@ jobs:
           target: /var/www/serenut/server/releases/_incoming/${{ steps.release-version.outputs.value }}
           strip_components: 1
       - name: Deploy production
+        if: steps.client-release.outputs.required == 'true'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
