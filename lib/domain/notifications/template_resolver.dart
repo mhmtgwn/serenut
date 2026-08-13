@@ -67,7 +67,11 @@ class TemplateResolver {
     final templateStr = settings.smsTemplate;
     if (templateStr == null || templateStr.trim().isEmpty) return null;
 
-    final templateText = _findTemplate(eventType, templateStr);
+    final templateText = _findTemplate(
+      eventType,
+      templateStr,
+      channel: NotificationTemplateChannel.sms,
+    );
     if (templateText == null) return null;
 
     return _fillTokens(templateText, vars);
@@ -78,26 +82,55 @@ class TemplateResolver {
     if (!settings.smsEnabled) return false;
     final t = settings.smsTemplate;
     if (t == null || t.trim().isEmpty) return false;
-    return _findTemplate(eventType, t) != null;
+    return _findTemplate(
+          eventType,
+          t,
+          channel: NotificationTemplateChannel.sms,
+        ) !=
+        null;
+  }
+
+  /// Resolves the local preview/fallback text only when WhatsApp is enabled
+  /// for this event. WhatsApp itself uses the approved Meta template; this
+  /// text is kept for the local outbox and delivery history.
+  String? resolveWhatsApp({
+    required String eventType,
+    required Settings settings,
+    required Map<String, String> vars,
+  }) {
+    final templateStr = settings.smsTemplate;
+    if (templateStr == null || templateStr.trim().isEmpty) return null;
+    final templateText = _findTemplate(
+      eventType,
+      templateStr,
+      channel: NotificationTemplateChannel.whatsapp,
+    );
+    return templateText == null ? null : _fillTokens(templateText, vars);
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
 
-  String? _findTemplate(String eventType, String templateJson) {
+  String? _findTemplate(
+    String eventType,
+    String templateJson, {
+    required NotificationTemplateChannel channel,
+  }) {
     try {
       final decoded = jsonDecode(templateJson);
       if (decoded is! List) return null;
 
       // Try new format ID first, then legacy alias
-      final candidateIds = [
-        eventType,
-        _legacyAliases[eventType],
-      ].whereType<String>().toList();
+      final candidateIds =
+          [eventType, _legacyAliases[eventType]].whereType<String>().toList();
 
       for (final item in decoded) {
         if (item is! Map) continue;
         final id = item['id']?.toString();
-        final enabled = item['enabled'];
+        final enabled = switch (channel) {
+          NotificationTemplateChannel.sms =>
+            item['sms_enabled'] ?? item['enabled'],
+          NotificationTemplateChannel.whatsapp => item['whatsapp_enabled'],
+        };
         final template = item['template']?.toString();
 
         if (id == null || template == null || template.trim().isEmpty) continue;
@@ -119,6 +152,8 @@ class TemplateResolver {
   }
 }
 
+enum NotificationTemplateChannel { sms, whatsapp }
+
 // ── Variable Map Builders ─────────────────────────────────────────────────────
 // Convenience factory methods for each event type.
 
@@ -138,8 +173,10 @@ class SmsTemplateVars {
       'customer': customerName,
       'amount': _fmt(totalAmount, currency),
       'paid': _fmt(paidAmount, currency),
-      'debt':
-          _fmt((totalAmount - paidAmount).clamp(0, double.maxFinite), currency),
+      'debt': _fmt(
+        (totalAmount - paidAmount).clamp(0, double.maxFinite),
+        currency,
+      ),
       'id': saleId.toShortId,
       'business': businessName,
       'date': _today(),

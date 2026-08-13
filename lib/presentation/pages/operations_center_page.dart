@@ -14,17 +14,21 @@ final _operationPrintSummaryProvider = FutureProvider.autoDispose((ref) async {
   final jobs = await ref.watch(printingRepositoryProvider).getJobs();
   return (
     pending: jobs
-        .where((job) =>
-            job.state == PrintJobState.queued ||
-            job.state == PrintJobState.rendering ||
-            job.state == PrintJobState.sending ||
-            job.state == PrintJobState.retryWait ||
-            job.state == PrintJobState.awaitingUserCheck)
+        .where(
+          (job) =>
+              job.state == PrintJobState.queued ||
+              job.state == PrintJobState.rendering ||
+              job.state == PrintJobState.sending ||
+              job.state == PrintJobState.retryWait ||
+              job.state == PrintJobState.awaitingUserCheck,
+        )
         .length,
     failed: jobs
-        .where((job) =>
-            job.state == PrintJobState.failed ||
-            job.state == PrintJobState.rejected)
+        .where(
+          (job) =>
+              job.state == PrintJobState.failed ||
+              job.state == PrintJobState.rejected,
+        )
         .length,
   );
 });
@@ -84,9 +88,9 @@ class OperationsCenterPage extends ConsumerWidget {
             _OperationCard(
               icon: Icons.campaign_rounded,
               color: kPurple,
-              title: 'Toplu SMS İşlemleri',
+              title: 'Müşteri İletişimi',
               description:
-                  'Borç hatırlatması veya toplu duyuru gönderimi başlatın.',
+                  'Bakiye hatırlatması veya tanıtım ve duyuru mesajı gönderin.',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => SmsSettingsSheet(
@@ -145,14 +149,19 @@ class _StatusTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w900)),
-                  Text(label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          const TextStyle(fontSize: 10, color: kTextSecondary)),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, color: kTextSecondary),
+                  ),
                 ],
               ),
             ),
@@ -234,13 +243,19 @@ class _OperationCard extends StatelessWidget {
           foregroundColor: color,
           child: Icon(icon),
         ),
-        title: Text(title,
-            style: const TextStyle(
-                fontWeight: FontWeight.w800, color: kTextPrimary)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            color: kTextPrimary,
+          ),
+        ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(description,
-              style: const TextStyle(fontSize: 12, color: kTextSecondary)),
+          child: Text(
+            description,
+            style: const TextStyle(fontSize: 12, color: kTextSecondary),
+          ),
         ),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: onTap,

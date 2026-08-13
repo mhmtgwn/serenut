@@ -10,6 +10,7 @@ import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/sms_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/widgets/settings_widgets.dart'; // FullScreenSettingsPage
 import 'package:serenutos/domain/models/sms_log_entry.dart';
@@ -43,6 +44,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   late String selectedProvider;
   late bool autoDebtReminderEnabled;
   bool isSendingBulk = false;
+  bool whatsappStatusLoading = true;
+  bool whatsappConnected = false;
+  String? whatsappPhone;
+  final Map<String, Map<String, String>> whatsappTemplates = {};
 
   // SIM SMS Specific States
   List<Map<String, dynamic>> simCards = [];
@@ -60,9 +65,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     selectedProvider = 'sim';
     autoDebtReminderEnabled = widget.settings.smsAutoDebtReminderEnabled;
     minAmountCtrl = TextEditingController(
-        text: widget.settings.smsAutoDebtReminderMinAmount.toStringAsFixed(0));
+      text: widget.settings.smsAutoDebtReminderMinAmount.toStringAsFixed(0),
+    );
     ageDaysCtrl = TextEditingController(
-        text: widget.settings.smsAutoDebtReminderDays.toString());
+      text: widget.settings.smsAutoDebtReminderDays.toString(),
+    );
     limitCtrl = TextEditingController(
       text: widget.settings.smsMonthlyLimit != null
           ? widget.settings.smsMonthlyLimit.toString()
@@ -74,7 +81,46 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPermissionsAndLoadSims();
       _loadInterruptedLogs();
+      _loadWhatsAppStatus();
     });
+  }
+
+  Future<void> _loadWhatsAppStatus() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final results = await Future.wait([
+        api.get('/api/v1/whatsapp/connection'),
+        api.get('/api/v1/whatsapp/templates'),
+      ]);
+      final body = Map<String, dynamic>.from(results[0].json as Map);
+      final connection = body['connection'] is Map
+          ? Map<String, dynamic>.from(body['connection'] as Map)
+          : <String, dynamic>{};
+      final templates =
+          results[1].json is List ? results[1].json as List : const <dynamic>[];
+      if (!mounted) return;
+      setState(() {
+        whatsappConnected = connection['status'] == 'active';
+        whatsappPhone = connection['display_phone_number']?.toString();
+        whatsappTemplates
+          ..clear()
+          ..addEntries(
+            templates.whereType<Map>().map((item) {
+              final row = Map<String, dynamic>.from(item);
+              return MapEntry(
+                row['event_key']?.toString() ?? '',
+                {
+                  'status': row['status']?.toString() ?? 'pending',
+                  'name': row['meta_template_name']?.toString() ?? '',
+                },
+              );
+            }),
+          );
+        whatsappStatusLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => whatsappStatusLoading = false);
+    }
   }
 
   @override
@@ -126,11 +172,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       if (success) {
         sentCount++;
         await logRepo
-            .updateStatus(
-              log.id,
-              SmsLogStatus.sent,
-              sentAt: DateTime.now(),
-            )
+            .updateStatus(log.id, SmsLogStatus.sent, sentAt: DateTime.now())
             .onError((_, __) {});
       } else {
         failedCount++;
@@ -190,9 +232,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     }
     if (granted) {
       try {
-        final List<dynamic>? result =
-            await const MethodChannel('serenut/sms_sender')
-                .invokeListMethod('getSmsSimCards');
+        final List<dynamic>? result = await const MethodChannel(
+          'serenut/sms_sender',
+        ).invokeListMethod('getSmsSimCards');
         if (result != null && mounted) {
           setState(() {
             simCards =
@@ -200,7 +242,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             // If previously selected subscription ID is no longer valid, fallback
             if (selectedSubscriptionId != null &&
                 !simCards.any(
-                    (sim) => sim['subscriptionId'] == selectedSubscriptionId)) {
+                  (sim) => sim['subscriptionId'] == selectedSubscriptionId,
+                )) {
               selectedSubscriptionId = simCards.isNotEmpty
                   ? simCards.first['subscriptionId'] as int?
                   : null;
@@ -226,66 +269,84 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     final List<Map<String, dynamic>> defaultTemplates = [
       {
         'id': 'sale',
-        'name': 'Satış Tamamlandı',
+        'name': 'Satış Onayı',
         'template':
-            'Sn. {customer}, {amount} TL tutarındaki alışverişiniz tamamlanmıştır. Fiş No: {id}',
+            'Merhaba {customer}, {id} numaralı satış işleminiz tamamlandı. Toplam: {amount}. {business}',
         'enabled': true,
-      },
-      {
-        'id': 'discount',
-        'name': 'İndirim Uygulandı',
-        'template':
-            'Sn. {customer}, alışverişinizde {discount} TL indirim uygulandı! Yeni tutar: {amount} TL.',
-        'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'debt',
-        'name': 'Borç/Veresiye Kaydı',
+        'name': 'Vadeli Bakiye Kaydı',
         'template':
-            'Sn. {customer}, hesabınıza {amount} TL borç eklendi. Güncel borcunuz: {debt} TL.',
+            'Merhaba {customer}, {id} numaralı işlem sonrası vadeli tutarınız {debt}, güncel bakiyeniz {balance}. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'collection',
-        'name': 'Alacak / Tahsilat Alındı',
+        'name': 'Ödeme Alındı',
         'template':
-            'Sn. {customer}, {amount} TL tutarındaki ödemeniz alınmıştır. Kalan borcunuz: {debt} TL.',
+            'Merhaba {customer}, {amount} tutarındaki ödemeniz alındı. Kalan bakiyeniz {debt}. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'order',
         'name': 'Sipariş Alındı',
         'template':
-            'Sn. {customer}, {id} numaralı siparişiniz alınmıştır. Tutar: {amount} TL.',
+            'Merhaba {customer}, {id} numaralı siparişiniz alındı. Toplam: {amount}. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'order_preparing',
         'name': 'Sipariş Hazırlanıyor',
         'template':
-            'Sn. {customer}, {id} numaralı siparişiniz hazırlanmaya başlandı.',
+            'Merhaba {customer}, {id} numaralı siparişiniz hazırlanıyor. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'order_ready',
         'name': 'Sipariş Hazır',
         'template':
-            'Sn. {customer}, {id} numaralı siparişiniz hazırlanmıştır. Teslim alabilirsiniz.',
+            'Merhaba {customer}, {id} numaralı siparişiniz hazır. Teslim alabilirsiniz. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'order_delivered',
         'name': 'Sipariş Teslim Edildi',
         'template':
-            'Sn. {customer}, {id} numaralı siparişiniz teslim edilmiştir. Bizi tercih ettiğiniz için teşekkür ederiz.',
+            'Merhaba {customer}, {id} numaralı siparişiniz teslim edildi. Bizi tercih ettiğiniz için teşekkür ederiz. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
       {
         'id': 'order_cancelled',
         'name': 'Sipariş İptal Edildi',
         'template':
-            'Sn. {customer}, {id} numaralı siparişiniz iptal edilmiştir.',
+            'Merhaba {customer}, {id} numaralı siparişiniz iptal edildi. Ayrıntılı bilgi için işletmemizle iletişime geçebilirsiniz. {business}',
         'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
+      },
+      {
+        'id': 'balance_reminder',
+        'name': 'Bakiye Hatırlatması',
+        'template':
+            'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}',
+        'enabled': true,
+        'sms_enabled': true,
+        'whatsapp_enabled': false,
       },
     ];
 
@@ -298,6 +359,15 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       if (decoded is List) {
         final list =
             decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        // Eski sürümlerde ayrı bir indirim olayı yayınlanmadığı halde bu
+        // şablon gösteriliyordu. Hiç tetiklenemeyen ayarı arayüzden kaldır.
+        list.removeWhere((item) =>
+            item['id'] == 'discount' || item['id'] == 'discount_applied');
+        for (final item in list) {
+          item['sms_enabled'] ??= item['enabled'] == true;
+          item['whatsapp_enabled'] ??= false;
+          item['enabled'] = item['sms_enabled'] == true;
+        }
         for (final def in defaultTemplates) {
           if (!list.any((t) => t['id'] == def['id'])) {
             list.add(def);
@@ -307,6 +377,22 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       }
     } catch (_) {}
     return defaultTemplates;
+  }
+
+  String _balanceReminderMessage(String customerName, double amount) {
+    final configured = listTemplates.cast<Map<String, dynamic>?>().firstWhere(
+          (item) => item?['id'] == 'balance_reminder',
+          orElse: () => null,
+        );
+    final amountText =
+        '${amount.toStringAsFixed(2).replaceAll('.', ',')} ${widget.settings.currency}';
+    var message = configured?['template']?.toString() ??
+        'Merhaba {customer}, hesabınızdaki güncel vadeli bakiye {balance}. Ödeme bilgisi için işletmemizle iletişime geçebilirsiniz. {business}';
+    return message
+        .replaceAll('{customer}', customerName)
+        .replaceAll('{balance}', amountText)
+        .replaceAll('{debt}', amountText)
+        .replaceAll('{business}', widget.settings.businessName);
   }
 
   Future<void> _sendBulkDebtReminder(BuildContext context) async {
@@ -332,22 +418,30 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         final resumeConfirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Yarım Kalan Toplu SMS'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text('Yarım Kalan Bakiye İletişimi'),
             content: Text(
-                'Sistemde yarım kalmış bir toplu SMS gönderimi bulundu (${pendingIds.length} müşteri bekliyor). Devam etmek ister misiniz?'),
+              'Sistemde tamamlanmamış bir bakiye hatırlatma gönderimi bulundu (${pendingIds.length} müşteri bekliyor). Devam etmek ister misiniz?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Yeniden Başlat',
-                    style: TextStyle(color: POSColors.textSecondary)),
+                child: const Text(
+                  'Yeniden Başlat',
+                  style: TextStyle(color: POSColors.textSecondary),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Devam Et',
-                    style: TextStyle(
-                        color: POSColors.green, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Devam Et',
+                  style: TextStyle(
+                    color: POSColors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -358,14 +452,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           isResume = true;
           final allCampaignLogs = await logRepo.getRecentLogs(limit: 1000);
           sentCount = allCampaignLogs
-              .where((e) =>
-                  e.eventType == 'bulk_debt_reminder' &&
-                  e.status == SmsLogStatus.sent)
+              .where(
+                (e) =>
+                    e.eventType == 'bulk_debt_reminder' &&
+                    e.status == SmsLogStatus.sent,
+              )
               .length;
           failedCount = allCampaignLogs
-              .where((e) =>
-                  e.eventType == 'bulk_debt_reminder' &&
-                  e.status == SmsLogStatus.failed)
+              .where(
+                (e) =>
+                    e.eventType == 'bulk_debt_reminder' &&
+                    e.status == SmsLogStatus.failed,
+              )
               .length;
           totalCount = allCampaignLogs
               .where((e) => e.eventType == 'bulk_debt_reminder')
@@ -388,9 +486,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text(
-                      'Borçlu ve telefon numarası tanımlı müşteri bulunamadı.'),
-                  behavior: SnackBarBehavior.floating),
+                content: Text(
+                  'Borçlu ve telefon numarası tanımlı müşteri bulunamadı.',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           }
           return;
@@ -409,16 +509,17 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         // Insert all pending logs into SQLite (this creates the campaign state machine in SQLite)
         for (final customer in activeDebtors) {
           final debtAmount = customer.balance.abs();
-          final message =
-              'Sn. ${customer.name}, veresiye hesabınızda ${debtAmount.toStringAsFixed(2).replaceAll('.', ',')} ₺ borç bulunmaktadır. Ödemenizi rica ederiz.';
-          await logRepo.insertLog(SmsLogEntry(
-            id: 'bulk_debt_${customer.id}',
-            phone: customer.phone,
-            eventType: 'bulk_debt_reminder',
-            message: message,
-            createdAt: DateTime.now(),
-            status: SmsLogStatus.pending,
-          ));
+          final message = _balanceReminderMessage(customer.name, debtAmount);
+          await logRepo.insertLog(
+            SmsLogEntry(
+              id: 'bulk_debt_${customer.id}',
+              phone: customer.phone,
+              eventType: 'bulk_debt_reminder',
+              message: message,
+              createdAt: DateTime.now(),
+              status: SmsLogStatus.pending,
+            ),
+          );
         }
       }
 
@@ -439,10 +540,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     const int batchSize = 1;
                     while (pendingIds.isNotEmpty && !isBulkCancelled) {
                       final currentBatchIds = pendingIds.sublist(
-                          0,
-                          pendingIds.length > batchSize
-                              ? batchSize
-                              : pendingIds.length);
+                        0,
+                        pendingIds.length > batchSize
+                            ? batchSize
+                            : pendingIds.length,
+                      );
                       final currentBatchDebtors = activeDebtors
                           .where((c) => currentBatchIds.contains(c.id))
                           .toList();
@@ -450,49 +552,56 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                       // Set status to sending in database for current batch
                       for (final debtor in currentBatchDebtors) {
                         await logRepo.updateStatus(
-                            'bulk_debt_${debtor.id}', SmsLogStatus.sending);
+                          'bulk_debt_${debtor.id}',
+                          SmsLogStatus.sending,
+                        );
                       }
 
                       await Future.wait(
-                          currentBatchDebtors.map((customer) async {
-                        if (isBulkCancelled) return;
-                        try {
-                          final debtAmount = customer.balance.abs();
-                          final message =
-                              'Sn. ${customer.name}, veresiye hesabınızda ${debtAmount.toStringAsFixed(2).replaceAll('.', ',')} ₺ borç bulunmaktadır. Ödemenizi rica ederiz.';
+                        currentBatchDebtors.map((customer) async {
+                          if (isBulkCancelled) return;
+                          try {
+                            final debtAmount = customer.balance.abs();
+                            final message = _balanceReminderMessage(
+                              customer.name,
+                              debtAmount,
+                            );
 
-                          final success =
-                              await smsService.sendSms(customer.phone, message);
-                          if (success) {
-                            sentCount++;
-                            await logRepo
-                                .updateStatus(
-                                  'bulk_debt_${customer.id}',
-                                  SmsLogStatus.sent,
-                                  sentAt: DateTime.now(),
-                                )
-                                .onError((_, __) {});
-                          } else {
+                            final success = await smsService.sendSms(
+                              customer.phone,
+                              message,
+                            );
+                            if (success) {
+                              sentCount++;
+                              await logRepo
+                                  .updateStatus(
+                                    'bulk_debt_${customer.id}',
+                                    SmsLogStatus.sent,
+                                    sentAt: DateTime.now(),
+                                  )
+                                  .onError((_, __) {});
+                            } else {
+                              failedCount++;
+                              await logRepo
+                                  .updateStatus(
+                                    'bulk_debt_${customer.id}',
+                                    SmsLogStatus.failed,
+                                    errorMessage: 'Send failed',
+                                  )
+                                  .onError((_, __) {});
+                            }
+                          } catch (_) {
                             failedCount++;
                             await logRepo
                                 .updateStatus(
                                   'bulk_debt_${customer.id}',
                                   SmsLogStatus.failed,
-                                  errorMessage: 'Send failed',
+                                  errorMessage: 'Exception',
                                 )
                                 .onError((_, __) {});
                           }
-                        } catch (_) {
-                          failedCount++;
-                          await logRepo
-                              .updateStatus(
-                                'bulk_debt_${customer.id}',
-                                SmsLogStatus.failed,
-                                errorMessage: 'Exception',
-                              )
-                              .onError((_, __) {});
-                        }
-                      }));
+                        }),
+                      );
 
                       if (isBulkCancelled) {
                         // Mark all remaining pending and sending logs as cancelled
@@ -500,8 +609,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                         break;
                       }
 
-                      pendingIds
-                          .removeWhere((id) => currentBatchIds.contains(id));
+                      pendingIds.removeWhere(
+                        (id) => currentBatchIds.contains(id),
+                      );
 
                       if (dialogCtx.mounted) {
                         setDialogState(() {});
@@ -519,9 +629,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(isBulkCancelled
-                              ? 'Toplu SMS gönderimi iptal edildi. Gönderilen: $sentCount ✅ Başarısız: $failedCount ❌'
-                              : 'Gönderildi: $sentCount ✅  Başarısız: $failedCount ❌'),
+                          content: Text(
+                            isBulkCancelled
+                                ? 'Bakiye hatırlatma gönderimi iptal edildi. Gönderilen: $sentCount ✅ Başarısız: $failedCount ❌'
+                                : 'Gönderildi: $sentCount ✅  Başarısız: $failedCount ❌',
+                          ),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );
@@ -535,21 +647,24 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
                 return AlertDialog(
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  title: const Text('Toplu SMS Gönderiliyor'),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: const Text('Bakiye Hatırlatmaları Gönderiliyor'),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       LinearProgressIndicator(
                         value: progress,
                         valueColor: const AlwaysStoppedAnimation<Color>(
-                            POSColors.green),
+                          POSColors.green,
+                        ),
                         backgroundColor: POSColors.border,
                       ),
                       const SizedBox(height: 16),
                       Text('İlerleme: $totalProcessed / $totalCount'),
                       Text(
-                          'Başarılı: $sentCount ✅ | Başarısız: $failedCount ❌'),
+                        'Başarılı: $sentCount ✅ | Başarısız: $failedCount ❌',
+                      ),
                     ],
                   ),
                   actions: [
@@ -559,8 +674,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                         setDialogState(() {});
                       },
                       child: Text(
-                          isBulkCancelled ? 'İptal Ediliyor...' : 'İptal Et',
-                          style: const TextStyle(color: POSColors.red)),
+                        isBulkCancelled ? 'İptal Ediliyor...' : 'İptal Et',
+                        style: const TextStyle(color: POSColors.red),
+                      ),
                     ),
                   ],
                 );
@@ -574,9 +690,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Hata: $e'),
-              backgroundColor: POSColors.red,
-              behavior: SnackBarBehavior.floating),
+            content: Text('Hata: $e'),
+            backgroundColor: POSColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -588,7 +705,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
   ) {
     final selected = debtors.map((customer) => customer.id).toSet();
     var query = '';
-    var minimumDebt = 0.0;
+    var minimumDebt = autoDebtReminderEnabled
+        ? (double.tryParse(minAmountCtrl.text) ?? 0.0)
+        : 0.0;
     return showDialog<List<CustomerEntity>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -606,13 +725,20 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
           final longestMessage = selectedCustomers.isEmpty
               ? ''
               : selectedCustomers
-                  .map((customer) =>
-                      'Sn. ${customer.name}, veresiye hesabınızda ${customer.balance.abs().toStringAsFixed(2).replaceAll('.', ',')} ₺ borç bulunmaktadır. Ödemenizi rica ederiz.')
+                  .map(
+                    (customer) => _balanceReminderMessage(
+                      customer.name,
+                      customer.balance.abs(),
+                    ),
+                  )
                   .reduce((a, b) => a.length >= b.length ? a : b);
-          final analysis = const SmsMessageAnalyzer().analyze(longestMessage);
+          final analysis = const SmsMessageAnalyzer().analyze(
+            longestMessage,
+          );
           return AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text('SMS Alıcılarını Seç'),
             content: SizedBox(
               width: 520,
@@ -627,13 +753,17 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.sms_rounded,
-                            color: POSColors.amberDark),
+                        const Icon(
+                          Icons.sms_rounded,
+                          color: POSColors.amberDark,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             '${selected.length} / ${debtors.length} müşteri • En uzun mesaj: ${analysis.characters} karakter, ${analysis.segments} SMS',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                         TextButton(
@@ -644,9 +774,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                               selected.addAll(visible.map((e) => e.id));
                             }
                           }),
-                          child: Text(selected.length == debtors.length
-                              ? 'Temizle'
-                              : 'Tümünü seç'),
+                          child: Text(
+                            selected.length == debtors.length
+                                ? 'Temizle'
+                                : 'Tümünü seç',
+                          ),
                         ),
                       ],
                     ),
@@ -664,14 +796,19 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   Wrap(
                     spacing: 6,
                     children: [0.0, 100.0, 500.0, 1000.0]
-                        .map((amount) => ChoiceChip(
-                              label: Text(amount == 0
+                        .map(
+                          (amount) => ChoiceChip(
+                            label: Text(
+                              amount == 0
                                   ? 'Tüm borçlar'
-                                  : '${amount.toStringAsFixed(0)} ₺ üzeri'),
-                              selected: minimumDebt == amount,
-                              onSelected: (_) =>
-                                  setDialogState(() => minimumDebt = amount),
-                            ))
+                                  : '${amount.toStringAsFixed(0)} ₺ üzeri',
+                            ),
+                            selected: minimumDebt == amount,
+                            onSelected: (_) => setDialogState(
+                              () => minimumDebt = amount,
+                            ),
+                          ),
+                        )
                         .toList(),
                   ),
                   const SizedBox(height: 8),
@@ -711,7 +848,8 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                           dialogContext,
                           debtors
                               .where(
-                                  (customer) => selected.contains(customer.id))
+                                (customer) => selected.contains(customer.id),
+                              )
                               .toList(),
                         ),
                 icon: const Icon(Icons.send_rounded),
@@ -742,8 +880,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Telefon numarası tanımlı müşteri bulunamadı.'),
-                behavior: SnackBarBehavior.floating),
+              content: Text('Telefon numarası tanımlı müşteri bulunamadı.'),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
         return;
@@ -759,13 +898,15 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         await Future.delayed(const Duration(milliseconds: 300));
 
         final logId = const Uuid().v4();
-        await logRepo.insertLog(SmsLogEntry(
-          id: logId,
-          phone: customer.phone,
-          eventType: 'bulk_announcement',
-          message: message,
-          createdAt: DateTime.now(),
-        ));
+        await logRepo.insertLog(
+          SmsLogEntry(
+            id: logId,
+            phone: customer.phone,
+            eventType: 'bulk_announcement',
+            message: message,
+            createdAt: DateTime.now(),
+          ),
+        );
 
         smsService.sendSms(customer.phone, message).then((success) {
           logRepo
@@ -791,18 +932,21 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  '$sentCount adet duyuru mesajı gönderim sırasına alındı.'),
-              behavior: SnackBarBehavior.floating),
+            content: Text(
+              '$sentCount tanıtım ve duyuru mesajı gönderim sırasına alındı.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Hata: $e'),
-              backgroundColor: POSColors.red,
-              behavior: SnackBarBehavior.floating),
+            content: Text('Hata: $e'),
+            backgroundColor: POSColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -813,9 +957,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
     final failed = await logRepository.getFailedCampaignLogs();
     if (failed.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Yeniden gönderilecek başarısız SMS bulunmuyor.'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Yeniden gönderilecek başarısız SMS bulunmuyor.'),
+          ),
+        );
       }
       return;
     }
@@ -824,7 +970,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Başarısız SMS’leri Yeniden Gönder'),
-        content: Text('${failed.length} mesaj sırayla yeniden gönderilecek.'),
+        content: Text(
+          '${failed.length} mesaj sırayla yeniden gönderilecek.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -856,18 +1004,84 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       await Future<void>.delayed(const Duration(seconds: 1));
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('$sent / ${failed.length} SMS başarıyla gönderildi.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$sent / ${failed.length} SMS başarıyla gönderildi.'),
+        ),
+      );
     }
   }
 
-  void _showEditTemplateDialog(Map<String, dynamic>? existingTpl,
-      ValueChanged<Map<String, dynamic>> onSave) {
+  void _showEditTemplateDialog(
+    Map<String, dynamic>? existingTpl,
+    ValueChanged<Map<String, dynamic>> onSave,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) =>
           _EditTemplateDialog(existingTpl: existingTpl, onSave: onSave),
+    );
+  }
+
+  String _canonicalEventId(String id) =>
+      const {
+        'sale': 'sale_created',
+        'debt': 'debt_created',
+        'collection': 'collection_recorded',
+        'order': 'order_created',
+      }[id] ??
+      id;
+
+  Widget _buildWhatsAppConnectionCard() {
+    final color = whatsappStatusLoading
+        ? POSColors.textSecondary
+        : whatsappConnected
+            ? POSColors.green
+            : POSColors.amber;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.chat_rounded, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'WhatsApp Business',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  whatsappStatusLoading
+                      ? 'Bağlantı durumu kontrol ediliyor…'
+                      : whatsappConnected
+                          ? '${whatsappPhone ?? 'İşletme numarası'} bağlı. Aşağıdaki olaylar için WhatsApp’ı ayrı ayrı açabilirsiniz.'
+                          : 'Bağlantı kurulmadı. Firma sahibi müşteri portalındaki Bildirim Kanalları bölümünden hesabını bağlamalıdır.',
+                  style: const TextStyle(
+                    color: POSColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!whatsappStatusLoading)
+            Icon(
+              whatsappConnected
+                  ? Icons.check_circle_rounded
+                  : Icons.info_outline_rounded,
+              color: color,
+            ),
+        ],
+      ),
     );
   }
 
@@ -909,7 +1123,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               color: POSColors.shadowColor,
               blurRadius: 4,
               offset: Offset(0, 2),
-            )
+            ),
           ],
         ),
         child: Row(
@@ -922,13 +1136,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     : POSColors.surface,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon,
-                  color: !isSupported
-                      ? POSColors.textDisabled
-                      : (isSelected
-                          ? POSColors.green
-                          : POSColors.textSecondary),
-                  size: 24),
+              child: Icon(
+                icon,
+                color: !isSupported
+                    ? POSColors.textDisabled
+                    : (isSelected ? POSColors.green : POSColors.textSecondary),
+                size: 24,
+              ),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -959,8 +1173,11 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               ),
             ),
             if (isSelected && isSupported)
-              const Icon(Icons.check_circle_rounded,
-                  color: POSColors.green, size: 20),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: POSColors.green,
+                size: 20,
+              ),
           ],
         ),
       ),
@@ -969,7 +1186,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
 
   Widget _buildOperationsCenter() {
     return FullScreenSettingsPage(
-      title: 'SMS Operasyonları',
+      title: 'Müşteri İletişimi',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -981,7 +1198,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
               border: Border.all(color: POSColors.border),
             ),
             child: const Text(
-              'Toplu gönderimleri başlatın ve teslimat sonuçlarını takip edin. SMS yapılandırması bu ekranda değiştirilemez.',
+              'Bakiye hatırlatmalarını ve tanıtım mesajlarını kontrollü alıcı seçimiyle gönderin; sonuçları gönderim geçmişinden takip edin.',
               style: TextStyle(color: POSColors.textSecondary),
             ),
           ),
@@ -995,7 +1212,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     if (mounted) setState(() => isSendingBulk = false);
                   },
             icon: const Icon(Icons.people_alt_rounded),
-            label: const Text('Borçlulara SMS gönder'),
+            label: const Text('Bakiye hatırlatması gönder'),
           ),
           const SizedBox(height: 10),
           FilledButton.tonalIcon(
@@ -1007,14 +1224,14 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     if (mounted) setState(() => isSendingBulk = false);
                   },
             icon: const Icon(Icons.campaign_rounded),
-            label: const Text('Toplu duyuru gönder'),
+            label: const Text('Tanıtım ve duyuru mesajı oluştur'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed:
                 isSendingBulk ? null : () => _retryFailedDebtMessages(context),
             icon: const Icon(Icons.replay_rounded),
-            label: const Text('Başarısız borç SMS’lerini yeniden gönder'),
+            label: const Text('Başarısız bakiye mesajlarını yeniden gönder'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -1042,7 +1259,7 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         limit != null && limit > 0 ? (sent / limit).clamp(0.0, 1.0) : 0.0;
 
     return FullScreenSettingsPage(
-      title: 'SMS ve Bildirimler',
+      title: 'SMS ve WhatsApp Bildirimleri',
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -1058,14 +1275,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                   decoration: BoxDecoration(
                     color: POSColors.redLight,
-                    border:
-                        Border.all(color: POSColors.red.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: POSColors.red.withValues(alpha: 0.3),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline_rounded,
-                          color: POSColors.red, size: 24),
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: POSColors.red,
+                        size: 24,
+                      ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
@@ -1074,15 +1295,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                             const Text(
                               'SMS Gönderim Limiti Aşıldı!',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: POSColors.red,
-                                  fontSize: 14),
+                                fontWeight: FontWeight.bold,
+                                color: POSColors.red,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Bu ayki limitiniz ($limit SMS) dolmuştur. Yeni ay başında sayaç otomatik olarak sıfırlanacaktır.',
                               style: const TextStyle(
-                                  color: POSColors.red, fontSize: 12),
+                                color: POSColors.red,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -1100,14 +1324,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                   decoration: BoxDecoration(
                     color: POSColors.amberLight,
                     border: Border.all(
-                        color: POSColors.amber.withValues(alpha: 0.3)),
+                      color: POSColors.amber.withValues(alpha: 0.3),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          color: POSColors.amber, size: 24),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: POSColors.amber,
+                        size: 24,
+                      ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
@@ -1116,15 +1344,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                             Text(
                               '${interruptedLogs.length} Adet SMS\'in Durumu Belirsiz Kaldı',
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: POSColors.amberDark,
-                                  fontSize: 14),
+                                fontWeight: FontWeight.bold,
+                                color: POSColors.amberDark,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             const Text(
                               'Uygulama beklenmedik şekilde kapandı. Bu SMS\'lerin gönderilip gönderilmediği belirsizdir. Tekrar göndermek istiyor musunuz?',
                               style: TextStyle(
-                                  color: POSColors.textSecondary, fontSize: 12),
+                                color: POSColors.textSecondary,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             Row(
@@ -1137,17 +1368,23 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                     backgroundColor: POSColors.green,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
                                     minimumSize: Size.zero,
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                     shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8)),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
-                                  child: const Text('Tekrar Gönder',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold)),
+                                  child: const Text(
+                                    'Tekrar Gönder',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 OutlinedButton(
@@ -1156,20 +1393,27 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                       : _discardInterruptedLogs,
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: POSColors.red,
-                                    side:
-                                        const BorderSide(color: POSColors.red),
+                                    side: const BorderSide(
+                                      color: POSColors.red,
+                                    ),
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
                                     minimumSize: Size.zero,
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                     shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8)),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
-                                  child: const Text('Yoksay',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold)),
+                                  child: const Text(
+                                    'Yoksay',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1181,9 +1425,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 ),
               ],
 
+              _buildWhatsAppConnectionCard(),
               _buildSwitchRow(
                 title: 'SMS Bildirimlerini Etkinleştir',
-                subtitle: 'İşlem sonrası otomatik mesaj gönderimi',
+                subtitle: 'Android ana cihazın SIM kartından SMS gönderimi',
                 icon: Icons.message_rounded,
                 color: POSColors.orange,
                 value: smsEnabled,
@@ -1197,9 +1442,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                 const Text(
                   'Yerel SIM Gönderimi',
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: POSColors.text),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: POSColors.text,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
 
@@ -1263,10 +1509,13 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                         if (!hasPermissions && !checkingPermissions)
                           TextButton(
                             onPressed: _requestPermissions,
-                            child: const Text('İzin Ver',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: POSColors.amberDark)),
+                            child: const Text(
+                              'İzin Ver',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: POSColors.amberDark,
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -1277,20 +1526,25 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     DropdownButtonFormField<int>(
                       value: selectedSubscriptionId,
                       dropdownColor: Colors.white,
-                      style:
-                          const TextStyle(color: POSColors.text, fontSize: 14),
+                      style: const TextStyle(
+                        color: POSColors.text,
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Gönderici SIM Kart',
-                        prefixIcon: const Icon(Icons.sim_card_outlined,
-                            size: 18, color: POSColors.textSecondary),
+                        prefixIcon: const Icon(
+                          Icons.sim_card_outlined,
+                          size: 18,
+                          color: POSColors.textSecondary,
+                        ),
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide:
-                                const BorderSide(color: POSColors.border)),
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: POSColors.border),
+                        ),
                         enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide:
-                                const BorderSide(color: POSColors.border)),
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: POSColors.border),
+                        ),
                         filled: true,
                         fillColor: POSColors.surface,
                       ),
@@ -1336,19 +1590,23 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Bu Ayki SMS Kullanımı',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: POSColors.text)),
+                              const Text(
+                                'Bu Ayki SMS Kullanımı',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: POSColors.text,
+                                ),
+                              ),
                               Text(
                                 '$sent / $limit SMS',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: isLimitExceeded
-                                        ? POSColors.red
-                                        : POSColors.greenDark),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: isLimitExceeded
+                                      ? POSColors.red
+                                      : POSColors.greenDark,
+                                ),
                               ),
                             ],
                           ),
@@ -1360,11 +1618,12 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                               minHeight: 8,
                               backgroundColor: POSColors.surface,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                  isLimitExceeded
-                                      ? POSColors.red
-                                      : (percent >= 0.8
-                                          ? POSColors.amber
-                                          : POSColors.green)),
+                                isLimitExceeded
+                                    ? POSColors.red
+                                    : (percent >= 0.8
+                                        ? POSColors.amber
+                                        : POSColors.green),
+                              ),
                             ),
                           ),
                         ],
@@ -1383,189 +1642,234 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.lg),
+              ],
+              const SizedBox(height: AppSpacing.lg),
 
-                // Tetikleyiciler & Otomatik Kurallar
+              // Bakiye iletişimi
+              const Text(
+                'Müşteri Bakiye İletişimi',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: POSColors.text,
+                ),
+              ),
+              const Divider(color: POSColors.border),
+              _buildSwitchRow(
+                title: 'Bakiye Hatırlatma Tercihlerini Kullan',
+                subtitle:
+                    'Manuel hatırlatma listesinde belirlediğiniz eşikleri uygular',
+                icon: Icons.notifications_active_rounded,
+                color: POSColors.blue,
+                value: autoDebtReminderEnabled,
+                onChanged: (val) {
+                  setState(() => autoDebtReminderEnabled = val);
+                },
+              ),
+              if (autoDebtReminderEnabled) ...[
+                const SizedBox(height: AppSpacing.sm),
+                TextFormField(
+                  controller: minAmountCtrl,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Önerilecek Minimum Bakiye (TL)',
+                    helperText:
+                        'Hatırlatma ekranı bu tutarın altındaki müşterileri başlangıçta filtreler.',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+
+              if (widget.operationsOnly) ...[
+                // Müşteri iletişimi
                 const Text(
-                  'Tetikleyiciler & Kurallar',
+                  'Müşteri İletişimi',
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: POSColors.text),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: POSColors.text,
+                  ),
                 ),
                 const Divider(color: POSColors.border),
-                _buildSwitchRow(
-                  title: 'Otomatik Borç Hatırlatıcısı Gönder',
-                  subtitle:
-                      'Belirli koşullara göre müşteriye otomatik hatırlatma gönderimi',
-                  icon: Icons.notifications_active_rounded,
-                  color: POSColors.blue,
-                  value: autoDebtReminderEnabled,
-                  onChanged: (val) {
-                    setState(() => autoDebtReminderEnabled = val);
-                  },
-                ),
-                if (autoDebtReminderEnabled) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: minAmountCtrl,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'Min Borç Tutarı (TL)',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: ageDaysCtrl,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'Hatırlatma Yaşı (Gün)',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.lg),
-
-                if (widget.operationsOnly) ...[
-                  // Toplu SMS İşlemleri
-                  const Text(
-                    'Toplu SMS İşlemleri',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: POSColors.text),
-                  ),
-                  const Divider(color: POSColors.border),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: isSendingBulk
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Color(0xFF8B5CF6)))
-                              : const Icon(Icons.people_alt_rounded,
-                                  size: 16, color: Color(0xFF8B5CF6)),
-                          label: const Text('Borçlulara SMS',
-                              style: TextStyle(
-                                  color: POSColors.text, fontSize: 12)),
-                          onPressed: !isSendingBulk
-                              ? () async {
-                                  setState(() => isSendingBulk = true);
-                                  await _sendBulkDebtReminder(context);
-                                  if (mounted) {
-                                    setState(() => isSendingBulk = false);
-                                  }
-                                }
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: POSColors.border),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: isSendingBulk
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: POSColors.green))
-                              : const Icon(Icons.campaign_rounded,
-                                  size: 16, color: POSColors.green),
-                          label: const Text('Toplu Duyuru SMS',
-                              style: TextStyle(
-                                  color: POSColors.text, fontSize: 12)),
-                          onPressed: !isSendingBulk
-                              ? () async {
-                                  setState(() => isSendingBulk = true);
-                                  await _sendBulkAnnouncement(context);
-                                  if (mounted) {
-                                    setState(() => isSendingBulk = false);
-                                  }
-                                }
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: POSColors.border),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-
-                // Flexible Templates Header
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Esnek SMS Şablonları',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: POSColors.text),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: isSendingBulk
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF8B5CF6),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.people_alt_rounded,
+                                size: 16,
+                                color: Color(0xFF8B5CF6),
+                              ),
+                        label: const Text(
+                          'Bakiye Hatırlatması',
+                          style: TextStyle(color: POSColors.text, fontSize: 12),
+                        ),
+                        onPressed: !isSendingBulk
+                            ? () async {
+                                setState(() => isSendingBulk = true);
+                                await _sendBulkDebtReminder(context);
+                                if (mounted) {
+                                  setState(() => isSendingBulk = false);
+                                }
+                              }
+                            : null,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: POSColors.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
                     ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.add_circle_outline_rounded,
-                          size: 18, color: POSColors.green),
-                      label: const Text('Şablon Ekle',
-                          style: TextStyle(
-                              color: POSColors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13)),
-                      onPressed: () => _showEditTemplateDialog(null, (newTpl) {
-                        setState(() {
-                          listTemplates.add(newTpl);
-                        });
-                      }),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: isSendingBulk
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: POSColors.green,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.campaign_rounded,
+                                size: 16,
+                                color: POSColors.green,
+                              ),
+                        label: const Text(
+                          'Tanıtım Mesajı',
+                          style: TextStyle(color: POSColors.text, fontSize: 12),
+                        ),
+                        onPressed: !isSendingBulk
+                            ? () async {
+                                setState(() => isSendingBulk = true);
+                                await _sendBulkAnnouncement(context);
+                                if (mounted) {
+                                  setState(() => isSendingBulk = false);
+                                }
+                              }
+                            : null,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: POSColors.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const Divider(color: POSColors.border),
+                const SizedBox(height: AppSpacing.lg),
+              ],
 
-                // Templates list view
-                if (listTemplates.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                        'Tanımlı şablon bulunamadı. Lütfen yeni şablon ekleyin.',
-                        style: TextStyle(
-                            color: POSColors.textSecondary, fontSize: 13)),
-                  )
-                else
-                  Column(
-                    children: [
-                      for (int i = 0; i < listTemplates.length; i++) ...[
-                        Builder(builder: (context) {
+              // Flexible Templates Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Otomatik Bildirim Şablonları',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: POSColors.text,
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 18,
+                      color: POSColors.green,
+                    ),
+                    label: const Text(
+                      'Şablon Ekle',
+                      style: TextStyle(
+                        color: POSColors.green,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    onPressed: () => _showEditTemplateDialog(null, (newTpl) {
+                      setState(() {
+                        listTemplates.add(newTpl);
+                      });
+                    }),
+                  ),
+                ],
+              ),
+              const Divider(color: POSColors.border),
+              const Text(
+                'SMS metnini burada düzenleyebilirsiniz. WhatsApp, Meta tarafından onaylanan ve olayla eşleştirilen kurumsal şablonu kullanır.',
+                style: TextStyle(
+                  color: POSColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Templates list view
+              if (listTemplates.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'Tanımlı şablon bulunamadı. Lütfen yeni şablon ekleyin.',
+                    style: TextStyle(
+                      color: POSColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    for (int i = 0; i < listTemplates.length; i++) ...[
+                      Builder(
+                        builder: (context) {
                           final tpl = listTemplates[i];
-                          final isEnabled = tpl['enabled'] == true;
+                          final smsTemplateEnabled =
+                              tpl['sms_enabled'] ?? tpl['enabled'] == true;
+                          final whatsappTemplateEnabled =
+                              tpl['whatsapp_enabled'] == true;
+                          final eventId = _canonicalEventId(
+                            tpl['id']?.toString() ?? '',
+                          );
+                          final whatsappSupported = const {
+                            'sale_created',
+                            'debt_created',
+                            'collection_recorded',
+                            'order_created',
+                            'order_preparing',
+                            'order_ready',
+                            'order_delivered',
+                            'order_cancelled',
+                          }.contains(eventId);
+                          final whatsappTemplate = whatsappTemplates[eventId];
+                          final whatsappStatus = whatsappTemplate?['status'];
+                          final whatsappTemplateName =
+                              whatsappTemplate?['name'];
+                          final isEnabled =
+                              smsTemplateEnabled || whatsappTemplateEnabled;
                           return Container(
                             padding: const EdgeInsets.all(12),
                             margin: const EdgeInsets.only(bottom: 8),
@@ -1575,9 +1879,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   : Colors.grey[50]!,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                  color: isEnabled
-                                      ? POSColors.border
-                                      : Colors.grey[200]!),
+                                color: isEnabled
+                                    ? POSColors.border
+                                    : Colors.grey[200]!,
+                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1596,36 +1901,28 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                             : POSColors.textDisabled,
                                       ),
                                     ),
-                                    Row(
-                                      children: [
-                                        Switch.adaptive(
-                                          value: isEnabled,
-                                          activeColor: POSColors.green,
-                                          onChanged: (val) {
-                                            setState(() {
-                                              listTemplates[i]['enabled'] = val;
-                                            });
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: Icon(Icons.edit_rounded,
-                                              size: 18,
-                                              color: isEnabled
-                                                  ? POSColors.blue
-                                                  : POSColors.textDisabled),
-                                          onPressed: isEnabled
-                                              ? () {
-                                                  _showEditTemplateDialog(tpl,
-                                                      (updatedTpl) {
-                                                    setState(() {
-                                                      listTemplates[i] =
-                                                          updatedTpl;
-                                                    });
-                                                  });
-                                                }
-                                              : null,
-                                        ),
-                                      ],
+                                    IconButton(
+                                      tooltip: 'Mesaj metnini düzenle',
+                                      icon: const Icon(
+                                        Icons.edit_rounded,
+                                        size: 18,
+                                        color: POSColors.blue,
+                                      ),
+                                      onPressed: () {
+                                        _showEditTemplateDialog(tpl, (
+                                          updatedTpl,
+                                        ) {
+                                          setState(() {
+                                            updatedTpl['sms_enabled'] =
+                                                smsTemplateEnabled;
+                                            updatedTpl['whatsapp_enabled'] =
+                                                whatsappTemplateEnabled;
+                                            updatedTpl['enabled'] =
+                                                smsTemplateEnabled;
+                                            listTemplates[i] = updatedTpl;
+                                          });
+                                        });
+                                      },
                                     ),
                                   ],
                                 ),
@@ -1639,6 +1936,66 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                         : POSColors.textDisabled,
                                   ),
                                 ),
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 16,
+                                  runSpacing: 6,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Switch.adaptive(
+                                          value: smsTemplateEnabled,
+                                          activeColor: POSColors.green,
+                                          onChanged: smsEnabled
+                                              ? (val) => setState(() {
+                                                    tpl['sms_enabled'] = val;
+                                                    tpl['enabled'] = val;
+                                                  })
+                                              : null,
+                                        ),
+                                        const Text(
+                                          'SMS',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Switch.adaptive(
+                                          value: whatsappTemplateEnabled,
+                                          activeColor: const Color(0xFF16A34A),
+                                          onChanged: whatsappConnected &&
+                                                  whatsappSupported
+                                              ? (val) => setState(
+                                                    () =>
+                                                        tpl['whatsapp_enabled'] =
+                                                            val,
+                                                  )
+                                              : null,
+                                        ),
+                                        Text(
+                                          !whatsappSupported
+                                              ? 'WhatsApp • uygun değil'
+                                              : whatsappStatus == null
+                                                  ? 'WhatsApp • şablon bekliyor'
+                                                  : 'WhatsApp • $whatsappTemplateName • $whatsappStatus',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: whatsappConnected &&
+                                                    whatsappSupported
+                                                ? POSColors.text
+                                                : POSColors.textDisabled,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: 6),
                                 Row(
                                   mainAxisAlignment:
@@ -1646,11 +2003,14 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: isEnabled
-                                            ? POSColors.blue
-                                                .withValues(alpha: 0.08)
+                                            ? POSColors.blue.withValues(
+                                                alpha: 0.08,
+                                              )
                                             : Colors.grey[100]!,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
@@ -1672,13 +2032,17 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                                         tpl['id'] != 'order')
                                       TextButton.icon(
                                         icon: const Icon(
-                                            Icons.delete_outline_rounded,
-                                            size: 14,
-                                            color: POSColors.red),
-                                        label: const Text('Sil',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: POSColors.red)),
+                                          Icons.delete_outline_rounded,
+                                          size: 14,
+                                          color: POSColors.red,
+                                        ),
+                                        label: const Text(
+                                          'Sil',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: POSColors.red,
+                                          ),
+                                        ),
                                         onPressed: () {
                                           setState(() {
                                             listTemplates.removeAt(i);
@@ -1690,51 +2054,53 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
                               ],
                             ),
                           );
-                        }),
-                      ]
+                        },
+                      ),
                     ],
-                  ),
-              ],
-
+                  ],
+                ),
               const SizedBox(height: 24),
-              _buildModalSaveButton(onTap: () async {
-                if (_formKey.currentState!.validate()) {
-                  final templateJson = jsonEncode(listTemplates);
+              _buildModalSaveButton(
+                onTap: () async {
+                  if (_formKey.currentState!.validate()) {
+                    final templateJson = jsonEncode(listTemplates);
 
-                  // Save SMS Settings including new SIM and limits fields
-                  final updated = widget.settings.copyWith(
-                    smsEnabled: smsEnabled,
-                    smsProvider: 'sim',
-                    smsApiKey: null,
-                    smsTemplate: templateJson,
-                    smsSimSubscriptionId: selectedSubscriptionId,
-                    smsMonthlyLimit: limitCtrl.text.trim().isEmpty
-                        ? null
-                        : int.tryParse(limitCtrl.text.trim()),
-                  );
-                  final minAmt = double.tryParse(minAmountCtrl.text) ?? 100.0;
-                  final ageDays = int.tryParse(ageDaysCtrl.text) ?? 15;
-                  final updatedWithReminder = updated.copyWith(
-                    smsAutoDebtReminderEnabled: autoDebtReminderEnabled,
-                    smsAutoDebtReminderMinAmount: minAmt,
-                    smsAutoDebtReminderDays: ageDays,
-                  );
-                  try {
-                    await ref
-                        .read(settingsNotifierProvider.notifier)
-                        .updateSettings(updatedWithReminder);
-                    if (context.mounted) Navigator.pop(context);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                    // Save SMS Settings including new SIM and limits fields
+                    final updated = widget.settings.copyWith(
+                      smsEnabled: smsEnabled,
+                      smsProvider: 'sim',
+                      smsApiKey: null,
+                      smsTemplate: templateJson,
+                      smsSimSubscriptionId: selectedSubscriptionId,
+                      smsMonthlyLimit: limitCtrl.text.trim().isEmpty
+                          ? null
+                          : int.tryParse(limitCtrl.text.trim()),
+                    );
+                    final minAmt = double.tryParse(minAmountCtrl.text) ?? 100.0;
+                    final ageDays = int.tryParse(ageDaysCtrl.text) ?? 15;
+                    final updatedWithReminder = updated.copyWith(
+                      smsAutoDebtReminderEnabled: autoDebtReminderEnabled,
+                      smsAutoDebtReminderMinAmount: minAmt,
+                      smsAutoDebtReminderDays: ageDays,
+                    );
+                    try {
+                      await ref
+                          .read(settingsNotifierProvider.notifier)
+                          .updateSettings(updatedWithReminder);
+                      if (context.mounted) Navigator.pop(context);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
                             content: Text('Hata: $e'),
-                            backgroundColor: POSColors.red),
-                      );
+                            backgroundColor: POSColors.red,
+                          ),
+                        );
+                      }
                     }
                   }
-                }
-              }),
+                },
+              ),
             ],
           ),
         ),
@@ -1760,9 +2126,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
             child: Text(
               title,
               style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: POSColors.text),
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                color: POSColors.text,
+              ),
             ),
           ),
           Switch.adaptive(
@@ -1806,8 +2173,9 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
       validator: validator,
       onChanged: onChanged,
       style: TextStyle(
-          color: enabled ? POSColors.text : POSColors.textSecondary,
-          fontSize: 14),
+        color: enabled ? POSColors.text : POSColors.textSecondary,
+        fontSize: 14,
+      ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
@@ -1826,8 +2194,10 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         ),
         filled: true,
         fillColor: enabled ? POSColors.surface : const Color(0xFFEFEFEF),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
     );
   }
@@ -1840,14 +2210,18 @@ class _SmsSettingsSheetState extends ConsumerState<SmsSettingsSheet>
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: POSColors.green,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           elevation: 0,
         ),
         child: const Text(
           'Kaydet',
           style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
       ),
     );
@@ -1858,10 +2232,7 @@ class _EditTemplateDialog extends StatefulWidget {
   final Map<String, dynamic>? existingTpl;
   final ValueChanged<Map<String, dynamic>> onSave;
 
-  const _EditTemplateDialog({
-    required this.existingTpl,
-    required this.onSave,
-  });
+  const _EditTemplateDialog({required this.existingTpl, required this.onSave});
 
   @override
   State<_EditTemplateDialog> createState() => _EditTemplateDialogState();
@@ -1877,12 +2248,12 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
   void initState() {
     super.initState();
     nameCtrl = TextEditingController(text: widget.existingTpl?['name'] ?? '');
-    templateCtrl =
-        TextEditingController(text: widget.existingTpl?['template'] ?? '');
+    templateCtrl = TextEditingController(
+      text: widget.existingTpl?['template'] ?? '',
+    );
 
     selectedEvent = widget.existingTpl?['id'] ?? 'sale_created';
     if (selectedEvent == 'sale') selectedEvent = 'sale_created';
-    if (selectedEvent == 'discount') selectedEvent = 'discount_applied';
     if (selectedEvent == 'debt') selectedEvent = 'debt_created';
     if (selectedEvent == 'collection') selectedEvent = 'collection_recorded';
     if (selectedEvent == 'order') selectedEvent = 'order_created';
@@ -1896,10 +2267,15 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
   }
 
   Widget _buildVariableChip(
-      TextEditingController controller, String token, String label) {
+    TextEditingController controller,
+    String token,
+    String label,
+  ) {
     return ActionChip(
-      label: Text(label,
-          style: const TextStyle(fontSize: 11, color: POSColors.green)),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 11, color: POSColors.green),
+      ),
       backgroundColor: POSColors.green.withValues(alpha: 0.08),
       side: BorderSide.none,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
@@ -1908,11 +2284,15 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
         final text = controller.text;
         final selection = controller.selection;
         if (selection.start >= 0) {
-          final newText =
-              text.replaceRange(selection.start, selection.end, token);
+          final newText = text.replaceRange(
+            selection.start,
+            selection.end,
+            token,
+          );
           controller.text = newText;
-          controller.selection =
-              TextSelection.collapsed(offset: selection.start + token.length);
+          controller.selection = TextSelection.collapsed(
+            offset: selection.start + token.length,
+          );
         } else {
           controller.text = text + token;
         }
@@ -1925,7 +2305,6 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
     final isNew = widget.existingTpl == null;
     const validEvents = [
       'sale_created',
-      'discount_applied',
       'debt_created',
       'collection_recorded',
       'order_created',
@@ -1933,6 +2312,7 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
       'order_ready',
       'order_delivered',
       'order_cancelled',
+      'balance_reminder',
     ];
     if (!validEvents.contains(selectedEvent)) {
       selectedEvent = 'sale_created';
@@ -1940,8 +2320,10 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(isNew ? 'Yeni Şablon Ekle' : 'Şablonu Düzenle',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      title: Text(
+        isNew ? 'Yeni Şablon Ekle' : 'Şablonu Düzenle',
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      ),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -1955,7 +2337,8 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
                   labelText: 'Şablon Adı',
                   prefixIcon: const Icon(Icons.title_rounded, size: 18),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 validator: (v) =>
                     v!.trim().isEmpty ? 'Şablon adı gerekli' : null,
@@ -1968,35 +2351,46 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
                   labelText: 'Tetikleyici Durum (Olay)',
                   prefixIcon: const Icon(Icons.flash_on_rounded, size: 18),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 items: const [
                   DropdownMenuItem(
-                      value: 'sale_created',
-                      child: Text('Satış Tamamlandığında')),
+                    value: 'sale_created',
+                    child: Text('Satış Tamamlandığında'),
+                  ),
                   DropdownMenuItem(
-                      value: 'discount_applied',
-                      child: Text('İndirim Yapıldığında')),
+                    value: 'debt_created',
+                    child: Text('Borç Eklendiğinde'),
+                  ),
                   DropdownMenuItem(
-                      value: 'debt_created', child: Text('Borç Eklendiğinde')),
+                    value: 'collection_recorded',
+                    child: Text('Tahsilat Yapıldığında'),
+                  ),
                   DropdownMenuItem(
-                      value: 'collection_recorded',
-                      child: Text('Tahsilat Yapıldığında')),
+                    value: 'order_created',
+                    child: Text('Sipariş Alındığında'),
+                  ),
                   DropdownMenuItem(
-                      value: 'order_created',
-                      child: Text('Sipariş Alındığında')),
+                    value: 'order_preparing',
+                    child: Text('Sipariş Hazırlanmaya Başladığında'),
+                  ),
                   DropdownMenuItem(
-                      value: 'order_preparing',
-                      child: Text('Sipariş Hazırlanmaya Başladığında')),
+                    value: 'order_ready',
+                    child: Text('Sipariş Hazırlandığında'),
+                  ),
                   DropdownMenuItem(
-                      value: 'order_ready',
-                      child: Text('Sipariş Hazırlandığında')),
+                    value: 'order_delivered',
+                    child: Text('Sipariş Teslim Edildiğinde'),
+                  ),
                   DropdownMenuItem(
-                      value: 'order_delivered',
-                      child: Text('Sipariş Teslim Edildiğinde')),
+                    value: 'order_cancelled',
+                    child: Text('Sipariş İptal Edildiğinde'),
+                  ),
                   DropdownMenuItem(
-                      value: 'order_cancelled',
-                      child: Text('Sipariş İptal Edildiğinde')),
+                    value: 'balance_reminder',
+                    child: Text('Bakiye Hatırlatması Gönderildiğinde'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -2016,7 +2410,8 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
                   hintText: 'örn: Sn. {customer}, {amount} TL ödemeniz alındı.',
                   prefixIcon: const Icon(Icons.text_snippet_rounded, size: 18),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 validator: (v) =>
                     v!.trim().isEmpty ? 'Şablon içeriği gerekli' : null,
@@ -2024,11 +2419,14 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
               const SizedBox(height: 12),
               const Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Kullanılabilir Değişkenler:',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: POSColors.textSecondary)),
+                child: Text(
+                  'Kullanılabilir Değişkenler:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: POSColors.textSecondary,
+                  ),
+                ),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -2037,7 +2435,6 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
                 children: [
                   _buildVariableChip(templateCtrl, '{customer}', 'Müşteri'),
                   _buildVariableChip(templateCtrl, '{amount}', 'Tutar'),
-                  _buildVariableChip(templateCtrl, '{discount}', 'İndirim'),
                   _buildVariableChip(templateCtrl, '{debt}', 'Borç/Bakiye'),
                   _buildVariableChip(templateCtrl, '{id}', 'Fiş/İşlem No'),
                   _buildVariableChip(templateCtrl, '{business}', 'İşletme Adı'),
@@ -2053,8 +2450,10 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('İptal',
-              style: TextStyle(color: POSColors.textSecondary)),
+          child: const Text(
+            'İptal',
+            style: TextStyle(color: POSColors.textSecondary),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -2063,7 +2462,14 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
                 'id': selectedEvent,
                 'name': nameCtrl.text.trim(),
                 'template': templateCtrl.text.trim(),
-                'enabled': widget.existingTpl?['enabled'] ?? true,
+                'enabled': widget.existingTpl?['sms_enabled'] ??
+                    widget.existingTpl?['enabled'] ??
+                    true,
+                'sms_enabled': widget.existingTpl?['sms_enabled'] ??
+                    widget.existingTpl?['enabled'] ??
+                    true,
+                'whatsapp_enabled':
+                    widget.existingTpl?['whatsapp_enabled'] ?? false,
               };
               widget.onSave(result);
               Navigator.pop(context);
@@ -2071,8 +2477,9 @@ class _EditTemplateDialogState extends State<_EditTemplateDialog> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: POSColors.green,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('Kaydet', style: TextStyle(color: Colors.white)),
         ),
@@ -2103,15 +2510,16 @@ class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Toplu Mesaj Gönder'),
+      title: const Text('Tanıtım ve Duyuru Mesajı'),
       content: Form(
         key: _formKey,
         child: TextFormField(
           controller: msgCtrl,
           maxLines: 4,
           decoration: const InputDecoration(
-            labelText: 'Duyuru Mesajı',
-            hintText: 'Tüm müşterilere gönderilecek mesajı yazın...',
+            labelText: 'Tanıtım veya Duyuru Mesajı',
+            hintText:
+                'İletişim izni bulunan müşterilere gönderilecek metni yazın...',
             border: OutlineInputBorder(),
           ),
           validator: (val) =>
@@ -2121,8 +2529,10 @@ class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Vazgeç',
-              style: TextStyle(color: POSColors.textSecondary)),
+          child: const Text(
+            'Vazgeç',
+            style: TextStyle(color: POSColors.textSecondary),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -2131,7 +2541,9 @@ class _BulkAnnouncementDialogState extends State<_BulkAnnouncementDialog> {
             }
           },
           style: ElevatedButton.styleFrom(
-              backgroundColor: POSColors.text, foregroundColor: Colors.white),
+            backgroundColor: POSColors.text,
+            foregroundColor: Colors.white,
+          ),
           child: const Text('Gönder'),
         ),
       ],
