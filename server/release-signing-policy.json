@@ -1,5 +1,9 @@
 {
   "requiredUpgradeSignerModulusSha256": "330be910eb5aa1162183154fced1cae3fcf4be3b4c0acf3cd32bae13dfa3dcc9",
   "trustedSinceVersion": "1.3.10+91",
+  "compatibilityBaselineRef": "57b2e756aad847bfaf4b8793a9d9f52a05bd8242",
+  "androidPackageCertificateSha256": "3806945a82a023a36a91ddcce3ff350d3695da41503b254452375313bd221493",
+  "legacyClientMaxVersion": "1.2.1+60",
+  "legacyUpgradeSignerModulusSha256": "908e4c16273e17bc845581d1f8635260a09a041624f01eee534b913600492415",
   "rotationPhase": "stable"
 }
