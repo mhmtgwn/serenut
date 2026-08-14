@@ -156,11 +156,13 @@ void main() {
         body: '{"success":true,"reset_revision":91}',
       );
     };
+    var catalogSourceReset = false;
     final service = SyncV4Service(
       api,
       deviceActivationIdResolver: () async => 'activation-1',
       deviceIdResolver: () async => 'installation-1',
       productImageCleaner: () async {},
+      catalogSourceResetter: () async => catalogSourceReset = true,
     );
 
     expect(await service.resetProductCatalog(), 91);
@@ -169,6 +171,52 @@ void main() {
     expect(product['is_deleted'], 1);
     expect(await db.query('sync_outbox_v4'), isEmpty);
     expect((await db.query('sync_cursor_v4')).single['cursor'], 91);
+    expect(catalogSourceReset, isTrue);
+  });
+
+  test('remote catalog reset also detaches the mounted catalog source',
+      () async {
+    final db = await manager.getDatabase();
+    await db.insert('sync_cursor_v4', {'key': 'global', 'cursor': 7});
+    await db.insert('products', {
+      'id': 'old-product',
+      'name': 'Eski ürün',
+      'price': 10,
+      'quantity': 1,
+      'category': 'Test',
+      'is_active': 1,
+      'created_at': '2026-01-01T00:00:00Z',
+      'updated_at': '2026-01-01T00:00:00Z',
+    });
+
+    final api = ApiClient();
+    api.mockHandler = (request) {
+      if (request.url.path.endsWith('/api/v4/sync/pull')) {
+        return const ApiResponse(
+          statusCode: 200,
+          headers: {},
+          body: '''{"next_cursor":8,"changes":[
+            {"entity_type":"system_reset","entity_id":"catalog-reset-1","operation":"UPSERT","payload":{"scope":"catalog"}}
+          ]}''',
+        );
+      }
+      throw StateError('Unexpected request: ${request.url}');
+    };
+    var catalogSourceReset = false;
+    final result = await SyncV4Service(
+      api,
+      deviceActivationIdResolver: () async => 'activation-1',
+      deviceIdResolver: () async => 'installation-1',
+      productImageCleaner: () async {},
+      catalogSourceResetter: () async => catalogSourceReset = true,
+    ).sync();
+
+    expect(result.success, isTrue);
+    expect(catalogSourceReset, isTrue);
+    final product = (await db.query('products')).single;
+    expect(product['is_active'], 0);
+    expect(product['is_deleted'], 1);
+    expect((await db.query('sync_cursor_v4')).single['cursor'], 8);
   });
 
   test('full cleanup removes imported product image directory', () async {

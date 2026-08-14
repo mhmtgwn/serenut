@@ -23,6 +23,7 @@ import 'package:serenutos/presentation/controllers/sales_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/infrastructure/sync_v4/sms_cloud_outbox.dart';
+import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 
 // ── Sync Status ───────────────────────────────────────────────────────────────
 enum SyncStatus { idle, syncing, success, error }
@@ -79,6 +80,8 @@ class SyncNotifier extends StateNotifier<SyncState>
       _syncService = SyncV4Service(
         _ref.read(apiClientProvider),
         licenseService: _ref.read(licenseServiceProvider),
+        catalogSourceResetter: () =>
+            _ref.read(datasetLoaderServiceProvider).unmountActiveVersion(),
       );
       await triggerSync();
       _periodicSyncTimer ??= Timer.periodic(
@@ -144,6 +147,7 @@ class SyncNotifier extends StateNotifier<SyncState>
     state = state.copyWith(status: SyncStatus.syncing, lastError: null);
     try {
       await service.resetProductCatalog();
+      _invalidateProductProjections();
       state = state.copyWith(
         status: SyncStatus.success,
         lastSyncedCount: 0,
@@ -157,6 +161,20 @@ class SyncNotifier extends StateNotifier<SyncState>
     } finally {
       _resetInProgress = false;
     }
+  }
+
+  void _invalidateProductProjections() {
+    _ref.invalidate(productRepositoryProvider);
+    _ref.invalidate(productsControllerProvider);
+    _ref.invalidate(salesProductsControllerProvider);
+    _ref.invalidate(ordersProductsControllerProvider);
+    _ref.invalidate(allProductsProvider);
+    _ref.invalidate(lowStockProductsProvider);
+    _ref.invalidate(productInventorySummaryProvider);
+    _ref.read(productCategoriesStateProvider.notifier).state = [];
+    _ref.read(productCategoryFilterProvider.notifier).state = null;
+    _ref.read(salesProductCategoryFilterProvider.notifier).state = null;
+    _ref.read(ordersProductCategoryFilterProvider.notifier).state = null;
   }
 
   /// Prevents a database write from racing with factory-reset file removal.
@@ -269,6 +287,7 @@ class SyncNotifier extends StateNotifier<SyncState>
         _ref.invalidate(allSalesProvider);
         _ref.invalidate(todayRevenueProvider);
         _ref.invalidate(lowStockProductsProvider);
+        _ref.invalidate(productInventorySummaryProvider);
         _ref.invalidate(debtorsProvider);
         _ref.invalidate(reportRepositoryProvider);
         _ref.invalidate(dashboardRepositoryProvider);

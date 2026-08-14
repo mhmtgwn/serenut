@@ -15,6 +15,8 @@ import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 import 'package:serenutos/infrastructure/services/data_reset_service.dart';
 import 'package:serenutos/infrastructure/services/product_image_peer_service.dart';
 
+Future<void> _noopAsync() async {}
+
 int _syncInt(Object? value, [int fallback = 0]) {
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '') ?? fallback;
@@ -49,12 +51,14 @@ class SyncV4Service {
     Future<String> Function()? deviceActivationIdResolver,
     Future<String> Function()? deviceIdResolver,
     Future<void> Function()? productImageCleaner,
+    Future<void> Function()? catalogSourceResetter,
     ProductImagePeerService? productImagePeerService,
     LicenseService? licenseService,
   })  : _deviceActivationIdResolver = deviceActivationIdResolver,
         _deviceIdResolver = deviceIdResolver,
         _productImageCleaner =
             productImageCleaner ?? DataResetService.clearProductImages,
+        _catalogSourceResetter = catalogSourceResetter ?? _noopAsync,
         _productImagePeerService =
             productImagePeerService ?? ProductImagePeerService.instance,
         _licenseService = licenseService;
@@ -62,6 +66,7 @@ class SyncV4Service {
   final Future<String> Function()? _deviceActivationIdResolver;
   final Future<String> Function()? _deviceIdResolver;
   final Future<void> Function() _productImageCleaner;
+  final Future<void> Function() _catalogSourceResetter;
   final ProductImagePeerService _productImagePeerService;
   final LicenseService? _licenseService;
   static const _legacySnapshotKey = 'sync_v4_legacy_snapshot_v1';
@@ -122,6 +127,7 @@ class SyncV4Service {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       });
+      await _catalogSourceResetter();
       await _productImageCleaner();
     }
     return revision;
@@ -247,6 +253,7 @@ class SyncV4Service {
     var pulled = companyChanged ? 1 : 0;
     var reconciled = 0;
     var productImagesNeedCleanup = false;
+    var catalogSourceNeedsReset = false;
 
     // A fresh installation cannot reconstruct a tenant from a change log that
     // started after the tenant's original records were created. Hydrate from
@@ -262,6 +269,7 @@ class SyncV4Service {
             .toList(),
       );
       productImagesNeedCleanup = snapshot.any(_isProductImageReset);
+      catalogSourceNeedsReset = snapshot.any(_isCatalogReset);
       await db.transaction((txn) async {
         for (final raw in snapshot) {
           await _apply(txn, raw);
@@ -286,6 +294,8 @@ class SyncV4Service {
       );
       productImagesNeedCleanup =
           productImagesNeedCleanup || changes.any(_isProductImageReset);
+      catalogSourceNeedsReset =
+          catalogSourceNeedsReset || changes.any(_isCatalogReset);
       final next = _syncInt(pullBody['next_cursor'], cursor);
       await db.transaction((txn) async {
         for (final raw in changes.cast<Map>()) {
@@ -301,6 +311,9 @@ class SyncV4Service {
     }
     if (productImagesNeedCleanup && !kIsWeb) {
       await _productImageCleaner();
+    }
+    if (catalogSourceNeedsReset && !kIsWeb) {
+      await _catalogSourceResetter();
     }
     if (!kIsWeb) {
       try {
@@ -720,6 +733,13 @@ class SyncV4Service {
     final payload = change['payload'];
     if (payload is! Map) return false;
     return payload['scope'] == 'operational' || payload['scope'] == 'catalog';
+  }
+
+  static bool _isCatalogReset(Map<String, dynamic> change) {
+    if (change['entity_type'] != 'system_reset') return false;
+    final payload = change['payload'];
+    if (payload is! Map) return false;
+    return payload['scope'] == 'catalog';
   }
 
   /// Local order numbers historically came from a device-local sequence, so
