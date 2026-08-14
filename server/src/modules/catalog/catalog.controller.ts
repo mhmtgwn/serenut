@@ -10,6 +10,18 @@ function resolveCatalogPath(): string {
   return path.join(catalogDir, path.basename(catalogFileName));
 }
 
+async function readCatalogProductCount(filePath: string): Promise<number> {
+  const metadataPath = `${filePath}.metadata.json`;
+  const metadata = await fs.promises
+    .readFile(metadataPath, 'utf8')
+    .then((value) => JSON.parse(value) as { productCount?: unknown })
+    .catch(() => null);
+  const productCount = metadata?.productCount;
+  return typeof productCount === 'number' && Number.isSafeInteger(productCount) && productCount >= 0
+    ? productCount
+    : 0;
+}
+
 router.get('/ready', async (_req, res) => {
   const filePath = resolveCatalogPath();
   try {
@@ -20,12 +32,13 @@ router.get('/ready', async (_req, res) => {
       .readFile(checksumPath, 'utf8')
       .then((value) => value.trim().split(/\s+/)[0])
       .catch(() => null);
+    const productCount = await readCatalogProductCount(filePath);
     return res.json({
       available: true,
       name: 'Serenut Hazır Ürün Kataloğu',
       fileName: path.basename(filePath),
       sizeBytes: stat.size,
-      productCount: 15173,
+      productCount,
       sha256: checksum,
       updatedAt: stat.mtime.toISOString(),
       downloadUrl: '/api/v1/catalogs/ready/download',

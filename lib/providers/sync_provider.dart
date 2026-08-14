@@ -133,6 +133,32 @@ class SyncNotifier extends StateNotifier<SyncState>
     }
   }
 
+  Future<void> resetProductCatalog() async {
+    await _waitForActiveSync();
+    final service = _syncService;
+    if (service == null) {
+      throw StateError(
+          'Senkronizasyon servisi henüz hazır değil. Lütfen tekrar deneyin.');
+    }
+    _resetInProgress = true;
+    state = state.copyWith(status: SyncStatus.syncing, lastError: null);
+    try {
+      await service.resetProductCatalog();
+      state = state.copyWith(
+        status: SyncStatus.success,
+        lastSyncedCount: 0,
+        lastSyncAt: DateTime.now(),
+        lastError: null,
+      );
+    } catch (error) {
+      state =
+          state.copyWith(status: SyncStatus.error, lastError: error.toString());
+      rethrow;
+    } finally {
+      _resetInProgress = false;
+    }
+  }
+
   /// Prevents a database write from racing with factory-reset file removal.
   Future<void> prepareForFactoryReset() async {
     await _waitForActiveSync();

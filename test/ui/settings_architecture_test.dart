@@ -27,15 +27,14 @@ void main() {
     await pump(DataManagementMode.transfer);
     expect(find.text('Buluttan Hazır Katalog İçe Aktar'), findsOneWidget);
     expect(find.text('Ürün Kataloğu İçe Aktar (.zip / .xlsx)'), findsOneWidget);
-    expect(find.text('Tüm Verileri Sıfırla (Fabrika Ayarları)'), findsNothing);
+    expect(find.text('Uygulama ve Firma Verilerini Sıfırla'), findsNothing);
 
     await pump(DataManagementMode.backup);
     expect(find.text('Yedekleme ve Geri Yükleme'), findsWidgets);
     expect(find.text('Ürün Kataloğu İçe Aktar (.zip / .xlsx)'), findsNothing);
 
     await pump(DataManagementMode.dangerous);
-    expect(
-        find.text('Tüm Verileri Sıfırla (Fabrika Ayarları)'), findsOneWidget);
+    expect(find.text('Uygulama ve Firma Verilerini Sıfırla'), findsOneWidget);
     expect(find.text('Yedekleme ve Geri Yükleme'), findsNothing);
   });
 

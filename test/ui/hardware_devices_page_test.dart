@@ -52,6 +52,25 @@ class _FakeHardwareDevicesNotifier extends HardwareDevicesNotifier {
   }
 }
 
+class _OfflineHardwareDevicesNotifier extends HardwareDevicesNotifier {
+  @override
+  Future<List<HardwareDevice>> build() async => const [
+        HardwareDevice(
+          id: 'offline-printer',
+          name: 'Uzun isimli ana kasa fiş yazıcısı',
+          type: HardwareDeviceType.receiptPrinter,
+          connectionType: HardwareConnectionType.tcp,
+          configuration: {
+            'host': '192.168.100.200',
+            'port': 9100,
+            'activeFor': ['receipt'],
+          },
+          status: HardwareDeviceStatus.offline,
+          lastError: 'Yazıcıya son kontrolde bağlanılamadı.',
+        ),
+      ];
+}
+
 void main() {
   testWidgets('renders persisted devices and opens the three-step add flow',
       (tester) async {
@@ -75,12 +94,15 @@ void main() {
 
     expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
     expect(find.text('Kasa Terazisi'), findsOneWidget);
-    expect(find.text('Test başarılı'), findsWidgets);
+    expect(find.text('Hazır'), findsWidgets);
+    expect(find.byTooltip('Bağlantıları yenile'), findsOneWidget);
+    expect(find.byTooltip('Ortak yazıcılar'), findsOneWidget);
+    expect(find.byTooltip('Yönetici işlemleri'), findsNothing);
 
-    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.tap(find.byTooltip('Aygıt ekle'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Yeni cihaz ekle'), findsOneWidget);
+    expect(find.text('Yeni aygıt ekle'), findsOneWidget);
     expect(find.textContaining('1/3'), findsOneWidget);
     expect(find.text('Fiş yazıcısı'), findsWidgets);
     expect(find.text('Terazi'), findsWidgets);
@@ -111,8 +133,12 @@ void main() {
     await tester.tap(find.text('Kasa Terazisi'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('3/3'), findsOneWidget);
-    expect(find.text('Bağlantıyı kontrol et'), findsOneWidget);
+    expect(find.textContaining('3/3'), findsNothing);
+    expect(find.textContaining('Aygıt ayarları'), findsOneWidget);
+    expect(find.text('Genel bilgiler'), findsOneWidget);
+    expect(find.text('Bağlantı'), findsOneWidget);
+    expect(find.text('Donanım özellikleri'), findsOneWidget);
+    expect(find.text('Bağlantıyı test et'), findsOneWidget);
     expect(find.text('Ayarları kaydet'), findsOneWidget);
 
     await tester.tap(find.text('Ayarları kaydet'));
@@ -174,7 +200,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.tap(find.byTooltip('Aygıt ekle'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Devam et'));
@@ -186,8 +212,13 @@ void main() {
     await tester.tap(find.text('Devam et'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cihazı kaydet'), findsOneWidget);
-    expect(find.text('Bağlantıyı kontrol et'), findsOneWidget);
+    expect(find.text('Aygıtı kaydet'), findsOneWidget);
+    expect(find.text('Bağlantıyı test et'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byType(TextField).first);
+    await tester.showKeyboard(find.byType(TextField).first);
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -213,7 +244,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.tap(find.byTooltip('Aygıt ekle'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Etiket yazıcısı').first);
     await tester.tap(find.text('Devam et'));
@@ -222,6 +253,87 @@ void main() {
     expect(find.text('Bluetooth'), findsWidgets);
     expect(find.text('TCP / Ağ'), findsWidgets);
     expect(find.text('Dahili'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('embedded receipt printer explains its automatic connection',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hardwareDevicesProvider
+              .overrideWith(_FakeHardwareDevicesNotifier.new),
+        ],
+        child: const MaterialApp(home: HardwareTestPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Aygıt ekle'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dahili'));
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Uygulama bu cihazdaki dahili yazıcıyı otomatik olarak kullanır.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Donanım özellikleri'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('receipt copy count is validated instead of silently reset',
+      (tester) async {
+    _FakeHardwareDevicesNotifier.saveCalls = 0;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hardwareDevicesProvider
+              .overrideWith(_FakeHardwareDevicesNotifier.new),
+        ],
+        child: const MaterialApp(home: HardwareTestPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Aygıt ekle'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dahili'));
+    await tester.tap(find.text('Devam et'));
+    await tester.pumpAndSettle();
+
+    final copies = find.widgetWithText(TextField, 'Yazdırılacak kopya sayısı');
+    await tester.ensureVisible(copies);
+    await tester.enterText(copies, '0');
+    await tester.tap(find.text('Aygıtı kaydet'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kopya sayısı 1-20 arasında olmalıdır.'), findsOneWidget);
+    expect(_FakeHardwareDevicesNotifier.saveCalls, 0);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -237,7 +349,7 @@ void main() {
     });
 
     Future<void> openFor(String typeLabel, String discoveryLabel) async {
-      await tester.tap(find.byTooltip('Cihaz ekle'));
+      await tester.tap(find.byTooltip('Aygıt ekle'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(typeLabel).first);
       await tester.tap(find.text('Devam et'));
@@ -287,7 +399,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.tap(find.byTooltip('Aygıt ekle'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Devam et'));
     await tester.pumpAndSettle();
@@ -298,7 +410,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ortak cihazları bul'), findsOneWidget);
-    expect(find.text('Bağlantıyı kontrol et'), findsNothing);
+    expect(find.text('Bağlantıyı test et'), findsNothing);
+    expect(find.text('Genel bilgiler'), findsNothing);
+    expect(find.text('Donanım özellikleri'), findsNothing);
+    expect(find.text('Ortak yazıcıyı kullan'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -333,18 +448,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byTooltip('Cihaz ekle'));
+    await tester.tap(find.byTooltip('Aygıt ekle'));
     await tester.pumpAndSettle();
-    expect(find.text('Yeni cihaz ekle'), findsOneWidget);
+    expect(find.text('Yeni aygıt ekle'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Devam et'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Devam et'));
     await tester.pumpAndSettle();
-    expect(find.text('Cihazı kaydet'), findsOneWidget);
-    expect(find.text('Bağlantıyı kontrol et'), findsOneWidget);
+    expect(find.text('Aygıtı kaydet'), findsOneWidget);
+    expect(find.text('Bağlantıyı test et'), findsOneWidget);
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('long device states stay overflow-free on a narrow viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hardwareDevicesProvider
+              .overrideWith(_OfflineHardwareDevicesNotifier.new),
+        ],
+        child: const MaterialApp(home: HardwareTestPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Çevrimdışı'), findsOneWidget);
+    expect(find.byTooltip('Yönetici işlemleri'), findsOneWidget);
+    expect(find.byTooltip('Aygıt ekle'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

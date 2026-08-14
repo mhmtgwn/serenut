@@ -49,6 +49,33 @@ class DataResetService {
     }
   }
 
+  /// Hides the complete product catalogue while preserving product rows that
+  /// are referenced by historical sales. Pending product mutations are
+  /// discarded because the server-issued catalogue reset is the causal
+  /// barrier for every device in the tenant.
+  static Future<void> clearProductCatalog(
+    DatabaseExecutor db, {
+    bool clearProductOutbox = true,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.rawUpdate('''
+      UPDATE products
+      SET is_active = 0,
+          is_deleted = 1,
+          deleted_at = COALESCE(deleted_at, ?),
+          updated_at = ?,
+          is_synced = 1
+    ''', [now, now]);
+    if (clearProductOutbox) {
+      await db.rawDelete(
+        "DELETE FROM sync_outbox_v4 WHERE entity_type = 'product'",
+      );
+      await db.rawDelete(
+        "DELETE FROM sync_conflicts_v4 WHERE entity_type = 'product'",
+      );
+    }
+  }
+
   static Future<void> _deleteIfPresent(
     DatabaseExecutor db,
     String table,

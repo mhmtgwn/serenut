@@ -32,7 +32,7 @@ function tokenForDevice(): string {
       email: 'owner@sync-http.test',
       company_id: companyId,
       roles: ['owner'],
-      permissions: ['settings:printer', 'settings:database'],
+      permissions: ['settings:printer', 'settings:database', 'settings:recovery'],
       token_version: 1,
       entitlement_state: 'active',
       entitlement_valid_until: Date.now() + 60 * 60 * 1000,
