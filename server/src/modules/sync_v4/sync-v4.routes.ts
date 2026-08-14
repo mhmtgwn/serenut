@@ -21,6 +21,16 @@ const entityTypes = new Set([
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const syncProtocolVersion = 6;
+const requireDestructiveResetRole = (req: any, res: any, next: any) => {
+  const roles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+  if (!roles.includes("owner") && !roles.includes("sysadmin")) {
+    return res.status(403).json({
+      error: "forbidden",
+      message: "Bu işlem yalnızca işletme sahibi tarafından yapılabilir.",
+    });
+  }
+  return next();
+};
 
 type SyncMutation = {
   entity_type: string;
@@ -841,8 +851,85 @@ router.post("/hardware-jobs/:id/result", requirePermission("settings:printer") a
 });
 
 router.post(
+  "/catalog-reset",
+  requirePermission("settings:recovery") as any,
+  requireDestructiveResetRole as any,
+  async (req, res) => {
+    const user = (req as any).user;
+    const activationId = req.header("x-device-activation-id") || req.body?.device_activation_id;
+    const deviceId = req.header("x-device-id") || req.body?.device_id;
+    const client = await pgPool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT set_config('app.current_company_id', $1, true)", [user.company_id]);
+      await assertActiveSyncActivation(user.company_id, activationId, deviceId, client);
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtext($1), hashtext('operational-reset'))",
+        [user.company_id],
+      );
+      const countResult = await client.query(
+        "SELECT COUNT(*) AS products FROM products WHERE company_id=$1 AND is_deleted=false",
+        [user.company_id],
+      );
+      await client.query(
+        `UPDATE products SET is_deleted=true,status='inactive',deleted_at=COALESCE(deleted_at,NOW()),updated_at=NOW()
+          WHERE company_id=$1`,
+        [user.company_id],
+      );
+      await client.query(
+        "DELETE FROM sync_v4_entities WHERE tenant_id=$1 AND entity_type='product'",
+        [user.company_id],
+      );
+      await client.query(
+        "DELETE FROM sync_v4_conflicts WHERE tenant_id=$1 AND entity_type='product'",
+        [user.company_id],
+      );
+
+      const mutationId = randomUUID();
+      const payload = { scope: "catalog", counts: countResult.rows[0] };
+      const resetChange = await client.query(
+        `INSERT INTO sync_v4_changes
+          (tenant_id,mutation_id,device_id,device_activation_id,entity_type,entity_id,operation,payload)
+         VALUES ($1,$2::uuid,$3,$4,'system_reset',$5,'UPSERT',$6::jsonb)
+         RETURNING revision`,
+        [user.company_id, mutationId, deviceId, activationId,
+          `catalog-${mutationId}`, JSON.stringify(payload)],
+      );
+      const resetRevision = Number(resetChange.rows[0].revision);
+      await client.query(
+        `INSERT INTO audit_logs
+          (id,company_id,user_id,action,entity,entity_id,new_value,ip_address)
+         VALUES ($1,$2,$3,'PRODUCT_CATALOG_RESET','product_catalog',$4,$5,$6)`,
+        [`aud-${randomUUID()}`, user.company_id, user.id, String(resetRevision),
+          JSON.stringify(payload), req.ip ?? null],
+      );
+      await client.query("COMMIT");
+      await RealtimeBroadcastService.publishEvent(
+        user.company_id,
+        "ProductCatalogReset",
+        { reset_revision: resetRevision },
+        req.headers["x-correlation-id"] as string | undefined,
+      );
+      return res.json({ success: true, reset_revision: resetRevision, counts: countResult.rows[0] });
+    } catch (error: any) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      logger.error("Product catalog reset failed", {
+        error: error?.message || "catalog_reset_failed",
+        company_id: user.company_id,
+        user_id: user.id,
+      });
+      const status = error?.message === "invalid_device_activation" ? 403 : 500;
+      return res.status(status).json({ error: error?.message || "catalog_reset_failed" });
+    } finally {
+      client.release();
+    }
+  },
+);
+
+router.post(
   "/operational-reset",
-  requirePermission("settings:database") as any,
+  requirePermission("settings:recovery") as any,
+  requireDestructiveResetRole as any,
   async (req, res) => {
     const user = (req as any).user;
     const activationId = req.header("x-device-activation-id") || req.body?.device_activation_id;
@@ -976,11 +1063,15 @@ router.post("/push", async (req, res) => {
       revision: number;
     }> = [];
     const resetBarrierResult = await client.query(
-      `SELECT COALESCE(MAX(revision),0) AS revision FROM sync_v4_changes
-        WHERE tenant_id=$1 AND entity_type='system_reset'`,
+      `SELECT
+         COALESCE(MAX(revision) FILTER (WHERE payload->>'scope'='operational'),0) AS operational_revision,
+         COALESCE(MAX(revision) FILTER (WHERE payload->>'scope'='catalog'),0) AS catalog_revision
+       FROM sync_v4_changes
+       WHERE tenant_id=$1 AND entity_type='system_reset'`,
       [user.company_id],
     );
-    const resetBarrierRevision = Number(resetBarrierResult.rows[0].revision);
+    const operationalResetRevision = Number(resetBarrierResult.rows[0].operational_revision);
+    const catalogResetRevision = Number(resetBarrierResult.rows[0].catalog_revision);
     for (const mutation of mutations) {
       await client.query("SAVEPOINT sync_mutation");
       try {
@@ -999,6 +1090,9 @@ router.post("/push", async (req, res) => {
       ) {
         throw new Error("invalid_mutation");
       }
+      const resetBarrierRevision = mutation.entity_type === "product"
+        ? Math.max(operationalResetRevision, catalogResetRevision)
+        : operationalResetRevision;
       if (mutation.base_revision < resetBarrierRevision) {
         throw new Error("stale_before_operational_reset");
       }

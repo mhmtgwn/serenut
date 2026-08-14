@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
@@ -67,6 +68,7 @@ void main() {
       api,
       deviceActivationIdResolver: () async => 'activation-1',
       deviceIdResolver: () async => 'installation-1',
+      productImageCleaner: () async {},
     );
 
     expect(await service.resetOperationalData(), 88);
@@ -107,6 +109,7 @@ void main() {
       api,
       deviceActivationIdResolver: () async => 'activation-1',
       deviceIdResolver: () async => 'installation-1',
+      productImageCleaner: () async {},
     ).sync();
 
     expect(result.success, isTrue);
@@ -117,6 +120,55 @@ void main() {
         await db.query('products', where: 'id=?', whereArgs: ['new-product']),
         hasLength(1));
     expect((await db.query('sync_cursor_v4')).single['cursor'], 9);
+  });
+
+  test('catalog reset hides products but preserves operational history',
+      () async {
+    final db = await manager.getDatabase();
+    await db.insert('products', {
+      'id': 'old-product',
+      'name': 'Eski ürün',
+      'price': 10,
+      'quantity': 1,
+      'category': 'Test',
+      'is_active': 1,
+      'created_at': '2026-01-01T00:00:00Z',
+      'updated_at': '2026-01-01T00:00:00Z',
+    });
+    await db.insert('sync_cursor_v4', {'key': 'global', 'cursor': 7});
+    await db.insert('sync_outbox_v4', {
+      'mutation_id': 'stale-product-mutation',
+      'entity_type': 'product',
+      'entity_id': 'old-product',
+      'operation': 'UPSERT',
+      'payload': '{}',
+      'state': 'PENDING',
+      'attempts': 0,
+      'created_at': '2026-01-01T00:00:00Z',
+    });
+
+    final api = ApiClient();
+    api.mockHandler = (request) {
+      expect(request.url.path, endsWith('/api/v4/sync/catalog-reset'));
+      return const ApiResponse(
+        statusCode: 200,
+        headers: {},
+        body: '{"success":true,"reset_revision":91}',
+      );
+    };
+    final service = SyncV4Service(
+      api,
+      deviceActivationIdResolver: () async => 'activation-1',
+      deviceIdResolver: () async => 'installation-1',
+      productImageCleaner: () async {},
+    );
+
+    expect(await service.resetProductCatalog(), 91);
+    final product = (await db.query('products')).single;
+    expect(product['is_active'], 0);
+    expect(product['is_deleted'], 1);
+    expect(await db.query('sync_outbox_v4'), isEmpty);
+    expect((await db.query('sync_cursor_v4')).single['cursor'], 91);
   });
 
   test('full cleanup removes imported product image directory', () async {

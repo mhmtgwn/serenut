@@ -159,11 +159,22 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
           showStatusIndicator: false,
           actions: [
             Badge(
-              isLabelVisible: stockFilter != null || sortBy != null,
+              isLabelVisible: selectedCategory != null ||
+                  stockFilter != null ||
+                  sortBy != null,
               child: IconButton(
-                tooltip: 'Ürün filtreleri',
-                onPressed: _showProductFilters,
-                icon: const Icon(Icons.tune_rounded),
+                tooltip: selectedCategory == null
+                    ? 'Ürün filtreleri'
+                    : 'Filtre: $selectedCategory',
+                onPressed: () => _showProductFilters(categoriesVal),
+                icon: Icon(
+                  Icons.filter_list_rounded,
+                  color: selectedCategory == null &&
+                          stockFilter == null &&
+                          sortBy == null
+                      ? _kTextSecondary
+                      : _kGreen,
+                ),
               ),
             ),
             // Barkod tarama ikonu - Kamera
@@ -318,7 +329,8 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
     );
   }
 
-  Future<void> _showProductFilters() async {
+  Future<void> _showProductFilters(List<String> categories) async {
+    var category = ref.read(salesProductCategoryFilterProvider);
     var stock = ref.read(salesProductStockFilterProvider);
     var sort = ref.read(salesProductSortProvider);
     await showModalBottomSheet<void>(
@@ -333,6 +345,25 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
             children: [
               const Text('Ürünleri filtrele',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String?>(
+                value: category,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Kategori'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Tüm kategoriler'),
+                  ),
+                  ...categories.map(
+                    (item) => DropdownMenuItem<String?>(
+                      value: item,
+                      child: Text(item, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setSheetState(() => category = value),
+              ),
               const SizedBox(height: 14),
               Wrap(
                 spacing: 8,
@@ -372,14 +403,38 @@ class _CatalogPanelState extends ConsumerState<CatalogPanel> {
                 onChanged: (value) => setSheetState(() => sort = value),
               ),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  ref.read(salesProductStockFilterProvider.notifier).state =
-                      stock;
-                  ref.read(salesProductSortProvider.notifier).state = sort;
-                  Navigator.pop(context);
-                },
-                child: const Text('Uygula'),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setSheetState(() {
+                          category = null;
+                          stock = null;
+                          sort = null;
+                        });
+                      },
+                      child: const Text('Temizle'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        ref
+                            .read(salesProductCategoryFilterProvider.notifier)
+                            .state = category;
+                        ref
+                            .read(salesProductStockFilterProvider.notifier)
+                            .state = stock;
+                        ref.read(salesProductSortProvider.notifier).state =
+                            sort;
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Uygula'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

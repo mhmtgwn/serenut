@@ -19,29 +19,19 @@ class HardwareTestPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final devices = ref.watch(hardwareDevicesProvider);
-    final compact = MediaQuery.sizeOf(context).width < 600;
     return FullScreenSettingsPage(
       title: 'Aygıtlar',
       useScrollView: false,
       actions: [
-        if (!compact)
-          IconButton(
-            tooltip: 'Bağlantıları yenile',
-            onPressed: () => _refreshDevices(context, ref),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        if (!compact)
-          IconButton(
-            tooltip: 'Ortak yazıcılar',
-            onPressed: () => _openSharedPrinters(context, ref),
-            icon: const Icon(Icons.cloud_queue_rounded),
-          ),
-        if (!compact)
-          IconButton(
-            tooltip: 'Cihaz ekle',
-            onPressed: () => _openEditor(context, ref),
-            icon: const Icon(Icons.add_rounded),
-          ),
+        _DeviceManagerToolbar(
+          onRefresh: () => _refreshDevices(context, ref),
+          onSharedPrinters: () => _openSharedPrinters(context, ref),
+        ),
+        IconButton(
+          tooltip: 'Aygıt ekle',
+          onPressed: () => _openEditor(context, ref),
+          icon: const Icon(Icons.add_rounded),
+        ),
       ],
       child: devices.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -339,6 +329,68 @@ class HardwareTestPage extends ConsumerWidget {
   }
 }
 
+enum _DeviceManagerAction { refresh, sharedPrinters }
+
+class _DeviceManagerToolbar extends StatelessWidget {
+  final VoidCallback onRefresh;
+  final VoidCallback onSharedPrinters;
+
+  const _DeviceManagerToolbar({
+    required this.onRefresh,
+    required this.onSharedPrinters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 600) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Bağlantıları yenile',
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            tooltip: 'Ortak yazıcılar',
+            onPressed: onSharedPrinters,
+            icon: const Icon(Icons.cloud_queue_rounded),
+          ),
+        ],
+      );
+    }
+    return PopupMenuButton<_DeviceManagerAction>(
+      tooltip: 'Yönetici işlemleri',
+      onSelected: (action) {
+        switch (action) {
+          case _DeviceManagerAction.refresh:
+            onRefresh();
+          case _DeviceManagerAction.sharedPrinters:
+            onSharedPrinters();
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: _DeviceManagerAction.refresh,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.refresh_rounded),
+            title: Text('Bağlantıları yenile'),
+          ),
+        ),
+        PopupMenuItem(
+          value: _DeviceManagerAction.sharedPrinters,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.cloud_queue_rounded),
+            title: Text('Ortak yazıcılar'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 enum _DeviceFilter { all, printers, salesHardware }
 
 class _DeviceList extends StatefulWidget {
@@ -403,34 +455,36 @@ class _DeviceListState extends State<_DeviceList> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: Text('Tümü (${devices.length})'),
-                    selected: _filter == _DeviceFilter.all,
-                    onSelected: (_) =>
-                        setState(() => _filter = _DeviceFilter.all),
-                  ),
-                  ChoiceChip(
-                    label: Text(
-                      'Yazıcılar (${devices.where((device) => device.type == HardwareDeviceType.receiptPrinter || device.type == HardwareDeviceType.labelPrinter).length})',
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: Text('Tümü (${devices.length})'),
+                      selected: _filter == _DeviceFilter.all,
+                      onSelected: (_) =>
+                          setState(() => _filter = _DeviceFilter.all),
                     ),
-                    selected: _filter == _DeviceFilter.printers,
-                    onSelected: (_) =>
-                        setState(() => _filter = _DeviceFilter.printers),
-                  ),
-                  ChoiceChip(
-                    label: Text(
-                      'Satış donanımı (${devices.where((device) => device.type != HardwareDeviceType.receiptPrinter && device.type != HardwareDeviceType.labelPrinter).length})',
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text(
+                        'Yazıcılar (${devices.where((device) => device.type == HardwareDeviceType.receiptPrinter || device.type == HardwareDeviceType.labelPrinter).length})',
+                      ),
+                      selected: _filter == _DeviceFilter.printers,
+                      onSelected: (_) =>
+                          setState(() => _filter = _DeviceFilter.printers),
                     ),
-                    selected: _filter == _DeviceFilter.salesHardware,
-                    onSelected: (_) => setState(
-                      () => _filter = _DeviceFilter.salesHardware,
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text(
+                        'Satış donanımı (${devices.where((device) => device.type != HardwareDeviceType.receiptPrinter && device.type != HardwareDeviceType.labelPrinter).length})',
+                      ),
+                      selected: _filter == _DeviceFilter.salesHardware,
+                      onSelected: (_) =>
+                          setState(() => _filter = _DeviceFilter.salesHardware),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -450,24 +504,28 @@ class _DeviceListState extends State<_DeviceList> {
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
                 final columns = constraints.crossAxisExtent >= 760 ? 2 : 1;
+                final textScale = MediaQuery.textScalerOf(context).scale(1);
+                final cardExtent = 308.0 + (textScale - 1).clamp(0.0, 1.0) * 96;
                 return SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
-                    mainAxisExtent:
-                        constraints.crossAxisExtent < 420 ? 292 : 268,
+                    mainAxisExtent: cardExtent,
                   ),
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final device = visible[index];
-                    return _DeviceCard(
-                      device: device,
-                      onEdit: () => widget.onEdit(device),
-                      onActivate: () => widget.onActivate(device),
-                      onTest: () => widget.onTest(device),
-                      onDelete: () => widget.onDelete(device),
-                    );
-                  }, childCount: visible.length),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final device = visible[index];
+                      return _DeviceCard(
+                        device: device,
+                        onEdit: () => widget.onEdit(device),
+                        onActivate: () => widget.onActivate(device),
+                        onTest: () => widget.onTest(device),
+                        onDelete: () => widget.onDelete(device),
+                      );
+                    },
+                    childCount: visible.length,
+                  ),
                 );
               },
             ),
@@ -743,7 +801,17 @@ class _DeviceCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (isActive)
+                    const _StatusBadge(label: 'Aktif', color: kGreen),
+                  _StatusBadge(label: status.$1, color: status.$2),
+                ],
+              ),
+              const SizedBox(height: 10),
               Text(
                 device.name,
                 maxLines: 1,
@@ -958,6 +1026,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   Widget build(BuildContext context) {
     final editing = widget.device != null;
     final content = Material(
+      key: const ValueKey('hardware-device-editor'),
       color: const Color(0xFFF8FAF9),
       borderRadius: BorderRadius.circular(widget.desktopDialog ? 24 : 28),
       clipBehavior: Clip.antiAlias,
@@ -999,7 +1068,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        editing ? 'Aygıt ayarları' : 'Yeni cihaz ekle',
+                        editing ? widget.device!.name : 'Yeni aygıt ekle',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1010,7 +1079,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                       ),
                       Text(
                         editing
-                            ? '${_step + 1}/3 · ${deviceFriendlyIdentity(widget.device!)}'
+                            ? 'Aygıt ayarları · ${deviceFriendlyIdentity(widget.device!)}'
                             : '${_step + 1}/3 · İşletmenize yeni bir donanım bağlayın',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1042,8 +1111,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _EditorProgress(step: _step),
-                  const SizedBox(height: 24),
+                  if (!editing) ...[
+                    _EditorProgress(step: _step),
+                    const SizedBox(height: 24),
+                  ],
                   if (_step == 0) _typeStep(),
                   if (_step == 1) _connectionStep(),
                   if (_step == 2) _detailsStep(),
@@ -1070,16 +1141,19 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     );
 
     if (widget.desktopDialog) return content;
-    final height = MediaQuery.sizeOf(context).height;
+    final mediaQuery = MediaQuery.of(context);
+    final availableHeight =
+        mediaQuery.size.height - mediaQuery.viewInsets.bottom;
     return Align(
       alignment: Alignment.bottomCenter,
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+        child: SizedBox(
+          height: availableHeight * .92,
+          child: content,
         ),
-        child: SizedBox(height: height * .92, child: content),
       ),
     );
   }
@@ -1088,15 +1162,18 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     final back = _step > (editing ? 1 : 0)
         ? TextButton.icon(
             onPressed: _working ? null : () => setState(() => _step--),
-            icon: const Icon(Icons.arrow_back_rounded, size: 18),
-            label: const Text('Geri'),
+            icon: Icon(
+              editing ? Icons.cable_rounded : Icons.arrow_back_rounded,
+              size: 18,
+            ),
+            label: Text(editing ? 'Bağlantı seçimi' : 'Geri'),
           )
         : const SizedBox.shrink();
     final test = _step == 2 && _connection != HardwareConnectionType.cloud
         ? OutlinedButton.icon(
             onPressed: _working ? null : _testDraft,
             icon: const Icon(Icons.cable_rounded, size: 18),
-            label: const Text('Bağlantıyı kontrol et'),
+            label: const Text('Bağlantıyı test et'),
           )
         : const SizedBox.shrink();
     final primary = FilledButton.icon(
@@ -1109,43 +1186,65 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 color: Colors.white,
               ),
             )
-          : Icon(
-              _step < 2 ? Icons.arrow_forward_rounded : Icons.save_rounded,
-            ),
-      label: Text(
-        _step < 2
-            ? 'Devam et'
-            : editing
-                ? 'Ayarları kaydet'
-                : 'Cihazı kaydet',
-      ),
+          : Icon(_step < 2
+              ? Icons.arrow_forward_rounded
+              : _connection == HardwareConnectionType.cloud
+                  ? Icons.link_rounded
+                  : Icons.save_rounded),
+      label: Text(_step < 2
+          ? 'Devam et'
+          : _connection == HardwareConnectionType.cloud
+              ? 'Ortak yazıcıyı kullan'
+              : editing
+                  ? 'Ayarları kaydet'
+                  : 'Aygıtı kaydet'),
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 520) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              primary,
-              if (_step == 2) ...[const SizedBox(height: 8), test],
-              if (_step > (editing ? 1 : 0)) ...[
-                const SizedBox(height: 4),
-                back,
-              ],
-            ],
-          );
-        }
-        return Row(
+    return LayoutBuilder(builder: (context, constraints) {
+      final textScale = MediaQuery.textScalerOf(context).scale(1);
+      if (constraints.maxWidth < 350 || textScale > 1.1) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            back,
-            const Spacer(),
-            test,
-            if (_step == 2) const SizedBox(width: 10),
+            if (_step > (editing ? 1 : 0)) ...[
+              back,
+              const SizedBox(height: 4),
+            ],
+            if (_step == 2 && _connection != HardwareConnectionType.cloud) ...[
+              test,
+              const SizedBox(height: 8),
+            ],
             primary,
           ],
         );
-      },
-    );
+      }
+      if (constraints.maxWidth < 520) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_step > (editing ? 1 : 0))
+              Align(alignment: Alignment.centerLeft, child: back),
+            if (_step > (editing ? 1 : 0)) const SizedBox(height: 4),
+            if (_step == 2 && _connection != HardwareConnectionType.cloud)
+              Row(
+                children: [
+                  Expanded(child: test),
+                  const SizedBox(width: 8),
+                  Expanded(child: primary),
+                ],
+              )
+            else
+              primary,
+          ],
+        );
+      }
+      return Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 10,
+        runSpacing: 8,
+        children: [back, test, primary],
+      );
+    });
   }
 
   Widget _typeStep() {
@@ -1215,30 +1314,47 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           style: TextStyle(fontSize: 12, color: kTextSecondary),
         ),
         const SizedBox(height: 14),
-        ..._connectionsFor(_type).map(
-          (connection) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _SelectionCard(
-              selected: connection == _connection,
-              icon: _connectionIcon(connection),
-              color: kGreen,
-              title: _connectionLabel(connection),
-              subtitle: _connectionDescription(connection),
-              onTap: () => setState(() {
-                _connection = connection;
-                _error = null;
-                if (connection != HardwareConnectionType.cloud) {
-                  _selectedSharedDevice = null;
-                }
-              }),
-            ),
-          ),
-        ),
+        ..._connectionsFor(_type).map((connection) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _SelectionCard(
+                selected: connection == _connection,
+                icon: _connectionIcon(connection),
+                color: kGreen,
+                title: _connectionLabel(connection),
+                subtitle: _connectionDescription(connection),
+                onTap: () => _selectConnection(connection),
+              ),
+            )),
       ],
     );
   }
 
+  void _selectConnection(HardwareConnectionType connection) {
+    if (connection == _connection) return;
+    setState(() {
+      _connection = connection;
+      _error = null;
+      _draftTestResult = null;
+      _verifiedFingerprint = null;
+      _selectedSharedDevice = null;
+      _sharedDevices = const [];
+      _discoveredPrinters = const [];
+      _bluetoothDevices = const [];
+      _serialDevices = const [];
+      if (connection == HardwareConnectionType.tcp) {
+        _host.clear();
+        _port.text = _defaultPort(_type).toString();
+      } else if (connection == HardwareConnectionType.serial) {
+        _serialPort.clear();
+      } else if (connection == HardwareConnectionType.windows ||
+          connection == HardwareConnectionType.bluetooth) {
+        _printerName.clear();
+      }
+    });
+  }
+
   Widget _detailsStep() {
+    final sharedConnection = _connection == HardwareConnectionType.cloud;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1251,15 +1367,33 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           '${_connectionLabel(_connection)} için gerekli alanları doldurun.',
           style: const TextStyle(fontSize: 12, color: kTextSecondary),
         ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _name,
-          decoration: const InputDecoration(
-            labelText: 'Cihaz adı',
-            helperText: 'Örn. Kasa 1 fiş yazıcısı',
+        if (!sharedConnection) ...[
+          const SizedBox(height: 20),
+          const _FormSectionTitle(
+            icon: Icons.badge_outlined,
+            title: 'Genel bilgiler',
           ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(
+              labelText: 'Aygıt adı',
+              helperText: 'Örn. Kasa 1 fiş yazıcısı',
+            ),
+          ),
+        ],
+        const SizedBox(height: 22),
+        const _FormSectionTitle(
+          icon: Icons.cable_rounded,
+          title: 'Bağlantı',
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
+        if (_connection == HardwareConnectionType.embedded)
+          const _ConnectionNotice(
+            icon: Icons.smartphone_rounded,
+            message:
+                'Uygulama bu cihazdaki dahili yazıcıyı otomatik olarak kullanır.',
+          ),
         if (_connection == HardwareConnectionType.tcp) ...[
           _ResponsiveFieldRow(
             flexes: const [3, 1],
@@ -1341,21 +1475,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             ],
           ),
         ],
-        if (_type == HardwareDeviceType.scale) ...[
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _scaleUnit,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Terazinin gönderdiği varsayılan birim',
-            ),
-            items: const [
-              DropdownMenuItem(value: 'kg', child: Text('Kilogram (kg)')),
-              DropdownMenuItem(value: 'g', child: Text('Gram (g)')),
-            ],
-            onChanged: (value) => _scaleUnit = value ?? 'kg',
-          ),
-        ],
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
             _connection == HardwareConnectionType.windows) ...[
@@ -1408,6 +1527,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           ),
         ],
         if (_connection == HardwareConnectionType.tcp) ...[
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: _discoveringNetwork ? null : _discoverNetworkPrinters,
             icon: _discoveringNetwork
@@ -1450,6 +1570,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           const SizedBox(height: 10),
         ],
         if (_connection == HardwareConnectionType.serial) ...[
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: _discoverSerialPorts,
             icon: const Icon(Icons.usb_rounded),
@@ -1602,8 +1723,29 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             style: TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
+        if (!sharedConnection) ...[
+          const SizedBox(height: 22),
+          const _FormSectionTitle(
+            icon: Icons.tune_rounded,
+            title: 'Donanım özellikleri',
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (_type == HardwareDeviceType.scale) ...[
+          DropdownButtonFormField<String>(
+            value: _scaleUnit,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Terazinin gönderdiği varsayılan birim',
+            ),
+            items: const [
+              DropdownMenuItem(value: 'kg', child: Text('Kilogram (kg)')),
+              DropdownMenuItem(value: 'g', child: Text('Gram (g)')),
+            ],
+            onChanged: (value) => _scaleUnit = value ?? 'kg',
+          ),
+        ],
         if (_type == HardwareDeviceType.paymentTerminal) ...[
-          const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: _vendor,
             isExpanded: true,
@@ -1644,8 +1786,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             style: TextStyle(fontSize: 11, color: kTextSecondary),
           ),
         ],
-        if (_type == HardwareDeviceType.receiptPrinter) ...[
-          const SizedBox(height: 12),
+        if (_type == HardwareDeviceType.receiptPrinter &&
+            !sharedConnection) ...[
           SegmentedButton<int>(
             segments: const [
               ButtonSegment(value: 58, label: Text('58 mm')),
@@ -1656,17 +1798,16 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                 setState(() => _paperWidth = values.first),
           ),
           const SizedBox(height: 12),
-          SwitchListTile(
-            title: const Text('Fiş Sonunda Otomatik Kes'),
+          _SettingsToggle(
+            title: 'Fiş sonunda otomatik kes',
             value: _autoCut,
             onChanged: (val) => setState(() => _autoCut = val),
-            contentPadding: EdgeInsets.zero,
           ),
-          SwitchListTile(
-            title: const Text('Kasa Çekmecesini Aç'),
+          const SizedBox(height: 8),
+          _SettingsToggle(
+            title: 'Kasa çekmecesini aç',
             value: _openDrawer,
             onChanged: (val) => setState(() => _openDrawer = val),
-            contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: 8),
           TextField(
@@ -1674,11 +1815,11 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
               labelText: 'Yazdırılacak kopya sayısı',
+              helperText: '1-20 arasında bir değer girin.',
             ),
           ),
         ],
-        if (_type == HardwareDeviceType.labelPrinter) ...[
-          const SizedBox(height: 12),
+        if (_type == HardwareDeviceType.labelPrinter && !sharedConnection) ...[
           DropdownButtonFormField<String>(
             value: _labelLanguage,
             isExpanded: true,
@@ -1725,14 +1866,12 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           ),
           if (_labelLanguage == 'tspl') ...[
             const SizedBox(height: 4),
-            SwitchListTile(
-              title: const Text('Gap boşluğunu otomatik algıla'),
-              subtitle: const Text(
-                'Gaplı etiket kullanıldığında yazıcı sensörü etiket aralığını kalibre eder.',
-              ),
+            _SettingsToggle(
+              title: 'Gap boşluğunu otomatik algıla',
+              subtitle:
+                  'Gaplı etiket kullanıldığında yazıcı sensörü etiket aralığını kalibre eder.',
               value: _autoDetectLabelGap,
               onChanged: (value) => setState(() => _autoDetectLabelGap = value),
-              contentPadding: EdgeInsets.zero,
             ),
           ],
           const SizedBox(height: 12),
@@ -2014,7 +2153,10 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   }
 
   String? _validate() {
-    if (_name.text.trim().isEmpty) return 'Cihaz adı gereklidir.';
+    if (_connection != HardwareConnectionType.cloud &&
+        _name.text.trim().isEmpty) {
+      return 'Aygıt adı gereklidir.';
+    }
     if (_connection == HardwareConnectionType.tcp) {
       if (_host.text.trim().isEmpty) return 'IP adresi gereklidir.';
       final port = int.tryParse(_port.text);
@@ -2041,7 +2183,15 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         _selectedSharedDevice == null) {
       return 'Kullanılacak ortak cihazı seçin.';
     }
-    if (_type == HardwareDeviceType.labelPrinter) {
+    if (_type == HardwareDeviceType.receiptPrinter &&
+        _connection != HardwareConnectionType.cloud) {
+      final copies = int.tryParse(_labelCopies.text);
+      if (copies == null || copies < 1 || copies > 20) {
+        return 'Kopya sayısı 1-20 arasında olmalıdır.';
+      }
+    }
+    if (_type == HardwareDeviceType.labelPrinter &&
+        _connection != HardwareConnectionType.cloud) {
       final width = int.tryParse(_labelWidth.text);
       final height = int.tryParse(_labelHeight.text);
       final gap = int.tryParse(_labelGap.text);
@@ -2222,6 +2372,111 @@ class _EditorProgress extends StatelessWidget {
           }),
         );
       },
+    );
+  }
+}
+
+class _FormSectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _FormSectionTitle({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: kGreen),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: kTextPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(child: Divider()),
+      ],
+    );
+  }
+}
+
+class _SettingsToggle extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingsToggle({
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: kBorderColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SwitchListTile(
+        title: Text(title),
+        subtitle: subtitle == null
+            ? null
+            : Text(
+                subtitle!,
+                style: const TextStyle(fontSize: 11, color: kTextSecondary),
+              ),
+        value: value,
+        onChanged: onChanged,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      ),
+    );
+  }
+}
+
+class _ConnectionNotice extends StatelessWidget {
+  final IconData icon;
+  final String message;
+
+  const _ConnectionNotice({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kGreen.withValues(alpha: .06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kGreen.withValues(alpha: .22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: kGreen),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                height: 1.35,
+                fontSize: 12,
+                color: kTextPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2576,8 +2831,8 @@ class _LoadError extends StatelessWidget {
   return switch (status) {
     HardwareDeviceStatus.unverified => ('Doğrulanmadı', kTextSecondary),
     HardwareDeviceStatus.testing => ('Test ediliyor', kBlue),
-    HardwareDeviceStatus.ready => ('Test başarılı', kGreen),
-    HardwareDeviceStatus.offline => ('Son kontrolde çevrimdışı', kOrange),
+    HardwareDeviceStatus.ready => ('Hazır', kGreen),
+    HardwareDeviceStatus.offline => ('Çevrimdışı', kOrange),
     HardwareDeviceStatus.error => ('Hata', kPink),
     HardwareDeviceStatus.disabled => ('Pasif', kTextSecondary),
   };

@@ -187,16 +187,16 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
               _buildTransferRow(
                 title: 'Tüm Ürün Kataloğunu Temizle',
                 subtitle:
-                    'Kayıtlı olan tüm örnek veya yüklü ürün verilerini siler.',
+                    'Firma kataloğunu sunucudan ve bağlı tüm cihazlardan siler.',
                 icon: Icons.delete_sweep_rounded,
                 color: _kPink,
                 onTap: () => _clearAllProducts(),
               ),
               const _Divider(),
               _buildTransferRow(
-                title: 'Tüm Verileri Sıfırla (Fabrika Ayarları)',
+                title: 'Uygulama ve Firma Verilerini Sıfırla',
                 subtitle:
-                    'Veritabanını temizler, ayarları ve tüm verileri sıfırlar.',
+                    'Firma verilerini veya yalnızca bu cihazı sıfırlayın.',
                 icon: Icons.phonelink_erase_rounded,
                 color: _kPink,
                 onTap: () => _resetAllUserData(),
@@ -373,7 +373,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Standart Sıfırlama',
+                          Text('Firma Verilerini Sıfırla',
                               style: TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 15)),
                           SizedBox(height: 2),
@@ -410,14 +410,14 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Tam Temizlik',
+                          Text('Yalnızca Bu Cihazı Sıfırla',
                               style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
                                   color: Color(0xFFDC2626))),
                           SizedBox(height: 2),
                           Text(
-                            'Tüm veriler, ayarlar, PIN kodu ve yedekler silinir. Cihaz fabrika ayarlarına döner.',
+                            'Bu cihazdaki veriler, ayarlar, PIN kodu ve yerel yedekler silinir. Sunucu ve diğer cihazlar korunur.',
                             style: TextStyle(
                                 color: Color(0xFF991B1B), fontSize: 12),
                           ),
@@ -444,11 +444,11 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
 
     // Second confirmation dialog
     final title = resetType == 'standard'
-        ? 'Standart Sıfırlama Onayı'
-        : 'Tam Temizlik Onayı';
+        ? 'Firma Verilerini Sıfırlama Onayı'
+        : 'Bu Cihazı Sıfırlama Onayı';
     final desc = resetType == 'standard'
         ? 'Bu firmaya ait satışlar, siparişler, müşteriler ve ürünler sunucudan ve tüm cihazlardan kalıcı olarak silinecek. Ayarlarınız ve yedekleriniz korunacak. İnternet bağlantısı zorunludur.\n\nBu işlem geri alınamaz!'
-        : 'Tüm veriler, ayarlar, PIN kodu, kullanıcılar ve yedekler silinecek. Cihaz ilk kurulum ekranına dönecek.\n\nBu işlem KESİNLİKLE geri alınamaz!';
+        : 'Yalnızca bu cihazdaki veritabanı, ayarlar, PIN kodu ve yerel yedekler silinecek. Sunucudaki firma verileri ve diğer cihazlar korunacak. Bu cihaz ilk kurulum ekranına dönecek.\n\nBu işlem KESİNLİKLE geri alınamaz!';
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -475,7 +475,7 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             child: Text(
-                resetType == 'standard' ? 'Standart Sıfırla' : 'Her Şeyi Sil'),
+                resetType == 'standard' ? 'Firmayı Sıfırla' : 'Cihazı Sıfırla'),
           ),
         ],
       ),
@@ -484,9 +484,12 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
     if (confirmed != true || !mounted) return;
 
     requirePermissionAccess(context,
-        permission: app_permission.Permission.settingsDatabase,
+        permission: app_permission.Permission.settingsRecovery,
         title: 'Sıfırlama Yetkisi',
-        onGranted: (approvedByUserId, approvedByUserName) async {
+        allowedRoles: const [
+          app_permission.UserRole.owner,
+          app_permission.UserRole.sysadmin,
+        ], onGranted: (approvedByUserId, approvedByUserName) async {
       // Show loading
       showDialog(
         context: context,
@@ -631,36 +634,61 @@ class _DataTransferPageState extends ConsumerState<DataTransferPage> {
       ),
     );
 
-    if (confirmed == true) {
-      try {
-        final productRepo = await ref.read(productRepositoryProvider.future);
-        final all = await productRepo.findAll();
-        for (final p in all) {
-          await productRepo.delete(p.id);
-        }
-        ref.invalidate(productRepositoryProvider);
-        ref.invalidate(productsControllerProvider);
-        ref.read(productCategoriesStateProvider.notifier).state = [];
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Katalogdaki tüm ürünler başarıyla temizlendi.'),
-              backgroundColor: _kPink,
-              behavior: SnackBarBehavior.floating,
-            ),
+    if (confirmed != true || !mounted) return;
+    await requirePermissionAccess(
+      context,
+      permission: app_permission.Permission.settingsRecovery,
+      title: 'Ürün Kataloğunu Temizleme',
+      allowedRoles: const [
+        app_permission.UserRole.owner,
+        app_permission.UserRole.sysadmin,
+      ],
+      onGranted: (approvedByUserId, approvedByUserName) async {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+        try {
+          final auditService = await ref.read(auditServiceProvider.future);
+          await auditService.logSystemAction(
+            'product_catalog_reset',
+            'Firma kapsamındaki ürün kataloğu tüm cihazlarda temizlendi.',
+            approvedByUserId: approvedByUserId,
+            approvedByUserName: approvedByUserName,
           );
+          await ref.read(syncProvider.notifier).resetProductCatalog();
+          if (kIsWeb) InMemoryDb.products.clear();
+          ref.invalidate(productRepositoryProvider);
+          ref.invalidate(productsControllerProvider);
+          ref.invalidate(salesProductsControllerProvider);
+          ref.invalidate(ordersProductsControllerProvider);
+          ref.invalidate(productInventorySummaryProvider);
+          ref.read(productCategoriesStateProvider.notifier).state = [];
+          if (mounted) Navigator.pop(context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Ürün kataloğu sunucudan ve bağlı cihazlardan temizlendi.'),
+                backgroundColor: _kPink,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) Navigator.pop(context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Temizleme tamamlanamadı: $e'),
+                backgroundColor: _kPink,
+              ),
+            );
+          }
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Temizleme hatası: $e'),
-              backgroundColor: _kPink,
-            ),
-          );
-        }
-      }
-    }
+      },
+    );
   }
 
   // ── 2. ÜRÜN KATALOĞU DIŞARI AKTAR ───────────────────────────────────────────

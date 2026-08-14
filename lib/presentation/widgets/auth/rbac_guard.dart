@@ -61,14 +61,18 @@ Future<void> requirePermissionAccess(
   required Permission permission,
   required GatedActionCallback onGranted,
   String title = 'İşlem Doğrulaması',
+  List<UserRole>? allowedRoles,
 }) async {
   final container = ProviderScope.containerOf(context);
   final user = container.read(currentUserProvider);
 
-  final hasAccess = user != null &&
+  final hasPermission = user != null &&
       (user.role == UserRole.sysadmin ||
           user.role == UserRole.owner ||
           user.hasPermission(permission.value));
+  final hasAllowedRole = user != null &&
+      (allowedRoles == null || allowedRoles.contains(user.role));
+  final hasAccess = hasPermission && hasAllowedRole;
 
   if (!hasAccess) {
     if (!context.mounted) return;

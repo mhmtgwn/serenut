@@ -171,6 +171,26 @@ void main() {
       expect(find.text('Test Kola'), findsNothing);
     });
 
+    testWidgets('Sales product filter exposes category, stock and sorting',
+        (WidgetTester tester) async {
+      setupWideScreen(tester);
+      addTearDown(() => resetScreen(tester));
+
+      await tester.pumpWidget(createTestWidget());
+      await tester.pump(const Duration(seconds: 1));
+
+      await tester.tap(find.byTooltip('Ürün filtreleri'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Ürünleri filtrele'), findsOneWidget);
+      expect(find.text('Kategori'), findsOneWidget);
+      expect(find.text('Tüm stoklar'), findsOneWidget);
+      expect(find.text('Sıralama'), findsOneWidget);
+      expect(find.text('Temizle'), findsOneWidget);
+      expect(find.text('Uygula'), findsOneWidget);
+    });
+
     testWidgets('SUNMI 320px görünümünde uzun içerik taşma üretmez',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(320, 640);

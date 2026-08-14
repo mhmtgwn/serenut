@@ -10,12 +10,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:serenutos/config/environment.dart';
+import 'package:serenutos/infrastructure/services/product_image_peer_service.dart';
 
 final appDocumentsDirectoryProvider = FutureProvider<Directory>((ref) async {
   if (kIsWeb) {
     throw UnsupportedError('Documents directory is not supported on Web');
   }
-  return getApplicationDocumentsDirectory();
+  return getApplicationSupportDirectory();
 });
 
 class ProductImage extends ConsumerWidget {
@@ -96,7 +97,15 @@ class ProductImage extends ConsumerWidget {
     return docsDirAsync.when(
       data: (dir) {
         if (imageUrl != null && imageUrl!.isNotEmpty) {
-          if (_isNetworkUrl(imageUrl!)) {
+          if (ProductImagePeerService.isDeviceImageUri(imageUrl)) {
+            final imageId = ProductImagePeerService.imageIdFromUri(imageUrl);
+            if (imageId != null) {
+              final localPath = p.join(dir.path, 'product_images', imageId);
+              if (File(localPath).existsSync()) {
+                return _buildFileImage(context, localPath);
+              }
+            }
+          } else if (_isNetworkUrl(imageUrl!)) {
             return _buildNetworkImage(context, _toAbsoluteUrl(imageUrl!));
           } else {
             final resolvedPath = _resolveLocalPath(imageUrl!, dir.path);

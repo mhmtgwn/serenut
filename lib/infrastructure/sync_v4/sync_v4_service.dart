@@ -13,6 +13,7 @@ import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/infrastructure/network/api_client.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
 import 'package:serenutos/infrastructure/services/data_reset_service.dart';
+import 'package:serenutos/infrastructure/services/product_image_peer_service.dart';
 
 int _syncInt(Object? value, [int fallback = 0]) {
   if (value is num) return value.toInt();
@@ -47,13 +48,21 @@ class SyncV4Service {
     this._api, {
     Future<String> Function()? deviceActivationIdResolver,
     Future<String> Function()? deviceIdResolver,
+    Future<void> Function()? productImageCleaner,
+    ProductImagePeerService? productImagePeerService,
     LicenseService? licenseService,
   })  : _deviceActivationIdResolver = deviceActivationIdResolver,
         _deviceIdResolver = deviceIdResolver,
+        _productImageCleaner =
+            productImageCleaner ?? DataResetService.clearProductImages,
+        _productImagePeerService =
+            productImagePeerService ?? ProductImagePeerService.instance,
         _licenseService = licenseService;
   final ApiClient _api;
   final Future<String> Function()? _deviceActivationIdResolver;
   final Future<String> Function()? _deviceIdResolver;
+  final Future<void> Function() _productImageCleaner;
+  final ProductImagePeerService _productImagePeerService;
   final LicenseService? _licenseService;
   static const _legacySnapshotKey = 'sync_v4_legacy_snapshot_v1';
   static const _unsyncedProductRecoveryKey =
@@ -85,6 +94,35 @@ class SyncV4Service {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       });
+      await _productImageCleaner();
+    }
+    return revision;
+  }
+
+  /// Resets only the tenant product catalogue on the server and applies the
+  /// returned barrier locally. Sales, customers and financial history remain.
+  Future<int> resetProductCatalog() async {
+    final deviceActivationId = await _deviceActivationId();
+    final deviceId = await _deviceId();
+    final response = await _api.post('/api/v4/sync/catalog-reset', {
+      'device_activation_id': deviceActivationId,
+      'device_id': deviceId,
+    });
+    final body = Map<String, dynamic>.from(response.json as Map);
+    final revision = _syncInt(body['reset_revision']);
+    if (revision <= 0) throw StateError('invalid_catalog_reset_revision');
+
+    if (!kIsWeb) {
+      final db = await DatabaseManager().getDatabase();
+      await db.transaction((txn) async {
+        await DataResetService.clearProductCatalog(txn);
+        await txn.insert(
+          'sync_cursor_v4',
+          {'key': 'global', 'cursor': revision},
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      });
+      await _productImageCleaner();
     }
     return revision;
   }
@@ -100,6 +138,15 @@ class SyncV4Service {
     }
     final deviceActivationId = await _deviceActivationId();
     final deviceId = await _deviceId();
+    if (!kIsWeb) {
+      try {
+        final scope = _licenseService?.getLicenseInfo()?.merchantId ?? '';
+        await _productImagePeerService.start(scope);
+        await _productImagePeerService.prepareLocalImages(db);
+      } catch (_) {
+        // Product images are best-effort and never block business-data sync.
+      }
+    }
     await _snapshotPreV4DataOnce(db);
     await _recoverUnsyncedImportedProductsOnce(db);
     await db.rawUpdate(
@@ -199,6 +246,7 @@ class SyncV4Service {
     var cursor = state.isEmpty ? 0 : _syncInt(state.first['cursor']);
     var pulled = companyChanged ? 1 : 0;
     var reconciled = 0;
+    var productImagesNeedCleanup = false;
 
     // A fresh installation cannot reconstruct a tenant from a change log that
     // started after the tenant's original records were created. Hydrate from
@@ -213,6 +261,7 @@ class SyncV4Service {
             .map((value) => Map<String, dynamic>.from(value as Map))
             .toList(),
       );
+      productImagesNeedCleanup = snapshot.any(_isProductImageReset);
       await db.transaction((txn) async {
         for (final raw in snapshot) {
           await _apply(txn, raw);
@@ -235,6 +284,8 @@ class SyncV4Service {
             .map((value) => Map<String, dynamic>.from(value as Map))
             .toList(),
       );
+      productImagesNeedCleanup =
+          productImagesNeedCleanup || changes.any(_isProductImageReset);
       final next = _syncInt(pullBody['next_cursor'], cursor);
       await db.transaction((txn) async {
         for (final raw in changes.cast<Map>()) {
@@ -247,6 +298,16 @@ class SyncV4Service {
       pulled += changes.length;
       if (changes.length < 200 || next <= cursor) break;
       cursor = next;
+    }
+    if (productImagesNeedCleanup && !kIsWeb) {
+      await _productImageCleaner();
+    }
+    if (!kIsWeb) {
+      try {
+        pulled += await _productImagePeerService.syncMissingImages(db);
+      } catch (_) {
+        // An offline peer is expected; the periodic sync pass retries later.
+      }
     }
     return SyncV4Result(
       pushed: pushed,
@@ -521,10 +582,16 @@ class SyncV4Service {
     final payload = Map<String, dynamic>.from(change['payload'] as Map);
     var id = change['entity_id'] as String;
     if (type == 'system_reset') {
-      if (payload['scope'] != 'operational') {
-        throw StateError('unsupported_system_reset_scope');
+      switch (payload['scope']) {
+        case 'operational':
+          await DataResetService.clearOperationalTables(db);
+          break;
+        case 'catalog':
+          await DataResetService.clearProductCatalog(db);
+          break;
+        default:
+          throw StateError('unsupported_system_reset_scope');
       }
-      await DataResetService.clearOperationalTables(db);
       return;
     }
     if (type == 'refund') {
@@ -646,6 +713,13 @@ class SyncV4Service {
             conflictAlgorithm: ConflictAlgorithm.replace);
       }
     }
+  }
+
+  static bool _isProductImageReset(Map<String, dynamic> change) {
+    if (change['entity_type'] != 'system_reset') return false;
+    final payload = change['payload'];
+    if (payload is! Map) return false;
+    return payload['scope'] == 'operational' || payload['scope'] == 'catalog';
   }
 
   /// Local order numbers historically came from a device-local sequence, so

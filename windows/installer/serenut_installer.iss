@@ -5,7 +5,7 @@
 [Setup]
 AppId={{5E22B005-9B28-4DE3-BB10-388C838F5F2B}
 AppName=Serenut OS
-AppVersion=1.3.21
+AppVersion=1.3.27
 AppPublisher=Serenut OS Software Technologies A.Ş.
 AppPublisherURL=https://serenut.com/
 AppSupportURL=https://serenut.com/faq.html
@@ -54,7 +54,17 @@ Type: files; Name: "{userprograms}\Serenut OS\Serenut OS.lnk"
 ; The installer already runs elevated because application files live under
 ; Program Files. Skip the redistributable when it is already installed.
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Microsoft Visual C++ çalışma zamanı kuruluyor..."; Flags: waituntilterminated; Check: NeedsVCRuntime
+; Product images never live on the VPS. Permit authenticated peer transfer only
+; on trusted/private LAN profiles; the application still validates company and hash.
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Serenut OS Ürün Görseli TCP"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Serenut OS Ürün Görseli TCP"" dir=in action=allow program=""{app}\serenutos.exe"" protocol=TCP localport=48731 profile=private"; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Serenut OS Ürün Görseli UDP"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Serenut OS Ürün Görseli UDP"" dir=in action=allow program=""{app}\serenutos.exe"" protocol=UDP localport=48732 profile=private"; Flags: runhidden waituntilterminated
 Filename: "{app}\serenutos.exe"; Description: "{cm:LaunchProgram,Serenut OS}"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Serenut OS Ürün Görseli TCP"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Serenut OS Ürün Görseli UDP"""; Flags: runhidden waituntilterminated
 
 [Code]
 function NeedsVCRuntime: Boolean;
