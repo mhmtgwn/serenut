@@ -6,6 +6,7 @@ import 'dart:math' show Random;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serenutos/domain/services/dataset_import_service.dart';
+import 'package:serenutos/domain/models/import_strategy.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
 import 'package:archive/archive.dart';
@@ -174,6 +175,66 @@ void main() {
       final importedProducts = await productRepo.findAll();
       expect(importedProducts, hasLength(1));
       expect(importedProducts.first.quantity, equals(0));
+    });
+
+    test('default catalog update preserves existing store stock', () async {
+      await productRepo.create(ProductEntity(
+        id: '8690504090106',
+        name: 'Eski Ürün Adı',
+        description: 'Eski Marka',
+        price: 10,
+        quantity: 37,
+        category: 'Eski Kategori',
+      ));
+
+      final excel = ex.Excel.createExcel();
+      final sheet = excel['market_data_catalog'];
+      excel.delete('Sheet1');
+      sheet.appendRow([
+        ex.TextCellValue('Barkod'),
+        ex.TextCellValue('Urun Adi'),
+        ex.TextCellValue('Kategori'),
+        ex.TextCellValue('Marka'),
+        ex.TextCellValue('Fiyat (TL)'),
+        ex.TextCellValue('KDV Orani (%)'),
+        ex.TextCellValue('Gorsel Linki'),
+        ex.TextCellValue('Stok'),
+      ]);
+      sheet.appendRow([
+        ex.TextCellValue('8690504090106'),
+        ex.TextCellValue('Güncel Ürün Adı'),
+        ex.TextCellValue('Güncel Kategori'),
+        ex.TextCellValue('Güncel Marka'),
+        const ex.DoubleCellValue(25),
+        const ex.IntCellValue(20),
+        ex.TextCellValue(''),
+        const ex.IntCellValue(0),
+      ]);
+      final excelBytes = excel.save()!;
+      final archive = Archive()
+        ..addFile(ArchiveFile(
+          'market_data_catalog.xlsx',
+          excelBytes.length,
+          excelBytes,
+        ));
+      final zipBytes = Uint8List.fromList(ZipEncoder().encode(archive)!);
+
+      await importService.importFromZip(zipBytes, (_, __) {});
+
+      var product = await productRepo.findById('8690504090106');
+      expect(product, isNotNull);
+      expect(product!.name, 'Güncel Ürün Adı');
+      expect(product.price, 25);
+      expect(product.quantity, 37);
+
+      await importService.importFromZip(
+        zipBytes,
+        (_, __) {},
+        const ImportStrategy(syncStocks: true),
+      );
+
+      product = await productRepo.findById('8690504090106');
+      expect(product!.quantity, 0);
     });
 
     test('imports five-column catalog layout with TL price and image path',

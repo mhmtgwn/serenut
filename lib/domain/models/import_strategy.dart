@@ -16,7 +16,7 @@ class ImportStrategy {
   const ImportStrategy({
     this.insertNew = true,
     this.updateExisting = true,
-    this.syncStocks = true,
+    this.syncStocks = false,
     this.syncPrices = true,
     this.syncDescriptions = true,
     this.syncImages = true,
