@@ -120,12 +120,11 @@ class DatasetLoaderService {
   }
 
   Future<void> unmountActiveVersion() async {
-    if (_activeDb != null) {
-      await _activeDb!.close();
-      _activeDb = null;
-    }
+    final activeDb = _activeDb;
+    _activeDb = null;
     _activeVersion = 'None';
     await _prefs.setString('active_dataset_version', 'None');
+    await activeDb?.close();
   }
 
   Future<void> setSelectedMarket(String market) async {

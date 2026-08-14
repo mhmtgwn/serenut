@@ -5,7 +5,7 @@
 [Setup]
 AppId={{5E22B005-9B28-4DE3-BB10-388C838F5F2B}
 AppName=Serenut OS
-AppVersion=1.3.27
+AppVersion=1.3.28
 AppPublisher=Serenut OS Software Technologies A.Ş.
 AppPublisherURL=https://serenut.com/
 AppSupportURL=https://serenut.com/faq.html
