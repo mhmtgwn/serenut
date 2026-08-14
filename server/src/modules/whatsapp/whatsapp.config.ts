@@ -46,4 +46,3 @@ export function validateWhatsAppRuntimeConfig(env: NodeJS.ProcessEnv = process.e
 
   return errors;
 }
-

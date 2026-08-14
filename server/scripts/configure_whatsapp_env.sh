@@ -40,8 +40,18 @@ secret_or_generate() {
 }
 
 umask 077
-webhook_token="$(secret_or_generate WHATSAPP_WEBHOOK_VERIFY_TOKEN)"
-encryption_key="$(secret_or_generate WHATSAPP_CREDENTIAL_ENCRYPTION_KEY)"
+webhook_token="${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-$(secret_or_generate WHATSAPP_WEBHOOK_VERIFY_TOKEN)}"
+encryption_key="${WHATSAPP_CREDENTIAL_ENCRYPTION_KEY:-$(secret_or_generate WHATSAPP_CREDENTIAL_ENCRYPTION_KEY)}"
+
+for generated_secret in "$webhook_token" "$encryption_key"; do
+  case "$generated_secret" in
+    *[!0-9a-fA-F]*|'') echo "Invalid WhatsApp production secret" >&2; exit 1 ;;
+  esac
+  if [ "${#generated_secret}" -lt 64 ]; then
+    echo "Invalid WhatsApp production secret" >&2
+    exit 1
+  fi
+done
 
 upsert META_APP_ID 1224880033182854
 upsert META_APP_SECRET "$meta_app_secret"
@@ -58,4 +68,3 @@ fi
 
 chmod 600 "$ENV_FILE"
 echo "WhatsApp production environment prepared; channel remains disabled until approval."
-

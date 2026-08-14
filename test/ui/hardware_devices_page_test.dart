@@ -92,7 +92,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Aygıt Yöneticisi'), findsOneWidget);
+    expect(find.text('Aygıtlar'), findsOneWidget);
     expect(find.text('Kasa Terazisi'), findsOneWidget);
     expect(find.text('Hazır'), findsWidgets);
     expect(find.byTooltip('Bağlantıları yenile'), findsOneWidget);
@@ -138,7 +138,13 @@ void main() {
     expect(find.text('Genel bilgiler'), findsOneWidget);
     expect(find.text('Bağlantı'), findsOneWidget);
     expect(find.text('Donanım özellikleri'), findsOneWidget);
-    expect(find.text('Bağlantıyı test et'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('hardware-device-editor')),
+        matching: find.text('Bağlantıyı test et'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Ayarları kaydet'), findsOneWidget);
 
     await tester.tap(find.text('Ayarları kaydet'));
@@ -213,7 +219,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Aygıtı kaydet'), findsOneWidget);
-    expect(find.text('Bağlantıyı test et'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('hardware-device-editor')),
+        matching: find.text('Bağlantıyı test et'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byType(TextField).first);
@@ -410,7 +422,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ortak cihazları bul'), findsOneWidget);
-    expect(find.text('Bağlantıyı test et'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('hardware-device-editor')),
+        matching: find.text('Bağlantıyı test et'),
+      ),
+      findsNothing,
+    );
     expect(find.text('Genel bilgiler'), findsNothing);
     expect(find.text('Donanım özellikleri'), findsNothing);
     expect(find.text('Ortak yazıcıyı kullan'), findsOneWidget);
@@ -458,7 +476,13 @@ void main() {
     await tester.tap(find.text('Devam et'));
     await tester.pumpAndSettle();
     expect(find.text('Aygıtı kaydet'), findsOneWidget);
-    expect(find.text('Bağlantıyı test et'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('hardware-device-editor')),
+        matching: find.text('Bağlantıyı test et'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -483,7 +507,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Çevrimdışı'), findsOneWidget);
+    expect(find.text('Çevrimdışı'), findsWidgets);
     expect(find.byTooltip('Yönetici işlemleri'), findsOneWidget);
     expect(find.byTooltip('Aygıt ekle'), findsOneWidget);
     expect(tester.takeException(), isNull);

@@ -10,6 +10,7 @@ import 'package:pointycastle/export.dart';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -135,6 +136,7 @@ class DownloadCancellationToken {
 enum InstallResult {
   success,
   sha256Failed,
+  permissionRequired,
   openFileFailed,
   platformUnsupported
 }
@@ -154,6 +156,8 @@ enum InstallResult {
 /// if (info.hasUpdate) { ... }
 /// ```
 class ReleaseManagerService {
+  static const MethodChannel _androidUpdateChannel =
+      MethodChannel('serenut/app_update');
   static const String _configuredRsaModulus = String.fromEnvironment(
     'RELEASE_RSA_MODULUS',
     defaultValue: '',
@@ -449,6 +453,15 @@ class ReleaseManagerService {
     final path = file.path;
 
     if (Platform.isAndroid) {
+      final canInstall = await _androidUpdateChannel
+              .invokeMethod<bool>('canRequestPackageInstalls') ??
+          false;
+      if (!canInstall) {
+        await _androidUpdateChannel.invokeMethod<void>(
+          'openInstallPermissionSettings',
+        );
+        return InstallResult.permissionRequired;
+      }
       final result = await OpenFilex.open(path,
           type: 'application/vnd.android.package-archive');
       return result.type == ResultType.done

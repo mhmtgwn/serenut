@@ -1,10 +1,14 @@
 package com.serenut.pos
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
@@ -32,6 +36,7 @@ class MainActivity : FlutterActivity() {
     private val SCANNER_EVENT_CHANNEL = "com.sunmi.scanner/events" // Continuous stream
     private val NFC_CHANNEL = "com.sunmi.nfc"
     private val DRAWER_CHANNEL = "com.sunmi.drawer"
+    private val APP_UPDATE_CHANNEL = "serenut/app_update"
     
     // Sunmi Yazıcı Servisi
     private var sunmiPrinter: SunmiPrinterService? = null
@@ -64,6 +69,28 @@ class MainActivity : FlutterActivity() {
         
         // SMS Gönderici kanalı
         SmsSenderPlugin.register(flutterEngine.dartExecutor.binaryMessenger, this)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_UPDATE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "canRequestPackageInstalls" -> {
+                        val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                            packageManager.canRequestPackageInstalls()
+                        result.success(allowed)
+                    }
+                    "openInstallPermissionSettings" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:$packageName")
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                        }
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         
         // Sunmi yazıcısına bağlan
         connectPrinter()

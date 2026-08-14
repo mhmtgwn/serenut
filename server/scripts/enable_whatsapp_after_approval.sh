@@ -36,4 +36,3 @@ esac
 
 chmod 600 "$ENV_FILE"
 echo "WhatsApp channel enabled after successful public webhook verification."
-

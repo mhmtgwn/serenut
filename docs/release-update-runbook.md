@@ -24,6 +24,30 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
    indirilir. Değişken `/latest` adresi yalnız web sitesindeki elle indirme
    bağlantılarıyla geriye uyumluluk içindir ve önbelleğe alınmaz.
 
+## Desteklenen yükseltme yolları
+
+Her “imza hatası” aynı değildir. Serenut'ta iki bağımsız güven zinciri vardır:
+
+| Katman | Ne doğrular? | Sabit değer |
+|---|---|---|
+| Android paket sertifikası | Yeni APK'nın mevcut uygulamanın üzerine kurulabilmesi | `server/release-signing-policy.json` → `androidPackageCertificateSha256` |
+| OTA RSA imzası | İndirilen APK/EXE'nin Serenut yayın sunucusu tarafından üretildiği | `requiredUpgradeSignerModulusSha256` |
+
+Doğrudan OTA desteğinin alt sınırı **`1.3.10+91`** sürümüdür. Bu sürüm hem eski
+hem aktif OTA anahtarını içerir. `1.2.1+60` ve daha eski istemciler yalnız eski
+OTA anahtarını tanıdığı için aktif anahtarla imzalanmış güncel sürüme doğrudan
+geçemez. Bu cihazlar için:
+
+1. cihazın mevcut sürümü kaydedilir;
+2. eski OTA özel anahtarıyla imzalanmış, iki public anahtarı da içeren bir
+   **köprü sürüm** yayınlanır;
+3. cihaz köprü sürüme yükseltilir ve açıldığı doğrulanır;
+4. ardından normal güncel sürüme yükseltilir.
+
+Eski private key yoksa OTA ile köprü kurulamaz. Veriler yedeklenerek üretim
+imzalı APK'nın kontrollü manuel kurulumu planlanır. Bu durum “yeniden sürüm
+numarası artırarak” çözülemez.
+
 ## Her sürümde izlenecek akış
 
 1. `pubspec.yaml` içindeki sürümü artırın: `MAJOR.MINOR.PATCH+BUILD`.
@@ -42,6 +66,8 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
    Set-Location server
    npm run build
    npm run test:release-signing
+   Set-Location ..
+   node scripts/verify_release_key_continuity.js HEAD^
    ```
 
 4. Android/Windows artefaktlarını yalnızca `.github/workflows/deploy.yml`
@@ -55,13 +81,26 @@ Güncelleme bütünlüğü ile işletim sistemi paket imzası farklı katmanlard
 5. `main` dalındaki başarılı iş akışı artefaktları VPS'e yükler ve
    `server/scripts/deploy_production_ci.sh <sürüm+build>` komutunu çalıştırır.
    Bu betik, kanonik `dist/scripts/publish-release.js` yayınlayıcısını kullanır.
+   Her sürüm kendi `_incoming/<sürüm+build>` dizinini kullanır; ortak incoming
+   dizini kullanmak yasaktır. VPS yayınları dosya kilidiyle sıraya alınır ve
+   sunucuda artefaktı üreten kesin Git commit'i dağıtılır. Böylece iptal edilmiş
+   bir SSH işi yeni çalışmanın APK/EXE dosyalarını veya kaynak kodunu alamaz.
 6. İşlem ancak `scripts/verify_published_release.js` Android ve Windows
    artefaktlarını public sürüme özel URL'lerden indirip şu kontrollerin tümünü
    geçerse başarılı sayılır: doğru sürüm, değişmez URL, dosya boyutu, SHA-256
    ve istemci trusted keyring'iyle RSA imzası. Bu kontrol production dağıtım
    betiğinin zorunlu son adımıdır; başarısızsa yayın başarılı kabul edilmez.
-7. En az bir Android ve bir Windows test cihazında indirme ve kurulum yapın;
-   ardından kademeli dağıtım gerekiyorsa rollout oranını yükseltin.
+7. [`release-signoff-checklist.md`](release-signoff-checklist.md) formunu
+   doldurun. Test Android cihazında mağaza/üretim imzalı eski sürüm bulunmalıdır;
+   Android Studio debug kurulumu yükseltme testi olarak kabul edilmez.
+8. En az bir Android ve bir Windows test cihazında uygulama içinden indirme ve
+   yerinde yükseltme tamamlanmadan müşterilere “yayınlandı” duyurusu yapmayın.
+9. `1.3.10+91` altındaki cihazları normal rollout'a dahil etmeyin; köprü sürüm
+   prosedürünü uygulayın.
+
+Yalnızca belge, policy veya CI değiştiğinde canlıdaki aynı istemci sürümü yeniden
+yayınlanmaz. Android/Windows istemci dosyaları değişmiş fakat `pubspec.yaml`
+hâlâ canlı sürümü gösteriyorsa CI durur ve sürüm/build artırılmasını zorunlu kılar.
 
 ## Elle kurtarma yayını
 
@@ -86,6 +125,14 @@ adımda değiştirilmez. Ayrıntılı iki aşamalı prosedür için
   numarasını artırın ve kanonik akışla yeni bir sürüm yayınlayın.
 - `RSA signature did not match`: İstemcideki trusted keyring ile VPS'teki
   release private key aynı anahtar ailesinde değildir. Anahtar rotasyonu
-  prosedürünü uygulayın.
+  prosedürünü uygulayın. Cihaz `1.3.10+91` altındaysa doğrudan tekrar yayın
+  denemeyin; köprü sürüm gerekir.
 - Android paket imzası hatası: APK farklı keystore ile üretilmiştir. Mevcut
   uygulamanın üzerine kurulamaz; doğru production keystore ile yeniden üretin.
+- “Bu kaynaktan uygulama yükleme” izni kapalıysa bu bir imza hatası değildir.
+  Serenut için izin açılır ve aynı doğrulanmış dosyayla kurulum yeniden denenir.
+- `already exists with different content` hatası yeni ve daha önce
+  yayınlanmamış bir sürümde görülürse sürüm artırarak devam etmeyin. Aynı
+  `_incoming` dizinini kullanan eşzamanlı/iptal edilmiş bir yayın vardır.
+  Sürüm bazlı incoming dizinini, VPS yayın kilidini ve kesin commit checkout'unu
+  doğrulayın; ancak ondan sonra yeni build numarasıyla temiz yayın oluşturun.
