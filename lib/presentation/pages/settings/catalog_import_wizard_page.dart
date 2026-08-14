@@ -61,13 +61,15 @@ class _CatalogImportWizardPageState
   bool _insertNew = true;
   bool _updateExisting = true;
   bool _syncPrices = true;
-  bool _syncStocks = true;
+  // A shared product catalogue is not a reliable source for store-specific
+  // inventory. Preserve current stock unless the user explicitly opts in.
+  bool _syncStocks = false;
   bool _syncDescriptions = true;
   bool _syncImages = true;
   bool _deactivateMissing = false;
   // Re-importing the same catalogue must be idempotent by default. Matching
-  // barcodes update the existing row and replace its stock value; users can
-  // still explicitly choose "Mevcut Stoka Ekle" when that is intentional.
+  // barcodes update catalogue fields while preserving store inventory; users
+  // can still explicitly sync or merge stock when that is intentional.
   DuplicateResolution _duplicateResolution = DuplicateResolution.update;
 
   bool _isImporting = false;
@@ -812,7 +814,7 @@ class _CatalogImportWizardPageState
                 _buildSubCheckboxTile('Fiyatları Güncelle', _syncPrices,
                     (val) => setState(() => _syncPrices = val ?? true)),
                 _buildSubCheckboxTile('Stok Miktarlarını Güncelle', _syncStocks,
-                    (val) => setState(() => _syncStocks = val ?? true)),
+                    (val) => setState(() => _syncStocks = val ?? false)),
                 _buildSubCheckboxTile(
                     'Açıklamaları Güncelle',
                     _syncDescriptions,

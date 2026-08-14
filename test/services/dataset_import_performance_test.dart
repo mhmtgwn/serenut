@@ -147,8 +147,8 @@ void main() {
       expect(row['is_active'], 1);
       expect(row['is_deleted'], 0);
       expect(row['deleted_at'], isNull);
-      expect(row['quantity'], 4,
-          reason: 'Tekrar import mevcut stok üzerine ekleme yapmamalı');
+      expect(row['quantity'], 1,
+          reason: 'Katalog güncellemesi mevcut mağaza stokunu korumalı');
       expect(
         await db.query('products', where: 'id = ?', whereArgs: [barcode]),
         hasLength(1),
@@ -205,7 +205,7 @@ void main() {
       expect(rows, hasLength(1),
           reason: 'UPC-A ve sıfır önekli EAN-13 çift ürün oluşturmamalı');
       expect(rows.single['id'], upc);
-      expect(rows.single['quantity'], 4);
+      expect(rows.single['quantity'], 1);
       expect(rows.single['price'], 25.0);
     });
 
@@ -355,7 +355,10 @@ void main() {
       final result = await importService.importFromZip(
         zipBytes,
         (p, msg) {},
-        const ImportStrategy(duplicateResolution: DuplicateResolution.update),
+        const ImportStrategy(
+          duplicateResolution: DuplicateResolution.update,
+          syncStocks: true,
+        ),
       );
 
       expect(result['success'], equals(1));
