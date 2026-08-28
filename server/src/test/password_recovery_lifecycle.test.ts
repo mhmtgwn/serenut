@@ -58,6 +58,19 @@ async function run(): Promise<void> {
     assert.equal(registration.body.recovery_codes.length, 10, 'Registration must return exactly ten one-time recovery codes');
     const registeredUserId = registration.body.user_id || registration.body.user?.id;
     assert.ok(registeredUserId);
+    const registeredSubscription = await client.query(
+      `SELECT s.current_period_start, s.current_period_end
+       FROM subscriptions s
+       JOIN users u ON u.company_id = s.company_id
+       WHERE u.id = $1`,
+      [registeredUserId],
+    );
+    assert.equal(registeredSubscription.rowCount, 1, 'Registration must provision one trial subscription');
+    assert.ok(
+      new Date(registeredSubscription.rows[0].current_period_end).getTime() >
+        new Date(registeredSubscription.rows[0].current_period_start).getTime(),
+      'Trial subscription end must be after its start',
+    );
     const storedRegistrationCodes = await client.query(
       'SELECT code_hash FROM user_recovery_codes WHERE user_id=$1', [registeredUserId],
     );
