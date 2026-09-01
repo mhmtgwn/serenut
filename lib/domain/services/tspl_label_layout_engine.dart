@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/models/label_model.dart';
 
@@ -745,7 +744,6 @@ class TsplLabelLayoutEngine {
           corners.map((p) => p.b).reduce((a, b) => a + b) / corners.length;
 
       final List<int> rasterBytes = [];
-      var firedDots = 0;
       for (int y = 0; y < targetHeight; y++) {
         for (int x = 0; x < widthBytes; x++) {
           int b = 0;
@@ -761,7 +759,6 @@ class TsplLabelLayoutEngine {
                   : p.a >= 128 && backgroundDistance >= 45;
               if (isForeground) {
                 b |= (0x80 >> bit);
-                firedDots++;
               }
             }
           }
