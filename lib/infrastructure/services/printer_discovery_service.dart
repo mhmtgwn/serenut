@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 enum DiscoveredPrinterKind { windows, network, bluetooth, sunmi }
 
@@ -41,23 +42,57 @@ class PrinterDiscoveryService {
             ((host, port, timeout) =>
                 Socket.connect(host, port, timeout: timeout));
 
+  /// Lists all printers registered in the Windows spooler via WMI.
+  ///
+  /// Uses `Get-CimInstance Win32_Printer` instead of `Get-Printer` for two
+  /// reasons:
+  ///  1. `Get-Printer` is part of the optional PrintManagement module which
+  ///     is absent on Windows Home editions.
+  ///  2. When a PowerShell script is passed as a `-Command` argument by
+  ///     Dart's `Process.run`, the shell strips `$` prefixes so `$_.Name`
+  ///     becomes `.Name` and the whole script fails silently.
+  ///     We avoid this by encoding the script as Base64 UTF-16LE and using
+  ///     `-EncodedCommand`.
   Future<List<DiscoveredPrinter>> listWindowsPrinters() async {
     if (!Platform.isWindows) return const [];
-    const script = r'''
-$default = (Get-CimInstance Win32_Printer | Where-Object Default -eq $true | Select-Object -First 1 -ExpandProperty Name)
-@(Get-Printer | ForEach-Object {
-  [PSCustomObject]@{ name = $_.Name; port = $_.PortName; isDefault = ($_.Name -eq $default) }
-}) | ConvertTo-Json -Compress
+
+    // Script uses $_ inside ForEach-Object — must be passed via
+    // -EncodedCommand to prevent Dart/shell from stripping the $ signs.
+    const psScript = r'''
+$defaultName = (Get-CimInstance Win32_Printer | Where-Object { $_.Default -eq $true } | Select-Object -First 1 -ExpandProperty Name)
+$arr = @(Get-CimInstance Win32_Printer | ForEach-Object {
+  [PSCustomObject]@{ name = $_.Name; port = $_.PortName; isDefault = ($_.Name -eq $defaultName) }
+})
+if ($arr.Count -eq 0) { Write-Output '[]'; exit 0 }
+$arr | ConvertTo-Json -Compress
 ''';
+
+    // Encode as UTF-16LE (what PowerShell -EncodedCommand expects).
+    // psScript is ASCII-only so each codeUnit fits in one UTF-16LE word.
+    final utf16LeBytes = <int>[];
+    for (final cu in psScript.codeUnits) {
+      utf16LeBytes.add(cu & 0xFF);
+      utf16LeBytes.add((cu >> 8) & 0xFF);
+    }
+    final encoded = base64Encode(Uint8List.fromList(utf16LeBytes));
+
     try {
       final result = await Process.run(
         'powershell',
-        ['-NoProfile', '-NonInteractive', '-Command', script],
-      ).timeout(const Duration(seconds: 8));
-      if (result.exitCode != 0 || result.stdout.toString().trim().isEmpty) {
+        ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+      ).timeout(const Duration(seconds: 10));
+
+      final stdout = result.stdout.toString().trim();
+      final stderr = result.stderr.toString().trim();
+
+      if (result.exitCode != 0 || stdout.isEmpty) {
+        if (stderr.isNotEmpty) {
+          throw Exception('PowerShell hata kodu ${result.exitCode}: $stderr');
+        }
         return const [];
       }
-      final decoded = jsonDecode(result.stdout.toString());
+
+      final decoded = jsonDecode(stdout);
       final rows = decoded is List ? decoded : [decoded];
       return rows.map((row) {
         final map = Map<String, dynamic>.from(row as Map);
@@ -70,8 +105,8 @@ $default = (Get-CimInstance Win32_Printer | Where-Object Default -eq $true | Sel
           isDefault: map['isDefault'] == true,
         );
       }).toList();
-    } catch (_) {
-      return const [];
+    } catch (e) {
+      rethrow;
     }
   }
 
