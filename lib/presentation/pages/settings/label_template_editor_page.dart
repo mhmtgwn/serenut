@@ -463,18 +463,24 @@ class _LabelTemplateEditorPageState
 
   // ── Önizleme Widget'ları ──────────────────────────────────────────────────
   Widget _buildProductLabelPreview(String bizName, String? logoPath) {
-    double scale = switch (_productFontSize) {
-      'Küçük' => 0.85,
-      'Büyük' => 1.15,
-      _ => 1.0,
-    };
+    final dimScale = math.min(_labelWidthMm / 50.0, _labelHeightMm / 30.0);
+    final scale = (switch (_productFontSize) {
+          'Küçük' => 0.85,
+          'Büyük' => 1.15,
+          _ => 1.0,
+        }) *
+        dimScale;
 
     final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
+    final aspect = _labelWidthMm / _labelHeightMm;
+    final previewWidth = 260.0;
+    final previewHeight = (previewWidth / aspect).clamp(110.0, 340.0);
 
     return Center(
       child: Container(
-        width: 280,
-        padding: EdgeInsets.all(14 * scale),
+        width: previewWidth,
+        height: previewHeight,
+        padding: EdgeInsets.all(12 * scale),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -488,97 +494,108 @@ class _LabelTemplateEditorPageState
           ],
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            if (_productShowBusinessName) ...[
-              if (hasLogo)
-                _logoImage(
-                  logoPath,
-                  height: 26 * scale,
-                  fit: BoxFit.contain,
-                )
-              else
-                Text(
-                  bizName.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 10 * scale,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              const Divider(height: 10, thickness: 0.5),
-            ],
-            if (_productShowBrand)
-              Text(
-                'SERENUT ORGANİK',
-                style: GoogleFonts.inter(
-                  fontSize: 10 * scale,
-                  color: Colors.grey[600],
-                ),
-              ),
-            Text(
-              'Taze Çifte Kavrulmuş Fındık 500g',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 14 * scale,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (_productShowBarcode) ...[
-              Container(
-                height: 36 * scale,
-                width: 180,
-                color: Colors.grey[200],
-                child: Center(
-                  child: Text(
-                    '||||| ||||||| ||||||| |||||',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14 * scale,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '8690000123456',
-                style: GoogleFonts.inter(
-                  fontSize: 10 * scale,
-                  letterSpacing: 2,
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            if (_productShowPrice)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '₺185,00',
-                    style: GoogleFonts.inter(
-                      fontSize: 22 * scale,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                    ),
-                  ),
-                  if (_productShowVat) ...[
-                    const SizedBox(width: 4),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_productShowBusinessName) ...[
+                  if (hasLogo)
+                    _logoImage(
+                      logoPath,
+                      height: (24 * scale).clamp(10.0, 40.0),
+                      fit: BoxFit.contain,
+                    )
+                  else
                     Text(
-                      '(KDV Dahil)',
+                      bizName.toUpperCase(),
                       style: GoogleFonts.inter(
-                        fontSize: 9 * scale,
-                        color: Colors.grey[600],
+                        fontSize: (10 * scale).clamp(8.0, 16.0),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                        letterSpacing: 0.5,
                       ),
                     ),
-                  ],
+                  const Divider(height: 8, thickness: 0.5),
                 ],
-              ),
+                if (_productShowBrand)
+                  Text(
+                    'SERENUT ORGANİK',
+                    style: GoogleFonts.inter(
+                      fontSize: (10 * scale).clamp(7.0, 14.0),
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                Text(
+                  'Taze Çifte Kavrulmuş Fındık 500g',
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: (13 * scale).clamp(9.0, 18.0),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_productShowBarcode) ...[
+                  Container(
+                    height: (30 * scale).clamp(14.0, 44.0),
+                    width: (160 * scale).clamp(80.0, 220.0),
+                    color: Colors.grey[200],
+                    child: Center(
+                      child: Text(
+                        '||||| ||||||| ||||||| |||||',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: (13 * scale).clamp(9.0, 18.0),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '8690000123456',
+                    style: GoogleFonts.inter(
+                      fontSize: (9 * scale).clamp(7.0, 12.0),
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (_productShowPrice)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '₺185,00',
+                        style: GoogleFonts.inter(
+                          fontSize: (20 * scale).clamp(12.0, 28.0),
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black,
+                        ),
+                      ),
+                      if (_productShowVat) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '(KDV Dahil)',
+                          style: GoogleFonts.inter(
+                            fontSize: (8 * scale).clamp(6.0, 12.0),
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -586,18 +603,23 @@ class _LabelTemplateEditorPageState
   }
 
   Widget _buildOrderLabelPreview(String bizName, String? logoPath) {
-    double scale = switch (_orderFontSize) {
-      'Küçük' => 0.85,
-      'Büyük' => 1.15,
-      _ => 1.0,
-    };
+    final dimScale = math.min(_labelWidthMm / 50.0, _labelHeightMm / 30.0);
+    final scale = (switch (_orderFontSize) {
+          'Küçük' => 0.85,
+          'Büyük' => 1.15,
+          _ => 1.0,
+        }) *
+        dimScale;
 
-    final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
+    final aspect = _labelWidthMm / _labelHeightMm;
+    final previewWidth = 260.0;
+    final previewHeight = (previewWidth / aspect).clamp(130.0, 380.0);
 
     return Center(
       child: Container(
-        width: 280,
-        padding: EdgeInsets.all(14 * scale),
+        width: previewWidth,
+        height: previewHeight,
+        padding: EdgeInsets.all(12 * scale),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -614,24 +636,19 @@ class _LabelTemplateEditorPageState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Sipariş etiketinde logo gösterilmez, sadece firma ismi metni
             if (_orderShowBusinessName) ...[
               Center(
-                child: hasLogo
-                    ? _logoImage(
-                        logoPath,
-                        height: 26 * scale,
-                        fit: BoxFit.contain,
-                      )
-                    : Text(
-                        bizName.toUpperCase(),
-                        style: GoogleFonts.inter(
-                          fontSize: 11 * scale,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                child: Text(
+                  bizName.toUpperCase(),
+                  style: GoogleFonts.inter(
+                    fontSize: (11 * scale).clamp(8.0, 16.0),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
-              const Divider(height: 10, thickness: 0.5),
+              const Divider(height: 8, thickness: 0.5),
             ],
             if (_orderShowOrderNo)
               Row(
