@@ -31,9 +31,9 @@ if ([string]$keys.RELEASE_RSA_MODULI -ne $releaseKeyring) {
     throw 'RELEASE_RSA_MODULI must exactly match RELEASE_RSA_TRUSTED_MODULI in the same order.'
 }
 $activeModulusBytes = [Text.Encoding]::UTF8.GetBytes($activeReleaseModulus)
-$activeModulusFingerprint = [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData($activeModulusBytes)
-).ToLowerInvariant()
+$sha256 = [System.Security.Cryptography.SHA256]::Create()
+$hashBytes = $sha256.ComputeHash($activeModulusBytes)
+$activeModulusFingerprint = [BitConverter]::ToString($hashBytes).Replace('-', '').ToLowerInvariant()
 if ($activeModulusFingerprint -ne [string]$signingPolicy.requiredUpgradeSignerModulusSha256) {
     throw 'The active client key does not match the required upgrade signer policy.'
 }
