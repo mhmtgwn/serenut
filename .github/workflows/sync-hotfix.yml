@@ -29,6 +29,7 @@ jobs:
       - name: Deploy sync backend and migrations
         uses: appleboy/ssh-action@v1.2.0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
           WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${{ secrets.WHATSAPP_WEBHOOK_VERIFY_TOKEN }}
           WHATSAPP_CREDENTIAL_ENCRYPTION_KEY: ${{ secrets.WHATSAPP_CREDENTIAL_ENCRYPTION_KEY }}
@@ -37,12 +38,12 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          envs: META_APP_SECRET,WHATSAPP_WEBHOOK_VERIFY_TOKEN,WHATSAPP_CREDENTIAL_ENCRYPTION_KEY
+          envs: GITHUB_TOKEN,META_APP_SECRET,WHATSAPP_WEBHOOK_VERIFY_TOKEN,WHATSAPP_CREDENTIAL_ENCRYPTION_KEY
           script_stop: true
           script: |
             cd /var/www/serenut
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch "https://x-access-token:${GITHUB_TOKEN}@github.com/mhmtgwn/serenut.git" main
+            git reset --hard FETCH_HEAD
             cd server
             printf '%s' "$META_APP_SECRET" | sh scripts/configure_whatsapp_env.sh
             sh scripts/ensure_maintenance_token.sh

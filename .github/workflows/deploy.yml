@@ -350,11 +350,14 @@ jobs:
       - name: Deploy production
         if: steps.client-release.outputs.required == 'true'
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          envs: GITHUB_TOKEN
           script_stop: true
           script: |
             cd /var/www/serenut
@@ -364,7 +367,7 @@ jobs:
             fi
             # Deploy the exact commit that produced the downloaded artifacts;
             # main may advance while this remote SSH command is still running.
-            git fetch origin main
+            git fetch "https://x-access-token:${GITHUB_TOKEN}@github.com/mhmtgwn/serenut.git" main
             git cat-file -e '${{ github.sha }}^{commit}'
             git reset --hard '${{ github.sha }}'
             sh server/scripts/deploy_production_ci.sh '${{ steps.release-version.outputs.value }}'

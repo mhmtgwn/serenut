@@ -474,7 +474,7 @@ class _LabelTemplateEditorPageState
 
     final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
     final aspect = _labelWidthMm / _labelHeightMm;
-    final previewWidth = 260.0;
+    const previewWidth = 260.0;
     final previewHeight = (previewWidth / aspect).clamp(110.0, 340.0);
 
     return Center(
@@ -613,7 +613,7 @@ class _LabelTemplateEditorPageState
         dimScale;
 
     final aspect = _labelWidthMm / _labelHeightMm;
-    final previewWidth = 260.0;
+    const previewWidth = 260.0;
     final previewHeight = (previewWidth / aspect).clamp(130.0, 380.0);
 
     return Center(
