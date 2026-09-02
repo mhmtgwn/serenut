@@ -5,6 +5,7 @@
 -- causing all INSERTs/UPDATEs (including bypass_rls admin paths) to be rejected.
 
 -- user_recovery_codes: user-scoped (no company_id column, access via user_id)
+DROP POLICY IF EXISTS rls_user_recovery_codes ON user_recovery_codes;
 CREATE POLICY rls_user_recovery_codes ON user_recovery_codes
   FOR ALL
   USING (
@@ -21,6 +22,7 @@ CREATE POLICY rls_user_recovery_codes ON user_recovery_codes
   );
 
 -- password_recovery_requests: has company_id column
+DROP POLICY IF EXISTS rls_password_recovery_requests ON password_recovery_requests;
 CREATE POLICY rls_password_recovery_requests ON password_recovery_requests
   FOR ALL
   USING (
@@ -33,6 +35,7 @@ CREATE POLICY rls_password_recovery_requests ON password_recovery_requests
   );
 
 -- password_security_events: has company_id column
+DROP POLICY IF EXISTS rls_password_security_events ON password_security_events;
 CREATE POLICY rls_password_security_events ON password_security_events
   FOR ALL
   USING (

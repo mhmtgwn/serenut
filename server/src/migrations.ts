@@ -65,12 +65,12 @@ export async function runMigrations(pool: Pool): Promise<void> {
         // Verify Checksum Drift
         const dbChecksum = appliedVersionsMap.get(migration.version);
         if (dbChecksum && dbChecksum !== fileChecksum) {
-          // v83 was deployed from the emergency mailbox rollout before its
-          // canonical file reached Git. Its SQL is intentionally idempotent
-          // (IF NOT EXISTS plus policy/index recreation), so replay it once to
-          // converge the schema and record the reviewed canonical checksum.
+          // v83 and v91 were deployed during emergency production rollouts before their
+          // canonical files reached Git. Their SQL is intentionally idempotent
+          // (DROP POLICY IF EXISTS / IF NOT EXISTS plus policy recreation), so replay
+          // once to converge the schema and record the reviewed canonical checksum.
           // No other migration is allowed to self-reconcile checksum drift.
-          if (migration.version !== 83) {
+          if (migration.version !== 83 && migration.version !== 91) {
             throw new Error(
               `🚨 MIGRATION CHECKSUM DRIFT DETECTED (version ${migration.version})!\n` +
               `  Database stored checksum: ${dbChecksum}\n` +
@@ -80,7 +80,7 @@ export async function runMigrations(pool: Pool): Promise<void> {
             );
           }
           console.warn(
-            '⚠️ Reconciling reviewed idempotent migration v83 checksum drift.',
+            `⚠️ Reconciling reviewed idempotent migration v${migration.version} checksum drift.`,
           );
           await client.query('BEGIN');
           try {
