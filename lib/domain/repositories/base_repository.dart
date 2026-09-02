@@ -647,6 +647,31 @@ class OrderEntity {
         createdBy: map['created_by']?.toString(),
         items: [],
       );
+
+  OrderEntity copyWith({
+    String? id,
+    String? orderNumber,
+    String? customerId,
+    String? status,
+    DateTime? createdAt,
+    DateTime? expectedDeliveryDate,
+    DateTime? actualDeliveryDate,
+    List<Map<String, dynamic>>? items,
+    String? notes,
+    String? createdBy,
+  }) =>
+      OrderEntity(
+        id: id ?? this.id,
+        orderNumber: orderNumber ?? this.orderNumber,
+        customerId: customerId ?? this.customerId,
+        status: status ?? this.status,
+        createdAt: createdAt ?? this.createdAt,
+        expectedDeliveryDate: expectedDeliveryDate ?? this.expectedDeliveryDate,
+        actualDeliveryDate: actualDeliveryDate ?? this.actualDeliveryDate,
+        items: items ?? this.items,
+        notes: notes ?? this.notes,
+        createdBy: createdBy ?? this.createdBy,
+      );
 }
 
 /// Abstract contract for orchestrating database transactions from the domain layer.

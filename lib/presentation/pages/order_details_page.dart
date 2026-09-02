@@ -23,10 +23,13 @@ import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 
+import 'package:serenutos/domain/services/inventory_service.dart';
+
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
+const _kOrange = POSColors.orange;
 const _kRed = Color(0xFFDC2626);
 const _kRedLight = Color(0xFFFEE2E2);
 const _kAmber = Color(0xFFEAB308);
@@ -350,7 +353,9 @@ class OrderDetailsPage extends ConsumerWidget {
 
                 // ── Actions ─────────────────────────────────────
                 if (order.status != 'cancelled' && order.status != 'delivered')
-                  _buildActionButtons(context, ref, order),
+                  _buildActionButtons(context, ref, order)
+                else if (order.status == 'delivered')
+                  _buildDeliveredActions(context, ref, order),
               ],
             ),
           );
@@ -665,10 +670,51 @@ class OrderDetailsPage extends ConsumerWidget {
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref, OrderEntity order) {
+    if (order.status == 'delivered') {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: Colors.orange, size: 28),
+              SizedBox(width: 8),
+              Text('Teslim Edilmiş Sipariş'),
+            ],
+          ),
+          content: const Text(
+            'Bu sipariş teslim edilmiştir. Teslim edilmiş siparişler doğrudan silinemez; stok ve finansal kayıtların tutarlılığı için iade alınmalıdır.\n\nİade işlemi başlatmak ister misiniz?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Vazgeç'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kOrange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _showOrderRefundDialog(context, ref, order);
+              },
+              child: const Text('İade İşlemi Başlat'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Siparişi Sil'),
         content: const Text(
             'Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
@@ -681,36 +727,385 @@ class OrderDetailsPage extends ConsumerWidget {
                 backgroundColor: _kRed,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
+                    borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
               Navigator.pop(context);
 
-              final controller = ref.read(ordersControllerProvider.notifier);
-              // Ledger rows are immutable. Cancellation creates the required
-              // reversal and restores stock before the order tombstone syncs.
-              if (order.status != 'cancelled') {
-                await controller.updateStatus(order.id, 'cancelled');
-              }
-              await controller.deleteOrder(order.id);
+              try {
+                final controller = ref.read(ordersControllerProvider.notifier);
+                if (order.status != 'cancelled') {
+                  await controller.updateStatus(order.id, 'cancelled');
+                }
+                await controller.deleteOrder(order.id);
 
-              ref.invalidate(dashboardProvider);
-              ref.invalidate(productsControllerProvider);
-              ref.invalidate(customerTransactionsProvider(order.customerId));
-              ref.invalidate(customerBalanceDetailsProvider(order.customerId));
-              await ref.read(customersControllerProvider.notifier).refresh();
+                ref.invalidate(dashboardProvider);
+                ref.invalidate(productsControllerProvider);
+                ref.invalidate(customerTransactionsProvider(order.customerId));
+                ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+                await ref.read(customersControllerProvider.notifier).refresh();
 
-              if (context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Sipariş başarıyla silindi.'),
-                      backgroundColor: Colors.red),
-                );
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Sipariş başarıyla silindi.'),
+                        backgroundColor: Colors.red),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Sipariş silinemedi: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
             child: const Text('Sil'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveredActions(
+      BuildContext context, WidgetRef ref, OrderEntity order) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: _kGreenLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_rounded,
+                    color: _kGreenDark, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sipariş Teslim Edildi',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: _kText,
+                    ),
+                  ),
+                  Text(
+                    'Müşteri iade talebinde bulunduysa iade alabilirsiniz.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _kTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          ElevatedButton.icon(
+            onPressed: () => _showOrderRefundDialog(context, ref, order),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kOrange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: const Icon(Icons.undo_rounded, size: 16),
+            label: const Text(
+              'İade Al',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOrderRefundDialog(
+      BuildContext context, WidgetRef ref, OrderEntity order) {
+    final products = ref.read(productsControllerProvider).value ?? [];
+    final productNameMap = {for (final p in products) p.id: p.name};
+
+    final returnItems = order.items.map((item) {
+      final productId =
+          item['product_id'] as String? ?? item['productId'] as String? ?? '';
+      final double qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
+      final double unitPrice = (item['unit_price'] as num?)?.toDouble() ??
+          (item['price'] as num?)?.toDouble() ??
+          0.0;
+      return {
+        'productId': productId,
+        'maxQty': qty,
+        'returnQty': qty,
+        'unitPrice': unitPrice,
+      };
+    }).toList();
+
+    String refundMethod = 'balance';
+    String reason = '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          final refundTotal = returnItems.fold<double>(
+            0.0,
+            (sum, item) =>
+                sum +
+                ((item['returnQty'] as double) *
+                    (item['unitPrice'] as double)),
+          );
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.undo_rounded, color: _kOrange),
+                SizedBox(width: 8),
+                Text('Sipariş İadesi'),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'İade edilecek ürün ve miktarları belirleyin:',
+                      style: TextStyle(fontSize: 12, color: _kTextSecondary),
+                    ),
+                    const SizedBox(height: 10),
+                    ...returnItems.map((item) {
+                      final pId = item['productId'] as String;
+                      final name = productNameMap[pId] ?? pId;
+                      final maxQty = item['maxQty'] as double;
+                      final currentQty = item['returnQty'] as double;
+                      final price = item['unitPrice'] as double;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _kBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₺${price.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: _kTextSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline,
+                                  size: 18),
+                              color: _kTextSecondary,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 26, minHeight: 26),
+                              onPressed: currentQty > 0
+                                  ? () => setDialog(() {
+                                        final step = maxQty < 2 ? 0.1 : 1.0;
+                                        item['returnQty'] = (currentQty - step)
+                                            .clamp(0.0, maxQty);
+                                      })
+                                  : null,
+                            ),
+                            Text(
+                              '${currentQty % 1 == 0 ? currentQty.toInt() : currentQty.toStringAsFixed(2)} / ${maxQty % 1 == 0 ? maxQty.toInt() : maxQty.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline,
+                                  size: 18),
+                              color: _kGreen,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 26, minHeight: 26),
+                              onPressed: currentQty < maxQty
+                                  ? () => setDialog(() {
+                                        final step = maxQty < 2 ? 0.1 : 1.0;
+                                        item['returnQty'] = (currentQty + step)
+                                            .clamp(0.0, maxQty);
+                                      })
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Toplam İade Tutarı:',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          '₺${refundTotal.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: _kOrange,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      decoration: InputDecoration(
+                        labelText: 'İade Gerekçesi',
+                        hintText: 'Örn: Müşteri vazgeçti / Kusurlu ürün',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                      ),
+                      onChanged: (val) => setDialog(() => reason = val.trim()),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: refundMethod,
+                      decoration: InputDecoration(
+                        labelText: 'İade Yöntemi',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'balance',
+                          child: Text(
+                              'Müşteri Bakiyesine Alacak Yaz (Borçtan Düş)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'cash',
+                          child: Text('Kasadan Nakit Olarak İade Et'),
+                        ),
+                      ],
+                      onChanged: (v) =>
+                          setDialog(() => refundMethod = v ?? 'balance'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('İptal'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: refundTotal > 0 && reason.isNotEmpty
+                    ? () async {
+                        Navigator.pop(ctx);
+                        try {
+                          final itemsToRefund = returnItems
+                              .where((ri) => (ri['returnQty'] as double) > 0)
+                              .map((ri) {
+                            final qty = ri['returnQty'] as double;
+                            final intQty = qty < 1
+                                ? (qty * 1000).round()
+                                : qty.round();
+                            return SaleItemInput(
+                              productId: ri['productId'] as String,
+                              quantity: intQty,
+                              saleQuantity: qty,
+                              unitPrice: ri['unitPrice'] as double,
+                            );
+                          }).toList();
+
+                          await ref
+                              .read(ordersControllerProvider.notifier)
+                              .refundOrder(
+                                orderId: order.id,
+                                refundMethod: refundMethod,
+                                reason: reason,
+                                itemsToRefund: itemsToRefund,
+                              );
+
+                          ref.invalidate(_orderDetailProvider(order.id));
+
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Sipariş başarıyla iade alındı. ₺${refundTotal.toStringAsFixed(2)} iade edildi.',
+                                ),
+                                backgroundColor: _kOrange,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text('İade işlemi başarısız oldu: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    : null,
+                child: const Text('İadeyi Onayla'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -931,6 +1326,14 @@ class OrderDetailsPage extends ConsumerWidget {
                 'Oluşturma',
                 DateFormat('dd.MM.yyyy HH:mm').format(order.createdAt),
                 Icons.calendar_today_outlined),
+            if (order.createdBy != null && order.createdBy!.isNotEmpty) ...[
+              const Divider(height: 20),
+              _infoRow(
+                'İşlemi Yapan',
+                order.createdBy!,
+                Icons.badge_outlined,
+              ),
+            ],
             if (order.expectedDeliveryDate != null) ...[
               const Divider(height: 20),
               _infoRow(

@@ -316,18 +316,16 @@ class TsplLabelLayoutEngine {
     int sx(num value) => (value * widthDots / 400).round();
     int sy(num value) => (value * safeDpi / 203).round();
 
-    final paddingX = (widthDots * 0.04).clamp(6.0, 24.0).round();
+    final paddingX = (widthDots * 0.03).clamp(4.0, 16.0).round();
     final usableW = widthDots - (paddingX * 2);
 
+    const bodyFont = '2';
+    const bodyFontPitch = 12;
     final fontScale = switch (fontSize) {
       'Küçük' => 0.90,
       'Büyük' => 1.30,
       _ => 1.10,
     };
-
-    // Primary font: Font "2" (12x20 dots) is much clearer than tiny Font "1" (8x12 dots)
-    const bodyFont = '2';
-    const bodyFontPitch = 12;
     final rowHeight = sy((20 * fontScale).clamp(16.0, 30.0).round());
     final maxBodyChars = (usableW / bodyFontPitch).floor().clamp(4, 90);
 
@@ -352,7 +350,7 @@ class TsplLabelLayoutEngine {
     final hasDate = showDate && timeStr.isNotEmpty;
 
     // ── Pre-calculate Exact Dot Height ──
-    int calculatedDots = sy(6);
+    int calculatedDots = sy(4);
     if (hasCustomBizName) {
       calculatedDots += sy(24);
     }
@@ -370,7 +368,7 @@ class TsplLabelLayoutEngine {
       }
     }
     if (previousDebt > 0.001) calculatedDots += rowHeight;
-    calculatedDots += sy(12); // Separator 1
+    calculatedDots += sy(8); // Separator 1
 
     if (showItemsCount &&
         itemsCount != null &&
@@ -385,7 +383,6 @@ class TsplLabelLayoutEngine {
         final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
         calculatedDots += (nameLines.length * rowHeight);
         calculatedDots += rowHeight; // Detail / line total
-        calculatedDots += sy(2);
       }
     } else {
       final nameLines = _splitText(prodClean, maxBodyChars, maxLines: 2);
@@ -393,17 +390,18 @@ class TsplLabelLayoutEngine {
       calculatedDots += rowHeight;
     }
 
-    calculatedDots += sy(12); // Separator 2
+    calculatedDots += sy(8); // Separator 2
     calculatedDots += rowHeight; // Payment status
     if (noteClean != null) calculatedDots += rowHeight;
-    if (showTotalAmount && totalAmount != null) calculatedDots += sy(28);
-    calculatedDots += sy(55); // Footer & QR Code clearance + bottom padding
+    if (showTotalAmount && totalAmount != null) calculatedDots += sy(26);
+    calculatedDots += sy(38); // Footer & QR Code clearance
 
-    final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil() + 6;
+    // Prevent vertical overflow by not adding unnecessary phantom padding
+    final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil();
     final requestedHeightMm = heightMm.clamp(15, 1000);
-    final safeHeight = requestedHeightMm > requiredHeightMm
-        ? requestedHeightMm
-        : requiredHeightMm;
+    final safeHeight = requiredHeightMm > requestedHeightMm
+        ? requiredHeightMm
+        : requestedHeightMm;
     final heightDots = (safeHeight * safeDpi / 25.4).round();
 
     final commands = _TsplBuffer()
@@ -415,9 +413,9 @@ class TsplLabelLayoutEngine {
       ..writeln('REFERENCE 0,0')
       ..writeln('CLS');
 
-    int currentY = sy(6);
+    int currentY = sy(4);
 
-    // ── 1. Business Header (Only custom business name, no default Serenut) ──
+    // ── 1. Business Header ──
     if (hasCustomBizName) {
       final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
       final layout = _widestTextLayout(
@@ -436,12 +434,12 @@ class TsplLabelLayoutEngine {
         layout.yMultiplier,
         bizText,
       );
-      currentY += layout.height + sy(3);
+      currentY += layout.height + sy(2);
     }
 
-    // ── 2. Order # & Date (Side by side on same row) ──
+    // ── 2. Order # & Date (Spread horizontally across full width) ──
     if (hasOrderNo && hasDate) {
-      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 25));
+      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 30));
       final orderText = 'SIPARIS #$orderNo';
       commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$orderText"');
       final dateText = timeStr;
@@ -450,7 +448,7 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
       currentY += rowHeight;
     } else if (hasOrderNo) {
-      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 25));
+      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 30));
       commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
       currentY += rowHeight;
     } else if (hasDate) {
@@ -458,10 +456,10 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 3. Customer Info (Name + Phone side-by-side; No customer ID/No) ──
+    // ── 3. Customer Info (Spread horizontally) ──
     if (showCustomerName) {
       final whoText = custClean.isNotEmpty
-          ? 'Musteri: ${_fit(custClean, (maxBodyChars - 9).clamp(4, 50))}'
+          ? 'Musteri: ${_fit(custClean, (maxBodyChars - 9).clamp(4, 60))}'
           : 'Musteri: Genel';
       if (phoneClean.isNotEmpty) {
         final phoneText = 'Tel: ${_fit(phoneClean, 20)}';
@@ -490,12 +488,12 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 4. Separator Line 1 ──
+    // ── 4. Separator Line 1 (Full horizontal span across entire label) ──
     final barH = (heightDots * 0.01).clamp(1, 2).round();
     commands.writeln('BAR $paddingX,$currentY,${widthDots - paddingX * 2},$barH');
-    currentY += barH + sy(4);
+    currentY += barH + sy(3);
 
-    // ── 5. Items Breakdown ──
+    // ── 5. Items Breakdown (Adaptive layout) ──
     if (showItemsCount &&
         itemsCount != null &&
         (items == null || items.isEmpty)) {
@@ -523,8 +521,10 @@ class TsplLabelLayoutEngine {
                 : unitPrice == null
                     ? null
                     : unitPrice * itemQty;
+        final rightTotal =
+            lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
 
-        // Line 1: Product Name (wrapped if long)
+        // Line 1: Product Name
         final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
         for (final line in nameLines) {
           commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$line"');
@@ -535,9 +535,6 @@ class TsplLabelLayoutEngine {
         final leftDetail = unitPrice == null
             ? '  $itemQtyStr adet'
             : '  ${itemQtyStr}x ${unitPrice.toStringAsFixed(2)} TL';
-        final rightTotal =
-            lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
-
         final safeLeft = _fit(
           leftDetail,
           (maxBodyChars - rightTotal.length - 1).clamp(4, maxBodyChars),
@@ -568,9 +565,9 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 6. Separator Line 2 ──
+    // ── 6. Separator Line 2 (Full horizontal span) ──
     commands.writeln('BAR $paddingX,$currentY,${widthDots - paddingX * 2},$barH');
-    currentY += barH + sy(4);
+    currentY += barH + sy(3);
 
     // ── 7. Payment Status & Note ──
     commands.writeln(
@@ -585,15 +582,16 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 8. Total Amount & QR Footer ──
-    currentY += sy(4);
-    final footerY = currentY;
+    // ── 8. Total Amount & QR Footer (Anchored inside label dots, spreading horizontally) ──
+    final footerY = currentY + sy(2);
 
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
-      final footerTextChars = ((widthDots - sx(110)) ~/ 8).clamp(8, 50);
+      final qrWidthReserve = sx(82);
+      final safeAvailableWidth = (widthDots - paddingX - qrWidthReserve).clamp(80, widthDots);
+      final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
       final safeTotal = _fit(totalStr, footerTextChars);
-      final totalLayout = _widestTextLayout(safeTotal, widthDots - sx(110), maxHeight: sy(26));
+      final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth, maxHeight: sy(26));
       commands.boldText(
         paddingX,
         footerY,
@@ -606,7 +604,8 @@ class TsplLabelLayoutEngine {
 
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
     if (qrValue.isNotEmpty) {
-      final qrX = widthDots - sx(82);
+      final qrSize = (widthDots < 300) ? 45 : 60;
+      final qrX = widthDots - paddingX - qrSize;
       final qrCellWidth = (widthDots < 300) ? 2 : 3;
       commands.writeln(
         'QRCODE $qrX,$footerY,L,$qrCellWidth,A,0,M2,S7,"$qrValue"',

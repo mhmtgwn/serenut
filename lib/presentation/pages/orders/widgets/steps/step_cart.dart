@@ -70,7 +70,7 @@ extension OrderCreationCartStep on OrderCreationDialogState {
           children: [
             Row(
               children: [
-                const Icon(Icons.shopping_bag_outlined,
+                const Icon(Icons.shopping_cart_rounded,
                     size: 20, color: _kGreen),
                 const SizedBox(width: 8),
                 const Text(
@@ -90,7 +90,7 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${_cart.length} çeşit / ${totalQuantity % 1 == 0 ? totalQuantity.toInt() : totalQuantity.toStringAsFixed(1)} adet',
+                    '${_cart.length} çeşit • ${_formatQuantity(totalQuantity)} birim',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -105,7 +105,10 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Sepeti Temizle'),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Sepeti Boşalt',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     content: const Text(
                         'Sepetteki tüm ürünleri kaldırmak istediğinizden emin misiniz?'),
                     actions: [
@@ -117,6 +120,8 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _kRed,
                           foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
@@ -141,155 +146,210 @@ extension OrderCreationCartStep on OrderCreationDialogState {
           final quantity = entry.value;
           final lineTotal = product.price * quantity;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _kBorder),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Product Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          final categoryName = product.category.trim().isEmpty
+              ? 'GENEL'
+              : product.category.toUpperCase();
+
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final bool isNarrow = constraints.maxWidth < 430;
+
+              final productInfoWidget = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kText,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
                     children: [
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _kText,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          categoryName,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: _kTextSecondary,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              product.category.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: _kTextSecondary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '₺${product.price.toStringAsFixed(2)} / adet',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: _kTextSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 8),
+                      Text(
+                        '₺${product.price.toStringAsFixed(2)} / ${product.isWeighed ? "kg" : "adet"}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: _kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
+                ],
+              );
+
+              final stepperWidget = Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _kBorder),
                 ),
-                const SizedBox(width: 12),
-                // Stepper Controls
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_rounded, size: 16),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 30, minHeight: 30),
-                        color: _kTextSecondary,
-                        onPressed: () {
-                          updateState(() {
-                            if (quantity > 1) {
-                              _cart[product] = quantity - 1;
-                            } else {
-                              _cart.remove(product);
-                            }
-                          });
-                        },
-                      ),
-                      _InlineQuantityField(
-                        quantity: quantity,
-                        hasBorder: false,
-                        onChanged: (newQty) {
-                          updateState(() {
-                            if (newQty <= 0) {
-                              _cart.remove(product);
-                            } else {
-                              _cart[product] = newQty;
-                            }
-                          });
-                        },
-                        onRemove: () =>
-                            updateState(() => _cart.remove(product)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 30, minHeight: 30),
-                        color: _kGreen,
-                        onPressed: () {
-                          updateState(() => _cart[product] = quantity + 1);
-                        },
-                      ),
-                    ],
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove_rounded, size: 16),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                      color: _kTextSecondary,
+                      onPressed: () {
+                        updateState(() {
+                          final step = product.isWeighed ? 0.1 : 1.0;
+                          if (quantity > step) {
+                            _cart[product] = double.parse(
+                                (quantity - step).toStringAsFixed(3));
+                          } else {
+                            _cart.remove(product);
+                          }
+                        });
+                      },
+                    ),
+                    _InlineQuantityField(
+                      quantity: quantity,
+                      hasBorder: false,
+                      onChanged: (newQty) {
+                        updateState(() {
+                          if (newQty <= 0) {
+                            _cart.remove(product);
+                          } else {
+                            _cart[product] = newQty;
+                          }
+                        });
+                      },
+                      onRemove: () =>
+                          updateState(() => _cart.remove(product)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                      color: _kGreen,
+                      onPressed: () {
+                        updateState(() {
+                          final step = product.isWeighed ? 0.1 : 1.0;
+                          _cart[product] = double.parse(
+                              (quantity + step).toStringAsFixed(3));
+                        });
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                // Line Total
-                SizedBox(
-                  width: 80,
-                  child: Text(
+              );
+
+              final totalAndRemoveWidget = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
                     '₺${lineTotal.toStringAsFixed(2)}',
-                    textAlign: TextAlign.right,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                       color: _kText,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        size: 20, color: _kRed),
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 30, minHeight: 30),
+                    tooltip: 'Ürünü Çıkar',
+                    onPressed: () {
+                      updateState(() => _cart.remove(product));
+                    },
+                  ),
+                ],
+              );
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                // Remove Button
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      size: 20, color: _kRed),
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 32, minHeight: 32),
-                  tooltip: 'Ürünü Çıkar',
-                  onPressed: () {
-                    updateState(() => _cart.remove(product));
-                  },
-                ),
-              ],
-            ),
+                child: isNarrow
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: productInfoWidget),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    size: 18, color: _kRed),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 26, minHeight: 26),
+                                tooltip: 'Ürünü Çıkar',
+                                onPressed: () {
+                                  updateState(() => _cart.remove(product));
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              stepperWidget,
+                              Text(
+                                '₺${lineTotal.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: _kText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: productInfoWidget),
+                          const SizedBox(width: 12),
+                          stepperWidget,
+                          const SizedBox(width: 14),
+                          totalAndRemoveWidget,
+                        ],
+                      ),
+              );
+            },
           );
         }),
       ],
@@ -308,14 +368,14 @@ extension OrderCreationCartStep on OrderCreationDialogState {
           ),
           child: Row(
             children: [
-              const Icon(Icons.person_pin_rounded, size: 24, color: _kGreen),
+              const Icon(Icons.person_rounded, size: 24, color: _kGreen),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _selectedCustomer?.name ?? 'Genel Müşteri',
+                      _selectedCustomer?.name ?? 'Müşteri Seçilmedi',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -334,17 +394,25 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                   ],
                 ),
               ),
-              OutlinedButton(
-                onPressed: () => updateState(() => _activeStep = 0),
-                style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+              InkWell(
+                onTap: () => updateState(() => _activeStep = 0),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _kGreenLight,
                     borderRadius: BorderRadius.circular(6),
                   ),
+                  child: const Text(
+                    'Değiştir',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _kGreenDark,
+                    ),
+                  ),
                 ),
-                child: const Text('Değiştir', style: TextStyle(fontSize: 11)),
               ),
             ],
           ),
@@ -473,7 +541,7 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                   const Text('Toplam Miktar',
                       style: TextStyle(fontSize: 12, color: _kTextSecondary)),
                   Text(
-                    '${totalQuantity % 1 == 0 ? totalQuantity.toInt() : totalQuantity.toStringAsFixed(1)} adet',
+                    '${totalQuantity % 1 == 0 ? totalQuantity.toInt() : totalQuantity.toStringAsFixed(2)} birim',
                     style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

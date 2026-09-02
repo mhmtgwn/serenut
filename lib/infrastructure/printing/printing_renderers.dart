@@ -57,7 +57,27 @@ class EscPosReceiptRenderer implements PrintRenderer {
     final document = Map<String, Object?>.from(
       payload['document'] as Map? ?? const {},
     );
-    final bytes = <int>[..._init, 0x1C, 0x2E, 0x1B, 0x74, 0x0D];
+    final turkishMode = design['turkishMode']?.toString() ?? 'universal';
+    final List<int> bytes;
+    if (turkishMode == 'cp857') {
+      bytes = <int>[
+        ..._init,
+        0x1C, 0x2E,
+        0x1B, 0x74, 0x0D, // ESC t 13 (Epson CP857)
+        0x1B, 0x74, 0x18, // ESC t 24 (Xprinter CP857)
+      ];
+    } else if (turkishMode == 'cp1254') {
+      bytes = <int>[
+        ..._init,
+        0x1C, 0x2E,
+        0x1B, 0x74, 0x46, // ESC t 70 (Windows-1254)
+      ];
+    } else {
+      bytes = <int>[
+        ..._init,
+        0x1C, 0x2E,
+      ];
+    }
 
     if (document['openDrawer'] == true && design['openCashDrawer'] == true) {
       bytes.addAll(_drawer);
@@ -72,18 +92,27 @@ class EscPosReceiptRenderer implements PrintRenderer {
     bytes.addAll(_alignCenter);
     final businessName = business['name']?.toString().trim() ?? '';
     if ((logo == null || logo.isEmpty) && businessName.isNotEmpty) {
-      _line(bytes, businessName, bold: true);
+      _line(bytes, businessName, bold: true, mode: turkishMode);
     }
-    for (final value in [
-      business['address'],
-      business['phone'],
-      business['taxId']
-    ]) {
-      if (value?.toString().trim().isNotEmpty == true) {
-        _line(bytes, value.toString());
+
+    // Address rendering: Respects manual newlines and uses word-wrapping
+    final addressRaw = business['address']?.toString().trim() ?? '';
+    if (addressRaw.isNotEmpty) {
+      for (final rawLine in addressRaw.split('\n')) {
+        final lineTrimmed = rawLine.trim();
+        if (lineTrimmed.isNotEmpty) {
+          for (final wrapped in _wrap(lineTrimmed, width)) {
+            _line(bytes, wrapped, mode: turkishMode);
+          }
+        }
       }
     }
-    _line(bytes, '_' * width);
+    for (final value in [business['phone'], business['taxId']]) {
+      if (value?.toString().trim().isNotEmpty == true) {
+        _line(bytes, value.toString().trim(), mode: turkishMode);
+      }
+    }
+    _line(bytes, '_' * width, mode: turkishMode);
 
     bytes.addAll(_alignLeft);
     for (final entry in <String, Object?>{
@@ -94,7 +123,7 @@ class EscPosReceiptRenderer implements PrintRenderer {
       'Müşteri': document['customerName'],
     }.entries) {
       if (entry.value?.toString().trim().isNotEmpty == true) {
-        _line(bytes, '${entry.key}: ${entry.value}');
+        _line(bytes, '${entry.key}: ${entry.value}', mode: turkishMode);
       }
     }
     if (design['showCustomerBalance'] != false &&
@@ -104,14 +133,15 @@ class EscPosReceiptRenderer implements PrintRenderer {
           bytes,
           balance < 0
               ? 'Geçmiş Borç: ${balance.abs().toStringAsFixed(2)}'
-              : 'Bakiye: ${balance.toStringAsFixed(2)}');
+              : 'Bakiye: ${balance.toStringAsFixed(2)}',
+          mode: turkishMode);
     }
     if (document['notes']?.toString().trim().isNotEmpty == true) {
       for (final line in _wrap('Not: ${document['notes']}', width)) {
-        _line(bytes, line);
+        _line(bytes, line, mode: turkishMode);
       }
     }
-    _line(bytes, '_' * width);
+    _line(bytes, '_' * width, mode: turkishMode);
 
     if (design['showProductDetails'] != false) {
       final items = payload['items'] as List? ?? const [];
@@ -128,38 +158,40 @@ class EscPosReceiptRenderer implements PrintRenderer {
         final detail = '$name (${_quantity(quantity)} x '
             '${unitPrice.toStringAsFixed(2)})';
         if (detail.length + right.length + 1 <= width) {
-          _line(bytes, _columns(detail, right, width));
+          _line(bytes, _columns(detail, right, width), mode: turkishMode);
         } else {
-          _line(bytes, _fit(name, width));
+          _line(bytes, _fit(name, width), mode: turkishMode);
           _line(
               bytes,
               _columns(
                 '  ${_quantity(quantity)} x ${unitPrice.toStringAsFixed(2)}',
                 right,
                 width,
-              ));
+              ),
+              mode: turkishMode);
         }
       }
-      _line(bytes, '_' * width);
+      _line(bytes, '_' * width, mode: turkishMode);
     }
 
     bytes.addAll(_alignRight);
     final currency = payload['currency']?.toString() ?? 'TL';
     _line(bytes,
         'TOPLAM: ${_decimal(document['total']).toStringAsFixed(2)} $currency',
-        bold: true);
+        bold: true, mode: turkishMode);
     if (document['paid'] != null) {
       _line(bytes,
-          'Ödenen: ${_decimal(document['paid']).toStringAsFixed(2)} $currency');
+          'Ödenen: ${_decimal(document['paid']).toStringAsFixed(2)} $currency',
+          mode: turkishMode);
     }
     bytes.addAll(_alignCenter);
-    _line(bytes, '_' * width);
+    _line(bytes, '_' * width, mode: turkishMode);
     final footer = business['receiptFooterText']?.toString().trim() ??
         design['footerText']?.toString().trim() ??
         '';
     if (footer.isNotEmpty) {
       for (final line in _wrap(footer, width)) {
-        _line(bytes, line);
+        _line(bytes, line, mode: turkishMode);
       }
     }
     final barcode = document['barcode']?.toString().trim() ?? '';
@@ -188,10 +220,11 @@ class EscPosReceiptRenderer implements PrintRenderer {
     );
   }
 
-  static void _line(List<int> bytes, String value, {bool bold = false}) {
+  static void _line(List<int> bytes, String value,
+      {bool bold = false, String mode = 'universal'}) {
     if (bold) bytes.addAll(_boldOn);
     bytes
-      ..addAll(_cp857(value))
+      ..addAll(_encodeText(value, mode))
       ..add(0x0A);
     if (bold) bytes.addAll(_boldOff);
   }
@@ -215,17 +248,74 @@ class EscPosReceiptRenderer implements PrintRenderer {
     final lines = <String>[];
     var current = '';
     for (final word in value.split(RegExp(r'\s+'))) {
+      if (word.isEmpty) continue;
       if (current.isEmpty) {
-        current = word;
+        if (word.length <= width) {
+          current = word;
+        } else {
+          for (var i = 0; i < word.length; i += width) {
+            final end = (i + width < word.length) ? i + width : word.length;
+            lines.add(word.substring(i, end));
+          }
+        }
       } else if (current.length + word.length + 1 <= width) {
         current = '$current $word';
       } else {
-        lines.add(_fit(current, width));
-        current = word;
+        lines.add(current);
+        if (word.length <= width) {
+          current = word;
+        } else {
+          for (var i = 0; i < word.length; i += width) {
+            final end = (i + width < word.length) ? i + width : word.length;
+            lines.add(word.substring(i, end));
+          }
+          current = '';
+        }
       }
     }
-    if (current.isNotEmpty) lines.add(_fit(current, width));
+    if (current.isNotEmpty) lines.add(current);
     return lines;
+  }
+
+  static List<int> _encodeText(String text, String mode) {
+    if (mode == 'cp857') {
+      return _cp857(text);
+    } else if (mode == 'cp1254') {
+      return _cp1254(text);
+    } else {
+      return _universalTurkish(text);
+    }
+  }
+
+  static List<int> _universalTurkish(String text) {
+    const substitutions = {
+      'ğ': 'g',
+      'Ğ': 'G',
+      'ş': 's',
+      'Ş': 'S',
+      'ı': 'i',
+      'İ': 'I',
+      'ç': 'c',
+      'Ç': 'C',
+      'ö': 'o',
+      'Ö': 'O',
+      'ü': 'u',
+      'Ü': 'U',
+      '₺': 'TL',
+    };
+    final bytes = <int>[];
+    for (final rune in text.runes) {
+      final character = String.fromCharCode(rune);
+      final replacement = substitutions[character];
+      if (replacement != null) {
+        bytes.addAll(replacement.codeUnits);
+      } else if (rune <= 127) {
+        bytes.add(rune);
+      } else {
+        bytes.add(0x20);
+      }
+    }
+    return bytes;
   }
 
   static List<int> _cp857(String text) {
@@ -242,6 +332,36 @@ class EscPosReceiptRenderer implements PrintRenderer {
       'Ö': 0x99,
       'ü': 0x81,
       'Ü': 0x9A,
+    };
+    final bytes = <int>[];
+    for (final rune in text.runes) {
+      final character = String.fromCharCode(rune);
+      final replacement = substitutions[character];
+      if (replacement != null) {
+        bytes.add(replacement);
+      } else if (character == '₺') {
+        bytes.addAll('TL'.codeUnits);
+      } else {
+        bytes.add(rune <= 127 ? rune : 0x3F);
+      }
+    }
+    return bytes;
+  }
+
+  static List<int> _cp1254(String text) {
+    const substitutions = {
+      'ğ': 0xF0,
+      'Ğ': 0xD0,
+      'ş': 0xFE,
+      'Ş': 0xDE,
+      'ı': 0xFD,
+      'İ': 0xDD,
+      'ç': 0xE7,
+      'Ç': 0xC7,
+      'ö': 0xF6,
+      'Ö': 0xD6,
+      'ü': 0xFC,
+      'Ü': 0xDC,
     };
     final bytes = <int>[];
     for (final rune in text.runes) {

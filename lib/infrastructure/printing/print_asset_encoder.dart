@@ -69,6 +69,24 @@ class PrintAssetEncoder {
       resized = img.copyResize(resized, width: aligned.clamp(8, maxWidth));
     }
     final widthBytes = (resized.width + 7) ~/ 8;
+
+    // Detect background color (corners) to recognize all foreground colors
+    final corners = [
+      resized.getPixel(0, 0),
+      resized.getPixel(resized.width - 1, 0),
+      resized.getPixel(0, resized.height - 1),
+      resized.getPixel(resized.width - 1, resized.height - 1),
+    ];
+    final backgroundAlpha =
+        corners.map((p) => p.a).reduce((a, b) => a + b) / corners.length;
+    final transparentCanvas = backgroundAlpha < 128;
+    final bgR =
+        corners.map((p) => p.r).reduce((a, b) => a + b) / corners.length;
+    final bgG =
+        corners.map((p) => p.g).reduce((a, b) => a + b) / corners.length;
+    final bgB =
+        corners.map((p) => p.b).reduce((a, b) => a + b) / corners.length;
+
     final bytes = <int>[
       0x1D,
       0x76,
@@ -86,9 +104,23 @@ class PrintAssetEncoder {
           final px = x + bit;
           if (px >= resized.width) continue;
           final pixel = resized.getPixel(px, y);
-          if (pixel.a < 128) continue;
-          final luminance = 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
-          if (luminance < 128) {
+          final bool isForeground;
+          if (transparentCanvas) {
+            isForeground = pixel.a >= 32;
+          } else {
+            if (pixel.a < 64) {
+              isForeground = false;
+            } else {
+              final distFromBg = (pixel.r - bgR).abs() +
+                  (pixel.g - bgG).abs() +
+                  (pixel.b - bgB).abs();
+              final luminance =
+                  0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+              // Ensures all colored elements (orange, green, red, etc.) are rendered
+              isForeground = distFromBg >= 40 || luminance < 210;
+            }
+          }
+          if (isForeground) {
             value |= 1 << (7 - bit);
           }
         }

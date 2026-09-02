@@ -9,6 +9,7 @@ import 'package:serenutos/providers/event_providers.dart';
 import 'package:serenutos/providers/audit_provider.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/sales_controller.dart';
+import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/services/math_engine.dart';
 import 'package:serenutos/domain/services/inventory_service.dart';
 import 'package:serenutos/providers/database_provider.dart';
@@ -248,7 +249,9 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         .map((item) {
           final productId =
               (item['product_id'] ?? item['productId']).toString();
-          final quantity = (item['quantity'] as num?)?.toInt() ?? 0;
+          final rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+          final intQty =
+              rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
           final price = ((item['unit_price'] ??
                       item['unitPrice'] ??
                       item['price']) as num?)
@@ -256,11 +259,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
               0.0;
           return SaleItemInput(
             productId: productId,
-            quantity: quantity,
+            quantity: intQty,
+            saleQuantity: rawQty,
             unitPrice: price,
           );
         })
-        .where((item) => item.productId.isNotEmpty && item.quantity > 0)
+        .where((item) => item.productId.isNotEmpty && item.saleQuantity > 0)
         .toList();
   }
 
@@ -356,6 +360,102 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
+    unawaited(ref.read(syncProvider.notifier).triggerSync());
+    await refresh();
+  }
+
+  Future<void> refundOrder({
+    required String orderId,
+    required String refundMethod,
+    required String reason,
+    List<SaleItemInput>? itemsToRefund,
+  }) async {
+    await future;
+    final order = await _repository.findById(orderId);
+    if (order == null) throw StateError('Sipariş bulunamadı: $orderId');
+
+    final inventory = await ref.read(inventoryServiceProvider.future);
+    final paymentService = await ref.read(paymentServiceProvider.future);
+
+    // 1. İade edilecek ürünleri ve toplam tutarı belirle
+    final restoredItems = <SaleItemInput>[];
+    double totalRefundAmount = 0.0;
+
+    if (itemsToRefund != null && itemsToRefund.isNotEmpty) {
+      restoredItems.addAll(itemsToRefund);
+      for (final item in itemsToRefund) {
+        final qty = item.saleQuantity;
+        totalRefundAmount += qty * item.unitPrice;
+      }
+    } else {
+      // Siparişteki tüm kalemlerin tam iadesi
+      for (final item in order.items) {
+        final productId =
+            item['product_id'] as String? ?? item['productId'] as String?;
+        final double rawQty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+        final price = (item['unit_price'] as num?)?.toDouble() ??
+            (item['unitPrice'] as num?)?.toDouble() ??
+            0.0;
+        if (productId != null && rawQty > 0) {
+          final int intQty =
+              rawQty < 1 ? (rawQty * 1000).round() : rawQty.round();
+          restoredItems.add(SaleItemInput(
+            productId: productId,
+            quantity: intQty,
+            saleQuantity: rawQty,
+            unitPrice: price,
+          ));
+          totalRefundAmount += rawQty * price;
+        }
+      }
+    }
+
+    // 2. Stokları depoya geri yükle
+    if (restoredItems.isNotEmpty) {
+      await inventory.increaseStock(restoredItems);
+    }
+
+    // 3. Deftere iade kaydı işle (müşteri bakiyesini güncelle veya nakit çıkışı yap)
+    await paymentService.processRefund(
+      saleId: order.id,
+      customerId: order.customerId,
+      refundTotal: totalRefundAmount,
+      refundMethod: refundMethod,
+    );
+
+    // 4. Sipariş notuna ve durumuna iade bilgisini işle
+    final returnNote =
+        'İade Alındı: ₺${totalRefundAmount.toStringAsFixed(2)} ($refundMethod) - $reason';
+    final updatedNotes = order.notes != null && order.notes!.isNotEmpty
+        ? '${order.notes}\n$returnNote'
+        : returnNote;
+
+    await _repository.update(order.copyWith(
+      status: 'cancelled',
+      notes: updatedNotes,
+    ));
+
+    // 5. Denetim kütüğüne (Audit Trail) işle
+    try {
+      final auditService = await ref.read(auditServiceProvider.future);
+      await auditService.logEvent(
+        eventType: 'items_returned',
+        entityType: 'order',
+        entityId: order.id,
+        newValue: '₺${totalRefundAmount.toStringAsFixed(2)}',
+        notes:
+            'Sipariş İadesi Yapıldı (${order.orderNumber.isNotEmpty ? order.orderNumber : order.id}) - Yöntem: $refundMethod, Gerekçe: $reason',
+      );
+    } catch (e, st) {
+      TelemetryService().logError(e, st,
+          context: 'orders_controller', level: LogLevel.warning);
+    }
+
+    // İlgili tüm sağlayıcıları yenile
+    ref.invalidate(customersControllerProvider);
+    ref.invalidate(customerTransactionsProvider(order.customerId));
+    ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+    ref.invalidate(productsControllerProvider);
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }

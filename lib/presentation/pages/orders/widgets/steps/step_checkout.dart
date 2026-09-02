@@ -55,7 +55,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                               border: Border.all(color: _kBorder),
                             ),
                             child: Text(
-                              '${_cart.length} Çeşit (${totalQty % 1 == 0 ? totalQty.toInt() : totalQty.toStringAsFixed(1)} Adet)',
+                              '${_cart.length} çeşit • ${_formatQuantity(totalQty)} birim',
                               style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
@@ -428,10 +428,10 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
       },
       {
         'id': 'card',
-        'label': hasPos ? 'Kart' : 'POS yok',
+        'label': hasPos ? 'Kart (POS)' : 'Kart (Banka POS)',
         'icon': Icons.credit_card_rounded,
         'color': Colors.blue,
-        'enabled': hasPos,
+        'enabled': true,
       },
       if (_selectedCustomer != null)
         {

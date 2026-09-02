@@ -36,6 +36,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                         ),
                         child: TextField(
                           controller: _productSearchController,
+                          focusNode: _productSearchFocusNode,
                           decoration: const InputDecoration(
                             hintText: 'Ürün ara...',
                             hintStyle: TextStyle(
@@ -231,8 +232,8 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                               color: Colors.transparent,
                               borderRadius: BorderRadius.circular(14),
                               child: InkWell(
-                                onTap: () => updateState(
-                                    () => _cart[existingKey] = qtyInCart + 1.0),
+                                onTap: () => _handleProductTap(
+                                    p, existingKey, qtyInCart),
                                 borderRadius: BorderRadius.circular(14),
                                 splashColor: _kGreenLight,
                                 highlightColor:
@@ -502,7 +503,7 @@ extension OrderCreationProductStep on OrderCreationDialogState {
                       ],
                     ),
                     Text(
-                      '${_formatQuantity(totalQty)} adet • Teslim: ${DateFormat('dd.MM.yyyy').format(_expectedDelivery)}',
+                      '${_formatQuantity(totalQty)} birim • Teslim: ${DateFormat('dd.MM.yyyy').format(_expectedDelivery)}',
                       style: const TextStyle(
                           color: Color(0xFF94A3B8), fontSize: 11),
                     ),
@@ -656,6 +657,213 @@ extension OrderCreationProductStep on OrderCreationDialogState {
               }),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleProductTap(
+      ProductEntity p, ProductEntity existingKey, double qtyInCart) async {
+    if (p.quantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${p.name}" stokta bulunmamaktadır (Stok: ${p.quantity}).'),
+          backgroundColor: _kRed,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (p.isWeighed) {
+      final selectedKg =
+          await _showWeightInputDialog(p, currentWeightKg: qtyInCart);
+      if (selectedKg != null && selectedKg > 0) {
+        updateState(() => _cart[existingKey] = selectedKg);
+      }
+    } else {
+      updateState(() => _cart[existingKey] = qtyInCart + 1.0);
+    }
+  }
+
+  Future<double?> _showWeightInputDialog(ProductEntity product,
+      {double currentWeightKg = 0.0}) {
+    final initialKg = currentWeightKg > 0 ? currentWeightKg : 0.5;
+    final controller =
+        TextEditingController(text: _formatQuantity(initialKg));
+    double selectedKg = initialKg;
+
+    return showDialog<double>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDlgState) {
+            final lineTotal = product.price * selectedKg;
+
+            void updateKg(double newKg) {
+              setDlgState(() {
+                selectedKg = newKg;
+                controller.text = _formatQuantity(newKg);
+              });
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _kGreenLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.scale_rounded,
+                        color: _kGreenDark, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.name,
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: _kText),
+                        ),
+                        Text(
+                          '₺${product.price.toStringAsFixed(2)} / kg',
+                          style: const TextStyle(
+                              fontSize: 12, color: _kTextSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        {'label': '250 gr', 'kg': 0.25},
+                        {'label': '500 gr', 'kg': 0.5},
+                        {'label': '750 gr', 'kg': 0.75},
+                        {'label': '1 kg', 'kg': 1.0},
+                        {'label': '1.5 kg', 'kg': 1.5},
+                        {'label': '2 kg', 'kg': 2.0},
+                      ].map((preset) {
+                        final kg = preset['kg'] as double;
+                        final isSel = (selectedKg - kg).abs() < 0.001;
+                        return ChoiceChip(
+                          label: Text(preset['label'] as String),
+                          selected: isSel,
+                          selectedColor: _kGreenLight,
+                          labelStyle: TextStyle(
+                            color: isSel ? _kGreenDark : _kText,
+                            fontWeight: isSel
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 12,
+                          ),
+                          onSelected: (_) => updateKg(kg),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: _kText),
+                      decoration: InputDecoration(
+                        labelText: 'Miktar (Kilogram)',
+                        suffixText: 'kg',
+                        suffixStyle: const TextStyle(
+                            fontWeight: FontWeight.bold, color: _kGreenDark),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*[.,]?\d*')),
+                      ],
+                      onChanged: (val) {
+                        final parsed =
+                            double.tryParse(val.replaceAll(',', '.'));
+                        if (parsed != null && parsed >= 0) {
+                          setDlgState(() => selectedKg = parsed);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _kBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Kalem Tutarı:',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _kTextSecondary),
+                          ),
+                          Text(
+                            '₺${lineTotal.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: _kGreenDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, null),
+                  child: const Text('İptal'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: selectedKg > 0
+                      ? () => Navigator.pop(ctx, selectedKg)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: const Text('Sepete Ekle'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

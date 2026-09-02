@@ -267,9 +267,10 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       ],
                       _buildFormTextField(
                         controller: addressCtrl,
-                        label: 'Detaylı İşletme Adresi',
+                        label: 'Detaylı İşletme Adresi (Alt satıra geçilebilir)',
                         icon: Icons.location_on_rounded,
-                        maxLines: 2,
+                        maxLines: 3,
+                        keyboardType: TextInputType.multiline,
                       ),
                       const SizedBox(height: 12),
                       _buildFormTextField(
@@ -326,9 +327,15 @@ extension _SettingsPageDialogs on _SettingsPageState {
     bool enabled = true,
     String? Function(String?)? validator,
   }) {
+    final effectiveKeyboardType =
+        maxLines > 1 && keyboardType == TextInputType.text
+            ? TextInputType.multiline
+            : keyboardType;
     return TextFormField(
       controller: controller,
-      keyboardType: keyboardType,
+      keyboardType: effectiveKeyboardType,
+      textInputAction:
+          maxLines > 1 ? TextInputAction.newline : TextInputAction.next,
       maxLines: maxLines,
       enabled: enabled,
       validator: validator,
@@ -441,6 +448,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
     var printQr = definition['showQrCode'] == true;
     var autoCut = definition['autoCut'] != false;
     var openDrawer = definition['openCashDrawer'] == true;
+    var turkishMode = definition['turkishMode']?.toString() ?? 'universal';
     var feedLines =
         ((definition['feedLines'] as num?)?.toInt() ?? 2).clamp(0, 8);
     final footerCtrl = TextEditingController(
@@ -514,6 +522,25 @@ extension _SettingsPageDialogs on _SettingsPageState {
                         setModalState(() => itemLayout = v ?? 'auto'),
                   ),
                   const SizedBox(height: 12),
+                  _buildFormDropdown<String>(
+                    label: 'Türkçe Karakter Kodlaması',
+                    icon: Icons.language_rounded,
+                    value: turkishMode,
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'universal',
+                          child: Text('Temiz Türkçe (Önerilen - Tüm Yazıcılar)')),
+                      DropdownMenuItem(
+                          value: 'cp857',
+                          child: Text('Donanımsal CP857 (Epson / Xprinter)')),
+                      DropdownMenuItem(
+                          value: 'cp1254',
+                          child: Text('Windows-1254 (Latin-5)')),
+                    ],
+                    onChanged: (v) =>
+                        setModalState(() => turkishMode = v ?? 'universal'),
+                  ),
+                  const SizedBox(height: 12),
                   _buildFormTextField(
                     controller: footerCtrl,
                     label: 'Fiş sonu mesajı',
@@ -574,6 +601,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             definition['showProductDetails'] != false,
                         'autoCut': autoCut,
                         'openCashDrawer': openDrawer,
+                        'turkishMode': turkishMode,
                       },
                       isDefault: true,
                       createdAt: profile.createdAt,

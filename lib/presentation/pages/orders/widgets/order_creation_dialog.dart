@@ -16,8 +16,10 @@ import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/repository_providers.dart';
+import 'package:serenutos/domain/services/inventory_service.dart'
+    show SaleItemInput;
 import 'package:serenutos/presentation/controllers/sales_controller.dart'
-    show paymentServiceProvider;
+    show paymentServiceProvider, inventoryServiceProvider;
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
@@ -76,6 +78,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   final _barcodeFocusNode = FocusNode();
   bool _isProductSearching = false;
   final _productSearchController = TextEditingController();
+  final _productSearchFocusNode = FocusNode();
   final ScrollController _productScrollController = ScrollController();
 
   // Step 3: Cart Review
@@ -136,6 +139,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     if (event is! KeyDownEvent) return false;
     if (_activeStep != 1) return false;
     if (ModalRoute.of(context)?.isCurrent != true) return false;
+    if (_productSearchFocusNode.hasFocus) return false;
 
     final now = DateTime.now();
     if (_lastBufferTime != null) {
@@ -320,6 +324,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     _barcodeController.dispose();
     _barcodeFocusNode.dispose();
     _productSearchController.dispose();
+    _productSearchFocusNode.dispose();
     super.dispose();
   }
 
@@ -581,7 +586,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                                   shape: BoxShape.circle,
                                 ),
                                 child: Text(
-                                  '${totalQty % 1 == 0 ? totalQty.toInt() : totalQty.toStringAsFixed(1)}',
+                                  _formatQuantity(totalQty),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 9,
@@ -646,7 +651,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       nextButtonLabel = 'Ürün Seçimine Geç';
     } else if (_activeStep == 1) {
       nextButtonLabel =
-          'Sepete Geç (${totalQty % 1 == 0 ? totalQty.toInt() : totalQty.toStringAsFixed(1)} Adet)';
+          'Sepete Geç (${_formatQuantity(totalQty)} Birim)';
     } else if (_activeStep == 2) {
       nextButtonLabel =
           'Ödemeye Geç (₺${_totalAmount.toStringAsFixed(2)})';
@@ -741,6 +746,22 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
     AuthorizedCardPayment? cardPayment;
     try {
+      // 0. Pre-flight inventory stock verification BEFORE running card transaction or modifying state
+      final inventoryService = await ref.read(inventoryServiceProvider.future);
+      final inventoryCheckItems = _cart.entries.map((e) {
+        final rawQty = e.value;
+        final intQty =
+            rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
+        return SaleItemInput(
+          productId: e.key.id,
+          productName: e.key.name,
+          quantity: intQty,
+          saleQuantity: rawQty,
+          unitPrice: e.key.price,
+        );
+      }).toList();
+      await inventoryService.verifyStockAvailability(inventoryCheckItems);
+
       final itemsList = _cart.entries
           .map((e) => {
                 'product_id': e.key.id,
@@ -857,44 +878,48 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
             customerBalanceDetailsProvider(widget.existingOrder!.customerId));
       }
 
-      // Print order receipt & labels
-      final settings = ref.read(settingsNotifierProvider).value;
-      if (settings != null) {
-        final receiptItems = _cart.entries
-            .map((e) => {
-                  'product_name': e.key.name,
-                  'product_id': e.key.id,
-                  'barcode': e.key.id,
-                  'quantity': e.value,
-                  'unit_price': e.key.price,
-                })
-            .toList();
+      // Print order receipt & labels (isolated to prevent printer network errors from aborting or rolling back saved order)
+      try {
+        final settings = ref.read(settingsNotifierProvider).value;
+        if (settings != null) {
+          final receiptItems = _cart.entries
+              .map((e) => {
+                    'product_name': e.key.name,
+                    'product_id': e.key.id,
+                    'barcode': e.key.id,
+                    'quantity': e.value,
+                    'unit_price': e.key.price,
+                  })
+              .toList();
 
-        // 1. Print main receipt copies
-        if (_printReceipt) {
-          await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
-                newOrder,
-                receiptItems,
-                _selectedCustomer,
-                settings,
-                paidAmount: finalPaid,
-                notes: _notesController.text.trim(),
-                copies: _printCopies,
-              );
-        }
+          // 1. Print main receipt copies
+          if (_printReceipt) {
+            await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
+                  newOrder,
+                  receiptItems,
+                  _selectedCustomer,
+                  settings,
+                  paidAmount: finalPaid,
+                  notes: _notesController.text.trim(),
+                  copies: _printCopies,
+                );
+          }
 
-        // 2. Print label stickers if label printer toggle is enabled
-        if (_printLabel) {
-          await ref.read(printingApplicationServiceProvider).queueOrderLabel(
-                newOrder,
-                receiptItems,
-                settings,
-                customer: _selectedCustomer,
-                paidAmount: finalPaid,
-                previousDebt: previousDebt,
-                copies: _labelCopies,
-              );
+          // 2. Print label stickers if label printer toggle is enabled
+          if (_printLabel) {
+            await ref.read(printingApplicationServiceProvider).queueOrderLabel(
+                  newOrder,
+                  receiptItems,
+                  settings,
+                  customer: _selectedCustomer,
+                  paidAmount: finalPaid,
+                  previousDebt: previousDebt,
+                  copies: _labelCopies,
+                );
+          }
         }
+      } catch (printError) {
+        debugPrint('[OrderCreationDialog] Yazıcı hatası (sipariş başarıyla kaydedildi): $printError');
       }
 
       ref.invalidate(dashboardProvider);
@@ -933,7 +958,7 @@ String _formatQuantity(double qty) {
   if (qty == qty.toInt()) {
     return qty.toInt().toString();
   }
-  return qty.toString();
+  return qty.toStringAsFixed(3).replaceAll(RegExp(r'\.?0+$'), '');
 }
 
 class _InlineQuantityField extends StatefulWidget {
@@ -1012,7 +1037,7 @@ class _InlineQuantityFieldState extends State<_InlineQuantityField> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 48,
+      width: 58,
       height: 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(

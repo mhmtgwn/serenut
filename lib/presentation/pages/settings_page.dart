@@ -30,6 +30,8 @@ import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
 import 'package:serenutos/presentation/pages/settings/support_page.dart';
+import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
+import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/providers/printing_providers.dart';
@@ -508,6 +510,51 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             Permission.settingsUsers,
             () => _showUserManagementPage(),
             title: 'Kullanıcı Yönetimi',
+          ),
+        ),
+      );
+    }
+    final canViewAudit = currentUser != null &&
+        (currentUser.role == UserRole.sysadmin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin ||
+            currentUser.hasPermission(Permission.settingsAudit.value));
+    if (canViewAudit &&
+        _matchesQuery(
+            'denetim', 'audit', 'geçmiş', 'kim', 'işlem', 'log', 'kasiyer')) {
+      if (group1.isNotEmpty) group1.add(const _IOSDivider());
+      group1.add(
+        _buildCategoryRow(
+          title: 'Denetim & İşlem Geçmişi',
+          subtitle:
+              'Kimin hangi satışı, siparişi veya tahsilatı yaptığını inceleyin',
+          icon: Icons.policy_rounded,
+          color: _kBlue,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const AuditCenterPage(),
+            ),
+          ),
+        ),
+      );
+    }
+    final canViewAdmin = currentUser != null &&
+        (currentUser.role == UserRole.sysadmin ||
+            currentUser.role == UserRole.owner ||
+            currentUser.role == UserRole.admin);
+    if (canViewAdmin &&
+        _matchesQuery('yönetici', 'admin', 'panel', 'kontrol', 'gözlem')) {
+      if (group1.isNotEmpty) group1.add(const _IOSDivider());
+      group1.add(
+        _buildCategoryRow(
+          title: 'Yönetici Kontrol Paneli',
+          subtitle: 'Sistem durumu, veri onarımı ve yönetim merkezi',
+          icon: Icons.admin_panel_settings_rounded,
+          color: POSColors.greenDark,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const AdminPage(),
+            ),
           ),
         ),
       );
