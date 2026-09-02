@@ -441,7 +441,6 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
   const client = await pgPool.connect();
   let verificationToken = '';
   let registeredUserId = '';
-  let registeredCompanyId = '';
   let recoveryCodes: string[] = [];
   try {
     await client.query('BEGIN');
@@ -503,7 +502,6 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
         !emailVerificationRequired, emailVerificationRequired ? null : new Date()]
     );
     registeredUserId = userId;
-    registeredCompanyId = companyId;
     recoveryCodes = await PasswordRecoveryService.issueRecoveryCodes(client, userId);
 
     const consentVersion = process.env.LEGAL_DOCUMENT_VERSION || '2026-07';
@@ -543,33 +541,21 @@ router.post('/register', signupLimiter, async (req: Request, res: Response) => {
            VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')`,
           [`evt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, userId, verificationHash]
         );
+
+        const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
+        const message = emailVerificationEmail({
+          userName: name,
+          verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${verificationToken}`
+        });
+        const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+        await client.query(
+          `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
+           VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
+          [notificationId, companyId, normalizedEmail, message.subject, message.html]
+        );
       }
 
     await client.query('COMMIT');
-
-    if (emailVerificationRequired) try {
-    const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
-    const message = emailVerificationEmail({
-      userName: name,
-      verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${verificationToken}`
-    });
-    const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    await pgPool.query(
-      `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
-       VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
-      [notificationId, registeredCompanyId, normalizedEmail, message.subject, message.html]
-    );
-    await enqueueNotification({
-      notification_id: notificationId,
-      company_id: registeredCompanyId,
-      channel: 'email',
-      recipient: normalizedEmail,
-      title: message.subject,
-      body: message.html
-    });
-    } catch (notificationError) {
-      logger.error('Verification email could not be queued after registration', notificationError);
-    }
 
     if (!emailVerificationRequired) {
       try {
@@ -688,27 +674,18 @@ router.post('/resend-verification', signupLimiter, async (req: Request, res: Res
        VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')`,
       [`evt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`, user.id, tokenHash]
     );
-    await client.query('COMMIT');
-
     const publicUrl = (process.env.PUBLIC_URL || 'https://serenut.com').replace(/\/$/, '');
     const emailMessage = emailVerificationEmail({
       userName: user.name,
       verificationLink: `${publicUrl}/api/v1/auth/verify-email?token=${rawToken}`
     });
     const notificationId = `notif-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    await pgPool.query(
+    await client.query(
       `INSERT INTO notification_queue (id, company_id, channel, recipient, title, body, status, scheduled_at)
        VALUES ($1, $2, 'email', $3, $4, $5, 'pending', NOW())`,
       [notificationId, user.company_id, normalizedEmail, emailMessage.subject, emailMessage.html]
     );
-    await enqueueNotification({
-      notification_id: notificationId,
-      company_id: user.company_id,
-      channel: 'email',
-      recipient: normalizedEmail,
-      title: emailMessage.subject,
-      body: emailMessage.html
-    });
+    await client.query('COMMIT');
     return res.status(200).json(genericResponse);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

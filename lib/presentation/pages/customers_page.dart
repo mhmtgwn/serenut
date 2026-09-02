@@ -40,10 +40,17 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _searchController.text = ref.read(customerSearchQueryProvider);
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    ref.read(customerSearchQueryProvider.notifier).state =
+        _searchController.text.trim();
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -66,8 +73,18 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     return PosPageLayout(
       title: 'Müşteriler',
       isSearching: _isSearching,
-      onSearchToggled: (val) => setState(() => _isSearching = val),
+      onSearchToggled: (val) {
+        setState(() {
+          _isSearching = val;
+          if (!val) {
+            _searchController.clear();
+            ref.read(customerSearchQueryProvider.notifier).state = '';
+          }
+        });
+      },
       searchController: _searchController,
+      onSearchChanged: (val) =>
+          ref.read(customerSearchQueryProvider.notifier).state = val.trim(),
       searchHint: 'Müşteri adı veya telefon ile ara...',
       actions: [
         Semantics(

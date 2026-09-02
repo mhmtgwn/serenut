@@ -274,10 +274,12 @@ class SqliteCustomerRepository implements ICustomerRepository {
     final matches = candidates.where((row) {
       final name = _normalizeTurkish(row['name']?.toString() ?? '');
       final email = _normalizeTurkish(row['email']?.toString() ?? '');
+      final taxNumber = _normalizeTurkish(row['tax_number']?.toString() ?? '');
       final phone =
           row['phone']?.toString().replaceAll(RegExp(r'\D'), '') ?? '';
       return name.contains(query) ||
           email.contains(query) ||
+          taxNumber.contains(query) ||
           (normalizedPhone?.isNotEmpty == true &&
               phone.contains(normalizedPhone!));
     }).toList();
@@ -343,7 +345,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
   Future<double> getTotalDebt(String customerId) async {
     final result = await _executor.rawQuery(
       "SELECT COALESCE(SUM(CASE WHEN type IN ('sale', 'manual_debt') THEN amount WHEN type = 'cancellation' THEN -amount ELSE 0 END), 0.0) as total "
-      'FROM financial_transactions WHERE customer_id = ?',
+      'FROM financial_transactions WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0',
       [customerId],
     );
     if (result.isEmpty) return 0.0;
@@ -361,7 +363,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
       "  WHEN type = 'cancellation' THEN -paid_amount "
       '  ELSE 0 '
       'END), 0.0) as total '
-      'FROM financial_transactions WHERE customer_id = ?',
+      'FROM financial_transactions WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0',
       [customerId],
     );
     if (result.isEmpty) return 0.0;

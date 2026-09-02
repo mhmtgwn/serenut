@@ -43,19 +43,17 @@ class TsplLabelLayoutEngine {
     final heightDots = (safeHeight * safeDpi / 25.4).round();
 
     // Scale factors relative to 50x30 mm reference label (400x240 dots)
-    final dimScaleX = widthDots / 400.0;
     final dimScaleY = heightDots / 240.0;
 
-    int sx(num value) => (value * dimScaleX).round();
     int sy(num value) => (value * dimScaleY).round();
 
     final horizontalPadding = (widthDots * 0.04).clamp(6.0, 24.0).round();
     final usableWidth = widthDots - (horizontalPadding * 2);
 
     final fontScale = switch (fontSize) {
-      'Küçük' => 0.85,
-      'Büyük' => 1.15,
-      _ => 1.0,
+      'Küçük' => 0.95,
+      'Büyük' => 1.30,
+      _ => 1.15,
     };
 
     final barcode = _barcode(model.barcode ?? '');
@@ -69,11 +67,11 @@ class TsplLabelLayoutEngine {
       ..writeln('REFERENCE 0,0')
       ..writeln('CLS');
 
-    int currentY = (heightDots * 0.04).clamp(4, 16).round();
+    int currentY = (heightDots * 0.03).clamp(2, 12).round();
 
     // ── 1. Top Header: Logo or Business Name ──────────────────────────────
     if (showBusinessName) {
-      final maxHeaderHeight = (heightDots * 0.18 * fontScale).clamp(10, 48).round();
+      final maxHeaderHeight = (heightDots * 0.16 * fontScale).clamp(10, 44).round();
       final bitmapCmd = _generateTsplBitmap(
         logoPath,
         logoBytes,
@@ -83,7 +81,7 @@ class TsplLabelLayoutEngine {
       );
       if (bitmapCmd != null) {
         commands.addAll(bitmapCmd.bytes);
-        currentY += bitmapCmd.height + sy(3);
+        currentY += bitmapCmd.height + sy(2);
       } else if (model.businessName?.trim().isNotEmpty == true) {
         final bizText = model.businessName!.trim();
         final maxChars = (usableWidth / 12).floor().clamp(4, 60);
@@ -104,7 +102,7 @@ class TsplLabelLayoutEngine {
           layout.yMultiplier,
           bizClean,
         );
-        currentY += layout.height + sy(3);
+        currentY += layout.height + sy(2);
       }
     }
 
@@ -124,12 +122,12 @@ class TsplLabelLayoutEngine {
       commands.writeln(
         'TEXT $centerX,$currentY,"${layout.font}",0,${layout.xMultiplier},${layout.yMultiplier},"$brandText"',
       );
-      currentY += layout.height + sy(2);
+      currentY += layout.height + sy(1);
     }
 
     // ── 3. Product Name (Middle Section) ─────────────────────────────────
     final nameClean = _ascii(model.productName);
-    final availableNameBudget = (heightDots * 0.32 * fontScale).clamp(20, 90).round();
+    final availableNameBudget = (heightDots * 0.38 * fontScale).clamp(24, 110).round();
     final singleLineMaxChars = (usableWidth / 12).floor().clamp(4, 60);
 
     if (nameClean.length <= singleLineMaxChars) {
@@ -149,7 +147,7 @@ class TsplLabelLayoutEngine {
         layout.yMultiplier,
         nameClean,
       );
-      currentY += layout.height + sy(4);
+      currentY += layout.height + sy(2);
     } else {
       final maxLineChars = (usableWidth / 10).floor().clamp(4, 60);
       final lines = _wrapProductName(nameClean, maxLineChars);
@@ -173,9 +171,9 @@ class TsplLabelLayoutEngine {
           layout.yMultiplier,
           line,
         );
-        currentY += layout.height + sy(2);
+        currentY += layout.height + sy(1);
       }
-      currentY += sy(2);
+      currentY += sy(1);
     }
 
     // Ensure space for bottom price/barcode section
@@ -190,18 +188,16 @@ class TsplLabelLayoutEngine {
     commands.writeln(
       'BAR $horizontalPadding,$currentY,${widthDots - (horizontalPadding * 2)},$barHeight',
     );
-    currentY += barHeight + sy(3);
+    currentY += barHeight + sy(2);
 
     // ── 5. Bottom Section (Left: Barcode | Right: Price & KDV) ────────────
     final bottomY = currentY;
     final bottomHeight = (heightDots - bottomY - sy(4)).clamp(20, heightDots).round();
 
     // Bottom Left: Barcode
-    int barcodeWidth = 0;
     if (showBarcode && barcode.isNotEmpty) {
       final barcodeHeight = (bottomHeight * 0.65).clamp(16, 72).round();
-      barcodeWidth = (usableWidth * 0.44).clamp(70, 220).round();
-      final narrowBar = (usableWidth < 260) ? 1 : 2;
+      const narrowBar = 1;
       commands.writeln(
         'BARCODE $horizontalPadding,$bottomY,"128",$barcodeHeight,0,0,$narrowBar,2,"$barcode"',
       );
@@ -215,7 +211,7 @@ class TsplLabelLayoutEngine {
       const vatStr = '(KDV Dahil)';
 
       if (showBarcode && barcode.isNotEmpty) {
-        final priceLeft = horizontalPadding + barcodeWidth + sx(8);
+        final priceLeft = (widthDots * 0.44).round();
         final availablePriceWidth = (widthDots - priceLeft - horizontalPadding).clamp(40, widthDots);
         final priceText = '$whole,$cents';
         const currencyWidth = 14;
@@ -249,28 +245,22 @@ class TsplLabelLayoutEngine {
         }
       } else {
         final priceStr = 'TL $whole.$cents';
-        final priceLayout = _widestTextLayout(
-          priceStr,
-          usableWidth,
-          maxHeight: (bottomHeight * 0.65).round(),
-        );
-        final priceX = ((widthDots - priceLayout.width) / 2)
-            .round()
-            .clamp(horizontalPadding, widthDots - horizontalPadding);
-        commands.boldText(
-          priceX,
-          bottomY + sy(2),
-          priceLayout.font,
-          priceLayout.xMultiplier,
-          priceLayout.yMultiplier,
-          priceStr,
-        );
+        final usablePriceWidth = widthDots - (horizontalPadding * 2);
+        final priceFont = priceStr.length * 24 <= usablePriceWidth
+            ? '4'
+            : (priceStr.length * 16 <= usablePriceWidth ? '3' : '2');
+        final priceCharWidth =
+            priceFont == '4' ? 24 : (priceFont == '3' ? 16 : 12);
+        final textW = priceStr.length * priceCharWidth;
+        final priceX = ((widthDots - textW) / 2)
+            .clamp(horizontalPadding, widthDots - horizontalPadding)
+            .round();
+        commands.writeln('TEXT $priceX,$bottomY,"$priceFont",0,1,1,"$priceStr"');
         if (showVat) {
-          final vatLayout = _widestTextLayout(vatStr, usableWidth, maxHeight: 14);
-          final vatX = ((widthDots - vatLayout.width) / 2)
+          final vatY = bottomY + bottomHeight - sy(10);
+          final vatX = ((widthDots - (vatStr.length * 8)) / 2)
               .round()
               .clamp(horizontalPadding, widthDots - horizontalPadding);
-          final vatY = bottomY + bottomHeight - sy(10);
           commands.writeln('TEXT $vatX,$vatY,"1",0,1,1,"$vatStr"');
         }
       }
@@ -314,8 +304,7 @@ class TsplLabelLayoutEngine {
     String? businessName,
     List<int>? logoBytes,
   }) {
-    final safeWidth = widthMm.clamp(20, 120);
-    final safeHeight = heightMm.clamp(15, 200);
+    final safeWidth = widthMm.clamp(20, 150);
     final safeGap = gapMm.clamp(0, 10);
     final safeDpi = dpi == 300 ? 300 : 203;
 
@@ -323,13 +312,9 @@ class TsplLabelLayoutEngine {
     final widthDots = printableWidthDots == null
         ? mediaWidthDots
         : printableWidthDots.clamp(140, mediaWidthDots);
-    final heightDots = (safeHeight * safeDpi / 25.4).round();
 
-    final dimScaleX = widthDots / 400.0;
-    final dimScaleY = heightDots / 240.0;
-
-    int sx(num value) => (value * dimScaleX).round();
-    int sy(num value) => (value * dimScaleY).round();
+    int sx(num value) => (value * widthDots / 400).round();
+    int sy(num value) => (value * safeDpi / 203).round();
 
     final paddingX = (widthDots * 0.04).clamp(6.0, 24.0).round();
     final usableW = widthDots - (paddingX * 2);
@@ -351,6 +336,53 @@ class TsplLabelLayoutEngine {
         ? quantity.toInt().toString()
         : quantity.toStringAsFixed(1);
 
+    // ── Pre-calculate Exact Dot Height ──
+    int calculatedDots = sy(6);
+    if (showBusinessName) {
+      calculatedDots += sy(24);
+    }
+    if (showOrderNo) calculatedDots += sy(20);
+    if (showDate && timeStr.isNotEmpty) calculatedDots += sy(20);
+    if (showCustomerName) calculatedDots += sy(20);
+    if (customerNoClean.isNotEmpty) calculatedDots += sy(16);
+    if (phoneClean.isNotEmpty) calculatedDots += sy(16);
+    if (previousDebt > 0.001) calculatedDots += sy(16);
+    calculatedDots += sy(12); // Separator 1
+
+    if (showItemsCount &&
+        itemsCount != null &&
+        (items == null || items.isEmpty)) {
+      calculatedDots += sy(18);
+    }
+
+    if (items != null && items.isNotEmpty) {
+      for (final item in items) {
+        final rawName =
+            _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
+        final nameLines = _splitText(rawName, maxFont1Chars, maxLines: 2);
+        calculatedDots += (nameLines.length * sy(18));
+        calculatedDots += sy(18); // Detail / line total
+        calculatedDots += sy(2);
+      }
+    } else {
+      final nameLines = _splitText(prodClean, maxFont2Chars, maxLines: 2);
+      calculatedDots += nameLines.length * sy(20);
+      calculatedDots += sy(18);
+    }
+
+    calculatedDots += sy(12); // Separator 2
+    calculatedDots += sy(18); // Payment status
+    if (noteClean != null) calculatedDots += sy(20);
+    if (showTotalAmount && totalAmount != null) calculatedDots += sy(28);
+    calculatedDots += sy(55); // Footer & QR Code clearance + bottom padding
+
+    final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil() + 6;
+    final requestedHeightMm = heightMm.clamp(15, 1000);
+    final safeHeight = requestedHeightMm > requiredHeightMm
+        ? requestedHeightMm
+        : requiredHeightMm;
+    final heightDots = (safeHeight * safeDpi / 25.4).round();
+
     final commands = _TsplBuffer()
       ..writeln('SIZE $safeWidth mm,$safeHeight mm')
       ..writeln('GAP $safeGap mm,0 mm')
@@ -362,16 +394,16 @@ class TsplLabelLayoutEngine {
 
     int currentY = sy(6);
 
-    // ── 1. Business Header (Metin olarak basılır - Sipariş etiketinde logo basılmaz) ──
+    // ── 1. Business Header ──
     if (showBusinessName) {
-      final bizText = (businessName != null && businessName.trim().isNotEmpty)
+      final bizText = _ascii((businessName != null && businessName.trim().isNotEmpty)
           ? businessName.trim()
-          : 'SERENUT OS';
+          : 'SERENUT OS');
       final bizClean = _fit(bizText, maxFont2Chars);
       final layout = _widestTextLayout(
         bizClean,
         usableW,
-        maxHeight: (heightDots * 0.16).clamp(10, 30).round(),
+        maxHeight: (heightDots * 0.14).clamp(10, 28).round(),
       );
       final bizX = ((widthDots - layout.width) / 2)
           .round()
@@ -387,7 +419,7 @@ class TsplLabelLayoutEngine {
       currentY += layout.height + sy(3);
     }
 
-    // ── 2. Order # & Date ────────────────────────────────────────────────
+    // ── 2. Order # & Date ──
     if (showOrderNo) {
       final orderNo = _fit(orderIdShort, (maxFont2Chars - 9).clamp(4, 20));
       commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"SIPARIS #$orderNo"');
@@ -399,7 +431,7 @@ class TsplLabelLayoutEngine {
       currentY += sy(18);
     }
 
-    // ── 3. Customer Info ─────────────────────────────────────────────────
+    // ── 3. Customer Info ──
     if (showCustomerName) {
       final whoText = custClean.isNotEmpty
           ? 'Musteri: ${_fit(custClean, (maxFont2Chars - 9).clamp(4, 40))}'
@@ -426,12 +458,12 @@ class TsplLabelLayoutEngine {
       currentY += sy(16);
     }
 
-    // ── 4. Separator Line 1 ──────────────────────────────────────────────
+    // ── 4. Separator Line 1 ──
     final barH = (heightDots * 0.01).clamp(1, 2).round();
     commands.writeln('BAR $paddingX,$currentY,${widthDots - paddingX * 2},$barH');
     currentY += barH + sy(4);
 
-    // ── 5. Items Breakdown ───────────────────────────────────────────────
+    // ── 5. Items Breakdown ──
     if (showItemsCount &&
         itemsCount != null &&
         (items == null || items.isEmpty)) {
@@ -504,11 +536,11 @@ class TsplLabelLayoutEngine {
       currentY += sy(18);
     }
 
-    // ── 6. Separator Line 2 ──────────────────────────────────────────────
+    // ── 6. Separator Line 2 ──
     commands.writeln('BAR $paddingX,$currentY,${widthDots - paddingX * 2},$barH');
     currentY += barH + sy(4);
 
-    // ── 7. Payment Status & Note ─────────────────────────────────────────
+    // ── 7. Payment Status & Note ──
     commands.writeln(
       'TEXT $paddingX,$currentY,"1",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxFont1Chars - 7).clamp(4, 60))}"',
     );
@@ -521,7 +553,7 @@ class TsplLabelLayoutEngine {
       currentY += sy(20);
     }
 
-    // ── 8. Total Amount & QR Footer ──────────────────────────────────────
+    // ── 8. Total Amount & QR Footer ──
     currentY += sy(4);
     final footerY = currentY;
 
@@ -529,7 +561,15 @@ class TsplLabelLayoutEngine {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
       final footerTextChars = ((widthDots - sx(110)) ~/ 8).clamp(8, 50);
       final safeTotal = _fit(totalStr, footerTextChars);
-      commands.writeln('TEXT $paddingX,$footerY,"2",0,1,1,"$safeTotal"');
+      final totalLayout = _widestTextLayout(safeTotal, widthDots - sx(110), maxHeight: sy(26));
+      commands.boldText(
+        paddingX,
+        footerY,
+        totalLayout.font,
+        totalLayout.xMultiplier,
+        totalLayout.yMultiplier,
+        safeTotal,
+      );
     }
 
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");

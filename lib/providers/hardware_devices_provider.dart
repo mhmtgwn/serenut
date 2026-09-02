@@ -878,6 +878,9 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     final now = DateTime.now();
     final config = Map<String, Object?>.from(device.configuration)
       ..remove('activeFor');
+    if (device.id.startsWith('shared:')) {
+      config.putIfAbsent('hardwareId', () => device.id.substring(7));
+    }
     final isLabel = device.type == HardwareDeviceType.labelPrinter;
     final capabilities = isLabel
         ? {

@@ -279,6 +279,10 @@ class SyncNotifier extends StateNotifier<SyncState>
         _ref.invalidate(salesControllerProvider);
         _ref.invalidate(salesHistoryControllerProvider);
         _ref.invalidate(customersControllerProvider);
+        _ref.invalidate(customerBalanceSummaryProvider);
+        _ref.invalidate(salesCustomersControllerProvider);
+        _ref.invalidate(ordersCustomersControllerProvider);
+        _ref.invalidate(collectionCustomersControllerProvider);
         _ref.invalidate(productsControllerProvider);
         _ref.invalidate(salesProductsControllerProvider);
         _ref.invalidate(ordersProductsControllerProvider);

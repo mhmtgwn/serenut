@@ -155,6 +155,7 @@ class SyncV4Service {
     }
     await _snapshotPreV4DataOnce(db);
     await _recoverUnsyncedImportedProductsOnce(db);
+    await _recoverRejectedFinancialTransactions(db);
     await db.rawUpdate(
         "UPDATE sync_outbox_v4 SET state = 'PENDING' WHERE state = 'SENDING'");
     var pending = await db.query('sync_outbox_v4',
@@ -274,6 +275,7 @@ class SyncV4Service {
         for (final raw in snapshot) {
           await _apply(txn, raw);
         }
+        reconciled += await _reconcileCustomerBalances(txn);
         cursor = _syncInt(bootstrapBody['next_cursor']);
         await txn.insert('sync_cursor_v4', {'key': 'global', 'cursor': cursor},
             conflictAlgorithm: ConflictAlgorithm.replace);
@@ -545,6 +547,40 @@ class SyncV4Service {
       }
     });
     await prefs.setBool(_unsyncedProductRecoveryKey, true);
+  }
+
+  /// Retries previously rejected financial transactions and enqueues any unsynced
+  /// ledger rows so order-backed or transiently failed transactions converge.
+  Future<void> _recoverRejectedFinancialTransactions(Database db) async {
+    await db.rawUpdate('''
+      UPDATE sync_outbox_v4
+         SET state = 'PENDING', attempts = 0
+       WHERE state = 'REJECTED'
+         AND entity_type = 'financial_transaction'
+    ''');
+
+    await db.transaction((txn) async {
+      final unsynced = await txn.rawQuery('''
+        SELECT ft.* FROM financial_transactions ft
+        WHERE COALESCE(ft.is_synced, 0) = 0
+          AND NOT EXISTS (
+            SELECT 1 FROM sync_outbox_v4 o
+            WHERE o.entity_type = 'financial_transaction'
+              AND o.entity_id = ft.id
+          )
+      ''');
+      for (final row in unsynced) {
+        final id = row['id']?.toString();
+        if (id == null || id.isEmpty) continue;
+        await SyncOutboxV4.enqueue(
+          txn,
+          entityType: 'financial_transaction',
+          entityId: id,
+          operation: 'UPSERT',
+          payload: Map<String, dynamic>.from(row),
+        );
+      }
+    });
   }
 
   /// Parents must exist before child aggregate rows and line items are applied.

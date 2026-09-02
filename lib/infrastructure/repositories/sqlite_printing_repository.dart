@@ -219,7 +219,11 @@ class SqlitePrintingRepository implements PrintingRepository {
       final jobId = _uuid.v4();
       final transportConfig = Map<String, Object?>.from(device.transportConfig)
         ..putIfAbsent('jobId', () => jobId)
+        ..putIfAbsent('deviceId', () => device.id)
         ..putIfAbsent('documentKind', () => kind.name);
+      if (device.id.startsWith('shared:')) {
+        transportConfig.putIfAbsent('hardwareId', () => device.id.substring(7));
+      }
       job = PrintJobRecord(
         id: jobId,
         kind: kind,
@@ -289,8 +293,16 @@ class SqlitePrintingRepository implements PrintingRepository {
       }
       final profile = PrintDesignProfile.fromMap(profiles.single);
       final now = DateTime.now();
+      final jobId = _uuid.v4();
+      final transportConfig = Map<String, Object?>.from(device.transportConfig)
+        ..putIfAbsent('jobId', () => jobId)
+        ..putIfAbsent('deviceId', () => device.id)
+        ..putIfAbsent('documentKind', () => kind.name);
+      if (device.id.startsWith('shared:')) {
+        transportConfig.putIfAbsent('hardwareId', () => device.id.substring(7));
+      }
       job = PrintJobRecord(
-        id: _uuid.v4(),
+        id: jobId,
         kind: kind,
         payloadJson: payloadJson,
         copies: copies,
@@ -298,7 +310,7 @@ class SqlitePrintingRepository implements PrintingRepository {
         designSnapshotJson: profiles.single['definition_json']! as String,
         deviceId: device.id,
         transportSnapshotJson: '{"kind":"${device.transport.name}",'
-            '"config":${devices.single['transport_config_json']}}',
+            '"config":${jsonEncode(transportConfig)}}',
         capabilitySnapshotJson: devices.single['capabilities_json']! as String,
         rendererVersion: profile.rendererVersion,
         state: PrintJobState.queued,

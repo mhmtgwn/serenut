@@ -342,6 +342,42 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   double get _karmaRemainder => _karmaResult.remaining;
   bool get _karmaValid => _karmaResult.isValid;
 
+  Future<void> _pickDeliveryDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expectedDelivery,
+      firstDate: now.subtract(const Duration(days: 30)),
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: 'Teslimat Tarihi Seçin',
+      confirmText: 'Seç',
+      cancelText: 'İptal',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _kGreen,
+              onPrimary: Colors.white,
+              onSurface: _kText,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      updateState(() {
+        _expectedDelivery = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _expectedDelivery.hour,
+          _expectedDelivery.minute,
+        );
+      });
+    }
+  }
+
   void _nextStep() {
     if (_activeStep < 2) {
       setState(() => _activeStep++);

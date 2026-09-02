@@ -68,7 +68,43 @@ class DatabaseManager {
     _database = await _databaseFuture;
     await _verifyDatabaseSchemaInvariants(_database!);
     await DatabaseTriggers.verifyAndRepairTriggers(_database!);
+    await _reconcileAllCustomerBalances(_database!);
     return _database!;
+  }
+
+  /// Reconciles all customer balances against the append-only ledger on database startup.
+  Future<void> _reconcileAllCustomerBalances(Database db) async {
+    try {
+      await db.rawUpdate('''
+        UPDATE customers
+           SET balance = COALESCE((
+             SELECT SUM(CASE
+               WHEN ft.type IN ('sale', 'manual_debt') THEN -ft.debt_amount
+               WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+               WHEN ft.type = 'cancellation' THEN ft.debt_amount
+               WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+               ELSE 0
+             END)
+               FROM financial_transactions ft
+              WHERE ft.customer_id = customers.id
+                AND COALESCE(ft.is_deleted, 0) = 0
+           ), 0)
+          WHERE ABS(balance - COALESCE((
+              SELECT SUM(CASE
+                WHEN ft.type IN ('sale', 'manual_debt') THEN -ft.debt_amount
+                WHEN ft.type IN ('payment', 'collection') THEN ft.paid_amount
+                WHEN ft.type = 'cancellation' THEN ft.debt_amount
+                WHEN ft.type = 'refund' AND ft.paid_amount = 0 THEN ft.amount
+                ELSE 0
+              END)
+                FROM financial_transactions ft
+               WHERE ft.customer_id = customers.id
+                 AND COALESCE(ft.is_deleted, 0) = 0
+            ), 0)) > 0.001
+      ''');
+    } catch (e) {
+      debugPrint('[DatabaseManager] Customer balance reconciliation error: $e');
+    }
   }
 
   /// Verify that crucial tables and columns exist using sqlite_master and PRAGMA table_info

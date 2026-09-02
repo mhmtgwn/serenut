@@ -128,14 +128,20 @@ class SharedHardwareService implements SharedHardwareJobGateway {
 
   Map<String, dynamic>? get _identity {
     final license = _licenseService.getLicenseInfo();
-    if (_apiClient.jwtToken?.isNotEmpty != true ||
-        license?.activationId?.isNotEmpty != true ||
-        license?.deviceId?.isNotEmpty != true) {
+    if (_apiClient.jwtToken?.isNotEmpty != true) {
+      return null;
+    }
+    // activationId may be absent during trial or before first license sync;
+    // deviceId alone is sufficient for shared-hardware API calls.
+    final activationId = license?.activationId;
+    final deviceId = license?.deviceId ?? _licenseService.getDeviceUuid();
+    if (deviceId.isEmpty) {
       return null;
     }
     return {
-      'device_activation_id': license!.activationId,
-      'device_id': license.deviceId,
+      if (activationId?.isNotEmpty == true)
+        'device_activation_id': activationId,
+      'device_id': deviceId,
     };
   }
 

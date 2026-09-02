@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/infrastructure/services/native_printer_bridge.dart';
@@ -229,10 +230,17 @@ class CloudRelayPrintTransport implements PrintTransport {
     required int copies,
     required Map<String, Object?> configuration,
   }) async {
-    final hardwareId = configuration['hardwareId']?.toString() ?? '';
-    final jobId = configuration['jobId']?.toString() ?? '';
+    var hardwareId = configuration['hardwareId']?.toString().trim() ?? '';
+    if (hardwareId.isEmpty) {
+      final deviceId = configuration['deviceId']?.toString().trim() ?? '';
+      if (deviceId.startsWith('shared:')) {
+        hardwareId = deviceId.substring(7);
+      }
+    }
+    final rawJobId = configuration['jobId']?.toString().trim() ?? '';
+    final jobId = rawJobId.isNotEmpty ? rawJobId : const Uuid().v4();
     final documentKind = configuration['documentKind']?.toString() ?? '';
-    if (hardwareId.isEmpty || jobId.isEmpty) {
+    if (hardwareId.isEmpty) {
       throw const PrintTransportException(
         code: 'invalid_cloud_relay_configuration',
         message: 'Ortak yazıcı kimliği eksik.',

@@ -375,6 +375,16 @@ class ProductEntity {
             : (int.tryParse((map['minimum_weight_grams'] ?? '20').toString()) ??
                 20),
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProductEntity &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 /// Customer entity

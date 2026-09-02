@@ -54,16 +54,26 @@ async function assertActiveSyncActivation(
   installationId: unknown,
   executor: Pick<PoolClient, "query"> = pgPool,
 ): Promise<void> {
-  if (typeof activationId !== "string" || typeof installationId !== "string" ||
-      !activationId || !installationId) {
+  if (typeof installationId !== "string" || !installationId) {
     throw new Error("invalid_device_activation");
   }
-  const activation = await executor.query(
-    `SELECT id FROM device_activations
-     WHERE id = $1 AND company_id = $2 AND device_hash = $3 AND status = 'active'`,
-    [activationId, companyId, installationId],
-  );
-  if (activation.rowCount === 0) throw new Error("invalid_device_activation");
+  // activationId is optional for trial users who haven't completed license activation yet.
+  if (typeof activationId === "string" && activationId) {
+    const activation = await executor.query(
+      `SELECT id FROM device_activations
+       WHERE id = $1 AND company_id = $2 AND device_hash = $3 AND status = 'active'`,
+      [activationId, companyId, installationId],
+    );
+    if (activation.rowCount === 0) throw new Error("invalid_device_activation");
+  } else {
+    const activation = await executor.query(
+      `SELECT id FROM device_activations
+       WHERE company_id = $1 AND device_hash = $2 AND status = 'active'
+       LIMIT 1`,
+      [companyId, installationId],
+    );
+    if (activation.rowCount === 0) throw new Error("invalid_device_activation");
+  }
 }
 
 /**
@@ -341,10 +351,15 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
   if (!customer.rowCount) throw new Error("invalid_customer");
   if (type === "sale") {
-    const sale = await client.query(
+    let sale = await client.query(
       `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
       [referenceId, companyId]);
-    // The canonical sale may already include later partial payments when an
+    if (!sale.rowCount) {
+      sale = await client.query(
+        `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+        [referenceId, companyId, paidAmount]);
+    }
+    // The canonical sale or order may already include later partial payments when an
     // older device uploads its initial ledger snapshot. Validate the immutable
     // original fact instead of requiring the current paid projection to match.
     if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
@@ -355,17 +370,27 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     if (!referenceId || amount <= 0 || Math.abs(amount-paidAmount)>0.01) {
       throw new Error("invalid_payment_transaction");
     }
-    const sale = await client.query(
+    let sale = await client.query(
       `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
       [referenceId, companyId]);
-    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
-        Number(sale.rows[0].paid_amount)+amount > Number(sale.rows[0].total_amount)+0.01) {
+    const isOrder = !sale.rowCount;
+    if (isOrder) {
+      sale = await client.query(
+        `SELECT total_amount, $3::numeric as paid_amount, customer_id FROM customer_orders WHERE id=$1 AND company_id=$2 FOR UPDATE`,
+        [referenceId, companyId, amount]);
+    }
+    if (!sale.rowCount || sale.rows[0].customer_id !== customerId) {
       throw new Error("payment_exceeds_sale");
     }
-    const newPaid = Number(sale.rows[0].paid_amount)+amount;
-    await client.query(
-      `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
-      [newPaid, newPaid >= Number(sale.rows[0].total_amount)-0.01 ? 'completed' : 'partial', referenceId, companyId]);
+    if (!isOrder) {
+      if (Number(sale.rows[0].paid_amount)+amount > Number(sale.rows[0].total_amount)+0.01) {
+        throw new Error("payment_exceeds_sale");
+      }
+      const newPaid = Number(sale.rows[0].paid_amount)+amount;
+      await client.query(
+        `UPDATE sales SET paid_amount=$1,status=$2,updated_at=NOW() WHERE id=$3 AND company_id=$4`,
+        [newPaid, newPaid >= Number(sale.rows[0].total_amount)-0.01 ? 'completed' : 'partial', referenceId, companyId]);
+    }
   } else if (type === "collection" &&
       (amount <= 0 || Math.abs(amount-paidAmount)>0.01 || referenceId)) {
     throw new Error("invalid_collection_transaction");
@@ -376,9 +401,14 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     if (!referenceId || amount <= 0 || paidAmount > amount || debtAmount > amount) {
       throw new Error(`invalid_${type}_transaction`);
     }
-    const sale = await client.query(
+    let sale = await client.query(
       `SELECT customer_id,total_amount FROM sales WHERE id=$1 AND company_id=$2`,
       [referenceId, companyId]);
+    if (!sale.rowCount) {
+      sale = await client.query(
+        `SELECT customer_id,total_amount FROM customer_orders WHERE id=$1 AND company_id=$2`,
+        [referenceId, companyId]);
+    }
     if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
         amount > Number(sale.rows[0].total_amount)+0.01) {
       throw new Error(`${type}_sale_mismatch`);

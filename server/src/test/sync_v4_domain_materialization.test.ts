@@ -86,6 +86,11 @@ async function run() {
     };
     await applyDomainMutation(client, 'sync-v4-company', partialPayment);
     await applyDomainMutation(client, 'sync-v4-company', partialPayment);
+    await applyDomainMutation(client, 'sync-v4-company', {
+      entity_type: 'financial_transaction', entity_id: 'ledger-order-1', operation: 'UPSERT', base_revision: 0,
+      payload: { type: 'sale', customer_id: 'customer-1', amount: 15, paid_amount: 0,
+        debt_amount: 15, reference_id: 'order-1' },
+    });
     await client.query('COMMIT');
 
     const [saleRows, saleItemRows, orderRows, orderItemRows, ledgerRows, productRows, refundRows, movementRows, paidSale, repairedCatalogRows, malformedCatalogRows] = await Promise.all([
@@ -102,7 +107,7 @@ async function run() {
       pgPool.query("SELECT id FROM products WHERE id='7031652' AND company_id='sync-v4-company'"),
     ]);
     if (saleRows.rowCount !== 2 || saleItemRows.rowCount !== 1 || orderRows.rowCount !== 1 ||
-        orderItemRows.rowCount !== 1 || ledgerRows.rowCount !== 4 || refundRows.rowCount !== 1 ||
+        orderItemRows.rowCount !== 1 || ledgerRows.rowCount !== 5 || refundRows.rowCount !== 1 ||
         movementRows.rowCount !== 2 || Number(paidSale.rows[0]?.paid_amount) !== 5 ||
         paidSale.rows[0]?.status !== 'partial') {
       throw new Error('Sync V4 mutation was not materialized exactly once in all domain tables.');
