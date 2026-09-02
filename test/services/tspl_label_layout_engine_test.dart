@@ -233,13 +233,12 @@ void main() {
     );
 
     final order =
-        RegExp(r'TEXT \d+,(\d+),"1",0,1,1,"SIPARIS').firstMatch(output);
+        RegExp(r'TEXT \d+,(\d+),"2",0,1,1,"SIPARIS').firstMatch(output);
     final date =
-        RegExp(r'TEXT \d+,(\d+),"1",0,1,1,"06\.08 15:45"').firstMatch(output);
+        RegExp(r'TEXT \d+,(\d+),"2",0,1,1,"06\.08 15:45"').firstMatch(output);
     expect(order, isNotNull);
     expect(date, isNotNull);
-    expect(
-        int.parse(date!.group(1)!), greaterThan(int.parse(order!.group(1)!)));
+    expect(int.parse(date!.group(1)!), equals(int.parse(order!.group(1)!)));
     expect(output, contains('Elma'));
     expect(output, contains('2x 12.50 TL'));
     expect(output, contains('25.00 TL'));

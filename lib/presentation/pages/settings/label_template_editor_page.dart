@@ -474,8 +474,8 @@ class _LabelTemplateEditorPageState
 
     final hasLogo = logoPath != null && logoPath.trim().isNotEmpty;
     final aspect = _labelWidthMm / _labelHeightMm;
-    const previewWidth = 260.0;
-    final previewHeight = (previewWidth / aspect).clamp(110.0, 340.0);
+    final previewWidth = (_labelWidthMm * 4.8).clamp(240.0, 420.0);
+    final previewHeight = (previewWidth / aspect).clamp(110.0, 420.0);
 
     return Center(
       child: Container(
@@ -613,8 +613,12 @@ class _LabelTemplateEditorPageState
         dimScale;
 
     final aspect = _labelWidthMm / _labelHeightMm;
-    const previewWidth = 260.0;
-    final previewHeight = (previewWidth / aspect).clamp(130.0, 380.0);
+    final previewWidth = (_labelWidthMm * 4.8).clamp(240.0, 440.0);
+    final previewHeight = (previewWidth / aspect).clamp(130.0, 480.0);
+
+    final hasCustomBizName = _orderShowBusinessName &&
+        bizName.trim().isNotEmpty &&
+        !bizName.toUpperCase().contains('SERENUT');
 
     return Center(
       child: Container(
@@ -633,208 +637,273 @@ class _LabelTemplateEditorPageState
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Sipariş etiketinde logo gösterilmez, sadece firma ismi metni
-            if (_orderShowBusinessName) ...[
-              Center(
-                child: Text(
-                  bizName.toUpperCase(),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Sipariş etiketinde logo gösterilmez; Serenut yazısı kaldırıldı, sadece özel işletme adı varsa gösterilir
+              if (hasCustomBizName) ...[
+                Center(
+                  child: Text(
+                    bizName.toUpperCase(),
+                    style: GoogleFonts.inter(
+                      fontSize: (12 * scale).clamp(9.0, 18.0),
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const Divider(height: 8, thickness: 0.5),
+              ],
+              // Sipariş No ve Tarih / Saat yan yana aynı satırda
+              if (_orderShowOrderNo || _orderShowDate) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (_orderShowOrderNo)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'SİPARİŞ ',
+                            style: GoogleFonts.inter(
+                              fontSize: (11 * scale).clamp(9.0, 16.0),
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '#ORD-2026-0042',
+                            style: GoogleFonts.inter(
+                              fontSize: (12 * scale).clamp(10.0, 18.0),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    if (_orderShowDate)
+                      Text(
+                        '31.07.2026 14:30',
+                        style: GoogleFonts.inter(
+                          fontSize: (11 * scale).clamp(9.0, 16.0),
+                          color: Colors.grey[800],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
+              // Müşteri adı ve Telefon (ID/No kaldırıldı, dar etiketlerde otomatik alt satıra geçer)
+              if (_orderShowCustomerName) ...[
+                if (_labelWidthMm >= 65) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'MÜŞTERİ: ',
+                                style: GoogleFonts.inter(
+                                  fontSize: (11 * scale).clamp(9.0, 16.0),
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              TextSpan(
+                                text: 'Ahmet Yılmaz',
+                                style: GoogleFonts.inter(
+                                  fontSize: (12 * scale).clamp(10.0, 18.0),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Tel: 0555 123 45 67',
+                        style: GoogleFonts.inter(
+                          fontSize: (10.5 * scale).clamp(8.5, 15.0),
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'MÜŞTERİ: ',
+                        style: GoogleFonts.inter(
+                          fontSize: (11 * scale).clamp(9.0, 16.0),
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Ahmet Yılmaz',
+                        style: GoogleFonts.inter(
+                          fontSize: (12 * scale).clamp(10.0, 18.0),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'TELEFON:',
+                        style: GoogleFonts.inter(
+                          fontSize: (10.5 * scale).clamp(8.5, 15.0),
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '0555 123 45 67',
+                        style: GoogleFonts.inter(
+                          fontSize: (11 * scale).clamp(9.0, 16.0),
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Eski borç:',
+                      style: GoogleFonts.inter(
+                        fontSize: (10.5 * scale).clamp(8.5, 15.0),
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      '₺150,00',
+                      style: GoogleFonts.inter(
+                        fontSize: (10.5 * scale).clamp(8.5, 15.0),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const Divider(height: 12, thickness: 0.5),
+              if (_orderShowItemsCount) ...[
+                Text(
+                  'SİPARİŞ İÇERİĞİ (2 Çeşit):',
                   style: GoogleFonts.inter(
-                    fontSize: (11 * scale).clamp(8.0, 16.0),
+                    fontSize: (11 * scale).clamp(9.0, 16.0),
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+                    color: Colors.grey[700],
                   ),
                 ),
-              ),
-              const Divider(height: 8, thickness: 0.5),
-            ],
-            if (_orderShowOrderNo)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'SİPARİŞ NO:',
-                    style: GoogleFonts.inter(
-                      fontSize: 10 * scale,
-                      color: Colors.grey[600],
+                const SizedBox(height: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Taze Çifte Kavrulmuş Fındık 500g',
+                      style: GoogleFonts.inter(
+                        fontSize: (12 * scale).clamp(10.0, 18.0),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
                     ),
-                  ),
-                  Text(
-                    '#ORD-2026-0042',
-                    style: GoogleFonts.inter(
-                      fontSize: 12 * scale,
-                      fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '  2x 200,00 TL',
+                          style: GoogleFonts.inter(
+                            fontSize: (11 * scale).clamp(9.0, 16.0),
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        Text(
+                          '400,00 TL',
+                          style: GoogleFonts.inter(
+                            fontSize: (11 * scale).clamp(9.0, 16.0),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            if (_orderShowCustomerName) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'MÜŞTERİ:',
-                    style: GoogleFonts.inter(
-                      fontSize: 10 * scale,
-                      color: Colors.grey[600],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Anamur Muz 1kg',
+                      style: GoogleFonts.inter(
+                        fontSize: (12 * scale).clamp(10.0, 18.0),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Ahmet Yılmaz',
-                    style: GoogleFonts.inter(
-                      fontSize: 12 * scale,
-                      fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '  1x 20,00 TL',
+                          style: GoogleFonts.inter(
+                            fontSize: (11 * scale).clamp(9.0, 16.0),
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        Text(
+                          '20,00 TL',
+                          style: GoogleFonts.inter(
+                            fontSize: (11 * scale).clamp(9.0, 16.0),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Eski borç:',
-                    style: GoogleFonts.inter(
-                      fontSize: 10 * scale,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  Text(
-                    '₺150,00',
-                    style: GoogleFonts.inter(
-                      fontSize: 10 * scale,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (_orderShowDate) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'TARİH:',
-                    style: GoogleFonts.inter(
-                      fontSize: 10 * scale,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  Text(
-                    '31.07.2026 14:30',
-                    style: GoogleFonts.inter(
-                      fontSize: 10 * scale,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const Divider(height: 12, thickness: 0.5),
-            if (_orderShowItemsCount) ...[
-              Text(
-                'SİPARİŞ İÇERİĞİ (2 Çeşit):',
-                style: GoogleFonts.inter(
-                  fontSize: 10 * scale,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
+                  ],
                 ),
-              ),
-              const SizedBox(height: 6),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Taze Çifte Kavrulmuş Fındık 500g',
-                    style: GoogleFonts.inter(
-                      fontSize: 11 * scale,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
+                const SizedBox(height: 6),
+              ],
+              const Divider(height: 10, thickness: 0.5),
+              if (_orderShowTotalAmount) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'TOPLAM:',
+                      style: GoogleFonts.inter(
+                        fontSize: (13 * scale).clamp(10.0, 20.0),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '  2x 200,00 TL',
-                        style: GoogleFonts.inter(
-                          fontSize: 10 * scale,
-                          color: Colors.grey[800],
-                        ),
+                    Text(
+                      '₺420,00',
+                      style: GoogleFonts.inter(
+                        fontSize: (17 * scale).clamp(13.0, 26.0),
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black,
                       ),
-                      Text(
-                        '400,00 TL',
-                        style: GoogleFonts.inter(
-                          fontSize: 10 * scale,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Anamur Muz 1kg',
-                    style: GoogleFonts.inter(
-                      fontSize: 11 * scale,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
                     ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '  1x 20,00 TL',
-                        style: GoogleFonts.inter(
-                          fontSize: 10 * scale,
-                          color: Colors.grey[800],
-                        ),
-                      ),
-                      Text(
-                        '20,00 TL',
-                        style: GoogleFonts.inter(
-                          fontSize: 10 * scale,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
+                  ],
+                ),
+              ],
             ],
-            const Divider(height: 10, thickness: 0.5),
-            if (_orderShowTotalAmount) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'TOPLAM:',
-                    style: GoogleFonts.inter(
-                      fontSize: 12 * scale,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '₺420,00',
-                    style: GoogleFonts.inter(
-                      fontSize: 16 * scale,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

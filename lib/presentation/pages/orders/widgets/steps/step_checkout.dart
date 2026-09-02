@@ -4,282 +4,169 @@ part of '../order_creation_dialog.dart';
 extension OrderCreationCheckoutStep on OrderCreationDialogState {
   Widget _buildCheckoutStep() {
     final isKarma = _paymentMethod == 'karma';
+    final totalQty = _cart.values.fold(0.0, (a, b) => a + b);
 
-    final leftSummaryColumn = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Sipariş Sepeti',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
-            ),
-            Text(
-              '${_cart.length} çeşit ürün',
-              style: const TextStyle(fontSize: 12, color: _kTextSecondary, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (_cart.isEmpty)
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Compact Order & Customer Summary Banner ──
           Container(
-            padding: const EdgeInsets.all(16),
-            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: _kBorder),
             ),
-            child: const Text(
-              'Sepette ürün bulunmamaktadır.',
-              style: TextStyle(color: _kTextSecondary, fontSize: 12),
-            ),
-          )
-        else
-          ..._cart.entries.map((entry) {
-            final product = entry.key;
-            final quantity = entry.value;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: _kBorder),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(product.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w700)),
-                        Text(
-                          '₺${product.price.toStringAsFixed(2)} / adet',
-                          style: const TextStyle(
-                              fontSize: 10, color: _kTextSecondary),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _kGreenLight,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  // Quantity Stepper
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: const Icon(Icons.receipt_long_rounded,
+                      size: 22, color: _kGreenDark),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                        color: _kTextSecondary,
-                        onPressed: () {
-                          updateState(() {
-                            if (quantity > 1) {
-                              _cart[product] = quantity - 1;
-                            } else {
-                              _cart.remove(product);
-                            }
-                          });
-                        },
+                      Row(
+                        children: [
+                          Text(
+                            _selectedCustomer?.name ?? 'Genel Müşteri',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: _kText,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: _kBorder),
+                            ),
+                            child: Text(
+                              '${_cart.length} Çeşit (${totalQty % 1 == 0 ? totalQty.toInt() : totalQty.toStringAsFixed(1)} Adet)',
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: _kTextSecondary),
+                            ),
+                          ),
+                        ],
                       ),
-                      _InlineQuantityField(
-                        quantity: quantity,
-                        onChanged: (newQty) {
-                          updateState(() {
-                            if (newQty <= 0) {
-                              _cart.remove(product);
-                            } else {
-                              _cart[product] = newQty;
-                            }
-                          });
-                        },
-                        onRemove: () => updateState(() => _cart.remove(product)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                        color: _kGreen,
-                        onPressed: () {
-                          updateState(() => _cart[product] = quantity + 1);
-                        },
+                      const SizedBox(height: 2),
+                      Text(
+                        'Teslimat: ${DateFormat('dd.MM.yyyy').format(_expectedDelivery)}',
+                        style: const TextStyle(
+                            fontSize: 11, color: _kTextSecondary),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '₺${(product.price * quantity).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w800, color: _kText),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: _kRed),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                    tooltip: 'Ürünü Çıkar',
-                    onPressed: () {
-                      updateState(() => _cart.remove(product));
-                    },
-                  ),
-                ],
-              ),
-            );
-          }),
-        const SizedBox(height: 6),
-        _buildSummaryRow(
-          icon: Icons.person_outline_rounded,
-          label: 'Müşteri',
-          value: _selectedCustomer?.name ?? 'Genel Müşteri',
-        ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: _pickDeliveryDate,
-          borderRadius: BorderRadius.circular(8),
-          child: _buildSummaryRow(
-            icon: Icons.calendar_today_rounded,
-            label: 'Teslimat Tarihi',
-            value: '${DateFormat('dd.MM.yyyy').format(_expectedDelivery)} (Değiştir)',
-            valueColor: _kGreenDark,
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'Ödenecek Tutar',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: _kTextSecondary),
+                    ),
+                    Text(
+                      '₺${_totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: _kGreenDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Sepeti Düzenle',
+                  icon: const Icon(Icons.edit_outlined,
+                      size: 20, color: _kGreen),
+                  onPressed: () => updateState(() => _activeStep = 2),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        // Sipariş Notu Alanı
-        TextField(
-          controller: _notesController,
-          maxLines: 2,
-          style: const TextStyle(fontSize: 12, color: _kText),
-          decoration: InputDecoration(
-            labelText: 'Sipariş Notu',
-            hintText: 'Sipariş veya teslimat notu ekleyin...',
-            prefixIcon: const Icon(Icons.edit_note_rounded, size: 20, color: _kTextSecondary),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _kBorder),
+          const SizedBox(height: 20),
+
+          // ── Payment Methods Selection ──
+          const Text(
+            'Ödeme Yöntemi Seçin',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: _kText,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _kBorder),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _kGreen, width: 1.5),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
-        ),
-        const SizedBox(height: 8),
-        _buildSummaryRow(
-          icon: Icons.payments_rounded,
-          label: 'Toplam Tutar',
-          value: '₺${_totalAmount.toStringAsFixed(2)}',
-          valueColor: _kGreenDark,
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildPrintChoice(
-                icon: Icons.receipt_long_rounded,
-                label: 'Fiş',
-                enabled: _printReceipt,
-                copies: _printCopies,
-                onToggle: () =>
-                    updateState(() => _printReceipt = !_printReceipt),
-                onMinus: _printCopies > 1
-                    ? () => updateState(() => _printCopies--)
-                    : null,
-                onPlus: () => updateState(() => _printCopies++),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildPrintChoice(
-                icon: Icons.label_rounded,
-                label: 'Etiket',
-                enabled: _printLabel,
-                copies: _labelCopies,
-                onToggle: () {
-                  updateState(() => _printLabel = !_printLabel);
-                  _saveLabelPrinterSettings();
-                },
-                onMinus: _labelCopies > 1
-                    ? () {
-                        updateState(() => _labelCopies--);
-                        _saveLabelPrinterSettings();
-                      }
-                    : null,
-                onPlus: () {
-                  updateState(() => _labelCopies++);
-                  _saveLabelPrinterSettings();
-                },
-              ),
-            ),
+          const SizedBox(height: 12),
+          _buildPaymentSelectionGrid(),
+
+          if (isKarma) ...[
+            const SizedBox(height: 18),
+            _buildKarmaFields(),
           ],
-        ),
-      ],
-    );
 
-    final rightPaymentColumn = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Ödeme Yöntemi Seçin',
-          style: TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 14, color: _kText),
-        ),
-        const SizedBox(height: 12),
-        _buildPaymentSelectionGrid(),
-        // NAKİT: Dialog ile handle ediliyor (_showCashPaymentDialog)
-        if (isKarma) ...[
-          const SizedBox(height: 16),
-          _buildKarmaFields(),
+          const SizedBox(height: 20),
+          // ── Print Choices ──
+          Row(
+            children: [
+              Expanded(
+                child: _buildPrintChoice(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Fiş Yazdır',
+                  enabled: _printReceipt,
+                  copies: _printCopies,
+                  onToggle: () =>
+                      updateState(() => _printReceipt = !_printReceipt),
+                  onMinus: _printCopies > 1
+                      ? () => updateState(() => _printCopies--)
+                      : null,
+                  onPlus: () => updateState(() => _printCopies++),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPrintChoice(
+                  icon: Icons.label_rounded,
+                  label: 'Sipariş Etiketi',
+                  enabled: _printLabel,
+                  copies: _labelCopies,
+                  onToggle: () {
+                    updateState(() => _printLabel = !_printLabel);
+                    _saveLabelPrinterSettings();
+                  },
+                  onMinus: _labelCopies > 1
+                      ? () {
+                          updateState(() => _labelCopies--);
+                          _saveLabelPrinterSettings();
+                        }
+                      : null,
+                  onPlus: () {
+                    updateState(() => _labelCopies++);
+                    _saveLabelPrinterSettings();
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
-      ],
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isWide = constraints.maxWidth >= 600;
-
-        if (isWide) {
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: SingleChildScrollView(child: leftSummaryColumn),
-                ),
-                const VerticalDivider(width: 24, color: _kBorder),
-                Expanded(
-                  flex: 5,
-                  child: SingleChildScrollView(child: rightPaymentColumn),
-                ),
-              ],
-            ),
-          );
-        } else {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                leftSummaryColumn,
-                const Divider(height: 32, color: _kBorder),
-                rightPaymentColumn,
-              ],
-            ),
-          );
-        }
-      },
+      ),
     );
   }
 
@@ -335,37 +222,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
     );
   }
 
-  Widget _buildSummaryRow(
-      {required IconData icon,
-      required String label,
-      required String value,
-      Color? valueColor}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _kBorder),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: _kTextSecondary),
-          const SizedBox(width: 8),
-          Text(label,
-              style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: valueColor ?? _kText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _showCashPaymentDialog() {
     showDialog(

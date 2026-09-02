@@ -319,12 +319,20 @@ class TsplLabelLayoutEngine {
     final paddingX = (widthDots * 0.04).clamp(6.0, 24.0).round();
     final usableW = widthDots - (paddingX * 2);
 
-    final maxFont1Chars = (usableW / 8).floor().clamp(4, 80);
-    final maxFont2Chars = (usableW / 12).floor().clamp(4, 60);
+    final fontScale = switch (fontSize) {
+      'Küçük' => 0.90,
+      'Büyük' => 1.30,
+      _ => 1.10,
+    };
+
+    // Primary font: Font "2" (12x20 dots) is much clearer than tiny Font "1" (8x12 dots)
+    const bodyFont = '2';
+    const bodyFontPitch = 12;
+    final rowHeight = sy((20 * fontScale).clamp(16.0, 30.0).round());
+    final maxBodyChars = (usableW / bodyFontPitch).floor().clamp(4, 90);
 
     final custClean = _ascii(customerName.trim());
     final prodClean = _ascii(productName.trim());
-    final customerNoClean = _ascii(customerNo?.trim() ?? '');
     final phoneClean = _ascii(customerPhone?.trim() ?? '');
     final noteClean =
         note != null && note.trim().isNotEmpty ? _ascii(note.trim()) : null;
@@ -336,43 +344,58 @@ class TsplLabelLayoutEngine {
         ? quantity.toInt().toString()
         : quantity.toStringAsFixed(1);
 
+    final hasCustomBizName = showBusinessName &&
+        businessName != null &&
+        businessName.trim().isNotEmpty &&
+        !businessName.trim().toUpperCase().contains('SERENUT');
+    final hasOrderNo = showOrderNo && orderIdShort.trim().isNotEmpty;
+    final hasDate = showDate && timeStr.isNotEmpty;
+
     // ── Pre-calculate Exact Dot Height ──
     int calculatedDots = sy(6);
-    if (showBusinessName) {
+    if (hasCustomBizName) {
       calculatedDots += sy(24);
     }
-    if (showOrderNo) calculatedDots += sy(20);
-    if (showDate && timeStr.isNotEmpty) calculatedDots += sy(20);
-    if (showCustomerName) calculatedDots += sy(20);
-    if (customerNoClean.isNotEmpty) calculatedDots += sy(16);
-    if (phoneClean.isNotEmpty) calculatedDots += sy(16);
-    if (previousDebt > 0.001) calculatedDots += sy(16);
+    if (hasOrderNo || hasDate) {
+      calculatedDots += rowHeight;
+    }
+    if (showCustomerName) {
+      calculatedDots += rowHeight;
+      if (phoneClean.isNotEmpty) {
+        final whoText = custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
+        final phoneText = 'Tel: $phoneClean';
+        if (whoText.length + phoneText.length + 2 > maxBodyChars) {
+          calculatedDots += rowHeight;
+        }
+      }
+    }
+    if (previousDebt > 0.001) calculatedDots += rowHeight;
     calculatedDots += sy(12); // Separator 1
 
     if (showItemsCount &&
         itemsCount != null &&
         (items == null || items.isEmpty)) {
-      calculatedDots += sy(18);
+      calculatedDots += rowHeight;
     }
 
     if (items != null && items.isNotEmpty) {
       for (final item in items) {
         final rawName =
             _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
-        final nameLines = _splitText(rawName, maxFont1Chars, maxLines: 2);
-        calculatedDots += (nameLines.length * sy(18));
-        calculatedDots += sy(18); // Detail / line total
+        final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
+        calculatedDots += (nameLines.length * rowHeight);
+        calculatedDots += rowHeight; // Detail / line total
         calculatedDots += sy(2);
       }
     } else {
-      final nameLines = _splitText(prodClean, maxFont2Chars, maxLines: 2);
-      calculatedDots += nameLines.length * sy(20);
-      calculatedDots += sy(18);
+      final nameLines = _splitText(prodClean, maxBodyChars, maxLines: 2);
+      calculatedDots += nameLines.length * rowHeight;
+      calculatedDots += rowHeight;
     }
 
     calculatedDots += sy(12); // Separator 2
-    calculatedDots += sy(18); // Payment status
-    if (noteClean != null) calculatedDots += sy(20);
+    calculatedDots += rowHeight; // Payment status
+    if (noteClean != null) calculatedDots += rowHeight;
     if (showTotalAmount && totalAmount != null) calculatedDots += sy(28);
     calculatedDots += sy(55); // Footer & QR Code clearance + bottom padding
 
@@ -394,14 +417,11 @@ class TsplLabelLayoutEngine {
 
     int currentY = sy(6);
 
-    // ── 1. Business Header ──
-    if (showBusinessName) {
-      final bizText = _ascii((businessName != null && businessName.trim().isNotEmpty)
-          ? businessName.trim()
-          : 'SERENUT OS');
-      final bizClean = _fit(bizText, maxFont2Chars);
+    // ── 1. Business Header (Only custom business name, no default Serenut) ──
+    if (hasCustomBizName) {
+      final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
       final layout = _widestTextLayout(
-        bizClean,
+        bizText,
         usableW,
         maxHeight: (heightDots * 0.14).clamp(10, 28).round(),
       );
@@ -414,48 +434,60 @@ class TsplLabelLayoutEngine {
         layout.font,
         layout.xMultiplier,
         layout.yMultiplier,
-        bizClean,
+        bizText,
       );
       currentY += layout.height + sy(3);
     }
 
-    // ── 2. Order # & Date ──
-    if (showOrderNo) {
-      final orderNo = _fit(orderIdShort, (maxFont2Chars - 9).clamp(4, 20));
-      commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"SIPARIS #$orderNo"');
-      currentY += sy(18);
-    }
-    if (showDate && timeStr.isNotEmpty) {
-      final safeTime = _fit(timeStr, maxFont1Chars);
-      commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"$safeTime"');
-      currentY += sy(18);
+    // ── 2. Order # & Date (Side by side on same row) ──
+    if (hasOrderNo && hasDate) {
+      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 25));
+      final orderText = 'SIPARIS #$orderNo';
+      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$orderText"');
+      final dateText = timeStr;
+      final dateWidth = dateText.length * bodyFontPitch;
+      final dateX = (widthDots - paddingX - dateWidth).clamp(paddingX, widthDots - paddingX);
+      commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+      currentY += rowHeight;
+    } else if (hasOrderNo) {
+      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 25));
+      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
+      currentY += rowHeight;
+    } else if (hasDate) {
+      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr"');
+      currentY += rowHeight;
     }
 
-    // ── 3. Customer Info ──
+    // ── 3. Customer Info (Name + Phone side-by-side; No customer ID/No) ──
     if (showCustomerName) {
       final whoText = custClean.isNotEmpty
-          ? 'Musteri: ${_fit(custClean, (maxFont2Chars - 9).clamp(4, 40))}'
+          ? 'Musteri: ${_fit(custClean, (maxBodyChars - 9).clamp(4, 50))}'
           : 'Musteri: Genel';
-      commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"$whoText"');
-      currentY += sy(18);
-    }
-    if (customerNoClean.isNotEmpty) {
-      commands.writeln(
-        'TEXT $paddingX,$currentY,"1",0,1,1,"Mus. No: ${_fit(customerNoClean, (maxFont1Chars - 9).clamp(4, 40))}"',
-      );
-      currentY += sy(16);
-    }
-    if (phoneClean.isNotEmpty) {
-      commands.writeln(
-        'TEXT $paddingX,$currentY,"1",0,1,1,"Tel: ${_fit(phoneClean, (maxFont1Chars - 5).clamp(4, 60))}"',
-      );
-      currentY += sy(16);
+      if (phoneClean.isNotEmpty) {
+        final phoneText = 'Tel: ${_fit(phoneClean, 20)}';
+        final totalChars = whoText.length + phoneText.length + 2;
+        if (totalChars <= maxBodyChars) {
+          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+          final phoneWidth = phoneText.length * bodyFontPitch;
+          final phoneX = (widthDots - paddingX - phoneWidth).clamp(paddingX, widthDots - paddingX);
+          commands.writeln('TEXT $phoneX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+          currentY += rowHeight;
+        } else {
+          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+          currentY += rowHeight;
+          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+          currentY += rowHeight;
+        }
+      } else {
+        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+        currentY += rowHeight;
+      }
     }
     if (previousDebt > 0.001) {
       commands.writeln(
-        'TEXT $paddingX,$currentY,"1",0,1,1,"Eski borc: TL ${previousDebt.toStringAsFixed(2)}"',
+        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Eski borc: TL ${previousDebt.toStringAsFixed(2)}"',
       );
-      currentY += sy(16);
+      currentY += rowHeight;
     }
 
     // ── 4. Separator Line 1 ──
@@ -468,9 +500,9 @@ class TsplLabelLayoutEngine {
         itemsCount != null &&
         (items == null || items.isEmpty)) {
       commands.writeln(
-        'TEXT $paddingX,$currentY,"1",0,1,1,"${_fit('- $itemsCount Parca Urun / Paket', maxFont1Chars)}"',
+        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit('- $itemsCount Parca Urun / Paket', maxBodyChars)}"',
       );
-      currentY += sy(16);
+      currentY += rowHeight;
     }
 
     if (items != null && items.isNotEmpty) {
@@ -493,10 +525,10 @@ class TsplLabelLayoutEngine {
                     : unitPrice * itemQty;
 
         // Line 1: Product Name (wrapped if long)
-        final nameLines = _splitText(rawName, maxFont1Chars, maxLines: 2);
+        final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
         for (final line in nameLines) {
-          commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"$line"');
-          currentY += sy(18);
+          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$line"');
+          currentY += rowHeight;
         }
 
         // Line 2: Quantity x Unit Price (Left) & Line Total (Right)
@@ -508,32 +540,32 @@ class TsplLabelLayoutEngine {
 
         final safeLeft = _fit(
           leftDetail,
-          (maxFont1Chars - rightTotal.length - 1).clamp(4, maxFont1Chars),
+          (maxBodyChars - rightTotal.length - 1).clamp(4, maxBodyChars),
         );
-        commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"$safeLeft"');
+        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$safeLeft"');
 
         if (rightTotal.isNotEmpty) {
-          final rightX = (widthDots - paddingX - (rightTotal.length * 8))
+          final rightX = (widthDots - paddingX - (rightTotal.length * bodyFontPitch))
               .clamp(paddingX, widthDots - paddingX);
-          commands.writeln('TEXT $rightX,$currentY,"1",0,1,1,"$rightTotal"');
+          commands.writeln('TEXT $rightX,$currentY,"$bodyFont",0,1,1,"$rightTotal"');
         }
-        currentY += sy(18);
+        currentY += rowHeight;
       }
     } else {
-      final nameLines = _splitText(prodClean, maxFont2Chars, maxLines: 2);
+      final nameLines = _splitText(prodClean, maxBodyChars, maxLines: 2);
       for (final line in nameLines) {
-        commands.writeln('TEXT $paddingX,$currentY,"2",0,1,1,"$line"');
-        currentY += sy(20);
+        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$line"');
+        currentY += rowHeight;
       }
       final detail = '  $qtyStr adet';
-      commands.writeln('TEXT $paddingX,$currentY,"1",0,1,1,"$detail"');
+      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$detail"');
       if (totalAmount != null) {
         final totalText = '${totalAmount.toStringAsFixed(2)} TL';
-        final rightX = (widthDots - paddingX - (totalText.length * 8))
+        final rightX = (widthDots - paddingX - (totalText.length * bodyFontPitch))
             .clamp(paddingX, widthDots - paddingX);
-        commands.writeln('TEXT $rightX,$currentY,"1",0,1,1,"$totalText"');
+        commands.writeln('TEXT $rightX,$currentY,"$bodyFont",0,1,1,"$totalText"');
       }
-      currentY += sy(18);
+      currentY += rowHeight;
     }
 
     // ── 6. Separator Line 2 ──
@@ -542,15 +574,15 @@ class TsplLabelLayoutEngine {
 
     // ── 7. Payment Status & Note ──
     commands.writeln(
-      'TEXT $paddingX,$currentY,"1",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxFont1Chars - 7).clamp(4, 60))}"',
+      'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxBodyChars - 7).clamp(4, 60))}"',
     );
-    currentY += sy(18);
+    currentY += rowHeight;
 
     if (noteClean != null) {
       commands.writeln(
-        'TEXT $paddingX,$currentY,"1",0,1,1,"Not: ${_fit(noteClean, (maxFont1Chars - 5).clamp(4, 60))}"',
+        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}"',
       );
-      currentY += sy(20);
+      currentY += rowHeight;
     }
 
     // ── 8. Total Amount & QR Footer ──

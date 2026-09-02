@@ -27,6 +27,7 @@ import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
+part 'steps/step_cart.dart';
 part 'steps/step_checkout.dart';
 
 // Color and layout constants
@@ -379,7 +380,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   }
 
   void _nextStep() {
-    if (_activeStep < 2) {
+    if (_activeStep < 3) {
       setState(() => _activeStep++);
       if (_activeStep == 1) {
         Future.delayed(const Duration(milliseconds: 100), () {
@@ -494,15 +495,18 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   }
 
   Widget _buildStepperHeader() {
+    final totalQty = _cart.values.fold(0.0, (a, b) => a + b);
+
     final steps = [
-      {'icon': Icons.person_outline_rounded},
-      {'icon': Icons.grid_view_rounded},
-      {'icon': Icons.shopping_cart_checkout_rounded},
+      {'icon': Icons.person_rounded, 'label': 'Müşteri'},
+      {'icon': Icons.inventory_2_rounded, 'label': 'Ürünler'},
+      {'icon': Icons.shopping_cart_rounded, 'label': 'Sepet'},
+      {'icon': Icons.payments_rounded, 'label': 'Ödeme'},
     ];
 
     return Container(
       color: _kSurface,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       width: double.infinity,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -511,36 +515,102 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
           final step = entry.value;
           final isCompleted = idx < _activeStep;
           final isCurrent = idx == _activeStep;
+          final isCartStep = idx == 2;
 
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Step Bubble
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: isCurrent
-                      ? _kGreen
-                      : (isCompleted ? _kGreenLight : Colors.white),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: isCurrent || isCompleted ? _kGreen : _kBorder),
-                ),
-                child: Icon(
-                  isCompleted
-                      ? Icons.check_circle_rounded
-                      : (step['icon'] as IconData),
-                  size: 16,
-                  color: isCurrent
-                      ? Colors.white
-                      : (isCompleted ? _kGreenDark : _kTextSecondary),
+              // Interactive Step Item
+              InkWell(
+                onTap: () {
+                  if (idx <= _activeStep) {
+                    setState(() => _activeStep = idx);
+                  } else if (idx == 1 && _selectedCustomer != null) {
+                    setState(() => _activeStep = 1);
+                  } else if (idx == 2 && _cart.isNotEmpty) {
+                    setState(() => _activeStep = 2);
+                  } else if (idx == 3 && _cart.isNotEmpty) {
+                    setState(() => _activeStep = 3);
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: isCurrent
+                                  ? _kGreen
+                                  : (isCompleted ? _kGreenLight : Colors.white),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isCurrent || isCompleted
+                                    ? _kGreen
+                                    : _kBorder,
+                                width: isCurrent ? 2 : 1,
+                              ),
+                            ),
+                            child: Icon(
+                              isCompleted
+                                  ? Icons.check_circle_rounded
+                                  : (step['icon'] as IconData),
+                              size: 16,
+                              color: isCurrent
+                                  ? Colors.white
+                                  : (isCompleted
+                                      ? _kGreenDark
+                                      : _kTextSecondary),
+                            ),
+                          ),
+                          if (isCartStep && _cart.isNotEmpty)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: _kGreenDark,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${totalQty % 1 == 0 ? totalQty.toInt() : totalQty.toStringAsFixed(1)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        step['label'] as String,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              isCurrent ? FontWeight.bold : FontWeight.w600,
+                          color: isCurrent
+                              ? _kGreenDark
+                              : (isCompleted ? _kText : _kTextSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              if (idx < 2)
+              if (idx < 3)
                 Container(
-                  width: 20,
+                  width: 24,
                   height: 2,
                   color: isCompleted ? _kGreen : _kBorder,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -559,6 +629,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       case 1:
         return _buildProductStep();
       case 2:
+        return _buildCartStep();
+      case 3:
         return _buildCheckoutStep();
       default:
         return const SizedBox.shrink();
@@ -567,6 +639,18 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   Widget _buildBottomActionBar() {
     final nextDisabled = _isNextDisabled();
+    final totalQty = _cart.values.fold(0.0, (a, b) => a + b);
+
+    String nextButtonLabel = 'Devam Et';
+    if (_activeStep == 0) {
+      nextButtonLabel = 'Ürün Seçimine Geç';
+    } else if (_activeStep == 1) {
+      nextButtonLabel =
+          'Sepete Geç (${totalQty % 1 == 0 ? totalQty.toInt() : totalQty.toStringAsFixed(1)} Adet)';
+    } else if (_activeStep == 2) {
+      nextButtonLabel =
+          'Ödemeye Geç (₺${_totalAmount.toStringAsFixed(2)})';
+    }
 
     return Container(
       color: Colors.white,
@@ -598,7 +682,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   child: const Text('Kapat'),
                 ),
           // Next / Confirm button
-          _activeStep < 2
+          _activeStep < 3
               ? ElevatedButton.icon(
                   onPressed: nextDisabled ? null : _nextStep,
                   style: ElevatedButton.styleFrom(
@@ -610,8 +694,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         horizontal: 18, vertical: 14),
                   ),
                   icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: const Text('Devam Et',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: Text(nextButtonLabel,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 )
               : ElevatedButton.icon(
                   onPressed: _isSubmitting ||
@@ -648,6 +732,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   bool _isNextDisabled() {
     if (_activeStep == 0) return _selectedCustomer == null || _isAddingCustomer;
     if (_activeStep == 1) return _cart.isEmpty;
+    if (_activeStep == 2) return _cart.isEmpty;
     return false;
   }
 
