@@ -134,6 +134,7 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           'autoDetectLabelGap': settings.labelAutoDetectGap,
           'dpi': settings.labelDpi,
           'copies': settings.labelPrinterCopies,
+          'printableWidthDots': (settings.labelWidthMm * settings.labelDpi / 25.4).round(),
         },
       ));
     }
@@ -882,14 +883,23 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
       config.putIfAbsent('hardwareId', () => device.id.substring(7));
     }
     final isLabel = device.type == HardwareDeviceType.labelPrinter;
+    final labelWidthMm = _int(config['labelWidthMm'], 50);
+    final labelDpi = _int(config['dpi'], 203);
+    final calculatedLabelDots = (labelWidthMm * labelDpi / 25.4).round();
+    final configuredPrintableDots = _int(config['printableWidthDots'], 0);
+    final effectiveLabelDots =
+        (configuredPrintableDots > 0 && configuredPrintableDots != 384)
+            ? configuredPrintableDots
+            : calculatedLabelDots;
+
     final capabilities = isLabel
         ? {
-            'dpi': _int(config['dpi'], 203),
-            'mediaWidthMm': _int(config['labelWidthMm'], 50),
+            'dpi': labelDpi,
+            'mediaWidthMm': labelWidthMm,
             'mediaHeightMm': _int(config['labelHeightMm'], 30),
             'gapMm': _int(config['labelGapMm'], 2),
             'autoDetectGap': config['autoDetectLabelGap'] as bool? ?? false,
-            'printableWidthDots': _int(config['printableWidthDots'], 384),
+            'printableWidthDots': effectiveLabelDots,
             'direction': _int(config['printDirection'], 0),
             'raster': true,
           }

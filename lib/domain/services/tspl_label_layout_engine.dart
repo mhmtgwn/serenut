@@ -37,7 +37,7 @@ class TsplLabelLayoutEngine {
     final safeDpi = dpi == 300 ? 300 : 203;
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final widthDots = printableWidthDots == null
+    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 54))
         ? mediaWidthDots
         : printableWidthDots.clamp(140, mediaWidthDots);
     final heightDots = (safeHeight * safeDpi / 25.4).round();
@@ -211,7 +211,11 @@ class TsplLabelLayoutEngine {
       const vatStr = '(KDV Dahil)';
 
       if (showBarcode && barcode.isNotEmpty) {
-        final priceLeft = (widthDots * 0.44).round();
+        final barcodeWidth = (barcode.length * 11 + 35) * 1;
+        final priceLeft = (horizontalPadding + barcodeWidth + 12).clamp(
+          (widthDots * 0.40).round(),
+          (widthDots * 0.58).round(),
+        );
         final availablePriceWidth = (widthDots - priceLeft - horizontalPadding).clamp(40, widthDots);
         final priceText = '$whole,$cents';
         const currencyWidth = 14;
@@ -309,18 +313,18 @@ class TsplLabelLayoutEngine {
     final safeDpi = dpi == 300 ? 300 : 203;
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final widthDots = printableWidthDots == null
+    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 54))
         ? mediaWidthDots
         : printableWidthDots.clamp(140, mediaWidthDots);
 
-    int sx(num value) => (value * widthDots / 400).round();
+    final isVeryWide = widthDots >= 540; // >= 68mm
     int sy(num value) => (value * safeDpi / 203).round();
 
-    final paddingX = (widthDots * 0.03).clamp(4.0, 16.0).round();
+    final paddingX = (widthDots * 0.03).clamp(4.0, 20.0).round();
     final usableW = widthDots - (paddingX * 2);
 
-    const bodyFont = '2';
-    const bodyFontPitch = 12;
+    final bodyFont = isVeryWide ? '3' : '2';
+    final bodyFontPitch = isVeryWide ? 16 : 12;
     final fontScale = switch (fontSize) {
       'Küçük' => 0.90,
       'Büyük' => 1.30,
@@ -583,15 +587,21 @@ class TsplLabelLayoutEngine {
     }
 
     // ── 8. Total Amount & QR Footer (Anchored inside label dots, spreading horizontally) ──
-    final footerY = currentY + sy(2);
+    final availableFooterSpace = heightDots - currentY;
+    final footerY = (availableFooterSpace < sy(32))
+        ? (heightDots - sy(30)).clamp(currentY, heightDots - sy(24))
+        : currentY + sy(2);
+
+    final qrSize = isVeryWide ? 80 : ((widthDots < 300) ? 45 : 60);
+    final qrCellWidth = isVeryWide ? 4 : ((widthDots < 300) ? 2 : 3);
+    final qrX = widthDots - paddingX - qrSize;
 
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
-      final qrWidthReserve = sx(82);
-      final safeAvailableWidth = (widthDots - paddingX - qrWidthReserve).clamp(80, widthDots);
+      final safeAvailableWidth = (qrX - paddingX - 8).clamp(80, widthDots);
       final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
       final safeTotal = _fit(totalStr, footerTextChars);
-      final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth, maxHeight: sy(26));
+      final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth, maxHeight: (isVeryWide ? sy(32) : sy(26)));
       commands.boldText(
         paddingX,
         footerY,
@@ -604,9 +614,6 @@ class TsplLabelLayoutEngine {
 
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
     if (qrValue.isNotEmpty) {
-      final qrSize = (widthDots < 300) ? 45 : 60;
-      final qrX = widthDots - paddingX - qrSize;
-      final qrCellWidth = (widthDots < 300) ? 2 : 3;
       commands.writeln(
         'QRCODE $qrX,$footerY,L,$qrCellWidth,A,0,M2,S7,"$qrValue"',
       );
