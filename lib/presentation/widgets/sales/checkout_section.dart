@@ -15,6 +15,7 @@ import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:uuid/uuid.dart';
+import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 import 'checkout/cash_dialog.dart';
 
 part 'checkout/karma_fields.dart';
@@ -518,6 +519,15 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
                           fontWeight: FontWeight.w800)),
                 ),
             ],
+          ),
+          const SizedBox(height: 8),
+          KarmaPaymentSummaryBar(
+            total: widget.total,
+            paid: _karmaResult.paidAmount,
+            remaining: _karmaRemainder,
+            debt: _karmaDebt,
+            change: _karmaResult.change,
+            isValid: _karmaValid,
           ),
           const SizedBox(height: 10),
           Row(

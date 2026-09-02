@@ -429,6 +429,15 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 ),
             ],
           ),
+          const SizedBox(height: 10),
+          KarmaPaymentSummaryBar(
+            total: _totalAmount,
+            paid: _karmaResult.paidAmount,
+            remaining: _karmaRemainder,
+            debt: _karmaDebt,
+            change: _karmaResult.change,
+            isValid: _karmaValid,
+          ),
           const SizedBox(height: 12),
           _buildSplitField(
             controller: _cashSplitController,
@@ -459,39 +468,6 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
             remaining: remaining,
             hasCustomer: hasCustomer,
             isEnabled: hasCustomer,
-          ),
-          const Divider(height: 24, color: _kBorder),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Girilen Toplam:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text('₺${_karmaTotal.toStringAsFixed(2)}',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: _karmaValid ? _kGreenDark : _kRed)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _karmaResult.change > 0 ? 'Para Üstü:' : 'Kalan Tutar:',
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-              Text(
-                _karmaResult.change > 0
-                    ? '₺${_karmaResult.change.toStringAsFixed(2)}'
-                    : '₺${_karmaRemainder.toStringAsFixed(2)}',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: _karmaResult.change > 0 ? _kGreenDark : _kText),
-              ),
-            ],
           ),
         ],
       ),

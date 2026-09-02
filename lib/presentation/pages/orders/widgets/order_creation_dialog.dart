@@ -23,6 +23,7 @@ import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout/cash_dialog.dart';
+import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
@@ -338,7 +339,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         card: _karmaCard,
         debt: _karmaDebt,
       );
-  double get _karmaTotal => _karmaResult.allocatedTotal;
   double get _karmaRemainder => _karmaResult.remaining;
   bool get _karmaValid => _karmaResult.isValid;
 
