@@ -367,17 +367,15 @@ class TsplLabelLayoutEngine {
       calculatedDots += sy(24);
     }
     if (hasOrderNo && hasDate) {
-      final dateWidth = (timeStr.length * bodyFontPitch) + 4;
-      final dateX = widthDots - rightMargin - dateWidth;
-      final availableOrderChars = (dateX - paddingX - 8) ~/ bodyFontPitch;
-      calculatedDots += (availableOrderChars >= 10 ? rowHeight : rowHeight * 2);
+      calculatedDots += rowHeight;
     } else if (hasOrderNo || hasDate) {
       calculatedDots += rowHeight;
     }
     if (showCustomerName) {
       calculatedDots += rowHeight;
       if (phoneClean.isNotEmpty) {
-        final whoText = custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
+        final whoText =
+            custClean.isNotEmpty ? 'Musteri: $custClean' : 'Musteri: Genel';
         final phoneText = 'Tel: $phoneClean';
         if (whoText.length + phoneText.length + 2 > maxBodyChars) {
           calculatedDots += rowHeight;
@@ -454,39 +452,36 @@ class TsplLabelLayoutEngine {
       currentY += layout.height + sy(2);
     }
 
-    // ── 2. Order # & Date (Spread horizontally across full width) ──
+    // ── 2. Order # & Date (Brought close together, never pushed to the far-right edge) ──
     if (hasOrderNo && hasDate) {
       final dateText = timeStr;
       final dateWidth = (dateText.length * bodyFontPitch) + 4;
-      final dateX = (widthDots - rightMargin - dateWidth).clamp(paddingX, widthDots - rightMargin);
+      final maxDateX = math.max(paddingX + 10, widthDots - rightMargin - dateWidth);
+      final minDateX = math.min(paddingX + 60, maxDateX);
+      final rawDateX = math.min((widthDots * 0.50).round(), maxDateX);
+      final dateX = rawDateX.clamp(minDateX, maxDateX);
 
-      final availableOrderWidth = dateX - paddingX - 8;
-      final availableOrderChars = (availableOrderWidth / bodyFontPitch).floor();
+      final availableOrderChars =
+          ((dateX - paddingX - 6) / bodyFontPitch).floor();
+      final orderNo =
+          _fit(orderIdShort, (availableOrderChars - 9).clamp(3, 25));
 
-      if (availableOrderChars >= 10) {
-        final orderNo = _fit(orderIdShort, availableOrderChars - 9);
-        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
-        commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
-        currentY += rowHeight;
-      } else {
-        final orderNo = _fit(orderIdShort, maxBodyChars - 9);
-        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
-        currentY += rowHeight;
-        commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
-        currentY += rowHeight;
-      }
+      commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
+      commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+      currentY += rowHeight;
     } else if (hasOrderNo) {
       final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 30));
-      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
+      commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
       currentY += rowHeight;
     } else if (hasDate) {
-      final dateWidth = (timeStr.length * bodyFontPitch) + 4;
-      final dateX = (widthDots - rightMargin - dateWidth).clamp(paddingX, widthDots - rightMargin);
-      commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$timeStr"');
+      commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr"');
       currentY += rowHeight;
     }
 
-    // ── 3. Customer Info (Spread horizontally) ──
+    // ── 3. Customer Info (Brought close together, never pushed to the far-right edge) ──
     if (showCustomerName) {
       final whoText = custClean.isNotEmpty
           ? 'Musteri: ${_fit(custClean, (maxBodyChars - 9).clamp(4, 60))}'
@@ -494,20 +489,31 @@ class TsplLabelLayoutEngine {
       if (phoneClean.isNotEmpty) {
         final phoneText = 'Tel: ${_fit(phoneClean, 20)}';
         final phoneWidth = (phoneText.length * bodyFontPitch) + 4;
-        final phoneX = (widthDots - rightMargin - phoneWidth).clamp(paddingX, widthDots - rightMargin);
-        final availableWhoChars = (phoneX - paddingX - 8) ~/ bodyFontPitch;
+        final maxPhoneX =
+            math.max(paddingX + 10, widthDots - rightMargin - phoneWidth);
+        final minPhoneX = math.min(paddingX + 60, maxPhoneX);
+        final rawPhoneX = math.min((widthDots * 0.52).round(), maxPhoneX);
+        final phoneX = rawPhoneX.clamp(minPhoneX, maxPhoneX);
+
+        final availableWhoChars =
+            ((phoneX - paddingX - 6) / bodyFontPitch).floor();
         if (whoText.length <= availableWhoChars) {
-          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
-          commands.writeln('TEXT $phoneX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+          commands.writeln(
+              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+          commands.writeln(
+              'TEXT $phoneX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
           currentY += rowHeight;
         } else {
-          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+          commands.writeln(
+              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
           currentY += rowHeight;
-          commands.writeln('TEXT $phoneX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+          commands.writeln(
+              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
           currentY += rowHeight;
         }
       } else {
-        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+        commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
         currentY += rowHeight;
       }
     }
@@ -523,7 +529,7 @@ class TsplLabelLayoutEngine {
     commands.writeln('BAR $paddingX,$currentY,$usableW,$barH');
     currentY += barH + sy(3);
 
-    // ── 5. Items Breakdown (Adaptive layout) ──
+    // ── 5. Items Breakdown (Adaptive layout, items and amounts grouped together) ──
     if (showItemsCount &&
         itemsCount != null &&
         (items == null || items.isEmpty)) {
@@ -561,22 +567,16 @@ class TsplLabelLayoutEngine {
           currentY += rowHeight;
         }
 
-        // Line 2: Quantity x Unit Price (Left) & Line Total (Right)
+        // Line 2: Quantity x Unit Price & Line Total (Grouped together, not pushed to edge)
         final leftDetail = unitPrice == null
             ? '  $itemQtyStr adet'
             : '  ${itemQtyStr}x ${unitPrice.toStringAsFixed(2)} TL';
-        final safeLeft = _fit(
-          leftDetail,
-          (maxBodyChars - rightTotal.length - 1).clamp(4, maxBodyChars),
+        final lineDetail = rightTotal.isNotEmpty
+            ? '$leftDetail  ($rightTotal)'
+            : leftDetail;
+        commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(lineDetail, maxBodyChars)}"',
         );
-        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$safeLeft"');
-
-        if (rightTotal.isNotEmpty) {
-          final totalWidth = (rightTotal.length * bodyFontPitch) + 4;
-          final rightX = (widthDots - rightMargin - totalWidth)
-              .clamp(paddingX, widthDots - rightMargin);
-          commands.writeln('TEXT $rightX,$currentY,"$bodyFont",0,1,1,"$rightTotal"');
-        }
         currentY += rowHeight;
       }
     } else {
@@ -585,15 +585,10 @@ class TsplLabelLayoutEngine {
         commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$line"');
         currentY += rowHeight;
       }
-      final detail = '  $qtyStr adet';
-      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$detail"');
-      if (totalAmount != null) {
-        final totalText = '${totalAmount.toStringAsFixed(2)} TL';
-        final totalWidth = (totalText.length * bodyFontPitch) + 4;
-        final rightX = (widthDots - rightMargin - totalWidth)
-            .clamp(paddingX, widthDots - rightMargin);
-        commands.writeln('TEXT $rightX,$currentY,"$bodyFont",0,1,1,"$totalText"');
-      }
+      final detail = totalAmount != null
+          ? '  $qtyStr adet  (${totalAmount.toStringAsFixed(2)} TL)'
+          : '  $qtyStr adet';
+      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(detail, maxBodyChars)}"');
       currentY += rowHeight;
     }
 
@@ -622,7 +617,9 @@ class TsplLabelLayoutEngine {
 
     final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
     final qrBoxSize = qrCellWidth * 30; // 60 dots for cellWidth 2, 90 dots for cellWidth 3
-    final qrX = widthDots - math.max(rightMargin, 16) - qrBoxSize;
+    final qrX = (widthDots - math.max(rightMargin * 1.5, 36) - qrBoxSize)
+        .round()
+        .clamp(paddingX + 100, widthDots - qrBoxSize - 28);
 
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
