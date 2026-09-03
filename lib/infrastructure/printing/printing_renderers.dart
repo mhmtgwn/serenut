@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
+import 'package:serenutos/domain/services/tspl_canvas_label_engine.dart';
 import 'package:serenutos/domain/services/tspl_label_layout_engine.dart';
 
 class LegacyRawPrintRenderer implements PrintRenderer {
@@ -600,45 +601,88 @@ class TsplOrderLabelRenderer implements PrintRenderer {
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
     final logo = payload['logoBytesBase64'] as String?;
-    final bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
-      orderIdShort: payload['orderNo']?.toString() ?? '',
-      customerName: payload['customerName']?.toString() ?? '',
-      customerPhone: payload['customerPhone']?.toString(),
-      customerNo: payload['customerNo']?.toString(),
-      previousDebt: _decimal(payload['previousDebt'], 0),
-      paymentStatus: payload['paymentStatus']?.toString() ?? 'Bilinmiyor',
-      productName: payload['productName']?.toString() ?? '',
-      quantity: _decimal(payload['quantity'], 1),
-      items: (payload['items'] as List?)
-          ?.map((value) => Map<String, dynamic>.from(value as Map))
-          .toList(),
-      note: payload['note'] as String?,
-      timestamp: payload['timestamp'] == null
-          ? null
-          : DateTime.parse(payload['timestamp']! as String),
-      totalAmount: payload['totalAmount'] == null
-          ? null
-          : _decimal(payload['totalAmount'], 0),
-      itemsCount: payload['itemsCount'] as int?,
-      widthMm: _integer(capabilities['mediaWidthMm'], 50),
-      heightMm: _integer(capabilities['mediaHeightMm'], 30),
-      gapMm: _integer(capabilities['gapMm'], 2),
-      autoDetectGap: capabilities['autoDetectGap'] == true,
-      dpi: _integer(capabilities['dpi'], 203),
-      printableWidthDots: capabilities['printableWidthDots'] as int?,
-      direction: _integer(capabilities['direction'], 0),
-      copies: 1,
-      showBusinessName: design['showBusinessName'] != false,
-      showCustomerName: design['showCustomerName'] != false,
-      showOrderNo: design['showOrderNo'] != false,
-      showDate: design['showDate'] != false,
-      showTotalAmount: design['showTotalAmount'] != false,
-      showItemsCount: design['showItemsCount'] != false,
-      fontSize: design['fontSize']?.toString() ?? 'Orta',
-      paginateOnOverflow: design['paginateOnOverflow'] != false,
-      businessName: payload['businessName'] as String?,
-      logoBytes: logo != null ? base64Decode(logo) : null,
-    );
+    final useCanvas = design['useCanvas'] == true || design['engine'] == 'canvas';
+    final List<int> bytes;
+    if (useCanvas) {
+      bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+        orderIdShort: payload['orderNo']?.toString() ?? '',
+        customerName: payload['customerName']?.toString() ?? '',
+        customerPhone: payload['customerPhone']?.toString(),
+        customerNo: payload['customerNo']?.toString(),
+        previousDebt: _decimal(payload['previousDebt'], 0),
+        paymentStatus: payload['paymentStatus']?.toString() ?? 'Bilinmiyor',
+        productName: payload['productName']?.toString() ?? '',
+        quantity: _decimal(payload['quantity'], 1),
+        items: (payload['items'] as List?)
+            ?.map((value) => Map<String, dynamic>.from(value as Map))
+            .toList(),
+        note: payload['note'] as String?,
+        timestamp: payload['timestamp'] == null
+            ? null
+            : DateTime.parse(payload['timestamp']! as String),
+        totalAmount: payload['totalAmount'] == null
+            ? null
+            : _decimal(payload['totalAmount'], 0),
+        itemsCount: payload['itemsCount'] as int?,
+        widthMm: _integer(capabilities['mediaWidthMm'], 50),
+        heightMm: _integer(capabilities['mediaHeightMm'], 30),
+        gapMm: _integer(capabilities['gapMm'], 2),
+        autoDetectGap: capabilities['autoDetectGap'] == true,
+        dpi: _integer(capabilities['dpi'], 203),
+        direction: _integer(capabilities['direction'], 0),
+        copies: 1,
+        showBusinessName: design['showBusinessName'] != false,
+        showCustomerName: design['showCustomerName'] != false,
+        showOrderNo: design['showOrderNo'] != false,
+        showDate: design['showDate'] != false,
+        showTotalAmount: design['showTotalAmount'] != false,
+        showItemsCount: design['showItemsCount'] != false,
+        fontSize: design['fontSize']?.toString() ?? 'Orta',
+        paginateOnOverflow: design['paginateOnOverflow'] != false,
+        businessName: payload['businessName'] as String?,
+        logoBytes: logo != null ? base64Decode(logo) : null,
+      );
+    } else {
+      bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: payload['orderNo']?.toString() ?? '',
+        customerName: payload['customerName']?.toString() ?? '',
+        customerPhone: payload['customerPhone']?.toString(),
+        customerNo: payload['customerNo']?.toString(),
+        previousDebt: _decimal(payload['previousDebt'], 0),
+        paymentStatus: payload['paymentStatus']?.toString() ?? 'Bilinmiyor',
+        productName: payload['productName']?.toString() ?? '',
+        quantity: _decimal(payload['quantity'], 1),
+        items: (payload['items'] as List?)
+            ?.map((value) => Map<String, dynamic>.from(value as Map))
+            .toList(),
+        note: payload['note'] as String?,
+        timestamp: payload['timestamp'] == null
+            ? null
+            : DateTime.parse(payload['timestamp']! as String),
+        totalAmount: payload['totalAmount'] == null
+            ? null
+            : _decimal(payload['totalAmount'], 0),
+        itemsCount: payload['itemsCount'] as int?,
+        widthMm: _integer(capabilities['mediaWidthMm'], 50),
+        heightMm: _integer(capabilities['mediaHeightMm'], 30),
+        gapMm: _integer(capabilities['gapMm'], 2),
+        autoDetectGap: capabilities['autoDetectGap'] == true,
+        dpi: _integer(capabilities['dpi'], 203),
+        printableWidthDots: capabilities['printableWidthDots'] as int?,
+        direction: _integer(capabilities['direction'], 0),
+        copies: 1,
+        showBusinessName: design['showBusinessName'] != false,
+        showCustomerName: design['showCustomerName'] != false,
+        showOrderNo: design['showOrderNo'] != false,
+        showDate: design['showDate'] != false,
+        showTotalAmount: design['showTotalAmount'] != false,
+        showItemsCount: design['showItemsCount'] != false,
+        fontSize: design['fontSize']?.toString() ?? 'Orta',
+        paginateOnOverflow: design['paginateOnOverflow'] != false,
+        businessName: payload['businessName'] as String?,
+        logoBytes: logo != null ? base64Decode(logo) : null,
+      );
+    }
     return RenderedPrintDocument(
       bytes: Uint8List.fromList(bytes),
       mimeType: 'application/vnd.tspl',
