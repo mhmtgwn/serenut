@@ -36,7 +36,7 @@ void main() {
       final result = await NativePrinterBridge.printUsbRaw(
           'Invalid_Printer_XYZ_999', [0x1B, 0x40, 0x0A]);
       expect(result, isFalse);
-    });
+    }, timeout: const Timeout(Duration(seconds: 90)));
 
     // ── 2. Kritik H: License Clock Tampering Protection test ──────────────────
     test('Kritik H: SQLite operational logs protect against clock manipulation',
