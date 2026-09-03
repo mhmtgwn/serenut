@@ -285,7 +285,6 @@ class TsplLabelLayoutEngine {
     final safeWidth = widthMm.clamp(20, 150);
     final safeGap = gapMm.clamp(0, 10);
     final safeDpi = dpi == 300 ? 300 : 203;
-
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
     // On <=54mm rolls (such as standard 50mm, 40mm), clamp to 384 dots (max physical width of standard 2-inch printhead)
     final maxPhysicalDots =
@@ -299,19 +298,21 @@ class TsplLabelLayoutEngine {
     int sy(num value) => (value * safeDpi / 203).round();
 
     // Symmetric margins: left and right margins are equal so the label is centered and balanced.
-    final paddingX = (widthDots * 0.035).clamp(12.0, 24.0).round();
+    final paddingX = (widthDots * 0.045).clamp(16.0, 32.0).round();
     final usableW = widthDots - (2 * paddingX);
     final barW = usableW;
 
     final bodyFont = isVeryWide ? '3' : '2';
-    final bodyFontPitch = isVeryWide ? 19 : 15;
+    // Exact character pitch (in dots) including character glyph width and inter-character spacing:
+    // Font '2' is 12x20 dots (pitch: 14 dots); Font '3' is 16x24 dots (pitch: 18 dots).
+    final bodyFontPitch = isVeryWide ? 18 : 14;
     final fontScale = switch (fontSize) {
       'Küçük' => 0.90,
-      'Büyük' => 1.30,
-      _ => 1.10,
+      'Büyük' => 1.25,
+      _ => 1.05,
     };
     final rowHeight = sy((20 * fontScale).clamp(16.0, 30.0).round());
-    final maxBodyChars = (usableW / bodyFontPitch).floor().clamp(4, 90);
+    final maxBodyChars = ((usableW - 10) / bodyFontPitch).floor().clamp(4, 70);
 
     final custClean = _ascii(customerName.trim());
     final prodClean = _ascii(productName.trim());
@@ -329,20 +330,25 @@ class TsplLabelLayoutEngine {
     final hasOrderNo = showOrderNo && orderIdShort.trim().isNotEmpty;
     final hasDate = showDate && timeStr.isNotEmpty;
 
+    final requestedHeightMm = heightMm.clamp(15, 150);
+    final labelHeightDots = (requestedHeightMm * safeDpi / 25.4).round();
+    final topGapMargin = (labelHeightDots * 0.04).clamp(8, 16).round();
+    final bottomGapMargin = (labelHeightDots * 0.08).clamp(24, 40).round();
+    final maxSafePageY = labelHeightDots - bottomGapMargin;
+    final barH = (labelHeightDots * 0.01).clamp(1, 2).round();
+
     // ── Pre-calculate Exact Dot Height ──
-    int calculatedDots = sy(4);
+    int calculatedDots = topGapMargin;
     if (hasCustomBizName) {
       calculatedDots += sy(24);
     }
-    if (hasOrderNo && hasDate) {
-      calculatedDots += rowHeight;
-    } else if (hasOrderNo || hasDate) {
+    if (hasOrderNo || hasDate) {
       calculatedDots += rowHeight;
     }
     if (showCustomerName) {
       calculatedDots += rowHeight;
       if (phoneClean.isNotEmpty) {
-        calculatedDots += rowHeight; // Phone is always on its own line under customer name
+        calculatedDots += rowHeight;
       }
     }
     if (previousDebt > 0.001) calculatedDots += rowHeight;
@@ -353,54 +359,6 @@ class TsplLabelLayoutEngine {
         (items == null || items.isEmpty)) {
       calculatedDots += rowHeight;
     }
-
-    if (items != null && items.isNotEmpty) {
-      for (final item in items) {
-        final rawName =
-            _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
-        final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
-        calculatedDots += (nameLines.length * rowHeight);
-        calculatedDots += rowHeight; // Detail / line total
-      }
-    } else {
-      final nameLines = _splitText(prodClean, maxBodyChars, maxLines: 2);
-      calculatedDots += nameLines.length * rowHeight;
-      calculatedDots += rowHeight;
-    }
-
-    calculatedDots += sy(8); // Separator 2
-    final prePaymentY = calculatedDots;
-    calculatedDots += rowHeight; // Payment status
-    if (noteClean != null) calculatedDots += rowHeight;
-    if (showTotalAmount && totalAmount != null) calculatedDots += sy(26);
-
-    // QR code starts at paymentY (aligned with payment status)
-    final preQrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
-    final preQrBoxSize = preQrCellWidth * 30;
-    final minBottomForQr = prePaymentY + preQrBoxSize + sy(6);
-    if (calculatedDots < minBottomForQr) {
-      calculatedDots = minBottomForQr;
-    } else {
-      calculatedDots += sy(10); // Safe bottom margin
-    }
-
-    final requestedHeightMm = heightMm.clamp(15, 1000);
-    final labelHeightDots = (requestedHeightMm * safeDpi / 25.4).round();
-    final barH = (labelHeightDots * 0.01).clamp(1, 2).round();
-
-    final dateText = timeStr;
-    final dateWidth = (dateText.length * bodyFontPitch) + 4;
-    final maxDateX = widthDots - paddingX - dateWidth;
-    final minDateX = paddingX + 60;
-    final dateX = maxDateX >= minDateX ? maxDateX : minDateX;
-    final availableOrderChars =
-        ((dateX - paddingX - 8) / bodyFontPitch).floor().clamp(4, 40);
-
-    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
-    final qrBoxSize = qrCellWidth * 30;
-    final qrX = (widthDots - paddingX - qrBoxSize)
-        .clamp(paddingX + 60, widthDots - paddingX - qrBoxSize);
-    final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
 
     final List<Map<String, dynamic>> itemsList;
     if (items != null && items.isNotEmpty) {
@@ -421,6 +379,38 @@ class TsplLabelLayoutEngine {
       final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
       return (nameLines.length * rowHeight) + rowHeight;
     }
+
+    for (final item in itemsList) {
+      calculatedDots += itemHeightOf(item);
+    }
+
+    calculatedDots += sy(8); // Separator 2
+    final prePaymentY = calculatedDots;
+    calculatedDots += rowHeight; // Payment status
+    if (noteClean != null) calculatedDots += rowHeight;
+    if (showTotalAmount && totalAmount != null) calculatedDots += sy(26);
+
+    // QR code starts at paymentY (aligned with payment status)
+    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
+    final qrBoxSize = qrCellWidth * 30;
+    final qrX = (widthDots - paddingX - qrBoxSize)
+        .clamp(paddingX + 60, widthDots - paddingX - qrBoxSize);
+    final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
+
+    final minBottomForQr = prePaymentY + qrBoxSize + sy(6);
+    if (calculatedDots < minBottomForQr) {
+      calculatedDots = minBottomForQr;
+    } else {
+      calculatedDots += bottomGapMargin;
+    }
+
+    final dateText = timeStr;
+    final dateCharPitch = isVeryWide ? 17 : 13;
+    final datePixelWidth = dateText.length * dateCharPitch;
+    final safeDateX = (widthDots - paddingX - datePixelWidth)
+        .clamp(paddingX + 60, widthDots - paddingX);
+    final availableOrderChars =
+        ((safeDateX - paddingX - 12) / bodyFontPitch).floor().clamp(3, 30);
 
     int renderItems(List<Map<String, dynamic>> itemList, int startY, _TsplBuffer buf) {
       var y = startY;
@@ -468,22 +458,45 @@ class TsplLabelLayoutEngine {
       return y;
     }
 
-    final safeGapMarginDots = (4.5 * safeDpi / 25.4).round();
-    final maxSafeContentY = labelHeightDots - safeGapMarginDots;
+    final page1HeaderHeight = topGapMargin +
+        (hasCustomBizName ? (sy(22) + sy(2)) : 0) +
+        ((hasOrderNo || hasDate) ? rowHeight : 0) +
+        (showCustomerName ? (rowHeight + (phoneClean.isNotEmpty ? rowHeight : 0)) : 0) +
+        (previousDebt > 0.001 ? rowHeight : 0) +
+        (barH + sy(3));
+
+    final subsequentHeaderHeight = topGapMargin + rowHeight + (barH + sy(3));
+
+    final closingFooterHeight = (barH + sy(3)) +
+        math.max(
+          rowHeight +
+              (noteClean != null ? rowHeight : 0) +
+              (showTotalAmount && totalAmount != null ? sy(26) : 0),
+          qrBoxSize,
+        ) +
+        sy(4);
+
+    var totalItemsHeight = 0;
+    for (final item in itemsList) {
+      totalItemsHeight += itemHeightOf(item);
+    }
+    final singlePageTotalNeeded = page1HeaderHeight + totalItemsHeight + closingFooterHeight;
+    final fitsInOnePage = singlePageTotalNeeded <= maxSafePageY;
+
+    final shouldPaginate = safeGap > 0 &&
+        paginateOnOverflow &&
+        itemsList.length >= 4 &&
+        !fitsInOnePage;
 
     List<List<Map<String, dynamic>>> paginateItems() {
       final pages = <List<Map<String, dynamic>>>[];
       var itemIndex = 0;
 
       // Page 1 budget
-      final page1HeaderHeight = sy(4) +
-          (hasCustomBizName ? (sy(24) + sy(2)) : 0) +
-          ((hasOrderNo || hasDate) ? rowHeight : 0) +
-          (showCustomerName ? (rowHeight + (phoneClean.isNotEmpty ? rowHeight : 0)) : 0) +
-          (previousDebt > 0.001 ? rowHeight : 0) +
-          (barH + sy(3));
-      final page1FooterHeight = barH + sy(3);
-      final page1ItemBudget = math.max(rowHeight * 2, maxSafeContentY - page1HeaderHeight - page1FooterHeight);
+      final page1ItemBudget = math.max(
+        rowHeight * 2,
+        maxSafePageY - page1HeaderHeight - (barH + sy(3)),
+      );
 
       final page1Items = <Map<String, dynamic>>[];
       var page1Used = 0;
@@ -496,38 +509,33 @@ class TsplLabelLayoutEngine {
         page1Used += h;
         itemIndex++;
       }
-      if (page1Items.length == itemsList.length && itemsList.length > 1) {
+      if (itemIndex == itemsList.length && page1Items.length > 1) {
         page1Items.removeLast();
         itemIndex--;
       }
       pages.add(page1Items);
 
       // Subsequent pages budgets
-      final subsequentHeaderHeight = sy(4) + rowHeight + (barH + sy(3));
-      final lastPageFooterHeight = (barH + sy(3)) +
-          math.max(
-            rowHeight +
-                (noteClean != null ? rowHeight : 0) +
-                (showTotalAmount && totalAmount != null ? sy(26) : 0),
-            qrBoxSize,
-          ) +
-          sy(6);
-      final intermediateFooterHeight = barH + sy(3);
-      final lastPageItemBudget = math.max(rowHeight * 2, maxSafeContentY - subsequentHeaderHeight - lastPageFooterHeight);
-      final interItemBudget = math.max(rowHeight * 2, maxSafeContentY - subsequentHeaderHeight - intermediateFooterHeight);
+      final closingPageItemBudget = math.max(
+        rowHeight * 2,
+        maxSafePageY - subsequentHeaderHeight - closingFooterHeight,
+      );
+      final interItemBudget = math.max(
+        rowHeight * 2,
+        maxSafePageY - subsequentHeaderHeight - (barH + sy(3)),
+      );
 
       while (itemIndex < itemsList.length) {
-        // Check if all remaining items fit on the final page
         var remainingHeight = 0;
         for (var i = itemIndex; i < itemsList.length; i++) {
           remainingHeight += itemHeightOf(itemsList[i]);
         }
-        if (remainingHeight <= lastPageItemBudget) {
+        if (remainingHeight <= closingPageItemBudget) {
           pages.add(itemsList.sublist(itemIndex));
+          itemIndex = itemsList.length;
           break;
         }
 
-        // Fill an intermediate page
         final interItems = <Map<String, dynamic>>[];
         var interUsed = 0;
         while (itemIndex < itemsList.length) {
@@ -545,16 +553,10 @@ class TsplLabelLayoutEngine {
       return pages;
     }
 
-    final shouldPaginate = safeGap > 0 &&
-        paginateOnOverflow &&
-        itemsList.length >= 5 &&
-        calculatedDots > labelHeightDots;
     final commands = _TsplBuffer();
 
     if (shouldPaginate) {
       final pages = paginateItems();
-      // Print in reverse order (Page N downto 1) so when labels feed out of the printer roll,
-      // Page 1 is at the top of the strip and Page N is at the bottom, matching natural reading order.
       for (var pageIdx = pages.length - 1; pageIdx >= 0; pageIdx--) {
         commands
           ..writeln('SIZE $safeWidth mm,$requestedHeightMm mm')
@@ -565,16 +567,15 @@ class TsplLabelLayoutEngine {
           ..writeln('REFERENCE 0,0')
           ..writeln('CLS');
 
-        var currentY = sy(4);
+        var currentY = topGapMargin;
 
         if (pageIdx == 0) {
-          // Page 1: Full Header
           if (hasCustomBizName) {
             final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
             final layout = _widestTextLayout(
               bizText,
               usableW,
-              maxHeight: (labelHeightDots * 0.14).clamp(10, 28).round(),
+              maxHeight: (labelHeightDots * 0.14).clamp(10, 24).round(),
             );
             final bizX = ((widthDots - layout.width) / 2)
                 .round()
@@ -591,12 +592,12 @@ class TsplLabelLayoutEngine {
           }
 
           final page1OrderNo =
-              _fit(orderIdShort, (availableOrderChars - 10).clamp(3, 22));
+              _fit(orderIdShort, (availableOrderChars - 8).clamp(3, 22));
           if (hasOrderNo && hasDate) {
             commands.writeln(
                 'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$page1OrderNo (1/${pages.length})"');
             commands.writeln(
-                'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
@@ -638,14 +639,13 @@ class TsplLabelLayoutEngine {
 
           commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
         } else if (pageIdx < pages.length - 1) {
-          // Intermediate Page
           final contOrderNo =
-              _fit(orderIdShort, (availableOrderChars - 14).clamp(3, 20));
+              _fit(orderIdShort, (availableOrderChars - 10).clamp(3, 20));
           if (hasOrderNo && hasDate) {
             commands.writeln(
                 'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length})"');
             commands.writeln(
-                'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
@@ -664,14 +664,13 @@ class TsplLabelLayoutEngine {
 
           commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
         } else {
-          // Final Closing Page
           final contOrderNo =
-              _fit(orderIdShort, (availableOrderChars - 14).clamp(3, 20));
+              _fit(orderIdShort, (availableOrderChars - 10).clamp(3, 20));
           if (hasOrderNo && hasDate) {
             commands.writeln(
                 'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length})"');
             commands.writeln(
-                'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
@@ -715,7 +714,7 @@ class TsplLabelLayoutEngine {
             final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
             final safeAvailableWidth =
                 (qrX - paddingX - 10).clamp(60, widthDots).round();
-            final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
+            final footerTextChars = ((safeAvailableWidth) ~/ 12).clamp(8, 30);
             final safeTotal = _fit(totalStr, footerTextChars);
             final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth,
                 maxHeight: (isVeryWide ? sy(32) : sy(26)));
@@ -733,11 +732,12 @@ class TsplLabelLayoutEngine {
         commands.writeln('PRINT ${copies.clamp(1, 20)},1');
       }
     } else {
-      // Single Page (continuous elongation or fits in one label)
-      final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil();
-      final safeHeight = requiredHeightMm > requestedHeightMm
-          ? requiredHeightMm
-          : requestedHeightMm;
+      final safeHeight = (safeGap > 0 && paginateOnOverflow)
+          ? requestedHeightMm
+          : math.max(
+              requestedHeightMm,
+              (calculatedDots * 25.4 / safeDpi).ceil(),
+            );
       final heightDots = (safeHeight * safeDpi / 25.4).round();
 
       commands
@@ -749,15 +749,14 @@ class TsplLabelLayoutEngine {
         ..writeln('REFERENCE 0,0')
         ..writeln('CLS');
 
-      var currentY = sy(4);
+      var currentY = topGapMargin;
 
-      // ── 1. Business Header ──
       if (hasCustomBizName) {
         final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
         final layout = _widestTextLayout(
           bizText,
           usableW,
-          maxHeight: (heightDots * 0.14).clamp(10, 28).round(),
+          maxHeight: (heightDots * 0.14).clamp(10, 24).round(),
         );
         final bizX = ((widthDots - layout.width) / 2)
             .round()
@@ -773,18 +772,17 @@ class TsplLabelLayoutEngine {
         currentY += layout.height + sy(2);
       }
 
-      // ── 2. Order # & Date ──
+      final safeOrderNo =
+          _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));
       if (hasOrderNo && hasDate) {
-        final orderNo =
-            _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));
         commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
-        commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$safeOrderNo"');
+        commands.writeln(
+            'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
         currentY += rowHeight;
       } else if (hasOrderNo) {
-        final orderNo = _fit(orderIdShort, (maxBodyChars - 5).clamp(4, 30));
         commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$safeOrderNo"');
         currentY += rowHeight;
       } else if (hasDate) {
         commands.writeln(

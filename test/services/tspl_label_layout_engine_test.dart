@@ -324,5 +324,44 @@ void main() {
     expect(output, contains('(2/'));
     expect(output, contains('TOPLAM: TL 500.00'));
     expect(output, contains('QRCODE '));
+    for (var i = 0; i < 8; i++) {
+      expect(output, contains('Urun $i'));
+    }
+  });
+
+  test('4 kalem aralıklı etikete sığmadığında 2 sayfaya bölünür ve tüm ürünler basılır', () {
+    final items = List.generate(
+      4,
+      (i) => {
+        'product_name': 'Uzun Adli Urun Kalemi $i',
+        'quantity': 2.0,
+        'unit_price': 45.0,
+      },
+    );
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: '1042',
+        customerName: 'Ahmet Yilmaz',
+        customerPhone: '0555 123 45 67',
+        productName: '4 Urun',
+        quantity: 1,
+        items: items,
+        itemsCount: 4,
+        totalAmount: 360,
+        widthMm: 80,
+        heightMm: 40,
+        gapMm: 3,
+        timestamp: DateTime(2026, 9, 4, 14, 35),
+      ),
+    );
+
+    final printMatches = RegExp(r'PRINT 1,1').allMatches(output);
+    expect(printMatches.length, 2);
+    expect(output, contains('SIZE 80 mm,40 mm'));
+    expect(output, contains('GAP 3 mm,0 mm'));
+    // Every single product must be present in output
+    for (var i = 0; i < 4; i++) {
+      expect(output, contains('Uzun Adli Urun Kalemi $i'));
+    }
   });
 }
