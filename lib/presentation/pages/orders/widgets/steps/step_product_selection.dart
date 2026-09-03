@@ -419,116 +419,11 @@ extension OrderCreationProductStep on OrderCreationDialogState {
             ],
           );
 
-        return Stack(
-          children: [
-            Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: _cart.isNotEmpty ? 76 : 16,
-              ),
-              child: catalogWidget,
-            ),
-            if (_cart.isNotEmpty)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 12,
-                child: _buildFloatingCartBar(),
-              ),
-          ],
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: catalogWidget,
         );
       },
-    );
-  }
-
-  // ── Mobil / Dar Ekran Kayan Sepet Çubuğu ──────────────────────────────────────
-  Widget _buildFloatingCartBar() {
-    final hasNote = _notesController.text.trim().isNotEmpty;
-    final totalQty = _cart.values.fold<double>(0, (sum, q) => sum + q);
-
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(14),
-      shadowColor: Colors.black.withValues(alpha: 0.25),
-      child: InkWell(
-        onTap: () => updateState(() => _activeStep = 2),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A), // Slate 900
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _kGreen, width: 1.2),
-          ),
-          child: Row(
-            children: [
-              Badge(
-                label: Text('${_cart.length}'),
-                backgroundColor: _kGreen,
-                child: const Icon(Icons.shopping_cart_rounded,
-                    color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          '₺${_totalAmount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                          ),
-                        ),
-                        if (hasNote) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: _kGreen.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('Not var',
-                                style: TextStyle(
-                                    color: _kGreenLight, fontSize: 10)),
-                          ),
-                        ],
-                      ],
-                    ),
-                    Text(
-                      '${_formatQuantity(totalQty)} birim • Teslim: ${DateFormat('dd.MM.yyyy').format(_expectedDelivery)}',
-                      style: const TextStyle(
-                          color: Color(0xFF94A3B8), fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => updateState(() => _activeStep = 2),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  elevation: 2,
-                ),
-                icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                label: const Text('Sepete Git',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

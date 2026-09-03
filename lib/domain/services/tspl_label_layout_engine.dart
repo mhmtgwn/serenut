@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image/image.dart' as img;
@@ -313,15 +314,22 @@ class TsplLabelLayoutEngine {
     final safeDpi = dpi == 300 ? 300 : 203;
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 54))
-        ? mediaWidthDots
-        : printableWidthDots.clamp(140, mediaWidthDots);
+    // On <=54mm rolls (such as standard 50mm, 40mm), clamp to 384 dots (max physical width of standard 2-inch printhead)
+    final maxPhysicalDots =
+        safeWidth <= 54 ? math.min(mediaWidthDots, 384) : mediaWidthDots;
+    final widthDots = (printableWidthDots == null ||
+            (printableWidthDots == 384 && safeWidth > 54))
+        ? maxPhysicalDots
+        : printableWidthDots.clamp(140, maxPhysicalDots);
 
     final isVeryWide = widthDots >= 540; // >= 68mm
     int sy(num value) => (value * safeDpi / 203).round();
 
-    final paddingX = (widthDots * 0.03).clamp(4.0, 20.0).round();
-    final usableW = widthDots - (paddingX * 2);
+    // Thermal label margins: provide a comfortable left padding and generous right safety margin
+    // so physical roll drift / mechanical margins never cause right edge collision and wrap-around.
+    final paddingX = (widthDots * 0.04).clamp(10.0, 20.0).round();
+    final rightMargin = (widthDots * 0.08).clamp(24.0, 48.0).round();
+    final usableW = widthDots - paddingX - rightMargin;
 
     final bodyFont = isVeryWide ? '3' : '2';
     final bodyFontPitch = isVeryWide ? 19 : 15;
@@ -359,10 +367,10 @@ class TsplLabelLayoutEngine {
       calculatedDots += sy(24);
     }
     if (hasOrderNo && hasDate) {
-      final dateWidth = (timeStr.length * bodyFontPitch) + 8;
-      final dateX = widthDots - paddingX - dateWidth;
+      final dateWidth = (timeStr.length * bodyFontPitch) + 4;
+      final dateX = widthDots - rightMargin - dateWidth;
       final availableOrderChars = (dateX - paddingX - 8) ~/ bodyFontPitch;
-      calculatedDots += (availableOrderChars >= 12 ? rowHeight : rowHeight * 2);
+      calculatedDots += (availableOrderChars >= 10 ? rowHeight : rowHeight * 2);
     } else if (hasOrderNo || hasDate) {
       calculatedDots += rowHeight;
     }
@@ -449,13 +457,13 @@ class TsplLabelLayoutEngine {
     // ── 2. Order # & Date (Spread horizontally across full width) ──
     if (hasOrderNo && hasDate) {
       final dateText = timeStr;
-      final dateWidth = (dateText.length * bodyFontPitch) + 8;
-      final dateX = (widthDots - paddingX - dateWidth).clamp(paddingX, widthDots - paddingX);
+      final dateWidth = (dateText.length * bodyFontPitch) + 4;
+      final dateX = (widthDots - rightMargin - dateWidth).clamp(paddingX, widthDots - rightMargin);
 
       final availableOrderWidth = dateX - paddingX - 8;
       final availableOrderChars = (availableOrderWidth / bodyFontPitch).floor();
 
-      if (availableOrderChars >= 12) {
+      if (availableOrderChars >= 10) {
         final orderNo = _fit(orderIdShort, availableOrderChars - 9);
         commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
         commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
@@ -472,8 +480,8 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
       currentY += rowHeight;
     } else if (hasDate) {
-      final dateWidth = (timeStr.length * bodyFontPitch) + 8;
-      final dateX = (widthDots - paddingX - dateWidth).clamp(paddingX, widthDots - paddingX);
+      final dateWidth = (timeStr.length * bodyFontPitch) + 4;
+      final dateX = (widthDots - rightMargin - dateWidth).clamp(paddingX, widthDots - rightMargin);
       commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$timeStr"');
       currentY += rowHeight;
     }
@@ -485,8 +493,8 @@ class TsplLabelLayoutEngine {
           : 'Musteri: Genel';
       if (phoneClean.isNotEmpty) {
         final phoneText = 'Tel: ${_fit(phoneClean, 20)}';
-        final phoneWidth = (phoneText.length * bodyFontPitch) + 6;
-        final phoneX = (widthDots - paddingX - phoneWidth).clamp(paddingX, widthDots - paddingX);
+        final phoneWidth = (phoneText.length * bodyFontPitch) + 4;
+        final phoneX = (widthDots - rightMargin - phoneWidth).clamp(paddingX, widthDots - rightMargin);
         final availableWhoChars = (phoneX - paddingX - 8) ~/ bodyFontPitch;
         if (whoText.length <= availableWhoChars) {
           commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
@@ -512,7 +520,7 @@ class TsplLabelLayoutEngine {
 
     // ── 4. Separator Line 1 (Full horizontal span across entire label) ──
     final barH = (heightDots * 0.01).clamp(1, 2).round();
-    commands.writeln('BAR $paddingX,$currentY,${widthDots - paddingX * 2},$barH');
+    commands.writeln('BAR $paddingX,$currentY,$usableW,$barH');
     currentY += barH + sy(3);
 
     // ── 5. Items Breakdown (Adaptive layout) ──
@@ -564,9 +572,9 @@ class TsplLabelLayoutEngine {
         commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$safeLeft"');
 
         if (rightTotal.isNotEmpty) {
-          final totalWidth = (rightTotal.length * bodyFontPitch) + 6;
-          final rightX = (widthDots - paddingX - totalWidth)
-              .clamp(paddingX, widthDots - paddingX);
+          final totalWidth = (rightTotal.length * bodyFontPitch) + 4;
+          final rightX = (widthDots - rightMargin - totalWidth)
+              .clamp(paddingX, widthDots - rightMargin);
           commands.writeln('TEXT $rightX,$currentY,"$bodyFont",0,1,1,"$rightTotal"');
         }
         currentY += rowHeight;
@@ -581,16 +589,16 @@ class TsplLabelLayoutEngine {
       commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$detail"');
       if (totalAmount != null) {
         final totalText = '${totalAmount.toStringAsFixed(2)} TL';
-        final totalWidth = (totalText.length * bodyFontPitch) + 6;
-        final rightX = (widthDots - paddingX - totalWidth)
-            .clamp(paddingX, widthDots - paddingX);
+        final totalWidth = (totalText.length * bodyFontPitch) + 4;
+        final rightX = (widthDots - rightMargin - totalWidth)
+            .clamp(paddingX, widthDots - rightMargin);
         commands.writeln('TEXT $rightX,$currentY,"$bodyFont",0,1,1,"$totalText"');
       }
       currentY += rowHeight;
     }
 
     // ── 6. Separator Line 2 (Full horizontal span) ──
-    commands.writeln('BAR $paddingX,$currentY,${widthDots - paddingX * 2},$barH');
+    commands.writeln('BAR $paddingX,$currentY,$usableW,$barH');
     currentY += barH + sy(3);
 
     // ── 7. Payment Status & Note ──
@@ -614,11 +622,12 @@ class TsplLabelLayoutEngine {
 
     final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
     final qrBoxSize = qrCellWidth * 30; // 60 dots for cellWidth 2, 90 dots for cellWidth 3
-    final qrX = widthDots - paddingX - qrBoxSize;
+    final qrX = widthDots - math.max(rightMargin, 16) - qrBoxSize;
 
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
-      final safeAvailableWidth = (qrX - paddingX - 10).clamp(60, widthDots);
+      final safeAvailableWidth =
+          (qrX - paddingX - 10).clamp(60, widthDots).round();
       final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
       final safeTotal = _fit(totalStr, footerTextChars);
       final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth, maxHeight: (isVeryWide ? sy(32) : sy(26)));

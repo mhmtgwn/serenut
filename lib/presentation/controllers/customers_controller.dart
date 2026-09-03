@@ -235,6 +235,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
       ref.invalidate(ordersCustomersControllerProvider);
       ref.invalidate(collectionCustomersControllerProvider);
       ref.invalidate(customerBalanceSummaryProvider);
+      ref.invalidate(customerLookupMapProvider);
       unawaited(ref.read(syncProvider.notifier).triggerSync());
     });
   }
@@ -243,6 +244,13 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
 final customersControllerProvider =
     AsyncNotifierProvider<CustomersController, List<CustomerEntity>>(() {
   return CustomersController();
+});
+
+/// Unfiltered global map of {customerId: customerName} for order & sales listings
+final customerLookupMapProvider = FutureProvider<Map<String, String>>((ref) async {
+  final repository = await ref.watch(customerRepositoryProvider.future);
+  final customers = await repository.findAll();
+  return {for (final c in customers) c.id: c.name};
 });
 
 // Screen-specific Customer Search Providers

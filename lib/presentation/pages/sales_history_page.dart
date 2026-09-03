@@ -59,13 +59,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final salesAsync = ref.watch(salesHistoryControllerProvider);
-    final customersVal = ref.watch(customersControllerProvider);
+    final customerMapVal = ref.watch(customerLookupMapProvider);
 
     // Build customer map for fast lookups
-    final customerMap = customersVal.maybeWhen(
-      data: (list) => {for (final c in list) c.id: c.name},
-      orElse: () => <String, String>{},
-    );
+    final customerMap = customerMapVal.valueOrNull ?? const <String, String>{};
 
     return Scaffold(
       backgroundColor: _kSurface,

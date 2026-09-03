@@ -226,9 +226,31 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      final customer = customersVal.valueOrNull
+                      CustomerEntity? customer = customersVal.valueOrNull
                           ?.where((value) => value.id == order.customerId)
                           .firstOrNull;
+                      if (customer == null && order.customerId.isNotEmpty) {
+                        try {
+                          final customerRepo =
+                              await ref.read(customerRepositoryProvider.future);
+                          customer =
+                              await customerRepo.findById(order.customerId);
+                        } catch (_) {}
+                      }
+                      double totalPaid = 0.0;
+                      try {
+                        final txRepo = await ref
+                            .read(financialTransactionRepositoryProvider.future);
+                        final txs =
+                            await txRepo.getByCustomerId(order.customerId);
+                        for (final t in txs) {
+                          if (t.referenceId == order.id) {
+                            if (t.type == 'sale' || t.type == 'payment') {
+                              totalPaid += t.paidAmount;
+                            }
+                          }
+                        }
+                      } catch (_) {}
                       final items = order.items.map((item) {
                         final normalized = Map<String, dynamic>.from(item);
                         final productId = item['product_id']?.toString() ?? '';
@@ -245,14 +267,7 @@ class OrderDetailsPage extends ConsumerWidget {
                               items,
                               settings,
                               customer: customer,
-                              paymentStatusOverride: switch (order.status) {
-                                'created' => 'Beklemede',
-                                'preparing' => 'Hazirlaniyor',
-                                'ready' => 'Hazir',
-                                'delivered' => 'Teslim Edildi',
-                                'cancelled' => 'Iptal Edildi',
-                                _ => order.status,
-                              },
+                              paidAmount: totalPaid,
                             );
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(

@@ -287,7 +287,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(ordersControllerProvider);
-    final customersVal = ref.watch(customersControllerProvider);
+    final customerMapVal = ref.watch(customerLookupMapProvider);
 
     return ordersAsync.when(
       loading: () => const Scaffold(
@@ -428,20 +428,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                         );
                       }
                       final order = filtered[index];
-                      final customerName = customersVal.maybeWhen(
-                        data: (list) {
-                          final c = list.firstWhere(
-                            (c) => c.id == order.customerId,
-                            orElse: () => CustomerEntity(
-                                id: '',
-                                name: 'Bilinmeyen',
-                                email: '',
-                                phone: '',
-                                balance: 0,
-                                createdAt: DateTime.now()),
-                          );
-                          return c.name;
-                        },
+                      final customerName = customerMapVal.maybeWhen(
+                        data: (map) => map[order.customerId] ?? 'Bilinmeyen Müşteri',
                         orElse: () => '...',
                       );
                       return _OrderCard(
