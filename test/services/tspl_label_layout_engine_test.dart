@@ -321,8 +321,7 @@ void main() {
     expect(output, contains('SIZE 80 mm,40 mm'));
     expect(output, contains('GAP 2 mm,0 mm'));
     expect(output, contains('(1/'));
-    expect(output, contains('DEVAMI'));
-    expect(output, contains('Devam'));
+    expect(output, contains('(2/'));
     expect(output, contains('TOPLAM: TL 500.00'));
     expect(output, contains('QRCODE '));
   });

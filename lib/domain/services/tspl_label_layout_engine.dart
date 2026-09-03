@@ -501,6 +501,9 @@ class TsplLabelLayoutEngine {
       return y;
     }
 
+    final safeGapMarginDots = (4.5 * safeDpi / 25.4).round();
+    final maxSafeContentY = labelHeightDots - safeGapMarginDots;
+
     List<List<Map<String, dynamic>>> paginateItems() {
       final pages = <List<Map<String, dynamic>>>[];
       var itemIndex = 0;
@@ -512,8 +515,8 @@ class TsplLabelLayoutEngine {
           (showCustomerName ? (rowHeight + (phoneClean.isNotEmpty ? rowHeight : 0)) : 0) +
           (previousDebt > 0.001 ? rowHeight : 0) +
           (barH + sy(3));
-      final page1FooterHeight = (barH + sy(3)) + rowHeight + sy(6);
-      final page1ItemBudget = math.max(rowHeight * 2, labelHeightDots - page1HeaderHeight - page1FooterHeight);
+      final page1FooterHeight = barH + sy(3);
+      final page1ItemBudget = math.max(rowHeight * 2, maxSafeContentY - page1HeaderHeight - page1FooterHeight);
 
       final page1Items = <Map<String, dynamic>>[];
       var page1Used = 0;
@@ -541,10 +544,10 @@ class TsplLabelLayoutEngine {
                 (showTotalAmount && totalAmount != null ? sy(26) : 0),
             qrBoxSize,
           ) +
-          sy(10);
-      final intermediateFooterHeight = (barH + sy(3)) + rowHeight + sy(6);
-      final lastPageItemBudget = math.max(rowHeight * 2, labelHeightDots - subsequentHeaderHeight - lastPageFooterHeight);
-      final interItemBudget = math.max(rowHeight * 2, labelHeightDots - subsequentHeaderHeight - intermediateFooterHeight);
+          sy(6);
+      final intermediateFooterHeight = barH + sy(3);
+      final lastPageItemBudget = math.max(rowHeight * 2, maxSafeContentY - subsequentHeaderHeight - lastPageFooterHeight);
+      final interItemBudget = math.max(rowHeight * 2, maxSafeContentY - subsequentHeaderHeight - intermediateFooterHeight);
 
       while (itemIndex < itemsList.length) {
         // Check if all remaining items fit on the final page
@@ -583,7 +586,9 @@ class TsplLabelLayoutEngine {
 
     if (shouldPaginate) {
       final pages = paginateItems();
-      for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+      // Print in reverse order (Page N downto 1) so when labels feed out of the printer roll,
+      // Page 1 is at the top of the strip and Page N is at the bottom, matching natural reading order.
+      for (var pageIdx = pages.length - 1; pageIdx >= 0; pageIdx--) {
         commands
           ..writeln('SIZE $safeWidth mm,$requestedHeightMm mm')
           ..writeln('GAP $safeGap mm,0 mm')
@@ -665,25 +670,19 @@ class TsplLabelLayoutEngine {
           currentY = renderItems(pages[0], currentY, commands);
 
           commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
-          currentY += barH + sy(3);
-
-          final contMsg = '>> DEVAMI 2. ETIKETTE (1/${pages.length}) >>';
-          commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(contMsg, maxBodyChars)}"',
-          );
         } else if (pageIdx < pages.length - 1) {
           // Intermediate Page
           final contOrderNo =
               _fit(orderIdShort, (availableOrderChars - 14).clamp(3, 20));
           if (hasOrderNo && hasDate) {
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length}) - Devam"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length})"');
             commands.writeln(
                 'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length}) - Devam"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length})"');
             currentY += rowHeight;
           } else if (hasDate) {
             commands.writeln(
@@ -697,26 +696,19 @@ class TsplLabelLayoutEngine {
           currentY = renderItems(pages[pageIdx], currentY, commands);
 
           commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
-          currentY += barH + sy(3);
-
-          final contMsg =
-              '>> DEVAMI ${pageIdx + 2}. ETIKETTE (${pageIdx + 1}/${pages.length}) >>';
-          commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(contMsg, maxBodyChars)}"',
-          );
         } else {
           // Final Closing Page
           final contOrderNo =
               _fit(orderIdShort, (availableOrderChars - 14).clamp(3, 20));
           if (hasOrderNo && hasDate) {
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length}) - Devam"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length})"');
             commands.writeln(
                 'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length}) - Devam"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length})"');
             currentY += rowHeight;
           } else if (hasDate) {
             commands.writeln(
