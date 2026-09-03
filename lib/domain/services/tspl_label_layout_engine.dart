@@ -302,17 +302,11 @@ class TsplLabelLayoutEngine {
     final usableW = widthDots - (2 * paddingX);
     final barW = usableW;
 
-    final bodyFont = isVeryWide ? '3' : '2';
-    // Exact character pitch (in dots) including character glyph width and inter-character spacing:
-    // Font '2' is 12x20 dots (pitch: 14 dots); Font '3' is 16x24 dots (pitch: 18 dots).
-    final bodyFontPitch = isVeryWide ? 18 : 14;
-    final fontScale = switch (fontSize) {
-      'Küçük' => 0.90,
-      'Büyük' => 1.25,
-      _ => 1.05,
-    };
-    final rowHeight = sy((20 * fontScale).clamp(16.0, 30.0).round());
-    final maxBodyChars = ((usableW - 10) / bodyFontPitch).floor().clamp(4, 70);
+    final bodyFont = isVeryWide
+        ? const _TsplFontProfile('3', 18, 26)
+        : const _TsplFontProfile('2', 14, 22);
+    final rowHeight = bodyFont.lineHeight;
+    final maxBodyChars = bodyFont.maxChars(usableW);
 
     final custClean = _ascii(customerName.trim());
     final prodClean = _ascii(productName.trim());
@@ -376,8 +370,8 @@ class TsplLabelLayoutEngine {
     int itemHeightOf(Map<String, dynamic> item) {
       final rawName =
           _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
-      final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
-      return (nameLines.length * rowHeight) + rowHeight;
+      final nameLines = bodyFont.wrap(rawName, usableW, maxLines: 2);
+      return (nameLines.length * bodyFont.lineHeight) + bodyFont.lineHeight + 4;
     }
 
     for (final item in itemsList) {
@@ -405,12 +399,11 @@ class TsplLabelLayoutEngine {
     }
 
     final dateText = timeStr;
-    final dateCharPitch = isVeryWide ? 17 : 13;
-    final datePixelWidth = dateText.length * dateCharPitch;
+    final datePixelWidth = bodyFont.measureWidth(dateText);
     final safeDateX = (widthDots - paddingX - datePixelWidth)
         .clamp(paddingX + 60, widthDots - paddingX);
     final availableOrderChars =
-        ((safeDateX - paddingX - 12) / bodyFontPitch).floor().clamp(3, 30);
+        bodyFont.maxChars(safeDateX - paddingX - 14).clamp(3, 30);
 
     int renderItems(List<Map<String, dynamic>> itemList, int startY, _TsplBuffer buf) {
       var y = startY;
@@ -435,10 +428,10 @@ class TsplLabelLayoutEngine {
             lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
 
         // Line 1: Product Name
-        final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
+        final nameLines = bodyFont.wrap(rawName, usableW, maxLines: 2);
         for (final line in nameLines) {
-          buf.writeln('TEXT $paddingX,$y,"$bodyFont",0,1,1,"$line"');
-          y += rowHeight;
+          buf.writeln('TEXT $paddingX,$y,"${bodyFont.font}",0,1,1,"$line"');
+          y += bodyFont.lineHeight;
         }
 
         // Line 2: Quantity x Unit Price = Line Total
@@ -451,9 +444,9 @@ class TsplLabelLayoutEngine {
           lineDetail = '  $itemQtyStr adet';
         }
         buf.writeln(
-          'TEXT $paddingX,$y,"$bodyFont",0,1,1,"${_fit(lineDetail, maxBodyChars)}"',
+          'TEXT $paddingX,$y,"${bodyFont.font}",0,1,1,"${_fit(lineDetail, maxBodyChars)}"',
         );
-        y += rowHeight;
+        y += bodyFont.lineHeight + 4;
       }
       return y;
     }
@@ -1180,4 +1173,67 @@ class _TsplBuffer {
   void addAll(List<int> value) => _bytes.addAll(value);
 
   List<int> get bytes => List<int>.unmodifiable(_bytes);
+}
+
+class _TsplFontProfile {
+  final String font;
+  final int pitch;       // Exact horizontal character advance in dots
+  final int lineHeight;  // Exact vertical line height in dots
+
+  const _TsplFontProfile(this.font, this.pitch, this.lineHeight);
+
+  @override
+  String toString() => font;
+
+  int maxChars(int widthDots) => math.max(1, widthDots ~/ pitch);
+  int measureWidth(String text) => text.length * pitch;
+
+  List<String> wrap(String text, int widthDots, {int maxLines = 3}) {
+    final maxC = maxChars(widthDots);
+    if (text.length <= maxC) return [text];
+
+    final words = text.split(' ');
+    final lines = <String>[];
+    var current = '';
+
+    for (final word in words) {
+      if (word.isEmpty) continue;
+      if (lines.length == maxLines - 1) {
+        final remaining = current.isEmpty ? word : '$current $word';
+        if (remaining.length <= maxC) {
+          current = remaining;
+        } else {
+          final fitLen = (maxC - 2).clamp(1, maxC);
+          current = remaining.length <= fitLen
+              ? remaining
+              : '${remaining.substring(0, fitLen)}..';
+          break;
+        }
+      } else if (current.isEmpty) {
+        if (word.length <= maxC) {
+          current = word;
+        } else {
+          for (var i = 0; i < word.length; i += maxC) {
+            final end = math.min(i + maxC, word.length);
+            lines.add(word.substring(i, end));
+            if (lines.length == maxLines - 1) break;
+          }
+        }
+      } else if (current.length + 1 + word.length <= maxC) {
+        current = '$current $word';
+      } else {
+        lines.add(current);
+        if (lines.length == maxLines - 1) {
+          final fitLen = (maxC - 2).clamp(1, maxC);
+          current = word.length <= fitLen ? word : '${word.substring(0, fitLen)}..';
+          break;
+        }
+        current = word.length <= maxC ? word : word.substring(0, maxC);
+      }
+    }
+    if (current.isNotEmpty && lines.length < maxLines) {
+      lines.add(current);
+    }
+    return lines;
+  }
 }
