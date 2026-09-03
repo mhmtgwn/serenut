@@ -1345,6 +1345,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         showTotalAmount: settings.labelOrderShowTotalAmount,
         showItemsCount: settings.labelOrderShowItemsCount,
         fontSize: settings.labelOrderFontSize,
+        paginateOnOverflow: false,
         businessName: settings.businessName,
       ));
     } else {

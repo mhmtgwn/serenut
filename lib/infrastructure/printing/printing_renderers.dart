@@ -509,6 +509,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
       showTotalAmount: design['showTotalAmount'] != false,
       showItemsCount: design['showItemsCount'] != false,
       fontSize: design['fontSize']?.toString() ?? 'Orta',
+      paginateOnOverflow: design['paginateOnOverflow'] != false,
       businessName: payload['businessName'] as String?,
       logoBytes: logo != null ? base64Decode(logo) : null,
     );
