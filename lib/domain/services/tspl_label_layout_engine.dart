@@ -464,16 +464,16 @@ class TsplLabelLayoutEngine {
       final availableOrderChars =
           ((dateX - paddingX - 6) / bodyFontPitch).floor();
       final orderNo =
-          _fit(orderIdShort, (availableOrderChars - 9).clamp(3, 25));
+          _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));
 
       commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
       commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
       currentY += rowHeight;
     } else if (hasOrderNo) {
-      final orderNo = _fit(orderIdShort, (maxBodyChars - 9).clamp(4, 30));
+      final orderNo = _fit(orderIdShort, (maxBodyChars - 5).clamp(4, 30));
       commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"SIPARIS #$orderNo"');
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
       currentY += rowHeight;
     } else if (hasDate) {
       commands.writeln(
@@ -484,8 +484,8 @@ class TsplLabelLayoutEngine {
     // ── 3. Customer Info (Brought close together, never pushed to the far-right edge) ──
     if (showCustomerName) {
       final whoText = custClean.isNotEmpty
-          ? 'Musteri: ${_fit(custClean, (maxBodyChars - 9).clamp(4, 60))}'
-          : 'Musteri: Genel';
+          ? 'Mus: ${_fit(custClean, (maxBodyChars - 5).clamp(4, 60))}'
+          : 'Mus: Genel';
       if (phoneClean.isNotEmpty) {
         final phoneText = 'Tel: ${_fit(phoneClean, 20)}';
         final phoneWidth = (phoneText.length * bodyFontPitch) + 4;
@@ -519,7 +519,7 @@ class TsplLabelLayoutEngine {
     }
     if (previousDebt > 0.001) {
       commands.writeln(
-        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Eski borc: TL ${previousDebt.toStringAsFixed(2)}"',
+        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Brc: TL ${previousDebt.toStringAsFixed(2)}"',
       );
       currentY += rowHeight;
     }
@@ -598,7 +598,7 @@ class TsplLabelLayoutEngine {
 
     // ── 7. Payment Status & Note ──
     commands.writeln(
-      'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odeme: ${_fit(_ascii(paymentStatus), (maxBodyChars - 7).clamp(4, 60))}"',
+      'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odm: ${_fit(_ascii(paymentStatus), (maxBodyChars - 5).clamp(4, 60))}"',
     );
     currentY += rowHeight;
 

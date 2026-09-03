@@ -233,7 +233,7 @@ void main() {
     );
 
     final order =
-        RegExp(r'TEXT \d+,(\d+),"2",0,1,1,"SIPARIS').firstMatch(output);
+        RegExp(r'TEXT \d+,(\d+),"2",0,1,1,"Sip #').firstMatch(output);
     final date =
         RegExp(r'TEXT \d+,(\d+),"2",0,1,1,"06\.08 15:45"').firstMatch(output);
     expect(order, isNotNull);
