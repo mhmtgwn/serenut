@@ -592,13 +592,13 @@ class TsplLabelLayoutEngine {
         ? (heightDots - sy(30)).clamp(currentY, heightDots - sy(24))
         : currentY + sy(2);
 
-    final qrSize = isVeryWide ? 80 : ((widthDots < 300) ? 45 : 60);
-    final qrCellWidth = isVeryWide ? 4 : ((widthDots < 300) ? 2 : 3);
-    final qrX = widthDots - paddingX - qrSize;
+    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
+    final qrBoxSize = qrCellWidth * 30; // 60 dots for cellWidth 2, 90 dots for cellWidth 3
+    final qrX = widthDots - paddingX - qrBoxSize;
 
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
-      final safeAvailableWidth = (qrX - paddingX - 8).clamp(80, widthDots);
+      final safeAvailableWidth = (qrX - paddingX - 10).clamp(60, widthDots);
       final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
       final safeTotal = _fit(totalStr, footerTextChars);
       final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth, maxHeight: (isVeryWide ? sy(32) : sy(26)));
@@ -615,7 +615,7 @@ class TsplLabelLayoutEngine {
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
     if (qrValue.isNotEmpty) {
       commands.writeln(
-        'QRCODE $qrX,$footerY,L,$qrCellWidth,A,0,M2,S7,"$qrValue"',
+        'QRCODE $qrX,$footerY,L,$qrCellWidth,A,0,"$qrValue"',
       );
     }
 
