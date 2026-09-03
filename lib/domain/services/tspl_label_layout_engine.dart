@@ -330,6 +330,8 @@ class TsplLabelLayoutEngine {
     final paddingX = (widthDots * 0.04).clamp(10.0, 20.0).round();
     final rightMargin = (widthDots * 0.08).clamp(24.0, 48.0).round();
     final usableW = widthDots - paddingX - rightMargin;
+    // Bounded separator width to ensure dividing lines never bleed into mechanical right margin
+    final barW = math.min(usableW, (widthDots * 0.74).round() - paddingX);
 
     final bodyFont = isVeryWide ? '3' : '2';
     final bodyFontPitch = isVeryWide ? 19 : 15;
@@ -401,10 +403,20 @@ class TsplLabelLayoutEngine {
     }
 
     calculatedDots += sy(8); // Separator 2
+    final prePaymentY = calculatedDots;
     calculatedDots += rowHeight; // Payment status
     if (noteClean != null) calculatedDots += rowHeight;
     if (showTotalAmount && totalAmount != null) calculatedDots += sy(26);
-    calculatedDots += sy(38); // Footer & QR Code clearance
+
+    // QR code starts at paymentY (aligned with payment status)
+    final preQrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
+    final preQrBoxSize = preQrCellWidth * 30;
+    final minBottomForQr = prePaymentY + preQrBoxSize + sy(6);
+    if (calculatedDots < minBottomForQr) {
+      calculatedDots = minBottomForQr;
+    } else {
+      calculatedDots += sy(10); // Safe bottom margin
+    }
 
     // Prevent vertical overflow by not adding unnecessary phantom padding
     final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil();
@@ -453,7 +465,8 @@ class TsplLabelLayoutEngine {
       final dateWidth = (dateText.length * bodyFontPitch) + 4;
       final maxDateX = math.max(paddingX + 10, widthDots - rightMargin - dateWidth);
       final minDateX = math.min(paddingX + 60, maxDateX);
-      final rawDateX = math.min((widthDots * 0.48).round(), maxDateX);
+      // Position date at ~56% of label width, nicely balancing spacing between Sip # and right margin
+      final rawDateX = math.min((widthDots * 0.56).round(), maxDateX);
       final dateX = rawDateX.clamp(minDateX, maxDateX);
 
       final availableOrderChars =
@@ -499,9 +512,9 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 4. Separator Line 1 (Full horizontal span across entire label) ──
+    // ── 4. Separator Line 1 (Bounded width to prevent right edge overflow) ──
     final barH = (heightDots * 0.01).clamp(1, 2).round();
-    commands.writeln('BAR $paddingX,$currentY,$usableW,$barH');
+    commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
     currentY += barH + sy(3);
 
     // ── 5. Items Breakdown (Adaptive layout, items and amounts grouped together) ──
@@ -569,11 +582,26 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 6. Separator Line 2 (Full horizontal span) ──
-    commands.writeln('BAR $paddingX,$currentY,$usableW,$barH');
+    // ── 6. Separator Line 2 (Bounded width to prevent right edge overflow) ──
+    commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
     currentY += barH + sy(3);
 
-    // ── 7. Payment Status & Note ──
+    // ── 7. Payment Status & QR Code (QR starts at paymentY to prevent bottom clipping) ──
+    final paymentY = currentY;
+    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
+    final qrBoxSize = qrCellWidth * 30; // 60 dots for cellWidth 2, 90 dots for cellWidth 3
+    final maxQrX = math.max(paddingX + 40, (widthDots * 0.80).round() - qrBoxSize);
+    final minQrX = math.min(paddingX + 60, maxQrX);
+    final qrX = ((widthDots * 0.72) - qrBoxSize / 2).round().clamp(minQrX, maxQrX);
+
+    final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
+    if (qrValue.isNotEmpty) {
+      // Elevated to start at paymentY so it never overflows from the bottom
+      commands.writeln(
+        'QRCODE $qrX,$paymentY,L,$qrCellWidth,A,0,"$qrValue"',
+      );
+    }
+
     commands.writeln(
       'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odm: ${_fit(_ascii(paymentStatus), (maxBodyChars - 5).clamp(4, 60))}"',
     );
@@ -586,18 +614,8 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
     }
 
-    // ── 8. Total Amount & QR Footer (Anchored inside label dots, spreading horizontally) ──
-    final availableFooterSpace = heightDots - currentY;
-    final footerY = (availableFooterSpace < sy(32))
-        ? (heightDots - sy(30)).clamp(currentY, heightDots - sy(24))
-        : currentY + sy(2);
-
-    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
-    final qrBoxSize = qrCellWidth * 30; // 60 dots for cellWidth 2, 90 dots for cellWidth 3
-    final maxQrX = math.max(paddingX + 40, (widthDots * 0.80).round() - qrBoxSize);
-    final minQrX = math.min(paddingX + 60, maxQrX);
-    final qrX = ((widthDots * 0.72) - qrBoxSize / 2).round().clamp(minQrX, maxQrX);
-
+    // ── 8. Total Amount ──
+    final footerY = currentY + sy(2);
     if (showTotalAmount && totalAmount != null) {
       final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
       final safeAvailableWidth =
@@ -612,13 +630,6 @@ class TsplLabelLayoutEngine {
         totalLayout.xMultiplier,
         totalLayout.yMultiplier,
         safeTotal,
-      );
-    }
-
-    final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
-    if (qrValue.isNotEmpty) {
-      commands.writeln(
-        'QRCODE $qrX,$footerY,L,$qrCellWidth,A,0,"$qrValue"',
       );
     }
 
