@@ -445,11 +445,10 @@ class TsplProductLabelRenderer implements PrintRenderer {
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
         showBusinessName: design['showBusinessName'] != false,
-        showBrand: false,
+        showBrand: design['showBrand'] == true,
         showBarcode: design['showBarcode'] != false,
         showPrice: design['showPrice'] != false,
-        // The compact shelf label deliberately omits the redundant VAT line.
-        showVat: false,
+        showVat: design['showVat'] == true,
         fontSize: design['fontSize']?.toString() ?? 'Orta',
         logoBytes: logo == null ? null : base64Decode(logo),
       ));

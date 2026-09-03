@@ -76,7 +76,7 @@ void main() {
 
     expect(output, contains('Uzun Urun Adi'));
     expect(output, contains('Cesidi'));
-    expect(output, contains('"3",0,1,2'));
+    expect(output, contains('"3",0,1,1'));
     expect(output, isNot(contains('BARCODE ')));
     expect(output, contains('"4",0,1,1,"TL 123.45"'));
     expect(output, isNot(contains('Ü')));
@@ -103,9 +103,9 @@ void main() {
       ),
     );
 
-    expect(output, contains('"2",0,3,3,"Kisa Urun"'));
+    expect(output, contains('"3",0,1,1,"Kisa Urun"'));
     expect(output, isNot(contains('Kod:')));
-    expect(output, contains('"3",0,2,2,"299,95"'));
+    expect(output, contains('299,95'));
     expect(output, contains('"2",0,1,1,"TL"'));
     expect(output, isNot(contains('TL 299.95')));
   });

@@ -48,13 +48,15 @@ class TsplLabelLayoutEngine {
 
     int sy(num value) => (value * dimScaleY).round();
 
-    final horizontalPadding = (widthDots * 0.04).clamp(6.0, 24.0).round();
+    final horizontalPadding = (widthDots * 0.04).clamp(12.0, 24.0).round();
     final usableWidth = widthDots - (horizontalPadding * 2);
+    final topGapMargin = (heightDots * 0.05).clamp(10, 22).round();
+    final bottomGapMargin = (heightDots * 0.05).clamp(10, 22).round();
 
     final fontScale = switch (fontSize) {
-      'Küçük' => 0.95,
-      'Büyük' => 1.30,
-      _ => 1.15,
+      'Küçük' => 0.90,
+      'Büyük' => 1.15,
+      _ => 1.0,
     };
 
     final barcode = _barcode(model.barcode ?? '');
@@ -68,11 +70,11 @@ class TsplLabelLayoutEngine {
       ..writeln('REFERENCE 0,0')
       ..writeln('CLS');
 
-    int currentY = (heightDots * 0.03).clamp(2, 12).round();
+    int currentY = topGapMargin;
 
     // ── 1. Top Header: Logo or Business Name ──────────────────────────────
     if (showBusinessName) {
-      final maxHeaderHeight = (heightDots * 0.16 * fontScale).clamp(10, 44).round();
+      final maxHeaderHeight = (heightDots * 0.18 * fontScale).clamp(12, 36).round();
       final bitmapCmd = _generateTsplBitmap(
         logoPath,
         logoBytes,
@@ -82,99 +84,70 @@ class TsplLabelLayoutEngine {
       );
       if (bitmapCmd != null) {
         commands.addAll(bitmapCmd.bytes);
-        currentY += bitmapCmd.height + sy(2);
+        currentY += bitmapCmd.height + sy(3);
       } else if (model.businessName?.trim().isNotEmpty == true) {
         final bizText = model.businessName!.trim();
-        final maxChars = (usableWidth / 12).floor().clamp(4, 60);
+        final maxChars = (usableWidth / 12).floor().clamp(4, 50);
         final bizClean = _fit(bizText, maxChars);
-        final layout = _widestTextLayout(
-          bizClean,
-          usableWidth,
-          maxHeight: maxHeaderHeight,
-        );
-        final centerX = ((widthDots - layout.width) / 2)
+        final textW = bizClean.length * 12;
+        final centerX = ((widthDots - textW) / 2)
             .round()
             .clamp(horizontalPadding, widthDots - horizontalPadding);
         commands.boldText(
           centerX,
           currentY,
-          layout.font,
-          layout.xMultiplier,
-          layout.yMultiplier,
+          '2',
+          1,
+          1,
           bizClean,
         );
-        currentY += layout.height + sy(2);
+        currentY += 22;
       }
     }
 
     // ── 2. Brand Name (if enabled) ────────────────────────────────────────
     if (showBrand && model.brand?.trim().isNotEmpty == true) {
-      final maxBrandChars = (usableWidth / 8).floor().clamp(4, 60);
+      final maxBrandChars = (usableWidth / 8).floor().clamp(4, 50);
       final brandText = _fit(model.brand!, maxBrandChars);
-      final maxBrandHeight = (heightDots * 0.10 * fontScale).clamp(8, 22).round();
-      final layout = _widestTextLayout(
-        brandText,
-        usableWidth,
-        maxHeight: maxBrandHeight,
-      );
-      final centerX = ((widthDots - layout.width) / 2)
+      final textW = brandText.length * 8;
+      final centerX = ((widthDots - textW) / 2)
           .round()
           .clamp(horizontalPadding, widthDots - horizontalPadding);
       commands.writeln(
-        'TEXT $centerX,$currentY,"${layout.font}",0,${layout.xMultiplier},${layout.yMultiplier},"$brandText"',
+        'TEXT $centerX,$currentY,"1",0,1,1,"$brandText"',
       );
-      currentY += layout.height + sy(1);
+      currentY += 14;
     }
 
-    // ── 3. Product Name (Middle Section) ─────────────────────────────────
+    // ── 3. Product Name (Middle Section, Proportional) ───────────────────
     final nameClean = _ascii(model.productName);
-    final availableNameBudget = (heightDots * 0.38 * fontScale).clamp(24, 110).round();
-    final singleLineMaxChars = (usableWidth / 12).floor().clamp(4, 60);
+    final maxFont3Chars = (usableWidth / 16).floor().clamp(6, 26);
+    final maxFont2Chars = (usableWidth / 12).floor().clamp(8, 42);
 
-    if (nameClean.length <= singleLineMaxChars) {
-      final layout = _widestTextLayout(
-        nameClean,
-        usableWidth,
-        maxHeight: availableNameBudget,
-      );
-      final centerX = ((widthDots - layout.width) / 2)
-          .round()
-          .clamp(horizontalPadding, widthDots - horizontalPadding);
-      commands.boldText(
-        centerX,
-        currentY,
-        layout.font,
-        layout.xMultiplier,
-        layout.yMultiplier,
-        nameClean,
-      );
-      currentY += layout.height + sy(2);
+    if (nameClean.length <= maxFont3Chars) {
+      final textW = nameClean.length * 16;
+      final centerX = ((widthDots - textW) / 2)
+          .clamp(horizontalPadding, widthDots - horizontalPadding)
+          .round();
+      commands.boldText(centerX, currentY, '3', 1, 1, nameClean);
+      currentY += 26;
+    } else if (nameClean.length <= maxFont2Chars) {
+      final textW = nameClean.length * 12;
+      final centerX = ((widthDots - textW) / 2)
+          .clamp(horizontalPadding, widthDots - horizontalPadding)
+          .round();
+      commands.boldText(centerX, currentY, '2', 1, 1, nameClean);
+      currentY += 22;
     } else {
-      final maxLineChars = (usableWidth / 10).floor().clamp(4, 60);
-      final lines = _wrapProductName(nameClean, maxLineChars);
-      final lineMaxHeight = (availableNameBudget / lines.length).floor().clamp(10, 36);
-
-      for (final rawLine in lines) {
-        final line = _fit(rawLine, maxLineChars);
-        final layout = _widestTextLayout(
-          line,
-          usableWidth,
-          maxHeight: lineMaxHeight,
-        );
-        final centerX = ((widthDots - layout.width) / 2)
-            .round()
-            .clamp(horizontalPadding, widthDots - horizontalPadding);
-        commands.boldText(
-          centerX,
-          currentY,
-          layout.font,
-          layout.xMultiplier,
-          layout.yMultiplier,
-          line,
-        );
-        currentY += layout.height + sy(1);
+      final lines = _wrapProductName(nameClean, maxFont2Chars);
+      for (final line in lines) {
+        final textW = line.length * 12;
+        final centerX = ((widthDots - textW) / 2)
+            .clamp(horizontalPadding, widthDots - horizontalPadding)
+            .round();
+        commands.boldText(centerX, currentY, '2', 1, 1, line);
+        currentY += 21;
       }
-      currentY += sy(1);
     }
 
     // Ensure space for bottom price/barcode section
@@ -187,17 +160,17 @@ class TsplLabelLayoutEngine {
     // ── 4. Horizontal Separator Line BAR ─────────────────────────────────
     final barHeight = (heightDots * 0.01).clamp(1, 3).round();
     commands.writeln(
-      'BAR $horizontalPadding,$currentY,${widthDots - (horizontalPadding * 2)},$barHeight',
+      'BAR $horizontalPadding,$currentY,$usableWidth,$barHeight',
     );
     currentY += barHeight + sy(2);
 
     // ── 5. Bottom Section (Left: Barcode | Right: Price & KDV) ────────────
     final bottomY = currentY;
-    final bottomHeight = (heightDots - bottomY - sy(4)).clamp(20, heightDots).round();
+    final availableBottomHeight = (heightDots - bottomY - bottomGapMargin).clamp(24, heightDots);
 
     // Bottom Left: Barcode
     if (showBarcode && barcode.isNotEmpty) {
-      final barcodeHeight = (bottomHeight * 0.65).clamp(16, 72).round();
+      final barcodeHeight = (availableBottomHeight * 0.60).clamp(18, 48).round();
       const narrowBar = 1;
       commands.writeln(
         'BARCODE $horizontalPadding,$bottomY,"128",$barcodeHeight,0,0,$narrowBar,2,"$barcode"',
@@ -212,9 +185,9 @@ class TsplLabelLayoutEngine {
       const vatStr = '(KDV Dahil)';
 
       if (showBarcode && barcode.isNotEmpty) {
-        final barcodeWidth = (barcode.length * 11 + 35) * 1;
-        final priceLeft = (horizontalPadding + barcodeWidth + 12).clamp(
-          (widthDots * 0.40).round(),
+        final barcodeEstimatedWidth = barcode.length * 11 + 35;
+        final priceLeft = (horizontalPadding + barcodeEstimatedWidth + 10).clamp(
+          (widthDots * 0.42).round(),
           (widthDots * 0.58).round(),
         );
         final availablePriceWidth = (widthDots - priceLeft - horizontalPadding).clamp(40, widthDots);
@@ -222,30 +195,29 @@ class TsplLabelLayoutEngine {
         const currencyWidth = 14;
         const gap = 2;
 
-        final priceLayout = _widestTextLayout(
-          priceText,
-          availablePriceWidth - currencyWidth - gap,
-          maxHeight: (bottomHeight * 0.65).round(),
-        );
-
-        final priceWidth = priceLayout.width;
+        final priceFont = (currencyWidth + gap + priceText.length * 24 <= availablePriceWidth)
+            ? '4'
+            : ((currencyWidth + gap + priceText.length * 16 <= availablePriceWidth) ? '3' : '2');
+        final priceCharWidth = priceFont == '4' ? 24 : (priceFont == '3' ? 16 : 12);
+        final priceWidth = priceText.length * priceCharWidth;
         final totalPriceWidth = currencyWidth + gap + priceWidth;
         final currencyX = (priceLeft + ((availablePriceWidth - totalPriceWidth) / 2))
             .round()
             .clamp(priceLeft, widthDots - horizontalPadding);
         final priceX = currencyX + currencyWidth + gap;
+        final priceY = bottomY + sy(2);
 
-        commands.writeln('TEXT $currencyX,${bottomY + sy(4)},"2",0,1,1,"TL"');
+        commands.writeln('TEXT $currencyX,${priceY + sy(6)},"2",0,1,1,"TL"');
         commands.boldText(
           priceX,
-          bottomY,
-          priceLayout.font,
-          priceLayout.xMultiplier,
-          priceLayout.yMultiplier,
+          priceY,
+          priceFont,
+          1,
+          1,
           priceText,
         );
         if (showVat) {
-          final vatY = bottomY + bottomHeight - sy(10);
+          final vatY = bottomY + availableBottomHeight - sy(10);
           commands.writeln('TEXT $currencyX,$vatY,"1",0,1,1,"$vatStr"');
         }
       } else {
@@ -260,12 +232,12 @@ class TsplLabelLayoutEngine {
         final priceX = ((widthDots - textW) / 2)
             .clamp(horizontalPadding, widthDots - horizontalPadding)
             .round();
-        commands.writeln('TEXT $priceX,$bottomY,"$priceFont",0,1,1,"$priceStr"');
+        final priceY = bottomY + sy(2);
+        commands.boldText(priceX, priceY, priceFont, 1, 1, priceStr);
         if (showVat) {
-          final vatY = bottomY + bottomHeight - sy(10);
-          final vatX = ((widthDots - (vatStr.length * 8)) / 2)
-              .round()
-              .clamp(horizontalPadding, widthDots - horizontalPadding);
+          const vatW = vatStr.length * 8;
+          final vatX = ((widthDots - vatW) / 2).clamp(horizontalPadding, widthDots - horizontalPadding).round();
+          final vatY = bottomY + availableBottomHeight - sy(10);
           commands.writeln('TEXT $vatX,$vatY,"1",0,1,1,"$vatStr"');
         }
       }
@@ -969,11 +941,11 @@ class TsplLabelLayoutEngine {
       lines.add(currentLine);
     }
 
-    if (lines.length == 2 && lines[1].length > maxCharsPerLine) {
-      lines[1] = '${lines[1].substring(0, maxCharsPerLine - 2)}..';
+    final result = <String>[];
+    for (final l in lines) {
+      result.add(_fit(l, maxCharsPerLine));
     }
-
-    return lines.isEmpty ? [clean] : lines;
+    return result.isEmpty ? [_fit(clean, maxCharsPerLine)] : result;
   }
 
   static String _barcode(String value) {
@@ -1079,18 +1051,22 @@ class TsplLabelLayoutEngine {
       if (source == null) return null;
       final decoded = _cropLogoWhitespace(source);
 
-      var targetWidth = (widthDots * 0.52).round().clamp(80, 240).toInt();
-      int targetHeight = (decoded.height * (targetWidth / decoded.width))
-          .round()
-          .clamp(8, maxHeight);
-      targetWidth = (targetWidth ~/ 8) * 8; // Multiple of 8
+      final maxTargetW = (widthDots * 0.50).round().clamp(60, 220);
+      final maxTargetH = maxHeight;
+      final scale = math.min(
+        maxTargetW / decoded.width,
+        maxTargetH / decoded.height,
+      );
+      var targetWidth = (decoded.width * scale).round().clamp(16, maxTargetW);
+      var targetHeight = (decoded.height * scale).round().clamp(8, maxTargetH);
+      targetWidth = ((targetWidth + 7) ~/ 8) * 8; // Multiple of 8
       if (targetWidth < 8) targetWidth = 8;
       final widthBytes = targetWidth ~/ 8;
 
       final resized =
           img.copyResize(decoded, width: targetWidth, height: targetHeight);
       final centerX =
-          ((widthDots - targetWidth) / 2).clamp(10, widthDots - 10).round();
+          ((widthDots - targetWidth) / 2).clamp(10, widthDots - targetWidth).round();
 
       final corners = [
         resized.getPixel(0, 0),
@@ -1127,7 +1103,7 @@ class TsplLabelLayoutEngine {
               }
             }
           }
-          rasterBytes.add(b ^ 0xFF);
+          rasterBytes.add(b);
         }
       }
 
