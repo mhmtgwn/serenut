@@ -69,6 +69,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'paid': paidAmount,
           'notes': notes ?? order.notes,
           'qrData': 'order|${order.id}|${order.totalAmount}',
+          'barcode': order.displayNumber,
         },
         items,
         requestedCopies: copies);
@@ -227,9 +228,15 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         {
           'business': {
             'name': settings.businessName,
+            'subtitle': settings.businessType.trim().isNotEmpty
+                ? settings.businessType.trim()
+                : null,
             'address': settings.businessAddress,
             'phone': settings.businessPhone,
             'taxId': settings.businessTaxId,
+            'email': settings.businessEmail?.trim().isNotEmpty == true
+                ? settings.businessEmail!.trim()
+                : null,
             'receiptFooterText': settings.receiptFooterText,
           },
           'document': document,
