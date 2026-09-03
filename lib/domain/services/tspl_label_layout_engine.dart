@@ -326,13 +326,10 @@ class TsplLabelLayoutEngine {
     final isVeryWide = widthDots >= 540; // >= 68mm
     int sy(num value) => (value * safeDpi / 203).round();
 
-    // Thermal label margins: provide a comfortable left padding and generous right safety margin
-    // so physical roll drift / mechanical margins never cause right edge collision and wrap-around.
-    final paddingX = (widthDots * 0.04).clamp(10.0, 20.0).round();
-    final rightMargin = (widthDots * 0.08).clamp(24.0, 48.0).round();
-    final usableW = widthDots - paddingX - rightMargin;
-    // Bounded separator width to ensure dividing lines never bleed into mechanical right margin
-    final barW = math.min(usableW, (widthDots * 0.74).round() - paddingX);
+    // Symmetric margins: left and right margins are equal so the label is centered and balanced.
+    final paddingX = (widthDots * 0.035).clamp(12.0, 24.0).round();
+    final usableW = widthDots - (2 * paddingX);
+    final barW = usableW;
 
     final bodyFont = isVeryWide ? '3' : '2';
     final bodyFontPitch = isVeryWide ? 19 : 15;
@@ -421,18 +418,16 @@ class TsplLabelLayoutEngine {
 
     final dateText = timeStr;
     final dateWidth = (dateText.length * bodyFontPitch) + 4;
-    final maxDateX = math.max(paddingX + 10, widthDots - rightMargin - dateWidth);
-    final minDateX = math.min(paddingX + 60, maxDateX);
-    final rawDateX = math.min((widthDots * 0.56).round(), maxDateX);
-    final dateX = rawDateX.clamp(minDateX, maxDateX);
+    final maxDateX = widthDots - paddingX - dateWidth;
+    final minDateX = paddingX + 60;
+    final dateX = maxDateX >= minDateX ? maxDateX : minDateX;
     final availableOrderChars =
-        ((dateX - paddingX - 6) / bodyFontPitch).floor();
+        ((dateX - paddingX - 8) / bodyFontPitch).floor().clamp(4, 40);
 
     final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
     final qrBoxSize = qrCellWidth * 30;
-    final maxQrX = math.max(paddingX + 40, (widthDots * 0.80).round() - qrBoxSize);
-    final minQrX = math.min(paddingX + 60, maxQrX);
-    final qrX = ((widthDots * 0.72) - qrBoxSize / 2).round().clamp(minQrX, maxQrX);
+    final qrX = (widthDots - paddingX - qrBoxSize)
+        .clamp(paddingX + 60, widthDots - paddingX - qrBoxSize);
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
 
     final List<Map<String, dynamic>> itemsList;
