@@ -299,6 +299,7 @@ class TsplLabelLayoutEngine {
     int? printableWidthDots,
     int direction = 0,
     int copies = 1,
+    bool paginateOnOverflow = true,
     bool showBusinessName = true,
     bool showCustomerName = true,
     bool showOrderNo = true,
@@ -352,10 +353,6 @@ class TsplLabelLayoutEngine {
     final timeStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
         : '';
-    final qtyStr = quantity % 1 == 0
-        ? quantity.toInt().toString()
-        : quantity.toStringAsFixed(1);
-
     final hasCustomBizName = showBusinessName &&
         businessName != null &&
         businessName.trim().isNotEmpty &&
@@ -418,117 +415,49 @@ class TsplLabelLayoutEngine {
       calculatedDots += sy(10); // Safe bottom margin
     }
 
-    // Prevent vertical overflow by not adding unnecessary phantom padding
-    final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil();
     final requestedHeightMm = heightMm.clamp(15, 1000);
-    final safeHeight = requiredHeightMm > requestedHeightMm
-        ? requiredHeightMm
-        : requestedHeightMm;
-    final heightDots = (safeHeight * safeDpi / 25.4).round();
+    final labelHeightDots = (requestedHeightMm * safeDpi / 25.4).round();
+    final barH = (labelHeightDots * 0.01).clamp(1, 2).round();
 
-    final commands = _TsplBuffer()
-      ..writeln('SIZE $safeWidth mm,$safeHeight mm')
-      ..writeln('GAP $safeGap mm,0 mm')
-      ..writelnIf(autoDetectGap, 'GAPDETECT')
-      ..writeln('DENSITY 8')
-      ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
-      ..writeln('REFERENCE 0,0')
-      ..writeln('CLS');
+    final dateText = timeStr;
+    final dateWidth = (dateText.length * bodyFontPitch) + 4;
+    final maxDateX = math.max(paddingX + 10, widthDots - rightMargin - dateWidth);
+    final minDateX = math.min(paddingX + 60, maxDateX);
+    final rawDateX = math.min((widthDots * 0.56).round(), maxDateX);
+    final dateX = rawDateX.clamp(minDateX, maxDateX);
+    final availableOrderChars =
+        ((dateX - paddingX - 6) / bodyFontPitch).floor();
 
-    int currentY = sy(4);
+    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
+    final qrBoxSize = qrCellWidth * 30;
+    final maxQrX = math.max(paddingX + 40, (widthDots * 0.80).round() - qrBoxSize);
+    final minQrX = math.min(paddingX + 60, maxQrX);
+    final qrX = ((widthDots * 0.72) - qrBoxSize / 2).round().clamp(minQrX, maxQrX);
+    final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
 
-    // ── 1. Business Header ──
-    if (hasCustomBizName) {
-      final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
-      final layout = _widestTextLayout(
-        bizText,
-        usableW,
-        maxHeight: (heightDots * 0.14).clamp(10, 28).round(),
-      );
-      final bizX = ((widthDots - layout.width) / 2)
-          .round()
-          .clamp(paddingX, widthDots - paddingX);
-      commands.boldText(
-        bizX,
-        currentY,
-        layout.font,
-        layout.xMultiplier,
-        layout.yMultiplier,
-        bizText,
-      );
-      currentY += layout.height + sy(2);
-    }
-
-    // ── 2. Order # & Date ──
-    if (hasOrderNo && hasDate) {
-      final dateText = timeStr;
-      final dateWidth = (dateText.length * bodyFontPitch) + 4;
-      final maxDateX = math.max(paddingX + 10, widthDots - rightMargin - dateWidth);
-      final minDateX = math.min(paddingX + 60, maxDateX);
-      // Position date at ~56% of label width, nicely balancing spacing between Sip # and right margin
-      final rawDateX = math.min((widthDots * 0.56).round(), maxDateX);
-      final dateX = rawDateX.clamp(minDateX, maxDateX);
-
-      final availableOrderChars =
-          ((dateX - paddingX - 6) / bodyFontPitch).floor();
-      final orderNo =
-          _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));
-
-      commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
-      commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
-      currentY += rowHeight;
-    } else if (hasOrderNo) {
-      final orderNo = _fit(orderIdShort, (maxBodyChars - 5).clamp(4, 30));
-      commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
-      currentY += rowHeight;
-    } else if (hasDate) {
-      commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr"');
-      currentY += rowHeight;
-    }
-
-    // ── 3. Customer Info (Customer number / phone is ALWAYS placed under customer name) ──
-    if (showCustomerName) {
-      final whoText = custClean.isNotEmpty
-          ? 'Mus: ${_fit(custClean, (maxBodyChars - 5).clamp(4, 60))}'
-          : 'Mus: Genel';
-      commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
-      currentY += rowHeight;
-
-      if (phoneClean.isNotEmpty) {
-        final phoneText = 'Tel: ${_fit(phoneClean, (maxBodyChars - 5).clamp(4, 30))}';
-        commands.writeln(
-            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
-        currentY += rowHeight;
-      }
-    }
-    if (previousDebt > 0.001) {
-      commands.writeln(
-        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Brc: TL ${previousDebt.toStringAsFixed(2)}"',
-      );
-      currentY += rowHeight;
-    }
-
-    // ── 4. Separator Line 1 (Bounded width to prevent right edge overflow) ──
-    final barH = (heightDots * 0.01).clamp(1, 2).round();
-    commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
-    currentY += barH + sy(3);
-
-    // ── 5. Items Breakdown (Adaptive layout, items and amounts grouped together) ──
-    if (showItemsCount &&
-        itemsCount != null &&
-        (items == null || items.isEmpty)) {
-      commands.writeln(
-        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit('- $itemsCount Parca Urun / Paket', maxBodyChars)}"',
-      );
-      currentY += rowHeight;
-    }
-
+    final List<Map<String, dynamic>> itemsList;
     if (items != null && items.isNotEmpty) {
-      for (final item in items) {
+      itemsList = items;
+    } else {
+      itemsList = [
+        {
+          'product_name': prodClean,
+          'quantity': quantity,
+          if (totalAmount != null) 'total': totalAmount,
+        }
+      ];
+    }
+
+    int itemHeightOf(Map<String, dynamic> item) {
+      final rawName =
+          _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
+      final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
+      return (nameLines.length * rowHeight) + rowHeight;
+    }
+
+    int renderItems(List<Map<String, dynamic>> itemList, int startY, _TsplBuffer buf) {
+      var y = startY;
+      for (final item in itemList) {
         final rawName =
             _ascii((item['product_name'] ?? item['name'] ?? 'Urun').toString());
         final itemQty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
@@ -551,11 +480,11 @@ class TsplLabelLayoutEngine {
         // Line 1: Product Name
         final nameLines = _splitText(rawName, maxBodyChars, maxLines: 2);
         for (final line in nameLines) {
-          commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$line"');
-          currentY += rowHeight;
+          buf.writeln('TEXT $paddingX,$y,"$bodyFont",0,1,1,"$line"');
+          y += rowHeight;
         }
 
-        // Line 2: Quantity x Unit Price = Line Total (Clean format without parentheses)
+        // Line 2: Quantity x Unit Price = Line Total
         final String lineDetail;
         if (unitPrice != null && rightTotal.isNotEmpty) {
           lineDetail = '  ${itemQtyStr}x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
@@ -564,76 +493,433 @@ class TsplLabelLayoutEngine {
         } else {
           lineDetail = '  $itemQtyStr adet';
         }
+        buf.writeln(
+          'TEXT $paddingX,$y,"$bodyFont",0,1,1,"${_fit(lineDetail, maxBodyChars)}"',
+        );
+        y += rowHeight;
+      }
+      return y;
+    }
+
+    List<List<Map<String, dynamic>>> paginateItems() {
+      final pages = <List<Map<String, dynamic>>>[];
+      var itemIndex = 0;
+
+      // Page 1 budget
+      final page1HeaderHeight = sy(4) +
+          (hasCustomBizName ? (sy(24) + sy(2)) : 0) +
+          ((hasOrderNo || hasDate) ? rowHeight : 0) +
+          (showCustomerName ? (rowHeight + (phoneClean.isNotEmpty ? rowHeight : 0)) : 0) +
+          (previousDebt > 0.001 ? rowHeight : 0) +
+          (barH + sy(3));
+      final page1FooterHeight = (barH + sy(3)) + rowHeight + sy(6);
+      final page1ItemBudget = math.max(rowHeight * 2, labelHeightDots - page1HeaderHeight - page1FooterHeight);
+
+      final page1Items = <Map<String, dynamic>>[];
+      var page1Used = 0;
+      while (itemIndex < itemsList.length) {
+        final h = itemHeightOf(itemsList[itemIndex]);
+        if (page1Items.isNotEmpty && (page1Used + h > page1ItemBudget)) {
+          break;
+        }
+        page1Items.add(itemsList[itemIndex]);
+        page1Used += h;
+        itemIndex++;
+      }
+      if (page1Items.length == itemsList.length && itemsList.length > 1) {
+        page1Items.removeLast();
+        itemIndex--;
+      }
+      pages.add(page1Items);
+
+      // Subsequent pages budgets
+      final subsequentHeaderHeight = sy(4) + rowHeight + (barH + sy(3));
+      final lastPageFooterHeight = (barH + sy(3)) +
+          math.max(
+            rowHeight +
+                (noteClean != null ? rowHeight : 0) +
+                (showTotalAmount && totalAmount != null ? sy(26) : 0),
+            qrBoxSize,
+          ) +
+          sy(10);
+      final intermediateFooterHeight = (barH + sy(3)) + rowHeight + sy(6);
+      final lastPageItemBudget = math.max(rowHeight * 2, labelHeightDots - subsequentHeaderHeight - lastPageFooterHeight);
+      final interItemBudget = math.max(rowHeight * 2, labelHeightDots - subsequentHeaderHeight - intermediateFooterHeight);
+
+      while (itemIndex < itemsList.length) {
+        // Check if all remaining items fit on the final page
+        var remainingHeight = 0;
+        for (var i = itemIndex; i < itemsList.length; i++) {
+          remainingHeight += itemHeightOf(itemsList[i]);
+        }
+        if (remainingHeight <= lastPageItemBudget) {
+          pages.add(itemsList.sublist(itemIndex));
+          break;
+        }
+
+        // Fill an intermediate page
+        final interItems = <Map<String, dynamic>>[];
+        var interUsed = 0;
+        while (itemIndex < itemsList.length) {
+          final h = itemHeightOf(itemsList[itemIndex]);
+          if (interItems.isNotEmpty && (interUsed + h > interItemBudget)) {
+            break;
+          }
+          interItems.add(itemsList[itemIndex]);
+          interUsed += h;
+          itemIndex++;
+        }
+        pages.add(interItems);
+      }
+
+      return pages;
+    }
+
+    final shouldPaginate = safeGap > 0 &&
+        paginateOnOverflow &&
+        itemsList.length >= 5 &&
+        calculatedDots > labelHeightDots;
+    final commands = _TsplBuffer();
+
+    if (shouldPaginate) {
+      final pages = paginateItems();
+      for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+        commands
+          ..writeln('SIZE $safeWidth mm,$requestedHeightMm mm')
+          ..writeln('GAP $safeGap mm,0 mm')
+          ..writelnIf(autoDetectGap, 'GAPDETECT')
+          ..writeln('DENSITY 8')
+          ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
+          ..writeln('REFERENCE 0,0')
+          ..writeln('CLS');
+
+        var currentY = sy(4);
+
+        if (pageIdx == 0) {
+          // Page 1: Full Header
+          if (hasCustomBizName) {
+            final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
+            final layout = _widestTextLayout(
+              bizText,
+              usableW,
+              maxHeight: (labelHeightDots * 0.14).clamp(10, 28).round(),
+            );
+            final bizX = ((widthDots - layout.width) / 2)
+                .round()
+                .clamp(paddingX, widthDots - paddingX);
+            commands.boldText(
+              bizX,
+              currentY,
+              layout.font,
+              layout.xMultiplier,
+              layout.yMultiplier,
+              bizText,
+            );
+            currentY += layout.height + sy(2);
+          }
+
+          final page1OrderNo =
+              _fit(orderIdShort, (availableOrderChars - 10).clamp(3, 22));
+          if (hasOrderNo && hasDate) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$page1OrderNo (1/${pages.length})"');
+            commands.writeln(
+                'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+            currentY += rowHeight;
+          } else if (hasOrderNo) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$page1OrderNo (1/${pages.length})"');
+            currentY += rowHeight;
+          } else if (hasDate) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr (1/${pages.length})"');
+            currentY += rowHeight;
+          }
+
+          if (showCustomerName) {
+            final whoText = custClean.isNotEmpty
+                ? 'Mus: ${_fit(custClean, (maxBodyChars - 5).clamp(4, 60))}'
+                : 'Mus: Genel';
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+            currentY += rowHeight;
+
+            if (phoneClean.isNotEmpty) {
+              final phoneText =
+                  'Tel: ${_fit(phoneClean, (maxBodyChars - 5).clamp(4, 30))}';
+              commands.writeln(
+                  'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+              currentY += rowHeight;
+            }
+          }
+          if (previousDebt > 0.001) {
+            commands.writeln(
+              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Brc: TL ${previousDebt.toStringAsFixed(2)}"',
+            );
+            currentY += rowHeight;
+          }
+
+          commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+          currentY += barH + sy(3);
+
+          currentY = renderItems(pages[0], currentY, commands);
+
+          commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+          currentY += barH + sy(3);
+
+          final contMsg = '>> DEVAMI 2. ETIKETTE (1/${pages.length}) >>';
+          commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(contMsg, maxBodyChars)}"',
+          );
+        } else if (pageIdx < pages.length - 1) {
+          // Intermediate Page
+          final contOrderNo =
+              _fit(orderIdShort, (availableOrderChars - 14).clamp(3, 20));
+          if (hasOrderNo && hasDate) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length}) - Devam"');
+            commands.writeln(
+                'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+            currentY += rowHeight;
+          } else if (hasOrderNo) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length}) - Devam"');
+            currentY += rowHeight;
+          } else if (hasDate) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr (${pageIdx + 1}/${pages.length})"');
+            currentY += rowHeight;
+          }
+
+          commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+          currentY += barH + sy(3);
+
+          currentY = renderItems(pages[pageIdx], currentY, commands);
+
+          commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+          currentY += barH + sy(3);
+
+          final contMsg =
+              '>> DEVAMI ${pageIdx + 2}. ETIKETTE (${pageIdx + 1}/${pages.length}) >>';
+          commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(contMsg, maxBodyChars)}"',
+          );
+        } else {
+          // Final Closing Page
+          final contOrderNo =
+              _fit(orderIdShort, (availableOrderChars - 14).clamp(3, 20));
+          if (hasOrderNo && hasDate) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length}) - Devam"');
+            commands.writeln(
+                'TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+            currentY += rowHeight;
+          } else if (hasOrderNo) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length}) - Devam"');
+            currentY += rowHeight;
+          } else if (hasDate) {
+            commands.writeln(
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr (${pages.length}/${pages.length})"');
+            currentY += rowHeight;
+          }
+
+          commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+          currentY += barH + sy(3);
+
+          currentY = renderItems(pages[pageIdx], currentY, commands);
+
+          commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+          currentY += barH + sy(3);
+
+          final paymentY = currentY;
+          if (qrValue.isNotEmpty) {
+            commands.writeln(
+              'QRCODE $qrX,$paymentY,L,$qrCellWidth,A,0,"$qrValue"',
+            );
+          }
+
+          commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odm: ${_fit(_ascii(paymentStatus), (maxBodyChars - 5).clamp(4, 60))}"',
+          );
+          currentY += rowHeight;
+
+          if (noteClean != null) {
+            commands.writeln(
+              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}"',
+            );
+            currentY += rowHeight;
+          }
+
+          final footerY = currentY + sy(2);
+          if (showTotalAmount && totalAmount != null) {
+            final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
+            final safeAvailableWidth =
+                (qrX - paddingX - 10).clamp(60, widthDots).round();
+            final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
+            final safeTotal = _fit(totalStr, footerTextChars);
+            final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth,
+                maxHeight: (isVeryWide ? sy(32) : sy(26)));
+            commands.boldText(
+              paddingX,
+              footerY,
+              totalLayout.font,
+              totalLayout.xMultiplier,
+              totalLayout.yMultiplier,
+              safeTotal,
+            );
+          }
+        }
+
+        commands.writeln('PRINT ${copies.clamp(1, 20)},1');
+      }
+    } else {
+      // Single Page (continuous elongation or fits in one label)
+      final requiredHeightMm = (calculatedDots * 25.4 / safeDpi).ceil();
+      final safeHeight = requiredHeightMm > requestedHeightMm
+          ? requiredHeightMm
+          : requestedHeightMm;
+      final heightDots = (safeHeight * safeDpi / 25.4).round();
+
+      commands
+        ..writeln('SIZE $safeWidth mm,$safeHeight mm')
+        ..writeln('GAP $safeGap mm,0 mm')
+        ..writelnIf(autoDetectGap, 'GAPDETECT')
+        ..writeln('DENSITY 8')
+        ..writeln('DIRECTION ${direction == 1 ? 1 : 0}')
+        ..writeln('REFERENCE 0,0')
+        ..writeln('CLS');
+
+      var currentY = sy(4);
+
+      // ── 1. Business Header ──
+      if (hasCustomBizName) {
+        final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
+        final layout = _widestTextLayout(
+          bizText,
+          usableW,
+          maxHeight: (heightDots * 0.14).clamp(10, 28).round(),
+        );
+        final bizX = ((widthDots - layout.width) / 2)
+            .round()
+            .clamp(paddingX, widthDots - paddingX);
+        commands.boldText(
+          bizX,
+          currentY,
+          layout.font,
+          layout.xMultiplier,
+          layout.yMultiplier,
+          bizText,
+        );
+        currentY += layout.height + sy(2);
+      }
+
+      // ── 2. Order # & Date ──
+      if (hasOrderNo && hasDate) {
+        final orderNo =
+            _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));
         commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(lineDetail, maxBodyChars)}"',
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
+        commands.writeln('TEXT $dateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+        currentY += rowHeight;
+      } else if (hasOrderNo) {
+        final orderNo = _fit(orderIdShort, (maxBodyChars - 5).clamp(4, 30));
+        commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$orderNo"');
+        currentY += rowHeight;
+      } else if (hasDate) {
+        commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$timeStr"');
+        currentY += rowHeight;
+      }
+
+      // ── 3. Customer Info ──
+      if (showCustomerName) {
+        final whoText = custClean.isNotEmpty
+            ? 'Mus: ${_fit(custClean, (maxBodyChars - 5).clamp(4, 60))}'
+            : 'Mus: Genel';
+        commands.writeln(
+            'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$whoText"');
+        currentY += rowHeight;
+
+        if (phoneClean.isNotEmpty) {
+          final phoneText =
+              'Tel: ${_fit(phoneClean, (maxBodyChars - 5).clamp(4, 30))}';
+          commands.writeln(
+              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+          currentY += rowHeight;
+        }
+      }
+      if (previousDebt > 0.001) {
+        commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Brc: TL ${previousDebt.toStringAsFixed(2)}"',
         );
         currentY += rowHeight;
       }
-    } else {
-      final nameLines = _splitText(prodClean, maxBodyChars, maxLines: 2);
-      for (final line in nameLines) {
-        commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$line"');
+
+      // ── 4. Separator Line 1 ──
+      commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+      currentY += barH + sy(3);
+
+      // ── 5. Items Breakdown ──
+      if (showItemsCount &&
+          itemsCount != null &&
+          (items == null || items.isEmpty)) {
+        commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit('- $itemsCount Parca Urun / Paket', maxBodyChars)}"',
+        );
         currentY += rowHeight;
       }
-      final detail = totalAmount != null
-          ? '  $qtyStr adet = ${totalAmount.toStringAsFixed(2)} TL'
-          : '  $qtyStr adet';
-      commands.writeln('TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"${_fit(detail, maxBodyChars)}"');
-      currentY += rowHeight;
-    }
 
-    // ── 6. Separator Line 2 (Bounded width to prevent right edge overflow) ──
-    commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
-    currentY += barH + sy(3);
+      currentY = renderItems(itemsList, currentY, commands);
 
-    // ── 7. Payment Status & QR Code (QR starts at paymentY to prevent bottom clipping) ──
-    final paymentY = currentY;
-    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
-    final qrBoxSize = qrCellWidth * 30; // 60 dots for cellWidth 2, 90 dots for cellWidth 3
-    final maxQrX = math.max(paddingX + 40, (widthDots * 0.80).round() - qrBoxSize);
-    final minQrX = math.min(paddingX + 60, maxQrX);
-    final qrX = ((widthDots * 0.72) - qrBoxSize / 2).round().clamp(minQrX, maxQrX);
+      // ── 6. Separator Line 2 ──
+      commands.writeln('BAR $paddingX,$currentY,$barW,$barH');
+      currentY += barH + sy(3);
 
-    final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
-    if (qrValue.isNotEmpty) {
-      // Elevated to start at paymentY so it never overflows from the bottom
+      // ── 7. Payment Status & QR Code ──
+      final paymentY = currentY;
+      if (qrValue.isNotEmpty) {
+        commands.writeln(
+          'QRCODE $qrX,$paymentY,L,$qrCellWidth,A,0,"$qrValue"',
+        );
+      }
+
       commands.writeln(
-        'QRCODE $qrX,$paymentY,L,$qrCellWidth,A,0,"$qrValue"',
-      );
-    }
-
-    commands.writeln(
-      'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odm: ${_fit(_ascii(paymentStatus), (maxBodyChars - 5).clamp(4, 60))}"',
-    );
-    currentY += rowHeight;
-
-    if (noteClean != null) {
-      commands.writeln(
-        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}"',
+        'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Odm: ${_fit(_ascii(paymentStatus), (maxBodyChars - 5).clamp(4, 60))}"',
       );
       currentY += rowHeight;
+
+      if (noteClean != null) {
+        commands.writeln(
+          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}"',
+        );
+        currentY += rowHeight;
+      }
+
+      // ── 8. Total Amount ──
+      final footerY = currentY + sy(2);
+      if (showTotalAmount && totalAmount != null) {
+        final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
+        final safeAvailableWidth =
+            (qrX - paddingX - 10).clamp(60, widthDots).round();
+        final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
+        final safeTotal = _fit(totalStr, footerTextChars);
+        final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth,
+            maxHeight: (isVeryWide ? sy(32) : sy(26)));
+        commands.boldText(
+          paddingX,
+          footerY,
+          totalLayout.font,
+          totalLayout.xMultiplier,
+          totalLayout.yMultiplier,
+          safeTotal,
+        );
+      }
+
+      commands.writeln('PRINT ${copies.clamp(1, 20)},1');
     }
 
-    // ── 8. Total Amount ──
-    final footerY = currentY + sy(2);
-    if (showTotalAmount && totalAmount != null) {
-      final totalStr = 'TOPLAM: TL ${totalAmount.toStringAsFixed(2)}';
-      final safeAvailableWidth =
-          (qrX - paddingX - 10).clamp(60, widthDots).round();
-      final footerTextChars = ((safeAvailableWidth) ~/ 8).clamp(8, 50);
-      final safeTotal = _fit(totalStr, footerTextChars);
-      final totalLayout = _widestTextLayout(safeTotal, safeAvailableWidth, maxHeight: (isVeryWide ? sy(32) : sy(26)));
-      commands.boldText(
-        paddingX,
-        footerY,
-        totalLayout.font,
-        totalLayout.xMultiplier,
-        totalLayout.yMultiplier,
-        safeTotal,
-      );
-    }
-
-    commands.writeln('PRINT ${copies.clamp(1, 20)},1');
     return commands.bytes;
   }
 

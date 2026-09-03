@@ -279,6 +279,7 @@ void main() {
         totalAmount: 1500,
         widthMm: 58,
         heightMm: 30,
+        gapMm: 0,
       ),
     );
 
@@ -289,5 +290,40 @@ void main() {
     final sizeMatch = RegExp(r'SIZE 58 mm,(\d+) mm').firstMatch(output);
     expect(sizeMatch, isNotNull);
     expect(int.parse(sizeMatch!.group(1)!), greaterThan(50));
+  });
+
+  test('aralıklı medyada (gap > 0) 5+ ürün olduğunda fiziksel boyuta sadık kalarak çoklu sayfaya böler', () {
+    final items = List.generate(
+      8,
+      (i) => {
+        'product_name': 'Ürün $i',
+        'quantity': (i + 1).toDouble(),
+        'unit_price': 15.0,
+      },
+    );
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: 'ORD-PAGE-8',
+        customerName: 'Ahmet Yilmaz',
+        productName: '8 Urun',
+        quantity: 1,
+        items: items,
+        itemsCount: 8,
+        totalAmount: 500,
+        widthMm: 80,
+        heightMm: 40,
+        gapMm: 2,
+      ),
+    );
+
+    final printMatches = RegExp(r'PRINT 1,1').allMatches(output);
+    expect(printMatches.length, greaterThanOrEqualTo(2));
+    expect(output, contains('SIZE 80 mm,40 mm'));
+    expect(output, contains('GAP 2 mm,0 mm'));
+    expect(output, contains('(1/'));
+    expect(output, contains('DEVAMI'));
+    expect(output, contains('Devam'));
+    expect(output, contains('TOPLAM: TL 500.00'));
+    expect(output, contains('QRCODE '));
   });
 }
