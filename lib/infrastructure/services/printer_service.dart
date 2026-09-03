@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show ByteData, rootBundle;
 import 'package:image/image.dart' as img;
@@ -1299,9 +1300,12 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final shortCustomerId = rawCustomerId.length > 8
         ? rawCustomerId.substring(0, 8).toUpperCase()
         : rawCustomerId.toUpperCase();
-    final previousDebt = customer != null && customer.balance < 0
+    final isFullyPaid = order.status == 'completed' || order.status == 'paid';
+    final orderUnpaid = isFullyPaid ? 0.0 : order.totalAmount;
+    final currentDebt = customer != null && customer.balance < 0
         ? customer.balance.abs()
         : 0.0;
+    final previousDebt = math.max(0.0, currentDebt - orderUnpaid);
 
     final firstItem = items.isEmpty ? null : items.first;
     final summaryName = items.length == 1

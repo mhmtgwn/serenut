@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/models/settings.dart';
@@ -137,6 +138,19 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
                 : paidAmount <= 0.01
                     ? 'Ödenmedi'
                     : 'Kısmi ödendi');
+    final double effectivePaid = paidAmount ??
+        ((order.status == 'completed' || order.status == 'paid')
+            ? order.totalAmount
+            : 0.0);
+    final orderUnpaid = math.max(0.0, order.totalAmount - effectivePaid);
+    final currentDebt = (customer != null && customer.balance < 0)
+        ? customer.balance.abs()
+        : 0.0;
+    // When re-printing an existing order whose unpaid amount has already been
+    // ledgered into customer.balance, subtract this order's unpaid portion so we
+    // only show genuine PREVIOUS debt that existed prior to this order.
+    final calculatedPreviousDebt = math.max(0.0, currentDebt - orderUnpaid);
+
     return _enqueue(
         PrintDocumentKind.orderLabel,
         {
@@ -144,10 +158,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'customerName': customer?.name ?? order.customerId,
           'customerPhone': customer?.phone ?? '',
           'customerNo': shortCustomerId,
-          'previousDebt': previousDebt ??
-              (customer != null && customer.balance < 0
-                  ? customer.balance.abs()
-                  : 0.0),
+          'previousDebt': previousDebt ?? calculatedPreviousDebt,
           'productName': items.length == 1
               ? _itemName(first ?? const {})
               : '${items.length} Ürün / Paket',
