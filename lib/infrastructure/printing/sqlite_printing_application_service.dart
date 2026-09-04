@@ -125,7 +125,6 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       String? paymentStatusOverride,
       int copies = 1}) async {
     final first = items.firstOrNull;
-    final logo = await assets.loadLogo(settings.businessLogo);
     // Derive a short customer identifier from the customer id
     final rawCustomerId = customer?.id ?? order.customerId;
     final shortCustomerId = rawCustomerId.length > 8
@@ -173,7 +172,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'paymentStatus': resolvedPaymentStatus,
           'itemsCount': items.length,
           'businessName': settings.businessName,
-          if (logo != null) 'logoBytesBase64': base64Encode(logo),
+          'labelWidthMm': settings.labelWidthMm,
+          'labelHeightMm': settings.labelHeightMm,
+          'labelGapMm': settings.labelGapMm,
+          'labelDpi': settings.labelDpi,
+          'autoDetectGap': settings.labelAutoDetectGap,
         },
         copies: copies);
   }
@@ -201,6 +204,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           PrintDocumentKind.productLabel,
           {
             'labels': [label.toMap()],
+            'labelWidthMm': settings.labelWidthMm,
+            'labelHeightMm': settings.labelHeightMm,
+            'labelGapMm': settings.labelGapMm,
+            'labelDpi': settings.labelDpi,
+            'autoDetectGap': settings.labelAutoDetectGap,
             if (logo != null) 'logoBytesBase64': base64Encode(logo),
           },
           copies: copies));

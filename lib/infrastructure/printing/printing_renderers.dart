@@ -559,17 +559,55 @@ class TsplProductLabelRenderer implements PrintRenderer {
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
     final logo = payload['logoBytesBase64'] as String?;
+    final widthMm = _integer(
+      payload['labelWidthMm'] ??
+          payload['widthMm'] ??
+          capabilities['mediaWidthMm'] ??
+          capabilities['labelWidthMm'] ??
+          capabilities['paperWidthMm'] ??
+          design['widthMm'],
+      50,
+    );
+    final heightMm = _integer(
+      payload['labelHeightMm'] ??
+          payload['heightMm'] ??
+          capabilities['mediaHeightMm'] ??
+          capabilities['labelHeightMm'] ??
+          design['heightMm'],
+      30,
+    );
+    final gapMm = _integer(
+      payload['labelGapMm'] ??
+          payload['gapMm'] ??
+          capabilities['gapMm'] ??
+          capabilities['labelGapMm'] ??
+          design['gapMm'],
+      2,
+    );
+    final dpi = _integer(
+      payload['labelDpi'] ??
+          payload['dpi'] ??
+          capabilities['dpi'] ??
+          design['dpi'],
+      203,
+    );
+    final autoDetectGap = payload['autoDetectGap'] == true ||
+        capabilities['autoDetectGap'] == true ||
+        design['autoDetectGap'] == true;
+    final printableWidthDots = (payload['printableWidthDots'] ??
+        capabilities['printableWidthDots']) as int?;
+
     final bytes = <int>[];
     var isFirstLabel = true;
     for (final raw in payload['labels'] as List? ?? const []) {
       bytes.addAll(TsplLabelLayoutEngine.generateLabelBytes(
         LabelModel.fromMap(Map<String, dynamic>.from(raw as Map)),
-        widthMm: _integer(capabilities['mediaWidthMm'], 50),
-        heightMm: _integer(capabilities['mediaHeightMm'], 30),
-        gapMm: _integer(capabilities['gapMm'], 2),
-        autoDetectGap: isFirstLabel && capabilities['autoDetectGap'] == true,
-        dpi: _integer(capabilities['dpi'], 203),
-        printableWidthDots: capabilities['printableWidthDots'] as int?,
+        widthMm: widthMm,
+        heightMm: heightMm,
+        gapMm: gapMm,
+        autoDetectGap: isFirstLabel && autoDetectGap,
+        dpi: dpi,
+        printableWidthDots: printableWidthDots,
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
         showBusinessName: design['showBusinessName'] != false,
@@ -600,8 +638,46 @@ class TsplOrderLabelRenderer implements PrintRenderer {
     final payload = _map(job.payloadJson);
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
-    final logo = payload['logoBytesBase64'] as String?;
     final useCanvas = design['useCanvas'] != false && design['engine'] != 'legacy';
+
+    final widthMm = _integer(
+      payload['labelWidthMm'] ??
+          payload['widthMm'] ??
+          capabilities['mediaWidthMm'] ??
+          capabilities['labelWidthMm'] ??
+          capabilities['paperWidthMm'] ??
+          design['widthMm'],
+      50,
+    );
+    final heightMm = _integer(
+      payload['labelHeightMm'] ??
+          payload['heightMm'] ??
+          capabilities['mediaHeightMm'] ??
+          capabilities['labelHeightMm'] ??
+          design['heightMm'],
+      30,
+    );
+    final gapMm = _integer(
+      payload['labelGapMm'] ??
+          payload['gapMm'] ??
+          capabilities['gapMm'] ??
+          capabilities['labelGapMm'] ??
+          design['gapMm'],
+      2,
+    );
+    final dpi = _integer(
+      payload['labelDpi'] ??
+          payload['dpi'] ??
+          capabilities['dpi'] ??
+          design['dpi'],
+      203,
+    );
+    final autoDetectGap = payload['autoDetectGap'] == true ||
+        capabilities['autoDetectGap'] == true ||
+        design['autoDetectGap'] == true;
+    final printableWidthDots = (payload['printableWidthDots'] ??
+        capabilities['printableWidthDots']) as int?;
+
     final List<int> bytes;
     if (useCanvas) {
       bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
@@ -624,14 +700,14 @@ class TsplOrderLabelRenderer implements PrintRenderer {
             ? null
             : _decimal(payload['totalAmount'], 0),
         itemsCount: payload['itemsCount'] as int?,
-        widthMm: _integer(capabilities['mediaWidthMm'], 50),
-        heightMm: _integer(capabilities['mediaHeightMm'], 30),
-        gapMm: _integer(capabilities['gapMm'], 2),
-        autoDetectGap: capabilities['autoDetectGap'] == true,
-        dpi: _integer(capabilities['dpi'], 203),
+        widthMm: widthMm,
+        heightMm: heightMm,
+        gapMm: gapMm,
+        autoDetectGap: autoDetectGap,
+        dpi: dpi,
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
-        printableWidthDots: capabilities['printableWidthDots'] as int?,
+        printableWidthDots: printableWidthDots,
         showBusinessName: design['showBusinessName'] != false,
         showCustomerName: design['showCustomerName'] != false,
         showOrderNo: design['showOrderNo'] != false,
@@ -641,7 +717,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         fontSize: design['fontSize']?.toString() ?? 'Orta',
         paginateOnOverflow: design['paginateOnOverflow'] != false,
         businessName: payload['businessName'] as String?,
-        logoBytes: logo != null ? base64Decode(logo) : null,
+        logoBytes: null, // Order labels do not print a logo
       );
     } else {
       bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(
@@ -664,12 +740,12 @@ class TsplOrderLabelRenderer implements PrintRenderer {
             ? null
             : _decimal(payload['totalAmount'], 0),
         itemsCount: payload['itemsCount'] as int?,
-        widthMm: _integer(capabilities['mediaWidthMm'], 50),
-        heightMm: _integer(capabilities['mediaHeightMm'], 30),
-        gapMm: _integer(capabilities['gapMm'], 2),
-        autoDetectGap: capabilities['autoDetectGap'] == true,
-        dpi: _integer(capabilities['dpi'], 203),
-        printableWidthDots: capabilities['printableWidthDots'] as int?,
+        widthMm: widthMm,
+        heightMm: heightMm,
+        gapMm: gapMm,
+        autoDetectGap: autoDetectGap,
+        dpi: dpi,
+        printableWidthDots: printableWidthDots,
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
         showBusinessName: design['showBusinessName'] != false,
@@ -681,7 +757,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         fontSize: design['fontSize']?.toString() ?? 'Orta',
         paginateOnOverflow: design['paginateOnOverflow'] != false,
         businessName: payload['businessName'] as String?,
-        logoBytes: logo != null ? base64Decode(logo) : null,
+        logoBytes: null, // Order labels do not print a logo
       );
     }
     return RenderedPrintDocument(

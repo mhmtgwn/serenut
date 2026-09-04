@@ -231,4 +231,39 @@ void main() {
     expect(output, contains('TOPLAM: TL 120.00'));
     expect(output, contains('Odm: Kismi odendi'));
   });
+
+  test('order renderer strictly adheres to payload printer settings dimensions and ignores logo', () async {
+    final rendered = await TsplOrderLabelRenderer().render(job(
+      kind: PrintDocumentKind.orderLabel,
+      rendererVersion: 'tspl-order-v1',
+      payload: {
+        'orderNo': 'ORD-40MM',
+        'customerName': 'Ölçü Test Müşteri',
+        'productName': '1 Ürün',
+        'quantity': 1,
+        'itemsCount': 1,
+        'totalAmount': 50,
+        'businessName': 'Serenut OS',
+        'labelWidthMm': 40,
+        'labelHeightMm': 30,
+        'labelGapMm': 2,
+        'labelDpi': 203,
+        'logoBytesBase64': base64Encode(utf8.encode('DUMMY_LOGO_BYTES')),
+        'items': [
+          {'product_name': 'Ölçü Test Ürünü', 'quantity': 1, 'unit_price': 50.0},
+        ],
+      },
+      design: const {},
+      capabilities: {
+        'mediaWidthMm': 50, // default in device profile, overridden by payload
+        'mediaHeightMm': 30,
+        'gapMm': 2,
+      },
+    ));
+    final output = latin1.decode(rendered.bytes, allowInvalid: true);
+    expect(output, contains('SIZE 40 mm,30 mm'));
+    // 40 mm @ 203 DPI = 320 dots / 8 = 40 bytes. Must be BITMAP 0,0,40, NOT 48 bytes!
+    expect(output, contains('BITMAP 0,0,40,'));
+    expect(output, isNot(contains('DUMMY_LOGO_BYTES')));
+  });
 }

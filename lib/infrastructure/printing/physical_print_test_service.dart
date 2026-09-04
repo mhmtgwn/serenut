@@ -169,6 +169,5 @@ class PhysicalPrintTestService {
         'totalAmount': 299.95,
         'itemsCount': 1,
         'businessName': 'SERENUT OS',
-        if (logo != null) 'logoBytesBase64': base64Encode(logo),
       };
 }

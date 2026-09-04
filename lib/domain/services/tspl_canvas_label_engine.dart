@@ -49,14 +49,17 @@ class TsplCanvasLabelEngine {
     final requestedHeightMm = heightMm.clamp(15, 150);
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final maxPhysicalDots = safeWidth <= 60 ? math.min(mediaWidthDots, 384) : mediaWidthDots;
-    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 60))
-        ? maxPhysicalDots
-        : printableWidthDots.clamp(140, maxPhysicalDots);
+    final targetDots = (printableWidthDots != null && printableWidthDots > 100)
+        ? math.min(mediaWidthDots, printableWidthDots)
+        : (safeWidth <= 54 ? math.min(mediaWidthDots, 384) : mediaWidthDots);
+    final widthBytes = (targetDots + 7) ~/ 8;
+    final widthDots = widthBytes * 8;
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
-    final paddingX = (widthDots * 0.06).clamp(20.0, 32.0);
-    final usableW = widthDots - (2 * paddingX);
+    final paddingLeft = (widthDots * 0.08).clamp(24.0, 36.0);
+    final paddingRight = (widthDots * 0.10).clamp(32.0, 48.0);
+    final safeRightX = widthDots - paddingRight;
+    final usableW = (safeRightX - paddingLeft).clamp(100.0, 1000.0);
     final topMargin = (heightDots * 0.04).clamp(10.0, 20.0);
     final bottomMargin = (heightDots * 0.08).clamp(24.0, 40.0);
     final maxSafePageY = heightDots - bottomMargin;
@@ -264,7 +267,7 @@ class TsplCanvasLabelEngine {
           )..layout(maxWidth: usableW);
           bizPainter.paint(
             canvas,
-            Offset(((widthDots - bizPainter.width) / 2).clamp(paddingX, widthDots - paddingX), currentY),
+            Offset(((widthDots - bizPainter.width) / 2).clamp(paddingLeft, safeRightX - bizPainter.width), currentY),
           );
           currentY += bizPainter.height + 4.0;
         }
@@ -283,8 +286,8 @@ class TsplCanvasLabelEngine {
               ),
             ),
             textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW * 0.65);
-          orderPainter.paint(canvas, Offset(paddingX, currentY));
+          )..layout(maxWidth: usableW * 0.60);
+          orderPainter.paint(canvas, Offset(paddingLeft, currentY));
 
           if (dateStr.isNotEmpty) {
             final datePainter = TextPainter(
@@ -292,13 +295,13 @@ class TsplCanvasLabelEngine {
                 text: dateStr,
                 style: TextStyle(
                   color: Colors.black,
-                  fontSize: bodyFontSize * 0.95,
+                  fontSize: bodyFontSize * 0.90,
                   fontWeight: FontWeight.normal,
                 ),
               ),
               textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW * 0.45);
-            final dateX = math.max(paddingX, widthDots - paddingX - datePainter.width);
+            )..layout(maxWidth: usableW * 0.40);
+            final dateX = math.max(paddingLeft, safeRightX - datePainter.width);
             datePainter.paint(canvas, Offset(dateX, currentY));
           }
           currentY += math.max(orderPainter.height, bodyFontSize) + 4.0;
@@ -318,7 +321,7 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          custPainter.paint(canvas, Offset(paddingX, currentY));
+          custPainter.paint(canvas, Offset(paddingLeft, currentY));
           currentY += custPainter.height + 2.0;
 
           if (customerPhone != null && customerPhone.trim().isNotEmpty) {
@@ -333,7 +336,7 @@ class TsplCanvasLabelEngine {
               ),
               textDirection: TextDirection.ltr,
             )..layout(maxWidth: usableW);
-            phonePainter.paint(canvas, Offset(paddingX, currentY));
+            phonePainter.paint(canvas, Offset(paddingLeft, currentY));
             currentY += phonePainter.height + 2.0;
           }
         }
@@ -350,12 +353,12 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          debtPainter.paint(canvas, Offset(paddingX, currentY));
+          debtPainter.paint(canvas, Offset(paddingLeft, currentY));
           currentY += debtPainter.height + 2.0;
         }
 
         // Divider
-        canvas.drawLine(Offset(paddingX, currentY + 2), Offset(widthDots - paddingX, currentY + 2), linePaint);
+        canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
         currentY += 6.0;
       } else {
         // Subsequent Pages Header
@@ -371,7 +374,7 @@ class TsplCanvasLabelEngine {
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: usableW * 0.65);
-        contPainter.paint(canvas, Offset(paddingX, currentY));
+        contPainter.paint(canvas, Offset(paddingLeft, currentY));
 
         if (dateStr.isNotEmpty) {
           final datePainter = TextPainter(
@@ -384,24 +387,24 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW * 0.35);
-          final dateX = math.max(paddingX, widthDots - paddingX - datePainter.width);
+          final dateX = math.max(paddingLeft, safeRightX - datePainter.width);
           datePainter.paint(canvas, Offset(dateX, currentY));
         }
         currentY += math.max(contPainter.height, bodyFontSize) + 4.0;
-        canvas.drawLine(Offset(paddingX, currentY + 2), Offset(widthDots - paddingX, currentY + 2), linePaint);
+        canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
         currentY += 6.0;
       }
 
       // Draw Items
       for (final it in pageItems) {
-        it.namePainter.paint(canvas, Offset(paddingX, currentY));
+        it.namePainter.paint(canvas, Offset(paddingLeft, currentY));
         currentY += it.namePainter.height;
-        it.detailPainter.paint(canvas, Offset(paddingX, currentY));
+        it.detailPainter.paint(canvas, Offset(paddingLeft, currentY));
         currentY += it.detailPainter.height + 4.0;
       }
 
       // Divider after items
-      canvas.drawLine(Offset(paddingX, currentY + 2), Offset(widthDots - paddingX, currentY + 2), linePaint);
+      canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
       currentY += 6.0;
 
       if (isLastPage) {
@@ -416,8 +419,8 @@ class TsplCanvasLabelEngine {
             ),
           ),
           textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW * 0.60);
-        payPainter.paint(canvas, Offset(paddingX, currentY));
+        )..layout(maxWidth: usableW * 0.50);
+        payPainter.paint(canvas, Offset(paddingLeft, currentY));
 
         // Total Amount (Bold, right aligned)
         if (showTotalAmount && totalAmount != null) {
@@ -432,7 +435,7 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          final totX = math.max(paddingX, widthDots - paddingX - totPainter.width);
+          final totX = math.max(paddingLeft, safeRightX - totPainter.width);
           totPainter.paint(canvas, Offset(totX, currentY - 2.0));
         }
       } else {
@@ -450,7 +453,7 @@ class TsplCanvasLabelEngine {
         )..layout(maxWidth: usableW);
         contBanner.paint(
           canvas,
-          Offset(((widthDots - contBanner.width) / 2).clamp(paddingX, widthDots - paddingX), currentY + 2),
+          Offset(((widthDots - contBanner.width) / 2).clamp(paddingLeft, safeRightX - contBanner.width), currentY + 2),
         );
       }
 
