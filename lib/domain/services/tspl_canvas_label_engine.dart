@@ -61,7 +61,7 @@ class TsplCanvasLabelEngine {
     final safeRightX = widthDots - paddingRight;
     final usableW = (safeRightX - paddingLeft).clamp(100.0, 1000.0);
     final topMargin = (heightDots * 0.04).clamp(10.0, 20.0);
-    final bottomMargin = (heightDots * 0.08).clamp(24.0, 40.0);
+    final bottomMargin = (heightDots * 0.12).clamp(32.0, 52.0);
     final maxSafePageY = heightDots - bottomMargin;
 
     final fontScale = switch (fontSize) {
@@ -171,19 +171,29 @@ class TsplCanvasLabelEngine {
     final page1HeaderH = measurePage1HeaderHeight();
     final subsequentHeaderH = topMargin + bodyFontSize + 10.0;
     final closingFooterH = (bodyFontSize * 2) + 24.0; // Odm, Toplam, lines
+    final contFooterH = detailFontSize + 18.0; // Divider + >> DEVAMI X. ETIKETTE >>
+
+    // Physical label height limits: for standard 30mm labels, page 1 can fit max 2 items safely.
+    final maxPage1Items = requestedHeightMm <= 35 ? 2 : (requestedHeightMm <= 50 ? 4 : 8);
+    final maxSubsequentItems = requestedHeightMm <= 35 ? 3 : (requestedHeightMm <= 50 ? 6 : 10);
 
     // Multi-page distribution
     final pages = <List<_MeasuredItem>>[];
-    if (!paginateOnOverflow || (itemsList.length <= 3 && (page1HeaderH + measuredItems.fold<double>(0, (s, i) => s + i.totalHeight) + closingFooterH <= maxSafePageY))) {
+    final allItemsTotalH = measuredItems.fold<double>(0, (s, i) => s + i.totalHeight);
+    final canFitSinglePage = itemsList.length <= 2 &&
+        (page1HeaderH + allItemsTotalH + closingFooterH <= maxSafePageY);
+
+    if (!paginateOnOverflow || canFitSinglePage) {
       pages.add(measuredItems);
     } else {
       var itemIdx = 0;
-      final page1Budget = maxSafePageY - page1HeaderH - 8.0;
+      final page1Budget = maxSafePageY - page1HeaderH - contFooterH;
       final page1Items = <_MeasuredItem>[];
       var page1Used = 0.0;
       while (itemIdx < measuredItems.length) {
         final item = measuredItems[itemIdx];
-        if (page1Items.isNotEmpty && (page1Used + item.totalHeight > page1Budget)) {
+        if (page1Items.isNotEmpty &&
+            (page1Items.length >= maxPage1Items || (page1Used + item.totalHeight > page1Budget))) {
           break;
         }
         page1Items.add(item);
@@ -197,14 +207,15 @@ class TsplCanvasLabelEngine {
       pages.add(page1Items);
 
       final subClosingBudget = maxSafePageY - subsequentHeaderH - closingFooterH;
-      final subInterBudget = maxSafePageY - subsequentHeaderH - 8.0;
+      final subInterBudget = maxSafePageY - subsequentHeaderH - contFooterH;
 
       while (itemIdx < measuredItems.length) {
         var remainingH = 0.0;
         for (var i = itemIdx; i < measuredItems.length; i++) {
           remainingH += measuredItems[i].totalHeight;
         }
-        if (remainingH <= subClosingBudget) {
+        final remainingCount = measuredItems.length - itemIdx;
+        if (remainingCount <= maxSubsequentItems && remainingH <= subClosingBudget) {
           pages.add(measuredItems.sublist(itemIdx));
           break;
         }
@@ -213,7 +224,8 @@ class TsplCanvasLabelEngine {
         var interUsed = 0.0;
         while (itemIdx < measuredItems.length) {
           final it = measuredItems[itemIdx];
-          if (inter.isNotEmpty && (interUsed + it.totalHeight > subInterBudget)) {
+          if (inter.isNotEmpty &&
+              (inter.length >= maxSubsequentItems || (interUsed + it.totalHeight > subInterBudget))) {
             break;
           }
           inter.add(it);

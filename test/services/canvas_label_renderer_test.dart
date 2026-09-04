@@ -98,14 +98,43 @@ void main() {
 
     // Verify background polarity: In TSPL 1=white (unburned), 0=black (burned).
     // The majority of bytes must be 0xFF (white background), NOT 0x00 (pitch black).
-    final bitmapPrefix = 'BITMAP 0,0,48,240,0,';
+    const bitmapPrefix = 'BITMAP 0,0,48,240,0,';
     final bitmapIndex = output.indexOf(bitmapPrefix);
     expect(bitmapIndex, isNonNegative);
     final rasterStart = bitmapIndex + bitmapPrefix.length;
     final rasterData = bytes.sublist(rasterStart, rasterStart + (48 * 240));
     final whiteBytes = rasterData.where((b) => b == 0xFF).length;
-    final totalBytes = 48 * 240;
+    const totalBytes = 48 * 240;
     // White background must account for >70% of the label bytes
     expect(whiteBytes / totalBytes, greaterThan(0.70));
+  });
+
+  test('TsplCanvasLabelEngine splits 4 items across multiple pages on 30mm label to prevent gap overflow', () async {
+    final items = [
+      {'product_name': 'Findik Ezmesi 350g', 'quantity': 1.0, 'unit_price': 120.0},
+      {'product_name': 'Kavrulmus Findik 500g', 'quantity': 2.0, 'unit_price': 250.0},
+      {'product_name': 'Cig Findik 1kg', 'quantity': 1.0, 'unit_price': 300.0},
+      {'product_name': 'Findik Unu 250g', 'quantity': 3.0, 'unit_price': 90.0},
+    ];
+
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: '4004',
+      customerName: 'Ahmet Kaya',
+      customerPhone: '0544 333 22 11',
+      productName: '4 Urun',
+      quantity: 1,
+      items: items,
+      totalAmount: 1190.0,
+      widthMm: 50,
+      heightMm: 30,
+      gapMm: 2,
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    // On 30mm label, 4 items must be split into 2 separate label prints so item 4 doesn't bleed into gap
+    final printCount = RegExp(r'PRINT 1,1').allMatches(output).length;
+    final bitmapCount = RegExp(r'BITMAP 0,0,48,').allMatches(output).length;
+    expect(printCount, equals(2));
+    expect(bitmapCount, equals(2));
   });
 }
