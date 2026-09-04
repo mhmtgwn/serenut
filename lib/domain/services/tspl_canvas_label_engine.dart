@@ -128,7 +128,7 @@ class TsplCanvasLabelEngine {
 
       final String detailText;
       if (unitPrice != null && rightTotal.isNotEmpty) {
-        detailText = '  ${qtyStr}x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
+        detailText = '  $qtyStr ad. x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
       } else if (rightTotal.isNotEmpty) {
         detailText = '  $qtyStr adet = $rightTotal';
       } else {
@@ -145,7 +145,7 @@ class TsplCanvasLabelEngine {
           ),
         ),
         textDirection: TextDirection.ltr,
-        maxLines: 1,
+        maxLines: 2,
       )..layout(maxWidth: usableW);
 
       final totalH = namePainter.height + detailPainter.height + 4.0;
@@ -433,10 +433,11 @@ class TsplCanvasLabelEngine {
             ),
           ),
           textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW * 0.50);
+        )..layout(maxWidth: usableW);
         payPainter.paint(canvas, Offset(paddingLeft, currentY));
+        currentY += payPainter.height + 3.0;
 
-        // Total Amount (Bold, right aligned)
+        // Total Amount (Bold, prominent, clearly inside margins)
         if (showTotalAmount && totalAmount != null) {
           final totPainter = TextPainter(
             text: TextSpan(
@@ -449,8 +450,8 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          final totX = math.max(paddingLeft, safeRightX - totPainter.width);
-          totPainter.paint(canvas, Offset(totX, currentY - 2.0));
+          totPainter.paint(canvas, Offset(paddingLeft, currentY));
+          currentY += totPainter.height + 2.0;
         }
       } else {
         // Continuation banner

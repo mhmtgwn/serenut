@@ -38,10 +38,11 @@ class PhysicalPrintTestService {
     required String deviceId,
     required PrintDocumentKind kind,
   }) async {
+    final device = await repository.getDevice(deviceId);
     final job = await repository.enqueueForDevice(
       kind: kind,
       deviceId: deviceId,
-      payloadJson: jsonEncode(await _payloadFor(kind)),
+      payloadJson: jsonEncode(await _payloadFor(kind, device)),
     );
     if (runtime.isRunning) {
       await runtime.processNow();
@@ -126,17 +127,59 @@ class PhysicalPrintTestService {
         if (logo != null) 'logoEscPosBase64': base64Encode(logo),
       };
 
-  Future<Map<String, Object?>> _payloadFor(PrintDocumentKind kind) async {
+  Future<Map<String, Object?>> _payloadFor(
+    PrintDocumentKind kind, [
+    PrinterDeviceProfile? device,
+  ]) async {
     final logo = await assets.loadLogo(null);
+    final capabilities = device?.capabilities ?? const {};
+    final config = device?.transportConfig ?? const {};
+    final widthMm = (capabilities['mediaWidthMm'] as num?)?.toInt() ??
+        (config['labelWidthMm'] as num?)?.toInt() ??
+        50;
+    final heightMm = (capabilities['mediaHeightMm'] as num?)?.toInt() ??
+        (config['labelHeightMm'] as num?)?.toInt() ??
+        30;
+    final gapMm = (capabilities['gapMm'] as num?)?.toInt() ??
+        (config['labelGapMm'] as num?)?.toInt() ??
+        2;
+    final dpi = (capabilities['dpi'] as num?)?.toInt() ??
+        (config['dpi'] as num?)?.toInt() ??
+        203;
+    final printableWidthDots =
+        (capabilities['printableWidthDots'] as num?)?.toInt() ??
+            (config['printableWidthDots'] as num?)?.toInt();
+
     return switch (kind) {
       PrintDocumentKind.receipt => _receiptPayload(
           logo == null ? null : assets.toEscPosRaster(logo, maxWidth: 320)),
-      PrintDocumentKind.productLabel => _labelPayload(logo),
-      PrintDocumentKind.orderLabel => _orderLabelPayload(logo),
+      PrintDocumentKind.productLabel => _labelPayload(
+          logo,
+          widthMm: widthMm,
+          heightMm: heightMm,
+          gapMm: gapMm,
+          dpi: dpi,
+          printableWidthDots: printableWidthDots,
+        ),
+      PrintDocumentKind.orderLabel => _orderLabelPayload(
+          logo,
+          widthMm: widthMm,
+          heightMm: heightMm,
+          gapMm: gapMm,
+          dpi: dpi,
+          printableWidthDots: printableWidthDots,
+        ),
     };
   }
 
-  static Map<String, Object?> _labelPayload(List<int>? logo) {
+  static Map<String, Object?> _labelPayload(
+    List<int>? logo, {
+    int widthMm = 50,
+    int heightMm = 30,
+    int gapMm = 2,
+    int dpi = 203,
+    int? printableWidthDots,
+  }) {
     final label = LabelModel(
       productName: 'Ürününüzün adı',
       businessName: 'SERENUT OS',
@@ -148,11 +191,24 @@ class PhysicalPrintTestService {
     );
     return {
       'labels': [label.toMap()],
+      'labelWidthMm': widthMm,
+      'labelHeightMm': heightMm,
+      'labelGapMm': gapMm,
+      'labelDpi': dpi,
+      if (printableWidthDots != null) 'printableWidthDots': printableWidthDots,
       if (logo != null) 'logoBytesBase64': base64Encode(logo),
     };
   }
 
-  static Map<String, Object?> _orderLabelPayload(List<int>? logo) => {
+  static Map<String, Object?> _orderLabelPayload(
+    List<int>? logo, {
+    int widthMm = 50,
+    int heightMm = 30,
+    int gapMm = 2,
+    int dpi = 203,
+    int? printableWidthDots,
+  }) =>
+      {
         'orderNo': '12345678',
         'customerName': 'Çağrı Yılmaz',
         'productName': 'Sipariş ürünü',
@@ -169,5 +225,10 @@ class PhysicalPrintTestService {
         'totalAmount': 299.95,
         'itemsCount': 1,
         'businessName': 'SERENUT OS',
+        'labelWidthMm': widthMm,
+        'labelHeightMm': heightMm,
+        'labelGapMm': gapMm,
+        'labelDpi': dpi,
+        if (printableWidthDots != null) 'printableWidthDots': printableWidthDots,
       };
 }
