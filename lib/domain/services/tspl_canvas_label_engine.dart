@@ -56,12 +56,14 @@ class TsplCanvasLabelEngine {
     final widthDots = widthBytes * 8;
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
-    final paddingLeft = (widthDots * 0.08).clamp(24.0, 36.0);
-    final paddingRight = (widthDots * 0.10).clamp(32.0, 48.0);
+    // 2.0 mm equal padding on all sides
+    final marginDots = (2.0 * safeDpi / 25.4).roundToDouble();
+    final paddingLeft = marginDots;
+    final paddingRight = marginDots;
     final safeRightX = widthDots - paddingRight;
     final usableW = (safeRightX - paddingLeft).clamp(100.0, 1000.0);
-    final topMargin = (heightDots * 0.04).clamp(10.0, 20.0);
-    final bottomMargin = (heightDots * 0.12).clamp(32.0, 52.0);
+    final topMargin = marginDots;
+    final bottomMargin = marginDots + 4.0; // 2.5 mm bottom edge clearance
     final maxSafePageY = heightDots - bottomMargin;
 
     final fontScale = switch (fontSize) {
