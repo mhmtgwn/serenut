@@ -125,6 +125,8 @@ class _LabelTemplateEditorPageState
         schemaVersion: order.schemaVersion,
         rendererVersion: order.rendererVersion,
         definition: {
+          'useCanvas': true,
+          'engine': 'canvas',
           'showBusinessName': _orderShowBusinessName,
           'showCustomerName': _orderShowCustomerName,
           'showOrderNo': _orderShowOrderNo,

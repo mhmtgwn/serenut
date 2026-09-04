@@ -716,6 +716,8 @@ class DatabaseSchema {
         'kind': 'orderLabel',
         'renderer_version': 'tspl-order-v1',
         'definition': {
+          'useCanvas': true,
+          'engine': 'canvas',
           'showBusinessName': true,
           'showCustomerName': true,
           'showOrderNo': true,

@@ -601,7 +601,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
     final logo = payload['logoBytesBase64'] as String?;
-    final useCanvas = design['useCanvas'] == true || design['engine'] == 'canvas';
+    final useCanvas = design['useCanvas'] != false && design['engine'] != 'legacy';
     final List<int> bytes;
     if (useCanvas) {
       bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
@@ -631,6 +631,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         dpi: _integer(capabilities['dpi'], 203),
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
+        printableWidthDots: capabilities['printableWidthDots'] as int?,
         showBusinessName: design['showBusinessName'] != false,
         showCustomerName: design['showCustomerName'] != false,
         showOrderNo: design['showOrderNo'] != false,

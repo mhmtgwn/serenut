@@ -148,9 +148,8 @@ void main() {
         PrintJobState.awaitingUserCheck);
     final command = String.fromCharCodes(transport.bytes!);
     expect(command, contains('DIRECTION 0'));
-    expect(command, contains('12345678'));
-    expect(command, contains('QRCODE '));
-    expect(command, isNot(contains('BARCODE ')));
+    expect(command, contains('BITMAP 0,0,'));
+    expect(command, contains('PRINT 1,1'));
   });
 }
 

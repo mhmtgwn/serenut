@@ -97,6 +97,7 @@ abstract class IPrinterService implements Listenable {
     List<Map<String, dynamic>> items,
     Settings settings, {
     CustomerEntity? customer,
+    bool useCanvas = false,
   });
 
   Future<void> printShelfLabels(

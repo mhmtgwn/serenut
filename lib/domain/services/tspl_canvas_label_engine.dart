@@ -32,6 +32,7 @@ class TsplCanvasLabelEngine {
     int dpi = 203,
     int direction = 0,
     int copies = 1,
+    int? printableWidthDots,
     bool showBusinessName = true,
     bool showCustomerName = true,
     bool showOrderNo = true,
@@ -47,7 +48,11 @@ class TsplCanvasLabelEngine {
     final safeWidth = widthMm.clamp(20, 120);
     final requestedHeightMm = heightMm.clamp(15, 150);
 
-    final widthDots = (safeWidth * safeDpi / 25.4).round();
+    final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
+    final maxPhysicalDots = safeWidth <= 54 ? math.min(mediaWidthDots, 384) : mediaWidthDots;
+    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 54))
+        ? maxPhysicalDots
+        : printableWidthDots.clamp(140, maxPhysicalDots);
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
     final paddingX = (widthDots * 0.045).clamp(16.0, 32.0);
@@ -288,7 +293,8 @@ class TsplCanvasLabelEngine {
               ),
               textDirection: TextDirection.ltr,
             )..layout(maxWidth: usableW * 0.45);
-            datePainter.paint(canvas, Offset(widthDots - paddingX - datePainter.width, currentY));
+            final dateX = math.max(paddingX, widthDots - paddingX - datePainter.width);
+            datePainter.paint(canvas, Offset(dateX, currentY));
           }
           currentY += math.max(orderPainter.height, bodyFontSize) + 4.0;
         }
@@ -373,7 +379,8 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW * 0.35);
-          datePainter.paint(canvas, Offset(widthDots - paddingX - datePainter.width, currentY));
+          final dateX = math.max(paddingX, widthDots - paddingX - datePainter.width);
+          datePainter.paint(canvas, Offset(dateX, currentY));
         }
         currentY += math.max(contPainter.height, bodyFontSize) + 4.0;
         canvas.drawLine(Offset(paddingX, currentY + 2), Offset(widthDots - paddingX, currentY + 2), linePaint);
@@ -420,7 +427,8 @@ class TsplCanvasLabelEngine {
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          totPainter.paint(canvas, Offset(widthDots - paddingX - totPainter.width, currentY - 2.0));
+          final totX = math.max(paddingX, widthDots - paddingX - totPainter.width);
+          totPainter.paint(canvas, Offset(totX, currentY - 2.0));
         }
       } else {
         // Continuation banner

@@ -19,6 +19,7 @@ import 'package:serenutos/domain/services/i_printer_service.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/services/label_layout_engine.dart';
 import 'package:serenutos/domain/services/tspl_label_layout_engine.dart';
+import 'package:serenutos/domain/services/tspl_canvas_label_engine.dart';
 
 /// Platform-aware printer backend.
 enum PrinterBackend { sunmi, network, bluetooth, usb, none }
@@ -1286,6 +1287,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     List<Map<String, dynamic>> items,
     Settings settings, {
     CustomerEntity? customer,
+    bool useCanvas = false,
   }) async {
     final targetSettings =
         _getSettingsForPurpose(settings, PrinterPurpose.label);
@@ -1319,35 +1321,68 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     final note = firstItem?['note']?.toString() ?? order.notes;
 
     if (isTspl) {
-      allBytes.addAll(TsplLabelLayoutEngine.generateOrderLabelBytes(
-        orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
-        customerName: custName,
-        customerNo: shortCustomerId,
-        productName: summaryName,
-        quantity: summaryQuantity,
-        items: items,
-        note: note,
-        timestamp: order.createdAt,
-        totalAmount: order.totalAmount,
-        previousDebt: previousDebt,
-        paymentStatus: _statusLabel(order.status),
-        itemsCount: items.length,
-        widthMm: settings.labelWidthMm,
-        heightMm: settings.labelHeightMm,
-        gapMm: settings.labelGapMm,
-        autoDetectGap: settings.labelAutoDetectGap,
-        dpi: settings.labelDpi,
-        copies: settings.labelPrinterCopies,
-        showBusinessName: settings.labelOrderShowBusinessName,
-        showCustomerName: settings.labelOrderShowCustomerName,
-        showOrderNo: settings.labelOrderShowOrderNo,
-        showDate: settings.labelOrderShowDate,
-        showTotalAmount: settings.labelOrderShowTotalAmount,
-        showItemsCount: settings.labelOrderShowItemsCount,
-        fontSize: settings.labelOrderFontSize,
-        paginateOnOverflow: false,
-        businessName: settings.businessName,
-      ));
+      if (useCanvas) {
+        allBytes.addAll(await TsplCanvasLabelEngine.generateOrderLabelBytes(
+          orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+          customerName: custName,
+          customerNo: shortCustomerId,
+          productName: summaryName,
+          quantity: summaryQuantity,
+          items: items,
+          note: note,
+          timestamp: order.createdAt,
+          totalAmount: order.totalAmount,
+          previousDebt: previousDebt,
+          paymentStatus: _statusLabel(order.status),
+          itemsCount: items.length,
+          widthMm: settings.labelWidthMm,
+          heightMm: settings.labelHeightMm,
+          gapMm: settings.labelGapMm,
+          autoDetectGap: settings.labelAutoDetectGap,
+          dpi: settings.labelDpi,
+          copies: settings.labelPrinterCopies,
+          printableWidthDots: targetSettings.paperWidth <= 58 ? 384 : null,
+          showBusinessName: settings.labelOrderShowBusinessName,
+          showCustomerName: settings.labelOrderShowCustomerName,
+          showOrderNo: settings.labelOrderShowOrderNo,
+          showDate: settings.labelOrderShowDate,
+          showTotalAmount: settings.labelOrderShowTotalAmount,
+          showItemsCount: settings.labelOrderShowItemsCount,
+          fontSize: settings.labelOrderFontSize,
+          paginateOnOverflow: false,
+          businessName: settings.businessName,
+        ));
+      } else {
+        allBytes.addAll(TsplLabelLayoutEngine.generateOrderLabelBytes(
+          orderIdShort: order.id.length > 8 ? order.id.substring(0, 8) : order.id,
+          customerName: custName,
+          customerNo: shortCustomerId,
+          productName: summaryName,
+          quantity: summaryQuantity,
+          items: items,
+          note: note,
+          timestamp: order.createdAt,
+          totalAmount: order.totalAmount,
+          previousDebt: previousDebt,
+          paymentStatus: _statusLabel(order.status),
+          itemsCount: items.length,
+          widthMm: settings.labelWidthMm,
+          heightMm: settings.labelHeightMm,
+          gapMm: settings.labelGapMm,
+          autoDetectGap: settings.labelAutoDetectGap,
+          dpi: settings.labelDpi,
+          copies: settings.labelPrinterCopies,
+          showBusinessName: settings.labelOrderShowBusinessName,
+          showCustomerName: settings.labelOrderShowCustomerName,
+          showOrderNo: settings.labelOrderShowOrderNo,
+          showDate: settings.labelOrderShowDate,
+          showTotalAmount: settings.labelOrderShowTotalAmount,
+          showItemsCount: settings.labelOrderShowItemsCount,
+          fontSize: settings.labelOrderFontSize,
+          paginateOnOverflow: false,
+          businessName: settings.businessName,
+        ));
+      }
     } else {
       final labelModel = LabelModel(
         productName: summaryName,

@@ -161,7 +161,7 @@ void main() {
     expect(output, isNot(contains('Kod:')));
   });
 
-  test('order renderer creates one aggregate order label', () async {
+  test('order renderer creates order label with canvas by default', () async {
     final rendered = await TsplOrderLabelRenderer().render(job(
       kind: PrintDocumentKind.orderLabel,
       rendererVersion: 'tspl-order-v1',
@@ -182,6 +182,41 @@ void main() {
         ],
       },
       design: const {},
+      capabilities: {
+        'mediaWidthMm': 50,
+        'mediaHeightMm': 30,
+        'gapMm': 2,
+        'dpi': 203,
+      },
+    ));
+    final output = latin1.decode(rendered.bytes, allowInvalid: true);
+    expect(RegExp(r'PRINT 1,1').allMatches(output), hasLength(1));
+    expect(output, contains('DIRECTION 0'));
+    // By default uses canvas with 384-dot (48-byte) clamping
+    expect(output, contains('BITMAP 0,0,48,'));
+  });
+
+  test('order renderer supports legacy engine fallback when requested', () async {
+    final rendered = await TsplOrderLabelRenderer().render(job(
+      kind: PrintDocumentKind.orderLabel,
+      rendererVersion: 'tspl-order-v1',
+      payload: {
+        'orderNo': 'ORD-1',
+        'customerName': 'Müşteri',
+        'customerPhone': '0555 111 22 33',
+        'previousDebt': 245.50,
+        'paymentStatus': 'Kısmi ödendi',
+        'productName': '2 Ürün / Paket',
+        'quantity': 1,
+        'itemsCount': 2,
+        'totalAmount': 120,
+        'businessName': 'Serenut OS',
+        'items': [
+          {'product_name': 'A', 'quantity': 1},
+          {'product_name': 'B', 'quantity': 1},
+        ],
+      },
+      design: const {'engine': 'legacy'},
       capabilities: {
         'mediaWidthMm': 50,
         'mediaHeightMm': 30,

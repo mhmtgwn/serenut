@@ -77,4 +77,23 @@ void main() {
     expect(output, contains('BITMAP 0,0,'));
     expect(output, contains('PRINT 1,1'));
   });
+
+  test('TsplCanvasLabelEngine clamps width to 384 dots (48 bytes) for <=54mm printheads', () async {
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: '2001',
+      customerName: 'Mehmet Demir',
+      productName: 'Fındık',
+      quantity: 1,
+      totalAmount: 150.0,
+      widthMm: 50,
+      heightMm: 30,
+      gapMm: 2,
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    expect(output, contains('SIZE 50 mm,30 mm'));
+    // 384 dots / 8 = 48 bytes. Must be BITMAP 0,0,48,240,0, NOT 50 bytes!
+    expect(output, contains('BITMAP 0,0,48,'));
+    expect(output, contains('PRINT 1,1'));
+  });
 }

@@ -1471,6 +1471,8 @@ class DatabaseMigrations {
         'schema_version': 1,
         'renderer_version': 'tspl-order-v1',
         'definition_json': jsonEncode({
+          'useCanvas': true,
+          'engine': 'canvas',
           'showBusinessName': flag('label_order_show_business_name') == 1,
           'showCustomerName': flag('label_order_show_customer_name') == 1,
           'showOrderNo': flag('label_order_show_order_no') == 1,
