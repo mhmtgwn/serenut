@@ -11,9 +11,9 @@ plugins {
 android {
     namespace = "com.serenut.pos"
     compileSdk = 36
-    // All current native plugins declare NDK 27; use their common highest
+    // All current native plugins declare NDK 28; use their common highest
     // compatible version instead of a machine-specific Flutter default.
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
