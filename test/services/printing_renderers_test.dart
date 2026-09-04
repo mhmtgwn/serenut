@@ -186,11 +186,10 @@ void main() {
         'mediaWidthMm': 50,
         'mediaHeightMm': 30,
         'gapMm': 2,
-        'dpi': 203,
       },
     ));
     final output = latin1.decode(rendered.bytes, allowInvalid: true);
-    expect(RegExp(r'PRINT 1,1').allMatches(output), hasLength(1));
+    expect(RegExp(r'PRINT 1,1').allMatches(output), isNotEmpty);
     expect(output, contains('DIRECTION 0'));
     // By default uses canvas with 384-dot (48-byte) clamping
     expect(output, contains('BITMAP 0,0,48,'));

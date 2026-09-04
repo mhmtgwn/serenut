@@ -49,22 +49,27 @@ class TsplCanvasLabelEngine {
     final requestedHeightMm = heightMm.clamp(15, 150);
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final maxPhysicalDots = safeWidth <= 54 ? math.min(mediaWidthDots, 384) : mediaWidthDots;
-    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 54))
+    final maxPhysicalDots = safeWidth <= 60 ? math.min(mediaWidthDots, 384) : mediaWidthDots;
+    final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 60))
         ? maxPhysicalDots
         : printableWidthDots.clamp(140, maxPhysicalDots);
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
-    final paddingX = (widthDots * 0.045).clamp(16.0, 32.0);
+    final paddingX = (widthDots * 0.06).clamp(20.0, 32.0);
     final usableW = widthDots - (2 * paddingX);
     final topMargin = (heightDots * 0.04).clamp(10.0, 20.0);
     final bottomMargin = (heightDots * 0.08).clamp(24.0, 40.0);
     final maxSafePageY = heightDots - bottomMargin;
 
+    final fontScale = switch (fontSize) {
+      'Küçük' => 0.88,
+      'Büyük' => 1.18,
+      _ => 1.0,
+    };
     final isWide = safeWidth >= 75;
-    final titleFontSize = isWide ? 17.0 : 13.0;
-    final bodyFontSize = isWide ? 13.5 : 10.5;
-    final detailFontSize = isWide ? 12.0 : 9.5;
+    final titleFontSize = (isWide ? 26.0 : 21.0) * fontScale;
+    final bodyFontSize = (isWide ? 21.0 : 17.5) * fontScale;
+    final detailFontSize = (isWide ? 18.0 : 14.5) * fontScale;
 
     final dateStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -461,7 +466,7 @@ class TsplCanvasLabelEngine {
 
         for (var y = 0; y < heightDots; y++) {
           for (var byteCol = 0; byteCol < widthBytes; byteCol++) {
-            var b = 0;
+            var b = 0xFF; // In TSPL BITMAP: 1 = white paper (unburned), 0 = black dot (burned)
             for (var bit = 0; bit < 8; bit++) {
               final px = byteCol * 8 + bit;
               if (px < widthDots) {
@@ -471,7 +476,8 @@ class TsplCanvasLabelEngine {
                 final bChannel = (pixel >> 16) & 0xFF;
                 final lum = (r * 77 + g * 150 + bChannel * 29) >> 8;
                 if (lum < 160) {
-                  b |= (0x80 >> bit);
+                  // Dark pixel (text, graphics): clear bit to 0
+                  b &= ~(0x80 >> bit);
                 }
               }
             }

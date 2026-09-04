@@ -78,7 +78,7 @@ void main() {
     expect(output, contains('PRINT 1,1'));
   });
 
-  test('TsplCanvasLabelEngine clamps width to 384 dots (48 bytes) for <=54mm printheads', () async {
+  test('TsplCanvasLabelEngine clamps width to 384 dots (48 bytes) for <=54mm printheads and inverts polarity for TSPL', () async {
     final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
       orderIdShort: '2001',
       customerName: 'Mehmet Demir',
@@ -95,5 +95,17 @@ void main() {
     // 384 dots / 8 = 48 bytes. Must be BITMAP 0,0,48,240,0, NOT 50 bytes!
     expect(output, contains('BITMAP 0,0,48,'));
     expect(output, contains('PRINT 1,1'));
+
+    // Verify background polarity: In TSPL 1=white (unburned), 0=black (burned).
+    // The majority of bytes must be 0xFF (white background), NOT 0x00 (pitch black).
+    final bitmapPrefix = 'BITMAP 0,0,48,240,0,';
+    final bitmapIndex = output.indexOf(bitmapPrefix);
+    expect(bitmapIndex, isNonNegative);
+    final rasterStart = bitmapIndex + bitmapPrefix.length;
+    final rasterData = bytes.sublist(rasterStart, rasterStart + (48 * 240));
+    final whiteBytes = rasterData.where((b) => b == 0xFF).length;
+    final totalBytes = 48 * 240;
+    // White background must account for >70% of the label bytes
+    expect(whiteBytes / totalBytes, greaterThan(0.70));
   });
 }
