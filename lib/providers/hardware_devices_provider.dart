@@ -182,6 +182,12 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
   Future<void> save(HardwareDevice device) async {
     if (_isPrinter(device)) {
       await _savePrinter(device, createRouteWhenMissing: true);
+      if (device.enabled) {
+        for (final kind in _documentKinds(device.type)) {
+          await _savePrinterRoute(kind, device.id);
+        }
+      }
+      await _syncLegacy(device);
       state = AsyncData(await _loadAll());
       await _backupRemoteProfile(state.requireValue);
       return;

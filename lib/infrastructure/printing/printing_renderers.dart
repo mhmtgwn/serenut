@@ -558,44 +558,54 @@ class TsplProductLabelRenderer implements PrintRenderer {
     final payload = _map(job.payloadJson);
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
+    final transport = _map(job.transportSnapshotJson);
+    final transportConfig = (transport['config'] as Map?)?.cast<String, Object?>() ?? const {};
     final logo = payload['logoBytesBase64'] as String?;
-    final widthMm = _integer(
-      payload['labelWidthMm'] ??
-          payload['widthMm'] ??
-          capabilities['mediaWidthMm'] ??
+    final capWidth = _integer(
+      capabilities['mediaWidthMm'] ??
           capabilities['labelWidthMm'] ??
-          capabilities['paperWidthMm'] ??
-          design['widthMm'],
-      50,
+          transportConfig['labelWidthMm'],
+      0,
     );
-    final heightMm = _integer(
-      payload['labelHeightMm'] ??
-          payload['heightMm'] ??
-          capabilities['mediaHeightMm'] ??
+    final capHeight = _integer(
+      capabilities['mediaHeightMm'] ??
           capabilities['labelHeightMm'] ??
-          design['heightMm'],
-      30,
+          transportConfig['labelHeightMm'],
+      0,
     );
+    final rawWidth = _integer(payload['labelWidthMm'] ?? payload['widthMm'], 0);
+    final rawHeight = _integer(payload['labelHeightMm'] ?? payload['heightMm'], 0);
+
+    final widthMm = (capWidth > 0 && capWidth != 50)
+        ? capWidth
+        : (rawWidth > 0 ? rawWidth : (capWidth > 0 ? capWidth : _integer(design['widthMm'], 50)));
+    final heightMm = (capHeight > 0 && capHeight != 30)
+        ? capHeight
+        : (rawHeight > 0 ? rawHeight : (capHeight > 0 ? capHeight : _integer(design['heightMm'], 30)));
     final gapMm = _integer(
-      payload['labelGapMm'] ??
-          payload['gapMm'] ??
-          capabilities['gapMm'] ??
+      capabilities['gapMm'] ??
           capabilities['labelGapMm'] ??
+          transportConfig['labelGapMm'] ??
+          payload['labelGapMm'] ??
+          payload['gapMm'] ??
           design['gapMm'],
       2,
     );
     final dpi = _integer(
-      payload['labelDpi'] ??
+      capabilities['dpi'] ??
+          transportConfig['dpi'] ??
+          payload['labelDpi'] ??
           payload['dpi'] ??
-          capabilities['dpi'] ??
           design['dpi'],
       203,
     );
     final autoDetectGap = payload['autoDetectGap'] == true ||
         capabilities['autoDetectGap'] == true ||
+        transportConfig['autoDetectLabelGap'] == true ||
         design['autoDetectGap'] == true;
-    final printableWidthDots = (payload['printableWidthDots'] ??
-        capabilities['printableWidthDots']) as int?;
+    final printableWidthDots = (capabilities['printableWidthDots'] ??
+        transportConfig['printableWidthDots'] ??
+        payload['printableWidthDots']) as int?;
 
     final bytes = <int>[];
     var isFirstLabel = true;
@@ -638,45 +648,55 @@ class TsplOrderLabelRenderer implements PrintRenderer {
     final payload = _map(job.payloadJson);
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
+    final transport = _map(job.transportSnapshotJson);
+    final transportConfig = (transport['config'] as Map?)?.cast<String, Object?>() ?? const {};
     final useCanvas = design['useCanvas'] != false && design['engine'] != 'legacy';
 
-    final widthMm = _integer(
-      payload['labelWidthMm'] ??
-          payload['widthMm'] ??
-          capabilities['mediaWidthMm'] ??
+    final capWidth = _integer(
+      capabilities['mediaWidthMm'] ??
           capabilities['labelWidthMm'] ??
-          capabilities['paperWidthMm'] ??
-          design['widthMm'],
-      50,
+          transportConfig['labelWidthMm'],
+      0,
     );
-    final heightMm = _integer(
-      payload['labelHeightMm'] ??
-          payload['heightMm'] ??
-          capabilities['mediaHeightMm'] ??
+    final capHeight = _integer(
+      capabilities['mediaHeightMm'] ??
           capabilities['labelHeightMm'] ??
-          design['heightMm'],
-      30,
+          transportConfig['labelHeightMm'],
+      0,
     );
+    final rawWidth = _integer(payload['labelWidthMm'] ?? payload['widthMm'], 0);
+    final rawHeight = _integer(payload['labelHeightMm'] ?? payload['heightMm'], 0);
+
+    final widthMm = (capWidth > 0 && capWidth != 50)
+        ? capWidth
+        : (rawWidth > 0 ? rawWidth : (capWidth > 0 ? capWidth : _integer(design['widthMm'], 50)));
+    final heightMm = (capHeight > 0 && capHeight != 30)
+        ? capHeight
+        : (rawHeight > 0 ? rawHeight : (capHeight > 0 ? capHeight : _integer(design['heightMm'], 30)));
     final gapMm = _integer(
-      payload['labelGapMm'] ??
-          payload['gapMm'] ??
-          capabilities['gapMm'] ??
+      capabilities['gapMm'] ??
           capabilities['labelGapMm'] ??
+          transportConfig['labelGapMm'] ??
+          payload['labelGapMm'] ??
+          payload['gapMm'] ??
           design['gapMm'],
       2,
     );
     final dpi = _integer(
-      payload['labelDpi'] ??
+      capabilities['dpi'] ??
+          transportConfig['dpi'] ??
+          payload['labelDpi'] ??
           payload['dpi'] ??
-          capabilities['dpi'] ??
           design['dpi'],
       203,
     );
     final autoDetectGap = payload['autoDetectGap'] == true ||
         capabilities['autoDetectGap'] == true ||
+        transportConfig['autoDetectLabelGap'] == true ||
         design['autoDetectGap'] == true;
-    final printableWidthDots = (payload['printableWidthDots'] ??
-        capabilities['printableWidthDots']) as int?;
+    final printableWidthDots = (capabilities['printableWidthDots'] ??
+        transportConfig['printableWidthDots'] ??
+        payload['printableWidthDots']) as int?;
 
     final List<int> bytes;
     if (useCanvas) {
@@ -708,7 +728,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
         printableWidthDots: printableWidthDots,
-        showBusinessName: design['showBusinessName'] != false,
+        showBusinessName: false, // Sipariş etiketinde firma adı gösterilmez
         showCustomerName: design['showCustomerName'] != false,
         showOrderNo: design['showOrderNo'] != false,
         showDate: design['showDate'] != false,
@@ -716,7 +736,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         showItemsCount: design['showItemsCount'] != false,
         fontSize: design['fontSize']?.toString() ?? 'Orta',
         paginateOnOverflow: design['paginateOnOverflow'] != false,
-        businessName: payload['businessName'] as String?,
+        businessName: null,
         logoBytes: null, // Order labels do not print a logo
       );
     } else {
@@ -748,7 +768,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         printableWidthDots: printableWidthDots,
         direction: _integer(capabilities['direction'], 0),
         copies: 1,
-        showBusinessName: design['showBusinessName'] != false,
+        showBusinessName: false, // Sipariş etiketinde firma adı gösterilmez
         showCustomerName: design['showCustomerName'] != false,
         showOrderNo: design['showOrderNo'] != false,
         showDate: design['showDate'] != false,
@@ -756,7 +776,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         showItemsCount: design['showItemsCount'] != false,
         fontSize: design['fontSize']?.toString() ?? 'Orta',
         paginateOnOverflow: design['paginateOnOverflow'] != false,
-        businessName: payload['businessName'] as String?,
+        businessName: null,
         logoBytes: null, // Order labels do not print a logo
       );
     }

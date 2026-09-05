@@ -618,10 +618,6 @@ class _LabelTemplateEditorPageState
     final previewWidth = (_labelWidthMm * 4.8).clamp(240.0, 440.0);
     final previewHeight = (previewWidth / aspect).clamp(130.0, 480.0);
 
-    final hasCustomBizName = _orderShowBusinessName &&
-        bizName.trim().isNotEmpty &&
-        !bizName.toUpperCase().contains('SERENUT');
-
     return Center(
       child: Container(
         width: previewWidth,
@@ -645,20 +641,6 @@ class _LabelTemplateEditorPageState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sipariş etiketinde logo gösterilmez; Serenut yazısı kaldırıldı, sadece özel işletme adı varsa gösterilir
-              if (hasCustomBizName) ...[
-                Center(
-                  child: Text(
-                    bizName.toUpperCase(),
-                    style: GoogleFonts.inter(
-                      fontSize: (12 * scale).clamp(9.0, 18.0),
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                const Divider(height: 8, thickness: 0.5),
-              ],
               // Sipariş No ve Tarih / Saat yan yana aynı satırda
               if (_orderShowOrderNo || _orderShowDate) ...[
                 Row(

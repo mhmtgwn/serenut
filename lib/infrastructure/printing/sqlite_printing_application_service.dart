@@ -151,6 +151,24 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     // only show genuine PREVIOUS debt that existed prior to this order.
     final calculatedPreviousDebt = math.max(0.0, currentDebt - orderUnpaid);
 
+    final route = await repository.getRoute(PrintDocumentKind.orderLabel);
+    final device = route != null ? await repository.getDevice(route.deviceId) : null;
+    final widthMm = (device?.capabilities['mediaWidthMm'] as num?)?.toInt() ??
+        (device?.transportConfig['labelWidthMm'] as num?)?.toInt() ??
+        settings.labelWidthMm;
+    final heightMm = (device?.capabilities['mediaHeightMm'] as num?)?.toInt() ??
+        (device?.transportConfig['labelHeightMm'] as num?)?.toInt() ??
+        settings.labelHeightMm;
+    final gapMm = (device?.capabilities['gapMm'] as num?)?.toInt() ??
+        (device?.transportConfig['labelGapMm'] as num?)?.toInt() ??
+        settings.labelGapMm;
+    final dpi = (device?.capabilities['dpi'] as num?)?.toInt() ??
+        (device?.transportConfig['dpi'] as num?)?.toInt() ??
+        settings.labelDpi;
+    final autoDetectGap = (device?.capabilities['autoDetectGap'] as bool?) ??
+        (device?.transportConfig['autoDetectLabelGap'] as bool?) ??
+        settings.labelAutoDetectGap;
+
     return _enqueue(
         PrintDocumentKind.orderLabel,
         {
@@ -171,12 +189,12 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'totalAmount': order.totalAmount,
           'paymentStatus': resolvedPaymentStatus,
           'itemsCount': items.length,
-          'businessName': settings.businessName,
-          'labelWidthMm': settings.labelWidthMm,
-          'labelHeightMm': settings.labelHeightMm,
-          'labelGapMm': settings.labelGapMm,
-          'labelDpi': settings.labelDpi,
-          'autoDetectGap': settings.labelAutoDetectGap,
+          'businessName': null, // Sipariş etiketinde işletme adına gerek yoktur
+          'labelWidthMm': widthMm,
+          'labelHeightMm': heightMm,
+          'labelGapMm': gapMm,
+          'labelDpi': dpi,
+          'autoDetectGap': autoDetectGap,
         },
         copies: copies);
   }
@@ -185,6 +203,24 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
   Future<List<PrintJobRecord>> queueProductLabels(
       List<ProductEntity> products, Settings settings,
       {int copies = 1}) async {
+    final route = await repository.getRoute(PrintDocumentKind.productLabel);
+    final device = route != null ? await repository.getDevice(route.deviceId) : null;
+    final widthMm = (device?.capabilities['mediaWidthMm'] as num?)?.toInt() ??
+        (device?.transportConfig['labelWidthMm'] as num?)?.toInt() ??
+        settings.labelWidthMm;
+    final heightMm = (device?.capabilities['mediaHeightMm'] as num?)?.toInt() ??
+        (device?.transportConfig['labelHeightMm'] as num?)?.toInt() ??
+        settings.labelHeightMm;
+    final gapMm = (device?.capabilities['gapMm'] as num?)?.toInt() ??
+        (device?.transportConfig['labelGapMm'] as num?)?.toInt() ??
+        settings.labelGapMm;
+    final dpi = (device?.capabilities['dpi'] as num?)?.toInt() ??
+        (device?.transportConfig['dpi'] as num?)?.toInt() ??
+        settings.labelDpi;
+    final autoDetectGap = (device?.capabilities['autoDetectGap'] as bool?) ??
+        (device?.transportConfig['autoDetectLabelGap'] as bool?) ??
+        settings.labelAutoDetectGap;
+
     final logo = await assets.loadLogo(settings.businessLogo);
     final jobs = <PrintJobRecord>[];
     for (final product in products) {
@@ -204,11 +240,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           PrintDocumentKind.productLabel,
           {
             'labels': [label.toMap()],
-            'labelWidthMm': settings.labelWidthMm,
-            'labelHeightMm': settings.labelHeightMm,
-            'labelGapMm': settings.labelGapMm,
-            'labelDpi': settings.labelDpi,
-            'autoDetectGap': settings.labelAutoDetectGap,
+            'labelWidthMm': widthMm,
+            'labelHeightMm': heightMm,
+            'labelGapMm': gapMm,
+            'labelDpi': dpi,
+            'autoDetectGap': autoDetectGap,
             if (logo != null) 'logoBytesBase64': base64Encode(logo),
           },
           copies: copies));

@@ -224,7 +224,7 @@ class PhysicalPrintTestService {
         'timestamp': DateTime.utc(2026, 8, 4, 12, 34).toIso8601String(),
         'totalAmount': 299.95,
         'itemsCount': 1,
-        'businessName': 'SERENUT OS',
+        'businessName': null, // Sipariş etiketinde işletme adı gösterilmez
         'labelWidthMm': widthMm,
         'labelHeightMm': heightMm,
         'labelGapMm': gapMm,

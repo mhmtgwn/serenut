@@ -317,10 +317,6 @@ class TsplLabelLayoutEngine {
     final timeStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
         : '';
-    final hasCustomBizName = showBusinessName &&
-        businessName != null &&
-        businessName.trim().isNotEmpty &&
-        !businessName.trim().toUpperCase().contains('SERENUT');
     final hasOrderNo = showOrderNo && orderIdShort.trim().isNotEmpty;
     final hasDate = showDate && timeStr.isNotEmpty;
 
@@ -333,9 +329,6 @@ class TsplLabelLayoutEngine {
 
     // ── Pre-calculate Exact Dot Height ──
     int calculatedDots = topGapMargin;
-    if (hasCustomBizName) {
-      calculatedDots += sy(24);
-    }
     if (hasOrderNo || hasDate) {
       calculatedDots += rowHeight;
     }
@@ -452,7 +445,6 @@ class TsplLabelLayoutEngine {
     }
 
     final page1HeaderHeight = topGapMargin +
-        (hasCustomBizName ? (sy(22) + sy(2)) : 0) +
         ((hasOrderNo || hasDate) ? rowHeight : 0) +
         (showCustomerName ? (rowHeight + (phoneClean.isNotEmpty ? rowHeight : 0)) : 0) +
         (previousDebt > 0.001 ? rowHeight : 0) +
@@ -563,27 +555,6 @@ class TsplLabelLayoutEngine {
         var currentY = topGapMargin;
 
         if (pageIdx == 0) {
-          if (hasCustomBizName) {
-            final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
-            final layout = _widestTextLayout(
-              bizText,
-              usableW,
-              maxHeight: (labelHeightDots * 0.14).clamp(10, 24).round(),
-            );
-            final bizX = ((widthDots - layout.width) / 2)
-                .round()
-                .clamp(paddingX, widthDots - paddingX);
-            commands.boldText(
-              bizX,
-              currentY,
-              layout.font,
-              layout.xMultiplier,
-              layout.yMultiplier,
-              bizText,
-            );
-            currentY += layout.height + sy(2);
-          }
-
           final page1OrderNo =
               _fit(orderIdShort, (availableOrderChars - 8).clamp(3, 22));
           if (hasOrderNo && hasDate) {
@@ -743,27 +714,6 @@ class TsplLabelLayoutEngine {
         ..writeln('CLS');
 
       var currentY = topGapMargin;
-
-      if (hasCustomBizName) {
-        final bizText = _fit(_ascii(businessName.trim()), maxBodyChars);
-        final layout = _widestTextLayout(
-          bizText,
-          usableW,
-          maxHeight: (heightDots * 0.14).clamp(10, 24).round(),
-        );
-        final bizX = ((widthDots - layout.width) / 2)
-            .round()
-            .clamp(paddingX, widthDots - paddingX);
-        commands.boldText(
-          bizX,
-          currentY,
-          layout.font,
-          layout.xMultiplier,
-          layout.yMultiplier,
-          bizText,
-        );
-        currentY += layout.height + sy(2);
-      }
 
       final safeOrderNo =
           _fit(orderIdShort, (availableOrderChars - 5).clamp(3, 25));

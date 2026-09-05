@@ -986,8 +986,15 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelCopies = TextEditingController(
       text: config['copies']?.toString() ?? '1',
     );
+    final initialWidth = int.tryParse(config['labelWidthMm']?.toString() ?? '') ?? 50;
+    final initialDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
+    final defaultDots = (initialWidth * initialDpi / 25.4).round();
+    final rawDots = int.tryParse(config['printableWidthDots']?.toString() ?? '');
+    final initialPrintableDots = (rawDots != null && (rawDots != 384 || initialWidth <= 54))
+        ? rawDots
+        : defaultDots;
     _printableWidthDots = TextEditingController(
-      text: config['printableWidthDots']?.toString() ?? '384',
+      text: initialPrintableDots.toString(),
     );
     _vendor = config['vendor']?.toString() ?? 'generic';
     _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
@@ -2250,7 +2257,12 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
         'autoDetectLabelGap': _labelLanguage == 'tspl' && _autoDetectLabelGap,
         'dpi': _labelDpi,
-        'printableWidthDots': int.tryParse(_printableWidthDots.text) ?? 384,
+        'printableWidthDots': () {
+          final resolvedWidth = int.tryParse(_labelWidth.text) ?? 50;
+          final calcDots = (resolvedWidth * _labelDpi / 25.4).round();
+          final rawDots = int.tryParse(_printableWidthDots.text) ?? calcDots;
+          return (rawDots == 384 && resolvedWidth > 54) ? calcDots : rawDots;
+        }(),
         'printDirection': _printDirection,
         'copies': int.tryParse(_labelCopies.text) ?? 1,
         'autoCut': _autoCut,

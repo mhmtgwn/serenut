@@ -266,4 +266,38 @@ void main() {
     expect(output, contains('BITMAP 0,0,40,'));
     expect(output, isNot(contains('DUMMY_LOGO_BYTES')));
   });
+
+  test('order renderer adheres to 80x40 printer capability dimensions and completely omits businessName Nutopia', () async {
+    final rendered = await TsplOrderLabelRenderer().render(job(
+      kind: PrintDocumentKind.orderLabel,
+      rendererVersion: 'tspl-order-v1',
+      payload: {
+        'orderNo': 'ORD-8040',
+        'customerName': 'Ahmet Yılmaz',
+        'customerPhone': '0538 000 00 00',
+        'productName': '1 Ürün',
+        'quantity': 2,
+        'itemsCount': 1,
+        'totalAmount': 240,
+        'businessName': 'Nutopia',
+        'items': [
+          {'product_name': 'Kavrulmuş Fındık 500g', 'quantity': 2, 'unit_price': 120.0},
+        ],
+      },
+      design: const {},
+      capabilities: {
+        'mediaWidthMm': 80,
+        'mediaHeightMm': 40,
+        'gapMm': 2,
+        'dpi': 203,
+      },
+    ));
+    final output = latin1.decode(rendered.bytes, allowInvalid: true);
+    expect(output, contains('SIZE 80 mm,40 mm'));
+    // 80 mm @ 203 DPI = 640 dots / 8 = 80 bytes. Must be BITMAP 0,0,80,320,0
+    expect(output, contains('BITMAP 0,0,80,320,0,'));
+    expect(output, isNot(contains('Nutopia')));
+    expect(output, isNot(contains('NUTOPIA')));
+    expect(output, contains('PRINT 1,1'));
+  });
 }

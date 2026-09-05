@@ -49,10 +49,12 @@ class TsplCanvasLabelEngine {
     final requestedHeightMm = heightMm.clamp(15, 150);
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final targetDots = (printableWidthDots != null && printableWidthDots > 100)
+    final effectivePrintableDots = (printableWidthDots != null &&
+            printableWidthDots > 100 &&
+            !(safeWidth >= 60 && printableWidthDots <= 450))
         ? math.min(mediaWidthDots, printableWidthDots)
         : (safeWidth <= 54 ? math.min(mediaWidthDots, 384) : mediaWidthDots);
-    final widthBytes = (targetDots + 7) ~/ 8;
+    final widthBytes = (effectivePrintableDots + 7) ~/ 8;
     final widthDots = widthBytes * 8;
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
@@ -71,19 +73,14 @@ class TsplCanvasLabelEngine {
       'Büyük' => 1.18,
       _ => 1.0,
     };
-    final isWide = safeWidth >= 75;
-    final titleFontSize = (isWide ? 26.0 : 21.0) * fontScale;
-    final bodyFontSize = (isWide ? 21.0 : 17.5) * fontScale;
-    final detailFontSize = (isWide ? 18.0 : 14.5) * fontScale;
+    final isWide = safeWidth >= 70;
+    final titleFontSize = (isWide ? 28.0 : 21.0) * fontScale;
+    final bodyFontSize = (isWide ? 23.0 : 17.5) * fontScale;
+    final detailFontSize = (isWide ? 20.0 : 14.5) * fontScale;
 
     final dateStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
         : '';
-
-    final hasCustomBizName = showBusinessName &&
-        businessName != null &&
-        businessName.trim().isNotEmpty &&
-        !businessName.trim().toUpperCase().contains('SERENUT');
 
     final List<Map<String, dynamic>> itemsList;
     if (items != null && items.isNotEmpty) {
@@ -157,7 +154,6 @@ class TsplCanvasLabelEngine {
     // Measure Header Heights
     double measurePage1HeaderHeight() {
       var h = topMargin;
-      if (hasCustomBizName) h += titleFontSize + 6.0;
       if (showOrderNo || showDate) h += bodyFontSize + 6.0;
       if (showCustomerName) {
         h += bodyFontSize + 4.0;
@@ -182,7 +178,7 @@ class TsplCanvasLabelEngine {
     // Multi-page distribution
     final pages = <List<_MeasuredItem>>[];
     final allItemsTotalH = measuredItems.fold<double>(0, (s, i) => s + i.totalHeight);
-    final canFitSinglePage = itemsList.length <= 2 &&
+    final canFitSinglePage = itemsList.length <= maxPage1Items &&
         (page1HeaderH + allItemsTotalH + closingFooterH <= maxSafePageY);
 
     if (!paginateOnOverflow || canFitSinglePage) {
@@ -263,29 +259,17 @@ class TsplCanvasLabelEngine {
         ..color = Colors.black
         ..strokeWidth = isWide ? 2.0 : 1.5;
 
+      final pageItemsTotalH = pageItems.fold<double>(0, (s, i) => s + i.totalHeight);
+      final headerH = isFirstPage ? page1HeaderH : subsequentHeaderH;
+      final footerH = isLastPage ? closingFooterH : contFooterH;
+      final estTotalH = headerH + pageItemsTotalH + footerH;
+      final slack = math.max(0.0, maxSafePageY - estTotalH);
+      final sectionSlack = (slack * 0.12).clamp(0.0, 10.0);
+      final itemSlack = (slack * 0.08).clamp(0.0, 6.0);
+
       var currentY = topMargin;
 
       if (isFirstPage) {
-        // Business Name
-        if (hasCustomBizName) {
-          final bizPainter = TextPainter(
-            text: TextSpan(
-              text: businessName.trim(),
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: titleFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW);
-          bizPainter.paint(
-            canvas,
-            Offset(((widthDots - bizPainter.width) / 2).clamp(paddingLeft, safeRightX - bizPainter.width), currentY),
-          );
-          currentY += bizPainter.height + 4.0;
-        }
-
         // Order No & Date
         final pageSuffix = totalPagesCount > 1 ? ' (1/$totalPagesCount)' : '';
         if (showOrderNo || showDate) {
@@ -318,7 +302,7 @@ class TsplCanvasLabelEngine {
             final dateX = math.max(paddingLeft, safeRightX - datePainter.width);
             datePainter.paint(canvas, Offset(dateX, currentY));
           }
-          currentY += math.max(orderPainter.height, bodyFontSize) + 4.0;
+          currentY += math.max(orderPainter.height, bodyFontSize) + 4.0 + sectionSlack;
         }
 
         // Customer & Phone
@@ -353,6 +337,7 @@ class TsplCanvasLabelEngine {
             phonePainter.paint(canvas, Offset(paddingLeft, currentY));
             currentY += phonePainter.height + 2.0;
           }
+          currentY += sectionSlack;
         }
 
         if (previousDebt > 0.001) {
@@ -373,7 +358,7 @@ class TsplCanvasLabelEngine {
 
         // Divider
         canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
-        currentY += 6.0;
+        currentY += 6.0 + sectionSlack;
       } else {
         // Subsequent Pages Header
         final contTitle = 'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
@@ -406,7 +391,7 @@ class TsplCanvasLabelEngine {
         }
         currentY += math.max(contPainter.height, bodyFontSize) + 4.0;
         canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
-        currentY += 6.0;
+        currentY += 6.0 + sectionSlack;
       }
 
       // Draw Items
@@ -414,31 +399,53 @@ class TsplCanvasLabelEngine {
         it.namePainter.paint(canvas, Offset(paddingLeft, currentY));
         currentY += it.namePainter.height;
         it.detailPainter.paint(canvas, Offset(paddingLeft, currentY));
-        currentY += it.detailPainter.height + 4.0;
+        currentY += it.detailPainter.height + 4.0 + itemSlack;
       }
 
       // Divider after items
       canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
-      currentY += 6.0;
+      currentY += 6.0 + sectionSlack;
 
       if (isLastPage) {
-        // Payment status
-        final payPainter = TextPainter(
-          text: TextSpan(
-            text: 'Ödeme: $paymentStatus',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: bodyFontSize,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW);
-        payPainter.paint(canvas, Offset(paddingLeft, currentY));
-        currentY += payPainter.height + 3.0;
+        // Distribute remaining slack so the footer is nicely anchored and bottom void is eliminated
+        final remainingSlack = math.max(0.0, maxSafePageY - currentY - closingFooterH);
+        if (remainingSlack > 4.0) {
+          currentY += (remainingSlack * 0.75).clamp(0.0, 60.0);
+        }
 
-        // Total Amount (Bold, prominent, clearly inside margins)
-        if (showTotalAmount && totalAmount != null) {
+        // Order Note
+        if (note != null && note.trim().isNotEmpty) {
+          final notePainter = TextPainter(
+            text: TextSpan(
+              text: 'Not: ${note.trim()}',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: detailFontSize,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+            maxLines: 2,
+          )..layout(maxWidth: usableW);
+          notePainter.paint(canvas, Offset(paddingLeft, currentY));
+          currentY += notePainter.height + 4.0;
+        }
+
+        // Payment status & Total Amount (Horizontal split on wide labels)
+        if (isWide && showTotalAmount && totalAmount != null) {
+          final payPainter = TextPainter(
+            text: TextSpan(
+              text: 'Ödeme: $paymentStatus',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW * 0.45);
+          payPainter.paint(canvas, Offset(paddingLeft, currentY));
+
           final totPainter = TextPainter(
             text: TextSpan(
               text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
@@ -449,9 +456,40 @@ class TsplCanvasLabelEngine {
               ),
             ),
             textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW * 0.55);
+          final totX = math.max(paddingLeft, safeRightX - totPainter.width);
+          totPainter.paint(canvas, Offset(totX, currentY - 2.0));
+          currentY += math.max(payPainter.height, totPainter.height) + 2.0;
+        } else {
+          final payPainter = TextPainter(
+            text: TextSpan(
+              text: 'Ödeme: $paymentStatus',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          totPainter.paint(canvas, Offset(paddingLeft, currentY));
-          currentY += totPainter.height + 2.0;
+          payPainter.paint(canvas, Offset(paddingLeft, currentY));
+          currentY += payPainter.height + 3.0;
+
+          if (showTotalAmount && totalAmount != null) {
+            final totPainter = TextPainter(
+              text: TextSpan(
+                text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: usableW);
+            totPainter.paint(canvas, Offset(paddingLeft, currentY));
+            currentY += totPainter.height + 2.0;
+          }
         }
       } else {
         // Continuation banner
