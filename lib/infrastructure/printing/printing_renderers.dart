@@ -738,6 +738,8 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         paginateOnOverflow: design['paginateOnOverflow'] != false,
         businessName: null,
         logoBytes: null, // Order labels do not print a logo
+        qrData: payload['qrData']?.toString() ?? payload['orderNo']?.toString(),
+        showQrCode: design['showQrCode'] != false,
       );
     } else {
       bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(

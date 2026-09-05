@@ -42,6 +42,29 @@ function parseUA(ua) {
   return os ? `${browser} / ${os}` : browser;
 }
 
+function formatDevicePlatform(platform, osVersion) {
+  const p = String(platform || '').toLowerCase();
+  let icon = '💻';
+  let title = 'Bilinmiyor';
+  if (p.includes('windows')) {
+    icon = '🪟';
+    title = 'Windows';
+  } else if (p.includes('android')) {
+    icon = '📱';
+    title = 'Android';
+  } else if (p.includes('linux')) {
+    icon = '🐧';
+    title = 'Linux';
+  } else if (p.includes('mac') || p.includes('ios')) {
+    icon = '🍎';
+    title = 'Apple';
+  } else if (platform && platform !== 'unknown' && platform !== '—') {
+    title = platform;
+  }
+  const osText = (osVersion && osVersion !== '—' && osVersion !== 'null') ? osVersion : (title !== 'Bilinmiyor' ? `${title} İşletim Sistemi` : 'İşletim sistemi bilgisi yok');
+  return `<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">${icon}</span><div><strong style="display:block;font-size:13px;">${esc(title)}</strong><small style="color:var(--text-muted, #94a3b8);display:block;font-size:11px;">${esc(osText)}</small></div></div>`;
+}
+
 function table(columns, rows) {
   if (!Array.isArray(rows) || !rows.length) return '<div class="state-panel">Kayıt bulunamadı.</div>';
   return `<div class="table-wrap"><table><thead><tr>${columns.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${columns.map(c => `<td>${c.render ? c.render(row) : esc(row[c.key] ?? '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
@@ -277,8 +300,8 @@ function companyDetailView(d, plans) {
     d.licenses,
   )}<h3 class="content-title">Cihazlar</h3>${table(
     [
-      { label: "Cihaz", render: (r) => esc(r.name || r.id) },
-      { label: "Platform", key: "platform" },
+      { label: "Cihaz", render: (r) => `<strong>${esc(r.name || 'Terminal')}</strong><small>${esc(r.id ? r.id.slice(0, 16) : '—')}</small>` },
+      { label: "İşletim Sistemi", render: (r) => formatDevicePlatform(r.platform, r.os_version) },
       { label: "Son Aktivite", render: (r) => esc(date(r.last_active_at)) },
       { label: "Durum", render: (r) => badge(r.status) },
     ],
@@ -460,7 +483,22 @@ const loaders = {
   },
   'company-devices': async () => {
     const devices=await apiFetch('/portal/devices');
-    set(`<div class="metrics-grid">${metric('Toplam Cihaz',devices.length)}${metric('Çevrimiçi',devices.filter(d=>d.is_online).length)}${metric('Çevrimdışı',devices.filter(d=>!d.is_online).length)}${metric('Engelli',devices.filter(d=>['revoked','blocked','inactive'].includes(d.status)).length)}</div><div class="section-heading"><div><h3>Bağlı Terminaller</h3><p>Cihaz kimliği, şube, son bağlantı ve lisans durumunu birlikte izleyin.</p></div></div>${table([{label:'Cihaz',render:r=>`${esc(r.name||'Terminal')}<small>${esc(r.id||'—')}</small>`},{label:'Platform',render:r=>esc(r.platform||'—')},{label:'Şube',render:r=>esc(r.store_name||'Tanımsız')},{label:'Donanım Kimliği',render:r=>`<code>${esc(r.device_hash?`${r.device_hash.slice(0,18)}…`:'—')}</code>`},{label:'Bağlantı',render:r=>badge(r.is_online?'online':'offline')},{label:'Son Aktivite',render:r=>esc(date(r.last_active_at))},{label:'Durum',render:r=>badge(tr(r.status))}],devices)}`);
+    set(`<div class="metrics-grid">${metric('Toplam Cihaz',devices.length)}${metric('Çevrimiçi',devices.filter(d=>d.is_online).length)}${metric('Çevrimdışı',devices.filter(d=>!d.is_online&&d.status==='active').length)}${metric('Kaldırılan / Pasif',devices.filter(d=>['revoked','blocked','inactive'].includes(d.status)).length)}</div><div class="section-heading spaced"><div><h3>Bağlı Terminaller ve Cihazlar</h3><p>İşletmenize bağlı tüm cihazları, işletim sistemi sürümlerini ve bağlantı durumlarını buradan yönetebilirsiniz.</p></div></div>${table([{label:'Cihaz Adı',render:r=>`<div style="line-height:1.3;"><strong style="font-size:13px;color:var(--text-primary,#f8fafc);">${esc(r.name||'Terminal')}</strong><div style="font-size:11px;color:var(--text-muted,#94a3b8);margin-top:2px;"><span>ID: ${esc(r.id?r.id.slice(0,16):'—')}</span>${r.app_version&&r.app_version!=='—'?` · <span style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;color:#93c5fd;">v${esc(r.app_version)}</span>`:''}</div></div>`},{label:'İşletim Sistemi',render:r=>formatDevicePlatform(r.platform,r.os_version)},{label:'Şube',render:r=>esc(r.store_name||'Tanımsız / Merkez')},{label:'Donanım Kimliği',render:r=>`<code>${esc(r.device_hash?`${r.device_hash.slice(0,14)}…`:'—')}</code>`},{label:'Bağlantı',render:r=>badge(r.is_online?'online':'offline')},{label:'Son Aktivite',render:r=>esc(date(r.last_active_at,true))},{label:'Durum',render:r=>badge(tr(r.status))},{label:'İşlem',render:r=>`<button class="btn btn-danger btn-sm device-remove" data-id="${esc(r.id)}" data-name="${esc(r.name||'Terminal')}">🗑️ Cihazı Kaldır</button>`}],devices)}`);
+    document.querySelectorAll('.device-remove').forEach(button=>button.onclick=async()=>{
+      const name=button.dataset.name||'Bu cihazı';
+      if(!confirm(`"${name}" adlı cihazı hesabınızdan kaldırmak istediğinize emin misiniz?\n\nBu işlem cihazın oturumunu ve lisans yetkisini sonlandıracak, lisans kotanız boşa çıkacaktır.`)) return;
+      button.disabled=true;
+      button.textContent='Kaldırılıyor…';
+      try{
+        await apiFetch(`/portal/devices/${encodeURIComponent(button.dataset.id)}`,{method:'DELETE'});
+        notice('Cihaz başarıyla kaldırıldı.');
+        await loaders['company-devices']();
+      }catch(err){
+        notice(err.message||'Cihaz kaldırılamadı.');
+        button.disabled=false;
+        button.textContent='🗑️ Cihazı Kaldır';
+      }
+    });
   },
   'team-management': async () => {
     const [users,roles,permissions] = await Promise.all([apiFetch('/portal/users'),apiFetch('/portal/roles'),apiFetch('/portal/permissions')]);
@@ -589,9 +627,19 @@ Yönetici hesabı oluşturuldu: ${adminEmail}\nTalep: ${result.recovery_request_
   },
   'platform-devices': async () => {
     const devices=await apiFetch('/admin/devices');
-    set(`<div class="metrics-grid">${metric('Toplam Cihaz',devices.length)}${metric('Çevrimiçi',devices.filter(d=>d.is_online).length)}${metric('Çevrimdışı',devices.filter(d=>!d.is_online).length)}${metric('Engelli',devices.filter(d=>d.status!=='active').length)}</div><div class="section-heading"><div><h3>Tüm Cihazlar</h3><p>Firma, şube, donanım kimliği ve bağlantı durumuna göre terminalleri yönetin.</p></div></div>${table([{label:'Cihaz',render:r=>`${esc(r.name||'Terminal')}<small>${esc(r.id)}</small>`},{label:'Firma',render:r=>esc(r.company_name||'—')},{label:'Şube',render:r=>esc(r.store_name||'—')},{label:'Donanım',render:r=>`<code>${esc(r.device_hash?`${r.device_hash.slice(0,18)}…`:'—')}</code>`},{label:'Son Aktivite',render:r=>esc(date(r.last_active_at))},{label:'Bağlantı',render:r=>badge(r.is_online?'online':'offline')},{label:'Durum',render:r=>badge(tr(r.status))},{label:'İşlem',render:r=>`<button class="btn btn-secondary btn-sm device-toggle" data-id="${esc(r.id)}">${r.status==='active'?'Engelle':'Etkinleştir'}</button> <button class="btn btn-secondary btn-sm device-swap" data-id="${esc(r.id)}" data-company="${esc(r.company_id)}" data-name="${esc(r.name||'Terminal')}">Cihazı Değiştir</button>`}],devices)}`);
+    set(`<div class="metrics-grid">${metric('Toplam Cihaz',devices.length)}${metric('Çevrimiçi',devices.filter(d=>d.is_online).length)}${metric('Çevrimdışı',devices.filter(d=>!d.is_online).length)}${metric('Engelli',devices.filter(d=>d.status!=='active').length)}</div><div class="section-heading"><div><h3>Tüm Cihazlar</h3><p>Firma, şube, donanım kimliği ve bağlantı durumuna göre terminalleri yönetin.</p></div></div>${table([{label:'Cihaz',render:r=>`<div style="line-height:1.3;"><strong style="font-size:13px;">${esc(r.name||'Terminal')}</strong><div style="font-size:11px;color:var(--text-muted,#94a3b8);"><span>ID: ${esc(r.id)}</span>${r.app_version&&r.app_version!=='—'?` · <span>v${esc(r.app_version)}</span>`:''}</div></div>`},{label:'Firma',render:r=>esc(r.company_name||'—')},{label:'İşletim Sistemi',render:r=>formatDevicePlatform(r.platform,r.os_version)},{label:'Donanım',render:r=>`<code>${esc(r.device_hash?`${r.device_hash.slice(0,14)}…`:'—')}</code>`},{label:'Son Aktivite',render:r=>esc(date(r.last_active_at))},{label:'Bağlantı',render:r=>badge(r.is_online?'online':'offline')},{label:'Durum',render:r=>badge(tr(r.status))},{label:'İşlem',render:r=>`<div style="display:flex;gap:4px;flex-wrap:wrap;"><button class="btn btn-secondary btn-sm device-toggle" data-id="${esc(r.id)}">${r.status==='active'?'Engelle':'Etkinleştir'}</button> <button class="btn btn-secondary btn-sm device-swap" data-id="${esc(r.id)}" data-company="${esc(r.company_id)}" data-name="${esc(r.name||'Terminal')}">Değiştir</button> <button class="btn btn-danger btn-sm device-remove-admin" data-id="${esc(r.id)}" data-name="${esc(r.name||'Terminal')}">Sil</button></div>`}],devices)}`);
     document.querySelectorAll('.device-toggle').forEach(button=>button.onclick=async()=>{if(!confirm('Cihaz erişim durumunu değiştirmek istediğinize emin misiniz?'))return;button.disabled=true;try{await apiFetch(`/admin/devices/${encodeURIComponent(button.dataset.id)}/toggle`,{method:'POST'});await loaders['platform-devices']();}catch(x){notice(x.message);button.disabled=false}});
     document.querySelectorAll('.device-swap').forEach(button=>button.onclick=async()=>{const name=prompt('Yeni cihaz adı:',button.dataset.name||'Yeni Terminal');if(!name)return;const hash=prompt('Yeni cihaz UUID / donanım kimliği:');if(!hash)return;button.disabled=true;try{await apiFetch('/admin/devices/swap',{method:'POST',body:{company_id:button.dataset.company,old_device_id:button.dataset.id,new_device_name:name.trim(),new_device_hash:hash.trim()}});notice('Cihaz eşleşmesi güncellendi.');await loaders['platform-devices']();}catch(x){notice(x.message);button.disabled=false}});
+    document.querySelectorAll('.device-remove-admin').forEach(button=>button.onclick=async()=>{
+      const name=button.dataset.name||'Bu cihazı';
+      if(!confirm(`"${name}" adlı cihazı kalıcı olarak silmek istediğinize emin misiniz?`)) return;
+      button.disabled=true;
+      try{
+        await apiFetch(`/admin/devices/${encodeURIComponent(button.dataset.id)}`,{method:'DELETE'});
+        notice('Cihaz silindi.');
+        await loaders['platform-devices']();
+      }catch(x){notice(x.message);button.disabled=false}
+    });
   },
   'platform-releases': async () => {
     const releases=await apiFetch('/releases/list');

@@ -108,6 +108,10 @@ async function run() {
   assert.match(portalController, /r\.company_id IS NULL OR r\.company_id = \$1/, 'tenant role lists must explicitly constrain global and company roles');
   assert.match(portalController, /const list = await runWithRoleCatalogAccess\([\s\S]*FROM users u/, 'tenant user lists must resolve global role names');
   assert.match(portalController, /Şube oluşturma yetkiniz yok/, 'branch creation must enforce management authorization');
+  assert.match(portalController, /router\.delete\('\/devices\/:id'/, 'portal must expose device deletion endpoint');
+  assert.match(portalController, /device_fingerprints df ON df\.device_id = da\.id/, 'portal device list must join fingerprints for OS and version details');
+  assert.match(runtime, /device-remove/, 'company-devices must render device removal control');
+  assert.match(runtime, /formatDevicePlatform/, 'device UI must format device platform with icon and OS version');
   assert.doesNotMatch(supportController, /createInboundEmailRequest\(/, 'inbound email must not automatically create a support request');
   assert.match(mailController, /route-to-support/, 'mailbox must expose explicit support routing');
   assert.match(mailController, /router\.delete\('\/:id'/, 'mailbox must expose recoverable delete');

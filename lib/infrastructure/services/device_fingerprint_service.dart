@@ -89,6 +89,16 @@ class DeviceFingerprintService {
         ? (Platform.environment['PROCESSOR_ARCHITECTURE'] ?? 'x64')
         : 'arm64';
 
+    String devName;
+    if (Platform.isWindows) {
+      final pcName = Platform.environment['COMPUTERNAME'] ?? Platform.localHostname;
+      devName = pcName.isNotEmpty ? 'PC ($pcName)' : 'Windows PC';
+    } else if (Platform.isAndroid) {
+      devName = 'Android Terminal';
+    } else {
+      devName = '${Platform.operatingSystem} Terminal';
+    }
+
     return DeviceFingerprint(
       installationId: getInstallationId(),
       deviceUuid: _deviceManager.getDeviceId(),
@@ -96,8 +106,8 @@ class DeviceFingerprintService {
       hardwareHash: getHardwareHash(),
       cpuArchitecture: cpuArch,
       osVersion: Platform.operatingSystemVersion,
-      appVersion: '1.0.0', // Application version
-      deviceName: Platform.localHostname,
+      appVersion: '1.3.42',
+      deviceName: devName,
       platform: Platform.operatingSystem,
       installDate: getInstallDate(),
       lastSeen: DateTime.now().toIso8601String(),

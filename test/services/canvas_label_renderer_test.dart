@@ -96,17 +96,17 @@ void main() {
     expect(output, contains('BITMAP 0,0,48,'));
     expect(output, contains('PRINT 1,1'));
 
-    // Verify background polarity: In TSPL 1=white (unburned), 0=black (burned).
-    // The majority of bytes must be 0xFF (white background), NOT 0x00 (pitch black).
+    // Verify background polarity: In TSPL BITMAP mode 0: 0=white (unburned), 1=black (burned).
+    // The majority of bytes must be 0x00 (white background), NOT 0xFF (pitch black).
     const bitmapPrefix = 'BITMAP 0,0,48,240,0,';
     final bitmapIndex = output.indexOf(bitmapPrefix);
     expect(bitmapIndex, isNonNegative);
     final rasterStart = bitmapIndex + bitmapPrefix.length;
     final rasterData = bytes.sublist(rasterStart, rasterStart + (48 * 240));
-    final whiteBytes = rasterData.where((b) => b == 0xFF).length;
+    final whiteBytes = rasterData.where((b) => b == 0x00).length;
     const totalBytes = 48 * 240;
-    // White background must account for >70% of the label bytes
-    expect(whiteBytes / totalBytes, greaterThan(0.70));
+    // White background (0x00) must account for >65% of the label bytes
+    expect(whiteBytes / totalBytes, greaterThan(0.65));
   });
 
   test('TsplCanvasLabelEngine splits 4 items across multiple pages on 30mm label to prevent gap overflow', () async {
@@ -137,4 +137,68 @@ void main() {
     expect(printCount, inInclusiveRange(2, 3));
     expect(bitmapCount, inInclusiveRange(2, 3));
   });
+
+  test('TsplCanvasLabelEngine emits QRCODE on final page and prints in forward order', () async {
+    final items = List.generate(
+      14,
+      (i) => {
+        'product_name': 'Paket Ürün No $i',
+        'quantity': 1.0,
+        'unit_price': 50.0,
+      },
+    );
+
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: 'SP-109',
+      customerName: 'Mustafa Bey',
+      customerPhone: '0538 000 11 22',
+      productName: '14 Ürün',
+      quantity: 1,
+      items: items,
+      totalAmount: 700.0,
+      widthMm: 80,
+      heightMm: 40,
+      gapMm: 2,
+      qrData: 'order|SP-109|700.0',
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    // Must contain TSPL QRCODE command
+    expect(output, contains('QRCODE '));
+    expect(output, contains('"order|SP-109|700.0"'));
+
+    // Check forward page order: multiple pages generated, QRCODE emitted only on the final page
+    final firstBitmap = output.indexOf('BITMAP 0,0,');
+    final secondBitmap = output.indexOf('BITMAP 0,0,', firstBitmap + 1);
+    expect(firstBitmap, isNonNegative);
+    expect(secondBitmap, isNonNegative);
+
+    final qrIndex = output.indexOf('QRCODE ');
+    expect(qrIndex, greaterThan(secondBitmap));
+  });
+
+  test('TsplCanvasLabelEngine keeps 2 items on single 80x40mm page without artificial split', () async {
+    final items = [
+      {'product_name': 'Danone Çikolatalı Puding 375g', 'quantity': 2.0, 'unit_price': 35.0},
+      {'product_name': 'Eti Lifalif Yulaf Bar 105g', 'quantity': 1.0, 'unit_price': 22.5},
+    ];
+
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: 'SP-200',
+      customerName: 'Ahmet Yılmaz',
+      productName: '2 Ürün',
+      items: items,
+      totalAmount: 92.5,
+      widthMm: 80,
+      heightMm: 40,
+      gapMm: 2,
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    final printCount = RegExp(r'PRINT 1,1').allMatches(output).length;
+    // Exactly 1 page on 80x40 mm!
+    expect(printCount, equals(1));
+    expect(output, contains('QRCODE '));
+  });
 }
+

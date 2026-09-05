@@ -427,7 +427,23 @@ router.get('/companies/:id', async (req: AuthenticatedRequest, res: Response) =>
               created_at, updated_at
        FROM branches WHERE company_id = $1 ORDER BY name`,
       [req.params.id]);
-    const devices = await runBypassingRLS('SELECT * FROM devices WHERE company_id = $1', [req.params.id]);
+    const devices = await runBypassingRLS(
+      `SELECT da.id,
+              COALESCE(NULLIF(df.device_name, ''), NULLIF(da.device_name, ''), 'Terminal') AS name,
+              da.device_hash,
+              COALESCE(NULLIF(df.platform, ''), NULLIF(da.platform, 'unknown'), 'Bilinmiyor') AS platform,
+              COALESCE(df.os_version, '—') AS os_version,
+              COALESCE(df.app_version, '—') AS app_version,
+              COALESCE(df.cpu_architecture, '—') AS cpu_architecture,
+              da.status,
+              da.activated_at AS created_at,
+              da.last_seen_at AS last_active_at
+       FROM device_activations da
+       LEFT JOIN device_fingerprints df ON df.device_id = da.id
+       WHERE da.company_id = $1
+       ORDER BY da.activated_at DESC`,
+      [req.params.id]
+    );
     const licenses = await runBypassingRLS(
       `SELECT le.*, p.name AS plan_name FROM license_entitlements le
        LEFT JOIN plans p ON p.id = le.plan_id
@@ -914,11 +930,17 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const list = await runBypassingRLS(`
       SELECT da.id, da.company_id, da.device_hash,
-             da.device_name AS name, da.platform, da.status,
+             COALESCE(NULLIF(df.device_name, ''), NULLIF(da.device_name, ''), 'Terminal') AS name,
+             COALESCE(NULLIF(df.platform, ''), NULLIF(da.platform, 'unknown'), 'Bilinmiyor') AS platform,
+             COALESCE(df.os_version, '—') AS os_version,
+             COALESCE(df.app_version, '—') AS app_version,
+             COALESCE(df.cpu_architecture, '—') AS cpu_architecture,
+             da.status,
              da.activated_at, da.last_seen_at AS last_active_at,
              c.name AS company_name, NULL::text AS store_name
       FROM device_activations da
       JOIN companies c ON da.company_id = c.id
+      LEFT JOIN device_fingerprints df ON df.device_id = da.id
       ORDER BY da.last_seen_at DESC NULLS LAST
     `);
     
@@ -933,6 +955,43 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
     return res.json(formatted);
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.delete('/devices/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const deviceId = req.params.id;
+  try {
+    const devRes = await runBypassingRLS('SELECT * FROM device_activations WHERE id = $1', [deviceId]);
+    if (devRes.rows.length === 0) {
+      return res.status(404).json({ error: 'device_not_found', message: 'Cihaz bulunamadı.' });
+    }
+
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+      await client.query('DELETE FROM hardware_jobs WHERE owner_activation_id = $1 OR requested_by_activation_id = $1', [deviceId]).catch(() => {});
+      await client.query('DELETE FROM shared_hardware WHERE owner_activation_id = $1', [deviceId]).catch(() => {});
+      await client.query('DELETE FROM device_fingerprints WHERE device_id = $1', [deviceId]).catch(() => {});
+
+      try {
+        await client.query('DELETE FROM device_activations WHERE id = $1', [deviceId]);
+      } catch (_) {
+        await client.query("UPDATE device_activations SET status = 'revoked', revoked_at = NOW(), revoked_by = 'sysadmin', updated_at = NOW() WHERE id = $1", [deviceId]);
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, message: 'Cihaz başarıyla kaldırıldı.' });
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    logger.error('Admin delete device error:', err);
+    return res.status(500).json({ error: 'server_error', message: 'Cihaz silinemedi.' });
   }
 });
 

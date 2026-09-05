@@ -302,9 +302,12 @@ class AuthService {
     if (!kIsWeb) {
       final deviceId =
           _licenseService?.getDeviceUuid() ?? _deviceManager.getDeviceId();
-      body['device_hash'] = deviceId;
-      body['device_name'] = 'POS Cihazı - $deviceId';
       final fingerprint = await _deviceFingerprintService?.getFingerprint();
+      final effectiveName = (fingerprint?.deviceName.isNotEmpty == true)
+          ? fingerprint!.deviceName
+          : 'POS Cihazı - $deviceId';
+      body['device_hash'] = deviceId;
+      body['device_name'] = effectiveName;
       if (fingerprint != null) body['fingerprint'] = fingerprint.toJson();
     }
     try {

@@ -68,15 +68,36 @@ export class LicenseService {
             machine_hash = $1, 
             hardware_hash = $2, 
             hardware_change_count = $3,
+            platform = COALESCE(NULLIF($4, ''), platform),
+            os_version = COALESCE(NULLIF($5, ''), os_version),
+            app_version = COALESCE(NULLIF($6, ''), app_version),
+            device_name = COALESCE(NULLIF($7, ''), device_name),
+            cpu_architecture = COALESCE(NULLIF($8, ''), cpu_architecture),
             last_seen = CURRENT_TIMESTAMP 
-           WHERE device_id = $4`,
-          [fp.machine_hash, fp.hardware_hash, newChangeCount, deviceId]
+           WHERE device_id = $9`,
+          [
+            fp.machine_hash, fp.hardware_hash, newChangeCount,
+            fp.platform || null, fp.os_version || null, fp.app_version || null,
+            fp.device_name || null, fp.cpu_architecture || null,
+            deviceId
+          ]
         );
       } else {
-        // Just update last seen
+        // Update device metadata and last seen
         await client.query(
-          'UPDATE device_fingerprints SET last_seen = CURRENT_TIMESTAMP WHERE device_id = $1',
-          [deviceId]
+          `UPDATE device_fingerprints SET 
+            platform = COALESCE(NULLIF($1, ''), platform),
+            os_version = COALESCE(NULLIF($2, ''), os_version),
+            app_version = COALESCE(NULLIF($3, ''), app_version),
+            device_name = COALESCE(NULLIF($4, ''), device_name),
+            cpu_architecture = COALESCE(NULLIF($5, ''), cpu_architecture),
+            last_seen = CURRENT_TIMESTAMP 
+           WHERE device_id = $6`,
+          [
+            fp.platform || null, fp.os_version || null, fp.app_version || null,
+            fp.device_name || null, fp.cpu_architecture || null,
+            deviceId
+          ]
         );
       }
     }
@@ -183,9 +204,11 @@ export class LicenseService {
         if (physicalDevice.rows.length > 0) {
           await client.query(
             `UPDATE device_activations
-             SET device_hash = $1, status = 'active', last_seen_at = NOW(), updated_at = NOW()
+             SET device_hash = $1, status = 'active', last_seen_at = NOW(), updated_at = NOW(),
+                 platform = CASE WHEN platform = 'unknown' OR platform IS NULL THEN COALESCE(NULLIF($3, ''), platform) ELSE platform END,
+                 device_name = CASE WHEN device_name LIKE 'Serenut cihazı%' OR device_name LIKE 'POS Cihazı%' THEN COALESCE(NULLIF($4, ''), device_name) ELSE device_name END
              WHERE id = $2`,
-            [deviceHash, physicalDevice.rows[0].id]
+            [deviceHash, physicalDevice.rows[0].id, fingerprint?.platform || null, deviceName || null]
           );
           devRes = physicalDevice;
         }
@@ -257,10 +280,14 @@ export class LicenseService {
           throw new Error('device_blocked');
         }
         deviceId = devRes.rows[0].id;
-        // Update last seen
+        // Update last seen and refresh platform/name if needed
         await client.query(
-          'UPDATE device_activations SET last_seen_at = NOW(), updated_at = NOW() WHERE id = $1',
-          [deviceId]
+          `UPDATE device_activations
+           SET last_seen_at = NOW(), updated_at = NOW(),
+               platform = CASE WHEN platform = 'unknown' OR platform IS NULL THEN COALESCE(NULLIF($1, ''), platform) ELSE platform END,
+               device_name = CASE WHEN device_name LIKE 'Serenut cihazı%' OR device_name LIKE 'POS Cihazı%' THEN COALESCE(NULLIF($2, ''), device_name) ELSE device_name END
+           WHERE id = $3`,
+          [fingerprint?.platform || null, deviceName || null, deviceId]
         );
         
         // Retrieve current device activation record versions

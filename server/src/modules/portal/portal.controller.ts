@@ -121,10 +121,19 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
     const list = await runWithTenantContext(user.company_id, `
-      SELECT da.id, da.device_name as name, da.device_hash, da.platform, da.status,
-             da.activated_at as created_at, da.last_seen_at as last_active_at,
+      SELECT da.id,
+             COALESCE(NULLIF(df.device_name, ''), NULLIF(da.device_name, ''), 'Terminal') AS name,
+             da.device_hash,
+             COALESCE(NULLIF(df.platform, ''), NULLIF(da.platform, 'unknown'), 'unknown') AS platform,
+             COALESCE(df.os_version, '—') AS os_version,
+             COALESCE(df.app_version, '—') AS app_version,
+             COALESCE(df.cpu_architecture, '—') AS cpu_architecture,
+             da.status,
+             da.activated_at AS created_at,
+             da.last_seen_at AS last_active_at,
              s.name AS store_name
       FROM device_activations da
+      LEFT JOIN device_fingerprints df ON df.device_id = da.id
       LEFT JOIN stores s ON s.id = da.store_id AND s.company_id = da.company_id
       WHERE da.company_id = $1
       ORDER BY da.activated_at DESC
@@ -141,6 +150,78 @@ router.get('/devices', async (req: AuthenticatedRequest, res: Response) => {
     return res.json(formatted);
   } catch (err) {
     return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+router.delete('/devices/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const deviceId = req.params.id;
+
+  const canManage = user.roles?.some(role => ['owner', 'admin', 'sysadmin'].includes(role)) ||
+                    user.permissions?.includes('devices:manage');
+  if (!canManage) {
+    return res.status(403).json({ error: 'forbidden', message: 'Cihazları yönetme yetkiniz yok.' });
+  }
+
+  const deviceCheck = await runWithTenantContext(user.company_id,
+    `SELECT id, device_name, device_hash, status FROM device_activations WHERE id = $1 AND company_id = $2`,
+    [deviceId, user.company_id]
+  );
+  if (deviceCheck.rows.length === 0) {
+    return res.status(404).json({ error: 'device_not_found', message: 'Cihaz bulunamadı.' });
+  }
+
+  const client = await pgPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL app.bypass_rls = 'true'");
+
+    // Clean up dependent hardware jobs and registrations if any
+    await client.query(
+      `DELETE FROM hardware_jobs WHERE (owner_activation_id = $1 OR requested_by_activation_id = $1) AND company_id = $2`,
+      [deviceId, user.company_id]
+    ).catch(() => {});
+
+    await client.query(
+      `DELETE FROM shared_hardware WHERE owner_activation_id = $1 AND company_id = $2`,
+      [deviceId, user.company_id]
+    ).catch(() => {});
+
+    await client.query(
+      `DELETE FROM device_fingerprints WHERE device_id = $1`,
+      [deviceId]
+    ).catch(() => {});
+
+    let deleted = false;
+    try {
+      const delRes = await client.query(
+        `DELETE FROM device_activations WHERE id = $1 AND company_id = $2`,
+        [deviceId, user.company_id]
+      );
+      deleted = (delRes.rowCount ?? 0) > 0;
+    } catch (_) {
+      // If foreign keys (e.g. audit or logs) restrict hard deletion, revoke it
+      await client.query(
+        `UPDATE device_activations SET status = 'revoked', revoked_at = NOW(), revoked_by = $1, updated_at = NOW() WHERE id = $2 AND company_id = $3`,
+        [user.id, deviceId, user.company_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    await writeTenantAudit(user.company_id, user.id, 'REMOVE_DEVICE', 'device_activations', deviceId, null, {
+      device_name: deviceCheck.rows[0].device_name,
+      device_hash: deviceCheck.rows[0].device_hash,
+      hard_deleted: deleted,
+    });
+
+    return res.json({ success: true, message: 'Cihaz başarıyla kaldırıldı.' });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Failed to remove device:', err);
+    return res.status(500).json({ error: 'device_removal_failed', message: 'Cihaz kaldırılırken hata oluştu.' });
+  } finally {
+    client.release();
   }
 });
 

@@ -195,6 +195,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'labelGapMm': gapMm,
           'labelDpi': dpi,
           'autoDetectGap': autoDetectGap,
+          'qrData': 'order|${order.id}|${order.totalAmount}',
         },
         copies: copies);
   }
