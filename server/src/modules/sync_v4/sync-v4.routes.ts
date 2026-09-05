@@ -301,12 +301,18 @@ async function upsertSale(client: PoolClient, companyId: string, id: string, pay
 async function upsertOrder(client: PoolClient, companyId: string, id: string, payload: Record<string, unknown>) {
   const customerId = stringValue(payload, "customer_id");
   if (!customerId) throw new Error("invalid_mutation");
-  const orderNumber = stringValue(payload, "order_number", `SYNC-${id}`);
+  const rawOrderNumber = stringValue(payload, "order_number");
+  const orderNumber = rawOrderNumber || `SYNC-${id}`;
   const items = Array.isArray(payload.items) ? payload.items : [];
   await client.query(
     `INSERT INTO customer_orders (id, company_id, order_number, customer_id, status, total_amount, order_date, expected_delivery_date, actual_delivery_date, notes, created_at, updated_at, is_deleted, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()),$8::timestamptz,$9::timestamptz,$10,COALESCE($11::timestamptz,NOW()),NOW(),false,$12)
-     ON CONFLICT (id) DO UPDATE SET order_number=EXCLUDED.order_number,
+     ON CONFLICT (id) DO UPDATE SET
+       order_number = CASE 
+         WHEN EXCLUDED.order_number NOT LIKE 'SYNC-%' AND EXCLUDED.order_number != '' THEN EXCLUDED.order_number
+         WHEN customer_orders.order_number NOT LIKE 'SYNC-%' AND customer_orders.order_number != '' THEN customer_orders.order_number
+         ELSE EXCLUDED.order_number
+       END,
        customer_id=EXCLUDED.customer_id, status=EXCLUDED.status,
        total_amount=EXCLUDED.total_amount, expected_delivery_date=EXCLUDED.expected_delivery_date,
        actual_delivery_date=EXCLUDED.actual_delivery_date, notes=EXCLUDED.notes, is_deleted=false,

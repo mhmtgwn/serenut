@@ -168,7 +168,21 @@ class SqliteOrderRepository implements IOrderRepository {
               ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
     );
     return _gateway.transaction(() async {
+      final existing = await _executor.query(
+        'orders',
+        columns: ['order_number'],
+        where: 'id = ?',
+        whereArgs: [entity.id],
+        limit: 1,
+      );
+      final existingNum = existing.isNotEmpty ? (existing.first['order_number']?.toString() ?? '') : '';
+      final orderNumber = entity.orderNumber.isNotEmpty && !entity.orderNumber.startsWith('SYNC-')
+          ? entity.orderNumber
+          : (existingNum.isNotEmpty && !existingNum.startsWith('SYNC-') ? existingNum : entity.orderNumber);
+
       final payload = {
+        'id': entity.id,
+        if (orderNumber.isNotEmpty) 'order_number': orderNumber,
         'customer_id': entity.customerId,
         'status': entity.status,
         'total_amount': totalAmount,
