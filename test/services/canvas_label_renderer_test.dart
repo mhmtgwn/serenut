@@ -109,6 +109,31 @@ void main() {
     expect(whiteBytes / totalBytes, greaterThan(0.65));
   });
 
+  test('TsplCanvasLabelEngine positions QR code safely inside 50x30mm bounds without clipping', () async {
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: '2001',
+      customerName: 'Mehmet Demir',
+      productName: 'Fındık',
+      quantity: 1,
+      totalAmount: 150.0,
+      widthMm: 50,
+      heightMm: 30,
+      gapMm: 2,
+      qrData: 'order|2001',
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    expect(output, contains('QRCODE '));
+    final match = RegExp(r'QRCODE\s+(\d+),(\d+),').firstMatch(output);
+    expect(match, isNotNull);
+    final qrX = int.parse(match!.group(1)!);
+    final qrY = int.parse(match.group(2)!);
+    // On 50mm (384 dots width), QR X must be <= 300 to leave safe clearance before 384
+    expect(qrX, lessThanOrEqualTo(300));
+    // On 30mm (240 dots height), QR Y must be <= 160 to leave safe clearance before 240
+    expect(qrY, lessThanOrEqualTo(160));
+  });
+
   test('TsplCanvasLabelEngine splits 4 items across multiple pages on 30mm label to prevent gap overflow', () async {
     final items = [
       {'product_name': 'Findik Ezmesi 350g', 'quantity': 1.0, 'unit_price': 120.0},

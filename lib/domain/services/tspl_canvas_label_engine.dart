@@ -63,7 +63,7 @@ class TsplCanvasLabelEngine {
     final widthDots = widthBytes * 8;
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
-    // Safe margins: Use 3.0mm padding on narrow labels (<=54mm) to avoid right-edge clipping
+    // Safe margins: 3.0mm on narrow labels (<=54mm)
     final marginMm = safeWidth <= 54 ? 3.0 : 2.0;
     final marginDots = (marginMm * safeDpi / 25.4).roundToDouble();
     final paddingLeft = marginDots;
@@ -71,7 +71,8 @@ class TsplCanvasLabelEngine {
     final safeRightX = widthDots - paddingRight;
     final usableW = (safeRightX - paddingLeft).clamp(80.0, 1000.0);
     final topMargin = (1.0 * safeDpi / 25.4).roundToDouble();
-    final bottomMargin = (1.5 * safeDpi / 25.4).roundToDouble();
+    // 2.5mm bottom clearance on 30mm labels to completely avoid bleeding into gap
+    final bottomMargin = (requestedHeightMm <= 30 ? 2.5 : 1.5) * safeDpi / 25.4;
     final maxSafePageY = heightDots - bottomMargin;
 
     final fontScale = switch (fontSize) {
@@ -183,17 +184,29 @@ class TsplCanvasLabelEngine {
 
     // Sizing for QR code on the closing footer (scaled proportionally to DPI)
     final dotsPerMm = safeDpi / 25.4;
-    final qrCellWidth =
-        isWide ? (safeDpi >= 300 ? 4 : 3) : (safeDpi >= 300 ? 3 : 2);
-    final qrBoxDots = (isWide ? 12.0 : 8.0) * dotsPerMm;
     final cleanQrData = (qrData != null && qrData.trim().isNotEmpty)
         ? qrData.trim()
         : 'order|$orderIdShort';
     final hasQr = showQrCode && cleanQrData.isNotEmpty;
 
+    // Sizing for QR code on the closing footer (scaled proportionally to DPI)
+    final qrCellWidth =
+        isWide ? (safeDpi >= 300 ? 4 : 3) : (safeDpi >= 300 ? 3 : 2);
+    // Level-M QR code typically generates 25-33 modules for short order keys
+    final qrModules = cleanQrData.length > 25 ? 35 : 29;
+    final qrActualSizeDots = (qrModules * qrCellWidth).toDouble();
+    // Layout reservation on canvas to ensure breathing room and avoid collision:
+    final qrBoxDots =
+        math.max(qrActualSizeDots + 4.0, (isWide ? 14.0 : 10.0) * dotsPerMm);
+
+    // Guaranteed margins to prevent right or bottom overflow on physical label:
+    final qrRightMarginDots = (safeWidth <= 54 ? 4.0 : 2.5) * dotsPerMm;
+    final qrBottomMarginDots =
+        (requestedHeightMm <= 30 ? 3.0 : 2.0) * dotsPerMm;
+
     // Accurate closing footer height measurement with compact leading
     double measureClosingFooterHeight() {
-      var h = 4.0; // Divider before footer
+      var h = 3.0; // Divider before footer
       final footerTextW = hasQr
           ? (usableW - qrBoxDots - 8.0).clamp(80.0, usableW)
           : usableW;
@@ -224,7 +237,7 @@ class TsplCanvasLabelEngine {
       } else {
         h += textH;
       }
-      return h + 3.0;
+      return h + 4.0;
     }
 
     final closingFooterH = measureClosingFooterHeight();
@@ -476,10 +489,15 @@ class TsplCanvasLabelEngine {
 
       if (isLastPage) {
         if (hasQr) {
-          pageQrX = (safeRightX - qrBoxDots).round();
-          pageQrY = currentY
+          // Position QR safely inside the right border
+          pageQrX = (widthDots - qrActualSizeDots - qrRightMarginDots)
               .round()
-              .clamp(topMargin.round(), (maxSafePageY - qrBoxDots).round());
+              .clamp(paddingLeft.round(), (widthDots - qrActualSizeDots).round());
+
+          // Position QR safely above the bottom border
+          final maxSafeQrY =
+              (heightDots - qrActualSizeDots - qrBottomMarginDots).round();
+          pageQrY = currentY.round().clamp(topMargin.round(), maxSafeQrY);
 
           // Paint a small "SİPARİŞİ AÇ" caption under the QR area on canvas for wide labels
           if (isWide) {
@@ -494,10 +512,10 @@ class TsplCanvasLabelEngine {
               ),
               textDirection: TextDirection.ltr,
             )..layout(maxWidth: qrBoxDots + 20.0);
-            final labelX = (pageQrX + (qrBoxDots - qrLabelPainter.width) / 2)
+            final labelX = (pageQrX + (qrActualSizeDots - qrLabelPainter.width) / 2)
                 .clamp(paddingLeft, safeRightX - qrLabelPainter.width);
             final labelY =
-                (pageQrY + qrBoxDots + 1.0).clamp(0.0, heightDots - 11.0);
+                (pageQrY + qrActualSizeDots + 1.0).clamp(0.0, heightDots - 11.0);
             if (labelY + qrLabelPainter.height <= heightDots - 2.0) {
               qrLabelPainter.paint(canvas, Offset(labelX, labelY));
             }
@@ -505,7 +523,7 @@ class TsplCanvasLabelEngine {
         }
 
         final textMaxW = hasQr
-            ? (usableW - qrBoxDots - 8.0).clamp(80.0, usableW)
+            ? (pageQrX - paddingLeft - 8.0).clamp(80.0, usableW)
             : usableW;
 
         // Order Note

@@ -1382,7 +1382,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           showTotalAmount: settings.labelOrderShowTotalAmount,
           showItemsCount: settings.labelOrderShowItemsCount,
           fontSize: settings.labelOrderFontSize,
-          paginateOnOverflow: false,
+          paginateOnOverflow: true,
           businessName: settings.businessName,
         ));
       } else {
@@ -1412,7 +1412,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           showTotalAmount: settings.labelOrderShowTotalAmount,
           showItemsCount: settings.labelOrderShowItemsCount,
           fontSize: settings.labelOrderFontSize,
-          paginateOnOverflow: false,
+          paginateOnOverflow: true,
           businessName: settings.businessName,
         ));
       }
