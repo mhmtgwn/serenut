@@ -100,7 +100,14 @@ class EscPosReceiptRenderer implements PrintRenderer {
     if (subtitle.isNotEmpty) {
       _line(bytes, '— $subtitle —', mode: turkishMode);
     }
-    _line(bytes, '[ SİPARİŞ FİŞİ ]', bold: true, mode: turkishMode);
+    final docKind = document['kind']?.toString().toLowerCase().trim();
+    final headerTitle = switch (docKind) {
+      'sale' || 'satis' => '[ SATIŞ FİŞİ ]',
+      'collection' || 'tahsilat' => '[ TAHSİLAT MAKBUZU ]',
+      'report' || 'rapor' => '[ RAPOR ]',
+      _ => '[ SİPARİŞ FİŞİ ]',
+    };
+    _line(bytes, headerTitle, bold: true, mode: turkishMode);
 
     // Address rendering: Respects manual newlines and uses word-wrapping
     final addressRaw = business['address']?.toString().trim() ?? '';
@@ -257,23 +264,27 @@ class EscPosReceiptRenderer implements PrintRenderer {
 
     bytes.addAll(_alignRight);
     final total = _decimal(document['total']);
-    final subtotal =
-        payload['subtotal'] != null ? _decimal(payload['subtotal']) : total;
-    final discount = _decimal(payload['discount']);
-    final vat = payload['vat'] != null
-        ? _decimal(payload['vat'])
-        : (total * 0.10 / 1.10);
+    final subtotal = document['subtotal'] != null
+        ? _decimal(document['subtotal'])
+        : (payload['subtotal'] != null ? _decimal(payload['subtotal']) : total);
+    final discount = _decimal(payload['discount'] ?? document['discount']);
+    final hasExplicitVat = payload['vat'] != null || document['vat'] != null;
+    final vat = hasExplicitVat
+        ? _decimal(payload['vat'] ?? document['vat'])
+        : 0.0;
 
-    _line(
-        bytes,
-        _columns(
-            'Ara Toplam:', '${subtotal.toStringAsFixed(2)} $currency', width),
-        mode: turkishMode);
+    if ((subtotal - total).abs() > 0.005 || discount > 0.009) {
+      _line(
+          bytes,
+          _columns(
+              'Ara Toplam:', '${subtotal.toStringAsFixed(2)} $currency', width),
+          mode: turkishMode);
+    }
     if (vat > 0.009) {
       _line(
           bytes,
           _columns(
-              'KDV (%10 Dahil):', '${vat.toStringAsFixed(2)} $currency', width),
+              'KDV Dahil:', '${vat.toStringAsFixed(2)} $currency', width),
           mode: turkishMode);
     }
     if (discount > 0.009) {
@@ -298,7 +309,7 @@ class EscPosReceiptRenderer implements PrintRenderer {
       _line(bytes,
           _columns('Ödenen:', '${paid.toStringAsFixed(2)} $currency', width),
           mode: turkishMode);
-      if (paid < total - 0.01) {
+      if (total - paid > 0.005) {
         _line(
             bytes,
             _columns('Kalan:', '${(total - paid).toStringAsFixed(2)} $currency',
@@ -319,7 +330,7 @@ class EscPosReceiptRenderer implements PrintRenderer {
       bytes
         ..addAll(_alignCenter)
         ..addAll([0x1D, 0x48, 0x00, 0x1D, 0x68, 0x40, 0x1D, 0x77, 0x02])
-        ..addAll([0x1D, 0x6B, 0x49, safe.length])
+        ..addAll([0x1D, 0x6B, 0x49, safe.length + 2, 0x7B, 0x42])
         ..addAll(safe)
         ..add(0x0A);
       final bizShort =
@@ -543,7 +554,7 @@ class EscPosReceiptRenderer implements PrintRenderer {
   }
 
   static List<int> _qr(String value) {
-    final data = value.codeUnits.where((byte) => byte <= 127).toList();
+    final data = utf8.encode(value);
     final length = data.length + 3;
     return [
       0x1D,

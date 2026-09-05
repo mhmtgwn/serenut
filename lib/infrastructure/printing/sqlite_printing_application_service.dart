@@ -29,15 +29,28 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       List<Map<String, dynamic>> items,
       CustomerEntity? customer,
       Settings settings) {
+    final subtotal = items.fold<double>(
+      0.0,
+      (sum, item) {
+        final q = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+        final up = (item['unit_price'] as num?)?.toDouble() ??
+            (item['price'] as num?)?.toDouble() ??
+            0.0;
+        final t = (item['total'] as num?)?.toDouble() ?? (q * up);
+        return sum + t;
+      },
+    );
     return _receipt(
         settings,
         {
+          'kind': 'sale',
           'number': _short(sale.id),
           'date': _date(sale.createdAt),
           'payment': _payment(sale.paymentMethod),
           'cashier': sale.createdBy,
           'customerName': customer?.name,
           'customerBalance': customer?.balance,
+          'subtotal': subtotal > 0 ? subtotal : sale.totalAmount,
           'total': sale.totalAmount,
           'paid': sale.paidAmount,
           'remaining': sale.remainingAmount,
@@ -56,15 +69,28 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       {double? paidAmount,
       String? notes,
       int copies = 1}) {
+    final subtotal = items.fold<double>(
+      0.0,
+      (sum, item) {
+        final q = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+        final up = (item['unit_price'] as num?)?.toDouble() ??
+            (item['price'] as num?)?.toDouble() ??
+            0.0;
+        final t = (item['total'] as num?)?.toDouble() ?? (q * up);
+        return sum + t;
+      },
+    );
     return _receipt(
         settings,
         {
+          'kind': 'order',
           'number': order.displayNumber,
           'date': _date(order.createdAt),
           'payment': 'Sipariş',
           'cashier': order.createdBy,
           'customerName': customer?.name ?? order.customerId,
           'customerBalance': customer?.balance,
+          'subtotal': subtotal > 0 ? subtotal : order.totalAmount,
           'total': order.totalAmount,
           'paid': paidAmount,
           'notes': notes ?? order.notes,
@@ -79,11 +105,13 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
   Future<PrintJobRecord> queueCollectionReceipt(CustomerEntity customer,
       double amount, String paymentMethod, String? notes, Settings settings) {
     return _receipt(settings, {
+      'kind': 'collection',
       'number': 'TAH-${DateTime.now().millisecondsSinceEpoch}',
       'date': _date(DateTime.now()),
       'payment': _payment(paymentMethod),
       'customerName': customer.name,
       'customerBalance': customer.balance,
+      'subtotal': amount,
       'total': amount,
       'paid': amount,
       'notes': notes,
@@ -96,9 +124,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     return _receipt(
         settings,
         {
+          'kind': 'report',
           'number': '$reportType RAPORU',
           'date': _date(DateTime.now()),
           'payment': summary.range.label,
+          'subtotal': summary.totalRevenue,
           'total': summary.totalRevenue,
           'paid': summary.totalCollected,
           'notes':
@@ -130,18 +160,20 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     final shortCustomerId = rawCustomerId.length > 8
         ? rawCustomerId.substring(0, 8).toUpperCase()
         : rawCustomerId.toUpperCase();
-    final resolvedPaymentStatus = paymentStatusOverride ??
-        (paidAmount == null
-            ? 'Bilinmiyor'
-            : paidAmount >= order.totalAmount - 0.01
-                ? 'Ödendi'
-                : paidAmount <= 0.01
-                    ? 'Ödenmedi'
-                    : 'Kısmi ödendi');
     final double effectivePaid = paidAmount ??
         ((order.status == 'completed' || order.status == 'paid')
             ? order.totalAmount
             : 0.0);
+    final resolvedPaymentStatus = paymentStatusOverride ??
+        (paidAmount != null
+            ? (paidAmount >= order.totalAmount - 0.01
+                ? 'Ödendi'
+                : paidAmount <= 0.01
+                    ? 'Ödenmedi'
+                    : 'Kısmi ödendi')
+            : ((order.status == 'completed' || order.status == 'paid')
+                ? 'Ödendi'
+                : 'Bilinmiyor'));
     final orderUnpaid = math.max(0.0, order.totalAmount - effectivePaid);
     final currentDebt = (customer != null && customer.balance < 0)
         ? customer.balance.abs()

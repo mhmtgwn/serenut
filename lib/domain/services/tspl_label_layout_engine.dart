@@ -35,7 +35,7 @@ class TsplLabelLayoutEngine {
     final safeWidth = widthMm.clamp(20, 120);
     final safeHeight = heightMm.clamp(15, 120);
     final safeGap = gapMm.clamp(0, 10);
-    final safeDpi = dpi == 300 ? 300 : 203;
+    final safeDpi = [203, 300, 600].contains(dpi) ? dpi : (dpi >= 100 ? dpi : 203);
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
     final widthDots = (printableWidthDots == null || (printableWidthDots == 384 && safeWidth > 54))
@@ -284,7 +284,7 @@ class TsplLabelLayoutEngine {
   }) {
     final safeWidth = widthMm.clamp(20, 150);
     final safeGap = gapMm.clamp(0, 10);
-    final safeDpi = dpi == 300 ? 300 : 203;
+    final safeDpi = [203, 300, 600].contains(dpi) ? dpi : (dpi >= 100 ? dpi : 203);
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
     // On <=54mm rolls (such as standard 50mm, 40mm), clamp to 384 dots (max physical width of standard 2-inch printhead)
     final maxPhysicalDots =
