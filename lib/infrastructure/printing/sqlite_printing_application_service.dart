@@ -168,6 +168,10 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     final autoDetectGap = (device?.capabilities['autoDetectGap'] as bool?) ??
         (device?.transportConfig['autoDetectLabelGap'] as bool?) ??
         settings.labelAutoDetectGap;
+    final printableWidthDots =
+        (device?.capabilities['printableWidthDots'] as num?)?.toInt() ??
+        (device?.transportConfig['printableWidthDots'] as num?)?.toInt() ??
+        (widthMm * dpi / 25.4).round();
 
     return _enqueue(
         PrintDocumentKind.orderLabel,
@@ -194,6 +198,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'labelHeightMm': heightMm,
           'labelGapMm': gapMm,
           'labelDpi': dpi,
+          'printableWidthDots': printableWidthDots,
           'autoDetectGap': autoDetectGap,
           'qrData': 'order|${order.id}|${order.totalAmount}',
         },
@@ -221,6 +226,10 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
     final autoDetectGap = (device?.capabilities['autoDetectGap'] as bool?) ??
         (device?.transportConfig['autoDetectLabelGap'] as bool?) ??
         settings.labelAutoDetectGap;
+    final printableWidthDots =
+        (device?.capabilities['printableWidthDots'] as num?)?.toInt() ??
+        (device?.transportConfig['printableWidthDots'] as num?)?.toInt() ??
+        (widthMm * dpi / 25.4).round();
 
     final logo = await assets.loadLogo(settings.businessLogo);
     final jobs = <PrintJobRecord>[];
@@ -245,6 +254,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
             'labelHeightMm': heightMm,
             'labelGapMm': gapMm,
             'labelDpi': dpi,
+            'printableWidthDots': printableWidthDots,
             'autoDetectGap': autoDetectGap,
             if (logo != null) 'logoBytesBase64': base64Encode(logo),
           },

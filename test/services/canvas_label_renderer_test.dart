@@ -200,5 +200,34 @@ void main() {
     expect(printCount, equals(1));
     expect(output, contains('QRCODE '));
   });
-}
 
+  test('overflow keeps every continuation page at the selected 80x80mm media size',
+      () async {
+    final items = List.generate(
+      36,
+      (index) => {
+        'product_name': 'Uzun açıklamalı sipariş ürünü numara $index',
+        'quantity': 1.0,
+        'unit_price': 10.0,
+      },
+    );
+
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: 'ORD-8080',
+      customerName: 'Ölçü Test Müşteri',
+      productName: '36 Ürün',
+      items: items,
+      totalAmount: 360,
+      widthMm: 80,
+      heightMm: 80,
+      gapMm: 3,
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    final pageCount = RegExp(r'PRINT 1,1').allMatches(output).length;
+    final sizeCount = RegExp(r'SIZE 80 mm,80 mm').allMatches(output).length;
+    expect(pageCount, greaterThan(1));
+    expect(sizeCount, pageCount);
+    expect(RegExp(r'GAP 3 mm,0 mm').allMatches(output).length, pageCount);
+  });
+}

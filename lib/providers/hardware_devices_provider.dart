@@ -134,7 +134,8 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           'autoDetectLabelGap': settings.labelAutoDetectGap,
           'dpi': settings.labelDpi,
           'copies': settings.labelPrinterCopies,
-          'printableWidthDots': (settings.labelWidthMm * settings.labelDpi / 25.4).round(),
+          'printableWidthDots':
+              (settings.labelWidthMm * settings.labelDpi / 25.4).round(),
         },
       ));
     }
@@ -892,10 +893,14 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
     final labelDpi = _int(config['dpi'], 203);
     final calculatedLabelDots = (labelWidthMm * labelDpi / 25.4).round();
     final configuredPrintableDots = _int(config['printableWidthDots'], 0);
-    final effectiveLabelDots =
-        (configuredPrintableDots > 0 && configuredPrintableDots != 384)
-            ? configuredPrintableDots
-            : calculatedLabelDots;
+    // `labelWidthMm` is the physical media width used by TSPL `SIZE`, while
+    // `printableWidthDots` is the width of the thermal printhead.  They are
+    // deliberately not interchangeable: a 50 mm label on a 384-dot / 203 DPI
+    // printhead has a 48 mm printable area.  Do not "correct" a configured
+    // 384-dot head to 400 dots, otherwise the right edge is clipped or scaled.
+    final effectiveLabelDots = configuredPrintableDots > 0
+        ? configuredPrintableDots
+        : calculatedLabelDots;
 
     final capabilities = isLabel
         ? {

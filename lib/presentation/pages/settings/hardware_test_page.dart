@@ -986,13 +986,16 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelCopies = TextEditingController(
       text: config['copies']?.toString() ?? '1',
     );
-    final initialWidth = int.tryParse(config['labelWidthMm']?.toString() ?? '') ?? 50;
+    final initialWidth =
+        int.tryParse(config['labelWidthMm']?.toString() ?? '') ?? 50;
     final initialDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
     final defaultDots = (initialWidth * initialDpi / 25.4).round();
-    final rawDots = int.tryParse(config['printableWidthDots']?.toString() ?? '');
-    final initialPrintableDots = (rawDots != null && (rawDots != 384 || initialWidth <= 54))
-        ? rawDots
-        : defaultDots;
+    final rawDots =
+        int.tryParse(config['printableWidthDots']?.toString() ?? '');
+    final initialPrintableDots =
+        (rawDots != null && (rawDots != 384 || initialWidth <= 54))
+            ? rawDots
+            : defaultDots;
     _printableWidthDots = TextEditingController(
       text: initialPrintableDots.toString(),
     );
@@ -1905,7 +1908,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
               labelText: 'Basılabilir genişlik (nokta)',
-              helperText: '58 mm / 203 DPI cihazlarda genellikle 384 noktadır.',
+              helperText:
+                  'Yazıcının gerçek printhead genişliğini girin; medya eniyle aynı olmak zorunda değildir (203 DPI, 384 dot ≈ 48 mm).',
             ),
           ),
           const SizedBox(height: 12),

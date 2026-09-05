@@ -51,10 +51,12 @@ class TsplCanvasLabelEngine {
     final requestedHeightMm = heightMm.clamp(15, 150);
 
     final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
-    final effectivePrintableDots = (printableWidthDots != null &&
-            printableWidthDots > 100 &&
-            !(safeWidth >= 60 && printableWidthDots <= 450) &&
-            !(safeWidth >= 70 && printableWidthDots < (mediaWidthDots * 0.88)))
+    // Media width and printhead width are separate physical facts. Preserve a
+    // configured printhead width exactly (bounded by the media); heuristic
+    // rejection of values such as 384 dots made 50 mm labels render at 400
+    // dots and lose content at the right edge on common 2-inch heads.
+    final effectivePrintableDots = printableWidthDots != null &&
+            printableWidthDots > 100
         ? math.min(mediaWidthDots, printableWidthDots)
         : (safeWidth <= 54 ? math.min(mediaWidthDots, 384) : mediaWidthDots);
     final widthBytes = (effectivePrintableDots + 7) ~/ 8;
@@ -100,10 +102,13 @@ class TsplCanvasLabelEngine {
 
     // Measure Item Layout and Height using TextPainter
     _MeasuredItem measureItem(Map<String, dynamic> item) {
-      final name = (item['product_name'] ?? item['name'] ?? 'Ürün').toString().trim();
+      final name =
+          (item['product_name'] ?? item['name'] ?? 'Ürün').toString().trim();
       final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
-      final qtyStr = qty % 1 == 0 ? qty.toInt().toString() : qty.toStringAsFixed(1);
-      final unitPrice = (item['unit_price'] as num? ?? item['unitPrice'] as num?)?.toDouble();
+      final qtyStr =
+          qty % 1 == 0 ? qty.toInt().toString() : qty.toStringAsFixed(1);
+      final unitPrice =
+          (item['unit_price'] as num? ?? item['unitPrice'] as num?)?.toDouble();
       final lineTotal = item['total'] != null
           ? (item['total'] as num).toDouble()
           : item['line_total'] != null
@@ -111,7 +116,8 @@ class TsplCanvasLabelEngine {
               : unitPrice == null
                   ? null
                   : unitPrice * qty;
-      final rightTotal = lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
+      final rightTotal =
+          lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
 
       final namePainter = TextPainter(
         text: TextSpan(
@@ -128,7 +134,8 @@ class TsplCanvasLabelEngine {
 
       final String detailText;
       if (unitPrice != null && rightTotal.isNotEmpty) {
-        detailText = '  $qtyStr ad. x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
+        detailText =
+            '  $qtyStr ad. x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
       } else if (rightTotal.isNotEmpty) {
         detailText = '  $qtyStr adet = $rightTotal';
       } else {
@@ -174,9 +181,8 @@ class TsplCanvasLabelEngine {
 
     // Sizing for QR code on the closing footer (scaled proportionally to DPI)
     final dotsPerMm = safeDpi / 25.4;
-    final qrCellWidth = isWide
-        ? (safeDpi >= 300 ? 4 : 3)
-        : (safeDpi >= 300 ? 3 : 2);
+    final qrCellWidth =
+        isWide ? (safeDpi >= 300 ? 4 : 3) : (safeDpi >= 300 ? 3 : 2);
     final qrBoxDots = (isWide ? 12.0 : 8.5) * dotsPerMm;
     final cleanQrData = (qrData != null && qrData.trim().isNotEmpty)
         ? qrData.trim()
@@ -203,7 +209,10 @@ class TsplCanvasLabelEngine {
         )..layout(maxWidth: footerTextW);
         h += notePainter.height + 4.0;
       }
-      final textH = (bodyFontSize + 4.0) + (showTotalAmount && totalAmount != null ? (titleFontSize + 4.0) : 0.0);
+      final textH = (bodyFontSize + 4.0) +
+          (showTotalAmount && totalAmount != null
+              ? (titleFontSize + 4.0)
+              : 0.0);
       if (isWide) {
         h += math.max(textH, hasQr ? (qrBoxDots + 4.0) : 0.0);
       } else {
@@ -213,12 +222,15 @@ class TsplCanvasLabelEngine {
     }
 
     final closingFooterH = measureClosingFooterHeight();
-    final contFooterH = detailFontSize + 18.0; // Divider + >> DEVAMI X. ETIKETTE >>
+    final contFooterH =
+        detailFontSize + 18.0; // Divider + >> DEVAMI X. ETIKETTE >>
 
     // ── Mathematically exact, lossless multi-page distribution ──
     final pages = <List<_MeasuredItem>>[];
-    final allItemsTotalH = measuredItems.fold<double>(0, (s, i) => s + i.totalHeight);
-    final canFitSinglePage = (page1HeaderH + allItemsTotalH + closingFooterH <= maxSafePageY);
+    final allItemsTotalH =
+        measuredItems.fold<double>(0, (s, i) => s + i.totalHeight);
+    final canFitSinglePage =
+        (page1HeaderH + allItemsTotalH + closingFooterH <= maxSafePageY);
 
     if (!paginateOnOverflow || canFitSinglePage) {
       pages.add(measuredItems);
@@ -230,7 +242,8 @@ class TsplCanvasLabelEngine {
       var page1Used = 0.0;
       while (itemIdx < measuredItems.length) {
         final item = measuredItems[itemIdx];
-        if (page1Items.isNotEmpty && (page1Used + item.totalHeight > page1Budget)) {
+        if (page1Items.isNotEmpty &&
+            (page1Used + item.totalHeight > page1Budget)) {
           break;
         }
         page1Items.add(item);
@@ -240,7 +253,8 @@ class TsplCanvasLabelEngine {
       pages.add(page1Items);
 
       // Subsequent pages budget
-      final subClosingBudget = maxSafePageY - subsequentHeaderH - closingFooterH;
+      final subClosingBudget =
+          maxSafePageY - subsequentHeaderH - closingFooterH;
       final subInterBudget = maxSafePageY - subsequentHeaderH - contFooterH;
 
       while (itemIdx < measuredItems.length) {
@@ -259,7 +273,8 @@ class TsplCanvasLabelEngine {
         var interUsed = 0.0;
         while (itemIdx < measuredItems.length) {
           final it = measuredItems[itemIdx];
-          if (inter.isNotEmpty && (interUsed + it.totalHeight > subInterBudget)) {
+          if (inter.isNotEmpty &&
+              (interUsed + it.totalHeight > subInterBudget)) {
             break;
           }
           inter.add(it);
@@ -297,7 +312,8 @@ class TsplCanvasLabelEngine {
         ..color = Colors.black
         ..strokeWidth = isWide ? 2.0 : 1.5;
 
-      final pageItemsTotalH = pageItems.fold<double>(0, (s, i) => s + i.totalHeight);
+      final pageItemsTotalH =
+          pageItems.fold<double>(0, (s, i) => s + i.totalHeight);
       final headerH = isFirstPage ? page1HeaderH : subsequentHeaderH;
       final footerH = isLastPage ? closingFooterH : contFooterH;
       final estTotalH = headerH + pageItemsTotalH + footerH;
@@ -340,12 +356,15 @@ class TsplCanvasLabelEngine {
             final dateX = math.max(paddingLeft, safeRightX - datePainter.width);
             datePainter.paint(canvas, Offset(dateX, currentY));
           }
-          currentY += math.max(orderPainter.height, bodyFontSize) + 4.0 + sectionSlack;
+          currentY +=
+              math.max(orderPainter.height, bodyFontSize) + 4.0 + sectionSlack;
         }
 
         // Customer & Phone
         if (showCustomerName) {
-          final custStr = customerName.trim().isNotEmpty ? 'Müş: ${customerName.trim()}' : 'Müş: Genel';
+          final custStr = customerName.trim().isNotEmpty
+              ? 'Müş: ${customerName.trim()}'
+              : 'Müş: Genel';
           final custPainter = TextPainter(
             text: TextSpan(
               text: custStr,
@@ -395,11 +414,13 @@ class TsplCanvasLabelEngine {
         }
 
         // Divider
-        canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
+        canvas.drawLine(Offset(paddingLeft, currentY + 2),
+            Offset(safeRightX, currentY + 2), linePaint);
         currentY += 6.0 + sectionSlack;
       } else {
         // Subsequent Pages Header
-        final contTitle = 'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
+        final contTitle =
+            'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
         final contPainter = TextPainter(
           text: TextSpan(
             text: contTitle,
@@ -428,7 +449,8 @@ class TsplCanvasLabelEngine {
           datePainter.paint(canvas, Offset(dateX, currentY));
         }
         currentY += math.max(contPainter.height, bodyFontSize) + 4.0;
-        canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
+        canvas.drawLine(Offset(paddingLeft, currentY + 2),
+            Offset(safeRightX, currentY + 2), linePaint);
         currentY += 6.0 + sectionSlack;
       }
 
@@ -441,19 +463,23 @@ class TsplCanvasLabelEngine {
       }
 
       // Divider after items
-      canvas.drawLine(Offset(paddingLeft, currentY + 2), Offset(safeRightX, currentY + 2), linePaint);
+      canvas.drawLine(Offset(paddingLeft, currentY + 2),
+          Offset(safeRightX, currentY + 2), linePaint);
       currentY += 6.0 + sectionSlack;
 
       if (isLastPage) {
         // Distribute remaining slack so the footer is nicely anchored and bottom void is eliminated
-        final remainingSlack = math.max(0.0, maxSafePageY - currentY - closingFooterH);
+        final remainingSlack =
+            math.max(0.0, maxSafePageY - currentY - closingFooterH);
         if (remainingSlack > 4.0) {
           currentY += (remainingSlack * 0.75).clamp(0.0, 60.0);
         }
 
         if (hasQr) {
           pageQrX = (safeRightX - qrBoxDots).round();
-          pageQrY = currentY.round().clamp(topMargin.round(), (maxSafePageY - qrBoxDots).round());
+          pageQrY = currentY
+              .round()
+              .clamp(topMargin.round(), (maxSafePageY - qrBoxDots).round());
 
           // Paint a small "SİPARİŞİ AÇ" caption under the QR area on canvas for wide labels
           if (isWide) {
@@ -470,7 +496,8 @@ class TsplCanvasLabelEngine {
             )..layout(maxWidth: qrBoxDots + 20.0);
             final labelX = (pageQrX + (qrBoxDots - qrLabelPainter.width) / 2)
                 .clamp(paddingLeft, safeRightX - qrLabelPainter.width);
-            final labelY = (pageQrY + qrBoxDots + 1.0).clamp(0.0, heightDots - 11.0);
+            final labelY =
+                (pageQrY + qrBoxDots + 1.0).clamp(0.0, heightDots - 11.0);
             if (labelY + qrLabelPainter.height <= heightDots - 2.0) {
               qrLabelPainter.paint(canvas, Offset(labelX, labelY));
             }
@@ -503,7 +530,8 @@ class TsplCanvasLabelEngine {
         if (showItemsCount && itemsCount != null) {
           final itemsPainter = TextPainter(
             text: TextSpan(
-              text: 'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Adet',
+              text:
+                  'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Adet',
               style: TextStyle(
                 color: Colors.black,
                 fontSize: detailFontSize,
@@ -561,13 +589,17 @@ class TsplCanvasLabelEngine {
         )..layout(maxWidth: usableW);
         contBanner.paint(
           canvas,
-          Offset(((widthDots - contBanner.width) / 2).clamp(paddingLeft, safeRightX - contBanner.width), currentY + 2),
+          Offset(
+              ((widthDots - contBanner.width) / 2)
+                  .clamp(paddingLeft, safeRightX - contBanner.width),
+              currentY + 2),
         );
       }
 
       final picture = recorder.endRecording();
       final image = await picture.toImage(widthDots, heightDots);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
       if (byteData != null) {
         final widthBytes = (widthDots + 7) ~/ 8;
@@ -577,7 +609,8 @@ class TsplCanvasLabelEngine {
 
         for (var y = 0; y < heightDots; y++) {
           for (var byteCol = 0; byteCol < widthBytes; byteCol++) {
-            var b = 0x00; // In TSPL BITMAP (mode 0): 0 = white paper (unburned), 1 = black dot (burned)
+            var b =
+                0x00; // In TSPL BITMAP (mode 0): 0 = white paper (unburned), 1 = black dot (burned)
             for (var bit = 0; bit < 8; bit++) {
               final px = byteCol * 8 + bit;
               if (px < widthDots) {
@@ -596,10 +629,13 @@ class TsplCanvasLabelEngine {
           }
         }
 
-        final tsplHeader =
-            'SIZE $safeWidth mm,$requestedHeightMm mm\r\n'
+        final tsplHeader = 'SIZE $safeWidth mm,$requestedHeightMm mm\r\n'
             'GAP $gapMm mm,0 mm\r\n'
-            '${autoDetectGap ? "GAPDETECT\r\n" : ""}'
+            // A gap scan is a calibration operation. On an overflowing order
+            // it may run at most once, before the first physical label; doing
+            // it again for every continuation label makes the printer feed
+            // unpredictably and breaks page alignment.
+            '${autoDetectGap && pageIdx == 0 ? "GAPDETECT\r\n" : ""}'
             'DENSITY 8\r\n'
             'DIRECTION ${direction == 1 ? 1 : 0}\r\n'
             'REFERENCE 0,0\r\n'
@@ -609,11 +645,16 @@ class TsplCanvasLabelEngine {
         outputBytes
           ..addAll(latin1.encode(tsplHeader))
           ..addAll(rasterBytes)
-          ..addAll(const [13, 10]); // CRLF termination after binary raster block
+          ..addAll(
+              const [13, 10]); // CRLF termination after binary raster block
 
         if (isLastPage && hasQr) {
-          final cleanQr = cleanQrData.replaceAll('"', "'").replaceAll('\r', '').replaceAll('\n', '');
-          final qrCmd = 'QRCODE $pageQrX,$pageQrY,M,$qrCellWidth,A,0,"$cleanQr"\r\n';
+          final cleanQr = cleanQrData
+              .replaceAll('"', "'")
+              .replaceAll('\r', '')
+              .replaceAll('\n', '');
+          final qrCmd =
+              'QRCODE $pageQrX,$pageQrY,M,$qrCellWidth,A,0,"$cleanQr"\r\n';
           outputBytes.addAll(latin1.encode(qrCmd));
         }
 
@@ -631,5 +672,6 @@ class _MeasuredItem {
   final TextPainter detailPainter;
   final double totalHeight;
 
-  _MeasuredItem(this.item, this.namePainter, this.detailPainter, this.totalHeight);
+  _MeasuredItem(
+      this.item, this.namePainter, this.detailPainter, this.totalHeight);
 }

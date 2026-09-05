@@ -76,7 +76,8 @@ class EscPosReceiptRenderer implements PrintRenderer {
     } else {
       bytes = <int>[
         ..._init,
-        0x1C, 0x2E,
+        0x1C,
+        0x2E,
       ];
     }
 
@@ -201,7 +202,8 @@ class EscPosReceiptRenderer implements PrintRenderer {
 
       _line(
         bytes,
-        _columns4('AD.', 'ÜRÜN ADI', 'BİRİM', 'TUTAR', wQty, wName, wPrice, wTotal),
+        _columns4(
+            'AD.', 'ÜRÜN ADI', 'BİRİM', 'TUTAR', wQty, wName, wPrice, wTotal),
         bold: true,
         mode: turkishMode,
       );
@@ -222,14 +224,16 @@ class EscPosReceiptRenderer implements PrintRenderer {
         if (name.length <= wName - 1) {
           _line(
             bytes,
-            _columns4(qtyStr, name, priceStr, totStr, wQty, wName, wPrice, wTotal),
+            _columns4(
+                qtyStr, name, priceStr, totStr, wQty, wName, wPrice, wTotal),
             mode: turkishMode,
           );
         } else {
           final nameLines = _wrap(name, wName - 1);
           _line(
             bytes,
-            _columns4(qtyStr, nameLines[0], '', '', wQty, wName, wPrice, wTotal),
+            _columns4(
+                qtyStr, nameLines[0], '', '', wQty, wName, wPrice, wTotal),
             mode: turkishMode,
           );
           for (var i = 1; i < nameLines.length - 1; i++) {
@@ -242,7 +246,8 @@ class EscPosReceiptRenderer implements PrintRenderer {
           final lastLine = nameLines.length > 1 ? nameLines.last : '';
           _line(
             bytes,
-            _columns4('', lastLine, priceStr, totStr, wQty, wName, wPrice, wTotal),
+            _columns4(
+                '', lastLine, priceStr, totStr, wQty, wName, wPrice, wTotal),
             mode: turkishMode,
           );
         }
@@ -252,38 +257,63 @@ class EscPosReceiptRenderer implements PrintRenderer {
 
     bytes.addAll(_alignRight);
     final total = _decimal(document['total']);
-    final subtotal = payload['subtotal'] != null
-        ? _decimal(payload['subtotal'])
-        : total;
+    final subtotal =
+        payload['subtotal'] != null ? _decimal(payload['subtotal']) : total;
     final discount = _decimal(payload['discount']);
     final vat = payload['vat'] != null
         ? _decimal(payload['vat'])
         : (total * 0.10 / 1.10);
 
-    _line(bytes, _columns('Ara Toplam:', '${subtotal.toStringAsFixed(2)} $currency', width), mode: turkishMode);
+    _line(
+        bytes,
+        _columns(
+            'Ara Toplam:', '${subtotal.toStringAsFixed(2)} $currency', width),
+        mode: turkishMode);
     if (vat > 0.009) {
-      _line(bytes, _columns('KDV (%10 Dahil):', '${vat.toStringAsFixed(2)} $currency', width), mode: turkishMode);
+      _line(
+          bytes,
+          _columns(
+              'KDV (%10 Dahil):', '${vat.toStringAsFixed(2)} $currency', width),
+          mode: turkishMode);
     }
     if (discount > 0.009) {
-      _line(bytes, _columns('İndirim / Kupon:', '-${discount.toStringAsFixed(2)} $currency', width), mode: turkishMode);
+      _line(
+          bytes,
+          _columns('İndirim / Kupon:',
+              '-${discount.toStringAsFixed(2)} $currency', width),
+          mode: turkishMode);
     }
 
     _line(bytes, '=' * width, mode: turkishMode);
-    _line(bytes, _columns('GENEL TOPLAM', '${total.toStringAsFixed(2)} $currency', width), bold: true, mode: turkishMode);
+    _line(
+        bytes,
+        _columns(
+            'GENEL TOPLAM', '${total.toStringAsFixed(2)} $currency', width),
+        bold: true,
+        mode: turkishMode);
     _line(bytes, '=' * width, mode: turkishMode);
 
     if (document['paid'] != null) {
       final paid = _decimal(document['paid']);
-      _line(bytes, _columns('Ödenen:', '${paid.toStringAsFixed(2)} $currency', width), mode: turkishMode);
+      _line(bytes,
+          _columns('Ödenen:', '${paid.toStringAsFixed(2)} $currency', width),
+          mode: turkishMode);
       if (paid < total - 0.01) {
-        _line(bytes, _columns('Kalan:', '${(total - paid).toStringAsFixed(2)} $currency', width), bold: true, mode: turkishMode);
+        _line(
+            bytes,
+            _columns('Kalan:', '${(total - paid).toStringAsFixed(2)} $currency',
+                width),
+            bold: true,
+            mode: turkishMode);
       }
     }
 
     bytes.addAll(_alignCenter);
     _line(bytes, _dashed(width), mode: turkishMode);
 
-    final barcode = document['barcode']?.toString().trim() ?? document['number']?.toString().trim() ?? '';
+    final barcode = document['barcode']?.toString().trim() ??
+        document['number']?.toString().trim() ??
+        '';
     if (barcode.isNotEmpty) {
       final safe = barcode.codeUnits.where((value) => value <= 127).toList();
       bytes
@@ -292,7 +322,8 @@ class EscPosReceiptRenderer implements PrintRenderer {
         ..addAll([0x1D, 0x6B, 0x49, safe.length])
         ..addAll(safe)
         ..add(0x0A);
-      final bizShort = (business['name']?.toString().trim() ?? 'SERENUT').toUpperCase();
+      final bizShort =
+          (business['name']?.toString().trim() ?? 'SERENUT').toUpperCase();
       final humanBarcode = '* $barcode - ${DateTime.now().year} - $bizShort *';
       _line(bytes, humanBarcode, mode: turkishMode);
     }
@@ -313,7 +344,9 @@ class EscPosReceiptRenderer implements PrintRenderer {
       }
     }
 
-    final website = business['website']?.toString().trim() ?? business['email']?.toString().trim() ?? '';
+    final website = business['website']?.toString().trim() ??
+        business['email']?.toString().trim() ??
+        '';
     if (website.isNotEmpty) {
       _line(bytes, website, mode: turkishMode);
     }
@@ -329,7 +362,10 @@ class EscPosReceiptRenderer implements PrintRenderer {
   }
 
   static String _dashed(int width) =>
-      List.generate((width / 2).floor(), (_) => '- ').join().padRight(width).substring(0, width);
+      List.generate((width / 2).floor(), (_) => '- ')
+          .join()
+          .padRight(width)
+          .substring(0, width);
 
   static String _columns4(
     String col1,
@@ -559,7 +595,8 @@ class TsplProductLabelRenderer implements PrintRenderer {
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
     final transport = _map(job.transportSnapshotJson);
-    final transportConfig = (transport['config'] as Map?)?.cast<String, Object?>() ?? const {};
+    final transportConfig =
+        (transport['config'] as Map?)?.cast<String, Object?>() ?? const {};
     final logo = payload['logoBytesBase64'] as String?;
     final capWidth = _integer(
       capabilities['mediaWidthMm'] ??
@@ -574,28 +611,33 @@ class TsplProductLabelRenderer implements PrintRenderer {
       0,
     );
     final rawWidth = _integer(payload['labelWidthMm'] ?? payload['widthMm'], 0);
-    final rawHeight = _integer(payload['labelHeightMm'] ?? payload['heightMm'], 0);
+    final rawHeight =
+        _integer(payload['labelHeightMm'] ?? payload['heightMm'], 0);
 
-    final widthMm = (capWidth > 0 && capWidth != 50)
-        ? capWidth
-        : (rawWidth > 0 ? rawWidth : (capWidth > 0 ? capWidth : _integer(design['widthMm'], 50)));
-    final heightMm = (capHeight > 0 && capHeight != 30)
-        ? capHeight
-        : (rawHeight > 0 ? rawHeight : (capHeight > 0 ? capHeight : _integer(design['heightMm'], 30)));
+    // The payload is the physical-media snapshot made when the job was
+    // queued.  Prefer it so a later device edit cannot change the geometry of
+    // an already queued job. Capabilities are only the fallback for legacy
+    // jobs that do not carry a snapshot.
+    final widthMm = rawWidth > 0
+        ? rawWidth
+        : (capWidth > 0 ? capWidth : _integer(design['widthMm'], 50));
+    final heightMm = rawHeight > 0
+        ? rawHeight
+        : (capHeight > 0 ? capHeight : _integer(design['heightMm'], 30));
     final gapMm = _integer(
-      capabilities['gapMm'] ??
+      payload['labelGapMm'] ??
+          payload['gapMm'] ??
+          capabilities['gapMm'] ??
           capabilities['labelGapMm'] ??
           transportConfig['labelGapMm'] ??
-          payload['labelGapMm'] ??
-          payload['gapMm'] ??
           design['gapMm'],
       2,
     );
     final dpi = _integer(
-      capabilities['dpi'] ??
-          transportConfig['dpi'] ??
-          payload['labelDpi'] ??
+      payload['labelDpi'] ??
           payload['dpi'] ??
+          capabilities['dpi'] ??
+          transportConfig['dpi'] ??
           design['dpi'],
       203,
     );
@@ -603,9 +645,9 @@ class TsplProductLabelRenderer implements PrintRenderer {
         capabilities['autoDetectGap'] == true ||
         transportConfig['autoDetectLabelGap'] == true ||
         design['autoDetectGap'] == true;
-    final printableWidthDots = (capabilities['printableWidthDots'] ??
-        transportConfig['printableWidthDots'] ??
-        payload['printableWidthDots']) as int?;
+    final printableWidthDots = (payload['printableWidthDots'] ??
+        capabilities['printableWidthDots'] ??
+        transportConfig['printableWidthDots']) as int?;
 
     final bytes = <int>[];
     var isFirstLabel = true;
@@ -649,8 +691,10 @@ class TsplOrderLabelRenderer implements PrintRenderer {
     final design = _map(job.designSnapshotJson);
     final capabilities = _map(job.capabilitySnapshotJson);
     final transport = _map(job.transportSnapshotJson);
-    final transportConfig = (transport['config'] as Map?)?.cast<String, Object?>() ?? const {};
-    final useCanvas = design['useCanvas'] != false && design['engine'] != 'legacy';
+    final transportConfig =
+        (transport['config'] as Map?)?.cast<String, Object?>() ?? const {};
+    final useCanvas =
+        design['useCanvas'] != false && design['engine'] != 'legacy';
 
     final capWidth = _integer(
       capabilities['mediaWidthMm'] ??
@@ -665,28 +709,32 @@ class TsplOrderLabelRenderer implements PrintRenderer {
       0,
     );
     final rawWidth = _integer(payload['labelWidthMm'] ?? payload['widthMm'], 0);
-    final rawHeight = _integer(payload['labelHeightMm'] ?? payload['heightMm'], 0);
+    final rawHeight =
+        _integer(payload['labelHeightMm'] ?? payload['heightMm'], 0);
 
-    final widthMm = (capWidth > 0 && capWidth != 50)
-        ? capWidth
-        : (rawWidth > 0 ? rawWidth : (capWidth > 0 ? capWidth : _integer(design['widthMm'], 50)));
-    final heightMm = (capHeight > 0 && capHeight != 30)
-        ? capHeight
-        : (rawHeight > 0 ? rawHeight : (capHeight > 0 ? capHeight : _integer(design['heightMm'], 30)));
+    // A queued order label must retain its original physical-media geometry.
+    // The capability snapshot is a fallback only for jobs created by older
+    // versions which did not persist these payload fields.
+    final widthMm = rawWidth > 0
+        ? rawWidth
+        : (capWidth > 0 ? capWidth : _integer(design['widthMm'], 50));
+    final heightMm = rawHeight > 0
+        ? rawHeight
+        : (capHeight > 0 ? capHeight : _integer(design['heightMm'], 30));
     final gapMm = _integer(
-      capabilities['gapMm'] ??
+      payload['labelGapMm'] ??
+          payload['gapMm'] ??
+          capabilities['gapMm'] ??
           capabilities['labelGapMm'] ??
           transportConfig['labelGapMm'] ??
-          payload['labelGapMm'] ??
-          payload['gapMm'] ??
           design['gapMm'],
       2,
     );
     final dpi = _integer(
-      capabilities['dpi'] ??
-          transportConfig['dpi'] ??
-          payload['labelDpi'] ??
+      payload['labelDpi'] ??
           payload['dpi'] ??
+          capabilities['dpi'] ??
+          transportConfig['dpi'] ??
           design['dpi'],
       203,
     );
@@ -694,9 +742,9 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         capabilities['autoDetectGap'] == true ||
         transportConfig['autoDetectLabelGap'] == true ||
         design['autoDetectGap'] == true;
-    final printableWidthDots = (capabilities['printableWidthDots'] ??
-        transportConfig['printableWidthDots'] ??
-        payload['printableWidthDots']) as int?;
+    final printableWidthDots = (payload['printableWidthDots'] ??
+        capabilities['printableWidthDots'] ??
+        transportConfig['printableWidthDots']) as int?;
 
     final List<int> bytes;
     if (useCanvas) {

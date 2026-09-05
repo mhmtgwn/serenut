@@ -195,7 +195,8 @@ void main() {
     expect(output, contains('BITMAP 0,0,48,'));
   });
 
-  test('order renderer supports legacy engine fallback when requested', () async {
+  test('order renderer supports legacy engine fallback when requested',
+      () async {
     final rendered = await TsplOrderLabelRenderer().render(job(
       kind: PrintDocumentKind.orderLabel,
       rendererVersion: 'tspl-order-v1',
@@ -232,7 +233,9 @@ void main() {
     expect(output, contains('Odm: Kismi odendi'));
   });
 
-  test('order renderer strictly adheres to payload printer settings dimensions and ignores logo', () async {
+  test(
+      'order renderer strictly adheres to payload printer settings dimensions and ignores logo',
+      () async {
     final rendered = await TsplOrderLabelRenderer().render(job(
       kind: PrintDocumentKind.orderLabel,
       rendererVersion: 'tspl-order-v1',
@@ -250,7 +253,11 @@ void main() {
         'labelDpi': 203,
         'logoBytesBase64': base64Encode(utf8.encode('DUMMY_LOGO_BYTES')),
         'items': [
-          {'product_name': 'Ölçü Test Ürünü', 'quantity': 1, 'unit_price': 50.0},
+          {
+            'product_name': 'Ölçü Test Ürünü',
+            'quantity': 1,
+            'unit_price': 50.0
+          },
         ],
       },
       design: const {},
@@ -267,7 +274,50 @@ void main() {
     expect(output, isNot(contains('DUMMY_LOGO_BYTES')));
   });
 
-  test('order renderer adheres to 80x40 printer capability dimensions and completely omits businessName Nutopia', () async {
+  test('order renderer preserves a narrower physical printhead on wider media',
+      () async {
+    final rendered = await TsplOrderLabelRenderer().render(job(
+      kind: PrintDocumentKind.orderLabel,
+      rendererVersion: 'tspl-order-v1',
+      payload: {
+        'orderNo': 'ORD-60MM',
+        'customerName': 'Ölçü Test Müşteri',
+        'productName': '1 Ürün',
+        'quantity': 1,
+        'itemsCount': 1,
+        'totalAmount': 50,
+        'labelWidthMm': 60,
+        'labelHeightMm': 30,
+        'labelGapMm': 2,
+        'labelDpi': 203,
+        'items': [
+          {
+            'product_name': 'Ölçü Test Ürünü',
+            'quantity': 1,
+            'unit_price': 50.0
+          },
+        ],
+      },
+      design: const {},
+      capabilities: {
+        'mediaWidthMm': 60,
+        'mediaHeightMm': 30,
+        'gapMm': 2,
+        'dpi': 203,
+        // A real, narrower 2-inch printhead. It must not be silently
+        // expanded to the 60 mm media width (480 dots).
+        'printableWidthDots': 384,
+      },
+    ));
+    final output = latin1.decode(rendered.bytes, allowInvalid: true);
+    expect(output, contains('SIZE 60 mm,30 mm'));
+    expect(output, contains('BITMAP 0,0,48,'));
+    expect(output, isNot(contains('BITMAP 0,0,60,')));
+  });
+
+  test(
+      'order renderer adheres to 80x40 printer capability dimensions and completely omits businessName Nutopia',
+      () async {
     final rendered = await TsplOrderLabelRenderer().render(job(
       kind: PrintDocumentKind.orderLabel,
       rendererVersion: 'tspl-order-v1',
@@ -281,7 +331,11 @@ void main() {
         'totalAmount': 240,
         'businessName': 'Nutopia',
         'items': [
-          {'product_name': 'Kavrulmuş Fındık 500g', 'quantity': 2, 'unit_price': 120.0},
+          {
+            'product_name': 'Kavrulmuş Fındık 500g',
+            'quantity': 2,
+            'unit_price': 120.0
+          },
         ],
       },
       design: const {},
