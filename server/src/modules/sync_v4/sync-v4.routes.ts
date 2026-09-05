@@ -360,6 +360,9 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
       `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
     if (!customer.rowCount) throw new Error("invalid_customer");
   }
+  const rawMetadata = typeof payload.metadata === "object" && payload.metadata !== null ? payload.metadata : null;
+  const isRevision = (rawMetadata && (rawMetadata as any).reason === "order_revision") ||
+                     (typeof payload.metadata === "string" && payload.metadata.includes('"order_revision"'));
   if (type === "sale") {
     let sale = await client.query(
       `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
@@ -374,8 +377,12 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     // original fact instead of requiring the current paid projection to match.
     const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
     const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
+    const isReversed = referenceId ? (Number((await client.query(
+      `SELECT 1 FROM financial_transactions WHERE reference_id=$1 AND company_id=$2 AND (metadata::text LIKE $3 OR metadata::text LIKE $4) LIMIT 1`,
+      [referenceId, companyId, `%"reverses":"${id}"%`, `%"reverses": "${id}"%`]
+    )).rowCount) > 0) : false;
     if (!sale.rowCount || hasCustomerMismatch ||
-        Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01 ||
+        (!isRevision && !isReversed && Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01) ||
         Number(sale.rows[0].paid_amount)+0.01 < paidAmount ||
         Math.abs(amount-paidAmount-debtAmount)>0.01) throw new Error("sale_ledger_mismatch");
   } else if (type === "payment") {
@@ -424,7 +431,7 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
     const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
     if (!sale.rowCount || hasCustomerMismatch ||
-        amount > Number(sale.rows[0].total_amount)+0.01) {
+        (!isRevision && amount > Number(sale.rows[0].total_amount)+0.01)) {
       throw new Error(`${type}_sale_mismatch`);
     }
   }
