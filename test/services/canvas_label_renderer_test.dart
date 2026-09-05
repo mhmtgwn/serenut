@@ -96,16 +96,16 @@ void main() {
     expect(output, contains('BITMAP 0,0,48,'));
     expect(output, contains('PRINT 1,1'));
 
-    // Verify background polarity: In TSPL BITMAP mode 0: 0=white (unburned), 1=black (burned).
-    // The majority of bytes must be 0x00 (white background), NOT 0xFF (pitch black).
+    // Verify background polarity: In TSPL BITMAP mode 0: 1=white (unburned), 0=black (burned).
+    // The majority of bytes must be 0xFF (white background), NOT 0x00 (pitch black).
     const bitmapPrefix = 'BITMAP 0,0,48,240,0,';
     final bitmapIndex = output.indexOf(bitmapPrefix);
     expect(bitmapIndex, isNonNegative);
     final rasterStart = bitmapIndex + bitmapPrefix.length;
     final rasterData = bytes.sublist(rasterStart, rasterStart + (48 * 240));
-    final whiteBytes = rasterData.where((b) => b == 0x00).length;
+    final whiteBytes = rasterData.where((b) => b == 0xFF).length;
     const totalBytes = 48 * 240;
-    // White background (0x00) must account for >65% of the label bytes
+    // White background (0xFF) must account for >65% of the label bytes
     expect(whiteBytes / totalBytes, greaterThan(0.65));
   });
 

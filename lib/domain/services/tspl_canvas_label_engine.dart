@@ -63,14 +63,15 @@ class TsplCanvasLabelEngine {
     final widthDots = widthBytes * 8;
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
-    // 2.0 mm equal padding on all sides
-    final marginDots = (2.0 * safeDpi / 25.4).roundToDouble();
+    // Safe margins: Use 3.0mm padding on narrow labels (<=54mm) to avoid right-edge clipping
+    final marginMm = safeWidth <= 54 ? 3.0 : 2.0;
+    final marginDots = (marginMm * safeDpi / 25.4).roundToDouble();
     final paddingLeft = marginDots;
     final paddingRight = marginDots;
     final safeRightX = widthDots - paddingRight;
-    final usableW = (safeRightX - paddingLeft).clamp(100.0, 1000.0);
-    final topMargin = marginDots;
-    final bottomMargin = marginDots + 4.0; // 2.5 mm bottom edge clearance
+    final usableW = (safeRightX - paddingLeft).clamp(80.0, 1000.0);
+    final topMargin = (2.0 * safeDpi / 25.4).roundToDouble();
+    final bottomMargin = (3.0 * safeDpi / 25.4).roundToDouble(); // 3.0 mm bottom edge clearance
     final maxSafePageY = heightDots - bottomMargin;
 
     final fontScale = switch (fontSize) {
@@ -78,10 +79,11 @@ class TsplCanvasLabelEngine {
       'Büyük' => 1.18,
       _ => 1.0,
     };
+    final heightScale = requestedHeightMm <= 30 ? 0.90 : 1.0;
     final isWide = safeWidth >= 70;
-    final titleFontSize = (isWide ? 28.0 : 21.0) * fontScale;
-    final bodyFontSize = (isWide ? 23.0 : 17.5) * fontScale;
-    final detailFontSize = (isWide ? 20.0 : 14.5) * fontScale;
+    final titleFontSize = (isWide ? 28.0 : 20.0) * fontScale * heightScale;
+    final bodyFontSize = (isWide ? 23.0 : 16.0) * fontScale * heightScale;
+    final detailFontSize = (isWide ? 20.0 : 13.5) * fontScale * heightScale;
 
     final dateStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -191,9 +193,9 @@ class TsplCanvasLabelEngine {
 
     // Accurate closing footer height measurement
     double measureClosingFooterHeight() {
-      var h = 6.0; // Divider after items
-      final footerTextW = (isWide && hasQr)
-          ? (usableW - qrBoxDots - 16.0).clamp(100.0, usableW)
+      var h = 4.0; // Divider after items
+      final footerTextW = hasQr
+          ? (usableW - qrBoxDots - 10.0).clamp(80.0, usableW)
           : usableW;
       if (note != null && note.trim().isNotEmpty) {
         final notePainter = TextPainter(
@@ -207,16 +209,20 @@ class TsplCanvasLabelEngine {
           textDirection: TextDirection.ltr,
           maxLines: 2,
         )..layout(maxWidth: footerTextW);
-        h += notePainter.height + 4.0;
+        h += notePainter.height + 3.0;
       }
-      final textH = (bodyFontSize + 4.0) +
-          (showTotalAmount && totalAmount != null
-              ? (titleFontSize + 4.0)
-              : 0.0);
-      if (isWide) {
-        h += math.max(textH, hasQr ? (qrBoxDots + 4.0) : 0.0);
+      var textH = 0.0;
+      if (showItemsCount && itemsCount != null) {
+        textH += detailFontSize + 3.0;
+      }
+      textH += bodyFontSize + 3.0; // Payment status
+      if (showTotalAmount && totalAmount != null) {
+        textH += titleFontSize + 3.0; // Total
+      }
+      if (hasQr) {
+        h += math.max(textH, qrBoxDots);
       } else {
-        h += textH + (hasQr ? (qrBoxDots + 4.0) : 0.0);
+        h += textH;
       }
       return h + 4.0;
     }
@@ -471,8 +477,8 @@ class TsplCanvasLabelEngine {
         // Distribute remaining slack so the footer is nicely anchored and bottom void is eliminated
         final remainingSlack =
             math.max(0.0, maxSafePageY - currentY - closingFooterH);
-        if (remainingSlack > 4.0) {
-          currentY += (remainingSlack * 0.75).clamp(0.0, 60.0);
+        if (remainingSlack > 2.0) {
+          currentY += (remainingSlack * 0.5).clamp(0.0, 30.0);
         }
 
         if (hasQr) {
@@ -504,8 +510,8 @@ class TsplCanvasLabelEngine {
           }
         }
 
-        final textMaxW = (isWide && hasQr)
-            ? (usableW - qrBoxDots - 16.0).clamp(100.0, usableW)
+        final textMaxW = hasQr
+            ? (usableW - qrBoxDots - 10.0).clamp(80.0, usableW)
             : usableW;
 
         // Order Note
@@ -523,7 +529,7 @@ class TsplCanvasLabelEngine {
             maxLines: 2,
           )..layout(maxWidth: textMaxW);
           notePainter.paint(canvas, Offset(paddingLeft, currentY));
-          currentY += notePainter.height + 3.0;
+          currentY += notePainter.height + 2.0;
         }
 
         // Summary item count (if enabled)
@@ -531,7 +537,7 @@ class TsplCanvasLabelEngine {
           final itemsPainter = TextPainter(
             text: TextSpan(
               text:
-                  'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Adet',
+                  'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
               style: TextStyle(
                 color: Colors.black,
                 fontSize: detailFontSize,
@@ -610,7 +616,7 @@ class TsplCanvasLabelEngine {
         for (var y = 0; y < heightDots; y++) {
           for (var byteCol = 0; byteCol < widthBytes; byteCol++) {
             var b =
-                0x00; // In TSPL BITMAP (mode 0): 0 = white paper (unburned), 1 = black dot (burned)
+                0xFF; // In TSPL BITMAP (mode 0): 1 = white paper (unburned), 0 = black dot (burned)
             for (var bit = 0; bit < 8; bit++) {
               final px = byteCol * 8 + bit;
               if (px < widthDots) {
@@ -620,8 +626,8 @@ class TsplCanvasLabelEngine {
                 final bChannel = (pixel >> 16) & 0xFF;
                 final lum = (r * 77 + g * 150 + bChannel * 29) >> 8;
                 if (lum < 160) {
-                  // Dark pixel (text, graphics): set bit to 1
-                  b |= (0x80 >> bit);
+                  // Dark pixel (text, graphics): clear bit to 0
+                  b &= ~(0x80 >> bit);
                 }
               }
             }
