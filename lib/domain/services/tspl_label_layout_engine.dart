@@ -558,10 +558,15 @@ class TsplLabelLayoutEngine {
           final page1OrderNo =
               _fit(orderIdShort, (availableOrderChars - 8).clamp(3, 22));
           if (hasOrderNo && hasDate) {
+            final page1OrderText =
+                'Sip #$page1OrderNo (1/${pages.length})';
+            final orderPixelW = bodyFont.measureWidth(page1OrderText);
+            final naturalDateX = paddingX + orderPixelW + sy(16);
+            final actualDateX = naturalDateX <= safeDateX ? naturalDateX : safeDateX;
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$page1OrderNo (1/${pages.length})"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$page1OrderText"');
             commands.writeln(
-                'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $actualDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
@@ -585,7 +590,7 @@ class TsplLabelLayoutEngine {
               final phoneText =
                   'Tel: ${_fit(phoneClean, (maxBodyChars - 5).clamp(4, 30))}';
               commands.writeln(
-                  'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$phoneText"');
               currentY += rowHeight;
             }
           }
@@ -606,10 +611,15 @@ class TsplLabelLayoutEngine {
           final contOrderNo =
               _fit(orderIdShort, (availableOrderChars - 10).clamp(3, 20));
           if (hasOrderNo && hasDate) {
+            final contOrderText =
+                'Sip #$contOrderNo (${pageIdx + 1}/${pages.length})';
+            final contPixelW = bodyFont.measureWidth(contOrderText);
+            final naturalDateX = paddingX + contPixelW + sy(16);
+            final actualDateX = naturalDateX <= safeDateX ? naturalDateX : safeDateX;
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pageIdx + 1}/${pages.length})"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$contOrderText"');
             commands.writeln(
-                'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $actualDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
@@ -631,10 +641,15 @@ class TsplLabelLayoutEngine {
           final contOrderNo =
               _fit(orderIdShort, (availableOrderChars - 10).clamp(3, 20));
           if (hasOrderNo && hasDate) {
+            final contOrderText =
+                'Sip #$contOrderNo (${pages.length}/${pages.length})';
+            final contPixelW = bodyFont.measureWidth(contOrderText);
+            final naturalDateX = paddingX + contPixelW + sy(16);
+            final actualDateX = naturalDateX <= safeDateX ? naturalDateX : safeDateX;
             commands.writeln(
-                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Sip #$contOrderNo (${pages.length}/${pages.length})"');
+                'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"$contOrderText"');
             commands.writeln(
-                'TEXT $safeDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
+                'TEXT $actualDateX,$currentY,"$bodyFont",0,1,1,"$dateText"');
             currentY += rowHeight;
           } else if (hasOrderNo) {
             commands.writeln(
