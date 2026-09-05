@@ -341,8 +341,6 @@ class _LabelTemplateEditorPageState
           const SizedBox(height: 10),
           _buildOrderLabelPreview(bizName, logoPath),
           const SizedBox(height: 20),
-          _buildBusinessInfoBanner(settings),
-          const SizedBox(height: 16),
           Text(
             'Sipariş Etiketi Ayarları',
             style: GoogleFonts.inter(
@@ -352,12 +350,6 @@ class _LabelTemplateEditorPageState
             ),
           ),
           const SizedBox(height: 12),
-          _buildToggleTile(
-            title: 'Firma Adı Göster',
-            subtitle: 'Sipariş etiketinin başında işletme adını yazar',
-            value: _orderShowBusinessName,
-            onChanged: (v) => setState(() => _orderShowBusinessName = v),
-          ),
           _buildToggleTile(
             title: 'Müşteri Adı Göster',
             subtitle: 'Sipariş sahibinin ad soyadını basar',

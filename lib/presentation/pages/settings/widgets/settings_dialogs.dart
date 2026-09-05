@@ -522,25 +522,6 @@ extension _SettingsPageDialogs on _SettingsPageState {
                         setModalState(() => itemLayout = v ?? 'auto'),
                   ),
                   const SizedBox(height: 12),
-                  _buildFormDropdown<String>(
-                    label: 'Türkçe Karakter Kodlaması',
-                    icon: Icons.language_rounded,
-                    value: turkishMode,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'universal',
-                          child: Text('Temiz Türkçe (Önerilen - Tüm Yazıcılar)')),
-                      DropdownMenuItem(
-                          value: 'cp857',
-                          child: Text('Donanımsal CP857 (Epson / Xprinter)')),
-                      DropdownMenuItem(
-                          value: 'cp1254',
-                          child: Text('Windows-1254 (Latin-5)')),
-                    ],
-                    onChanged: (v) =>
-                        setModalState(() => turkishMode = v ?? 'universal'),
-                  ),
-                  const SizedBox(height: 12),
                   _buildFormTextField(
                     controller: footerCtrl,
                     label: 'Fiş sonu mesajı',

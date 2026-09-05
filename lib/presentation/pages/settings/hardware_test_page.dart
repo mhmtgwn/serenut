@@ -922,7 +922,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
   late final TextEditingController _labelHeight;
   late final TextEditingController _labelGap;
   late final TextEditingController _labelCopies;
-  late final TextEditingController _printableWidthDots;
   String _vendor = 'generic';
   String _protocol = 'vendor_sdk';
   int _dataBits = 8;
@@ -986,19 +985,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelCopies = TextEditingController(
       text: config['copies']?.toString() ?? '1',
     );
-    final initialWidth =
-        int.tryParse(config['labelWidthMm']?.toString() ?? '') ?? 50;
-    final initialDpi = int.tryParse(config['dpi']?.toString() ?? '') ?? 203;
-    final defaultDots = (initialWidth * initialDpi / 25.4).round();
-    final rawDots =
-        int.tryParse(config['printableWidthDots']?.toString() ?? '');
-    final initialPrintableDots =
-        (rawDots != null && (rawDots != 384 || initialWidth <= 54))
-            ? rawDots
-            : defaultDots;
-    _printableWidthDots = TextEditingController(
-      text: initialPrintableDots.toString(),
-    );
     _vendor = config['vendor']?.toString() ?? 'generic';
     _protocol = config['protocol']?.toString() ?? 'vendor_sdk';
     _dataBits = int.tryParse(config['dataBits']?.toString() ?? '') ?? 8;
@@ -1028,7 +1014,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
     _labelHeight.dispose();
     _labelGap.dispose();
     _labelCopies.dispose();
-    _printableWidthDots.dispose();
     super.dispose();
   }
 
@@ -1435,55 +1420,7 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _ResponsiveFieldRow(
-            breakpoint: 620,
-            children: [
-              DropdownButtonFormField<int>(
-                value: _dataBits,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Veri biti'),
-                items: const [7, 8]
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text('$value bit'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => _dataBits = value ?? 8,
-              ),
-              DropdownButtonFormField<int>(
-                value: _stopBits,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Stop biti'),
-                items: const [1, 2]
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text('$value'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => _stopBits = value ?? 1,
-              ),
-              DropdownButtonFormField<String>(
-                value: _parity,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Parite'),
-                items: const {'none': 'Yok', 'even': 'Çift', 'odd': 'Tek'}
-                    .entries
-                    .map(
-                      (entry) => DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(entry.value),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => _parity = value ?? 'none',
-              ),
-            ],
-          ),
+
         ],
         if ((_type == HardwareDeviceType.receiptPrinter ||
                 _type == HardwareDeviceType.labelPrinter) &&
@@ -1830,24 +1767,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
           ),
         ],
         if (_type == HardwareDeviceType.labelPrinter && !sharedConnection) ...[
-          DropdownButtonFormField<String>(
-            value: _labelLanguage,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Yazıcı dili'),
-            items: const [
-              DropdownMenuItem(
-                value: 'tspl',
-                child: Text('TSPL / TSC uyumlu (önerilen)'),
-              ),
-              DropdownMenuItem(
-                value: 'escpos',
-                child: Text('ESC/POS (eski uyumluluk)'),
-              ),
-            ],
-            onChanged: (value) =>
-                setState(() => _labelLanguage = value ?? 'tspl'),
-          ),
-          const SizedBox(height: 12),
           _ResponsiveFieldRow(
             children: [
               TextField(
@@ -1874,16 +1793,14 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
                   '58 mm yazıcı genişliği ile etiketin gerçek en/boy ölçüsü aynı ayar değildir.',
             ),
           ),
-          if (_labelLanguage == 'tspl') ...[
-            const SizedBox(height: 4),
-            _SettingsToggle(
-              title: 'Gap boşluğunu otomatik algıla',
-              subtitle:
-                  'Gaplı etiket kullanıldığında yazıcı sensörü etiket aralığını kalibre eder.',
-              value: _autoDetectLabelGap,
-              onChanged: (value) => setState(() => _autoDetectLabelGap = value),
-            ),
-          ],
+          const SizedBox(height: 4),
+          _SettingsToggle(
+            title: 'Gap boşluğunu otomatik algıla',
+            subtitle:
+                'Gaplı etiket kullanıldığında yazıcı sensörü etiket aralığını kalibre eder.',
+            value: _autoDetectLabelGap,
+            onChanged: (value) => setState(() => _autoDetectLabelGap = value),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _labelCopies,
@@ -1901,16 +1818,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
             selected: {_labelDpi},
             onSelectionChanged: (values) =>
                 setState(() => _labelDpi = values.first),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _printableWidthDots,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Basılabilir genişlik (nokta)',
-              helperText:
-                  'Yazıcının gerçek printhead genişliğini girin; medya eniyle aynı olmak zorunda değildir (203 DPI, 384 dot ≈ 48 mm).',
-            ),
           ),
           const SizedBox(height: 12),
           SegmentedButton<int>(
@@ -2207,7 +2114,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       final height = int.tryParse(_labelHeight.text);
       final gap = int.tryParse(_labelGap.text);
       final copies = int.tryParse(_labelCopies.text);
-      final printableDots = int.tryParse(_printableWidthDots.text);
       if (width == null || width < 30 || width > 100) {
         return 'Etiket eni 30-100 mm arasında olmalıdır.';
       }
@@ -2219,11 +2125,6 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
       }
       if (copies == null || copies < 1 || copies > 20) {
         return 'Etiket adedi 1-20 arasında olmalıdır.';
-      }
-      if (printableDots == null ||
-          printableDots < 200 ||
-          printableDots > 1200) {
-        return 'Basılabilir genişlik 200-1200 nokta arasında olmalıdır.';
       }
     }
     return null;
@@ -2261,12 +2162,8 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
         'autoDetectLabelGap': _labelLanguage == 'tspl' && _autoDetectLabelGap,
         'dpi': _labelDpi,
-        'printableWidthDots': () {
-          final resolvedWidth = int.tryParse(_labelWidth.text) ?? 50;
-          final calcDots = (resolvedWidth * _labelDpi / 25.4).round();
-          final rawDots = int.tryParse(_printableWidthDots.text) ?? calcDots;
-          return (rawDots == 384 && resolvedWidth > 54) ? calcDots : rawDots;
-        }(),
+        'printableWidthDots':
+            ((int.tryParse(_labelWidth.text) ?? 50) * _labelDpi / 25.4).round(),
         'printDirection': _printDirection,
         'copies': int.tryParse(_labelCopies.text) ?? 1,
         'autoCut': _autoCut,
@@ -2500,12 +2397,11 @@ class _ConnectionNotice extends StatelessWidget {
 class _ResponsiveFieldRow extends StatelessWidget {
   final List<Widget> children;
   final List<int>? flexes;
-  final double breakpoint;
+  static const double breakpoint = 500;
 
   const _ResponsiveFieldRow({
     required this.children,
     this.flexes,
-    this.breakpoint = 500,
   });
 
   @override

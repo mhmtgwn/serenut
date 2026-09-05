@@ -189,6 +189,7 @@ void main() {
         labelPrinterIp: '192.168.1.150',
         labelPrinterPort: 9100,
         labelPrinterLanguage: 'tspl',
+        labelGapMm: 0,
         createdAt: DateTime.now(),
       );
       final socket = MockSocket();
@@ -243,14 +244,77 @@ void main() {
       expect('Dorduncu Urun'.allMatches(output), hasLength(1));
       expect('Besinci Urun'.allMatches(output), hasLength(1));
       expect(output, isNot(contains('diger urun')));
-      // A single dynamically growing order label must still respect the
-      // configured physical media gap; "continuous" describes one print job,
-      // not gapless paper.
-      expect(output, contains('GAP ${settings.labelGapMm} mm,0 mm'));
+      expect(output, contains('GAP 0 mm,0 mm'));
       final size = RegExp(r'SIZE 50 mm,(\d+) mm').firstMatch(output);
       expect(size, isNotNull);
       expect(int.parse(size!.group(1)!), greaterThan(30));
       expect('PRINT 1,1'.allMatches(output), hasLength(1));
+    });
+
+    test('gapped order label paginates across multiple pages on overflow',
+        () async {
+      final settings = Settings(
+        businessName: 'Test Market',
+        businessPhone: '123456',
+        businessAddress: 'Address',
+        labelPrinterEnabled: true,
+        labelPrinterName: 'network',
+        labelPrinterIp: '192.168.1.150',
+        labelPrinterPort: 9100,
+        labelPrinterLanguage: 'tspl',
+        labelGapMm: 2,
+        createdAt: DateTime.now(),
+      );
+      final socket = MockSocket();
+      final service =
+          PrinterService((ip, port, {timeout}) async => socket, null);
+      final items = <Map<String, dynamic>>[
+        {
+          'product_id': 'prod-1',
+          'product_name': 'Birinci Urun',
+          'quantity': 1.0,
+          'unit_price': 10.0,
+        },
+        {
+          'product_id': 'prod-2',
+          'product_name': 'Ikinci Urun',
+          'quantity': 2.0,
+          'unit_price': 20.0,
+        },
+        {
+          'product_id': 'prod-3',
+          'product_name': 'Ucuncu Urun',
+          'quantity': 3.0,
+          'unit_price': 30.0,
+        },
+        {
+          'product_id': 'prod-4',
+          'product_name': 'Dorduncu Urun',
+          'quantity': 4.0,
+          'unit_price': 40.0,
+        },
+        {
+          'product_id': 'prod-5',
+          'product_name': 'Besinci Urun',
+          'quantity': 5.0,
+          'unit_price': 50.0,
+        },
+      ];
+      final order = OrderEntity(
+        id: 'order-paged-items',
+        customerId: 'customer-1',
+        status: 'pending',
+        createdAt: DateTime.now(),
+        items: items,
+      );
+
+      await service.printOrderLabels(order, items, settings);
+
+      final output = String.fromCharCodes(socket.writtenBytes);
+      expect('Birinci Urun'.allMatches(output), hasLength(1));
+      expect('Besinci Urun'.allMatches(output), hasLength(1));
+      expect(output, contains('GAP 2 mm,0 mm'));
+      expect('PRINT 1,1'.allMatches(output).length, greaterThanOrEqualTo(2));
     });
   });
 }
