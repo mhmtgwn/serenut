@@ -341,15 +341,19 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
   const paidAmount = numberValue(payload, "paid_amount", Number.NaN);
   const debtAmount = numberValue(payload, "debt_amount", Number.NaN);
   const referenceId = nullableId(stringValue(payload, "reference_id"));
-  if (!["sale","payment","collection","manual_debt","cancellation","refund"].includes(type) || !customerId ||
+  const requiresCustomer = ["payment", "collection", "manual_debt"].includes(type);
+  if (!["sale","payment","collection","manual_debt","cancellation","refund"].includes(type) ||
+      (requiresCustomer && !customerId) ||
       !Number.isFinite(amount) || !Number.isFinite(paidAmount) || !Number.isFinite(debtAmount) ||
       amount < 0 || paidAmount < 0 || debtAmount < 0) throw new Error("invalid_financial_transaction");
   const prior = await client.query(
     `SELECT id FROM financial_transactions WHERE id=$1 AND company_id=$2 FOR UPDATE`, [id, companyId]);
   if (prior.rowCount) return;
-  const customer = await client.query(
-    `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
-  if (!customer.rowCount) throw new Error("invalid_customer");
+  if (customerId) {
+    const customer = await client.query(
+      `SELECT id FROM customers WHERE id=$1 AND company_id=$2 AND is_deleted=false`, [customerId, companyId]);
+    if (!customer.rowCount) throw new Error("invalid_customer");
+  }
   if (type === "sale") {
     let sale = await client.query(
       `SELECT total_amount,paid_amount,customer_id FROM sales WHERE id=$1 AND company_id=$2 FOR UPDATE`,
@@ -362,7 +366,9 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
     // The canonical sale or order may already include later partial payments when an
     // older device uploads its initial ledger snapshot. Validate the immutable
     // original fact instead of requiring the current paid projection to match.
-    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+    const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
+    const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
+    if (!sale.rowCount || hasCustomerMismatch ||
         Math.abs(Number(sale.rows[0].total_amount)-amount)>0.01 ||
         Number(sale.rows[0].paid_amount)+0.01 < paidAmount ||
         Math.abs(amount-paidAmount-debtAmount)>0.01) throw new Error("sale_ledger_mismatch");
@@ -409,7 +415,9 @@ async function upsertFinancialTransaction(client: PoolClient, companyId: string,
         `SELECT customer_id,total_amount FROM customer_orders WHERE id=$1 AND company_id=$2`,
         [referenceId, companyId]);
     }
-    if (!sale.rowCount || sale.rows[0].customer_id !== customerId ||
+    const saleCustId = sale.rowCount && sale.rows[0].customer_id ? String(sale.rows[0].customer_id) : null;
+    const hasCustomerMismatch = customerId && saleCustId && customerId !== saleCustId;
+    if (!sale.rowCount || hasCustomerMismatch ||
         amount > Number(sale.rows[0].total_amount)+0.01) {
       throw new Error(`${type}_sale_mismatch`);
     }
