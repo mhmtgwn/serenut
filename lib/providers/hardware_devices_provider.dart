@@ -187,7 +187,6 @@ class HardwareDevicesNotifier extends AsyncNotifier<List<HardwareDevice>> {
           await _savePrinterRoute(kind, device.id);
         }
       }
-      await _syncLegacy(device);
       state = AsyncData(await _loadAll());
       await _backupRemoteProfile(state.requireValue);
       return;
