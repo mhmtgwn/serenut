@@ -144,6 +144,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     });
     ref.invalidate(customerTransactionsProvider(id));
     ref.invalidate(customerBalanceDetailsProvider(id));
+    ref.invalidate(customerDetailProvider(id));
     _invalidateAll();
   }
 
@@ -177,6 +178,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     }
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
+    ref.invalidate(customerDetailProvider(customerId));
 
     // Refresh customers list
     state = const AsyncValue.loading();
@@ -216,6 +218,7 @@ class CustomersController extends AsyncNotifier<List<CustomerEntity>> {
     }
     ref.invalidate(customerTransactionsProvider(customerId));
     ref.invalidate(customerBalanceDetailsProvider(customerId));
+    ref.invalidate(customerDetailProvider(customerId));
     await refresh();
     _invalidateAll();
   }
@@ -351,6 +354,13 @@ final collectionCustomersControllerProvider =
     AsyncNotifierProvider<CollectionCustomersController, List<CustomerEntity>>(
         () {
   return CollectionCustomersController();
+});
+
+/// Per-customer reliable unpaginated provider by ID
+final customerDetailProvider =
+    FutureProvider.family<CustomerEntity?, String>((ref, customerId) async {
+  final repo = await ref.watch(customerRepositoryProvider.future);
+  return repo.findById(customerId);
 });
 
 /// Per-customer transactions provider

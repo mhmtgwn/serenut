@@ -8,6 +8,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show ByteData, rootBundle;
+import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/models/settings.dart';
@@ -1172,16 +1173,48 @@ class PrinterService with ChangeNotifier implements IPrinterService {
     if (!kIsWeb &&
         logoPath != null &&
         (logoPath.startsWith('https://') || logoPath.startsWith('http://'))) {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 5);
       try {
-        final request = await client.getUrl(Uri.parse(logoPath));
-        final response = await request.close();
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          throw HttpException('Logo HTTP ${response.statusCode}');
+        final supportDir = await getApplicationSupportDirectory();
+        final logoFile = File('${supportDir.path}/cached_business_logo.png');
+        final metaFile = File('${supportDir.path}/cached_business_logo.url');
+        if (await logoFile.exists() && await metaFile.exists()) {
+          final cachedUrl = (await metaFile.readAsString()).trim();
+          if (cachedUrl == logoPath.trim()) {
+            final bytes = await logoFile.readAsBytes();
+            if (bytes.isNotEmpty) return bytes;
+          }
         }
-        return Uint8List.fromList(await response
-            .fold<List<int>>([], (all, part) => all..addAll(part)));
+      } catch (_) {}
+
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 3);
+      try {
+        final request = await client.getUrl(Uri.parse(logoPath)).timeout(const Duration(seconds: 3));
+        final response = await request.close().timeout(const Duration(seconds: 3));
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final bytes = Uint8List.fromList(await response
+              .fold<List<int>>([], (all, part) => all..addAll(part))
+              .timeout(const Duration(seconds: 3)));
+          if (bytes.length <= 3 * 1024 * 1024 && img.decodeImage(bytes) != null) {
+            try {
+              final supportDir = await getApplicationSupportDirectory();
+              final logoFile = File('${supportDir.path}/cached_business_logo.png');
+              final metaFile = File('${supportDir.path}/cached_business_logo.url');
+              await logoFile.writeAsBytes(bytes);
+              await metaFile.writeAsString(logoPath.trim());
+            } catch (_) {}
+            return bytes;
+          }
+        }
+      } catch (_) {
+        try {
+          final supportDir = await getApplicationSupportDirectory();
+          final logoFile = File('${supportDir.path}/cached_business_logo.png');
+          if (await logoFile.exists()) {
+            final bytes = await logoFile.readAsBytes();
+            if (bytes.isNotEmpty) return bytes;
+          }
+        } catch (_) {}
       } finally {
         client.close(force: true);
       }

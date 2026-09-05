@@ -680,17 +680,22 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
               : null);
 
       if (_printReceipt && settings != null && customerToPrint != null) {
-        await ref
-            .read(printingApplicationServiceProvider)
-            .queueCollectionReceipt(
-              customerToPrint,
-              _enteredAmount,
-              _selectedMethod,
-              _noteController.text.trim().isEmpty
-                  ? null
-                  : _noteController.text.trim(),
-              settings,
-            );
+        try {
+          await ref
+              .read(printingApplicationServiceProvider)
+              .queueCollectionReceipt(
+                customerToPrint,
+                _enteredAmount,
+                _selectedMethod,
+                _noteController.text.trim().isEmpty
+                    ? null
+                    : _noteController.text.trim(),
+                settings,
+              )
+              .timeout(const Duration(seconds: 3));
+        } catch (e) {
+          debugPrint('Fiş yazdırma kuyruğa alınırken hata: $e');
+        }
       }
 
       ref.invalidate(dashboardProvider);

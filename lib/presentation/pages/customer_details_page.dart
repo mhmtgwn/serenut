@@ -140,23 +140,12 @@ class CustomerDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final customersVal = ref.watch(customersControllerProvider);
+    final customerAsync = ref.watch(customerDetailProvider(customerId));
     final transactionsVal = ref.watch(customerTransactionsProvider(customerId));
     final balanceVal = ref.watch(customerBalanceDetailsProvider(customerId));
 
-    final customer = customersVal.maybeWhen(
-      data: (list) {
-        try {
-          return list.firstWhere((c) => c.id == customerId);
-        } catch (_) {
-          return null;
-        }
-      },
-      orElse: () => null,
-    );
-
-    if (customer == null) {
-      return Scaffold(
+    return customerAsync.when(
+      loading: () => Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -167,13 +156,64 @@ class CustomerDetailsPage extends ConsumerWidget {
         body: const Center(
             child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation(_kGreen))),
-      );
-    }
+      ),
+      error: (err, _) => Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: _kGreenDark),
+          title: const Text('Müşteri Detayı',
+              style: TextStyle(color: _kText, fontWeight: FontWeight.bold)),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Hata: $err', style: const TextStyle(color: _kRed)),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () =>
+                    ref.invalidate(customerDetailProvider(customerId)),
+                child: const Text('Tekrar Dene'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (customer) {
+        if (customer == null) {
+          return Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              iconTheme: const IconThemeData(color: _kGreenDark),
+              title: const Text('Müşteri Detayı',
+                  style: TextStyle(color: _kText, fontWeight: FontWeight.bold)),
+            ),
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.person_off_rounded,
+                      size: 48, color: Colors.grey),
+                  const SizedBox(height: 12),
+                  const Text('Müşteri bulunamadı.',
+                      style: TextStyle(fontSize: 16, color: _kTextMuted)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Geri Dön'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-    final isDebt = customer.balance < 0;
+        final isDebt = customer.balance < 0;
 
-    return Scaffold(
-      backgroundColor: _kSurface,
+        return Scaffold(
+          backgroundColor: _kSurface,
       body: CustomScrollView(
         slivers: [
           // ── Hero AppBar + Gradient Card ─────────────────────────────────────
@@ -395,6 +435,8 @@ class CustomerDetailsPage extends ConsumerWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
+    );
+      },
     );
   }
 

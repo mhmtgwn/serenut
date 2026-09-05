@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 
+import 'package:path_provider/path_provider.dart';
+
 class PrintAssetEncoder {
   const PrintAssetEncoder();
   static final Map<String, Uint8List> _remoteLogoCache = {};
@@ -19,27 +21,63 @@ class PrintAssetEncoder {
           (source.startsWith('https://') || source.startsWith('http://'))) {
         final cached = _remoteLogoCache[source];
         if (cached != null) return cached;
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 5);
+
+        // 1. Check local persistent disk cache
         try {
-          final response =
-              await (await client.getUrl(Uri.parse(source))).close();
-          if (response.statusCode < 200 || response.statusCode >= 300) {
-            return null;
+          final supportDir = await getApplicationSupportDirectory();
+          final logoFile = File('${supportDir.path}/cached_business_logo.png');
+          final metaFile = File('${supportDir.path}/cached_business_logo.url');
+          if (await logoFile.exists() && await metaFile.exists()) {
+            final cachedUrl = (await metaFile.readAsString()).trim();
+            if (cachedUrl == source.trim()) {
+              final bytes = await logoFile.readAsBytes();
+              if (bytes.isNotEmpty) {
+                _remoteLogoCache[source] = bytes;
+                return bytes;
+              }
+            }
           }
-          final bytes = Uint8List.fromList(await response
-              .fold<List<int>>([], (all, part) => all..addAll(part)));
-          if (bytes.length > 3 * 1024 * 1024 ||
-              img.decodeImage(bytes) == null) {
-            return null;
+        } catch (_) {}
+
+        // 2. Not in disk cache or URL was updated by user: fetch once and persist to disk
+        final client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 3);
+        try {
+          final request = await client.getUrl(Uri.parse(source)).timeout(const Duration(seconds: 3));
+          final response = await request.close().timeout(const Duration(seconds: 3));
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            final bytes = Uint8List.fromList(await response
+                .fold<List<int>>([], (all, part) => all..addAll(part))
+                .timeout(const Duration(seconds: 3)));
+            if (bytes.length <= 3 * 1024 * 1024 &&
+                img.decodeImage(bytes) != null) {
+              _remoteLogoCache
+                ..clear()
+                ..[source] = bytes;
+              try {
+                final supportDir = await getApplicationSupportDirectory();
+                final logoFile = File('${supportDir.path}/cached_business_logo.png');
+                final metaFile = File('${supportDir.path}/cached_business_logo.url');
+                await logoFile.writeAsBytes(bytes);
+                await metaFile.writeAsString(source.trim());
+              } catch (_) {}
+              return bytes;
+            }
           }
-          _remoteLogoCache
-            ..clear()
-            ..[source] = bytes;
-          return bytes;
+        } catch (_) {
+          // If offline or network error, attempt to fall back to existing disk file
+          try {
+            final supportDir = await getApplicationSupportDirectory();
+            final logoFile = File('${supportDir.path}/cached_business_logo.png');
+            if (await logoFile.exists()) {
+              final bytes = await logoFile.readAsBytes();
+              if (bytes.isNotEmpty) return bytes;
+            }
+          } catch (_) {}
         } finally {
           client.close(force: true);
         }
+        return null;
       }
       if (!kIsWeb &&
           source != null &&
