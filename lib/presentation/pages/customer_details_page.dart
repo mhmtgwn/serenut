@@ -198,7 +198,7 @@ class CustomerDetailsPage extends ConsumerWidget {
                       size: 48, color: Colors.grey),
                   const SizedBox(height: 12),
                   const Text('Müşteri bulunamadı.',
-                      style: TextStyle(fontSize: 16, color: _kTextMuted)),
+                      style: TextStyle(fontSize: 16, color: _kTextSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.pop(),

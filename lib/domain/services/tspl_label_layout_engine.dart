@@ -702,7 +702,6 @@ class TsplLabelLayoutEngine {
               requestedHeightMm,
               (calculatedDots * 25.4 / safeDpi).ceil(),
             );
-      final heightDots = (safeHeight * safeDpi / 25.4).round();
 
       commands
         ..writeln('SIZE $safeWidth mm,$safeHeight mm')
@@ -821,41 +820,6 @@ class TsplLabelLayoutEngine {
     }
 
     return commands.bytes;
-  }
-
-  static List<String> _splitText(
-    String text,
-    int maxCharsPerLine, {
-    int maxLines = 2,
-  }) {
-    final clean = _ascii(text.trim().replaceAll(RegExp(r'\s+'), ' '))
-        .replaceAll('"', "'");
-    if (clean.length <= maxCharsPerLine) return [clean];
-
-    final words = clean.split(' ');
-    final lines = <String>[];
-    var currentLine = '';
-
-    for (final word in words) {
-      if (currentLine.isEmpty) {
-        currentLine = word;
-      } else if (currentLine.length + word.length + 1 <= maxCharsPerLine) {
-        currentLine = '$currentLine $word';
-      } else {
-        lines.add(currentLine);
-        currentLine = word;
-        if (lines.length == maxLines - 1) break;
-      }
-    }
-    if (currentLine.isNotEmpty && lines.length < maxLines) {
-      lines.add(currentLine);
-    }
-
-    if (lines.length == maxLines && lines.last.length > maxCharsPerLine) {
-      lines.last = '${lines.last.substring(0, maxCharsPerLine - 2)}..';
-    }
-
-    return lines.isEmpty ? [clean] : lines;
   }
 
   static List<String> _wrapProductName(String name, int maxCharsPerLine) {
