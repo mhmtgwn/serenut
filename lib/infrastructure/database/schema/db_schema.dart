@@ -56,6 +56,7 @@ class DatabaseSchema {
         is_synced INTEGER NOT NULL DEFAULT 1
         ,sale_type TEXT NOT NULL DEFAULT 'piece'
         ,minimum_weight_grams INTEGER NOT NULL DEFAULT 20
+        ,origin TEXT NOT NULL DEFAULT 'TÜRKİYE'
       )
     ''');
 

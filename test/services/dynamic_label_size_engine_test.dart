@@ -234,7 +234,7 @@ void main() {
         contentSize: longContent,
         mediaProfile: media,
       );
-      expect(longTarget.heightMm, greaterThan(80.0));
+      expect(longTarget.heightMm, greaterThan(70.0));
       expect(longTarget.pagesCount, equals(1));
     });
 

@@ -59,6 +59,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final TextEditingController _barcodeCtrl;
   late final TextEditingController _brandCtrl;
   late final TextEditingController _shelfCodeCtrl;
+  late final TextEditingController _originCtrl;
   String _unit = 'adet';
   String? _imageUrl;
 
@@ -92,6 +93,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _barcodeCtrl = TextEditingController(text: barcodeText);
     _brandCtrl = TextEditingController(text: p?.brand ?? '');
     _shelfCodeCtrl = TextEditingController(text: p?.shelfCode ?? '');
+    _originCtrl = TextEditingController(text: p?.origin ?? 'TÜRKİYE');
     _unit = p?.unit ?? (p?.isWeighed == true ? 'kg' : 'adet');
     _saleType = p?.saleType ?? 'piece';
     _minimumWeightCtrl =
@@ -112,6 +114,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _barcodeCtrl.dispose();
     _brandCtrl.dispose();
     _shelfCodeCtrl.dispose();
+    _originCtrl.dispose();
     _minimumWeightCtrl.dispose();
     super.dispose();
   }
@@ -153,6 +156,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         brand: _brandCtrl.text.trim(),
         unit: _saleType == 'weighed' ? 'kg' : _unit,
         shelfCode: _shelfCodeCtrl.text.trim(),
+        origin: _originCtrl.text.trim().isNotEmpty
+            ? _originCtrl.text.trim()
+            : 'TÜRKİYE',
         category: _selectedCategory!,
         vat: int.tryParse(_vatCtrl.text.trim()) ?? 18,
         saleType: _saleType,
@@ -358,6 +364,67 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               const SizedBox(height: 12),
               // ── Kategori ───────────────────────────────────────────────────
               _buildCategoryField(allCategories, parsedVatCategories),
+
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      controller: _brandCtrl,
+                      label: 'Marka',
+                      icon: Icons.branding_watermark_rounded,
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                      controller: _originCtrl,
+                      label: 'Menşei',
+                      icon: Icons.flag_rounded,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      controller: _shelfCodeCtrl,
+                      label: 'Raf Kodu',
+                      icon: Icons.table_restaurant_rounded,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _unit,
+                      decoration: InputDecoration(
+                        labelText: 'Birim',
+                        prefixIcon: const Icon(Icons.straighten_rounded),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'adet', child: Text('Adet')),
+                        DropdownMenuItem(
+                            value: 'kg', child: Text('Kilogram (kg)')),
+                        DropdownMenuItem(value: 'gr', child: Text('Gram (gr)')),
+                        DropdownMenuItem(value: 'paket', child: Text('Paket')),
+                        DropdownMenuItem(value: 'koli', child: Text('Koli')),
+                        DropdownMenuItem(value: 'lt', child: Text('Litre (lt)')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _unit = val);
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ]),
             const SizedBox(height: 16),
 

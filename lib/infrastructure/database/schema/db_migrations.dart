@@ -970,6 +970,19 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 52 && newVersion >= 52) {
+          try {
+            await txn.execute(
+                "ALTER TABLE products ADD COLUMN origin TEXT NOT NULL DEFAULT 'TÜRKİYE'");
+          } catch (e) {
+            handleMigrationError(e, 52);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 52,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing
@@ -1014,6 +1027,7 @@ class DatabaseMigrations {
       'image_url',
       'sale_type',
       'minimum_weight_grams',
+      'origin',
       'created_at',
       'updated_at',
     ];

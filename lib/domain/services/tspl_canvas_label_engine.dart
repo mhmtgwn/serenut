@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/printing/label_dimension_models.dart';
 
 /// Next-Generation TSPL Label Renderer powered by Flutter's Canvas & TextPainter.
@@ -47,7 +50,23 @@ class TsplCanvasLabelEngine {
     String? qrData,
     bool showQrCode = true,
     TargetPageSize? targetPageSize,
+    String? fontFamily,
   }) async {
+    TextStyle ts({
+      required double fontSize,
+      FontWeight fontWeight = FontWeight.normal,
+      FontStyle fontStyle = FontStyle.normal,
+      Color color = Colors.black,
+    }) {
+      return TextStyle(
+        fontFamily: fontFamily,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        fontStyle: fontStyle,
+        color: color,
+      );
+    }
+
     final isContinuous =
         gapMm <= 0 || (targetPageSize?.mode == MediaMode.continuous);
     final effectiveWidthMm = targetPageSize != null
@@ -75,18 +94,19 @@ class TsplCanvasLabelEngine {
     final widthDots = widthBytes * 8;
     final heightDots = (requestedHeightMm * safeDpi / 25.4).round();
 
-    // Safe margins: 4.0mm left, 5.5mm right on narrow labels (<=54mm) to ensure lines
-    // and QR code never reach the physical edge or bleed off-label.
-    final marginMm = safeWidth <= 54 ? 4.0 : 2.0;
+    // Safe margins: 4.5mm left on narrow labels (<=54mm), 5.0mm on wide labels (>=70mm)
+    // Safe margins: 4.0mm left on narrow labels (<=54mm), 5.0mm on wide labels (>=70mm)
+    // to ensure lines, text, and QR code never get cut off by physical printer margins.
+    final marginMm = safeWidth <= 54 ? 4.0 : 5.0;
     final paddingLeft = (marginMm * safeDpi / 25.4).roundToDouble();
     final paddingRight =
-        ((safeWidth <= 54 ? 5.5 : 2.0) * safeDpi / 25.4).roundToDouble();
+        ((safeWidth <= 54 ? 5.5 : 3.5) * safeDpi / 25.4).roundToDouble();
     const safetyDots = 2.0;
     final safeRightX = (widthDots - paddingRight - safetyDots).roundToDouble();
     final usableW = (safeRightX - paddingLeft).clamp(60.0, 1000.0);
-    final topMargin = (1.0 * safeDpi / 25.4).roundToDouble();
+    final topMargin = ((requestedHeightMm <= 30 ? 1.0 : 2.5) * safeDpi / 25.4).roundToDouble();
     // 2.5mm bottom clearance on 30mm labels to completely avoid bleeding into gap
-    final bottomMargin = (requestedHeightMm <= 30 ? 2.5 : 1.5) * safeDpi / 25.4;
+    final bottomMargin = (requestedHeightMm <= 30 ? 2.5 : 2.0) * safeDpi / 25.4;
     final maxSafePageY = heightDots - bottomMargin - safetyDots;
 
     final fontScale = switch (fontSize) {
@@ -98,11 +118,11 @@ class TsplCanvasLabelEngine {
     final isTall = requestedHeightMm > 40;
     // Larger, highly legible typography tailored to both width and height:
     final titleFontSize =
-        (isWide ? (isTall ? 30.0 : 25.0) : 23.0) * fontScale;
+        (isWide ? (isTall ? 32.0 : 26.0) : 23.0) * fontScale;
     final bodyFontSize =
-        (isWide ? (isTall ? 24.0 : 19.0) : 18.0) * fontScale;
+        (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
-        (isWide ? (isTall ? 20.0 : 16.0) : 15.0) * fontScale;
+        (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
 
     final dateStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -140,44 +160,64 @@ class TsplCanvasLabelEngine {
       final rightTotal =
           lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
 
+      final String detailText;
+      if (unitPrice != null && lineTotal != null) {
+        detailText =
+            '$qtyStr x ${unitPrice.toStringAsFixed(2)} = ${lineTotal.toStringAsFixed(2)} TL';
+      } else if (lineTotal != null) {
+        detailText = '$qtyStr x = ${lineTotal.toStringAsFixed(2)} TL';
+      } else if (rightTotal.isNotEmpty) {
+        detailText = '$qtyStr x $rightTotal';
+      } else {
+        detailText = '$qtyStr x';
+      }
+
+      final detailPainter = TextPainter(
+        text: TextSpan(
+          text: detailText,
+          style: ts(
+            fontSize: detailFontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: isWide ? 1 : 2,
+      )..layout(maxWidth: isWide ? (usableW * 0.65) : usableW);
+
+      final double nameMaxW;
+      if (isWide) {
+        nameMaxW = (usableW - detailPainter.width - 12.0).clamp(60.0, usableW);
+      } else {
+        nameMaxW = usableW;
+      }
+
       final namePainter = TextPainter(
         text: TextSpan(
           text: name,
-          style: TextStyle(
-            color: Colors.black,
+          style: ts(
             fontSize: bodyFontSize,
             fontWeight: FontWeight.bold,
           ),
         ),
         textDirection: TextDirection.ltr,
         maxLines: 2,
-      )..layout(maxWidth: usableW);
+      )..layout(maxWidth: nameMaxW);
 
-      final String detailText;
-      if (unitPrice != null && rightTotal.isNotEmpty) {
-        detailText =
-            '$qtyStr ad. x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
-      } else if (rightTotal.isNotEmpty) {
-        detailText = '$qtyStr adet = $rightTotal';
+      final canBeSideBySide = isWide;
+      final double totalH;
+      if (canBeSideBySide) {
+        totalH = math.max(namePainter.height, detailPainter.height) +
+            (isWide ? 6.5 : 3.5);
       } else {
-        detailText = '$qtyStr adet';
+        totalH = namePainter.height + detailPainter.height + 3.0;
       }
-
-      final detailPainter = TextPainter(
-        text: TextSpan(
-          text: detailText,
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: detailFontSize,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-        maxLines: 2,
-      )..layout(maxWidth: usableW);
-
-      final totalH = namePainter.height + detailPainter.height + 2.5;
-      return _MeasuredItem(item, namePainter, detailPainter, totalH);
+      return _MeasuredItem(
+        item,
+        namePainter,
+        detailPainter,
+        totalH,
+        isSingleLine: canBeSideBySide,
+      );
     }
 
     final measuredItems = itemsList.map(measureItem).toList();
@@ -191,8 +231,7 @@ class TsplCanvasLabelEngine {
         final orderPainter = TextPainter(
           text: TextSpan(
             text: leftOrder,
-            style: TextStyle(
-              color: Colors.black,
+            style: ts(
               fontSize: bodyFontSize,
               fontWeight: FontWeight.bold,
             ),
@@ -205,40 +244,63 @@ class TsplCanvasLabelEngine {
         final custStr = customerName.trim().isNotEmpty
             ? 'Müş: ${customerName.trim()}'
             : 'Müş: Genel';
-        final custPainter = TextPainter(
-          text: TextSpan(
-            text: custStr,
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: bodyFontSize,
-              fontWeight: FontWeight.bold,
+        if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
+          final custPainter = TextPainter(
+            text: TextSpan(
+              text: custStr,
+              style: ts(
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW);
-        h += custPainter.height + 1.0;
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW * 0.58);
 
-        if (customerPhone != null && customerPhone.trim().isNotEmpty) {
           final phonePainter = TextPainter(
             text: TextSpan(
               text: 'Tel: ${customerPhone.trim()}',
-              style: TextStyle(
-                color: Colors.black,
+              style: ts(
                 fontSize: detailFontSize,
-                fontWeight: FontWeight.normal,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW * 0.40);
+
+          h += math.max(custPainter.height, phonePainter.height) + 2.0;
+        } else {
+          final custPainter = TextPainter(
+            text: TextSpan(
+              text: custStr,
+              style: ts(
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.bold,
               ),
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: usableW);
-          h += phonePainter.height + 1.0;
+          h += custPainter.height + 1.0;
+
+          if (customerPhone != null && customerPhone.trim().isNotEmpty) {
+            final phonePainter = TextPainter(
+              text: TextSpan(
+                text: 'Tel: ${customerPhone.trim()}',
+                style: ts(
+                  fontSize: detailFontSize,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: usableW);
+            h += phonePainter.height + 1.0;
+          }
         }
       }
       if (previousDebt > 0.001) {
         final debtPainter = TextPainter(
           text: TextSpan(
             text: 'Geçmiş Borç: ${previousDebt.toStringAsFixed(2)} TL',
-            style: TextStyle(
-              color: Colors.black,
+            style: ts(
               fontSize: detailFontSize,
               fontWeight: FontWeight.bold,
             ),
@@ -255,11 +317,13 @@ class TsplCanvasLabelEngine {
     final subsequentHeaderH = () {
       var h = topMargin;
       final contMaxW = dateStr.isNotEmpty ? usableW * 0.55 : usableW;
+      final contTitle = dateStr.isNotEmpty
+          ? 'Sip #$orderIdShort (9/9)'
+          : 'Sip #$orderIdShort (9/9) - Devam';
       final contPainter = TextPainter(
         text: TextSpan(
-          text: 'Sip #$orderIdShort (9/9) - Devam',
-          style: TextStyle(
-            color: Colors.black,
+          text: contTitle,
+          style: ts(
             fontSize: bodyFontSize,
             fontWeight: FontWeight.bold,
           ),
@@ -296,20 +360,20 @@ class TsplCanvasLabelEngine {
         (requestedHeightMm <= 30 ? 3.0 : 2.0) * dotsPerMm;
 
     final footerTotalFontSize = (hasQr && !isWide)
-        ? (titleFontSize * 0.85).clamp(16.0, 20.0)
+        ? (titleFontSize * 0.70).clamp(14.0, 16.5)
         : titleFontSize;
 
     // Accurate closing footer height measurement using exact TextPainter layouts
     double measureClosingFooterHeight() {
-      var h = 4.0; // Divider before footer
+      var leftTextH = 0.0;
       final footerTextW = hasQr
-          ? (usableW - qrBoxDots - 8.0).clamp(60.0, usableW)
+          ? (safeRightX - paddingLeft - qrBoxDots - 8.0).clamp(60.0, usableW)
           : usableW;
       if (note != null && note.trim().isNotEmpty) {
         final notePainter = TextPainter(
           text: TextSpan(
             text: 'Not: ${note.trim()}',
-            style: TextStyle(
+            style: ts(
               fontSize: detailFontSize,
               fontStyle: FontStyle.italic,
             ),
@@ -317,76 +381,72 @@ class TsplCanvasLabelEngine {
           textDirection: TextDirection.ltr,
           maxLines: 2,
         )..layout(maxWidth: footerTextW);
-        h += notePainter.height + 1.5;
+        leftTextH += notePainter.height + 1.5;
       }
-      var textH = 0.0;
-      if (showItemsCount && itemsCount != null) {
-        final itemsPainter = TextPainter(
+      if (isWide && showItemsCount && itemsCount != null) {
+        final totalQty = itemsList.fold<double>(
+            0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0));
+        final payPainter = TextPainter(
           text: TextSpan(
             text:
-                'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: detailFontSize,
-              fontWeight: FontWeight.w500,
+                'Ödeme: $paymentStatus  •  $itemsCount Çeşit (${totalQty.toStringAsFixed(0)} Ad.)',
+            style: ts(
+              fontSize: bodyFontSize,
+              fontWeight: FontWeight.w600,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: footerTextW);
-        textH += itemsPainter.height + 1.5;
-      }
+        leftTextH += payPainter.height + 1.5;
+      } else {
+        if (showItemsCount && itemsCount != null) {
+          final itemsPainter = TextPainter(
+            text: TextSpan(
+              text:
+                  'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
+              style: ts(
+                fontSize: detailFontSize,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: footerTextW);
+          leftTextH += itemsPainter.height + 1.5;
+        }
 
-      final payPainter = TextPainter(
-        text: TextSpan(
-          text: 'Ödeme: $paymentStatus',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: bodyFontSize,
-            fontWeight: FontWeight.w600,
+        final payPainter = TextPainter(
+          text: TextSpan(
+            text: 'Ödeme: $paymentStatus',
+            style: ts(
+              fontSize: bodyFontSize,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: footerTextW);
-      textH += payPainter.height + 1.5;
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: footerTextW);
+        leftTextH += payPainter.height + 1.5;
+      }
 
       if (showTotalAmount && totalAmount != null) {
         final totPainter = TextPainter(
           text: TextSpan(
             text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
-            style: TextStyle(
-              color: Colors.black,
+            style: ts(
               fontSize: footerTotalFontSize,
               fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: footerTextW);
-        textH += totPainter.height + 1.5;
+        leftTextH += totPainter.height + 1.5;
       }
 
-      if (hasQr) {
-        h += math.max(textH, qrBoxDots);
-      } else {
-        h += textH;
-      }
-      return h + 4.0;
+      final bodyH = hasQr ? math.max(leftTextH, qrBoxDots) : leftTextH;
+      return bodyH + 3.0;
     }
 
     final closingFooterH = measureClosingFooterHeight();
-    final contFooterH = () {
-      final contBanner = TextPainter(
-        text: TextSpan(
-          text: '>> DEVAMI 9. ETİKETTE >>',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: detailFontSize,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: usableW);
-      return contBanner.height + 16.0;
-    }();
+    const contFooterH = 0.0;
 
     // ── Mathematically exact, lossless multi-page distribution ──
     final pages = <List<_MeasuredItem>>[];
@@ -542,8 +602,7 @@ class TsplCanvasLabelEngine {
           final orderPainter = TextPainter(
             text: TextSpan(
               text: leftOrder,
-              style: TextStyle(
-                color: Colors.black,
+              style: ts(
                 fontSize: bodyFontSize,
                 fontWeight: FontWeight.bold,
               ),
@@ -564,8 +623,7 @@ class TsplCanvasLabelEngine {
             final datePainter = TextPainter(
               text: TextSpan(
                 text: dateStr,
-                style: TextStyle(
-                  color: Colors.black,
+                style: ts(
                   fontSize: bodyFontSize * 0.88,
                   fontWeight: FontWeight.w500,
                 ),
@@ -575,9 +633,11 @@ class TsplCanvasLabelEngine {
             final preferredGap = isWide ? 24.0 : 16.0;
             final naturalDateX = paddingLeft + orderPainter.width + preferredGap;
             final maxDateX = safeRightX - datePainter.width;
-            final dateX = naturalDateX <= maxDateX
-                ? naturalDateX
-                : maxDateX.clamp(paddingLeft, maxDateX);
+            final dateX = isWide
+                ? maxDateX
+                : (naturalDateX <= maxDateX
+                    ? naturalDateX
+                    : maxDateX.clamp(paddingLeft, maxDateX));
             datePainter.paint(canvas, Offset(dateX, currentY));
 
             pageBoxes.add(ElementBoundingBox(
@@ -596,50 +656,92 @@ class TsplCanvasLabelEngine {
           final custStr = customerName.trim().isNotEmpty
               ? 'Müş: ${customerName.trim()}'
               : 'Müş: Genel';
-          final custPainter = TextPainter(
-            text: TextSpan(
-              text: custStr,
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: bodyFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: usableW);
-          custPainter.paint(canvas, Offset(paddingLeft, currentY));
-
-          pageBoxes.add(ElementBoundingBox(
-            elementName: 'CustomerName',
-            left: paddingLeft,
-            top: currentY,
-            width: custPainter.width,
-            height: custPainter.height,
-          ));
-          currentY += custPainter.height + 1.0;
-
-          if (customerPhone != null && customerPhone.trim().isNotEmpty) {
-            final phonePainter = TextPainter(
+          if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
+            final custPainter = TextPainter(
               text: TextSpan(
-                text: 'Tel: ${customerPhone.trim()}',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: detailFontSize,
-                  fontWeight: FontWeight.normal,
+                text: custStr,
+                style: ts(
+                  fontSize: bodyFontSize,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               textDirection: TextDirection.ltr,
-            )..layout(maxWidth: usableW);
-            phonePainter.paint(canvas, Offset(paddingLeft, currentY));
+            )..layout(maxWidth: usableW * 0.58);
+            custPainter.paint(canvas, Offset(paddingLeft, currentY));
+
+            pageBoxes.add(ElementBoundingBox(
+              elementName: 'CustomerName',
+              left: paddingLeft,
+              top: currentY,
+              width: custPainter.width,
+              height: custPainter.height,
+            ));
+
+            final phonePainter = TextPainter(
+              text: TextSpan(
+                text: 'Tel: ${customerPhone.trim()}',
+                style: ts(
+                  fontSize: detailFontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: usableW * 0.40);
+            final phoneX = safeRightX - phonePainter.width;
+            phonePainter.paint(canvas, Offset(phoneX, currentY));
 
             pageBoxes.add(ElementBoundingBox(
               elementName: 'CustomerPhone',
-              left: paddingLeft,
+              left: phoneX,
               top: currentY,
               width: phonePainter.width,
               height: phonePainter.height,
             ));
-            currentY += phonePainter.height + 1.0;
+            currentY += math.max(custPainter.height, phonePainter.height) + 2.0;
+          } else {
+            final custPainter = TextPainter(
+              text: TextSpan(
+                text: custStr,
+                style: ts(
+                  fontSize: bodyFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: usableW);
+            custPainter.paint(canvas, Offset(paddingLeft, currentY));
+
+            pageBoxes.add(ElementBoundingBox(
+              elementName: 'CustomerName',
+              left: paddingLeft,
+              top: currentY,
+              width: custPainter.width,
+              height: custPainter.height,
+            ));
+            currentY += custPainter.height + 1.0;
+
+            if (customerPhone != null && customerPhone.trim().isNotEmpty) {
+              final phonePainter = TextPainter(
+                text: TextSpan(
+                  text: 'Tel: ${customerPhone.trim()}',
+                  style: ts(
+                    fontSize: detailFontSize,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+                textDirection: TextDirection.ltr,
+              )..layout(maxWidth: usableW);
+              phonePainter.paint(canvas, Offset(paddingLeft, currentY));
+
+              pageBoxes.add(ElementBoundingBox(
+                elementName: 'CustomerPhone',
+                left: paddingLeft,
+                top: currentY,
+                width: phonePainter.width,
+                height: phonePainter.height,
+              ));
+              currentY += phonePainter.height + 1.0;
+            }
           }
         }
 
@@ -647,8 +749,7 @@ class TsplCanvasLabelEngine {
           final debtPainter = TextPainter(
             text: TextSpan(
               text: 'Geçmiş Borç: ${previousDebt.toStringAsFixed(2)} TL',
-              style: TextStyle(
-                color: Colors.black,
+              style: ts(
                 fontSize: detailFontSize,
                 fontWeight: FontWeight.bold,
               ),
@@ -681,13 +782,13 @@ class TsplCanvasLabelEngine {
         currentY += 2.5;
       } else {
         // Subsequent Pages Header
-        final contTitle =
-            'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
+        final contTitle = dateStr.isNotEmpty
+            ? 'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount)'
+            : 'Sip #$orderIdShort (${pageIdx + 1}/$totalPagesCount) - Devam';
         final contPainter = TextPainter(
           text: TextSpan(
             text: contTitle,
-            style: TextStyle(
-              color: Colors.black,
+            style: ts(
               fontSize: bodyFontSize,
               fontWeight: FontWeight.bold,
             ),
@@ -708,8 +809,7 @@ class TsplCanvasLabelEngine {
           final datePainter = TextPainter(
             text: TextSpan(
               text: dateStr,
-              style: TextStyle(
-                color: Colors.black,
+              style: ts(
                 fontSize: bodyFontSize * 0.88,
                 fontWeight: FontWeight.w500,
               ),
@@ -719,9 +819,11 @@ class TsplCanvasLabelEngine {
           final preferredGap = isWide ? 20.0 : 14.0;
           final naturalDateX = paddingLeft + contPainter.width + preferredGap;
           final maxDateX = safeRightX - datePainter.width;
-          final dateX = naturalDateX <= maxDateX
-              ? naturalDateX
-              : maxDateX.clamp(paddingLeft, maxDateX);
+          final dateX = isWide
+              ? maxDateX
+              : (naturalDateX <= maxDateX
+                  ? naturalDateX
+                  : maxDateX.clamp(paddingLeft, maxDateX));
           datePainter.paint(canvas, Offset(dateX, currentY));
 
           pageBoxes.add(ElementBoundingBox(
@@ -749,25 +851,49 @@ class TsplCanvasLabelEngine {
       var itemIdx = 0;
       for (final it in pageItems) {
         itemIdx++;
-        it.namePainter.paint(canvas, Offset(paddingLeft, currentY));
-        pageBoxes.add(ElementBoundingBox(
-          elementName: 'ItemName_${pageIdx + 1}_$itemIdx',
-          left: paddingLeft,
-          top: currentY,
-          width: it.namePainter.width,
-          height: it.namePainter.height,
-        ));
-        currentY += it.namePainter.height + 0.5;
+        if (it.isSingleLine) {
+          final itemH = math.max(it.namePainter.height, it.detailPainter.height);
+          it.namePainter.paint(canvas, Offset(paddingLeft, currentY));
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'ItemName_${pageIdx + 1}_$itemIdx',
+            left: paddingLeft,
+            top: currentY,
+            width: it.namePainter.width,
+            height: it.namePainter.height,
+          ));
 
-        it.detailPainter.paint(canvas, Offset(paddingLeft, currentY));
-        pageBoxes.add(ElementBoundingBox(
-          elementName: 'ItemDetail_${pageIdx + 1}_$itemIdx',
-          left: paddingLeft,
-          top: currentY,
-          width: it.detailPainter.width,
-          height: it.detailPainter.height,
-        ));
-        currentY += it.detailPainter.height + 2.0;
+          final detailX =
+              (safeRightX - it.detailPainter.width).clamp(paddingLeft, safeRightX);
+          it.detailPainter.paint(canvas, Offset(detailX, currentY));
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'ItemDetail_${pageIdx + 1}_$itemIdx',
+            left: detailX,
+            top: currentY,
+            width: it.detailPainter.width,
+            height: it.detailPainter.height,
+          ));
+          currentY += itemH + (isWide ? 6.5 : 3.5);
+        } else {
+          it.namePainter.paint(canvas, Offset(paddingLeft, currentY));
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'ItemName_${pageIdx + 1}_$itemIdx',
+            left: paddingLeft,
+            top: currentY,
+            width: it.namePainter.width,
+            height: it.namePainter.height,
+          ));
+          currentY += it.namePainter.height + 0.5;
+
+          it.detailPainter.paint(canvas, Offset(paddingLeft, currentY));
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'ItemDetail_${pageIdx + 1}_$itemIdx',
+            left: paddingLeft,
+            top: currentY,
+            width: it.detailPainter.width,
+            height: it.detailPainter.height,
+          ));
+          currentY += it.detailPainter.height + 2.0;
+        }
       }
 
       // Divider after items
@@ -808,8 +934,7 @@ class TsplCanvasLabelEngine {
             final qrLabelPainter = TextPainter(
               text: TextSpan(
                 text: 'SİPARİŞİ AÇ',
-                style: TextStyle(
-                  color: Colors.black,
+                style: ts(
                   fontSize: (detailFontSize * 0.72).clamp(8.0, 11.0),
                   fontWeight: FontWeight.bold,
                 ),
@@ -842,8 +967,7 @@ class TsplCanvasLabelEngine {
           final notePainter = TextPainter(
             text: TextSpan(
               text: 'Not: ${note.trim()}',
-              style: TextStyle(
-                color: Colors.black,
+              style: ts(
                 fontSize: detailFontSize,
                 fontStyle: FontStyle.italic,
               ),
@@ -863,61 +987,84 @@ class TsplCanvasLabelEngine {
           currentY += notePainter.height + 1.5;
         }
 
-        // Summary item count (if enabled)
-        if (showItemsCount && itemsCount != null) {
-          final itemsPainter = TextPainter(
+        if (isWide && showItemsCount && itemsCount != null) {
+          final totalQty = itemsList.fold<double>(
+              0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0));
+          final payPainter = TextPainter(
             text: TextSpan(
               text:
-                  'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: detailFontSize,
-                fontWeight: FontWeight.w500,
+                  'Ödeme: $paymentStatus  •  $itemsCount Çeşit (${totalQty.toStringAsFixed(0)} Ad.)',
+              style: ts(
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.w600,
               ),
             ),
             textDirection: TextDirection.ltr,
           )..layout(maxWidth: textMaxW);
-          itemsPainter.paint(canvas, Offset(paddingLeft, currentY));
+          payPainter.paint(canvas, Offset(paddingLeft, currentY));
 
           pageBoxes.add(ElementBoundingBox(
-            elementName: 'FooterItemsCount',
+            elementName: 'FooterPayment',
             left: paddingLeft,
             top: currentY,
-            width: itemsPainter.width,
-            height: itemsPainter.height,
+            width: payPainter.width,
+            height: payPainter.height,
           ));
-          currentY += itemsPainter.height + 1.5;
-        }
+          currentY += payPainter.height + 1.5;
+        } else {
+          // Summary item count (if enabled)
+          if (showItemsCount && itemsCount != null) {
+            final itemsPainter = TextPainter(
+              text: TextSpan(
+                text:
+                    'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
+                style: ts(
+                  fontSize: detailFontSize,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout(maxWidth: textMaxW);
+            itemsPainter.paint(canvas, Offset(paddingLeft, currentY));
 
-        // Payment status & Total Amount
-        final payPainter = TextPainter(
-          text: TextSpan(
-            text: 'Ödeme: $paymentStatus',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: bodyFontSize,
-              fontWeight: FontWeight.w600,
+            pageBoxes.add(ElementBoundingBox(
+              elementName: 'FooterItemsCount',
+              left: paddingLeft,
+              top: currentY,
+              width: itemsPainter.width,
+              height: itemsPainter.height,
+            ));
+            currentY += itemsPainter.height + 1.5;
+          }
+
+          // Payment status
+          final payPainter = TextPainter(
+            text: TextSpan(
+              text: 'Ödeme: $paymentStatus',
+              style: ts(
+                fontSize: bodyFontSize,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: textMaxW);
-        payPainter.paint(canvas, Offset(paddingLeft, currentY));
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: textMaxW);
+          payPainter.paint(canvas, Offset(paddingLeft, currentY));
 
-        pageBoxes.add(ElementBoundingBox(
-          elementName: 'FooterPayment',
-          left: paddingLeft,
-          top: currentY,
-          width: payPainter.width,
-          height: payPainter.height,
-        ));
-        currentY += payPainter.height + 1.5;
+          pageBoxes.add(ElementBoundingBox(
+            elementName: 'FooterPayment',
+            left: paddingLeft,
+            top: currentY,
+            width: payPainter.width,
+            height: payPainter.height,
+          ));
+          currentY += payPainter.height + 1.5;
+        }
 
         if (showTotalAmount && totalAmount != null) {
           final totPainter = TextPainter(
             text: TextSpan(
               text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
-              style: TextStyle(
-                color: Colors.black,
+              style: ts(
                 fontSize: footerTotalFontSize,
                 fontWeight: FontWeight.bold,
               ),
@@ -935,30 +1082,6 @@ class TsplCanvasLabelEngine {
           ));
           currentY += totPainter.height + 1.5;
         }
-      } else {
-        // Continuation banner
-        final contBanner = TextPainter(
-          text: TextSpan(
-            text: '>> DEVAMI ${(pageIdx + 2)}. ETİKETTE >>',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: detailFontSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: usableW);
-        final bannerX = ((widthDots - contBanner.width) / 2)
-            .clamp(paddingLeft, safeRightX - contBanner.width);
-        contBanner.paint(canvas, Offset(bannerX, currentY + 2));
-
-        pageBoxes.add(ElementBoundingBox(
-          elementName: 'ContinuationBanner',
-          left: bannerX,
-          top: currentY + 2,
-          width: contBanner.width,
-          height: contBanner.height,
-        ));
       }
 
       // Validate bounding boxes against UsablePrintArea
@@ -1037,6 +1160,538 @@ class TsplCanvasLabelEngine {
 
     return outputBytes;
   }
+
+  /// Generates single-page TSPL shelf label bytes using Flutter Canvas.
+  ///
+  /// Matches the exact reference design:
+  /// - Top Header: Centered Logo / Serenut OS Lockup
+  /// - Middle: Huge high-contrast bold product name
+  /// - Divider: Full-width clean horizontal line
+  /// - Bottom-Left: 'Kod: ...' text + Code 128 barcode bars
+  /// - Bottom-Right: Turkish Lira currency symbol + large bold integer price + superscript cents
+  static Future<List<int>> generateShelfLabelBytes({
+    required LabelModel model,
+    int widthMm = 80,
+    int heightMm = 40,
+    int gapMm = 2,
+    bool autoDetectGap = false,
+    int dpi = 203,
+    int direction = 0,
+    int copies = 1,
+    int? printableWidthDots,
+    bool showBusinessName = true,
+    bool showBrand = false,
+    bool showBarcode = true,
+    bool showPrice = true,
+    String fontSize = 'Orta',
+    String? logoPath,
+    Uint8List? logoBytes,
+    String? fontFamily,
+  }) async {
+    TextStyle ts({
+      required double fontSize,
+      FontWeight fontWeight = FontWeight.normal,
+      FontStyle fontStyle = FontStyle.normal,
+      Color color = Colors.black,
+    }) {
+      return TextStyle(
+        fontFamily: fontFamily,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        fontStyle: fontStyle,
+        color: color,
+      );
+    }
+
+    final safeDpi = dpi < 100 ? 203 : dpi;
+    final safeWidth = widthMm.clamp(20, 150);
+    final safeHeight = heightMm.clamp(15, 120);
+
+    final mediaWidthDots = (safeWidth * safeDpi / 25.4).round();
+    final maxNarrowDots = (48.0 * safeDpi / 25.4).round();
+    final maxPhysicalDots = safeWidth <= 54
+        ? math.min(mediaWidthDots, maxNarrowDots)
+        : mediaWidthDots;
+    final effectivePrintableDots = printableWidthDots != null &&
+            printableWidthDots > 100
+        ? math.min(maxPhysicalDots, printableWidthDots)
+        : maxPhysicalDots;
+    final widthBytes = (effectivePrintableDots + 7) ~/ 8;
+    final labelWidthDots = widthBytes * 8;
+    final labelHeightDots = (safeHeight * safeDpi / 25.4).round();
+
+    // Margins (in dots)
+    final marginMm = safeWidth <= 54 ? 3.0 : 4.0;
+    final leftMargin = (marginMm * safeDpi / 25.4).round();
+    final rightMargin = labelWidthDots - leftMargin;
+    final usableWidth = rightMargin - leftMargin;
+    final topMargin = (1.5 * safeDpi / 25.4).round();
+    final bottomMargin = labelHeightDots - (2.5 * safeDpi / 25.4).round();
+
+    // Load logo image if available
+    ui.Image? logoImage;
+    if (showBusinessName) {
+      Uint8List? effectiveLogoBytes = logoBytes;
+      if (effectiveLogoBytes == null && logoPath != null) {
+        try {
+          final file = File(logoPath);
+          if (file.existsSync()) {
+            effectiveLogoBytes = file.readAsBytesSync();
+          }
+        } catch (_) {}
+      }
+      if (effectiveLogoBytes == null) {
+        // Check default Serenut OS branding lockup
+        try {
+          final defaultLockup =
+              File('assets/branding/lockups/serenut-os-color-128h.png');
+          if (defaultLockup.existsSync()) {
+            effectiveLogoBytes = defaultLockup.readAsBytesSync();
+          }
+        } catch (_) {}
+      }
+      if (effectiveLogoBytes != null && effectiveLogoBytes.isNotEmpty) {
+        try {
+          final codec = await ui.instantiateImageCodec(effectiveLogoBytes);
+          final frame = await codec.getNextFrame();
+          logoImage = frame.image;
+        } catch (_) {}
+      }
+    }
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(
+      recorder,
+      Rect.fromLTWH(
+        0,
+        0,
+        labelWidthDots.toDouble(),
+        labelHeightDots.toDouble(),
+      ),
+    );
+
+    // Fill label background with pure white
+    canvas.drawRect(
+      Rect.fromLTWH(
+        0,
+        0,
+        labelWidthDots.toDouble(),
+        labelHeightDots.toDouble(),
+      ),
+      Paint()..color = Colors.white,
+    );
+
+    // ── 1. Top Header: Centered Logo / Business Name ───────────────────────
+    final headerHeight = (labelHeightDots * 0.23).clamp(42.0, 76.0);
+    var currentY = topMargin.toDouble();
+
+    if (showBusinessName) {
+      if (logoImage != null) {
+        // If this is the standard Serenut OS lockup (400x128 with transparent padding),
+        // crop the transparent margin (19, 19, 368, 90) so the logo content fills the header.
+        final isStandardLockup =
+            logoImage.width == 400 && logoImage.height == 128;
+        final srcRect = isStandardLockup
+            ? const Rect.fromLTWH(19, 19, 368, 90)
+            : Rect.fromLTWH(
+                0, 0, logoImage.width.toDouble(), logoImage.height.toDouble());
+        final aspect = srcRect.width / srcRect.height;
+        final targetH = headerHeight;
+        final targetW = math.min(targetH * aspect, usableWidth * 0.72);
+        final actualH = targetW / aspect;
+        final logoX = (labelWidthDots - targetW) / 2;
+        final logoY = currentY + (headerHeight - actualH) / 2;
+        canvas.drawImageRect(
+          logoImage,
+          srcRect,
+          Rect.fromLTWH(logoX, logoY, targetW, actualH),
+          Paint(),
+        );
+      } else {
+        final businessText = model.businessName?.trim().isNotEmpty == true
+            ? model.businessName!.trim()
+            : 'Serenut OS';
+        final headerPainter = TextPainter(
+          text: TextSpan(
+            text: businessText,
+            style: ts(
+              fontSize: headerHeight * 0.75,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        final textX = (labelWidthDots - headerPainter.width) / 2;
+        headerPainter.paint(canvas, Offset(textX, currentY));
+      }
+    }
+
+    final headerBottom = currentY + headerHeight + 2.0;
+
+    // ── 2. Bottom Section Geometry Calculations (Anchored from Bottom Up) ───
+    // Unit Price (e.g. "Birim Fiyatı: 299,95 TL / Adet")
+    final unitFontSize = (labelHeightDots * 0.050).clamp(10.0, 15.0);
+    final unitPriceVal = model.unitPrice ?? model.price;
+    final unitStr = model.unit.toLowerCase().trim();
+    final unitDisplay = (unitStr == 'adet' || unitStr.isEmpty)
+        ? 'Ad.'
+        : (unitStr == 'kg' ? 'kg' : unitStr);
+    final unitPriceText =
+        'Birim Fiyatı: ${unitPriceVal.toStringAsFixed(2)} TL / $unitDisplay';
+    final unitPainter = TextPainter(
+      text: TextSpan(
+        text: unitPriceText,
+        style: ts(
+          fontSize: unitFontSize,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: usableWidth * 0.48);
+
+    // Actual unit baseline is firmly anchored to bottom margin
+    final actualUnitY = bottomMargin - unitPainter.height;
+
+    // Barcode: vertically shortened, compact, and sits tightly above unit price
+    final barcodeHeight = (labelHeightDots * 0.115).clamp(24.0, 36.0);
+    final barcodeY = actualUnitY - 2.5 - barcodeHeight;
+
+    // Code & Shelf text sits tightly above the barcode
+    final codeStr = (model.barcode?.isNotEmpty == true
+            ? model.barcode
+            : model.shelfCode) ??
+        '';
+    final shelfText = model.shelfCode?.trim().isNotEmpty == true
+        ? '   Raf: ${model.shelfCode!.trim()}'
+        : '';
+    final codeLabel = 'Kod: $codeStr$shelfText';
+    final codePainter = TextPainter(
+      text: TextSpan(
+        text: codeLabel,
+        style: ts(
+          fontSize: (labelHeightDots * 0.058).clamp(11.0, 17.0),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: usableWidth * 0.48);
+    final codeY = barcodeY - 2.0 - codePainter.height;
+
+    // Price layout (Right side) - Format with thousand separator (e.g. 11.599 or 299)
+    final wholePart = model.price.floor();
+    final centsPart = ((model.price - wholePart) * 100).round();
+    final wholeStrRaw = wholePart.toString();
+    final wholeStrBuffer = StringBuffer();
+    for (var i = 0; i < wholeStrRaw.length; i++) {
+      if (i > 0 && (wholeStrRaw.length - i) % 3 == 0) {
+        wholeStrBuffer.write('.');
+      }
+      wholeStrBuffer.write(wholeStrRaw[i]);
+    }
+    final wholeStr = wholeStrBuffer.toString();
+    final centsStr = centsPart.toString().padLeft(2, '0');
+
+    final maxPriceWidth = usableWidth * 0.49;
+    double wholeFontSize = (labelHeightDots * 0.235).clamp(30.0, 70.0);
+    double centsFontSize = (wholeFontSize * 0.44).clamp(15.0, 32.0);
+    double symbolFontSize = (wholeFontSize * 0.48).clamp(16.0, 34.0);
+    double symbolGap = (wholeFontSize * 0.08).clamp(3.0, 7.0);
+    double centsGap = (wholeFontSize * 0.05).clamp(2.0, 4.0);
+
+    var wholePainter = TextPainter(
+      text: TextSpan(
+        text: wholeStr,
+        style: ts(fontSize: wholeFontSize, fontWeight: FontWeight.w900),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    var centsPainter = TextPainter(
+      text: TextSpan(
+        text: centsStr,
+        style: ts(fontSize: centsFontSize, fontWeight: FontWeight.w900),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    var symbolPainter = TextPainter(
+      text: TextSpan(
+        text: '₺',
+        style: ts(fontSize: symbolFontSize, fontWeight: FontWeight.bold),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    var totalPriceWidth = symbolPainter.width +
+        symbolGap +
+        wholePainter.width +
+        centsGap +
+        centsPainter.width;
+
+    // Auto-shrink price font size for large prices like 11.599 so it never clips
+    while (totalPriceWidth > maxPriceWidth && wholeFontSize > 20.0) {
+      wholeFontSize -= 1.0;
+      centsFontSize = (wholeFontSize * 0.44).clamp(15.0, 32.0);
+      symbolFontSize = (wholeFontSize * 0.48).clamp(16.0, 34.0);
+      symbolGap = (wholeFontSize * 0.08).clamp(3.0, 7.0);
+      centsGap = (wholeFontSize * 0.05).clamp(2.0, 4.0);
+
+      wholePainter = TextPainter(
+        text: TextSpan(
+          text: wholeStr,
+          style: ts(fontSize: wholeFontSize, fontWeight: FontWeight.w900),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      centsPainter = TextPainter(
+        text: TextSpan(
+          text: centsStr,
+          style: ts(fontSize: centsFontSize, fontWeight: FontWeight.w900),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      symbolPainter = TextPainter(
+        text: TextSpan(
+          text: '₺',
+          style: ts(fontSize: symbolFontSize, fontWeight: FontWeight.bold),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      totalPriceWidth = symbolPainter.width +
+          symbolGap +
+          wholePainter.width +
+          centsGap +
+          centsPainter.width;
+    }
+
+    final priceStartX = rightMargin - totalPriceWidth;
+    final wholeY = actualUnitY - wholePainter.height * 0.82;
+    final centsY = wholeY;
+    final symbolY =
+        wholeY + (wholePainter.height - symbolPainter.height) * 0.65;
+    final wholeNumberStartX = priceStartX + symbolPainter.width + symbolGap;
+
+    // Vergi bilgisi: Birim fiyatı ile dikeyde hizalı, fiyat rakamının başlangıcından başlar
+    final vatPainter = TextPainter(
+      text: TextSpan(
+        text: 'KDV Dahildir',
+        style: ts(
+          fontSize: (labelHeightDots * 0.046).clamp(9.5, 14.0),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final vatY = actualUnitY + (unitPainter.height - vatPainter.height);
+    final vatX = wholeNumberStartX;
+
+    // Regulatory Micro Info Bar (Menşei • F.D.T)
+    // Menşei ile Kod arasındaki satır boşluğu, Kod ile Barkod arasındaki boşlukla (2.0) tam olarak eşitlendi
+    final fdtDate =
+        '${model.timestamp.day.toString().padLeft(2, '0')}.${model.timestamp.month.toString().padLeft(2, '0')}.${model.timestamp.year}';
+    final originText = model.origin.isNotEmpty ? model.origin : 'TÜRKİYE';
+    final microText = 'Menşei: $originText  •  F.D.T: $fdtDate';
+    final microPainter = TextPainter(
+      text: TextSpan(
+        text: microText,
+        style: ts(
+          fontSize: (labelHeightDots * 0.044).clamp(9.0, 13.0),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: usableWidth.toDouble());
+
+    // Menşei satırı, Kod satırının tam 2.0 px üstüne yerleştirilir (Kod-Barkod arasıyla birebir aynı)
+    final microY = codeY - 2.0 - microPainter.height;
+
+    // Clean Horizontal Divider Line: directly above micro bar and above price
+    final dividerY = math.min(microY - 2.5, showPrice ? wholeY - 3.0 : microY - 2.5);
+
+    // ── 3. Product Name (Responsive, Big & Bold, Centered, Max 2 Lines) ────
+    final nameZoneTop = headerBottom;
+    final availableNameHeight = dividerY - 3.0 - nameZoneTop;
+
+    double productNameFontSize = (labelHeightDots * 0.165).clamp(26.0, 54.0);
+    var namePainter = TextPainter(
+      text: TextSpan(
+        text: model.productName,
+        style: ts(
+          fontSize: productNameFontSize,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      ellipsis: '...',
+      textDirection: TextDirection.ltr,
+    )..layout(
+        minWidth: usableWidth.toDouble(),
+        maxWidth: usableWidth.toDouble(),
+      );
+
+    // If it wraps to 2 lines, scale to a bold, prominent 2-line target size
+    if (namePainter.computeLineMetrics().length > 1) {
+      productNameFontSize = (labelHeightDots * 0.125).clamp(22.0, 40.0);
+      namePainter = TextPainter(
+        text: TextSpan(
+          text: model.productName,
+          style: ts(
+            fontSize: productNameFontSize,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        ellipsis: '...',
+        textDirection: TextDirection.ltr,
+      )..layout(
+          minWidth: usableWidth.toDouble(),
+          maxWidth: usableWidth.toDouble(),
+        );
+    }
+
+    // Step down font size if it exceeds the reserved headroom
+    while (namePainter.height > availableNameHeight && productNameFontSize > 13.0) {
+      productNameFontSize -= 1.0;
+      namePainter = TextPainter(
+        text: TextSpan(
+          text: model.productName,
+          style: ts(
+            fontSize: productNameFontSize,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        ellipsis: '...',
+        textDirection: TextDirection.ltr,
+      )..layout(
+          minWidth: usableWidth.toDouble(),
+          maxWidth: usableWidth.toDouble(),
+        );
+    }
+
+    // Paint Product Name centered vertically within its generous upper zone
+    final nameY = nameZoneTop + (availableNameHeight - namePainter.height) / 2;
+    namePainter.paint(canvas, Offset(leftMargin.toDouble(), nameY));
+
+    // ── 4. Paint Horizontal Divider Line & Regulatory Info ─────────────────
+    canvas.drawLine(
+      Offset(leftMargin.toDouble(), dividerY),
+      Offset(rightMargin.toDouble(), dividerY),
+      Paint()
+        ..color = Colors.black
+        ..strokeWidth = 1.8,
+    );
+    microPainter.paint(canvas, Offset(leftMargin.toDouble(), microY));
+
+    // ── 5. Paint Code, Barcode, Unit Price ──────────────────────────────────
+    codePainter.paint(canvas, Offset(leftMargin.toDouble(), codeY));
+
+    if (showBarcode && codeStr.isNotEmpty) {
+      final barcodeWidth = (usableWidth * 0.44).clamp(140.0, 300.0);
+      try {
+        final bc = Barcode.code128();
+        final elements = bc.make(
+          codeStr,
+          width: barcodeWidth,
+          height: barcodeHeight,
+        );
+        final barPaint = Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.fill;
+        for (final elem in elements) {
+          if (elem is BarcodeBar && elem.black) {
+            canvas.drawRect(
+              Rect.fromLTWH(
+                leftMargin + elem.left,
+                barcodeY,
+                elem.width,
+                barcodeHeight,
+              ),
+              barPaint,
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
+    unitPainter.paint(canvas, Offset(leftMargin.toDouble(), actualUnitY));
+
+    // ── 6. Paint Price & VAT (Right side) ───────────────────────────────────
+    if (showPrice) {
+      symbolPainter.paint(canvas, Offset(priceStartX, symbolY));
+      wholePainter.paint(
+        canvas,
+        Offset(wholeNumberStartX, wholeY),
+      );
+      centsPainter.paint(
+        canvas,
+        Offset(
+          wholeNumberStartX + wholePainter.width + centsGap,
+          centsY,
+        ),
+      );
+      vatPainter.paint(canvas, Offset(vatX, vatY));
+    }
+
+    // ── 5. Rasterize to 1-Bit TSPL Monochrome Bitmap ──────────────────────
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(labelWidthDots, labelHeightDots);
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+
+    if (byteData == null) {
+      throw StateError('Canvas rasterization failed for shelf label');
+    }
+
+    final rasterBytes = Uint8List(widthBytes * labelHeightDots);
+    var rasterIdx = 0;
+    final pixels = byteData.buffer.asUint32List();
+
+    for (var y = 0; y < labelHeightDots; y++) {
+      for (var byteCol = 0; byteCol < widthBytes; byteCol++) {
+        var b = 0xFF; // TSPL: 1 = white, 0 = black
+        for (var bit = 0; bit < 8; bit++) {
+          final px = byteCol * 8 + bit;
+          if (px < labelWidthDots) {
+            final pixel = pixels[y * labelWidthDots + px];
+            final a = (pixel >> 24) & 0xFF;
+            final r = pixel & 0xFF;
+            final g = (pixel >> 8) & 0xFF;
+            final bChannel = (pixel >> 16) & 0xFF;
+            final lum = (r * 77 + g * 150 + bChannel * 29) >> 8;
+            if (a > 50 && lum < 200) {
+              b &= ~(0x80 >> bit);
+            }
+          }
+        }
+        rasterBytes[rasterIdx++] = b;
+      }
+    }
+
+    final isContinuous = gapMm <= 0;
+    final tsplHeader = 'SIZE $safeWidth mm,$safeHeight mm\r\n'
+        'GAP ${isContinuous ? 0 : gapMm} mm,0 mm\r\n'
+        '${autoDetectGap ? "GAPDETECT\r\n" : ""}'
+        'DENSITY 8\r\n'
+        'DIRECTION ${direction == 1 ? 1 : 0}\r\n'
+        'REFERENCE 0,0\r\n'
+        'CLS\r\n'
+        'BITMAP 0,0,$widthBytes,$labelHeightDots,0,';
+
+    final outputBytes = <int>[
+      ...latin1.encode(tsplHeader),
+      ...rasterBytes,
+      ...const [13, 10],
+      ...latin1.encode('PRINT ${copies.clamp(1, 20)},1\r\n'),
+    ];
+
+    return outputBytes;
+  }
 }
 
 class _MeasuredItem {
@@ -1044,7 +1699,13 @@ class _MeasuredItem {
   final TextPainter namePainter;
   final TextPainter detailPainter;
   final double totalHeight;
+  final bool isSingleLine;
 
   _MeasuredItem(
-      this.item, this.namePainter, this.detailPainter, this.totalHeight);
+    this.item,
+    this.namePainter,
+    this.detailPainter,
+    this.totalHeight, {
+    this.isSingleLine = false,
+  });
 }

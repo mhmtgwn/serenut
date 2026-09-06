@@ -291,22 +291,40 @@ class DynamicLabelSizeEngine {
     bool showItemsCount = true,
     bool showQrCode = true,
     String? qrData,
+    String? fontFamily,
   }) {
+    TextStyle ts({
+      required double fontSize,
+      FontWeight fontWeight = FontWeight.normal,
+      FontStyle fontStyle = FontStyle.normal,
+      Color color = Colors.black,
+    }) {
+      return TextStyle(
+        fontFamily: fontFamily,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        fontStyle: fontStyle,
+        color: color,
+      );
+    }
+
     final dotsPerMm = mediaProfile.dotsPerMm;
     final effectiveDots = mediaProfile.effectivePrintableDots;
 
-    // Margins
-    final marginMm = mediaProfile.widthMm <= 54 ? 4.0 : 2.0;
+    // Margins: 4.0mm left on narrow labels (<=54mm), 5.0mm on wide labels (>=70mm)
+    // to prevent clipping from mechanical paper guide offsets.
+    final marginMm = mediaProfile.widthMm <= 54 ? 4.0 : 5.0;
     final paddingLeft = (marginMm * dotsPerMm).roundToDouble();
     final paddingRight =
-        ((mediaProfile.widthMm <= 54 ? 5.5 : 2.0) * dotsPerMm).roundToDouble();
+        ((mediaProfile.widthMm <= 54 ? 5.5 : 3.5) * dotsPerMm).roundToDouble();
     const safetyDots = 2.0;
     final safeRightX =
         (effectiveDots - paddingRight - safetyDots).roundToDouble();
     final usableW = (safeRightX - paddingLeft).clamp(60.0, 1000.0);
-    final topMargin = (1.0 * dotsPerMm).roundToDouble();
+    final topMargin =
+        ((mediaProfile.heightMm <= 30 ? 1.0 : 2.5) * dotsPerMm).roundToDouble();
     final bottomMargin =
-        (mediaProfile.heightMm <= 30 ? 2.5 : 1.5) * dotsPerMm;
+        (mediaProfile.heightMm <= 30 ? 2.5 : 2.0) * dotsPerMm;
 
     final usableArea = UsablePrintArea(
       usableLeft: paddingLeft,
@@ -325,12 +343,12 @@ class DynamicLabelSizeEngine {
     };
     final isWide = mediaProfile.widthMm >= 70;
     final isTall = mediaProfile.heightMm > 40;
-    final titleFontSize =
-        (isWide ? (isTall ? 30.0 : 25.0) : 23.0) * fontScale;
     final bodyFontSize =
-        (isWide ? (isTall ? 24.0 : 19.0) : 18.0) * fontScale;
+        (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
-        (isWide ? (isTall ? 20.0 : 16.0) : 15.0) * fontScale;
+        (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
+    final footerTotalFontSize =
+        (isWide ? (isTall ? 28.0 : 24.0) : 19.0) * fontScale;
 
     final List<Map<String, dynamic>> itemsList;
     if (items != null && items.isNotEmpty) {
@@ -354,8 +372,7 @@ class DynamicLabelSizeEngine {
       final orderPainter = TextPainter(
         text: TextSpan(
           text: leftOrder,
-          style: TextStyle(
-            color: Colors.black,
+          style: ts(
             fontSize: bodyFontSize,
             fontWeight: FontWeight.bold,
           ),
@@ -377,8 +394,7 @@ class DynamicLabelSizeEngine {
         final datePainter = TextPainter(
           text: TextSpan(
             text: dateStr,
-            style: TextStyle(
-              color: Colors.black,
+            style: ts(
               fontSize: bodyFontSize * 0.88,
               fontWeight: FontWeight.w500,
             ),
@@ -389,9 +405,11 @@ class DynamicLabelSizeEngine {
         final preferredGap = isWide ? 24.0 : 16.0;
         final naturalDateX = paddingLeft + orderPainter.width + preferredGap;
         final maxDateX = safeRightX - datePainter.width;
-        final dateX = naturalDateX <= maxDateX
-            ? naturalDateX
-            : maxDateX.clamp(paddingLeft, maxDateX);
+        final dateX = isWide
+            ? maxDateX
+            : (naturalDateX <= maxDateX
+                ? naturalDateX
+                : maxDateX.clamp(paddingLeft, maxDateX));
 
         boxes.add(ElementBoundingBox(
           elementName: 'Date',
@@ -408,48 +426,88 @@ class DynamicLabelSizeEngine {
       final custStr = customerName.trim().isNotEmpty
           ? 'Müş: ${customerName.trim()}'
           : 'Müş: Genel';
-      final custPainter = TextPainter(
-        text: TextSpan(
-          text: custStr,
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: bodyFontSize,
-            fontWeight: FontWeight.bold,
+      if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
+        final custPainter = TextPainter(
+          text: TextSpan(
+            text: custStr,
+            style: ts(
+              fontSize: bodyFontSize,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: usableW);
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: usableW * 0.58);
 
-      boxes.add(ElementBoundingBox(
-        elementName: 'CustomerName',
-        left: paddingLeft,
-        top: currentY,
-        width: custPainter.width,
-        height: custPainter.height,
-      ));
-      currentY += custPainter.height + 1.0;
+        boxes.add(ElementBoundingBox(
+          elementName: 'CustomerName',
+          left: paddingLeft,
+          top: currentY,
+          width: custPainter.width,
+          height: custPainter.height,
+        ));
 
-      if (customerPhone != null && customerPhone.trim().isNotEmpty) {
         final phonePainter = TextPainter(
           text: TextSpan(
             text: 'Tel: ${customerPhone.trim()}',
-            style: TextStyle(
-              color: Colors.black,
+            style: ts(
               fontSize: detailFontSize,
-              fontWeight: FontWeight.normal,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: usableW * 0.40);
+        final phoneX = safeRightX - phonePainter.width;
+
+        boxes.add(ElementBoundingBox(
+          elementName: 'CustomerPhone',
+          left: phoneX,
+          top: currentY,
+          width: phonePainter.width,
+          height: phonePainter.height,
+        ));
+        currentY += math.max(custPainter.height, phonePainter.height) + 2.0;
+      } else {
+        final custPainter = TextPainter(
+          text: TextSpan(
+            text: custStr,
+            style: ts(
+              fontSize: bodyFontSize,
+              fontWeight: FontWeight.bold,
             ),
           ),
           textDirection: TextDirection.ltr,
         )..layout(maxWidth: usableW);
 
         boxes.add(ElementBoundingBox(
-          elementName: 'CustomerPhone',
+          elementName: 'CustomerName',
           left: paddingLeft,
           top: currentY,
-          width: phonePainter.width,
-          height: phonePainter.height,
+          width: custPainter.width,
+          height: custPainter.height,
         ));
-        currentY += phonePainter.height + 1.0;
+        currentY += custPainter.height + 1.0;
+
+        if (customerPhone != null && customerPhone.trim().isNotEmpty) {
+          final phonePainter = TextPainter(
+            text: TextSpan(
+              text: 'Tel: ${customerPhone.trim()}',
+              style: ts(
+                fontSize: detailFontSize,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: usableW);
+
+          boxes.add(ElementBoundingBox(
+            elementName: 'CustomerPhone',
+            left: paddingLeft,
+            top: currentY,
+            width: phonePainter.width,
+            height: phonePainter.height,
+          ));
+          currentY += phonePainter.height + 1.0;
+        }
       }
     }
 
@@ -457,8 +515,7 @@ class DynamicLabelSizeEngine {
       final debtPainter = TextPainter(
         text: TextSpan(
           text: 'Geçmiş Borç: ${previousDebt.toStringAsFixed(2)} TL',
-          style: TextStyle(
-            color: Colors.black,
+          style: ts(
             fontSize: detailFontSize,
             fontWeight: FontWeight.bold,
           ),
@@ -509,64 +566,100 @@ class DynamicLabelSizeEngine {
       final rightTotal =
           lineTotal == null ? '' : '${lineTotal.toStringAsFixed(2)} TL';
 
+      final String detailText;
+      if (unitPrice != null && lineTotal != null) {
+        detailText =
+            '$qtyStr x ${unitPrice.toStringAsFixed(2)} = ${lineTotal.toStringAsFixed(2)} TL';
+      } else if (lineTotal != null) {
+        detailText = '$qtyStr x = ${lineTotal.toStringAsFixed(2)} TL';
+      } else if (rightTotal.isNotEmpty) {
+        detailText = '$qtyStr x $rightTotal';
+      } else {
+        detailText = '$qtyStr x';
+      }
+
+      final detailPainter = TextPainter(
+        text: TextSpan(
+          text: detailText,
+          style: ts(
+            fontSize: detailFontSize,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: isWide ? 1 : 2,
+      )..layout(maxWidth: isWide ? (usableW * 0.65) : usableW);
+
+      final double nameMaxW;
+      if (isWide) {
+        nameMaxW = (usableW - detailPainter.width - 12.0).clamp(60.0, usableW);
+      } else {
+        nameMaxW = usableW;
+      }
+
       final namePainter = TextPainter(
         text: TextSpan(
           text: name,
-          style: TextStyle(
-            color: Colors.black,
+          style: ts(
             fontSize: bodyFontSize,
             fontWeight: FontWeight.bold,
           ),
         ),
         textDirection: TextDirection.ltr,
         maxLines: 2,
-      )..layout(maxWidth: usableW);
+      )..layout(maxWidth: nameMaxW);
 
-      boxes.add(ElementBoundingBox(
-        elementName: 'ItemName_$itemIndex',
-        left: paddingLeft,
-        top: currentY,
-        width: namePainter.width,
-        height: namePainter.height,
-      ));
-      currentY += namePainter.height + 0.5;
+      final canBeSideBySide = isWide;
 
-      final String detailText;
-      if (unitPrice != null && rightTotal.isNotEmpty) {
-        detailText =
-            '$qtyStr ad. x ${unitPrice.toStringAsFixed(2)} TL = $rightTotal';
-      } else if (rightTotal.isNotEmpty) {
-        detailText = '$qtyStr adet = $rightTotal';
+      if (canBeSideBySide) {
+        final itemH = math.max(namePainter.height, detailPainter.height);
+        boxes.add(ElementBoundingBox(
+          elementName: 'ItemName_$itemIndex',
+          left: paddingLeft,
+          top: currentY,
+          width: namePainter.width,
+          height: namePainter.height,
+        ));
+
+        final detailX =
+            (safeRightX - detailPainter.width).clamp(paddingLeft, safeRightX);
+        boxes.add(ElementBoundingBox(
+          elementName: 'ItemDetail_$itemIndex',
+          left: detailX,
+          top: currentY,
+          width: detailPainter.width,
+          height: detailPainter.height,
+        ));
+        currentY += itemH + (isWide ? 6.5 : 3.5);
+
+        maxItemLineWidth = math.max(
+          maxItemLineWidth,
+          namePainter.width + detailPainter.width + 12.0,
+        );
       } else {
-        detailText = '$qtyStr adet';
+        boxes.add(ElementBoundingBox(
+          elementName: 'ItemName_$itemIndex',
+          left: paddingLeft,
+          top: currentY,
+          width: namePainter.width,
+          height: namePainter.height,
+        ));
+        currentY += namePainter.height + 0.5;
+
+        boxes.add(ElementBoundingBox(
+          elementName: 'ItemDetail_$itemIndex',
+          left: paddingLeft,
+          top: currentY,
+          width: detailPainter.width,
+          height: detailPainter.height,
+        ));
+        currentY += detailPainter.height + 2.0;
+
+        maxItemLineWidth = math.max(
+          maxItemLineWidth,
+          math.max(namePainter.width, detailPainter.width),
+        );
       }
-
-      final detailPainter = TextPainter(
-        text: TextSpan(
-          text: detailText,
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: detailFontSize,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-        maxLines: 2,
-      )..layout(maxWidth: usableW);
-
-      boxes.add(ElementBoundingBox(
-        elementName: 'ItemDetail_$itemIndex',
-        left: paddingLeft,
-        top: currentY,
-        width: detailPainter.width,
-        height: detailPainter.height,
-      ));
-      currentY += detailPainter.height + 2.0;
-
-      maxItemLineWidth = math.max(
-        maxItemLineWidth,
-        math.max(namePainter.width, detailPainter.width),
-      );
     }
 
     // Items divider
@@ -601,11 +694,13 @@ class DynamicLabelSizeEngine {
         ? (pageQrX - paddingLeft - 8.0).clamp(60.0, usableW)
         : usableW;
 
+    final footerStartY = currentY;
+
     if (note != null && note.trim().isNotEmpty) {
       final notePainter = TextPainter(
         text: TextSpan(
           text: 'Not: ${note.trim()}',
-          style: TextStyle(
+          style: ts(
             fontSize: detailFontSize,
             fontStyle: FontStyle.italic,
           ),
@@ -624,58 +719,81 @@ class DynamicLabelSizeEngine {
       currentY += notePainter.height + 1.5;
     }
 
-    if (showItemsCount && itemsCount != null) {
-      final itemsPainter = TextPainter(
+    if (isWide && showItemsCount && itemsCount != null) {
+      final totalQty = itemsList.fold<double>(
+          0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0));
+      final combinedText =
+          'Ödeme: $paymentStatus  •  $itemsCount Çeşit (${totalQty.toStringAsFixed(0)} Ad.)';
+      final payPainter = TextPainter(
         text: TextSpan(
-          text:
-              'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: detailFontSize,
-            fontWeight: FontWeight.w500,
+          text: combinedText,
+          style: ts(
+            fontSize: bodyFontSize,
+            fontWeight: FontWeight.w600,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout(maxWidth: textMaxW);
 
       boxes.add(ElementBoundingBox(
-        elementName: 'FooterItemsCount',
+        elementName: 'FooterPayment',
         left: paddingLeft,
         top: currentY,
-        width: itemsPainter.width,
-        height: itemsPainter.height,
+        width: payPainter.width,
+        height: payPainter.height,
       ));
-      currentY += itemsPainter.height + 1.5;
-    }
+      currentY += payPainter.height + 1.5;
+    } else {
+      if (showItemsCount && itemsCount != null) {
+        final itemsPainter = TextPainter(
+          text: TextSpan(
+            text:
+                'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
+            style: ts(
+              fontSize: detailFontSize,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: textMaxW);
 
-    final payPainter = TextPainter(
-      text: TextSpan(
-        text: 'Ödeme: $paymentStatus',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: bodyFontSize,
-          fontWeight: FontWeight.w600,
+        boxes.add(ElementBoundingBox(
+          elementName: 'FooterItemsCount',
+          left: paddingLeft,
+          top: currentY,
+          width: itemsPainter.width,
+          height: itemsPainter.height,
+        ));
+        currentY += itemsPainter.height + 1.5;
+      }
+
+      final payPainter = TextPainter(
+        text: TextSpan(
+          text: 'Ödeme: $paymentStatus',
+          style: ts(
+            fontSize: bodyFontSize,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: textMaxW);
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: textMaxW);
 
-    boxes.add(ElementBoundingBox(
-      elementName: 'FooterPayment',
-      left: paddingLeft,
-      top: currentY,
-      width: payPainter.width,
-      height: payPainter.height,
-    ));
-    currentY += payPainter.height + 1.5;
+      boxes.add(ElementBoundingBox(
+        elementName: 'FooterPayment',
+        left: paddingLeft,
+        top: currentY,
+        width: payPainter.width,
+        height: payPainter.height,
+      ));
+      currentY += payPainter.height + 1.5;
+    }
 
     if (showTotalAmount && totalAmount != null) {
       final totPainter = TextPainter(
         text: TextSpan(
           text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: titleFontSize,
+          style: ts(
+            fontSize: footerTotalFontSize,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -693,14 +811,24 @@ class DynamicLabelSizeEngine {
     }
 
     if (hasQr) {
-      final pageQrY = currentY - (qrActualSizeDots * 0.8);
+      final qrTotalH = qrActualSizeDots + (isWide ? 14.0 : 0.0);
       boxes.add(ElementBoundingBox(
         elementName: 'QRCode',
         left: pageQrX.toDouble(),
-        top: math.max(topMargin, pageQrY),
+        top: footerStartY,
         width: qrActualSizeDots,
         height: qrActualSizeDots,
       ));
+      if (isWide) {
+        boxes.add(ElementBoundingBox(
+          elementName: 'QRCaption',
+          left: pageQrX.toDouble(),
+          top: footerStartY + qrActualSizeDots + 1.0,
+          width: qrActualSizeDots,
+          height: 12.0,
+        ));
+      }
+      currentY = math.max(currentY, footerStartY + qrTotalH);
     }
 
     // Compute combined content bounding box
@@ -726,7 +854,7 @@ class DynamicLabelSizeEngine {
       );
     }
 
-    final totalHeightDots = math.max(currentY, maxB) + 4.0;
+    final totalHeightDots = math.max(currentY, maxB);
     final contentHeightMm = totalHeightDots / dotsPerMm;
     final maxLineWidthDots = paddingLeft + maxItemLineWidth + paddingRight;
     final contentWidthMm = maxLineWidthDots / dotsPerMm;
@@ -827,9 +955,11 @@ class DynamicLabelSizeEngine {
     final targetHeightMm = mediaProfile.heightMm;
     final dotsPerMm = mediaProfile.dotsPerMm;
     final bottomMargin = (targetHeightMm <= 30 ? 2.5 : 1.5) * dotsPerMm;
-    final maxSafePageY = (targetHeightMm * dotsPerMm).round() - bottomMargin;
+    final totalMediaDots = (targetHeightMm * dotsPerMm).round();
+    final maxSafePageY = totalMediaDots - bottomMargin;
+    final safeHeightLimit = totalMediaDots - (bottomMargin * 0.5);
 
-    if (contentSize.totalHeightDots <= maxSafePageY) {
+    if (contentSize.totalHeightDots <= safeHeightLimit) {
       return TargetPageSize(
         widthMm: mediaProfile.widthMm,
         heightMm: targetHeightMm,

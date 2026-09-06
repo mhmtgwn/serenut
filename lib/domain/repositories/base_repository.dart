@@ -267,6 +267,7 @@ class ProductEntity {
   final String? imageUrl;
   final String saleType; // piece | weighed
   final int minimumWeightGrams;
+  final String origin;
 
   ProductEntity({
     required this.id,
@@ -284,6 +285,7 @@ class ProductEntity {
     this.imageUrl,
     this.saleType = 'piece',
     this.minimumWeightGrams = 20,
+    this.origin = 'TÜRKİYE',
   });
 
   bool get isWeighed => saleType == 'weighed';
@@ -304,6 +306,7 @@ class ProductEntity {
     String? imageUrl,
     String? saleType,
     int? minimumWeightGrams,
+    String? origin,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -321,6 +324,7 @@ class ProductEntity {
       imageUrl: imageUrl ?? this.imageUrl,
       saleType: saleType ?? this.saleType,
       minimumWeightGrams: minimumWeightGrams ?? this.minimumWeightGrams,
+      origin: origin ?? this.origin,
     );
   }
 
@@ -340,6 +344,7 @@ class ProductEntity {
         'image_url': imageUrl,
         'sale_type': saleType,
         'minimum_weight_grams': minimumWeightGrams,
+        'origin': origin,
       };
 
   factory ProductEntity.fromMap(Map<String, dynamic> map) => ProductEntity(
@@ -374,6 +379,7 @@ class ProductEntity {
             ? (map['minimum_weight_grams'] as num).toInt()
             : (int.tryParse((map['minimum_weight_grams'] ?? '20').toString()) ??
                 20),
+        origin: (map['origin'] ?? 'TÜRKİYE').toString(),
       );
 
   @override

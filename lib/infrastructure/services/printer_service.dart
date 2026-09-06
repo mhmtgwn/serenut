@@ -447,6 +447,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
       unit: 'adet',
       shelfCode: 'A-01',
       businessName: settings.businessName,
+      origin: 'TÜRKİYE',
       weight: 1,
       price: 123.45,
       barcode: '869000000001',
@@ -458,21 +459,19 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         ? await _loadLogoSourceBytes(settings.businessLogo)
         : null;
     final bytes = settings.labelPrinterLanguage == 'tspl'
-        ? TsplLabelLayoutEngine.generateLabelBytes(
-            model,
+        ? await TsplCanvasLabelEngine.generateShelfLabelBytes(
+            model: model,
             widthMm: settings.labelWidthMm,
             heightMm: settings.labelHeightMm,
             gapMm: settings.labelGapMm,
             autoDetectGap: settings.labelAutoDetectGap,
             dpi: settings.labelDpi,
             showBusinessName: settings.labelShowBusinessName,
-            showBrand: settings.labelShowBrand,
             showBarcode: settings.labelShowBarcode,
             showPrice: settings.labelShowPrice,
-            showVat: settings.labelShowVat,
             fontSize: settings.labelFontSize,
             logoPath: settings.businessLogo,
-            logoBytes: logoBytes,
+            logoBytes: logoBytes != null ? Uint8List.fromList(logoBytes) : null,
           )
         : LabelLayoutEngine.generateLabelBytes(
             model,
@@ -1471,6 +1470,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         unit: product.unit,
         shelfCode: product.shelfCode,
         businessName: settings.businessName,
+        origin: product.origin,
+        vat: product.vat,
         weight: 1,
         price: product.price,
         barcode: product.id,
@@ -1478,8 +1479,8 @@ class PrinterService with ChangeNotifier implements IPrinterService {
         timestamp: DateTime.now(),
       );
       if (isTspl) {
-        bytes.addAll(TsplLabelLayoutEngine.generateLabelBytes(
-          model,
+        bytes.addAll(await TsplCanvasLabelEngine.generateShelfLabelBytes(
+          model: model,
           widthMm: settings.labelWidthMm,
           heightMm: settings.labelHeightMm,
           gapMm: settings.labelGapMm,
@@ -1490,10 +1491,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           showBrand: settings.labelShowBrand,
           showBarcode: settings.labelShowBarcode,
           showPrice: settings.labelShowPrice,
-          showVat: settings.labelShowVat,
           fontSize: settings.labelFontSize,
           logoPath: settings.businessLogo,
-          logoBytes: tsplLogoBytes,
+          logoBytes: tsplLogoBytes != null
+              ? Uint8List.fromList(tsplLogoBytes)
+              : null,
         ));
         isFirstTsplLabel = false;
       } else {

@@ -11,6 +11,9 @@ class LabelModel {
   final String unit;
   final String? shelfCode;
   final String? businessName;
+  final String origin;
+  final int? vat;
+  final double? unitPrice;
 
   LabelModel({
     required this.productName,
@@ -24,6 +27,9 @@ class LabelModel {
     this.unit = 'adet',
     this.shelfCode,
     this.businessName,
+    this.origin = 'TÜRKİYE',
+    this.vat,
+    this.unitPrice,
   });
 
   Map<String, dynamic> toMap() => {
@@ -38,6 +44,9 @@ class LabelModel {
         'unit': unit,
         'shelfCode': shelfCode,
         'businessName': businessName,
+        'origin': origin,
+        'vat': vat,
+        'unitPrice': unitPrice,
       };
 
   factory LabelModel.fromMap(Map<String, dynamic> map) => LabelModel(
@@ -52,5 +61,8 @@ class LabelModel {
         unit: map['unit'] as String? ?? 'adet',
         shelfCode: map['shelfCode'] as String?,
         businessName: map['businessName'] as String?,
+        origin: map['origin'] as String? ?? 'TÜRKİYE',
+        vat: map['vat'] as int?,
+        unitPrice: (map['unitPrice'] as num?)?.toDouble(),
       );
 }
