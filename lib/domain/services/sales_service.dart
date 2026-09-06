@@ -78,6 +78,7 @@ class SalesService {
     required List<SaleItemInput> items,
     required String paymentMethod,
     double? paidAmount,
+    double? discountAmount,
     String? idempotencyKey,
     String? createdBy,
     Map<String, dynamic>? terminalMetadata,
@@ -114,10 +115,14 @@ class SalesService {
     }
 
     // Calculate totals
-    double totalAmount = 0;
+    double subtotal = 0;
     for (final item in items) {
-      totalAmount += item.saleQuantity * item.unitPrice;
+      subtotal += item.saleQuantity * item.unitPrice;
     }
+    final double discount =
+        (discountAmount != null && discountAmount > 0) ? discountAmount : 0.0;
+    final double totalAmount =
+        (subtotal - discount).clamp(0.0, double.infinity);
 
     final double finalPaidAmount =
         paidAmount ?? (paymentMethod == 'debt' ? 0 : totalAmount);
@@ -151,6 +156,7 @@ class SalesService {
       customerId: customerId,
       totalAmount: totalAmount,
       paidAmount: finalPaidAmount,
+      discountAmount: discount,
       paymentMethod: paymentMethod,
       status: 'pending',
       createdAt: DateTime.now(),
@@ -169,6 +175,7 @@ class SalesService {
           customerId: sale.customerId,
           totalAmount: sale.totalAmount,
           paidAmount: sale.paidAmount,
+          discountAmount: sale.discountAmount,
           paymentMethod: sale.paymentMethod,
           status: 'processing',
           createdAt: sale.createdAt,
@@ -193,6 +200,7 @@ class SalesService {
           customerId: sale.customerId,
           totalAmount: sale.totalAmount,
           paidAmount: sale.paidAmount,
+          discountAmount: sale.discountAmount,
           paymentMethod: sale.paymentMethod,
           status: 'completed',
           createdAt: sale.createdAt,
@@ -252,6 +260,7 @@ class SalesService {
           customerId: sale.customerId,
           totalAmount: sale.totalAmount,
           paidAmount: sale.paidAmount,
+          discountAmount: sale.discountAmount,
           paymentMethod: sale.paymentMethod,
           status: 'processing',
           createdAt: sale.createdAt,
@@ -277,6 +286,7 @@ class SalesService {
           customerId: sale.customerId,
           totalAmount: sale.totalAmount,
           paidAmount: sale.paidAmount,
+          discountAmount: sale.discountAmount,
           paymentMethod: sale.paymentMethod,
           status: 'completed',
           createdAt: sale.createdAt,
@@ -357,6 +367,7 @@ class SalesService {
           customerId: sale.customerId,
           totalAmount: sale.totalAmount,
           paidAmount: newPaidAmount,
+          discountAmount: sale.discountAmount,
           paymentMethod: method,
           status: remainingDebt == 0 ? 'completed' : 'partial',
           createdAt: sale.createdAt,
@@ -389,6 +400,7 @@ class SalesService {
           customerId: sale.customerId,
           totalAmount: sale.totalAmount,
           paidAmount: newPaidAmount,
+          discountAmount: sale.discountAmount,
           paymentMethod: method,
           status: remainingDebt == 0 ? 'completed' : 'partial',
           createdAt: sale.createdAt,

@@ -70,7 +70,7 @@ class SaleDetailsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildItemsCard(sale.items, productNameMap),
+                  _buildItemsCard(sale, productNameMap),
                   const SizedBox(height: 16),
                 ],
                 _buildPaymentSummaryCard(sale),
@@ -194,15 +194,18 @@ class SaleDetailsPage extends ConsumerWidget {
   }
 
   Widget _buildItemsCard(
-    List<Map<String, dynamic>> items,
+    SaleEntity sale,
     Map<String, String> productNameMap,
   ) {
-    double total = 0;
+    final items = sale.items;
+    double subtotal = 0;
     for (final item in items) {
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       final price = (item['unit_price'] ?? item['unitPrice']) as double? ?? 0.0;
-      total += qty * price;
+      subtotal += qty * price;
     }
+    final discount = sale.discountAmount;
+    final netTotal = (subtotal - discount).clamp(0.0, double.infinity);
 
     return Container(
       decoration: BoxDecoration(
@@ -291,24 +294,74 @@ class SaleDetailsPage extends ConsumerWidget {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Text(
-                  'Toplam',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Color(0xFF0F172A),
+                if (discount > 0) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Ara Toplam',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        '${subtotal.toStringAsFixed(2)} TL',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  '${total.toStringAsFixed(2)} TL',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: Color(0xFF16A34A),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'İndirim',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Colors.red,
+                        ),
+                      ),
+                      Text(
+                        '-${discount.toStringAsFixed(2)} TL',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 6),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      discount > 0 ? 'Genel Toplam' : 'Toplam',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      '${netTotal.toStringAsFixed(2)} TL',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -320,6 +373,7 @@ class SaleDetailsPage extends ConsumerWidget {
 
   Widget _buildPaymentSummaryCard(SaleEntity sale) {
     final remaining = sale.totalAmount - sale.paidAmount;
+    final subtotal = sale.totalAmount + sale.discountAmount;
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -331,7 +385,13 @@ class SaleDetailsPage extends ConsumerWidget {
             const Text('Ödeme Özeti',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
-            _paymentRow('Toplam Tutar', sale.totalAmount, Colors.black87),
+            if (sale.discountAmount > 0) ...[
+              _paymentRow('Ara Toplam', subtotal, Colors.black87),
+              const SizedBox(height: 8),
+              _paymentRow('İndirim', -sale.discountAmount, Colors.red[700]!),
+              const SizedBox(height: 8),
+            ],
+            _paymentRow('Toplam Tutar', sale.totalAmount, Colors.black87, bold: true),
             const SizedBox(height: 8),
             _paymentRow('Ödenen', sale.paidAmount, POSColors.greenDark),
             if (remaining > 0) ...[

@@ -59,6 +59,7 @@ class SalesFlowState {
   final CustomerEntity? selectedCustomer;
   final String paymentMethod; // 'cash', 'card', 'debt', 'karma'
   final double paidAmount;
+  final double discountAmount;
   final double karmaCashTendered;
   final double karmaCashApplied;
   final double karmaCard;
@@ -74,6 +75,7 @@ class SalesFlowState {
     this.selectedCustomer,
     this.paymentMethod = 'cash',
     this.paidAmount = 0.0,
+    this.discountAmount = 0.0,
     this.karmaCashTendered = 0.0,
     this.karmaCashApplied = 0.0,
     this.karmaCard = 0.0,
@@ -83,7 +85,7 @@ class SalesFlowState {
     this.idempotencyKey = '',
   });
 
-  double get total {
+  double get subtotal {
     double sum = 0;
     cartQuantities.forEach((id, qty) {
       final prod = cartProducts[id];
@@ -95,6 +97,11 @@ class SalesFlowState {
     return sum;
   }
 
+  double get total {
+    final net = subtotal - discountAmount;
+    return net > 0 ? net : 0.0;
+  }
+
   SalesFlowState copyWith({
     SalesFlowStatus? status,
     Map<String, int>? cartQuantities,
@@ -102,6 +109,7 @@ class SalesFlowState {
     CustomerEntity? Function()? selectedCustomer,
     String? paymentMethod,
     double? paidAmount,
+    double? discountAmount,
     double? karmaCashTendered,
     double? karmaCashApplied,
     double? karmaCard,
@@ -118,6 +126,7 @@ class SalesFlowState {
           selectedCustomer != null ? selectedCustomer() : this.selectedCustomer,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paidAmount: paidAmount ?? this.paidAmount,
+      discountAmount: discountAmount ?? this.discountAmount,
       karmaCashTendered: karmaCashTendered ?? this.karmaCashTendered,
       karmaCashApplied: karmaCashApplied ?? this.karmaCashApplied,
       karmaCard: karmaCard ?? this.karmaCard,
@@ -240,6 +249,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
       selectedCustomer: state.selectedCustomer,
       paymentMethod: state.paymentMethod,
       paidAmount: state.paidAmount,
+      discountAmount: state.discountAmount,
       fsmStatus: state.status.name,
       idempotencyKey: state.idempotencyKey,
     );
@@ -265,6 +275,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         selectedCustomer: cached['selectedCustomer'] as CustomerEntity?,
         paymentMethod: cached['paymentMethod'] as String,
         paidAmount: cached['paidAmount'] as double,
+        discountAmount: (cached['discountAmount'] as num?)?.toDouble() ?? 0.0,
         isSubmitting: false,
         idempotencyKey: cached['idempotencyKey'] as String? ?? '',
       );
@@ -520,6 +531,20 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     _dispatch(SalesFlowEvent.proceedToPayment);
   }
 
+  void setDiscount(double discount) {
+    final sanitized = discount.clamp(0.0, state.subtotal);
+    double nextPaid = state.paidAmount;
+    final newTotal = (state.subtotal - sanitized).clamp(0.0, double.infinity);
+    if (state.paymentMethod == 'cash' || state.paymentMethod == 'card') {
+      nextPaid = newTotal;
+    }
+    state = state.copyWith(
+      discountAmount: sanitized,
+      paidAmount: nextPaid,
+    );
+    _persistState();
+  }
+
   void reset() {
     _dispatch(SalesFlowEvent.reset);
     state = const SalesFlowState();
@@ -535,7 +560,8 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
         sum += prod.price * (prod.isWeighed ? qty / 1000.0 : qty.toDouble());
       }
     });
-    return sum;
+    final net = sum - state.discountAmount;
+    return net > 0 ? net : 0.0;
   }
 }
 

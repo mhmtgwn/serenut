@@ -273,6 +273,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 items: itemsInput,
                 paymentMethod: flowState.paymentMethod,
                 paidAmount: finalPaid,
+                discountAmount: flowState.discountAmount,
                 idempotencyKey: flowState.idempotencyKey.isNotEmpty
                     ? flowState.idempotencyKey
                     : 'checkout-${DateTime.now().microsecondsSinceEpoch}',

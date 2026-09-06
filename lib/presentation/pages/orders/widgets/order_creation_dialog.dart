@@ -26,6 +26,7 @@ import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/presentation/widgets/sales/checkout/cash_dialog.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
+import 'package:serenutos/presentation/widgets/discount_dialog.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
@@ -97,6 +98,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   bool _printLabel = false;
   int _labelCopies = 1;
   bool _isSubmitting = false;
+  double _discountAmount = 0.0;
 
   String _barcodeBuffer = '';
   DateTime? _lastBufferTime;
@@ -186,6 +188,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       _notesController.text = order.notes ?? '';
       _expectedDelivery = order.expectedDeliveryDate ??
           DateTime.now().add(const Duration(days: 1));
+      _discountAmount = order.discountAmount;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final customers = ref.read(ordersCustomersControllerProvider).value;
@@ -328,7 +331,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     super.dispose();
   }
 
-  double get _totalAmount => MathEngine.calculateCartTotal(_cart);
+  double get _subtotalAmount => MathEngine.calculateCartTotal(_cart);
+  double get _totalAmount => max(0.0, _subtotalAmount - _discountAmount);
 
   // Karma split fields getters
   double get _karmaCash =>
@@ -792,6 +796,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
         items: itemsList,
         notes: _notesController.text.trim(),
         createdBy: isEdit ? widget.existingOrder!.createdBy : cashierName,
+        discountAmount: _discountAmount,
       );
 
       // Process customer balance ledger

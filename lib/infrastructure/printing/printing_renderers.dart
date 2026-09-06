@@ -33,7 +33,11 @@ class LegacyRawPrintRenderer implements PrintRenderer {
 }
 
 class EscPosReceiptRenderer implements PrintRenderer {
-  static const _init = [0x1B, 0x40];
+  static const _init = [
+    0x1B, 0x40, // ESC @ (Initialize)
+    0x1B, 0x37, 0x07, 0xF0, 0x02, // ESC 7: Max thermal heating contrast (jet black)
+    0x1B, 0x4D, 0x00, // ESC M 0: Hardware Font A
+  ];
   static const _alignLeft = [0x1B, 0x61, 0x00];
   static const _alignCenter = [0x1B, 0x61, 0x01];
   static const _alignRight = [0x1B, 0x61, 0x02];
@@ -102,13 +106,15 @@ class EscPosReceiptRenderer implements PrintRenderer {
       _line(bytes, '— $subtitle —', mode: turkishMode);
     }
     final docKind = document['kind']?.toString().toLowerCase().trim();
-    final headerTitle = switch (docKind) {
-      'sale' || 'satis' => '[ SATIŞ FİŞİ ]',
-      'collection' || 'tahsilat' => '[ TAHSİLAT MAKBUZU ]',
-      'report' || 'rapor' => '[ RAPOR ]',
-      _ => '[ SİPARİŞ FİŞİ ]',
-    };
-    _line(bytes, headerTitle, bold: true, mode: turkishMode);
+    if (docKind == 'report' || docKind == 'rapor' || design['showHeaderTitle'] == true) {
+      final headerTitle = switch (docKind) {
+        'sale' || 'satis' => '[ SATIS FISI ]',
+        'collection' || 'tahsilat' => '[ TAHSILAT MAKBUZU ]',
+        'report' || 'rapor' => '[ RAPOR ]',
+        _ => '[ SIPARIS FISI ]',
+      };
+      _line(bytes, headerTitle, bold: true, mode: turkishMode);
+    }
 
     // Address rendering: Respects manual newlines and uses word-wrapping
     final addressRaw = business['address']?.toString().trim() ?? '';
@@ -123,139 +129,162 @@ class EscPosReceiptRenderer implements PrintRenderer {
       }
     }
     final phone = business['phone']?.toString().trim() ?? '';
-    if (phone.isNotEmpty) {
-      _line(bytes, 'Tel: $phone', mode: turkishMode);
-    }
     final taxId = business['taxId']?.toString().trim() ?? '';
-    if (taxId.isNotEmpty) {
-      _line(bytes, 'Vergi No: $taxId', mode: turkishMode);
+    if (phone.isNotEmpty && taxId.isNotEmpty) {
+      _line(bytes, 'Tel.: $phone  -  V.No: $taxId', mode: turkishMode);
+    } else if (phone.isNotEmpty) {
+      _line(bytes, 'Tel.: $phone', mode: turkishMode);
+    } else if (taxId.isNotEmpty) {
+      _line(bytes, 'V.No: $taxId', mode: turkishMode);
     }
-    _line(bytes, _dashed(width), mode: turkishMode);
+    _line(bytes, '-' * width, mode: turkishMode);
 
     bytes.addAll(_alignLeft);
     final docNumber = document['number']?.toString().trim() ?? '';
     final dateRaw = document['date']?.toString().trim() ?? '';
     final customerName = document['customerName']?.toString().trim() ?? '';
+    final customerPhone = document['customerPhone']?.toString().trim() ?? '';
     final cashier = document['cashier']?.toString().trim() ?? '';
     final payment = document['payment']?.toString().trim() ?? '';
+    final notes = document['notes']?.toString().trim() ?? '';
 
-    String datePart = dateRaw;
+    String datePart = '';
     String timePart = '';
-    if (dateRaw.contains(' ')) {
+    final parsedDt = DateTime.tryParse(dateRaw);
+    if (parsedDt != null) {
+      datePart =
+          '${parsedDt.day.toString().padLeft(2, '0')}.${parsedDt.month.toString().padLeft(2, '0')}.${(parsedDt.year % 100).toString().padLeft(2, '0')}';
+      timePart =
+          '${parsedDt.hour.toString().padLeft(2, '0')}:${parsedDt.minute.toString().padLeft(2, '0')}:${parsedDt.second.toString().padLeft(2, '0')}';
+    } else if (dateRaw.contains(' ')) {
       final parts = dateRaw.split(' ');
       datePart = parts[0];
       timePart = parts.sublist(1).join(' ');
+    } else {
+      datePart = dateRaw;
+    }
+
+    String debtStr = '0.00';
+    if (document['customerBalance'] != null) {
+      final bal = _decimal(document['customerBalance']);
+      if (bal < 0) {
+        debtStr = bal.abs().toStringAsFixed(2);
+      } else if (bal > 0) {
+        debtStr = '-${bal.toStringAsFixed(2)}';
+      }
     }
 
     if (width >= 48) {
-      if (docNumber.isNotEmpty || datePart.isNotEmpty) {
-        final left = docNumber.isNotEmpty ? 'Sipariş No: #$docNumber' : '';
-        final right = datePart.isNotEmpty ? 'Tarih: $datePart' : '';
-        _line(bytes, _columns(left, right, width), mode: turkishMode);
+      // Row 1: S.No & Tarih
+      final sNoText = docNumber.isNotEmpty ? 'S.No: #$docNumber' : '';
+      if (sNoText.isNotEmpty || datePart.isNotEmpty) {
+        _line(bytes, _metaGridRow(sNoText, 'Tarih:', datePart, width: width),
+            mode: turkishMode);
       }
-      if (customerName.isNotEmpty || timePart.isNotEmpty) {
-        final left = customerName.isNotEmpty ? 'Müşteri: $customerName' : '';
-        final right = timePart.isNotEmpty ? 'Saat: $timePart' : '';
-        _line(bytes, _columns(left, right, width), mode: turkishMode);
+      // Row 2: Kas. & Saat
+      final kasText = cashier.isNotEmpty ? 'Kas.: $cashier' : '';
+      if (kasText.isNotEmpty || timePart.isNotEmpty) {
+        _line(bytes, _metaGridRow(kasText, 'Saat:', timePart, width: width),
+            mode: turkishMode);
       }
-      if (payment.isNotEmpty) {
-        _line(bytes, 'Ödeme Türü: $payment', mode: turkishMode);
+      // Row 3: Mus. & Borc
+      final musText = customerName.isNotEmpty ? 'Mus.: $customerName' : '';
+      if (musText.isNotEmpty || design['showCustomerBalance'] != false) {
+        _line(bytes, _metaGridRow(musText, 'Borc:', debtStr, width: width),
+            mode: turkishMode);
       }
-      if (cashier.isNotEmpty) {
-        _line(bytes, 'Kasiyer: $cashier', mode: turkishMode);
+      // Row 4: Tel.
+      if (customerPhone.isNotEmpty) {
+        _line(bytes, 'Tel.: $customerPhone', mode: turkishMode);
+      }
+      // Row 5: Not.
+      if (notes.isNotEmpty) {
+        for (final line in _wrap('Not.: $notes', width)) {
+          _line(bytes, line, mode: turkishMode);
+        }
       }
     } else {
       if (docNumber.isNotEmpty || datePart.isNotEmpty) {
-        final left = docNumber.isNotEmpty ? 'Sip: #$docNumber' : '';
-        _line(bytes, _columns(left, datePart, width), mode: turkishMode);
+        _line(bytes, _columns('S.No: #$docNumber', datePart, width),
+            mode: turkishMode);
+      }
+      if (cashier.isNotEmpty || timePart.isNotEmpty) {
+        _line(bytes, _columns('Kas.: $cashier', timePart, width),
+            mode: turkishMode);
       }
       if (customerName.isNotEmpty) {
-        _line(bytes, _fit('Müşteri: $customerName', width), mode: turkishMode);
+        _line(bytes, _fit('Mus.: $customerName', width), mode: turkishMode);
       }
-      if (timePart.isNotEmpty || payment.isNotEmpty) {
-        final left = timePart.isNotEmpty ? 'Saat: $timePart' : '';
-        final right = payment.isNotEmpty ? 'Ödeme: $payment' : '';
-        _line(bytes, _columns(left, right, width), mode: turkishMode);
+      if (customerPhone.isNotEmpty) {
+        _line(bytes, 'Tel.: $customerPhone', mode: turkishMode);
       }
-      if (cashier.isNotEmpty) {
-        _line(bytes, 'Kasiyer: $cashier', mode: turkishMode);
+      if (design['showCustomerBalance'] != false) {
+        _line(bytes, _columns('Borc:', debtStr, width), mode: turkishMode);
+      }
+      if (notes.isNotEmpty) {
+        for (final line in _wrap('Not.: $notes', width)) {
+          _line(bytes, line, mode: turkishMode);
+        }
       }
     }
 
     final currency = payload['currency']?.toString() ?? 'TL';
 
-    if (design['showCustomerBalance'] != false &&
-        document['customerBalance'] != null) {
-      final balance = _decimal(document['customerBalance']);
-      _line(
-          bytes,
-          balance < 0
-              ? 'Geçmiş Borç: ${balance.abs().toStringAsFixed(2)} $currency'
-              : 'Bakiye: ${balance.toStringAsFixed(2)} $currency',
-          mode: turkishMode);
-    }
-    if (document['notes']?.toString().trim().isNotEmpty == true) {
-      for (final line in _wrap('Not: ${document['notes']}', width)) {
-        _line(bytes, line, mode: turkishMode);
-      }
-    }
-    _line(bytes, '=' * width, mode: turkishMode);
-
     if (design['showProductDetails'] != false) {
       final items = payload['items'] as List? ?? const [];
-      final int wQty = width >= 48 ? 4 : 3;
-      final int wPrice = width >= 48 ? 9 : 7;
-      final int wTotal = width >= 48 ? 11 : 9;
-      final int wName = width - wQty - wPrice - wTotal;
-
-      _line(
-        bytes,
-        _columns4(
-            'AD.', 'ÜRÜN ADI', 'BİRİM', 'TUTAR', wQty, wName, wPrice, wTotal),
-        bold: true,
-        mode: turkishMode,
-      );
       _line(bytes, '-' * width, mode: turkishMode);
 
-      for (final raw in items) {
-        final item = Map<String, Object?>.from(raw as Map);
-        final name = item['name']?.toString().trim() ?? 'Ürün';
-        final quantity = _decimal(item['quantity']);
-        final unitPrice = _decimal(item['unitPrice']);
-        final total = item['total'] == null
-            ? quantity * unitPrice
-            : _decimal(item['total']);
-        final qtyStr = _quantity(quantity);
-        final priceStr = unitPrice.toStringAsFixed(2);
-        final totStr = total.toStringAsFixed(2);
+      if (width >= 48) {
+        _line(
+          bytes,
+          _productRow('URUN ADI', 'ADET', 'BIRIM', 'TUTAR'),
+          bold: true,
+          mode: turkishMode,
+        );
+        _line(bytes, '-' * width, mode: turkishMode);
 
-        if (name.length <= wName - 1) {
+        for (final raw in items) {
+          final item = Map<String, Object?>.from(raw as Map);
+          final name = item['name']?.toString().trim() ?? 'Urun';
+          final quantity = _decimal(item['quantity']);
+          final unitPrice = _decimal(item['unitPrice']);
+          final total = item['total'] == null
+              ? quantity * unitPrice
+              : _decimal(item['total']);
+          final qtyStr = _quantity(quantity);
+          final priceStr = unitPrice.toStringAsFixed(2);
+          final totStr = total.toStringAsFixed(2);
+
           _line(
             bytes,
-            _columns4(
-                qtyStr, name, priceStr, totStr, wQty, wName, wPrice, wTotal),
+            _productRow(name, qtyStr, priceStr, totStr),
             mode: turkishMode,
           );
-        } else {
-          final nameLines = _wrap(name, wName - 1);
+        }
+      } else {
+        _line(
+          bytes,
+          _columns4('AD.', 'URUN ADI', 'BIRIM', 'TUTAR', 3, 13, 7, 9),
+          bold: true,
+          mode: turkishMode,
+        );
+        _line(bytes, '-' * width, mode: turkishMode);
+
+        for (final raw in items) {
+          final item = Map<String, Object?>.from(raw as Map);
+          final name = item['name']?.toString().trim() ?? 'Urun';
+          final quantity = _decimal(item['quantity']);
+          final unitPrice = _decimal(item['unitPrice']);
+          final total = item['total'] == null
+              ? quantity * unitPrice
+              : _decimal(item['total']);
+          final qtyStr = _quantity(quantity);
+          final priceStr = unitPrice.toStringAsFixed(2);
+          final totStr = total.toStringAsFixed(2);
+
           _line(
             bytes,
-            _columns4(
-                qtyStr, nameLines[0], '', '', wQty, wName, wPrice, wTotal),
-            mode: turkishMode,
-          );
-          for (var i = 1; i < nameLines.length - 1; i++) {
-            _line(
-              bytes,
-              _columns4('', nameLines[i], '', '', wQty, wName, wPrice, wTotal),
-              mode: turkishMode,
-            );
-          }
-          final lastLine = nameLines.length > 1 ? nameLines.last : '';
-          _line(
-            bytes,
-            _columns4(
-                '', lastLine, priceStr, totStr, wQty, wName, wPrice, wTotal),
+            _columns4(qtyStr, name, priceStr, totStr, 3, 13, 7, 9),
             mode: turkishMode,
           );
         }
@@ -281,34 +310,35 @@ class EscPosReceiptRenderer implements PrintRenderer {
               'Ara Toplam:', '${subtotal.toStringAsFixed(2)} $currency', width),
           mode: turkishMode);
     }
+    if (discount > 0.009) {
+      _line(
+          bytes,
+          _columns('İndirim:',
+              '-${discount.toStringAsFixed(2)} $currency', width),
+          mode: turkishMode);
+    }
     if (vat > 0.009) {
       _line(
           bytes,
           _columns(
-              'KDV Dahil:', '${vat.toStringAsFixed(2)} $currency', width),
-          mode: turkishMode);
-    }
-    if (discount > 0.009) {
-      _line(
-          bytes,
-          _columns('İndirim / Kupon:',
-              '-${discount.toStringAsFixed(2)} $currency', width),
+              'KDV (%10 Dahil):', '${vat.toStringAsFixed(2)} $currency', width),
           mode: turkishMode);
     }
 
-    _line(bytes, '=' * width, mode: turkishMode);
+    _line(bytes, '-' * width, mode: turkishMode);
     _line(
         bytes,
         _columns(
             'GENEL TOPLAM', '${total.toStringAsFixed(2)} $currency', width),
         bold: true,
         mode: turkishMode);
-    _line(bytes, '=' * width, mode: turkishMode);
+    _line(bytes, '-' * width, mode: turkishMode);
 
     if (document['paid'] != null) {
       final paid = _decimal(document['paid']);
+      final payMethod = payment.isNotEmpty ? ' ($payment)' : '';
       _line(bytes,
-          _columns('Ödenen:', '${paid.toStringAsFixed(2)} $currency', width),
+          _columns('Odenen$payMethod:', '${paid.toStringAsFixed(2)} $currency', width),
           mode: turkishMode);
       if (total - paid > 0.005) {
         _line(
@@ -318,10 +348,8 @@ class EscPosReceiptRenderer implements PrintRenderer {
             bold: true,
             mode: turkishMode);
       }
+      _line(bytes, '-' * width, mode: turkishMode);
     }
-
-    bytes.addAll(_alignCenter);
-    _line(bytes, _dashed(width), mode: turkishMode);
 
     final barcode = document['barcode']?.toString().trim() ??
         document['number']?.toString().trim() ??
@@ -330,14 +358,10 @@ class EscPosReceiptRenderer implements PrintRenderer {
       final safe = barcode.codeUnits.where((value) => value <= 127).toList();
       bytes
         ..addAll(_alignCenter)
-        ..addAll([0x1D, 0x48, 0x00, 0x1D, 0x68, 0x40, 0x1D, 0x77, 0x02])
+        ..addAll([0x1D, 0x48, 0x00, 0x1D, 0x68, 65, 0x1D, 0x77, 0x02])
         ..addAll([0x1D, 0x6B, 0x49, safe.length + 2, 0x7B, 0x42])
         ..addAll(safe)
         ..add(0x0A);
-      final bizShort =
-          (business['name']?.toString().trim() ?? 'SERENUT').toUpperCase();
-      final humanBarcode = '* $barcode - ${DateTime.now().year} - $bizShort *';
-      _line(bytes, humanBarcode, mode: turkishMode);
     }
 
     final qrData = document['qrData']?.toString() ?? '';
@@ -347,30 +371,49 @@ class EscPosReceiptRenderer implements PrintRenderer {
         ..add(0x0A);
     }
 
+    bytes.addAll(_alignCenter);
     final footer = business['receiptFooterText']?.toString().trim() ??
         design['footerText']?.toString().trim() ??
-        'Afiyet Olsun! Bizi tercih ettiğiniz için teşekkür ederiz.';
+        'Bizi tercih ettiginiz icin tesekkur ederiz!';
     if (footer.isNotEmpty) {
-      for (final line in _wrap(footer, width)) {
-        _line(bytes, line, mode: turkishMode);
-      }
+      _line(bytes, footer, bold: true, mode: turkishMode);
     }
 
-    final website = business['website']?.toString().trim() ??
-        business['email']?.toString().trim() ??
-        '';
-    if (website.isNotEmpty) {
-      _line(bytes, website, mode: turkishMode);
-    }
-
-    for (var i = 0; i < _integer(design['feedLines'], 2).clamp(0, 8); i++) {
-      bytes.add(0x0A);
-    }
+    bytes.addAll([0x1B, 0x64, 0x02]); // 2 lines feed
     if (design['autoCut'] != false) bytes.addAll(_cut);
     return RenderedPrintDocument(
       bytes: Uint8List.fromList(bytes),
       mimeType: 'application/vnd.escpos',
     );
+  }
+
+  static String _metaGridRow(String left, String rLabel, String rVal,
+      {int width = 48}) {
+    final leftWidth = width >= 48 ? 32 : (width * 0.6).round();
+    String l = left.trim();
+    if (l.length > leftWidth - 1) l = l.substring(0, leftWidth - 1);
+    l = l.padRight(leftWidth);
+
+    String cleanR = rLabel.trim();
+    if (cleanR.endsWith(':')) {
+      final p = cleanR.substring(0, cleanR.length - 1).trim();
+      cleanR = p.padRight(5) + ':';
+    }
+    final rl = cleanR.padRight(8);
+    final valWidth = (width - leftWidth - 8).clamp(4, 20);
+    final rv = rVal.trim().padLeft(valWidth);
+    return (l + rl + rv).padRight(width).substring(0, width);
+  }
+
+  static String _productRow(
+      String name, String qty, String unitPrice, String total) {
+    String n = name.trim();
+    if (n.length > 22) n = n.substring(0, 22);
+    n = n.padRight(23);
+    final q = qty.trim().padLeft(5);
+    final u = unitPrice.trim().padLeft(8);
+    final t = total.trim().padLeft(12);
+    return '$n$q$u$t';
   }
 
   static String _dashed(int width) =>
@@ -786,6 +829,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
       totalAmount: payload['totalAmount'] == null
           ? null
           : _decimal(payload['totalAmount'], 0),
+      discountAmount: _decimal(payload['discountAmount'], 0),
       itemsCount: payload['itemsCount'] as int?,
       fontSize: design['fontSize']?.toString() ?? 'Orta',
       showCustomerName: design['showCustomerName'] != false,
@@ -823,6 +867,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         totalAmount: payload['totalAmount'] == null
             ? null
             : _decimal(payload['totalAmount'], 0),
+        discountAmount: _decimal(payload['discountAmount'], 0),
         itemsCount: payload['itemsCount'] as int?,
         widthMm: widthMm,
         heightMm: heightMm,

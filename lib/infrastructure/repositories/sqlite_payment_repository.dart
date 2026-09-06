@@ -145,6 +145,7 @@ class SqliteSaleRepository implements ISaleRepository {
         'customer_id': entity.customerId,
         'total_amount': entity.totalAmount,
         'paid_amount': entity.paidAmount,
+        'discount_amount': entity.discountAmount,
         'payment_method': entity.paymentMethod,
         'status': entity.status,
         'created_at': entity.createdAt.toIso8601String(),
@@ -190,6 +191,7 @@ class SqliteSaleRepository implements ISaleRepository {
         {
           'total_amount': entity.totalAmount,
           'paid_amount': entity.paidAmount,
+          'discount_amount': entity.discountAmount,
           'status': entity.status,
           'is_synced': entity.isSynced,
           'idempotency_key': entity.idempotencyKey,

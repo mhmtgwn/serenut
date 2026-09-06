@@ -362,7 +362,7 @@ class OrderDetailsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildOrderItemsCard(order.items, productNameMap),
+                  _buildOrderItemsCard(order, productNameMap),
                   const SizedBox(height: 16),
                 ],
 
@@ -2611,10 +2611,19 @@ class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
 }
 
 Widget _buildOrderItemsCard(
-  List<Map<String, dynamic>> items,
+  OrderEntity order,
   Map<String, String> productNameMap,
 ) {
-  double total = 0;
+  final items = order.items;
+  double subtotal = 0;
+  for (final item in items) {
+    final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+    final price = item['unit_price'] as double? ?? 0.0;
+    subtotal += qty * price;
+  }
+  final discount = order.discountAmount;
+  final netTotal = (subtotal - discount).clamp(0.0, double.infinity);
+
   return Container(
     decoration: BoxDecoration(
       color: Colors.white,
@@ -2631,7 +2640,6 @@ Widget _buildOrderItemsCard(
             final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
             final price = item['unit_price'] as double? ?? 0.0;
             final itemTotal = qty * price;
-            total += itemTotal;
             final productId = item['product_id']?.toString() ?? '';
             final productName = productNameMap[productId] ??
                 item['product_name']?.toString() ??
@@ -2698,19 +2706,65 @@ Widget _buildOrderItemsCard(
             );
           }),
           const Divider(height: 20),
+          if (discount > 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Ara Toplam',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: _kTextSecondary,
+                  ),
+                ),
+                Text(
+                  '${subtotal.toStringAsFixed(2)} TL',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: _kText,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'İndirim',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Colors.red,
+                  ),
+                ),
+                Text(
+                  '-${discount.toStringAsFixed(2)} TL',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Toplam',
-                style: TextStyle(
+              Text(
+                discount > 0 ? 'Genel Toplam' : 'Toplam',
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
                   color: _kText,
                 ),
               ),
               Text(
-                '${total.toStringAsFixed(2)} TL',
+                '${netTotal.toStringAsFixed(2)} TL',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 17,

@@ -868,6 +868,7 @@ class InMemoryOrderRepository implements IOrderRepository {
       items: entity.items,
       notes: entity.notes,
       createdBy: entity.createdBy,
+      discountAmount: entity.discountAmount,
     ));
     return 1;
   }

@@ -103,6 +103,7 @@ class DatabaseSchema {
         entitlement_snapshot TEXT,
         refunded_amount REAL NOT NULL DEFAULT 0,
         fsm_state TEXT NOT NULL DEFAULT 'completed',
+        discount_amount REAL NOT NULL DEFAULT 0.0,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
@@ -184,6 +185,7 @@ class DatabaseSchema {
         deleted_by TEXT,
         created_by TEXT,
         is_synced INTEGER NOT NULL DEFAULT 0,
+        discount_amount REAL NOT NULL DEFAULT 0.0,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');

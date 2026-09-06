@@ -983,6 +983,25 @@ class DatabaseMigrations {
             'status': 'success'
           });
         }
+        if (oldVersion < 53 && newVersion >= 53) {
+          try {
+            await txn.execute(
+                'ALTER TABLE sales ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0.0');
+          } catch (e) {
+            handleMigrationError(e, 53);
+          }
+          try {
+            await txn.execute(
+                'ALTER TABLE orders ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0.0');
+          } catch (e) {
+            handleMigrationError(e, 53);
+          }
+          await txn.insert('app_migration_history', {
+            'version': 53,
+            'migrated_at': DateTime.now().toIso8601String(),
+            'status': 'success'
+          });
+        }
       });
     } catch (err) {
       // Log migration error to history outside transaction before throwing

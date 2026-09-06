@@ -54,9 +54,9 @@ void main() {
       capabilities: {'paperWidthMm': 58, 'printableWidthDots': 384},
     ));
     final text = String.fromCharCodes(rendered.bytes);
-    expect(text, contains('=' * 32));
-    expect(text, isNot(contains('=' * 48)));
-    expect(text, contains('[ SIPARIS FISI ]'));
+    expect(text, contains('-' * 32));
+    expect(text, isNot(contains('-' * 48)));
+    expect(text, contains('S.No: #1'));
     expect(text, contains('GENEL TOPLAM'));
     expect(text, contains('AD.'));
     expect(rendered.bytes.sublist(rendered.bytes.length - 4),
@@ -110,20 +110,19 @@ void main() {
       capabilities: {'paperWidthMm': 80, 'printableWidthDots': 576},
     ));
     final text = String.fromCharCodes(rendered.bytes);
-    expect(text, contains('=' * 48));
-    expect(text, contains('[ SIPARIS FISI ]'));
+    expect(text, contains('-' * 48));
+    expect(text, isNot(contains('=' * 48)));
     expect(text, contains('FINDIK DEGIRMENI'));
-    expect(text, contains('Siparis No: #1042'));
-    expect(text, contains('Tarih: 04.09.2026'));
-    expect(text, contains('Musteri: Ahmet Yilmaz'));
-    expect(text, contains('Saat: 14:35'));
-    expect(text, contains('AD. URUN ADI'));
+    expect(text, contains('S.No: #1042'));
+    expect(text, contains('Tarih:'));
+    expect(text, contains('Mus.: Ahmet Yilmaz'));
+    expect(text, contains('Saat :'));
+    expect(text, contains('URUN ADI'));
     expect(text, contains('BIRIM'));
     expect(text, contains('TUTAR'));
     expect(text, contains('GENEL TOPLAM'));
     expect(text, contains('535.00 TL'));
-    expect(text, contains('* 1042 - 2026 - NUTOPIA *'));
-    expect(text, contains('www.nutopia.com.tr'));
+    expect(text, contains('Bizi tercih ettiginiz icin tesekkur ederiz!'));
   });
 
   test('product label uses device media dimensions and emits one TSPL copy',

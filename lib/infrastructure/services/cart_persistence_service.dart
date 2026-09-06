@@ -9,6 +9,7 @@ class CartPersistenceService {
   static const String _kSelectedCustomerKey = 'serenut_cart_customer';
   static const String _kPaymentMethodKey = 'serenut_cart_payment_method';
   static const String _kPaidAmountKey = 'serenut_cart_paid_amount';
+  static const String _kDiscountAmountKey = 'serenut_cart_discount_amount';
   static const String _kFsmStatusKey = 'serenut_cart_fsm_status';
   static const String _kIdempotencyKeyKey = 'serenut_cart_idempotency_key';
 
@@ -22,6 +23,7 @@ class CartPersistenceService {
     required CustomerEntity? selectedCustomer,
     required String paymentMethod,
     required double paidAmount,
+    double discountAmount = 0.0,
     required String fsmStatus,
     required String idempotencyKey,
   }) async {
@@ -34,6 +36,7 @@ class CartPersistenceService {
     await _prefs.setString(_kCartProductsKey, productsJson);
     await _prefs.setString(_kPaymentMethodKey, paymentMethod);
     await _prefs.setDouble(_kPaidAmountKey, paidAmount);
+    await _prefs.setDouble(_kDiscountAmountKey, discountAmount);
     await _prefs.setString(_kFsmStatusKey, fsmStatus);
     await _prefs.setString(_kIdempotencyKeyKey, idempotencyKey);
 
@@ -51,6 +54,7 @@ class CartPersistenceService {
     final customerRaw = _prefs.getString(_kSelectedCustomerKey);
     final paymentMethod = _prefs.getString(_kPaymentMethodKey) ?? 'cash';
     final paidAmount = _prefs.getDouble(_kPaidAmountKey) ?? 0.0;
+    final discountAmount = _prefs.getDouble(_kDiscountAmountKey) ?? 0.0;
     final fsmStatus = _prefs.getString(_kFsmStatusKey) ?? 'idle';
     final idempotencyKey = _prefs.getString(_kIdempotencyKeyKey) ?? '';
 
@@ -82,6 +86,7 @@ class CartPersistenceService {
       'selectedCustomer': selectedCustomer,
       'paymentMethod': paymentMethod,
       'paidAmount': paidAmount,
+      'discountAmount': discountAmount,
       'fsmStatus': fsmStatus,
       'idempotencyKey': idempotencyKey,
     };
@@ -93,6 +98,7 @@ class CartPersistenceService {
     await _prefs.remove(_kSelectedCustomerKey);
     await _prefs.remove(_kPaymentMethodKey);
     await _prefs.remove(_kPaidAmountKey);
+    await _prefs.remove(_kDiscountAmountKey);
     await _prefs.remove(_kFsmStatusKey);
     await _prefs.remove(_kIdempotencyKeyKey);
   }

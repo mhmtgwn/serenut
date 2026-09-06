@@ -16,6 +16,8 @@ import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:uuid/uuid.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
+import 'package:serenutos/presentation/widgets/discount_dialog.dart';
+import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'checkout/cash_dialog.dart';
 
 part 'checkout/karma_fields.dart';
@@ -434,6 +436,10 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
 
   Widget _buildTotalBox() {
     final isKarma = widget.paymentMethod == 'karma';
+    final flow = ref.watch(salesFlowProvider);
+    final discount = flow.discountAmount;
+    final subtotal = flow.subtotal;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -442,27 +448,95 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
         border: Border.all(color: _kBorder),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (isKarma && _karmaTotal > 0)
-            Text(
-              'Kalan: ₺${_karmaRemainder.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 12,
-                color: _karmaValid ? _kGreenDark : _kRed,
-                fontWeight: FontWeight.w800,
+          // Discount Button / Chip
+          InkWell(
+            onTap: subtotal > 0
+                ? () {
+                    DiscountDialog.show(
+                      context: context,
+                      subtotal: subtotal,
+                      currentDiscount: discount,
+                      onApply: (newDiscount) {
+                        ref
+                            .read(salesFlowProvider.notifier)
+                            .setDiscount(newDiscount);
+                      },
+                    );
+                  }
+                : null,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: discount > 0 ? _kGreenLight : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: discount > 0
+                      ? _kGreenDark.withValues(alpha: 0.3)
+                      : const Color(0xFFCBD5E1),
+                ),
               ),
-            )
-          else
-            const SizedBox.shrink(),
-          Text(
-            '₺${widget.total.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 24,
-              color: _kGreenDark,
-              letterSpacing: -0.5,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.percent_rounded,
+                    size: 16,
+                    color: discount > 0 ? _kGreenDark : _kTextSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    discount > 0
+                        ? 'İndirim: -₺${discount.toStringAsFixed(2)}'
+                        : 'İndirim',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: discount > 0 ? _kGreenDark : _kTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ),
+          const Spacer(),
+          if (isKarma && _karmaTotal > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Text(
+                'Kalan: ₺${_karmaRemainder.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _karmaValid ? _kGreenDark : _kRed,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (discount > 0)
+                Text(
+                  '₺${subtotal.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    decoration: TextDecoration.lineThrough,
+                    color: _kTextSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              Text(
+                '₺${widget.total.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 24,
+                  color: _kGreenDark,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
         ],
       ),

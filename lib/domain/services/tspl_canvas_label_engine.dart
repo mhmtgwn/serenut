@@ -28,6 +28,7 @@ class TsplCanvasLabelEngine {
     String? note,
     DateTime? timestamp,
     double? totalAmount,
+    double? discountAmount,
     int? itemsCount,
     int widthMm = 50,
     int heightMm = 30,
@@ -428,9 +429,13 @@ class TsplCanvasLabelEngine {
       }
 
       if (showTotalAmount && totalAmount != null) {
+        final hasDiscount = discountAmount != null && discountAmount > 0.009;
+        final totalText = hasDiscount
+            ? 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL (İnd: -${discountAmount.toStringAsFixed(2)} TL)'
+            : 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL';
         final totPainter = TextPainter(
           text: TextSpan(
-            text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
+            text: totalText,
             style: ts(
               fontSize: footerTotalFontSize,
               fontWeight: FontWeight.bold,
@@ -1061,9 +1066,13 @@ class TsplCanvasLabelEngine {
         }
 
         if (showTotalAmount && totalAmount != null) {
+          final hasDiscount = discountAmount != null && discountAmount > 0.009;
+          final totalText = hasDiscount
+              ? 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL (İnd: -${discountAmount.toStringAsFixed(2)} TL)'
+              : 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL';
           final totPainter = TextPainter(
             text: TextSpan(
-              text: 'TOPLAM: ${totalAmount.toStringAsFixed(2)} TL',
+              text: totalText,
               style: ts(
                 fontSize: footerTotalFontSize,
                 fontWeight: FontWeight.bold,

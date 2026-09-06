@@ -116,6 +116,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
     required List<SaleItemInput> items,
     required String paymentMethod,
     double? paidAmount,
+    double? discountAmount,
     String? idempotencyKey,
     Map<String, dynamic>? terminalMetadata,
   }) async {
@@ -132,6 +133,7 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
           items: items,
           paymentMethod: paymentMethod,
           paidAmount: paidAmount,
+          discountAmount: discountAmount,
           idempotencyKey: idempotencyKey,
           createdBy: cashierName,
           terminalMetadata: terminalMetadata,

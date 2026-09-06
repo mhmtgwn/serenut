@@ -66,13 +66,7 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<int> create(OrderEntity entity) async {
-    final totalAmount = entity.items.fold<double>(
-      0.0,
-      (sum, item) =>
-          sum +
-          ((item['unit_price'] as double? ?? 0.0) *
-              ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
-    );
+    final totalAmount = entity.totalAmount;
     return _gateway.transaction(() async {
       final sequenceRows = await _executor.query(
         'order_number_sequence',
@@ -125,6 +119,7 @@ class SqliteOrderRepository implements IOrderRepository {
         'customer_id': entity.customerId,
         'status': entity.status,
         'total_amount': totalAmount,
+        'discount_amount': entity.discountAmount,
         'order_date': entity.createdAt.toIso8601String(),
         'expected_delivery_date':
             entity.expectedDeliveryDate?.toIso8601String(),
@@ -160,13 +155,7 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<int> update(OrderEntity entity) async {
-    final totalAmount = entity.items.fold<double>(
-      0.0,
-      (sum, item) =>
-          sum +
-          ((item['unit_price'] as double? ?? 0.0) *
-              ((item['quantity'] as num?)?.toDouble() ?? 0.0)),
-    );
+    final totalAmount = entity.totalAmount;
     return _gateway.transaction(() async {
       final existing = await _executor.query(
         'orders',
@@ -186,6 +175,7 @@ class SqliteOrderRepository implements IOrderRepository {
         'customer_id': entity.customerId,
         'status': entity.status,
         'total_amount': totalAmount,
+        'discount_amount': entity.discountAmount,
         'expected_delivery_date':
             entity.expectedDeliveryDate?.toIso8601String(),
         'actual_delivery_date': entity.actualDeliveryDate?.toIso8601String(),

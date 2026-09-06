@@ -492,11 +492,14 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final meta = _statusMeta(order.status);
     final dateStr = DateFormat('dd.MM.yy HH:mm').format(order.createdAt);
-    final totalAmount = (order.items.fold<double>(0.0, (sum, item) {
+    final subtotal = (order.items.fold<double>(0.0, (sum, item) {
       final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
       final qty = (item['quantity'] as num?)?.toDouble() ?? 0.0;
       return sum + price * qty;
     }));
+    final totalAmount = order.totalAmount > 0 || order.discountAmount > 0
+        ? order.totalAmount
+        : subtotal;
     final itemCount = order.items.length;
 
     return Container(
@@ -618,6 +621,19 @@ class _OrderCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (order.discountAmount > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          '₺${subtotal.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            decoration: TextDecoration.lineThrough,
+                            color: _kTextSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),

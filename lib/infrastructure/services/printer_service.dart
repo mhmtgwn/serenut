@@ -1364,6 +1364,7 @@ class PrinterService with ChangeNotifier implements IPrinterService {
           note: note,
           timestamp: order.createdAt,
           totalAmount: order.totalAmount,
+          discountAmount: order.discountAmount,
           previousDebt: previousDebt,
           paymentStatus: _statusLabel(order.status),
           itemsCount: items.length,

@@ -549,6 +549,92 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                   ),
                 ],
               ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Ara Toplam',
+                      style: TextStyle(fontSize: 12, color: _kTextSecondary)),
+                  Text(
+                    '₺${_subtotalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _kText),
+                  ),
+                ],
+              ),
+              if (_discountAmount > 0) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('İskonto / İndirim',
+                        style: TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+                    Text(
+                      '-₺${_discountAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFDC2626)),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _subtotalAmount > 0
+                    ? () {
+                        DiscountDialog.show(
+                          context: context,
+                          subtotal: _subtotalAmount,
+                          currentDiscount: _discountAmount,
+                          onApply: (newDiscount) {
+                            setState(() {
+                              _discountAmount = newDiscount;
+                            });
+                          },
+                        );
+                      }
+                    : null,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _discountAmount > 0
+                        ? _kGreenLight
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _discountAmount > 0
+                          ? _kGreenDark.withValues(alpha: 0.3)
+                          : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.percent_rounded,
+                        size: 14,
+                        color: _discountAmount > 0 ? _kGreenDark : _kTextSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _discountAmount > 0
+                            ? 'İndirimi Düzenle (-₺${_discountAmount.toStringAsFixed(2)})'
+                            : 'İskonto / İndirim Ekle',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _discountAmount > 0 ? _kGreenDark : _kTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const Divider(height: 16, thickness: 0.5),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

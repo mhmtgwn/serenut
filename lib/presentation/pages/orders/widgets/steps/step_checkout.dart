@@ -76,6 +76,15 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (_discountAmount > 0)
+                      Text(
+                        '₺${_subtotalAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          decoration: TextDecoration.lineThrough,
+                          color: _kTextSecondary,
+                        ),
+                      ),
                     const Text(
                       'Ödenecek Tutar',
                       style: TextStyle(
@@ -93,7 +102,27 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                     ),
                   ],
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'İskonto / İndirim Düzenle',
+                  icon: Icon(
+                    Icons.percent_rounded,
+                    size: 18,
+                    color: _discountAmount > 0 ? _kGreenDark : _kTextSecondary,
+                  ),
+                  onPressed: () {
+                    DiscountDialog.show(
+                      context: context,
+                      subtotal: _subtotalAmount,
+                      currentDiscount: _discountAmount,
+                      onApply: (newDiscount) {
+                        setState(() {
+                          _discountAmount = newDiscount;
+                        });
+                      },
+                    );
+                  },
+                ),
                 IconButton(
                   tooltip: 'Sepeti Düzenle',
                   icon: const Icon(Icons.edit_outlined,

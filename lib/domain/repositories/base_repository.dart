@@ -440,6 +440,7 @@ class SaleEntity {
   final String customerId;
   final double totalAmount;
   final double paidAmount;
+  final double discountAmount;
   final String paymentMethod;
   final String
       status; // completed, pending, cancelled, processing, failed, reverted
@@ -455,6 +456,7 @@ class SaleEntity {
     required this.customerId,
     required this.totalAmount,
     required this.paidAmount,
+    this.discountAmount = 0.0,
     required this.paymentMethod,
     required this.status,
     required this.createdAt,
@@ -472,6 +474,7 @@ class SaleEntity {
         'customer_id': customerId,
         'total_amount': totalAmount,
         'paid_amount': paidAmount,
+        'discount_amount': discountAmount,
         'payment_method': paymentMethod,
         'status': status,
         'created_at': createdAt.toIso8601String(),
@@ -490,6 +493,10 @@ class SaleEntity {
         paidAmount: (map['paid_amount'] is num)
             ? (map['paid_amount'] as num).toDouble()
             : (double.tryParse((map['paid_amount'] ?? '0').toString()) ?? 0.0),
+        discountAmount: (map['discount_amount'] is num)
+            ? (map['discount_amount'] as num).toDouble()
+            : (double.tryParse((map['discount_amount'] ?? '0').toString()) ??
+                0.0),
         paymentMethod: (map['payment_method'] ?? 'cash').toString(),
         status: (map['status'] ?? 'completed').toString(),
         createdAt: map['created_at'] != null
@@ -502,6 +509,37 @@ class SaleEntity {
         createdBy: map['created_by']?.toString(),
         entitlementSnapshot: map['entitlement_snapshot']?.toString(),
         items: [],
+      );
+
+  SaleEntity copyWith({
+    String? id,
+    String? customerId,
+    double? totalAmount,
+    double? paidAmount,
+    double? discountAmount,
+    String? paymentMethod,
+    String? status,
+    DateTime? createdAt,
+    List<Map<String, dynamic>>? items,
+    String? idempotencyKey,
+    int? isSynced,
+    String? createdBy,
+    String? entitlementSnapshot,
+  }) =>
+      SaleEntity(
+        id: id ?? this.id,
+        customerId: customerId ?? this.customerId,
+        totalAmount: totalAmount ?? this.totalAmount,
+        paidAmount: paidAmount ?? this.paidAmount,
+        discountAmount: discountAmount ?? this.discountAmount,
+        paymentMethod: paymentMethod ?? this.paymentMethod,
+        status: status ?? this.status,
+        createdAt: createdAt ?? this.createdAt,
+        items: items ?? this.items,
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        isSynced: isSynced ?? this.isSynced,
+        createdBy: createdBy ?? this.createdBy,
+        entitlementSnapshot: entitlementSnapshot ?? this.entitlementSnapshot,
       );
 }
 
@@ -588,6 +626,7 @@ class OrderEntity {
   final List<Map<String, dynamic>> items;
   final String? notes;
   final String? createdBy;
+  final double discountAmount;
 
   OrderEntity({
     required this.id,
@@ -600,6 +639,7 @@ class OrderEntity {
     required this.items,
     this.notes,
     this.createdBy,
+    this.discountAmount = 0.0,
   });
 
   String get displayNumber =>
@@ -611,7 +651,7 @@ class OrderEntity {
         status != 'delivered';
   }
 
-  double get totalAmount {
+  double get subtotalAmount {
     double total = 0.0;
     for (final item in items) {
       final qty = (item['quantity'] as num?)?.toDouble() ?? 1.0;
@@ -621,6 +661,11 @@ class OrderEntity {
       total += qty * unitPrice;
     }
     return total;
+  }
+
+  double get totalAmount {
+    final net = subtotalAmount - discountAmount;
+    return net > 0.0 ? net : 0.0;
   }
 
   Map<String, dynamic> toMap() => {
@@ -633,6 +678,7 @@ class OrderEntity {
         'actual_delivery_date': actualDeliveryDate?.toIso8601String(),
         'notes': notes,
         'created_by': createdBy,
+        'discount_amount': discountAmount,
       };
 
   factory OrderEntity.fromMap(Map<String, dynamic> map) => OrderEntity(
@@ -651,6 +697,10 @@ class OrderEntity {
             : null,
         notes: map['notes']?.toString(),
         createdBy: map['created_by']?.toString(),
+        discountAmount: (map['discount_amount'] is num)
+            ? (map['discount_amount'] as num).toDouble()
+            : (double.tryParse((map['discount_amount'] ?? '0').toString()) ??
+                0.0),
         items: [],
       );
 
@@ -665,6 +715,7 @@ class OrderEntity {
     List<Map<String, dynamic>>? items,
     String? notes,
     String? createdBy,
+    double? discountAmount,
   }) =>
       OrderEntity(
         id: id ?? this.id,
@@ -677,6 +728,7 @@ class OrderEntity {
         items: items ?? this.items,
         notes: notes ?? this.notes,
         createdBy: createdBy ?? this.createdBy,
+        discountAmount: discountAmount ?? this.discountAmount,
       );
 }
 
