@@ -12,6 +12,7 @@ import 'package:serenutos/providers/hardware_devices_provider.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 
 class HardwareTestPage extends ConsumerWidget {
   const HardwareTestPage({super.key});
@@ -2162,8 +2163,14 @@ class _DeviceEditorState extends ConsumerState<_DeviceEditor> {
         'labelGapMm': int.tryParse(_labelGap.text) ?? 2,
         'autoDetectLabelGap': _labelLanguage == 'tspl' && _autoDetectLabelGap,
         'dpi': _labelDpi,
-        'printableWidthDots':
-            ((int.tryParse(_labelWidth.text) ?? 50) * _labelDpi / 25.4).round(),
+        'printableWidthDots': () {
+          final resolvedWidth = int.tryParse(_labelWidth.text) ?? 50;
+          final calcDots = (resolvedWidth * _labelDpi / 25.4).round();
+          final maxNarrowDots = (48.0 * _labelDpi / 25.4).round();
+          return resolvedWidth <= 54
+              ? math.min(calcDots, maxNarrowDots)
+              : calcDots;
+        }(),
         'printDirection': _printDirection,
         'copies': int.tryParse(_labelCopies.text) ?? 1,
         'autoCut': _autoCut,

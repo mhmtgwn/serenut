@@ -255,4 +255,62 @@ void main() {
     expect(sizeCount, pageCount);
     expect(RegExp(r'GAP 3 mm,0 mm').allMatches(output).length, pageCount);
   });
+
+  test('TsplCanvasLabelEngine ensures QR code has at least 40 dots safe clearance on right edge of 50mm label', () async {
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: 'ORD-9999',
+      customerName: 'Test Müşteri',
+      productName: 'Fındık 500g',
+      quantity: 1,
+      totalAmount: 200.0,
+      widthMm: 50,
+      heightMm: 30,
+      gapMm: 2,
+      printableWidthDots: 400, // Even if 400 dots requested from settings
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    expect(output, contains('BITMAP 0,0,48,')); // Clamped to 384 dots (48 bytes)
+    final match = RegExp(r'QRCODE\s+(\d+),(\d+),').firstMatch(output);
+    expect(match, isNotNull);
+    final qrX = int.parse(match!.group(1)!);
+    // At cell width 2 and 29 modules (58 dots), QR ending edge (qrX + 58) must be <= 344
+    expect(qrX, lessThanOrEqualTo(270));
+    expect(qrX + 58, lessThanOrEqualTo(344));
+  });
+
+  test('TsplCanvasLabelEngine splits 2 items across 2 pages when closing footer causes overflow', () async {
+    final items = [
+      {'product_name': 'Findik Ezmesi 350g', 'quantity': 1.0, 'unit_price': 120.0},
+      {'product_name': 'Kavrulmus Findik 500g', 'quantity': 2.0, 'unit_price': 250.0},
+    ];
+
+    final bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
+      orderIdShort: '4002',
+      customerName: 'Ahmet Kaya',
+      customerPhone: '0544 333 22 11',
+      productName: '2 Urun',
+      quantity: 1,
+      items: items,
+      totalAmount: 620.0,
+      widthMm: 50,
+      heightMm: 30,
+      gapMm: 2,
+    );
+
+    final output = latin1.decode(bytes, allowInvalid: true);
+    final printMatches = RegExp(r'PRINT 1,1').allMatches(output);
+    expect(printMatches.length, equals(2));
+
+    final bitmapMatches = RegExp(r'BITMAP 0,0,48,240,0,').allMatches(output);
+    expect(bitmapMatches.length, equals(2));
+
+    // Page 1 is continuation (no QR code), Page 2 has the closing footer with QRCODE
+    final p1Section = output.substring(0, printMatches.first.end);
+    final p2Section = output.substring(printMatches.first.end);
+    expect(p1Section, isNot(contains('QRCODE')));
+    expect(p2Section, contains('QRCODE'));
+  });
 }
+
+

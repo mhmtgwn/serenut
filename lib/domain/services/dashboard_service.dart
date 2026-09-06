@@ -1,4 +1,4 @@
-﻿// lib/domain/services/dashboard_service.dart
+// lib/domain/services/dashboard_service.dart
 // Phase 3 — Dashboard Domain Service
 // Generated: 21 Jun 2026
 
@@ -8,18 +8,22 @@ import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart'
 /// Aggregated data wrapper for the Dashboard
 class DashboardData {
   final DashboardSummary summary;
+  final DashboardOrderSummary orderSummary;
   final List<SalesTrendPoint> weeklyTrend;
   final List<DashboardCategoryShare> categoryShares;
   final List<DashboardProductPerformance> topProducts;
   final List<SaleEntity> recentSales;
+  final List<DashboardRecentOrder> recentOrders;
   final List<ProductEntity> lowStockProducts;
 
   const DashboardData({
     required this.summary,
+    required this.orderSummary,
     required this.weeklyTrend,
     required this.categoryShares,
     required this.topProducts,
     required this.recentSales,
+    required this.recentOrders,
     required this.lowStockProducts,
   });
 }
@@ -39,6 +43,8 @@ class DashboardService {
       _repo.getCategoryShares(),
       _repo.getRecentSales(limit: 5),
       _repo.getLowStockProducts(threshold: 5, limit: 5),
+      _repo.getOrderSummary(),
+      _repo.getRecentOrders(limit: 5),
     ]);
 
     return DashboardData(
@@ -48,6 +54,8 @@ class DashboardService {
       categoryShares: results[3] as List<DashboardCategoryShare>,
       recentSales: results[4] as List<SaleEntity>,
       lowStockProducts: results[5] as List<ProductEntity>,
+      orderSummary: results[6] as DashboardOrderSummary,
+      recentOrders: results[7] as List<DashboardRecentOrder>,
     );
   }
 }

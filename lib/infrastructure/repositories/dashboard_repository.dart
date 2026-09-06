@@ -70,6 +70,48 @@ class DashboardProductPerformance {
   });
 }
 
+/// DTO representing order metrics on the Dashboard
+class DashboardOrderSummary {
+  final int todayOrdersCount;
+  final double todayOrdersRevenue;
+  final int createdCount;
+  final int preparingCount;
+  final int shippedCount;
+  final int deliveredCount;
+
+  const DashboardOrderSummary({
+    this.todayOrdersCount = 0,
+    this.todayOrdersRevenue = 0.0,
+    this.createdCount = 0,
+    this.preparingCount = 0,
+    this.shippedCount = 0,
+    this.deliveredCount = 0,
+  });
+}
+
+/// DTO representing recent orders on the Dashboard
+class DashboardRecentOrder {
+  final String id;
+  final String orderNumber;
+  final String customerName;
+  final String customerPhone;
+  final String status;
+  final double totalAmount;
+  final int itemCount;
+  final DateTime createdAt;
+
+  const DashboardRecentOrder({
+    required this.id,
+    required this.orderNumber,
+    required this.customerName,
+    required this.customerPhone,
+    required this.status,
+    required this.totalAmount,
+    required this.itemCount,
+    required this.createdAt,
+  });
+}
+
 /// Interface for Dashboard data extraction
 abstract class IDashboardRepository {
   /// Fetches summary metrics for today
@@ -90,6 +132,12 @@ abstract class IDashboardRepository {
   /// Fetches critical low stock products
   Future<List<ProductEntity>> getLowStockProducts(
       {int threshold = 5, int limit = 5});
+
+  /// Fetches order metrics and status breakdown
+  Future<DashboardOrderSummary> getOrderSummary();
+
+  /// Fetches recent orders
+  Future<List<DashboardRecentOrder>> getRecentOrders({int limit = 5});
 }
 
 /// SQLite Implementation of IDashboardRepository
@@ -343,5 +391,113 @@ class SqliteDashboardRepository implements IDashboardRepository {
       limit: limit,
     );
     return rows.map((row) => ProductEntity.fromMap(row)).toList();
+  }
+
+  @override
+  Future<DashboardOrderSummary> getOrderSummary() async {
+    final now = DateTime.now();
+    final todayStart =
+        DateTime(now.year, now.month, now.day).toIso8601String();
+
+    try {
+      final rows = await _gateway.rawQuery('''
+        SELECT 
+          status,
+          COUNT(*) AS cnt,
+          SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS today_cnt,
+          SUM(CASE WHEN created_at >= ? THEN COALESCE(total_amount, 0) ELSE 0 END) AS today_rev
+        FROM orders
+        WHERE is_deleted = 0
+        GROUP BY status
+      ''', [todayStart, todayStart]);
+
+      int todayCount = 0;
+      double todayRevenue = 0.0;
+      int created = 0;
+      int preparing = 0;
+      int shipped = 0;
+      int delivered = 0;
+
+      for (final r in rows) {
+        final status = (r['status'] as String? ?? '').toLowerCase();
+        final count = (r['cnt'] as num?)?.toInt() ?? 0;
+        final tCount = (r['today_cnt'] as num?)?.toInt() ?? 0;
+        final tRev = (r['today_rev'] as num?)?.toDouble() ?? 0.0;
+
+        todayCount += tCount;
+        todayRevenue += tRev;
+
+        switch (status) {
+          case 'created':
+          case 'pending':
+          case 'yeni':
+            created += count;
+            break;
+          case 'preparing':
+          case 'hazirlaniyor':
+            preparing += count;
+            break;
+          case 'shipped':
+          case 'yolda':
+          case 'kargoda':
+            shipped += count;
+            break;
+          case 'delivered':
+          case 'completed':
+          case 'teslim':
+            delivered += count;
+            break;
+        }
+      }
+
+      return DashboardOrderSummary(
+        todayOrdersCount: todayCount,
+        todayOrdersRevenue: todayRevenue,
+        createdCount: created,
+        preparingCount: preparing,
+        shippedCount: shipped,
+        deliveredCount: delivered,
+      );
+    } catch (_) {
+      return const DashboardOrderSummary();
+    }
+  }
+
+  @override
+  Future<List<DashboardRecentOrder>> getRecentOrders({int limit = 5}) async {
+    try {
+      final rows = await _gateway.rawQuery('''
+        SELECT 
+          o.id,
+          o.order_number,
+          COALESCE(c.name, 'Müşteri') AS customer_name,
+          COALESCE(c.phone, '') AS customer_phone,
+          o.status,
+          COALESCE(o.total_amount, 0) AS total_amount,
+          (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count,
+          o.created_at
+        FROM orders o
+        LEFT JOIN customers c ON o.customer_id = c.id
+        WHERE o.is_deleted = 0
+        ORDER BY o.created_at DESC
+        LIMIT ?
+      ''', [limit]);
+
+      return rows.map((r) {
+        return DashboardRecentOrder(
+          id: r['id']?.toString() ?? '',
+          orderNumber: r['order_number']?.toString() ?? '',
+          customerName: r['customer_name']?.toString() ?? 'Müşteri',
+          customerPhone: r['customer_phone']?.toString() ?? '',
+          status: r['status']?.toString() ?? 'created',
+          totalAmount: (r['total_amount'] as num?)?.toDouble() ?? 0.0,
+          itemCount: (r['item_count'] as num?)?.toInt() ?? 0,
+          createdAt: DateTime.tryParse(r['created_at']?.toString() ?? '') ??
+              DateTime.now(),
+        );
+      }).toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

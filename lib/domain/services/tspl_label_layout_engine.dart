@@ -297,9 +297,11 @@ class TsplLabelLayoutEngine {
     final isVeryWide = widthDots >= 540; // >= 68mm
     int sy(num value) => (value * safeDpi / 203).round();
 
-    // Symmetric margins: left and right margins are equal so the label is centered and balanced.
-    final paddingX = (widthDots * 0.045).clamp(16.0, 32.0).round();
-    final usableW = widthDots - (2 * paddingX);
+    // Safe margins: Left and right margins configured so separator lines and QR code
+    // never touch or overflow the physical label boundary.
+    final paddingX = (widthDots * 0.07).clamp(24.0, 40.0).round();
+    final rightPadding = (widthDots <= 384 ? 38 : 28);
+    final usableW = widthDots - paddingX - rightPadding;
     final barW = usableW;
 
     final bodyFont = isVeryWide
@@ -378,11 +380,14 @@ class TsplLabelLayoutEngine {
     if (showTotalAmount && totalAmount != null) calculatedDots += sy(26);
 
     // QR code starts at paymentY (aligned with payment status)
-    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
-    final qrBoxSize = qrCellWidth * 30;
-    final qrX = (widthDots - paddingX - qrBoxSize)
-        .clamp(paddingX + 60, widthDots - paddingX - qrBoxSize);
     final qrValue = _ascii(orderIdShort).replaceAll('"', "'");
+    final qrCellWidth = isVeryWide ? 3 : ((widthDots < 440) ? 2 : 3);
+    // Level-M QR code typically generates 25-33 modules, plus 8 modules (4 each side) quiet zone
+    final qrModules = qrValue.length > 25 ? 41 : 37;
+    final qrBoxSize = qrCellWidth * qrModules;
+    final qrRightMargin = (widthDots <= 384 ? 40 : 28);
+    final qrX = (widthDots - qrRightMargin - qrBoxSize)
+        .clamp(paddingX + 60, widthDots - qrRightMargin - qrBoxSize);
 
     final minBottomForQr = prePaymentY + qrBoxSize + sy(6);
     if (calculatedDots < minBottomForQr) {
@@ -393,8 +398,8 @@ class TsplLabelLayoutEngine {
 
     final dateText = timeStr;
     final datePixelWidth = bodyFont.measureWidth(dateText);
-    final safeDateX = (widthDots - paddingX - datePixelWidth)
-        .clamp(paddingX + 60, widthDots - paddingX);
+    final safeDateX = (widthDots - rightPadding - datePixelWidth)
+        .clamp(paddingX + 60, widthDots - rightPadding);
     final availableOrderChars =
         bodyFont.maxChars(safeDateX - paddingX - 14).clamp(3, 30);
 
@@ -470,7 +475,6 @@ class TsplLabelLayoutEngine {
 
     final shouldPaginate = safeGap > 0 &&
         paginateOnOverflow &&
-        itemsList.length >= 4 &&
         !fitsInOnePage;
 
     List<List<Map<String, dynamic>>> paginateItems() {
@@ -542,7 +546,7 @@ class TsplLabelLayoutEngine {
 
     if (shouldPaginate) {
       final pages = paginateItems();
-      for (var pageIdx = pages.length - 1; pageIdx >= 0; pageIdx--) {
+      for (var pageIdx = 0; pageIdx < pages.length; pageIdx++) {
         commands
           ..writeln('SIZE $safeWidth mm,$requestedHeightMm mm')
           ..writeln('GAP $safeGap mm,0 mm')

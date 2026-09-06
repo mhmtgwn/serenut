@@ -364,4 +364,77 @@ void main() {
       expect(output, contains('Uzun Adli Urun Kalemi $i'));
     }
   });
+
+  test('sipariş etiketinde BAR ve QRCODE sağ kenardan en az 30 dot güvenli mesafede kalır', () {
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: '2026-99',
+        customerName: 'Test Musteri',
+        productName: 'Urun 1',
+        quantity: 1,
+        items: const [
+          {'product_name': 'Findik 500g', 'quantity': 1.0, 'unit_price': 150.0},
+        ],
+        itemsCount: 1,
+        totalAmount: 150,
+        widthMm: 50,
+        heightMm: 30,
+        gapMm: 2,
+      ),
+    );
+
+    // BAR x, y, width, height: Right edge is x + width
+    final barMatches = RegExp(r'BAR\s+(\d+),\d+,(\d+),\d+').allMatches(output);
+    expect(barMatches, isNotEmpty);
+    for (final m in barMatches) {
+      final barX = int.parse(m.group(1)!);
+      final barW = int.parse(m.group(2)!);
+      final rightEdge = barX + barW;
+      expect(rightEdge, lessThanOrEqualTo(355),
+          reason: 'BAR right edge exceeds safe boundary: $rightEdge > 355');
+    }
+
+    // QRCODE x, y, L, cell_width, ...
+    final qrMatch = RegExp(r'QRCODE\s+(\d+),\d+,\w+,(\d+),').firstMatch(output);
+    expect(qrMatch, isNotNull);
+    final qrX = int.parse(qrMatch!.group(1)!);
+    final cellWidth = int.parse(qrMatch.group(2)!);
+    // At cell width 2 and 37 modules (74 dots), right edge is qrX + 74
+    final qrRightEdge = qrX + (cellWidth * 37);
+    expect(qrRightEdge, lessThanOrEqualTo(350),
+        reason: 'QR right edge exceeds safe boundary: $qrRightEdge > 350');
+  });
+
+  test('sipariş etiketinde 2 ürün sığmadığında 2 sayfaya bölünür ve 1/2 ardından 2/2 sırasıyla basılır', () {
+    final items = [
+      {'product_name': 'Uzun İsimli Ürün Birinci Kalem', 'quantity': 1.0, 'unit_price': 120.0},
+      {'product_name': 'Uzun İsimli Ürün İkinci Kalem', 'quantity': 2.0, 'unit_price': 250.0},
+    ];
+
+    final output = latin1.decode(
+      TsplLabelLayoutEngine.generateOrderLabelBytes(
+        orderIdShort: '4002',
+        customerName: 'Ahmet Kaya',
+        customerPhone: '0544 333 22 11',
+        productName: '2 Urun',
+        quantity: 1,
+        items: items,
+        itemsCount: 2,
+        totalAmount: 620.0,
+        widthMm: 50,
+        heightMm: 30,
+        gapMm: 2,
+      ),
+    );
+
+    final printMatches = RegExp(r'PRINT 1,1').allMatches(output);
+    expect(printMatches.length, equals(2));
+    final p1Idx = output.indexOf('(1/2)');
+    final p2Idx = output.indexOf('(2/2)');
+    expect(p1Idx, isNonNegative);
+    expect(p2Idx, isNonNegative);
+    expect(p1Idx, lessThan(p2Idx), reason: 'Sayfa 1 önce, Sayfa 2 sonra basılmalıdır');
+  });
 }
+
+

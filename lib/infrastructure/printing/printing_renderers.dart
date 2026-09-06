@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:serenutos/domain/models/label_model.dart';
+import 'package:serenutos/domain/printing/label_dimension_models.dart';
 import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
 import 'package:serenutos/domain/services/tspl_canvas_label_engine.dart';
@@ -757,6 +758,50 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         capabilities['printableWidthDots'] ??
         transportConfig['printableWidthDots']) as int?;
 
+    final mediaProfile = MediaProfile(
+      widthMm: widthMm.toDouble(),
+      heightMm: heightMm.toDouble(),
+      gapMm: gapMm.toDouble(),
+      dpi: dpi,
+      printableWidthDots: printableWidthDots,
+    );
+
+    final contentSize = DynamicLabelSizeEngine.measureOrderContent(
+      mediaProfile: mediaProfile,
+      orderIdShort: payload['orderNo']?.toString() ?? '',
+      customerName: payload['customerName']?.toString() ?? '',
+      customerPhone: payload['customerPhone']?.toString(),
+      customerNo: payload['customerNo']?.toString(),
+      previousDebt: _decimal(payload['previousDebt'], 0),
+      paymentStatus: payload['paymentStatus']?.toString() ?? 'Bilinmiyor',
+      productName: payload['productName']?.toString() ?? '',
+      quantity: _decimal(payload['quantity'], 1),
+      items: (payload['items'] as List?)
+          ?.map((value) => Map<String, dynamic>.from(value as Map))
+          .toList(),
+      note: payload['note'] as String?,
+      timestamp: payload['timestamp'] == null
+          ? null
+          : DateTime.parse(payload['timestamp']! as String),
+      totalAmount: payload['totalAmount'] == null
+          ? null
+          : _decimal(payload['totalAmount'], 0),
+      itemsCount: payload['itemsCount'] as int?,
+      fontSize: design['fontSize']?.toString() ?? 'Orta',
+      showCustomerName: design['showCustomerName'] != false,
+      showOrderNo: design['showOrderNo'] != false,
+      showDate: design['showDate'] != false,
+      showTotalAmount: design['showTotalAmount'] != false,
+      showItemsCount: design['showItemsCount'] != false,
+      showQrCode: design['showQrCode'] != false,
+      qrData: payload['qrData']?.toString() ?? payload['orderNo']?.toString(),
+    );
+
+    final targetPageSize = DynamicLabelSizeEngine.determineTargetSize(
+      contentSize: contentSize,
+      mediaProfile: mediaProfile,
+    );
+
     final List<int> bytes;
     if (useCanvas) {
       bytes = await TsplCanvasLabelEngine.generateOrderLabelBytes(
@@ -799,6 +844,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         logoBytes: null, // Order labels do not print a logo
         qrData: payload['qrData']?.toString() ?? payload['orderNo']?.toString(),
         showQrCode: design['showQrCode'] != false,
+        targetPageSize: targetPageSize,
       );
     } else {
       bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(

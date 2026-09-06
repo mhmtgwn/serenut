@@ -184,11 +184,18 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   }
 
   void _onBarcodeScanned(String barcode) {
+    var query = barcode.trim();
+    if (query.startsWith('order|')) {
+      final parts = query.split('|');
+      if (parts.length > 1 && parts[1].isNotEmpty) {
+        query = parts[1];
+      }
+    }
     setState(() {
       _isSearching = true;
-      _searchController.text = barcode;
+      _searchController.text = query;
     });
-    ref.read(ordersControllerProvider.notifier).applySearch(barcode);
+    ref.read(ordersControllerProvider.notifier).applySearch(query);
     _refreshCounts();
   }
 

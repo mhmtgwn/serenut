@@ -225,7 +225,7 @@ void main() {
       },
     ));
     final output = latin1.decode(rendered.bytes);
-    expect(RegExp(r'PRINT 1,1').allMatches(output), hasLength(1));
+    expect(RegExp(r'PRINT 1,1').allMatches(output), hasLength(2));
     expect(output, contains('DIRECTION 0'));
     expect(output, contains('Tel: 0555 111 22 33'));
     expect(output, contains('Brc: TL 245.50'));

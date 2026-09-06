@@ -1495,6 +1495,77 @@ class InMemoryDashboardRepository implements IDashboardRepository {
     list.sort((a, b) => a.quantity.compareTo(b.quantity));
     return list.take(limit).toList();
   }
+
+  @override
+  Future<DashboardOrderSummary> getOrderSummary() async {
+    final now = DateTime.now();
+    int todayCount = 0;
+    double todayRevenue = 0.0;
+    int created = 0;
+    int preparing = 0;
+    int shipped = 0;
+    int delivered = 0;
+
+    for (final o in InMemoryDb.orders) {
+      if (o.createdAt.year == now.year &&
+          o.createdAt.month == now.month &&
+          o.createdAt.day == now.day) {
+        todayCount++;
+        todayRevenue += o.totalAmount ?? 0.0;
+      }
+      switch (o.status.toLowerCase()) {
+        case 'created':
+        case 'pending':
+        case 'yeni':
+          created++;
+          break;
+        case 'preparing':
+        case 'hazirlaniyor':
+          preparing++;
+          break;
+        case 'shipped':
+        case 'yolda':
+        case 'kargoda':
+          shipped++;
+          break;
+        case 'delivered':
+        case 'completed':
+        case 'teslim':
+          delivered++;
+          break;
+      }
+    }
+
+    return DashboardOrderSummary(
+      todayOrdersCount: todayCount,
+      todayOrdersRevenue: todayRevenue,
+      createdCount: created,
+      preparingCount: preparing,
+      shippedCount: shipped,
+      deliveredCount: delivered,
+    );
+  }
+
+  @override
+  Future<List<DashboardRecentOrder>> getRecentOrders({int limit = 5}) async {
+    final list = List<OrderEntity>.from(InMemoryDb.orders);
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list.take(limit).map((o) {
+      final customer = InMemoryDb.customers
+          .where((c) => c.id == o.customerId)
+          .firstOrNull;
+      return DashboardRecentOrder(
+        id: o.id,
+        orderNumber: o.orderNumber,
+        customerName: customer?.name ?? 'Müşteri',
+        customerPhone: customer?.phone ?? '',
+        status: o.status,
+        totalAmount: o.totalAmount ?? 0.0,
+        itemCount: o.items.length,
+        createdAt: o.createdAt,
+      );
+    }).toList();
+  }
 }
 
 /// Helper classes
