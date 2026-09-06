@@ -53,7 +53,8 @@ void main() {
               updated_at TEXT NOT NULL,
               image_url TEXT,
               sale_type TEXT NOT NULL DEFAULT 'piece',
-              minimum_weight_grams INTEGER NOT NULL DEFAULT 20
+              minimum_weight_grams INTEGER NOT NULL DEFAULT 20,
+              origin TEXT NOT NULL DEFAULT 'TÜRKİYE'
             )
           ''');
 
@@ -80,6 +81,7 @@ void main() {
               id TEXT PRIMARY KEY,
               customer_id TEXT NOT NULL,
               total_amount REAL NOT NULL,
+              discount_amount REAL NOT NULL DEFAULT 0.0,
               paid_amount REAL NOT NULL DEFAULT 0,
               payment_method TEXT,
               status TEXT NOT NULL DEFAULT 'completed',
