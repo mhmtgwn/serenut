@@ -25,14 +25,54 @@ export interface MetaMessageTemplate {
 }
 
 export const STANDARD_WHATSAPP_TEMPLATES = [
-  { eventKey: 'sale_created', name: 'serenut_satis_bildirimi', text: 'Merhaba {{1}}, {{2}} numaralı satış işleminiz tamamlandı. Toplam tutar: {{3}}. {{4}}', examples: ['Ayşe Yılmaz', 'S-1024', '450,00 TL', 'Örnek İşletme'] },
-  { eventKey: 'debt_created', name: 'serenut_borc_bildirimi', text: 'Merhaba {{1}}, {{2}} numaralı işlem sonrası güncel bakiyeniz {{3}}. {{4}}', examples: ['Ayşe Yılmaz', 'S-1024', '150,00 TL', 'Örnek İşletme'] },
-  { eventKey: 'collection_recorded', name: 'serenut_tahsilat_bildirimi', text: 'Merhaba {{1}}, {{2}} tutarındaki ödemeniz alınmıştır. Kalan bakiye: {{3}}. {{4}}', examples: ['Ayşe Yılmaz', '100,00 TL', '50,00 TL', 'Örnek İşletme'] },
-  { eventKey: 'order_created', name: 'serenut_siparis_alindi', text: 'Merhaba {{1}}, {{2}} numaralı siparişiniz alınmıştır. Toplam tutar: {{3}}. {{4}}', examples: ['Ayşe Yılmaz', 'SP-1024', '450,00 TL', 'Örnek İşletme'] },
-  { eventKey: 'order_preparing', name: 'serenut_siparis_hazirlaniyor', text: 'Merhaba {{1}}, {{2}} numaralı siparişiniz hazırlanıyor. {{3}}', examples: ['Ayşe Yılmaz', 'SP-1024', 'Örnek İşletme'] },
-  { eventKey: 'order_ready', name: 'serenut_siparis_hazir', text: 'Merhaba {{1}}, {{2}} numaralı siparişiniz hazırdır. {{3}}', examples: ['Ayşe Yılmaz', 'SP-1024', 'Örnek İşletme'] },
-  { eventKey: 'order_delivered', name: 'serenut_siparis_teslim', text: 'Merhaba {{1}}, {{2}} numaralı siparişiniz teslim edilmiştir. {{3}}', examples: ['Ayşe Yılmaz', 'SP-1024', 'Örnek İşletme'] },
-  { eventKey: 'order_cancelled', name: 'serenut_siparis_iptal', text: 'Merhaba {{1}}, {{2}} numaralı siparişiniz iptal edilmiştir. {{3}}', examples: ['Ayşe Yılmaz', 'SP-1024', 'Örnek İşletme'] },
+  {
+    eventKey: 'sale_created',
+    name: 'serenut_pro_satis_bilgisi',
+    text: '🧾 *Satış Bilgilendirmesi*\n\nSayın *{{1}}*,\nAlışverişiniz başarıyla tamamlanmıştır.\n\n▫️ *İşlem No:* {{2}}\n▫️ *Toplam Tutar:* *{{3}}*\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{{4}}*',
+    examples: ['Ayşe Yılmaz', 'S-1024', '450,00 TL', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'debt_created',
+    name: 'serenut_pro_bakiye_bilgisi',
+    text: '📋 *Cari Hesap Bilgilendirmesi*\n\nSayın *{{1}}*,\n{{2}} numaralı işleminiz cari hesabınıza kaydedilmiştir.\n\n▫️ *Güncel Bakiyeniz:* *{{3}}*\n\nDetaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.\n*{{4}}*',
+    examples: ['Ayşe Yılmaz', 'S-1024', '150,00 TL', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'collection_recorded',
+    name: 'serenut_pro_tahsilat_makbuzu',
+    text: '✅ *Tahsilat Makbuzu*\n\nSayın *{{1}}*,\nÖdemeniz başarıyla tahsil edilmiş ve hesabınıza işlenmiştir.\n\n▫️ *Tahsil Edilen:* *{{2}}*\n▫️ *Kalan Bakiye:* *{{3}}*\n\nÖdemeniz için teşekkür ederiz.\n*{{4}}*',
+    examples: ['Ayşe Yılmaz', '100,00 TL', '50,00 TL', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'order_created',
+    name: 'serenut_pro_siparis_alindi',
+    text: '🛎️ *Siparişiniz Alındı*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz onaylanmış ve sıraya alınmıştır.\n\n▫️ *Sipariş Tutarı:* *{{3}}*\n\nSiparişiniz hazırlandığında bilgilendirileceksiniz.\n*{{4}}*',
+    examples: ['Ayşe Yılmaz', 'SP-1024', '450,00 TL', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'order_preparing',
+    name: 'serenut_pro_siparis_hazirlaniyor',
+    text: '👨‍🍳 *Siparişiniz Hazırlanıyor*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz şu anda özenle hazırlanmaktadır.\n\nEn kısa sürede hazır olacaktır.\n*{{3}}*',
+    examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'order_ready',
+    name: 'serenut_pro_siparis_hazir',
+    text: '🎉 *Siparişiniz Hazır!*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz hazır durumdadır.\n\nAfiyet olsun, iyi günlerde kullanın!\n*{{3}}*',
+    examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'order_delivered',
+    name: 'serenut_pro_siparis_teslim',
+    text: '✨ *Sipariş Teslim Edildi*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz teslim edilmiştir.\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n*{{3}}*',
+    examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
+  },
+  {
+    eventKey: 'order_cancelled',
+    name: 'serenut_pro_siparis_iptal',
+    text: 'ℹ️ *Sipariş İptal Edildi*\n\nSayın *{{1}}*,\n#{{2}} numaralı siparişiniz iptal edilmiştir.\n\nDetaylı bilgi için bizimle iletişime geçebilirsiniz.\n*{{3}}*',
+    examples: ['Ayşe Yılmaz', 'SP-1024', 'Nutopian Fındık'],
+  },
 ] as const;
 
 export class WhatsAppProviderError extends Error {
