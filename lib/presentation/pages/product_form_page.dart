@@ -268,8 +268,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
     final allCategories = ref.watch(categoryPoolProvider);
 
-    return Scaffold(
-      backgroundColor: _kSurface,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 860;
+        final Widget innerScaffold = Scaffold(
+          backgroundColor: _kSurface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -653,6 +656,44 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ],
         ),
       ),
+    );
+
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.45),
+            body: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.pop(),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {}, // Prevent tap from dismissing modal
+                  child: Container(
+                    constraints:
+                        const BoxConstraints(maxWidth: 780, maxHeight: 860),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: innerScaffold,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return innerScaffold;
+      },
     );
   }
 

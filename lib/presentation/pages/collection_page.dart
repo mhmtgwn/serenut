@@ -125,8 +125,11 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     final debt = customer.balance < 0 ? customer.balance.abs() : 0.0;
     final isDebt = customer.balance < 0;
 
-    return Scaffold(
-      backgroundColor: _kSurface,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 800;
+        final Widget innerScaffold = Scaffold(
+          backgroundColor: _kSurface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -624,6 +627,44 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
           ],
         ),
       ),
+    );
+
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.45),
+            body: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.pop(),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    constraints:
+                        const BoxConstraints(maxWidth: 620, maxHeight: 760),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: innerScaffold,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return innerScaffold;
+      },
     );
   }
 

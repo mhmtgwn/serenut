@@ -369,6 +369,18 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                 },
               ),
             ] else ...[
+              FilledButton.icon(
+                onPressed: () => _showOrderForm(context),
+                icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                label: const Text('Yeni Sipariş'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Toplu Seçim',
                 icon: const Icon(Icons.checklist_rounded),
@@ -704,14 +716,33 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
           ),
           floatingActionButton: _isSelecting
               ? null
-              : FloatingActionButton(
-                  heroTag: 'fab_orders',
-                  tooltip: 'Yeni sipariş',
-                  onPressed: () => _showOrderForm(context),
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  elevation: 3,
-                  child: const Icon(Icons.add_shopping_cart_rounded),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isDesktop = MediaQuery.of(context).size.width >= 900;
+                    if (isDesktop) {
+                      return FloatingActionButton.extended(
+                        heroTag: 'fab_orders',
+                        tooltip: 'Yeni sipariş oluştur',
+                        onPressed: () => _showOrderForm(context),
+                        backgroundColor: _kGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 3,
+                        icon: const Icon(Icons.add_shopping_cart_rounded),
+                        label: const Text('Yeni Sipariş',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13)),
+                      );
+                    }
+                    return FloatingActionButton(
+                      heroTag: 'fab_orders',
+                      tooltip: 'Yeni sipariş',
+                      onPressed: () => _showOrderForm(context),
+                      backgroundColor: _kGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 3,
+                      child: const Icon(Icons.add_shopping_cart_rounded),
+                    );
+                  },
                 ),
         );
   }

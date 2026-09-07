@@ -125,160 +125,202 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kSurface,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: _kText),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          widget.isEditing ? 'Müşteri Düzenle' : 'Yeni Müşteri',
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, color: _kText, fontSize: 17),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _isSaving
-                ? const Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation(_kGreen),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 800;
+
+        final Widget innerScaffold = Scaffold(
+          backgroundColor: _kSurface,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded, color: _kText),
+              onPressed: () => context.pop(),
+            ),
+            title: Text(
+              widget.isEditing ? 'Müşteri Düzenle' : 'Yeni Müşteri',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: _kText, fontSize: 17),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: _isSaving
+                    ? const Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(_kGreen),
+                          ),
+                        ),
+                      )
+                    : TextButton(
+                        onPressed: _save,
+                        style: TextButton.styleFrom(
+                          backgroundColor: _kGreen,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                        ),
+                        child: Text(
+                          widget.isEditing ? 'Kaydet' : 'Ekle',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
+              ),
+            ],
+          ),
+          body: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                // ── Profil İkon ────────────────────────────────────────────────
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: _kGreenLight,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: _kGreen.withValues(alpha: 0.3), width: 2),
+                        ),
+                        child: const Icon(Icons.person_rounded,
+                            size: 36, color: _kGreenDark),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.isEditing
+                            ? 'Müşteri bilgilerini düzenleyin'
+                            : 'Yeni müşteri hesabı oluşturun',
+                        style:
+                            const TextStyle(color: _kTextSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // ── Temel Bilgiler ─────────────────────────────────────────────
+                _buildSection(
+                  icon: Icons.badge_rounded,
+                  label: 'Temel Bilgiler',
+                  children: [
+                    _buildField(
+                      controller: _nameController,
+                      focusNode: _nameFocus,
+                      label: 'Müşteri / Firma Adı *',
+                      icon: Icons.person_rounded,
+                      textCapitalization: TextCapitalization.words,
+                      nextFocus: _phoneFocus,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,
                     ),
-                  )
-                : TextButton(
-                    onPressed: _save,
-                    style: TextButton.styleFrom(
+                    const SizedBox(height: 14),
+                    _buildField(
+                      controller: _phoneController,
+                      focusNode: _phoneFocus,
+                      label: 'Telefon Numarası',
+                      icon: Icons.phone_rounded,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))
+                      ],
+                      nextFocus: _emailFocus,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildField(
+                      controller: _emailController,
+                      focusNode: _emailFocus,
+                      label: 'E-posta Adresi',
+                      icon: Icons.email_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                      nextFocus: null,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 32),
+
+                // ── Kaydet Butonu (büyük) ─────────────────────────────────────
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _save,
+                    style: ElevatedButton.styleFrom(
                       backgroundColor: _kGreen,
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                          borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: Text(
-                      widget.isEditing ? 'Kaydet' : 'Ekle',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : Icon(widget.isEditing
+                            ? Icons.save_rounded
+                            : Icons.person_add_rounded),
+                    label: Text(
+                      widget.isEditing ? 'Değişiklikleri Kaydet' : 'Müşteri Ekle',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                   ),
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // ── Profil İkon ────────────────────────────────────────────────
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: _kGreenLight,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: _kGreen.withValues(alpha: 0.3), width: 2),
-                    ),
-                    child: const Icon(Icons.person_rounded,
-                        size: 36, color: _kGreenDark),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.isEditing
-                        ? 'Müşteri bilgilerini düzenleyin'
-                        : 'Yeni müşteri hesabı oluşturun',
-                    style:
-                        const TextStyle(color: _kTextSecondary, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            // ── Temel Bilgiler ─────────────────────────────────────────────
-            _buildSection(
-              icon: Icons.badge_rounded,
-              label: 'Temel Bilgiler',
-              children: [
-                _buildField(
-                  controller: _nameController,
-                  focusNode: _nameFocus,
-                  label: 'Müşteri / Firma Adı *',
-                  icon: Icons.person_rounded,
-                  textCapitalization: TextCapitalization.words,
-                  nextFocus: _phoneFocus,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Ad zorunludur' : null,
-                ),
-                const SizedBox(height: 14),
-                _buildField(
-                  controller: _phoneController,
-                  focusNode: _phoneFocus,
-                  label: 'Telefon Numarası',
-                  icon: Icons.phone_rounded,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d\s\+\-]'))
-                  ],
-                  nextFocus: _emailFocus,
-                ),
-                const SizedBox(height: 14),
-                _buildField(
-                  controller: _emailController,
-                  focusNode: _emailFocus,
-                  label: 'E-posta Adresi',
-                  icon: Icons.email_rounded,
-                  keyboardType: TextInputType.emailAddress,
-                  nextFocus: null,
                 ),
               ],
             ),
+          ),
+        );
 
-            const SizedBox(height: 32),
-
-            // ── Kaydet Butonu (büyük) ─────────────────────────────────────
-            SizedBox(
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Icon(widget.isEditing
-                        ? Icons.save_rounded
-                        : Icons.person_add_rounded),
-                label: Text(
-                  widget.isEditing ? 'Değişiklikleri Kaydet' : 'Müşteri Ekle',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.45),
+            body: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.pop(),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {}, // Prevent tap from dismissing modal
+                  child: Container(
+                    constraints:
+                        const BoxConstraints(maxWidth: 620, maxHeight: 760),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: innerScaffold,
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
+          );
+        }
+
+        return innerScaffold;
+      },
     );
   }
 

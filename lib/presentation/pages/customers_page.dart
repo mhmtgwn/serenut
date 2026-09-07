@@ -88,6 +88,18 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           ref.read(customerSearchQueryProvider.notifier).state = val.trim(),
       searchHint: 'Müşteri adı veya telefon ile ara...',
       actions: [
+        FilledButton.icon(
+          onPressed: () => context.push('/customers/add'),
+          icon: const Icon(Icons.person_add_rounded, size: 18),
+          label: const Text('Yeni Müşteri'),
+          style: FilledButton.styleFrom(
+            backgroundColor: _kGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        const SizedBox(width: 8),
         Semantics(
           label: balanceFilter == CustomerBalanceFilter.all
               ? 'Bakiye filtresi'
@@ -264,13 +276,30 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_customers',
-        tooltip: 'Yeni müşteri',
-        onPressed: () => context.push('/customers/add'),
-        backgroundColor: _kGreen,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.person_add_rounded),
+      floatingActionButton: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = MediaQuery.of(context).size.width >= 900;
+          if (isDesktop) {
+            return FloatingActionButton.extended(
+              heroTag: 'fab_customers',
+              tooltip: 'Yeni müşteri oluştur',
+              onPressed: () => context.push('/customers/add'),
+              backgroundColor: _kGreen,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.person_add_rounded),
+              label: const Text('Yeni Müşteri',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            );
+          }
+          return FloatingActionButton(
+            heroTag: 'fab_customers',
+            tooltip: 'Yeni müşteri',
+            onPressed: () => context.push('/customers/add'),
+            backgroundColor: _kGreen,
+            foregroundColor: Colors.white,
+            child: const Icon(Icons.person_add_rounded),
+          );
+        },
       ),
     );
   }

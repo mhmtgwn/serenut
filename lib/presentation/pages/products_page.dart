@@ -226,6 +226,18 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         setState(() {});
       },
       actions: [
+        FilledButton.icon(
+          onPressed: () => context.push('/products/add'),
+          icon: const Icon(Icons.add_box_rounded, size: 18),
+          label: const Text('Yeni Ürün'),
+          style: FilledButton.styleFrom(
+            backgroundColor: _kGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        const SizedBox(width: 8),
         if (_isLabelSelectionMode)
           IconButton(
             tooltip: 'Filtreye uyan tüm ürünleri seç / temizle',
@@ -368,19 +380,46 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_products',
-        tooltip: _isLabelSelectionMode
-            ? '${_selectedLabelProductIds.length} etiketi yazdır'
-            : 'Yeni ürün',
-        onPressed: _isLabelSelectionMode
-            ? _queueShelfLabels
-            : () => context.push('/products/add'),
-        backgroundColor: _kGreen,
-        foregroundColor: Colors.white,
-        child: Icon(_isLabelSelectionMode
-            ? Icons.print_rounded
-            : Icons.add_box_rounded),
+      floatingActionButton: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = MediaQuery.of(context).size.width >= 900;
+          if (isDesktop) {
+            return FloatingActionButton.extended(
+              heroTag: 'fab_products',
+              tooltip: _isLabelSelectionMode
+                  ? '${_selectedLabelProductIds.length} etiketi yazdır'
+                  : 'Yeni ürün ekle',
+              onPressed: _isLabelSelectionMode
+                  ? _queueShelfLabels
+                  : () => context.push('/products/add'),
+              backgroundColor: _kGreen,
+              foregroundColor: Colors.white,
+              icon: Icon(_isLabelSelectionMode
+                  ? Icons.print_rounded
+                  : Icons.add_box_rounded),
+              label: Text(
+                _isLabelSelectionMode
+                    ? '${_selectedLabelProductIds.length} Etiketi Yazdır'
+                    : 'Yeni Ürün',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            );
+          }
+          return FloatingActionButton(
+            heroTag: 'fab_products',
+            tooltip: _isLabelSelectionMode
+                ? '${_selectedLabelProductIds.length} etiketi yazdır'
+                : 'Yeni ürün',
+            onPressed: _isLabelSelectionMode
+                ? _queueShelfLabels
+                : () => context.push('/products/add'),
+            backgroundColor: _kGreen,
+            foregroundColor: Colors.white,
+            child: Icon(_isLabelSelectionMode
+                ? Icons.print_rounded
+                : Icons.add_box_rounded),
+          );
+        },
       ),
     );
   }
