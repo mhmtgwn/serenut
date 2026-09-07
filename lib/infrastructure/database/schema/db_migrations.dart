@@ -1046,7 +1046,6 @@ class DatabaseMigrations {
       'image_url',
       'sale_type',
       'minimum_weight_grams',
-      'origin',
       'created_at',
       'updated_at',
     ];
