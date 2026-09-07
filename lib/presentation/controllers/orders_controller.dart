@@ -403,6 +403,184 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     await refresh();
   }
 
+  /// Toplu sipariş silme (teslim edilenler hariç).
+  Future<int> bulkDeleteOrders(Iterable<String> ids,
+      {String? approvedByUserId, String? approvedByUserName}) async {
+    await future;
+    final idSet = ids.toSet();
+    if (idSet.isEmpty) return 0;
+
+    int deletedCount = 0;
+    final deletedIds = <String>{};
+    final auditService = await ref.read(auditServiceProvider.future);
+
+    for (final id in idSet) {
+      final order = await _repository.findById(id);
+      if (order == null) continue;
+      // TESLİM EDİLMİŞ SİPARİŞLER SİLİNEMEZ (KORUMA KURALI)
+      if (order.status.toLowerCase() == 'delivered') continue;
+
+      await _repository.delete(id);
+      deletedCount++;
+      deletedIds.add(id);
+
+      try {
+        await auditService.logDelete(
+          'order',
+          id,
+          'Toplu Sipariş Silindi - ID: $id (Müşteri ID: ${order.customerId})',
+          approvedByUserId: approvedByUserId,
+          approvedByUserName: approvedByUserName,
+        );
+      } catch (e, st) {
+        TelemetryService().logError(e, st,
+            context: 'orders_controller:bulkDelete', level: LogLevel.warning);
+      }
+    }
+
+    if (deletedCount > 0) {
+      if (state.hasValue) {
+        state = AsyncValue.data(
+          state.requireValue.where((o) => !deletedIds.contains(o.id)).toList(),
+        );
+      }
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+      await refresh();
+    }
+
+    return deletedCount;
+  }
+
+  /// Toplu sipariş iptali (teslim edilenler hariç).
+  Future<int> bulkCancelOrders(Iterable<String> ids) async {
+    await future;
+    final idSet = ids.toSet();
+    if (idSet.isEmpty) return 0;
+
+    int cancelledCount = 0;
+    final cancellationService =
+        await ref.read(orderCancellationServiceProvider.future);
+    final publisher = ref.read(eventPublisherProvider);
+    final auditService = await ref.read(auditServiceProvider.future);
+    final affectedCustomerIds = <String>{};
+
+    for (final id in idSet) {
+      final order = await _repository.findById(id);
+      if (order == null) continue;
+      // TESLİM EDİLMİŞ VEYA ZATEN İPTAL OLANLAR ATLANIR
+      final currentStatus = order.status.toLowerCase();
+      if (currentStatus == 'delivered' || currentStatus == 'cancelled') {
+        continue;
+      }
+
+      await cancellationService.cancel(id: order.id);
+      cancelledCount++;
+      affectedCustomerIds.add(order.customerId);
+
+      publisher.publish(OrderCancelledEvent(
+        orderId: 0,
+        customerId: 0,
+        orderIdStr: order.orderNumber,
+        customerIdStr: order.customerId,
+      ));
+
+      try {
+        await auditService.logEvent(
+          eventType: 'order_cancelled',
+          entityType: 'order',
+          entityId: id,
+          newValue: 'cancelled',
+          notes: 'Toplu Sipariş İptal Edildi - ID: $id',
+        );
+      } catch (e, st) {
+        TelemetryService().logError(e, st,
+            context: 'orders_controller:bulkCancel', level: LogLevel.warning);
+      }
+    }
+
+    if (cancelledCount > 0) {
+      ref.invalidate(customersControllerProvider);
+      for (final custId in affectedCustomerIds) {
+        ref.invalidate(customerTransactionsProvider(custId));
+        ref.invalidate(customerBalanceDetailsProvider(custId));
+      }
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+      await refresh();
+    }
+
+    return cancelledCount;
+  }
+
+  /// Toplu sipariş durumu güncelleme (teslim hariç).
+  Future<int> bulkUpdateStatus(Iterable<String> ids, String newStatus) async {
+    await future;
+    final targetStatus = newStatus.toLowerCase();
+    // TESLİM DURUMU TOPLU İŞLEMLERE KAPALIDIR
+    if (targetStatus == 'delivered') {
+      throw ArgumentError(
+          'Teslim işlemi toplu olarak yapılamaz; satış ve ödeme adımları gerektirir.');
+    }
+
+    if (targetStatus == 'cancelled') {
+      return bulkCancelOrders(ids);
+    }
+
+    final idSet = ids.toSet();
+    if (idSet.isEmpty) return 0;
+
+    int updatedCount = 0;
+    final publisher = ref.read(eventPublisherProvider);
+    final auditService = await ref.read(auditServiceProvider.future);
+
+    for (final id in idSet) {
+      final order = await _repository.findById(id);
+      if (order == null) continue;
+      // TESLİM EDİLMİŞ SİPARİŞLERİN DURUMU TOPLUCA DEĞİŞTİRİLEMEZ
+      if (order.status.toLowerCase() == 'delivered') continue;
+      if (order.status.toLowerCase() == targetStatus) continue;
+
+      await _repository.updateStatus(id, targetStatus);
+      updatedCount++;
+
+      if (targetStatus == 'preparing') {
+        publisher.publish(OrderPreparingEvent(
+          orderId: 0,
+          customerId: 0,
+          orderIdStr: order.orderNumber,
+          customerIdStr: order.customerId,
+        ));
+      } else if (targetStatus == 'ready') {
+        publisher.publish(OrderReadyEvent(
+          orderId: 0,
+          customerId: 0,
+          orderIdStr: order.orderNumber,
+          customerIdStr: order.customerId,
+        ));
+      }
+
+      try {
+        await auditService.logEvent(
+          eventType: 'order_status_updated',
+          entityType: 'order',
+          entityId: id,
+          newValue: targetStatus,
+          notes: 'Toplu Sipariş Durumu Güncellendi: $id -> $targetStatus',
+        );
+      } catch (e, st) {
+        TelemetryService().logError(e, st,
+            context: 'orders_controller:bulkUpdateStatus',
+            level: LogLevel.warning);
+      }
+    }
+
+    if (updatedCount > 0) {
+      unawaited(ref.read(syncProvider.notifier).triggerSync());
+      await refresh();
+    }
+
+    return updatedCount;
+  }
+
   Future<void> refundOrder({
     required String orderId,
     required String refundMethod,

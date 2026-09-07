@@ -97,6 +97,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   bool _isSearching = false;
   String _timeFilter = 'all';
   bool _overdueOnly = false;
+  bool _isSelecting = false;
+  final Set<String> _selectedIds = <String>{};
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
   Map<String, int> _statusCounts = {
@@ -323,7 +325,11 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     final counts = _statusCounts;
 
     return PosPageLayout(
-          title: 'Siparişler',
+          title: _isSelecting
+              ? (_selectedIds.isEmpty
+                  ? 'Sipariş Seçin'
+                  : '${_selectedIds.length} Sipariş Seçildi')
+              : 'Siparişler',
           isSearching: _isSearching,
           onSearchToggled: (val) => setState(() => _isSearching = val),
           searchController: _searchController,
@@ -333,15 +339,55 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             _refreshCounts();
           },
           actions: [
-            Badge(
-              isLabelVisible: _timeFilter != 'all' || _overdueOnly,
-              backgroundColor: _kAmber,
-              child: IconButton(
-                tooltip: 'Tarih ve gecikme filtresi',
-                onPressed: _showAdvancedFilterSheet,
-                icon: const Icon(Icons.tune_rounded),
+            if (_isSelecting) ...[
+              IconButton(
+                tooltip: 'Teslim hariç tümünü seç',
+                icon: const Icon(Icons.select_all_rounded),
+                onPressed: () {
+                  final selectableIds = filtered
+                      .where((o) => o.status.toLowerCase() != 'delivered')
+                      .map((o) => o.id)
+                      .toSet();
+                  setState(() {
+                    if (_selectedIds.containsAll(selectableIds) &&
+                        selectableIds.isNotEmpty) {
+                      _selectedIds.clear();
+                    } else {
+                      _selectedIds.addAll(selectableIds);
+                    }
+                  });
+                },
               ),
-            ),
+              IconButton(
+                tooltip: 'Seçimden Çık',
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () {
+                  setState(() {
+                    _isSelecting = false;
+                    _selectedIds.clear();
+                  });
+                },
+              ),
+            ] else ...[
+              IconButton(
+                tooltip: 'Toplu Seçim',
+                icon: const Icon(Icons.checklist_rounded),
+                onPressed: () {
+                  setState(() {
+                    _isSelecting = true;
+                  });
+                },
+              ),
+              Badge(
+                isLabelVisible: _timeFilter != 'all' || _overdueOnly,
+                backgroundColor: _kAmber,
+                child: IconButton(
+                  tooltip: 'Tarih ve gecikme filtresi',
+                  onPressed: _showAdvancedFilterSheet,
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+              ),
+            ],
           ],
           filterWidget: PosFilterBar(
             padding: EdgeInsets.zero,
@@ -412,7 +458,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             child: _EmptyView(
                               icon: Icons.receipt_long_rounded,
                               message: _statusFilter == 'all'
-                                  ? 'Henüz sipariş oluşturulmamış.'
+                                   ? 'Henüz sipariş oluşturulmamış.'
                                   : 'Bu kategoride sipariş yok.',
                               action: TextButton.icon(
                                 onPressed: () => _showOrderForm(context),
@@ -468,10 +514,32 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                       'Bilinmeyen Müşteri',
                                   orElse: () => '...',
                                 );
+                                final isDelivered = order.status.toLowerCase() == 'delivered';
+                                final isSelected = _selectedIds.contains(order.id);
                                 return _OrderCard(
                                   order: order,
                                   customerName: customerName,
                                   isGrid: true,
+                                  isSelecting: _isSelecting,
+                                  isSelected: isSelected,
+                                  isSelectable: !isDelivered,
+                                  onSelectChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        _selectedIds.add(order.id);
+                                      } else {
+                                        _selectedIds.remove(order.id);
+                                      }
+                                    });
+                                  },
+                                  onLongPress: () {
+                                    if (!isDelivered) {
+                                      setState(() {
+                                        _isSelecting = true;
+                                        _selectedIds.add(order.id);
+                                      });
+                                    }
+                                  },
                                   onDetail: () =>
                                       context.push('/orders/detail/${order.id}'),
                                 );
@@ -511,10 +579,32 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                     'Bilinmeyen Müşteri',
                                 orElse: () => '...',
                               );
+                              final isDelivered = order.status.toLowerCase() == 'delivered';
+                              final isSelected = _selectedIds.contains(order.id);
                               return _OrderCard(
                                 order: order,
                                 customerName: customerName,
                                 isGrid: false,
+                                isSelecting: _isSelecting,
+                                isSelected: isSelected,
+                                isSelectable: !isDelivered,
+                                onSelectChanged: (val) {
+                                  setState(() {
+                                    if (val == true) {
+                                      _selectedIds.add(order.id);
+                                    } else {
+                                      _selectedIds.remove(order.id);
+                                    }
+                                  });
+                                },
+                                onLongPress: () {
+                                  if (!isDelivered) {
+                                    setState(() {
+                                      _isSelecting = true;
+                                      _selectedIds.add(order.id);
+                                    });
+                                  }
+                                },
                                 onDetail: () =>
                                     context.push('/orders/detail/${order.id}'),
                               );
@@ -534,18 +624,302 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     backgroundColor: Colors.transparent,
                   ),
                 ),
+              // ── Toplu İşlem Çubuğu (Floating Bar) ─────────────────────────
+              if (_isSelecting && _selectedIds.isNotEmpty)
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                  child: Center(
+                    child: Material(
+                      elevation: 8,
+                      borderRadius: BorderRadius.circular(30),
+                      color: const Color(0xFF1E293B),
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${_selectedIds.length} Seçili',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                ),
+                                icon: const Icon(Icons.swap_horiz_rounded,
+                                    size: 18),
+                                label: const Text('Durum Değiştir'),
+                                onPressed: _handleBulkStatusChange,
+                              ),
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFFCA5A5),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                ),
+                                icon: const Icon(Icons.cancel_outlined,
+                                    size: 18),
+                                label: const Text('İptal Et'),
+                                onPressed: _handleBulkCancel,
+                              ),
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFF87171),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 8),
+                                ),
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    size: 18),
+                                label: const Text('Sil'),
+                                onPressed: _handleBulkDelete,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
-            heroTag: 'fab_orders',
-            tooltip: 'Yeni sipariş',
-            onPressed: () => _showOrderForm(context),
-            backgroundColor: _kGreen,
-            foregroundColor: Colors.white,
-            elevation: 3,
-            child: const Icon(Icons.add_shopping_cart_rounded),
-          ),
+          floatingActionButton: _isSelecting
+              ? null
+              : FloatingActionButton(
+                  heroTag: 'fab_orders',
+                  tooltip: 'Yeni sipariş',
+                  onPressed: () => _showOrderForm(context),
+                  backgroundColor: _kGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  child: const Icon(Icons.add_shopping_cart_rounded),
+                ),
         );
+  }
+
+  // ── Toplu İşlem Yöneticileri ──────────────────────────────────────────────
+  Future<void> _handleBulkStatusChange() async {
+    if (_selectedIds.isEmpty) return;
+
+    final selectedTarget = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Toplu Durum Güncelle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Seçilen ${_selectedIds.length} sipariş için yeni durumu belirleyin:',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: const Text(
+                'Bilgi: Teslim edilmiş olan siparişler toplu işleme kapalıdır ve etkilenmez.',
+                style: TextStyle(fontSize: 12, color: Colors.brown),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              tileColor: _kAmberLight,
+              leading: const Icon(Icons.hourglass_top_rounded,
+                  color: _kAmberDark),
+              title: const Text('Hazırlanıyor',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(dialogCtx, 'preparing'),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              tileColor: _kGreenLight,
+              leading: const Icon(Icons.check_circle_outline_rounded,
+                  color: _kGreen),
+              title: const Text('Hazır',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(dialogCtx, 'ready'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Vazgeç'),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedTarget == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final count = await ref
+          .read(ordersControllerProvider.notifier)
+          .bulkUpdateStatus(_selectedIds, selectedTarget);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$count sipariş durumu güncellendi.'),
+          backgroundColor: _kGreen,
+        ),
+      );
+      setState(() {
+        _selectedIds.clear();
+        _isSelecting = false;
+      });
+      await _refreshCounts();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Durum güncellenemedi: $e'),
+          backgroundColor: _kRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleBulkCancel() async {
+    if (_selectedIds.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Toplu Sipariş İptali'),
+        content: Text(
+          'Seçilen ${_selectedIds.length} siparişi iptal etmek istiyor musunuz?\n\n'
+          '• Ayrılan stok miktarları otomatik olarak iade edilecektir.\n'
+          '• Teslim edilmiş siparişler iptal edilemez ve korunur.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _kRed),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('İptal Et'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final count = await ref
+          .read(ordersControllerProvider.notifier)
+          .bulkCancelOrders(_selectedIds);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$count sipariş başarıyla iptal edildi.'),
+          backgroundColor: _kGreen,
+        ),
+      );
+      setState(() {
+        _selectedIds.clear();
+        _isSelecting = false;
+      });
+      await _refreshCounts();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Siparişler iptal edilemedi: $e'),
+          backgroundColor: _kRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleBulkDelete() async {
+    if (_selectedIds.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Toplu Sipariş Silme'),
+        content: Text(
+          'Seçilen ${_selectedIds.length} siparişi kalıcı olarak silmek istediğinizden emin misiniz?\n\n'
+          '⚠️ Bu işlem geri alınamaz!\n'
+          '⚠️ Teslim edilmiş siparişler korunur ve silinmez.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _kRed),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Kalıcı Olarak Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final count = await ref
+          .read(ordersControllerProvider.notifier)
+          .bulkDeleteOrders(_selectedIds);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$count sipariş başarıyla silindi.'),
+          backgroundColor: _kGreen,
+        ),
+      );
+      setState(() {
+        _selectedIds.clear();
+        _isSelecting = false;
+      });
+      await _refreshCounts();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Siparişler silinemedi: $e'),
+          backgroundColor: _kRed,
+        ),
+      );
+    }
   }
 
   // ── Sipariş Form Dialog ───────────────────────────────────────────────────
@@ -568,12 +942,22 @@ class _OrderCard extends StatelessWidget {
   final String customerName;
   final VoidCallback onDetail;
   final bool isGrid;
+  final bool isSelecting;
+  final bool isSelected;
+  final bool isSelectable;
+  final ValueChanged<bool?>? onSelectChanged;
+  final VoidCallback? onLongPress;
 
   const _OrderCard({
     required this.order,
     required this.customerName,
     required this.onDetail,
     this.isGrid = false,
+    this.isSelecting = false,
+    this.isSelected = false,
+    this.isSelectable = true,
+    this.onSelectChanged,
+    this.onLongPress,
   });
 
   @override
@@ -590,12 +974,15 @@ class _OrderCard extends StatelessWidget {
         : subtotal;
     final itemCount = order.items.length;
 
-    return Container(
+    final card = Container(
       margin: isGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorder),
+        border: Border.all(
+          color: isSelected ? _kGreen : _kBorder,
+          width: isSelected ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -608,11 +995,55 @@ class _OrderCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: onDetail,
+          onTap: isSelecting
+              ? () {
+                  if (isSelectable) {
+                    onSelectChanged?.call(!isSelected);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Teslim edilmiş siparişler toplu işlemden etkilenmez.'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                }
+              : onDetail,
+          onLongPress: !isSelecting ? onLongPress : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
+                // ── Çoklu Seçim Durumu ─────────────────────────────────────
+                if (isSelecting) ...[
+                  if (!isSelectable)
+                    const Tooltip(
+                      message:
+                          'Teslim edilmiş siparişler toplu işleme kapalıdır',
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 10),
+                        child: Icon(
+                          Icons.lock_outline_rounded,
+                          size: 20,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Checkbox(
+                        value: isSelected,
+                        activeColor: _kGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        onChanged: onSelectChanged,
+                      ),
+                    ),
+                ],
+
                 // ── Sol Kısım: Durum Avatarı ─────────────────────────────────
                 Container(
                   width: 44,
@@ -752,6 +1183,14 @@ class _OrderCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (isSelecting && !isSelectable) {
+      return Opacity(
+        opacity: 0.6,
+        child: card,
+      );
+    }
+    return card;
   }
 }
 
