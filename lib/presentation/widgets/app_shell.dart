@@ -91,63 +91,26 @@ class AppShell extends ConsumerWidget {
       (item) => item.branchIndex == shellIndex,
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 900;
-
-        if (isWide) {
-          return Scaffold(
-            body: Row(
-              children: [
-                _PosSideBar(
-                  items: navItems,
-                  activeIndex: activeIndex,
-                  onTap: (index) => _onTap(navItems[index]),
-                ),
-                const VerticalDivider(width: 1, thickness: 1, color: POSColors.border),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: navigationShell),
-                      const Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 6,
-                        child: SafeArea(
-                          top: false,
-                          child: TrialBannerWidget(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(child: navigationShell),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 6,
+            child: SafeArea(
+              top: false,
+              child: TrialBannerWidget(),
             ),
-          );
-        }
-
-        return Scaffold(
-          body: Stack(
-            children: [
-              Positioned.fill(child: navigationShell),
-              const Positioned(
-                left: 0,
-                right: 0,
-                bottom: 6,
-                child: SafeArea(
-                  top: false,
-                  child: TrialBannerWidget(),
-                ),
-              ),
-            ],
           ),
-          bottomNavigationBar: _PosNavBar(
-            items: navItems,
-            activeIndex: activeIndex,
-            onTap: (index) => _onTap(navItems[index]),
-          ),
-        );
-      },
+        ],
+      ),
+      bottomNavigationBar: _PosNavBar(
+        items: navItems,
+        activeIndex: activeIndex,
+        onTap: (index) => _onTap(navItems[index]),
+      ),
     );
   }
 
@@ -163,142 +126,6 @@ class AppShell extends ConsumerWidget {
     navigationShell.goBranch(
       item.branchIndex,
       initialLocation: item.branchIndex == navigationShell.currentIndex,
-    );
-  }
-}
-
-// ── Sidebar (Desktop / Wide Screen) ──────────────────────────────────────────
-
-class _PosSideBar extends StatelessWidget {
-  final List<_NavItem> items;
-  final int activeIndex;
-  final void Function(int) onTap;
-
-  const _PosSideBar({
-    required this.items,
-    required this.activeIndex,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 210,
-      color: POSColors.card,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: _kGreenLight,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.point_of_sale_rounded,
-                      color: _kGreen,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'SERENUT OS',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: POSColors.text,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        'POS & İşletim',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: POSColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: POSColors.border),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final isActive = index == activeIndex;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => onTap(index),
-                        borderRadius: BorderRadius.circular(8),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isActive ? _kGreenLight : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isActive ? item.activeIcon : item.icon,
-                                size: 20,
-                                color: isActive ? _kGreen : _kInactive,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  item.label,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isActive
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: isActive ? _kGreen : POSColors.text,
-                                  ),
-                                ),
-                              ),
-                              if (isActive)
-                                Container(
-                                  width: 4,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: _kGreen,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

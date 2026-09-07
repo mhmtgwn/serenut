@@ -70,7 +70,13 @@ void main() {
     final completer = Completer<TelemetryEvent>();
     telemetryService.onOperationalEvent = (event) async {
       forwarded.add(event);
-      if (!completer.isCompleted) completer.complete(event);
+      if (event.metadata['error_message']
+              ?.toString()
+              .contains('Async failure') ==
+          true &&
+          !completer.isCompleted) {
+        completer.complete(event);
+      }
     };
 
     final container = ProviderContainer(
@@ -100,7 +106,13 @@ void main() {
     final completer = Completer<TelemetryEvent>();
     telemetryService.onOperationalEvent = (event) async {
       forwarded.add(event);
-      if (!completer.isCompleted) completer.complete(event);
+      if (event.metadata['error_message']
+              ?.toString()
+              .contains('Guarded mutation') ==
+          true &&
+          !completer.isCompleted) {
+        completer.complete(event);
+      }
     };
 
     final container = ProviderContainer(

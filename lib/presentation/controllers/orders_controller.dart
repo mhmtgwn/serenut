@@ -24,6 +24,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   // Pagination state
   int _offset = 0;
   bool _hasMore = true;
+  bool _isLoadingMore = false;
   String? _statusFilter;
   String? _searchQuery;
   DateTime? _dateFrom;
@@ -31,12 +32,14 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   bool _overdueOnly = false;
 
   bool get hasMore => _hasMore;
+  bool get isLoadingMore => _isLoadingMore;
 
   @override
   FutureOr<List<OrderEntity>> build() async {
     _repository = await ref.watch(orderRepositoryProvider.future);
     _offset = 0;
     _hasMore = true;
+    _isLoadingMore = false;
     final firstPage = await _repository.findFiltered(
       status: _statusFilter,
       searchQuery: _searchQuery,
@@ -57,7 +60,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     _statusFilter = (status == 'all' || status == null) ? null : status;
     _offset = 0;
     _hasMore = true;
-    state = const AsyncValue.loading();
+    _isLoadingMore = false;
+    if (state.hasValue) {
+      state = const AsyncLoading<List<OrderEntity>>().copyWithPrevious(state);
+    } else {
+      state = const AsyncValue.loading();
+    }
     state = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
@@ -75,7 +83,12 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     _searchQuery = (query == null || query.isEmpty) ? null : query;
     _offset = 0;
     _hasMore = true;
-    state = const AsyncValue.loading();
+    _isLoadingMore = false;
+    if (state.hasValue) {
+      state = const AsyncLoading<List<OrderEntity>>().copyWithPrevious(state);
+    } else {
+      state = const AsyncValue.loading();
+    }
     state = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
@@ -103,20 +116,35 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   // ── Pagination ──────────────────────────────────────────────────────────────
 
   Future<void> loadNextPage() async {
-    if (!_hasMore) return;
-    final current = state.valueOrNull ?? [];
-    final next = await _repository.findFiltered(
-      status: _statusFilter,
-      searchQuery: _searchQuery,
-      dateFrom: _dateFrom,
-      dateTo: _dateTo,
-      overdueOnly: _overdueOnly,
-      limit: _kPageSize,
-      offset: _offset,
-    );
-    if (next.length < _kPageSize) _hasMore = false;
-    _offset += next.length;
-    state = AsyncValue.data([...current, ...next]);
+    if (!_hasMore || _isLoadingMore) return;
+    _isLoadingMore = true;
+    try {
+      final current = state.valueOrNull ?? [];
+      final next = await _repository.findFiltered(
+        status: _statusFilter,
+        searchQuery: _searchQuery,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+        overdueOnly: _overdueOnly,
+        limit: _kPageSize,
+        offset: _offset,
+      );
+      if (next.length < _kPageSize) _hasMore = false;
+      _offset += next.length;
+      final existingIds = current.map((e) => e.id).toSet();
+      final uniqueNext =
+          next.where((e) => !existingIds.contains(e.id)).toList();
+      state = AsyncValue.data([...current, ...uniqueNext]);
+    } catch (e, stack) {
+      TelemetryService().logError(
+        e,
+        stack,
+        context: 'OrdersController.loadNextPage',
+        level: LogLevel.error,
+      );
+    } finally {
+      _isLoadingMore = false;
+    }
   }
 
   // ── Status counts (for sidebar badges) ────────────────────────────────────

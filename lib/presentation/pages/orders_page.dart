@@ -129,8 +129,9 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 250) {
       ref.read(ordersControllerProvider.notifier).loadNextPage();
     }
   }
@@ -442,14 +443,21 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                               itemCount: filtered.length + 1,
                               itemBuilder: (context, index) {
                                 if (index == filtered.length) {
-                                  final hasMore = ref
-                                      .read(ordersControllerProvider.notifier)
-                                      .hasMore;
-                                  if (!hasMore) return const SizedBox.shrink();
+                                  final notifier =
+                                      ref.read(ordersControllerProvider.notifier);
+                                  if (!notifier.hasMore) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    notifier.loadNextPage();
+                                  });
                                   return const Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor:
-                                          AlwaysStoppedAnimation(_kGreen),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation(_kGreen),
+                                      ),
                                     ),
                                   );
                                 }
@@ -478,15 +486,22 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             itemCount: filtered.length + 1,
                             itemBuilder: (context, index) {
                               if (index == filtered.length) {
-                                // Pagination footer
-                                final hasMore = ref
-                                    .read(ordersControllerProvider.notifier)
-                                    .hasMore;
-                                if (!hasMore) return const SizedBox.shrink();
+                                final notifier =
+                                    ref.read(ordersControllerProvider.notifier);
+                                if (!notifier.hasMore) {
+                                  return const SizedBox.shrink();
+                                }
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  notifier.loadNextPage();
+                                });
                                 return const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                   child: Center(
-                                      child: CircularProgressIndicator()),
+                                    child: CircularProgressIndicator(
+                                      valueColor:
+                                          AlwaysStoppedAnimation(_kGreen),
+                                    ),
+                                  ),
                                 );
                               }
                               final order = filtered[index];

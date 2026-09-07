@@ -82,8 +82,13 @@ class SyncOutboxV4 {
       await db.execute(
           'CREATE TABLE IF NOT EXISTS sync_cursor_v4 (key TEXT PRIMARY KEY, cursor INTEGER NOT NULL DEFAULT 0)');
       try {
-        await db.execute(
-            'ALTER TABLE sync_outbox_v4 ADD COLUMN base_revision INTEGER NOT NULL DEFAULT 0');
+        final info = await db.rawQuery('PRAGMA table_info(sync_outbox_v4)');
+        final hasBaseRev =
+            info.any((col) => col['name']?.toString() == 'base_revision');
+        if (!hasBaseRev) {
+          await db.execute(
+              'ALTER TABLE sync_outbox_v4 ADD COLUMN base_revision INTEGER NOT NULL DEFAULT 0');
+        }
       } catch (_) {
         // Existing databases already migrated; the column is intentionally idempotent.
       }
