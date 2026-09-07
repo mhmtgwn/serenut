@@ -295,13 +295,9 @@ class OrderDetailsPage extends ConsumerWidget {
                     icon: const Icon(Icons.edit_outlined, color: Colors.blue),
                     tooltip: 'Siparişi Düzenle',
                     onPressed: () {
-                      Navigator.push(
+                      OrderCreationDialog.show(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              OrderCreationDialog(existingOrder: order),
-                          fullscreenDialog: true,
-                        ),
+                        existingOrder: order,
                       ).then((_) {
                         ref.invalidate(_orderDetailProvider(orderId));
                       });

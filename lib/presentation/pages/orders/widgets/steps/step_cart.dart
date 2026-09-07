@@ -590,7 +590,7 @@ extension OrderCreationCartStep on OrderCreationDialogState {
                           subtotal: _subtotalAmount,
                           currentDiscount: _discountAmount,
                           onApply: (newDiscount) {
-                            setState(() {
+                            updateState(() {
                               _discountAmount = newDiscount;
                             });
                           },

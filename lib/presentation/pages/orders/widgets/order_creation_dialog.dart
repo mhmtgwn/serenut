@@ -51,6 +51,41 @@ class OrderCreationDialog extends ConsumerStatefulWidget {
   final OrderEntity? existingOrder;
   const OrderCreationDialog({super.key, this.existingOrder});
 
+  /// Opens the OrderCreationDialog as a centered modal dialog on desktop
+  /// or full-screen on mobile devices.
+  static Future<T?> show<T>(BuildContext context, {OrderEntity? existingOrder}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900;
+    if (isDesktop) {
+      return showDialog<T>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 920,
+              maxHeight: 820,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: OrderCreationDialog(existingOrder: existingOrder),
+            ),
+          ),
+        ),
+      );
+    } else {
+      return Navigator.push<T>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OrderCreationDialog(existingOrder: existingOrder),
+          fullscreenDialog: true,
+        ),
+      );
+    }
+  }
+
   @override
   ConsumerState<OrderCreationDialog> createState() =>
       OrderCreationDialogState();
@@ -417,10 +452,27 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? _kRed : _kGreen,
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isError ? _kRed : _kGreenDark,
         duration: duration,
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(bottom: 84, left: 24, right: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -465,51 +517,82 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar: Close button & compact stepper header
-            Container(
-              color: _kSurface,
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded,
-                        color: _kText, size: 22),
-                    onPressed: () => Navigator.pop(context),
-                    style: IconButton.styleFrom(
-                      padding: const EdgeInsets.all(8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 960;
+        final Widget innerScaffold = Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Top Bar: Close button & compact stepper header
+                Container(
+                  color: _kSurface,
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            color: _kText, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                        style: IconButton.styleFrom(
+                          padding: const EdgeInsets.all(8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildStepperHeader(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: _kBorder),
+                // Step Body
+                Expanded(
+                  child: _buildStepBody(),
+                ),
+              ],
+            ),
+          ),
+          bottomNavigationBar: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: _kBorder)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: _buildBottomActionBar(),
+            ),
+          ),
+        );
+
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: Colors.black.withValues(alpha: 0.45),
+            body: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 920, maxHeight: 820),
+                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
                     ),
-                  ),
-                  Expanded(
-                    child: _buildStepperHeader(),
-                  ),
-                ],
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: innerScaffold,
               ),
             ),
-            const Divider(height: 1, color: _kBorder),
-            // Step Body
-            Expanded(
-              child: _buildStepBody(),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: _kBorder)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: _buildBottomActionBar(),
-        ),
-      ),
+          );
+        }
+
+        return innerScaffold;
+      },
     );
   }
 

@@ -116,7 +116,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                       subtotal: _subtotalAmount,
                       currentDiscount: _discountAmount,
                       onApply: (newDiscount) {
-                        setState(() {
+                        updateState(() {
                           _discountAmount = newDiscount;
                         });
                       },
@@ -452,12 +452,12 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
       {
         'id': 'cash',
         'label': 'Nakit',
-        'icon': Icons.money_rounded,
+        'icon': Icons.payments_rounded,
         'color': _kGreen
       },
       {
         'id': 'card',
-        'label': hasPos ? 'Kart (POS)' : 'Kart (Banka POS)',
+        'label': hasPos ? 'Kart (POS)' : 'Kredi Kartı',
         'icon': Icons.credit_card_rounded,
         'color': Colors.blue,
         'enabled': true,
@@ -471,7 +471,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
         },
       {
         'id': 'karma',
-        'label': 'Karma Ödeme',
+        'label': 'Miks',
         'icon': Icons.call_split_rounded,
         'color': Colors.purple,
       },
@@ -479,31 +479,31 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        return GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 2.8,
-          children: methods.map((m) {
-            final isSel = _paymentMethod == m['id'];
-            final enabled = m['enabled'] as bool? ?? true;
-            final color = m['color'] as Color;
-            return GestureDetector(
+        final bool isWide = constraints.maxWidth >= 460;
+
+        Widget buildItem(Map<String, dynamic> m) {
+          final isSel = _paymentMethod == m['id'];
+          final enabled = m['enabled'] as bool? ?? true;
+          final color = m['color'] as Color;
+
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
               onTap: enabled
                   ? () {
+                      updateState(() => _paymentMethod = m['id'] as String);
                       if (m['id'] == 'cash') {
                         _showCashPaymentDialog();
-                      } else {
-                        updateState(() => _paymentMethod = m['id'] as String);
                       }
                     }
                   : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: isSel ? color : Colors.white,
+                  color: isSel ? color.withValues(alpha: 0.12) : Colors.white,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: isSel
@@ -511,16 +511,17 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                         : (enabled
                             ? color.withValues(alpha: 0.4)
                             : Colors.grey.shade300),
-                    width: isSel ? 2 : 1.5,
+                    width: isSel ? 2 : 1.2,
                   ),
                   boxShadow: isSel
                       ? [
                           BoxShadow(
-                              color: color.withValues(alpha: 0.25),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3))
+                            color: color.withValues(alpha: 0.18),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
                         ]
-                      : [],
+                      : null,
                 ),
                 child: Opacity(
                   opacity: enabled ? 1.0 : 0.45,
@@ -529,7 +530,7 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                     children: [
                       Icon(
                         m['icon'] as IconData,
-                        color: isSel ? Colors.white : color,
+                        color: isSel ? color : _kTextSecondary,
                         size: 18,
                       ),
                       const SizedBox(width: 6),
@@ -539,18 +540,109 @@ extension OrderCreationCheckoutStep on OrderCreationDialogState {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                            color: isSel ? Colors.white : _kText,
+                            fontWeight:
+                                isSel ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: 12,
+                            color: isSel ? color : _kText,
                           ),
                         ),
                       ),
+                      if (isSel) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.check_circle_rounded, size: 14, color: color),
+                      ],
                     ],
                   ),
                 ),
               ),
-            );
-          }).toList(),
+            ),
+          );
+        }
+
+        Widget buttonsRow;
+        if (isWide) {
+          buttonsRow = Row(
+            children: methods.map((m) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: buildItem(m),
+                ),
+              );
+            }).toList(),
+          );
+        } else {
+          buttonsRow = GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+            childAspectRatio: 3.6,
+            children: methods.map((m) => buildItem(m)).toList(),
+          );
+        }
+
+        final double? givenAmount = double.tryParse(
+            _givenCashController.text.replaceAll(',', '.'));
+        final bool showCashDetails = _paymentMethod == 'cash' &&
+            givenAmount != null &&
+            givenAmount > 0;
+        final double change =
+            showCashDetails && givenAmount > _totalAmount
+                ? givenAmount - _totalAmount
+                : 0.0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            buttonsRow,
+            if (showCashDetails) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: _showCashPaymentDialog,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _kGreenLight,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: _kGreen.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.payments_rounded,
+                            size: 14, color: _kGreenDark),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Alınan: ₺${givenAmount.toStringAsFixed(2)}  •  Para Üstü: ₺${change.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _kGreenDark,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          '(Değiştir)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _kGreenDark,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         );
       },
     );

@@ -924,13 +924,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   // ── Sipariş Form Dialog ───────────────────────────────────────────────────
   void _showOrderForm(BuildContext context, {OrderEntity? existingOrder}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OrderCreationDialog(existingOrder: existingOrder),
-        fullscreenDialog: true,
-      ),
-    );
+    OrderCreationDialog.show(context, existingOrder: existingOrder);
   }
 }
 

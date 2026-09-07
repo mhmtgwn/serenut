@@ -522,6 +522,7 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
         }
 
         _showNotification('${newCustomer.name} seçildi ve siparişe atandı.');
+        _nextStep();
       }
     } catch (e) {
       updateState(() => _isSavingCustomer = false);
