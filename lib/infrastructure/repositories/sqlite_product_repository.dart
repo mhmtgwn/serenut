@@ -208,29 +208,35 @@ class SqliteProductRepository implements IProductRepository {
             'Bu barkod kodu (${product.id}) zaten başka bir üründe kullanılıyor.');
       }
       await _gateway.transaction(() async {
-        await _executor.update(
+        try {
+          await _executor.execute('PRAGMA defer_foreign_keys = ON;');
+        } catch (_) {}
+
+        // Fetch original created_at to preserve product creation timestamp
+        final oldRows = await _executor.query(
+          'products',
+          columns: ['created_at'],
+          where: 'id = ?',
+          whereArgs: [oldId],
+          limit: 1,
+        );
+        final createdAt = oldRows.isNotEmpty && oldRows.first['created_at'] != null
+            ? oldRows.first['created_at']!.toString()
+            : DateTime.now().toIso8601String();
+
+        // 1. Insert the product under the new barcode/ID first so child table foreign keys are satisfied
+        await _executor.insert(
           'products',
           {
             ...product.toMap(),
+            'created_at': createdAt,
             'is_synced': 0,
             'updated_at': DateTime.now().toIso8601String(),
           },
-          where: 'id = ?',
-          whereArgs: [oldId],
+          conflictAlgorithm: ConflictAlgorithm.replace,
         );
-        // 1. Send DELETE tombstone for oldId so other devices remove the previous ID/barcode
-        await SyncOutboxV4.enqueue(_executor,
-            entityType: 'product',
-            entityId: oldId,
-            operation: 'DELETE',
-            payload: {'id': oldId, 'is_deleted': 1});
 
-        // 2. Send UPSERT for new product ID/barcode
-        await SyncOutboxV4.enqueue(_executor,
-            entityType: 'product',
-            entityId: product.id,
-            operation: 'UPSERT',
-            payload: {...product.toMap(), 'is_synced': 0});
+        // 2. Cascade foreign key updates to all child tables (sales, orders, refunds)
         await _executor.update(
           'sale_items',
           {'product_id': product.id},
@@ -243,6 +249,34 @@ class SqliteProductRepository implements IProductRepository {
           where: 'product_id = ?',
           whereArgs: [oldId],
         );
+        await _executor.update(
+          'refund_items',
+          {'product_id': product.id},
+          where: 'product_id = ?',
+          whereArgs: [oldId],
+        );
+
+        // 3. Now that no child tables reference the old ID, delete the old record safely
+        await _executor.delete(
+          'products',
+          where: 'id = ?',
+          whereArgs: [oldId],
+        );
+
+        // 4. Send DELETE tombstone for oldId so other devices remove the previous ID/barcode
+        await SyncOutboxV4.enqueue(_executor,
+            entityType: 'product',
+            entityId: oldId,
+            operation: 'DELETE',
+            payload: {'id': oldId, 'is_deleted': 1});
+
+        // 5. Send UPSERT for new product ID/barcode
+        await SyncOutboxV4.enqueue(_executor,
+            entityType: 'product',
+            entityId: product.id,
+            operation: 'UPSERT',
+            payload: {...product.toMap(), 'is_synced': 0});
+
         await _updateDeferredPricesAndOrders(product.id, product.price);
       });
       return 1;

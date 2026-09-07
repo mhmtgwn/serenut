@@ -310,6 +310,81 @@ void main() {
         final productAfter = await productRepository.findById(productId);
         expect(productAfter?.quantity, equals(initialQuantity + increaseQty));
       });
+
+      test('should update product ID/barcode when referenced by sale_items and order_items', () async {
+        final db = await databaseManager.getDatabase();
+        const oldId = 'prod-uuid-test';
+        const newBarcode = '8690123456789';
+
+        // 1. Insert product with old UUID
+        await db.insert('products', {
+          'id': oldId,
+          'name': 'Test Ezme',
+          'description': '',
+          'price': 100.0,
+          'quantity': 10,
+          'category': 'Ezme',
+          'is_active': 1,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+
+        // 2. Insert referencing sale and sale_item
+        await db.insert('sales', {
+          'id': 'sale-test-1',
+          'customer_id': 'cust-1',
+          'total_amount': 100.0,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('sale_items', {
+          'id': 'sale-item-test-1',
+          'sale_id': 'sale-test-1',
+          'product_id': oldId,
+          'quantity': 1,
+          'unit_price': 100.0,
+          'subtotal': 100.0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        // 3. Insert referencing order and order_item
+        await db.insert('orders', {
+          'id': 'order-test-1',
+          'order_number': 'ORD-TEST-001',
+          'customer_id': 'cust-1',
+          'status': 'created',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('order_items', {
+          'id': 'order-item-test-1',
+          'order_id': 'order-test-1',
+          'product_id': oldId,
+          'quantity': 1,
+          'unit_price': 100.0,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        // 4. Update product ID/barcode using repository
+        final originalProduct = await productRepository.findById(oldId);
+        expect(originalProduct, isNotNull);
+
+        final updatedProduct = originalProduct!.copyWith(id: newBarcode);
+        await productRepository.update(updatedProduct, oldId: oldId);
+
+        // 5. Verify the old product is gone and new product exists
+        expect(await productRepository.findById(oldId), isNull);
+        final foundNew = await productRepository.findById(newBarcode);
+        expect(foundNew, isNotNull);
+        expect(foundNew!.id, equals(newBarcode));
+
+        // 6. Verify referencing foreign keys in child tables were updated
+        final saleItem = await db.query('sale_items', where: 'id = ?', whereArgs: ['sale-item-test-1']);
+        expect(saleItem.first['product_id'], equals(newBarcode));
+
+        final orderItem = await db.query('order_items', where: 'id = ?', whereArgs: ['order-item-test-1']);
+        expect(orderItem.first['product_id'], equals(newBarcode));
+      });
     });
 
     group('SqliteCustomerRepository', () {
