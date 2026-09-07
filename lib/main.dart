@@ -41,6 +41,7 @@ import 'package:serenutos/presentation/pages/force_update_page.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
 import 'package:serenutos/presentation/widgets/branded_splash_screen.dart';
+import 'package:serenutos/presentation/observers/telemetry_provider_observer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -161,6 +162,9 @@ void main() async {
 
       runApp(
         ProviderScope(
+          observers: [
+            TelemetryProviderObserver(),
+          ],
           overrides: [
             authServiceProvider.overrideWithValue(authService),
             apiClientProvider.overrideWithValue(apiClient),

@@ -9,6 +9,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/events/event_publisher.dart';
 import 'package:serenutos/domain/events/domain_event.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 import 'database_executor.dart';
 import 'database_executor_impl.dart';
 import 'database_provider.dart';
@@ -69,7 +70,17 @@ class DbGatewayImpl implements DbGateway {
   /// Bypassed inside active transaction zones to prevent deadlocks.
   Future<T> _executeSerialized<T>(Future<T> Function() action) async {
     if (Zone.current[#sqlite_txn] != null) {
-      return await action();
+      try {
+        return await action();
+      } catch (e, stack) {
+        TelemetryService().logError(
+          e,
+          stack,
+          context: 'sqlite_gateway:txn_nested',
+          level: LogLevel.error,
+        );
+        rethrow;
+      }
     }
 
     final completer = Completer<T>();
@@ -84,6 +95,12 @@ class DbGatewayImpl implements DbGateway {
         final result = await action();
         completer.complete(result);
       } catch (e, stack) {
+        TelemetryService().logError(
+          e,
+          stack,
+          context: 'sqlite_gateway:write',
+          level: LogLevel.error,
+        );
         completer.completeError(e, stack);
       }
     }();
@@ -116,20 +133,30 @@ class DbGatewayImpl implements DbGateway {
     int? limit,
     int? offset,
   }) async {
-    await _waitForWriteLock(isWrite: false);
-    final executor = await _getExecutor();
-    return executor.query(
-      table,
-      distinct: distinct,
-      columns: columns,
-      where: where,
-      whereArgs: whereArgs,
-      groupBy: groupBy,
-      having: having,
-      orderBy: orderBy,
-      limit: limit,
-      offset: offset,
-    );
+    try {
+      await _waitForWriteLock(isWrite: false);
+      final executor = await _getExecutor();
+      return await executor.query(
+        table,
+        distinct: distinct,
+        columns: columns,
+        where: where,
+        whereArgs: whereArgs,
+        groupBy: groupBy,
+        having: having,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset,
+      );
+    } catch (e, stack) {
+      TelemetryService().logError(
+        e,
+        stack,
+        context: 'sqlite_gateway:query:$table',
+        level: LogLevel.error,
+      );
+      rethrow;
+    }
   }
 
   @override
@@ -203,9 +230,19 @@ class DbGatewayImpl implements DbGateway {
     String sql, [
     List<Object?>? arguments,
   ]) async {
-    await _waitForWriteLock(isWrite: false);
-    final executor = await _getExecutor();
-    return executor.rawQuery(sql, arguments);
+    try {
+      await _waitForWriteLock(isWrite: false);
+      final executor = await _getExecutor();
+      return await executor.rawQuery(sql, arguments);
+    } catch (e, stack) {
+      TelemetryService().logError(
+        e,
+        stack,
+        context: 'sqlite_gateway:rawQuery',
+        level: LogLevel.error,
+      );
+      rethrow;
+    }
   }
 
   @override

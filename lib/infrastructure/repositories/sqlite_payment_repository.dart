@@ -354,7 +354,7 @@ class SqliteSaleRepository implements ISaleRepository {
       'SELECT SUM(quantity) as total FROM sale_items',
     );
     if (result.isEmpty) return 0;
-    return result.first['total'] as int? ?? 0;
+    return (result.first['total'] as num?)?.toInt() ?? 0;
   }
 }
 

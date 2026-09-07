@@ -21,6 +21,7 @@ import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/presentation/widgets/product_image.dart';
 import 'package:serenutos/presentation/widgets/sales/barcode_scanner_dialog.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -227,7 +228,13 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      TelemetryService().logError(
+        e,
+        st,
+        context: 'product_form_save',
+        level: LogLevel.error,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
