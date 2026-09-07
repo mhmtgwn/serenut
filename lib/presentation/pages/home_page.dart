@@ -1,3 +1,4 @@
+// lib/presentation/pages/home_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import 'package:serenutos/infrastructure/repositories/dashboard_repository.dart'
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/realtime_status_indicator.dart';
+import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -41,18 +43,21 @@ class _HomePageState extends ConsumerState<HomePage> {
             onRefresh: () async => ref.invalidate(dashboardProvider),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= 900;
+                final isWide = constraints.maxWidth >= 960;
+                final double horizontalPadding = isWide ? 32 : 16;
+
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
-                    isWide ? 32 : 16,
+                    horizontalPadding,
                     16,
-                    isWide ? 32 : 16,
+                    horizontalPadding,
                     96,
                   ),
                   children: [
-                    // ── 1. Başlık ve Canlı Senkronizasyon Durumu ──
+                    // ── 1. Başlık, Canlı Durum ve Hızlı Butonlar ──
                     _DashboardHeader(
+                      isWide: isWide,
                       onRefresh: () => ref.invalidate(dashboardProvider),
                       onSettings: () => requirePermissionAccess(
                         context,
@@ -61,62 +66,105 @@ class _HomePageState extends ConsumerState<HomePage> {
                         onGranted: (_, __) => context.push(AppRoutes.settings),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const RealtimeStatusIndicator(compact: false),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
 
-                    // ── 2. Hero Ciro & Finans Komuta Kartı (Prestijli Görünüm) ──
-                    _HeroExecutiveCard(
+                    // ── 2. 4'lü Temiz Kurumsal KPI Metrik Kartları ──
+                    _HeroExecutiveMetrics(
                       summary: data.summary,
                       orderSummary: data.orderSummary,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── 3. Hızlı Aksiyon Dock'u (Hızlı Satış, Sipariş vb.) ──
-                    _QuickActionDock(),
-                    const SizedBox(height: 20),
-
-                    // ── 4. Canlı Sipariş Takip Barı (Durum Rozetleri) ──
-                    _OrderPipelineBar(orderSummary: data.orderSummary),
-                    const SizedBox(height: 20),
-
-                    // ── 5. Kritik Uyarılar (Düşük Stok / Bekleyenler) ──
-                    if (data.lowStockProducts.isNotEmpty) ...[
-                      _CriticalStockBanner(
-                        lowStockCount: data.lowStockProducts.length,
-                        onTap: () => context.go(AppRoutes.products),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // ── 6. Çift Akışlı Operasyon Paneli (Siparişler & Satışlar) ──
-                    _OperationsFeed(
-                      selectedTab: _selectedFeedTab,
-                      onTabChanged: (tab) => setState(() => _selectedFeedTab = tab),
-                      recentOrders: data.recentOrders,
-                      recentSales: data.recentSales,
+                      isWide: isWide,
                     ),
                     const SizedBox(height: 20),
 
-                    // ── 7. Alt Özet: En Çok Satanlar & Kategori Dağılımı ──
+                    // ── 3. Bento Dashboard Gövdesi ──
                     if (isWide)
+                      // Masaüstü Çift Sütunlu Kokpit
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // ── Sol Sütun (Canlı İşlem Akışı & Analitik) ──
                           Expanded(
-                            child: _TopProductsCard(products: data.topProducts),
+                            flex: 60,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _OperationsFeed(
+                                  selectedTab: _selectedFeedTab,
+                                  onTabChanged: (tab) =>
+                                      setState(() => _selectedFeedTab = tab),
+                                  recentOrders: data.recentOrders,
+                                  recentSales: data.recentSales,
+                                ),
+                                const SizedBox(height: 20),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: _TopProductsCard(
+                                          products: data.topProducts),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: _CategoryCard(
+                                          items: data.categoryShares),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 20),
+
+                          // ── Sağ Sütun (Hızlı Aksiyonlar, Pipeline, Uyarılar) ──
                           Expanded(
-                            child: _CategoryCard(items: data.categoryShares),
+                            flex: 40,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _QuickActionDock(),
+                                const SizedBox(height: 16),
+                                _OrderPipelineBar(
+                                    orderSummary: data.orderSummary),
+                                const SizedBox(height: 16),
+                                if (data.lowStockProducts.isNotEmpty)
+                                  _CriticalStockBanner(
+                                    lowStockCount: data.lowStockProducts.length,
+                                    onTap: () => context.go(AppRoutes.products),
+                                  ),
+                              ],
+                            ),
                           ),
                         ],
                       )
-                    else ...[
-                      _TopProductsCard(products: data.topProducts),
-                      const SizedBox(height: 16),
-                      _CategoryCard(items: data.categoryShares),
-                    ],
+                    else
+                      // Mobil Tek Sütunlu Akış
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _QuickActionDock(),
+                          const SizedBox(height: 16),
+                          _OrderPipelineBar(orderSummary: data.orderSummary),
+                          const SizedBox(height: 16),
+                          if (data.lowStockProducts.isNotEmpty) ...[
+                            _CriticalStockBanner(
+                              lowStockCount: data.lowStockProducts.length,
+                              onTap: () => context.go(AppRoutes.products),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          _OperationsFeed(
+                            selectedTab: _selectedFeedTab,
+                            onTabChanged: (tab) =>
+                                setState(() => _selectedFeedTab = tab),
+                            recentOrders: data.recentOrders,
+                            recentSales: data.recentSales,
+                          ),
+                          const SizedBox(height: 16),
+                          _TopProductsCard(products: data.topProducts),
+                          const SizedBox(height: 16),
+                          _CategoryCard(items: data.categoryShares),
+                        ],
+                      ),
                   ],
                 );
               },
@@ -131,10 +179,12 @@ class _HomePageState extends ConsumerState<HomePage> {
 // ── 1. Başlık Widget'ı ────────────────────────────────────────────────────────
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
+    required this.isWide,
     required this.onRefresh,
     required this.onSettings,
   });
 
+  final bool isWide;
   final VoidCallback onRefresh;
   final VoidCallback onSettings;
 
@@ -149,14 +199,20 @@ class _DashboardHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'İşletme Komuta Merkezi',
-                style: GoogleFonts.inter(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: POSColors.text,
-                  letterSpacing: -0.5,
-                ),
+              Row(
+                children: [
+                  Text(
+                    'İşletme Komuta Merkezi',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: POSColors.text,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const RealtimeStatusIndicator(compact: true),
+                ],
               ),
               const SizedBox(height: 3),
               Text(
@@ -170,6 +226,34 @@ class _DashboardHeader extends StatelessWidget {
             ],
           ),
         ),
+        if (isWide) ...[
+          FilledButton.icon(
+            onPressed: () => context.go(AppRoutes.sales),
+            icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+            label: const Text('Yeni Satış'),
+            style: FilledButton.styleFrom(
+              backgroundColor: POSColors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: () => OrderCreationDialog.show(context),
+            icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+            label: const Text('Yeni Sipariş'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9)),
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
         IconButton.filledTonal(
           onPressed: onRefresh,
           tooltip: 'Yenile',
@@ -196,217 +280,171 @@ class _DashboardHeader extends StatelessWidget {
   }
 }
 
-// ── 2. Hero Ciro & Finans Komuta Kartı ─────────────────────────────────────────
-class _HeroExecutiveCard extends StatelessWidget {
-  const _HeroExecutiveCard({
+// ── 2. 4'lü Temiz Kurumsal KPI Metrik Kartları ─────────────────────────────────
+class _HeroExecutiveMetrics extends StatelessWidget {
+  const _HeroExecutiveMetrics({
     required this.summary,
     required this.orderSummary,
+    required this.isWide,
   });
 
   final DashboardSummary summary;
   final DashboardOrderSummary orderSummary;
+  final bool isWide;
 
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'tr_TR', symbol: '₺');
     final totalTurnover = summary.todayRevenue + orderSummary.todayOrdersRevenue;
+    final totalTxCount = summary.totalSalesToday + orderSummary.todayOrdersCount;
 
+    final cards = [
+      _MetricCard(
+        title: 'BUGÜNKÜ CİRO',
+        amount: currency.format(totalTurnover),
+        subtitle: '$totalTxCount İşlem (Kasa + Sipariş)',
+        icon: Icons.payments_rounded,
+        accentColor: const Color(0xFF16A34A),
+      ),
+      _MetricCard(
+        title: 'KASA SATIŞI',
+        amount: currency.format(summary.todayRevenue),
+        subtitle: '${summary.totalSalesToday} Fiş Düzenlendi',
+        icon: Icons.point_of_sale_rounded,
+        accentColor: const Color(0xFF0D9488),
+      ),
+      _MetricCard(
+        title: 'SİPARİŞLER',
+        amount: currency.format(orderSummary.todayOrdersRevenue),
+        subtitle: '${orderSummary.todayOrdersCount} Kargo / Paket',
+        icon: Icons.local_shipping_rounded,
+        accentColor: const Color(0xFF2563EB),
+      ),
+      _MetricCard(
+        title: 'TAHSİLAT & VADELİ',
+        amount: currency.format(summary.todayCollected),
+        subtitle: 'Vadeli: ₺${summary.todayDebt.toStringAsFixed(2)}',
+        icon: Icons.account_balance_wallet_rounded,
+        accentColor: const Color(0xFFD97706),
+      ),
+    ];
+
+    if (isWide) {
+      return Row(
+        children: cards.map((c) => Expanded(child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          child: c,
+        ))).toList(),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 520) {
+          return GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.2,
+            children: cards,
+          );
+        }
+        return Column(
+          children: cards
+              .map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: c,
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.title,
+    required this.amount,
+    required this.subtitle,
+    required this.icon,
+    required this.accentColor,
+  });
+
+  final String title;
+  final String amount;
+  final String subtitle;
+  final IconData icon;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0F172A), // Slate 900
-            Color(0xFF1E293B), // Slate 800
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: POSColors.border),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF10B981), // Emerald
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'BUGÜNKÜ TİCARİ HACİM',
-                    style: GoogleFonts.inter(
-                      color: const Color(0xFF94A3B8),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ],
-              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
+                  color: accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  '${summary.totalSalesToday + orderSummary.todayOrdersCount} İşlem',
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Icon(icon, color: accentColor, size: 18),
+              ),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  color: POSColors.textSecondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            currency.format(totalTurnover),
+            amount,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-              color: Colors.white,
-              fontSize: 32,
+              color: POSColors.text,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 16),
-          const Divider(color: Color(0xFF334155), height: 1),
-          const SizedBox(height: 16),
-          // Kırılımlar: Kasa Satışları vs. Siparişler
-          Row(
-            children: [
-              Expanded(
-                child: _HeroSubMetric(
-                  title: 'Kasa Satışları',
-                  amount: currency.format(summary.todayRevenue),
-                  subtitle: '${summary.totalSalesToday} Fiş',
-                  accentColor: const Color(0xFF34D399), // Emerald
-                  icon: Icons.point_of_sale_rounded,
-                ),
-              ),
-              Container(width: 1, height: 38, color: const Color(0xFF334155)),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 14),
-                  child: _HeroSubMetric(
-                    title: 'Siparişler',
-                    amount: currency.format(orderSummary.todayOrdersRevenue),
-                    subtitle: '${orderSummary.todayOrdersCount} Paket/Kargo',
-                    accentColor: const Color(0xFF60A5FA), // Blue
-                    icon: Icons.local_shipping_rounded,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Alt İnce Satır: Tahsilat vs. Alacak
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Nakit/Kart Tahsilat: ${currency.format(summary.todayCollected)}',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFFCBD5E1),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  'Vadeli: ${currency.format(summary.todayDebt)}',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFFFBBF24), // Amber
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              color: POSColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _HeroSubMetric extends StatelessWidget {
-  const _HeroSubMetric({
-    required this.title,
-    required this.amount,
-    required this.subtitle,
-    required this.accentColor,
-    required this.icon,
-  });
-
-  final String title;
-  final String amount;
-  final String subtitle;
-  final Color accentColor;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: accentColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: accentColor, size: 18),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  color: const Color(0xFF94A3B8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                amount,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -415,62 +453,91 @@ class _HeroSubMetric extends StatelessWidget {
 class _QuickActionDock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final isWide = constraints.maxWidth >= 600;
-      return Row(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: POSColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: _ActionDockButton(
-              title: 'Yeni Satış',
-              icon: Icons.add_shopping_cart_rounded,
-              color: const Color(0xFF10B981),
-              onTap: () => context.go(AppRoutes.sales),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _ActionDockButton(
-              title: 'Yeni Sipariş',
-              icon: Icons.add_task_rounded,
-              color: const Color(0xFF3B82F6),
-              onTap: () => context.go(AppRoutes.orders),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _ActionDockButton(
-              title: 'Etiketler',
-              icon: Icons.qr_code_2_rounded,
-              color: const Color(0xFFF59E0B),
-              onTap: () => context.push(AppRoutes.printQueue),
-            ),
-          ),
-          if (isWide) ...[
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ActionDockButton(
-                title: 'Müşteriler',
-                icon: Icons.people_alt_rounded,
-                color: const Color(0xFF8B5CF6),
-                onTap: () => context.go(AppRoutes.customers),
+          Row(
+            children: [
+              const Icon(Icons.flash_on_rounded,
+                  size: 18, color: Color(0xFFD97706)),
+              const SizedBox(width: 8),
+              Text(
+                'Hızlı İşlemler',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: POSColors.text,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 2.3,
+                children: [
+                  _ActionDockButton(
+                    title: 'Yeni Sipariş',
+                    subtitle: 'Modal Aç',
+                    icon: Icons.add_shopping_cart_rounded,
+                    color: const Color(0xFF2563EB),
+                    onTap: () => OrderCreationDialog.show(context),
+                  ),
+                  _ActionDockButton(
+                    title: 'Hızlı Satış',
+                    subtitle: 'Kasa Ekranı',
+                    icon: Icons.point_of_sale_rounded,
+                    color: const Color(0xFF10B981),
+                    onTap: () => context.go(AppRoutes.sales),
+                  ),
+                  _ActionDockButton(
+                    title: 'Yeni Müşteri',
+                    subtitle: 'Kayıt Formu',
+                    icon: Icons.person_add_rounded,
+                    color: const Color(0xFF8B5CF6),
+                    onTap: () => context.push(AppRoutes.customerAdd),
+                  ),
+                  _ActionDockButton(
+                    title: 'Etiket Kuyruğu',
+                    subtitle: 'Yazıcıya Gönder',
+                    icon: Icons.qr_code_2_rounded,
+                    color: const Color(0xFFF59E0B),
+                    onTap: () => context.push(AppRoutes.printQueue),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
-      );
-    });
+      ),
+    );
   }
 }
 
 class _ActionDockButton extends StatelessWidget {
   const _ActionDockButton({
     required this.title,
+    required this.subtitle,
     required this.icon,
     required this.color,
     required this.onTap,
   });
 
   final String title;
+  final String subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
@@ -478,37 +545,54 @@ class _ActionDockButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: POSColors.border),
+            color: color.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.2)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 18),
               ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: POSColors.text,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: POSColors.text,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: POSColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -542,7 +626,8 @@ class _OrderPipelineBar extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.inventory_rounded, size: 18, color: POSColors.text),
+                  const Icon(Icons.inventory_rounded,
+                      size: 18, color: POSColors.text),
                   const SizedBox(width: 8),
                   Text(
                     'Sipariş Operasyon Durumu',
@@ -571,7 +656,8 @@ class _OrderPipelineBar extends StatelessWidget {
                         color: POSColors.greenDark,
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded, size: 18, color: POSColors.greenDark),
+                    const Icon(Icons.chevron_right_rounded,
+                        size: 18, color: POSColors.greenDark),
                   ],
                 ),
               ),
@@ -584,8 +670,8 @@ class _OrderPipelineBar extends StatelessWidget {
                 child: _PipelineBadge(
                   label: 'Yeni',
                   count: orderSummary.createdCount,
-                  color: const Color(0xFFF59E0B), // Amber
-                  onTap: () => context.go(AppRoutes.orders),
+                  color: const Color(0xFFF59E0B),
+                  onTap: () => context.go('/orders?status=created'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -593,8 +679,8 @@ class _OrderPipelineBar extends StatelessWidget {
                 child: _PipelineBadge(
                   label: 'Hazırlanıyor',
                   count: orderSummary.preparingCount,
-                  color: const Color(0xFF3B82F6), // Blue
-                  onTap: () => context.go(AppRoutes.orders),
+                  color: const Color(0xFF3B82F6),
+                  onTap: () => context.go('/orders?status=preparing'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -602,8 +688,8 @@ class _OrderPipelineBar extends StatelessWidget {
                 child: _PipelineBadge(
                   label: 'Yolda',
                   count: orderSummary.shippedCount,
-                  color: const Color(0xFF8B5CF6), // Purple
-                  onTap: () => context.go(AppRoutes.orders),
+                  color: const Color(0xFF8B5CF6),
+                  onTap: () => context.go('/orders?status=shipped'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -611,8 +697,8 @@ class _OrderPipelineBar extends StatelessWidget {
                 child: _PipelineBadge(
                   label: 'Teslim Edildi',
                   count: orderSummary.deliveredCount,
-                  color: const Color(0xFF10B981), // Emerald
-                  onTap: () => context.go(AppRoutes.orders),
+                  color: const Color(0xFF10B981),
+                  onTap: () => context.go('/orders?status=delivered'),
                 ),
               ),
             ],
@@ -709,7 +795,8 @@ class _CriticalStockBanner extends StatelessWidget {
                   color: Color(0xFFEF4444),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+                child: const Icon(Icons.warning_amber_rounded,
+                    color: Colors.white, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -725,7 +812,7 @@ class _CriticalStockBanner extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Tükenmek üzere olan ürünleri incelemek için dokunun.',
+                      'Tükenmek üzere olan ürünleri incelemek için tıklayın.',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: const Color(0xFFB91C1C),
@@ -734,7 +821,8 @@ class _CriticalStockBanner extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF991B1B)),
+              const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: Color(0xFF991B1B)),
             ],
           ),
         ),
@@ -808,7 +896,8 @@ class _OperationsFeed extends StatelessWidget {
               const SizedBox(
                 height: 120,
                 child: Center(
-                  child: Text('Henüz sipariş kaydı bulunmuyor.', style: TextStyle(color: POSColors.textSecondary)),
+                  child: Text('Henüz sipariş kaydı bulunmuyor.',
+                      style: TextStyle(color: POSColors.textSecondary)),
                 ),
               )
             else
@@ -816,12 +905,14 @@ class _OperationsFeed extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: recentOrders.length,
-                separatorBuilder: (_, __) => const Divider(color: POSColors.border, height: 16),
+                separatorBuilder: (_, __) =>
+                    const Divider(color: POSColors.border, height: 16),
                 itemBuilder: (context, index) {
                   final order = recentOrders[index];
-                  final timeStr = DateFormat('HH:mm').format(order.createdAt);
+                  final timeStr =
+                      DateFormat('HH:mm').format(order.createdAt);
                   return InkWell(
-                    onTap: () => context.go(AppRoutes.orders),
+                    onTap: () => context.push('/orders/detail/${order.id}'),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -834,7 +925,8 @@ class _OperationsFeed extends StatelessWidget {
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.shopping_bag_outlined, color: POSColors.textSecondary, size: 20),
+                            child: const Icon(Icons.shopping_bag_outlined,
+                                color: POSColors.textSecondary, size: 20),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -843,12 +935,15 @@ class _OperationsFeed extends StatelessWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      order.customerName,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: POSColors.text,
+                                    Flexible(
+                                      child: Text(
+                                        order.customerName,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          color: POSColors.text,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -898,7 +993,8 @@ class _OperationsFeed extends StatelessWidget {
               const SizedBox(
                 height: 120,
                 child: Center(
-                  child: Text('Henüz satış kaydı bulunmuyor.', style: TextStyle(color: POSColors.textSecondary)),
+                  child: Text('Henüz satış kaydı bulunmuyor.',
+                      style: TextStyle(color: POSColors.textSecondary)),
                 ),
               )
             else
@@ -906,12 +1002,14 @@ class _OperationsFeed extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: recentSales.length,
-                separatorBuilder: (_, __) => const Divider(color: POSColors.border, height: 16),
+                separatorBuilder: (_, __) =>
+                    const Divider(color: POSColors.border, height: 16),
                 itemBuilder: (context, index) {
                   final sale = recentSales[index];
-                  final timeStr = DateFormat('HH:mm').format(sale.createdAt);
+                  final timeStr =
+                      DateFormat('HH:mm').format(sale.createdAt);
                   return InkWell(
-                    onTap: () => context.go(AppRoutes.sales),
+                    onTap: () => context.push('/sales/detail/${sale.id}'),
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -924,7 +1022,8 @@ class _OperationsFeed extends StatelessWidget {
                               color: const Color(0xFFECFDF5),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.receipt_rounded, color: POSColors.green, size: 20),
+                            child: const Icon(Icons.receipt_rounded,
+                                color: POSColors.green, size: 20),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -951,7 +1050,8 @@ class _OperationsFeed extends StatelessWidget {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(6),
@@ -1040,10 +1140,26 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, bg) = switch (status.toLowerCase()) {
-      'preparing' || 'hazirlaniyor' => ('Hazırlanıyor', const Color(0xFF2563EB), const Color(0xFFEFF6FF)),
-      'shipped' || 'yolda' => ('Yolda', const Color(0xFF7C3AED), const Color(0xFFF5F3FF)),
-      'delivered' || 'completed' || 'teslim' => ('Teslim Edildi', const Color(0xFF059669), const Color(0xFFECFDF5)),
-      'cancelled' || 'iptal' => ('İptal', const Color(0xFFDC2626), const Color(0xFFFEF2F2)),
+      'preparing' || 'hazirlaniyor' => (
+          'Hazırlanıyor',
+          const Color(0xFF2563EB),
+          const Color(0xFFEFF6FF)
+        ),
+      'shipped' || 'yolda' => (
+          'Yolda',
+          const Color(0xFF7C3AED),
+          const Color(0xFFF5F3FF)
+        ),
+      'delivered' || 'completed' || 'teslim' => (
+          'Teslim Edildi',
+          const Color(0xFF059669),
+          const Color(0xFFECFDF5)
+        ),
+      'cancelled' || 'iptal' => (
+          'İptal',
+          const Color(0xFFDC2626),
+          const Color(0xFFFEF2F2)
+        ),
       _ => ('Yeni', const Color(0xFFD97706), const Color(0xFFFFFBEB)),
     };
 
@@ -1085,17 +1201,25 @@ class _TopProductsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.insights_rounded, size: 18, color: POSColors.greenDark),
+              const Icon(Icons.insights_rounded,
+                  size: 18, color: POSColors.greenDark),
               const SizedBox(width: 8),
               Text(
                 'En Çok Satan Ürünler',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: POSColors.text),
+                style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: POSColors.text),
               ),
             ],
           ),
           const SizedBox(height: 14),
           if (products.isEmpty)
-            const SizedBox(height: 80, child: Center(child: Text('Henüz satış verisi yok', style: TextStyle(color: POSColors.textSecondary))))
+            const SizedBox(
+                height: 80,
+                child: Center(
+                    child: Text('Henüz satış verisi yok',
+                        style: TextStyle(color: POSColors.textSecondary))))
           else
             ...products.take(4).map(
                   (product) => Padding(
@@ -1112,7 +1236,10 @@ class _TopProductsCard extends StatelessWidget {
                           child: Center(
                             child: Text(
                               '${product.rank}',
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: POSColors.text),
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: POSColors.text),
                             ),
                           ),
                         ),
@@ -1122,12 +1249,16 @@ class _TopProductsCard extends StatelessWidget {
                             product.productName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.inter(
+                                fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Text(
                           currency.format(product.totalRevenue),
-                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: POSColors.text),
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: POSColors.text),
                         ),
                       ],
                     ),
@@ -1157,17 +1288,25 @@ class _CategoryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.pie_chart_outline_rounded, size: 18, color: Color(0xFF3B82F6)),
+              const Icon(Icons.pie_chart_outline_rounded,
+                  size: 18, color: Color(0xFF3B82F6)),
               const SizedBox(width: 8),
               Text(
                 'Kategori Ciro Dağılımı',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: POSColors.text),
+                style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: POSColors.text),
               ),
             ],
           ),
           const SizedBox(height: 14),
           if (items.isEmpty)
-            const SizedBox(height: 80, child: Center(child: Text('Henüz kategori verisi yok', style: TextStyle(color: POSColors.textSecondary))))
+            const SizedBox(
+                height: 80,
+                child: Center(
+                    child: Text('Henüz kategori verisi yok',
+                        style: TextStyle(color: POSColors.textSecondary))))
           else
             ...items.take(3).map(
                   (item) => Padding(
@@ -1177,9 +1316,14 @@ class _CategoryCard extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(item.category, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                              child: Text(item.category,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
                             ),
-                            Text('%${item.percentage.toStringAsFixed(0)}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700)),
+                            Text('%${item.percentage.toStringAsFixed(0)}',
+                                style: GoogleFonts.inter(
+                                    fontSize: 12, fontWeight: FontWeight.w700)),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -1215,9 +1359,12 @@ class _DashboardError extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline_rounded, size: 48, color: POSColors.red),
+                  const Icon(Icons.error_outline_rounded,
+                      size: 48, color: POSColors.red),
                   const SizedBox(height: 12),
-                  const Text('Ana sayfa verileri alınamadı', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text('Ana sayfa verileri alınamadı',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
                   Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 16),

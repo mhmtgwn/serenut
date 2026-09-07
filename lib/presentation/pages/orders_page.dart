@@ -87,13 +87,14 @@ _StatusMeta _statusMeta(String status) {
 
 // ── Ana Sayfa ─────────────────────────────────────────────────────────────────
 class OrdersPage extends ConsumerStatefulWidget {
-  const OrdersPage({super.key});
+  final String? initialStatusFilter;
+  const OrdersPage({super.key, this.initialStatusFilter});
   @override
   ConsumerState<OrdersPage> createState() => _OrdersPageState();
 }
 
 class _OrdersPageState extends ConsumerState<OrdersPage> {
-  String _statusFilter = 'all';
+  late String _statusFilter;
   bool _isSearching = false;
   String _timeFilter = 'all';
   bool _overdueOnly = false;
@@ -116,10 +117,16 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   @override
   void initState() {
     super.initState();
+    _statusFilter = widget.initialStatusFilter ?? 'all';
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
     _scrollController.addListener(_onScroll);
-    // Load initial status counts
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshCounts());
+    // Load initial status counts and apply filter if passed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialStatusFilter != null && widget.initialStatusFilter != 'all') {
+        ref.read(ordersControllerProvider.notifier).applyFilter(widget.initialStatusFilter!);
+      }
+      _refreshCounts();
+    });
   }
 
   Future<void> _refreshCounts() async {

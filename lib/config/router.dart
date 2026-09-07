@@ -69,6 +69,8 @@ class AppRoutes {
   static const printQueue = '/settings/print-queue';
   static const smsHistory = '/settings/sms-history';
   static const dbHealth = '/settings/db-health';
+  static const customerAdd = '/customers/add';
+  static const productAdd = '/products/add';
 }
 
 String? _adminOnlyRedirect(BuildContext context, GoRouterState state) {
@@ -342,7 +344,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.orders,
                 name: 'orders',
-                builder: (context, state) => const OrdersPage(),
+                builder: (context, state) => OrdersPage(
+                  initialStatusFilter: state.uri.queryParameters['status'],
+                ),
                 redirect: (context, state) =>
                     _roleOrPermissionRedirect(context, Permission.ordersView),
                 routes: [
