@@ -146,6 +146,7 @@ class _PosNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 60,
       decoration: const BoxDecoration(
         color: POSColors.navBackground,
         border: Border(top: BorderSide(color: POSColors.border, width: 1)),
@@ -156,6 +157,7 @@ class _PosNavBar extends StatelessWidget {
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 360;
             return Center(
+              heightFactor: 1.0,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 560),
                 child: Padding(
