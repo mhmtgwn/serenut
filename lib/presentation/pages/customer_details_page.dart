@@ -14,6 +14,7 @@ import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
 import 'package:serenutos/presentation/pages/customer/ledger_explainability_sheet.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
@@ -235,6 +236,13 @@ class CustomerDetailsPage extends ConsumerWidget {
                       color: Colors.white),
                   tooltip: 'Sil',
                   onPressed: () => _confirmDelete(context, ref, customer),
+                ),
+              // ── WhatsApp Bakiye Bildirimi ──
+              if (customer.phone.trim().isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_rounded, color: Colors.white),
+                  tooltip: 'WhatsApp ile Bakiye Gönder',
+                  onPressed: () => _sendWhatsAppBalance(context, customer),
                 ),
               // ── Phase 4: PDF / Excel / SMS Export Button ──
               IconButton(
@@ -628,6 +636,67 @@ class CustomerDetailsPage extends ConsumerWidget {
         },
       );
     });
+  }
+
+  Future<void> _sendWhatsAppBalance(
+      BuildContext context, CustomerEntity customer) async {
+    final phone = customer.phone.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Müşterinin kayıtlı telefon numarası bulunmuyor.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final isDebt = customer.balance < 0;
+    final isClear = customer.balance == 0;
+    final absBalance = customer.balance.abs();
+    final statusText =
+        isDebt ? 'Borçlu' : (isClear ? 'Bakiyesi Yok' : 'Alacaklı');
+
+    final message = '''📋 *Cari Hesap Bilgilendirmesi*
+
+Sayın *${customer.name}*,
+Güncel hesap durumunuz:
+
+▫️ *Durum:* $statusText
+▫️ *Güncel Tutar:* *₺${absBalance.toStringAsFixed(2)}*
+
+Detaylı bilgi ve mutabakat için bizimle iletişime geçebilirsiniz.''';
+
+    final cleanedPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final normalized = cleanedPhone.startsWith('0')
+        ? '9$cleanedPhone'
+        : (cleanedPhone.length == 10 ? '90$cleanedPhone' : cleanedPhone);
+    final encoded = Uri.encodeComponent(message);
+    final uri = Uri.parse('https://wa.me/$normalized?text=$encoded');
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('WhatsApp başlatılamadı.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 }
 
