@@ -1,6 +1,7 @@
 // test/services/telemetry_provider_observer_test.dart
 // Unit tests for TelemetryProviderObserver verifying automatic capture of Riverpod errors.
 
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,8 +67,10 @@ void main() {
 
   test('captures unhandled provider failure via providerDidFail', () async {
     final forwarded = <TelemetryEvent>[];
+    final completer = Completer<TelemetryEvent>();
     telemetryService.onOperationalEvent = (event) async {
       forwarded.add(event);
+      if (!completer.isCompleted) completer.complete(event);
     };
 
     final container = ProviderContainer(
@@ -80,7 +83,7 @@ void main() {
       throwsA(isA<Exception>()),
     );
 
-    await Future.delayed(const Duration(milliseconds: 50));
+    await completer.future.timeout(const Duration(seconds: 3));
 
     expect(forwarded, isNotEmpty);
     expect(
@@ -94,8 +97,10 @@ void main() {
 
   test('captures AsyncError state changes via didUpdateProvider', () async {
     final forwarded = <TelemetryEvent>[];
+    final completer = Completer<TelemetryEvent>();
     telemetryService.onOperationalEvent = (event) async {
       forwarded.add(event);
+      if (!completer.isCompleted) completer.complete(event);
     };
 
     final container = ProviderContainer(
@@ -105,7 +110,7 @@ void main() {
     final notifier = container.read(failingNotifierProvider.notifier);
     await notifier.triggerFailure();
 
-    await Future.delayed(const Duration(milliseconds: 50));
+    await completer.future.timeout(const Duration(seconds: 3));
 
     expect(container.read(failingNotifierProvider).hasError, isTrue);
     expect(forwarded, isNotEmpty);
