@@ -303,208 +303,62 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 child: RefreshIndicator(
                   onRefresh: () =>
                       ref.read(productsControllerProvider.notifier).refresh(),
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: products.length + (hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == products.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation(_kGreen),
-                            ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 720;
+                      if (isWide) {
+                        return GridView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 440,
+                            mainAxisExtent: 96,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
                           ),
+                          itemCount: products.length + (hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == products.length) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                                ),
+                              );
+                            }
+                            final product = products[index];
+                            final isSelected =
+                                _selectedLabelProductIds.contains(product.id);
+                            return _buildProductCard(product, isSelected);
+                          },
                         );
                       }
-                      final product = products[index];
-                      final isSelected =
-                          _selectedLabelProductIds.contains(product.id);
-                      final isLowStock = product.quantity <= product.minStock;
-                      final isOutOfStock = product.quantity <= 0;
 
-                      final stockColor = isOutOfStock
-                          ? _kRed
-                          : (isLowStock ? Colors.orange[700]! : _kGreen);
-                      final stockBg = isOutOfStock
-                          ? _kRedLight
-                          : (isLowStock ? _kAmberLight : _kGreenLight);
-                      final stockText = isOutOfStock
-                          ? 'Tükendi'
-                          : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: _kBorder),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onLongPress: () {
-                              if (!_isLabelSelectionMode) {
-                                setState(() => _isLabelSelectionMode = true);
-                              }
-                              _toggleLabelSelection(product);
-                            },
-                            onTap: () => _isLabelSelectionMode
-                                ? _toggleLabelSelection(product)
-                                : context.push('/products/edit/${product.id}',
-                                    extra: product),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
-                              child: Row(
-                                children: [
-                                  if (_isLabelSelectionMode) ...[
-                                    Checkbox(
-                                      value: isSelected,
-                                      activeColor: _kGreen,
-                                      onChanged: (_) =>
-                                          _toggleLabelSelection(product),
-                                    ),
-                                    const SizedBox(width: 4),
-                                  ],
-                                  // Sol: Ürün görseli/kategori ikonu çerçevesi (Premium square design)
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: ProductImage(
-                                      imageUrl: product.imageUrl,
-                                      barcode: product.id,
-                                      size: 48,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-
-                                  // Orta Kısım: Ürün Adı, Açıklama, Kategori Tagı ve ID
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          product.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: _kText,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          product.brand.isNotEmpty
-                                              ? product.brand
-                                              : product.category,
-                                          style: const TextStyle(
-                                              color: _kTextSecondary,
-                                              fontSize: 11),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        if (product.brand.isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 5, vertical: 1.5),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFF1F5F9),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border:
-                                                  Border.all(color: _kBorder),
-                                            ),
-                                            child: Text(
-                                              product.category,
-                                              style: const TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: _kTextSecondary,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-
-                                  // Sağ Kısım: Satış Fiyatı ve Stok Miktarı
-                                  SizedBox(
-                                    width: 88,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: _kGreenLight,
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '₺${product.price.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 13,
-                                              color: _kGreenDark,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: stockBg,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            stockText,
-                                            style: TextStyle(
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.bold,
-                                              color: stockColor,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          '${_stockFormat.format(product.quantity)} ${product.unit}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color:
-                                                isOutOfStock ? _kRed : _kText,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                      return ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: products.length + (hasMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == products.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation(_kGreen),
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
+                            );
+                          }
+                          final product = products[index];
+                          final isSelected =
+                              _selectedLabelProductIds.contains(product.id);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _buildProductCard(product, isSelected),
+                          );
+                        },
                       );
                     },
                   ),
@@ -527,6 +381,181 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         child: Icon(_isLabelSelectionMode
             ? Icons.print_rounded
             : Icons.add_box_rounded),
+      ),
+    );
+  }
+
+  Widget _buildProductCard(ProductEntity product, bool isSelected) {
+    final isLowStock = product.quantity <= product.minStock;
+    final isOutOfStock = product.quantity <= 0;
+
+    final stockColor = isOutOfStock
+        ? _kRed
+        : (isLowStock ? Colors.orange[700]! : _kGreen);
+    final stockBg = isOutOfStock
+        ? _kRedLight
+        : (isLowStock ? _kAmberLight : _kGreenLight);
+    final stockText = isOutOfStock
+        ? 'Tükendi'
+        : (isLowStock ? 'Kritik Stok' : 'Stokta Var');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? _kGreen : _kBorder,
+          width: isSelected ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onLongPress: () {
+            if (!_isLabelSelectionMode) {
+              setState(() => _isLabelSelectionMode = true);
+            }
+            _toggleLabelSelection(product);
+          },
+          onTap: () => _isLabelSelectionMode
+              ? _toggleLabelSelection(product)
+              : context.push('/products/edit/${product.id}', extra: product),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                if (_isLabelSelectionMode) ...[
+                  Checkbox(
+                    value: isSelected,
+                    activeColor: _kGreen,
+                    onChanged: (_) => _toggleLabelSelection(product),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ProductImage(
+                    imageUrl: product.imageUrl,
+                    barcode: product.id,
+                    size: 44,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        product.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: _kText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        product.brand.isNotEmpty
+                            ? product.brand
+                            : product.category,
+                        style: const TextStyle(
+                          color: _kTextSecondary,
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      if (product.brand.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: _kBorder),
+                          ),
+                          child: Text(
+                            product.category,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: _kTextSecondary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 88,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _kGreenLight,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '₺${product.price.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                            color: _kGreenDark,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: stockBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          stockText,
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: stockColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_stockFormat.format(product.quantity)} ${product.unit}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isOutOfStock ? _kRed : _kText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

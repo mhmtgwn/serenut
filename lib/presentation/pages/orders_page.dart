@@ -424,32 +424,86 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                           ),
                         ],
                       )
-                    : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filtered.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == filtered.length) {
-                            // Pagination footer
-                            final hasMore =
-                                ref.read(ordersControllerProvider.notifier).hasMore;
-                            if (!hasMore) return const SizedBox.shrink();
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator()),
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth >= 720;
+                          if (isWide) {
+                            return GridView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate:
+                                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 520,
+                                mainAxisExtent: 110,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: filtered.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == filtered.length) {
+                                  final hasMore = ref
+                                      .read(ordersControllerProvider.notifier)
+                                      .hasMore;
+                                  if (!hasMore) return const SizedBox.shrink();
+                                  return const Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor:
+                                          AlwaysStoppedAnimation(_kGreen),
+                                    ),
+                                  );
+                                }
+                                final order = filtered[index];
+                                final customerName = customerMapVal.maybeWhen(
+                                  data: (map) =>
+                                      map[order.customerId] ??
+                                      'Bilinmeyen Müşteri',
+                                  orElse: () => '...',
+                                );
+                                return _OrderCard(
+                                  order: order,
+                                  customerName: customerName,
+                                  isGrid: true,
+                                  onDetail: () =>
+                                      context.push('/orders/detail/${order.id}'),
+                                );
+                              },
                             );
                           }
-                          final order = filtered[index];
-                          final customerName = customerMapVal.maybeWhen(
-                            data: (map) => map[order.customerId] ?? 'Bilinmeyen Müşteri',
-                            orElse: () => '...',
-                          );
-                          return _OrderCard(
-                            order: order,
-                            customerName: customerName,
-                            onDetail: () =>
-                                context.push('/orders/detail/${order.id}'),
+
+                          return ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: filtered.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == filtered.length) {
+                                // Pagination footer
+                                final hasMore = ref
+                                    .read(ordersControllerProvider.notifier)
+                                    .hasMore;
+                                if (!hasMore) return const SizedBox.shrink();
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
+                                );
+                              }
+                              final order = filtered[index];
+                              final customerName = customerMapVal.maybeWhen(
+                                data: (map) =>
+                                    map[order.customerId] ??
+                                    'Bilinmeyen Müşteri',
+                                orElse: () => '...',
+                              );
+                              return _OrderCard(
+                                order: order,
+                                customerName: customerName,
+                                isGrid: false,
+                                onDetail: () =>
+                                    context.push('/orders/detail/${order.id}'),
+                              );
+                            },
                           );
                         },
                       ),
@@ -498,11 +552,13 @@ class _OrderCard extends StatelessWidget {
   final OrderEntity order;
   final String customerName;
   final VoidCallback onDetail;
+  final bool isGrid;
 
   const _OrderCard({
     required this.order,
     required this.customerName,
     required this.onDetail,
+    this.isGrid = false,
   });
 
   @override
@@ -520,7 +576,7 @@ class _OrderCard extends StatelessWidget {
     final itemCount = order.items.length;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: isGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),

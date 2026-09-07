@@ -87,7 +87,7 @@ class AppTheme {
     // Masaüstü platformlarda fontları biraz daha belirgin yap
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
-    final double dfs = isDesktop ? 2.0 : 0.0; // desktop font size boost
+    final double dfs = 0.0; // Desktop font boost removed so desktop doesn't feel oversized
 
     final baseTextTheme =
         useGoogleFonts ? GoogleFonts.interTextTheme() : const TextTheme();
@@ -100,6 +100,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      visualDensity: isDesktop ? VisualDensity.compact : VisualDensity.standard,
       colorScheme: const ColorScheme.light(
         primary: POSColors.green,
         onPrimary: Colors.white,
