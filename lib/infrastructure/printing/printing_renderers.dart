@@ -809,6 +809,8 @@ class TsplOrderLabelRenderer implements PrintRenderer {
       printableWidthDots: printableWidthDots,
     );
 
+    final labelFont = await TsplCanvasLabelEngine.ensureFontLoaded();
+
     final contentSize = DynamicLabelSizeEngine.measureOrderContent(
       mediaProfile: mediaProfile,
       orderIdShort: payload['orderNo']?.toString() ?? '',
@@ -839,6 +841,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
       showItemsCount: design['showItemsCount'] != false,
       showQrCode: design['showQrCode'] != false,
       qrData: payload['qrData']?.toString() ?? payload['orderNo']?.toString(),
+      fontFamily: labelFont,
     );
 
     final targetPageSize = DynamicLabelSizeEngine.determineTargetSize(
@@ -890,6 +893,7 @@ class TsplOrderLabelRenderer implements PrintRenderer {
         qrData: payload['qrData']?.toString() ?? payload['orderNo']?.toString(),
         showQrCode: design['showQrCode'] != false,
         targetPageSize: targetPageSize,
+        fontFamily: labelFont,
       );
     } else {
       bytes = TsplLabelLayoutEngine.generateOrderLabelBytes(

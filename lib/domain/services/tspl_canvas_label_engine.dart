@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:serenutos/domain/models/label_model.dart';
 import 'package:serenutos/domain/printing/label_dimension_models.dart';
 
@@ -14,6 +15,44 @@ import 'package:serenutos/domain/printing/label_dimension_models.dart';
 /// and rendering with Flutter's actual typography engine directly to 1-bit
 /// monochrome raster bitmaps.
 class TsplCanvasLabelEngine {
+  static String? _resolvedFontFamily;
+  static bool _fontInitialized = false;
+
+  static String? get resolvedFontFamily => _resolvedFontFamily;
+
+  /// Ensures a robust, high-legibility system font (Arial on Windows, Roboto on Android)
+  /// is registered via FontLoader for TextPainter rendering, preventing tofu / black squares.
+  static Future<String?> ensureFontLoaded() async {
+    if (_fontInitialized) return _resolvedFontFamily;
+    _fontInitialized = true;
+    try {
+      if (Platform.isWindows) {
+        final fontFile = File('C:/Windows/Fonts/arial.ttf');
+        if (fontFile.existsSync()) {
+          final fontData = await fontFile.readAsBytes();
+          final fontLoader = FontLoader('SerenutLabelFont');
+          fontLoader.addFont(Future.value(ByteData.view(fontData.buffer)));
+          await fontLoader.load();
+          _resolvedFontFamily = 'SerenutLabelFont';
+          return _resolvedFontFamily;
+        }
+      } else if (Platform.isAndroid) {
+        final fontFile = File('/system/fonts/Roboto-Regular.ttf');
+        if (fontFile.existsSync()) {
+          final fontData = await fontFile.readAsBytes();
+          final fontLoader = FontLoader('SerenutLabelFont');
+          fontLoader.addFont(Future.value(ByteData.view(fontData.buffer)));
+          await fontLoader.load();
+          _resolvedFontFamily = 'SerenutLabelFont';
+          return _resolvedFontFamily;
+        }
+      }
+    } catch (e) {
+      debugPrint('[TsplCanvasLabelEngine] Font loader warning: $e');
+    }
+    return null;
+  }
+
   /// Generates multi-page or single-page TSPL order label bytes using Flutter Canvas.
   static Future<List<int>> generateOrderLabelBytes({
     required String orderIdShort,
@@ -53,6 +92,8 @@ class TsplCanvasLabelEngine {
     TargetPageSize? targetPageSize,
     String? fontFamily,
   }) async {
+    final effectiveFontFamily = fontFamily ?? await ensureFontLoaded();
+
     TextStyle ts({
       required double fontSize,
       FontWeight fontWeight = FontWeight.normal,
@@ -60,7 +101,7 @@ class TsplCanvasLabelEngine {
       Color color = Colors.black,
     }) {
       return TextStyle(
-        fontFamily: fontFamily,
+        fontFamily: effectiveFontFamily,
         fontSize: fontSize,
         fontWeight: fontWeight,
         fontStyle: fontStyle,
@@ -1136,11 +1177,6 @@ class TsplCanvasLabelEngine {
         final currentGapMm = isContinuous ? 0 : gapMm;
         final tsplHeader = 'SIZE $safeWidth mm,$labelHeightMm mm\r\n'
             'GAP $currentGapMm mm,0 mm\r\n'
-            // A gap scan is a calibration operation. On an overflowing order
-            // it may run at most once, before the first physical label; doing
-            // it again for every continuation label makes the printer feed
-            // unpredictably and breaks page alignment.
-            '${autoDetectGap && pageIdx == 0 ? "GAPDETECT\r\n" : ""}'
             'DENSITY 8\r\n'
             'DIRECTION ${direction == 1 ? 1 : 0}\r\n'
             'REFERENCE 0,0\r\n'
@@ -1197,6 +1233,8 @@ class TsplCanvasLabelEngine {
     Uint8List? logoBytes,
     String? fontFamily,
   }) async {
+    final effectiveFontFamily = fontFamily ?? await ensureFontLoaded();
+
     TextStyle ts({
       required double fontSize,
       FontWeight fontWeight = FontWeight.normal,
@@ -1204,7 +1242,7 @@ class TsplCanvasLabelEngine {
       Color color = Colors.black,
     }) {
       return TextStyle(
-        fontFamily: fontFamily,
+        fontFamily: effectiveFontFamily,
         fontSize: fontSize,
         fontWeight: fontWeight,
         fontStyle: fontStyle,
@@ -1685,7 +1723,6 @@ class TsplCanvasLabelEngine {
     final isContinuous = gapMm <= 0;
     final tsplHeader = 'SIZE $safeWidth mm,$safeHeight mm\r\n'
         'GAP ${isContinuous ? 0 : gapMm} mm,0 mm\r\n'
-        '${autoDetectGap ? "GAPDETECT\r\n" : ""}'
         'DENSITY 8\r\n'
         'DIRECTION ${direction == 1 ? 1 : 0}\r\n'
         'REFERENCE 0,0\r\n'
