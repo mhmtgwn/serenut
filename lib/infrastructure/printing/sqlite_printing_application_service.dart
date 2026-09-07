@@ -90,7 +90,7 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'date': order.createdAt.toIso8601String(),
           'payment': 'Sipariş',
           'cashier': order.createdBy,
-          'customerName': customer?.name ?? order.customerId,
+          'customerName': _resolveCustomerDisplayName(customer?.name, order.customerId),
           'customerPhone': customer?.phone,
           'customerBalance': customer?.balance,
           'subtotal': subtotal > 0 ? subtotal : order.subtotalAmount,
@@ -213,7 +213,8 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         PrintDocumentKind.orderLabel,
         {
           'orderNo': order.displayNumber,
-          'customerName': customer?.name ?? order.customerId,
+          'customerName':
+              _resolveCustomerDisplayName(customer?.name, order.customerId),
           'customerPhone': customer?.phone ?? '',
           'customerNo': shortCustomerId,
           'previousDebt': previousDebt ?? calculatedPreviousDebt,
@@ -278,6 +279,8 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         unit: product.unit,
         shelfCode: product.shelfCode,
         businessName: settings.businessName,
+        origin: product.origin,
+        vat: product.vat,
         weight: 1,
         price: product.price,
         barcode: product.id,
@@ -375,4 +378,14 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         'debt' || 'vadeli' => 'Vadeli',
         _ => value,
       };
+  static String _resolveCustomerDisplayName(String? name, String? fallbackId) {
+    final cleanName = name?.trim();
+    if (cleanName != null && cleanName.isNotEmpty) {
+      if (!cleanName.startsWith('cust-') &&
+          !RegExp(r'^[0-9a-fA-F-]{20,}$').hasMatch(cleanName)) {
+        return cleanName;
+      }
+    }
+    return 'Genel Müşteri';
+  }
 }

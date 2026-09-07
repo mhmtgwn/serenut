@@ -424,9 +424,13 @@ class DynamicLabelSizeEngine {
     }
 
     if (showCustomerName) {
-      final custStr = customerName.trim().isNotEmpty
-          ? 'Müş: ${customerName.trim()}'
-          : 'Müş: Genel';
+      final cleanCust = customerName.trim();
+      final isRawId = cleanCust.startsWith('cust-') ||
+          RegExp(r'^[0-9a-fA-F-]{20,}$').hasMatch(cleanCust);
+      final displayCust = (cleanCust.isNotEmpty && !isRawId)
+          ? cleanCust
+          : 'Genel Müşteri';
+      final custStr = 'Müş: $displayCust';
       if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
         final custPainter = TextPainter(
           text: TextSpan(
@@ -569,10 +573,14 @@ class DynamicLabelSizeEngine {
 
       final String detailText;
       if (unitPrice != null && lineTotal != null) {
-        detailText =
-            '$qtyStr x ${unitPrice.toStringAsFixed(2)} = ${lineTotal.toStringAsFixed(2)} TL';
+        if (qty == 1.0) {
+          detailText = '1 Adet  ${lineTotal.toStringAsFixed(2)} TL';
+        } else {
+          detailText =
+              '$qtyStr x ${unitPrice.toStringAsFixed(2)} = ${lineTotal.toStringAsFixed(2)} TL';
+        }
       } else if (lineTotal != null) {
-        detailText = '$qtyStr x = ${lineTotal.toStringAsFixed(2)} TL';
+        detailText = '$qtyStr x ${lineTotal.toStringAsFixed(2)} TL';
       } else if (rightTotal.isNotEmpty) {
         detailText = '$qtyStr x $rightTotal';
       } else {
@@ -631,7 +639,7 @@ class DynamicLabelSizeEngine {
           width: detailPainter.width,
           height: detailPainter.height,
         ));
-        currentY += itemH + (isWide ? 6.5 : 3.5);
+        currentY += itemH + (isTall ? 5.0 : (isWide ? 2.5 : 3.5));
 
         maxItemLineWidth = math.max(
           maxItemLineWidth,

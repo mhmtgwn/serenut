@@ -204,10 +204,14 @@ class TsplCanvasLabelEngine {
 
       final String detailText;
       if (unitPrice != null && lineTotal != null) {
-        detailText =
-            '$qtyStr x ${unitPrice.toStringAsFixed(2)} = ${lineTotal.toStringAsFixed(2)} TL';
+        if (qty == 1.0) {
+          detailText = '1 Adet  ${lineTotal.toStringAsFixed(2)} TL';
+        } else {
+          detailText =
+              '$qtyStr x ${unitPrice.toStringAsFixed(2)} = ${lineTotal.toStringAsFixed(2)} TL';
+        }
       } else if (lineTotal != null) {
-        detailText = '$qtyStr x = ${lineTotal.toStringAsFixed(2)} TL';
+        detailText = '$qtyStr x ${lineTotal.toStringAsFixed(2)} TL';
       } else if (rightTotal.isNotEmpty) {
         detailText = '$qtyStr x $rightTotal';
       } else {
@@ -249,9 +253,9 @@ class TsplCanvasLabelEngine {
       final double totalH;
       if (canBeSideBySide) {
         totalH = math.max(namePainter.height, detailPainter.height) +
-            (isWide ? 6.5 : 3.5);
+            (isTall ? 5.0 : (isWide ? 2.5 : 3.5));
       } else {
-        totalH = namePainter.height + detailPainter.height + 3.0;
+        totalH = namePainter.height + detailPainter.height + 2.5;
       }
       return _MeasuredItem(
         item,
@@ -283,9 +287,13 @@ class TsplCanvasLabelEngine {
         h += math.max(orderPainter.height, bodyFontSize) + 2.0;
       }
       if (showCustomerName) {
-        final custStr = customerName.trim().isNotEmpty
-            ? 'Müş: ${customerName.trim()}'
-            : 'Müş: Genel';
+        final cleanCust = customerName.trim();
+        final isRawId = cleanCust.startsWith('cust-') ||
+            RegExp(r'^[0-9a-fA-F-]{20,}$').hasMatch(cleanCust);
+        final displayCust = (cleanCust.isNotEmpty && !isRawId)
+            ? cleanCust
+            : 'Genel Müşteri';
+        final custStr = 'Müş: $displayCust';
         if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
           final custPainter = TextPainter(
             text: TextSpan(
@@ -393,13 +401,13 @@ class TsplCanvasLabelEngine {
     final qrActualSizeDots = (qrModules * qrCellWidth).toDouble();
     // Layout reservation on canvas to ensure breathing room and avoid collision (plus caption if wide):
     final qrBoxDots = math.max(
-        qrActualSizeDots + (isWide ? 16.0 : 4.0),
-        (isWide ? (requestedHeightMm <= 40 ? 10.0 : 14.0) : 10.0) * dotsPerMm);
+        qrActualSizeDots + (isWide ? (requestedHeightMm <= 40 ? 6.0 : 16.0) : 4.0),
+        (isWide ? (requestedHeightMm <= 40 ? 8.0 : 14.0) : 10.0) * dotsPerMm);
 
     // Guaranteed margins to prevent right or bottom overflow on physical label:
     final qrRightMarginDots = (safeWidth <= 54 ? 7.0 : 2.5) * dotsPerMm;
     final qrBottomMarginDots =
-        (requestedHeightMm <= 30 ? 3.0 : 2.0) * dotsPerMm;
+        (requestedHeightMm <= 30 ? 3.0 : (requestedHeightMm <= 40 ? 1.5 : 2.0)) * dotsPerMm;
 
     final footerTotalFontSize = (hasQr && !isWide)
         ? (titleFontSize * 0.70).clamp(14.0, 16.5)
@@ -488,7 +496,7 @@ class TsplCanvasLabelEngine {
       }
 
       final bodyH = hasQr ? math.max(leftTextH, qrBoxDots) : leftTextH;
-      return bodyH + 3.0;
+      return bodyH + (isTall ? 3.0 : 1.0);
     }
 
     final closingFooterH = measureClosingFooterHeight();
@@ -699,9 +707,13 @@ class TsplCanvasLabelEngine {
 
         // Customer & Phone
         if (showCustomerName) {
-          final custStr = customerName.trim().isNotEmpty
-              ? 'Müş: ${customerName.trim()}'
-              : 'Müş: Genel';
+          final cleanCust = customerName.trim();
+          final isRawId = cleanCust.startsWith('cust-') ||
+              RegExp(r'^[0-9a-fA-F-]{20,}$').hasMatch(cleanCust);
+          final displayCust = (cleanCust.isNotEmpty && !isRawId)
+              ? cleanCust
+              : 'Genel Müşteri';
+          final custStr = 'Müş: $displayCust';
           if (isWide && customerPhone != null && customerPhone.trim().isNotEmpty) {
             final custPainter = TextPainter(
               text: TextSpan(
@@ -918,7 +930,7 @@ class TsplCanvasLabelEngine {
             width: it.detailPainter.width,
             height: it.detailPainter.height,
           ));
-          currentY += itemH + (isWide ? 6.5 : 3.5);
+          currentY += itemH + (isTall ? 5.0 : (isWide ? 2.5 : 3.5));
         } else {
           it.namePainter.paint(canvas, Offset(paddingLeft, currentY));
           pageBoxes.add(ElementBoundingBox(

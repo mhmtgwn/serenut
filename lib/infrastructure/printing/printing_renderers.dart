@@ -704,27 +704,54 @@ class TsplProductLabelRenderer implements PrintRenderer {
         capabilities['printableWidthDots'] ??
         transportConfig['printableWidthDots']) as int?;
 
+    final useCanvas =
+        design['useCanvas'] != false && design['engine'] != 'legacy';
+    final labelFont = await TsplCanvasLabelEngine.ensureFontLoaded();
+    final logoBytes = logo == null ? null : base64Decode(logo);
+
     final bytes = <int>[];
     var isFirstLabel = true;
     for (final raw in payload['labels'] as List? ?? const []) {
-      bytes.addAll(TsplLabelLayoutEngine.generateLabelBytes(
-        LabelModel.fromMap(Map<String, dynamic>.from(raw as Map)),
-        widthMm: widthMm,
-        heightMm: heightMm,
-        gapMm: gapMm,
-        autoDetectGap: isFirstLabel && autoDetectGap,
-        dpi: dpi,
-        printableWidthDots: printableWidthDots,
-        direction: _integer(capabilities['direction'], 0),
-        copies: 1,
-        showBusinessName: design['showBusinessName'] != false,
-        showBrand: design['showBrand'] == true,
-        showBarcode: design['showBarcode'] != false,
-        showPrice: design['showPrice'] != false,
-        showVat: design['showVat'] == true,
-        fontSize: design['fontSize']?.toString() ?? 'Orta',
-        logoBytes: logo == null ? null : base64Decode(logo),
-      ));
+      final model = LabelModel.fromMap(Map<String, dynamic>.from(raw as Map));
+      if (useCanvas) {
+        bytes.addAll(await TsplCanvasLabelEngine.generateShelfLabelBytes(
+          model: model,
+          widthMm: widthMm,
+          heightMm: heightMm,
+          gapMm: gapMm,
+          autoDetectGap: isFirstLabel && autoDetectGap,
+          dpi: dpi,
+          printableWidthDots: printableWidthDots,
+          direction: _integer(capabilities['direction'], 0),
+          copies: 1,
+          showBusinessName: design['showBusinessName'] != false,
+          showBrand: design['showBrand'] == true,
+          showBarcode: design['showBarcode'] != false,
+          showPrice: design['showPrice'] != false,
+          fontSize: design['fontSize']?.toString() ?? 'Orta',
+          logoBytes: logoBytes,
+          fontFamily: labelFont,
+        ));
+      } else {
+        bytes.addAll(TsplLabelLayoutEngine.generateLabelBytes(
+          model,
+          widthMm: widthMm,
+          heightMm: heightMm,
+          gapMm: gapMm,
+          autoDetectGap: isFirstLabel && autoDetectGap,
+          dpi: dpi,
+          printableWidthDots: printableWidthDots,
+          direction: _integer(capabilities['direction'], 0),
+          copies: 1,
+          showBusinessName: design['showBusinessName'] != false,
+          showBrand: design['showBrand'] == true,
+          showBarcode: design['showBarcode'] != false,
+          showPrice: design['showPrice'] != false,
+          showVat: design['showVat'] == true,
+          fontSize: design['fontSize']?.toString() ?? 'Orta',
+          logoBytes: logoBytes,
+        ));
+      }
       isFirstLabel = false;
     }
     return RenderedPrintDocument(
