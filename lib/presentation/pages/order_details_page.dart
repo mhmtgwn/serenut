@@ -1,6 +1,8 @@
 // lib/presentation/pages/order_details_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/config/router.dart' show rootScaffoldMessengerKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
@@ -744,38 +746,49 @@ class OrderDetailsPage extends ConsumerWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
+              // 1. Close confirmation dialog
               Navigator.pop(context);
+
+              // 2. Immediately pop OrderDetailsPage so it doesn't rebuild in invalid state
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
 
               try {
                 final controller = ref.read(ordersControllerProvider.notifier);
-                if (order.status != 'cancelled') {
-                  await controller.updateStatus(order.id, 'cancelled');
+                // Only cancel uncompleted active orders; delivered or already cancelled orders must not be cancelled
+                if (order.status != 'cancelled' && order.status != 'delivered') {
+                  try {
+                    await controller.updateStatus(order.id, 'cancelled');
+                  } catch (err) {
+                    debugPrint('Pre-delete cancellation skipped: $err');
+                  }
                 }
                 await controller.deleteOrder(order.id);
 
                 ref.invalidate(dashboardProvider);
                 ref.invalidate(productsControllerProvider);
-                ref.invalidate(customerTransactionsProvider(order.customerId));
-                ref.invalidate(customerBalanceDetailsProvider(order.customerId));
-                await ref.read(customersControllerProvider.notifier).refresh();
+                if (order.customerId.isNotEmpty) {
+                  ref.invalidate(customerTransactionsProvider(order.customerId));
+                  ref.invalidate(customerBalanceDetailsProvider(order.customerId));
+                }
+                unawaited(ref.read(customersControllerProvider.notifier).refresh());
 
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Sipariş başarıyla silindi.'),
-                        backgroundColor: Colors.red),
-                  );
-                }
+                rootScaffoldMessengerKey.currentState?.showSnackBar(
+                  const SnackBar(
+                    content: Text('Sipariş başarıyla silindi.'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Sipariş silinemedi: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
+                rootScaffoldMessengerKey.currentState?.showSnackBar(
+                  SnackBar(
+                    content: Text('Sipariş silinemedi: $e'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
             },
             child: const Text('Sil'),

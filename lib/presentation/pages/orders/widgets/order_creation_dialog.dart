@@ -410,6 +410,21 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     }
   }
 
+  void _showNotification(String message,
+      {bool isError = false,
+      Duration duration = const Duration(milliseconds: 1800)}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? _kRed : _kGreen,
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _handleBarcodeSubmit(
       String barcode, List<ProductEntity> productsList) async {
     if (barcode.trim().isEmpty) return;
@@ -440,22 +455,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       });
       _barcodeController.clear();
       _barcodeFocusNode.requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${matched.name} siparişe eklendi.'),
-          backgroundColor: _kGreen,
-          duration: const Duration(milliseconds: 800),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showNotification('${matched.name} siparişe eklendi.');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Barkod ile eşleşen ürün bulunamadı: $barcode'),
-          backgroundColor: _kRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showNotification('Barkod ile eşleşen ürün bulunamadı: $barcode',
+          isError: true);
       _barcodeFocusNode.requestFocus();
     }
   }
@@ -494,10 +497,17 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
             Expanded(
               child: _buildStepBody(),
             ),
-            const Divider(height: 1, color: _kBorder),
-            // Bottom Action bar
-            _buildBottomActionBar(),
           ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: _kBorder)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: _buildBottomActionBar(),
         ),
       ),
     );

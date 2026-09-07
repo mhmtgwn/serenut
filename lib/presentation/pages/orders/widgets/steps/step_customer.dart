@@ -14,6 +14,10 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
+          if (_selectedCustomer != null) ...[
+            _buildSelectedCustomerBanner(),
+            const SizedBox(height: 12),
+          ],
           // Search and add button row
           LayoutBuilder(
             builder: (context, constraints) {
@@ -376,6 +380,104 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
     );
   }
 
+  Widget _buildSelectedCustomerBanner() {
+    final c = _selectedCustomer!;
+    final isDebt = c.balance < 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: _kGreen.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kGreen, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: _kGreen,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _kGreen,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'SEÇİLİ MÜŞTERİ',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        c.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: _kText,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      c.phone.isNotEmpty ? c.phone : 'Telefon Yok',
+                      style: const TextStyle(
+                        color: _kTextSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Bakiye: ₺${c.balance.abs().toStringAsFixed(2)}${isDebt ? ' (Borç)' : ''}',
+                      style: TextStyle(
+                        color: isDebt ? _kRed : _kGreenDark,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () {
+              updateState(() => _selectedCustomer = null);
+            },
+            icon: const Icon(Icons.close_rounded, size: 16, color: _kTextSecondary),
+            label: const Text(
+              'Kaldır',
+              style: TextStyle(color: _kTextSecondary, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveNewCustomer() async {
     if (!_addCustomerFormKey.currentState!.validate()) return;
     updateState(() => _isSavingCustomer = true);
@@ -397,6 +499,10 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
           .read(ordersCustomersControllerProvider.notifier)
           .addCustomer(newCustomer);
 
+      // Clear search query and filter so the new customer and all records are shown
+      _customerSearchController.clear();
+      ref.read(ordersCustomerSearchQueryProvider.notifier).state = '';
+
       await ref.read(ordersCustomersControllerProvider.notifier).refresh();
 
       if (mounted) {
@@ -406,20 +512,21 @@ extension OrderCreationCustomerStep on OrderCreationDialogState {
           _isSavingCustomer = false;
           _customerQuery = '';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Müşteri başarıyla kaydedildi.'),
-              backgroundColor: _kGreen),
-        );
+
+        if (_customerScrollController.hasClients) {
+          _customerScrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+
+        _showNotification('${newCustomer.name} seçildi ve siparişe atandı.');
       }
     } catch (e) {
       updateState(() => _isSavingCustomer = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Müşteri kaydedilirken hata: $e'),
-              backgroundColor: _kRed),
-        );
+        _showNotification('Müşteri kaydedilirken hata: $e', isError: true);
       }
     }
   }

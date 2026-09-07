@@ -135,7 +135,11 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   Future<void> refresh() async {
     _offset = 0;
     _hasMore = true;
-    state = const AsyncValue.loading();
+    if (state.hasValue) {
+      state = const AsyncLoading<List<OrderEntity>>().copyWithPrevious(state);
+    } else {
+      state = const AsyncValue.loading();
+    }
     state = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
@@ -273,6 +277,13 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     await future;
     final order = await _repository.findById(id);
     await _repository.delete(id);
+
+    // Optimistically update state so the deleted order vanishes immediately
+    if (state.hasValue) {
+      state = AsyncValue.data(
+        state.requireValue.where((o) => o.id != id).toList(),
+      );
+    }
 
     // Log to Audit Trail
     try {

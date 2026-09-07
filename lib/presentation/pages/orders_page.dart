@@ -296,28 +296,32 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     final ordersAsync = ref.watch(ordersControllerProvider);
     final customerMapVal = ref.watch(customerLookupMapProvider);
 
-    return ordersAsync.when(
-      loading: () => const Scaffold(
+    final ordersList = ordersAsync.valueOrNull;
+
+    if (ordersList == null && ordersAsync.isLoading) {
+      return const Scaffold(
         backgroundColor: _kSurface,
         body: SafeArea(child: _LoadingView()),
-      ),
-      error: (err, _) => Scaffold(
+      );
+    }
+
+    if (ordersList == null && ordersAsync.hasError) {
+      return Scaffold(
         backgroundColor: _kSurface,
         body: SafeArea(
           child: _ErrorView(
-            message: err.toString(),
+            message: ordersAsync.error.toString(),
             onRetry: () =>
                 ref.read(ordersControllerProvider.notifier).refresh(),
           ),
         ),
-      ),
-      data: (ordersList) {
-        // Status counts come from controller (server-side) — refreshed on filter/search change
-        final counts = _statusCounts;
-        // No client-side filtering — the controller already returned the correct page
-        final filtered = ordersList;
+      );
+    }
 
-        return PosPageLayout(
+    final filtered = ordersList ?? const <OrderEntity>[];
+    final counts = _statusCounts;
+
+    return PosPageLayout(
           title: 'Siparişler',
           isSearching: _isSearching,
           onSearchToggled: (val) => setState(() => _isSearching = val),
@@ -393,60 +397,75 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
               ),
             ],
           ),
-          body: RefreshIndicator(
-            onRefresh: () =>
-                ref.read(ordersControllerProvider.notifier).refresh(),
-            child: filtered.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height * .55,
-                        child: _EmptyView(
-                          icon: Icons.receipt_long_rounded,
-                          message: _statusFilter == 'all'
-                              ? 'Henüz sipariş oluşturulmamış.'
-                              : 'Bu kategoride sipariş yok.',
-                          action: TextButton.icon(
-                            onPressed: () => _showOrderForm(context),
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Sipariş Oluştur'),
-                            style:
-                                TextButton.styleFrom(foregroundColor: _kGreen),
+          body: Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: () =>
+                    ref.read(ordersControllerProvider.notifier).refresh(),
+                child: filtered.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.sizeOf(context).height * .55,
+                            child: _EmptyView(
+                              icon: Icons.receipt_long_rounded,
+                              message: _statusFilter == 'all'
+                                  ? 'Henüz sipariş oluşturulmamış.'
+                                  : 'Bu kategoride sipariş yok.',
+                              action: TextButton.icon(
+                                onPressed: () => _showOrderForm(context),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Sipariş Oluştur'),
+                                style:
+                                    TextButton.styleFrom(foregroundColor: _kGreen),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filtered.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == filtered.length) {
+                            // Pagination footer
+                            final hasMore =
+                                ref.read(ordersControllerProvider.notifier).hasMore;
+                            if (!hasMore) return const SizedBox.shrink();
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
+                          final order = filtered[index];
+                          final customerName = customerMapVal.maybeWhen(
+                            data: (map) => map[order.customerId] ?? 'Bilinmeyen Müşteri',
+                            orElse: () => '...',
+                          );
+                          return _OrderCard(
+                            order: order,
+                            customerName: customerName,
+                            onDetail: () =>
+                                context.push('/orders/detail/${order.id}'),
+                          );
+                        },
                       ),
-                    ],
-                  )
-                : ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == filtered.length) {
-                        // Pagination footer
-                        final hasMore =
-                            ref.read(ordersControllerProvider.notifier).hasMore;
-                        if (!hasMore) return const SizedBox.shrink();
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      final order = filtered[index];
-                      final customerName = customerMapVal.maybeWhen(
-                        data: (map) => map[order.customerId] ?? 'Bilinmeyen Müşteri',
-                        orElse: () => '...',
-                      );
-                      return _OrderCard(
-                        order: order,
-                        customerName: customerName,
-                        onDetail: () =>
-                            context.push('/orders/detail/${order.id}'),
-                      );
-                    },
+              ),
+              if (ordersAsync.isLoading)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    minHeight: 2.5,
+                    valueColor: AlwaysStoppedAnimation(_kGreen),
+                    backgroundColor: Colors.transparent,
                   ),
+                ),
+            ],
           ),
           floatingActionButton: FloatingActionButton(
             heroTag: 'fab_orders',
@@ -458,8 +477,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
             child: const Icon(Icons.add_shopping_cart_rounded),
           ),
         );
-      },
-    );
   }
 
   // ── Sipariş Form Dialog ───────────────────────────────────────────────────
