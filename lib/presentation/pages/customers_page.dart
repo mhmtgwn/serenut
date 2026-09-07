@@ -190,180 +190,70 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 return RefreshIndicator(
                   onRefresh: () =>
                       ref.read(customersControllerProvider.notifier).refresh(),
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: customersList.length + (hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == customersList.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation(_kGreen),
-                            ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 720;
+                      if (isWide) {
+                        return GridView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 520,
+                            mainAxisExtent: 110,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
                           ),
+                          itemCount: customersList.length + (hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == customersList.length) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: CircularProgressIndicator(
+                                    valueColor:
+                                        AlwaysStoppedAnimation(_kGreen),
+                                  ),
+                                ),
+                              );
+                            }
+                            final customer = customersList[index];
+                            return _CustomerCard(
+                              customer: customer,
+                              isGrid: true,
+                              onTap: () => context.push(
+                                  '/customers/detail/${customer.id}'),
+                            );
+                          },
                         );
                       }
-                      final customer = customersList[index];
-                      final isDebt = customer.balance < 0;
-                      final isClear = customer.balance == 0;
-                      final absBalance = customer.balance.abs();
 
-                      return GestureDetector(
-                        onTap: () =>
-                            context.push('/customers/detail/${customer.id}'),
-                        child: Card(
-                          color: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(color: _kBorder),
-                          ),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: isDebt
-                                      ? _kAmberLight
-                                      : isClear
-                                          ? POSColors.surfaceMuted
-                                          : _kGreenLight,
-                                  child: Text(
-                                    customer.name.isNotEmpty
-                                        ? customer.name[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      color: isDebt
-                                          ? _kAmberDark
-                                          : isClear
-                                              ? _kTextSecondary
-                                              : _kGreenDark,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                      return ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: customersList.length + (hasMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == customersList.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  valueColor:
+                                      AlwaysStoppedAnimation(_kGreen),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        customer.name,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                            color: _kText),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      if (customer.phone.isNotEmpty)
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.phone_rounded,
-                                                size: 13,
-                                                color: _kTextSecondary),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                customer.phone,
-                                                style: const TextStyle(
-                                                    color: _kTextSecondary,
-                                                    fontSize: 12),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      if (customer.email.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.email_rounded,
-                                                size: 13,
-                                                color: _kTextSecondary),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                customer.email,
-                                                style: const TextStyle(
-                                                    color: _kTextSecondary,
-                                                    fontSize: 12),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: isDebt
-                                            ? _kAmberLight
-                                            : isClear
-                                                ? POSColors.surfaceMuted
-                                                : _kGreenLight,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            isDebt
-                                                ? 'Vadeli Borç'
-                                                : isClear
-                                                    ? 'Bakiye yok'
-                                                    : 'Alacak',
-                                            style: TextStyle(
-                                                fontSize: 10,
-                                                color: isDebt
-                                                    ? _kAmberDark
-                                                    : isClear
-                                                        ? _kTextSecondary
-                                                        : _kGreenDark,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '₺${absBalance.toStringAsFixed(2)}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 16,
-                                              color: isDebt
-                                                  ? _kAmberDark
-                                                  : isClear
-                                                      ? _kTextSecondary
-                                                      : _kGreenDark,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    const Icon(Icons.chevron_right_rounded,
-                                        color: _kTextSecondary, size: 18),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                              ),
+                            );
+                          }
+                          final customer = customersList[index];
+                          return _CustomerCard(
+                            customer: customer,
+                            isGrid: false,
+                            onTap: () => context.push(
+                                '/customers/detail/${customer.id}'),
+                          );
+                        },
                       );
                     },
                   ),
@@ -667,6 +557,241 @@ class _SummaryChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Müşteri Kartı (Square/Loyverse POS Tasarımı) ───────────────────────────────
+class _CustomerCard extends StatelessWidget {
+  final CustomerEntity customer;
+  final bool isGrid;
+  final VoidCallback onTap;
+
+  const _CustomerCard({
+    required this.customer,
+    required this.onTap,
+    this.isGrid = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDebt = customer.balance < 0;
+    final isClear = customer.balance == 0;
+    final absBalance = customer.balance.abs();
+    final initial = customer.name.trim().isNotEmpty
+        ? customer.name.trim()[0].toUpperCase()
+        : '?';
+
+    final Color badgeBg;
+    final Color badgeText;
+    final String badgeLabel;
+    final Color avatarBg;
+    final Color avatarText;
+
+    if (isDebt) {
+      badgeBg = _kAmberLight;
+      badgeText = _kAmberDark;
+      badgeLabel = 'Vadeli Borç';
+      avatarBg = _kAmberLight;
+      avatarText = _kAmberDark;
+    } else if (isClear) {
+      badgeBg = const Color(0xFFF1F5F9);
+      badgeText = const Color(0xFF64748B);
+      badgeLabel = 'Bakiye Yok';
+      avatarBg = const Color(0xFFF1F5F9);
+      avatarText = const Color(0xFF64748B);
+    } else {
+      badgeBg = _kGreenLight;
+      badgeText = _kGreenDark;
+      badgeLabel = 'Alacak';
+      avatarBg = _kGreenLight;
+      avatarText = _kGreenDark;
+    }
+
+    return Container(
+      margin: isGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                // ── Sol Kısım: Avatar ─────────────────────────────────
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: avatarBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      initial,
+                      style: TextStyle(
+                        color: avatarText,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // ── Orta Kısım: Detaylar ─────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            customer.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: _kText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: badgeBg,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              badgeLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: badgeText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      if (customer.phone.isNotEmpty)
+                        Row(
+                          children: [
+                            const Icon(Icons.phone_outlined,
+                                size: 13, color: _kTextSecondary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                customer.phone,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _kText,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (customer.email.isNotEmpty && customer.phone.isEmpty)
+                        Row(
+                          children: [
+                            const Icon(Icons.email_outlined,
+                                size: 13, color: _kTextSecondary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                customer.email,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: _kTextSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (customer.phone.isNotEmpty && customer.email.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.email_outlined,
+                                  size: 13, color: _kTextSecondary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  customer.email,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: _kTextSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // ── Sağ Kısım: Bakiye ve Yönlendirme Ok ────────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '₺${absBalance.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: badgeText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: _kTextSecondary,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

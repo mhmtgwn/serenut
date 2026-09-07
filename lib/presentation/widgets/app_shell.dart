@@ -155,19 +155,25 @@ class _PosNavBar extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 360;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Row(
-                children: items.asMap().entries.map((entry) {
-                  return Expanded(
-                    child: _NavBarItem(
-                      item: entry.value,
-                      isActive: entry.key == activeIndex,
-                      compact: compact,
-                      onTap: () => onTap(entry.key),
-                    ),
-                  );
-                }).toList(),
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: items.asMap().entries.map((entry) {
+                      return Expanded(
+                        child: _NavBarItem(
+                          item: entry.value,
+                          isActive: entry.key == activeIndex,
+                          compact: compact,
+                          onTap: () => onTap(entry.key),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
             );
           },
