@@ -44,7 +44,6 @@ const _kBorder = Color(0xFFE2E8F0);
 /// Provider — build() dışında tanımlanıyor (kritik bug düzeltmesi)
 final _orderDetailProvider = FutureProvider.autoDispose
     .family<OrderEntity?, String>((ref, orderId) async {
-  ref.watch(ordersControllerProvider);
   final repo = await ref.watch(orderRepositoryProvider.future);
   return repo.findById(orderId);
 });
@@ -317,6 +316,7 @@ class OrderDetailsPage extends ConsumerWidget {
         ],
       ),
       body: orderVal.when(
+        skipLoadingOnReload: true,
         data: (order) {
           if (order == null) {
             return const Center(child: Text('Sipariş bulunamadı.'));
@@ -492,6 +492,7 @@ class OrderDetailsPage extends ConsumerWidget {
                       ref
                           .read(ordersControllerProvider.notifier)
                           .updateStatus(order.id, status);
+                      ref.invalidate(_orderDetailProvider(order.id));
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -1439,6 +1440,31 @@ class OrderDetailsPage extends ConsumerWidget {
     }
 
     if (saleTx == null) {
+      if (order.totalAmount > 0.01 && context.mounted) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Mali Kayıt Bulunamadı'),
+            content: Text(
+              'Bu siparişe (${order.id}) ait mali tahsilat/satış kaydı bulunamadı (Tutar: ₺${order.totalAmount.toStringAsFixed(2)}).\n\n'
+              'Siparişi ödeme alınmadan doğrudan teslim edildi olarak işaretlemek istiyor musunuz?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Vazgeç'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: _kGreen),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Teslim Edildi İşaretle'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+      }
+
       await ref
           .read(ordersControllerProvider.notifier)
           .updateStatus(order.id, 'delivered');

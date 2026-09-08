@@ -344,7 +344,12 @@ class SqliteCustomerRepository implements ICustomerRepository {
   @override
   Future<double> getTotalDebt(String customerId) async {
     final result = await _executor.rawQuery(
-      "SELECT COALESCE(SUM(CASE WHEN type IN ('sale', 'manual_debt') THEN amount WHEN type = 'cancellation' THEN -amount ELSE 0 END), 0.0) as total "
+      'SELECT COALESCE(SUM(CASE '
+      "  WHEN type = 'sale' THEN amount "
+      "  WHEN type = 'manual_debt' THEN debt_amount "
+      "  WHEN type = 'cancellation' THEN -amount "
+      '  ELSE 0 '
+      'END), 0.0) as total '
       'FROM financial_transactions WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0',
       [customerId],
     );
@@ -357,9 +362,8 @@ class SqliteCustomerRepository implements ICustomerRepository {
     final result = await _executor.rawQuery(
       'SELECT COALESCE(SUM(CASE '
       "  WHEN type = 'sale' THEN paid_amount "
-      "  WHEN type = 'payment' THEN amount "
-      "  WHEN type = 'collection' THEN amount "
-      "  WHEN type = 'refund' THEN amount "
+      "  WHEN type = 'payment' THEN paid_amount "
+      "  WHEN type = 'collection' THEN paid_amount "
       "  WHEN type = 'cancellation' THEN -paid_amount "
       '  ELSE 0 '
       'END), 0.0) as total '

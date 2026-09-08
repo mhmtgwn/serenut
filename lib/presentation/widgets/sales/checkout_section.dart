@@ -144,6 +144,18 @@ class _CheckoutSectionState extends ConsumerState<CheckoutSection> {
   }
 
   void _handleKarmaSubmit() {
+    final rawDebt =
+        double.tryParse(_debtSplitController.text.replaceAll(',', '.')) ?? 0.0;
+    if (rawDebt > 0 && widget.selectedCustomer == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veresiye/Borç kaydı için müşteri seçilmesi zorunludur!'),
+          backgroundColor: _kRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (!_karmaValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

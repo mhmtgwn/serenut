@@ -182,17 +182,23 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     if (!mounted) return;
 
     if (matched != null) {
-      ref.read(salesFlowProvider.notifier).addToCart(matched);
       _barcodeController.clear();
       _barcodeFocusNode.requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${matched.name} sepete eklendi.'),
-          backgroundColor: _kGreen,
-          duration: const Duration(milliseconds: 800),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (matched.isWeighed) {
+        await _handleProductSelected(matched);
+      } else {
+        ref.read(salesFlowProvider.notifier).addToCart(matched);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${matched.name} sepete eklendi.'),
+              backgroundColor: _kGreen,
+              duration: const Duration(milliseconds: 800),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     } else {
       _showErrorSnackBar('Barkod ile eşleşen ürün bulunamadı: $barcode');
       _barcodeFocusNode.requestFocus();

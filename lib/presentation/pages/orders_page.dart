@@ -96,8 +96,6 @@ class OrdersPage extends ConsumerStatefulWidget {
 class _OrdersPageState extends ConsumerState<OrdersPage> {
   late String _statusFilter;
   bool _isSearching = false;
-  String _timeFilter = 'all';
-  bool _overdueOnly = false;
   bool _isSelecting = false;
   final Set<String> _selectedIds = <String>{};
   final _searchController = TextEditingController();
@@ -140,8 +138,11 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
   void _onScroll() {
     if (_scrollController.hasClients &&
         _scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 250) {
-      ref.read(ordersControllerProvider.notifier).loadNextPage();
+            _scrollController.position.maxScrollExtent - 150) {
+      final notifier = ref.read(ordersControllerProvider.notifier);
+      if (notifier.hasMore && !notifier.isLoadingMore) {
+        notifier.loadNextPage();
+      }
     }
   }
 
@@ -209,97 +210,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     _refreshCounts();
   }
 
-  Future<void> _applyAdvancedFilter(String period, bool overdueOnly) async {
-    final now = DateTime.now();
-    DateTime? from;
-    DateTime? to;
-    switch (period) {
-      case 'today':
-        from = DateTime(now.year, now.month, now.day);
-        to = from.add(const Duration(days: 1));
-        break;
-      case '7d':
-        from = DateTime(now.year, now.month, now.day)
-            .subtract(const Duration(days: 6));
-        to =
-            DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
-        break;
-      case '30d':
-        from = DateTime(now.year, now.month, now.day)
-            .subtract(const Duration(days: 29));
-        to =
-            DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
-        break;
-    }
-    setState(() {
-      _timeFilter = period;
-      _overdueOnly = overdueOnly;
-    });
-    await ref.read(ordersControllerProvider.notifier).applyAdvancedFilter(
-          dateFrom: from,
-          dateTo: to,
-          overdueOnly: overdueOnly,
-        );
-    await _refreshCounts();
-  }
 
-  Future<void> _showAdvancedFilterSheet() async {
-    var period = _timeFilter;
-    var overdue = _overdueOnly;
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Siparişleri filtrele',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 14),
-                SegmentedButton<String>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: 'all', label: Text('Tümü')),
-                    ButtonSegment(value: 'today', label: Text('Bugün')),
-                    ButtonSegment(value: '7d', label: Text('7 Gün')),
-                    ButtonSegment(value: '30d', label: Text('30 Gün')),
-                  ],
-                  selected: {period},
-                  onSelectionChanged: (value) =>
-                      setSheetState(() => period = value.first),
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Yalnızca gecikenler'),
-                  subtitle: const Text(
-                      'Teslim tarihi geçen açık siparişleri gösterir'),
-                  value: overdue,
-                  activeColor: _kGreen,
-                  onChanged: (value) => setSheetState(() => overdue = value),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    _applyAdvancedFilter(period, overdue);
-                  },
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('Filtreyi Uygula'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -376,18 +287,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                 },
               ),
             ] else ...[
-              FilledButton.icon(
-                onPressed: () => _showOrderForm(context),
-                icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-                label: const Text('Yeni Sipariş'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-              const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Toplu Seçim',
                 icon: const Icon(Icons.checklist_rounded),
@@ -396,15 +295,6 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                     _isSelecting = true;
                   });
                 },
-              ),
-              Badge(
-                isLabelVisible: _timeFilter != 'all' || _overdueOnly,
-                backgroundColor: _kAmber,
-                child: IconButton(
-                  tooltip: 'Tarih ve gecikme filtresi',
-                  onPressed: _showAdvancedFilterSheet,
-                  icon: const Icon(Icons.tune_rounded),
-                ),
               ),
             ],
           ],
@@ -466,8 +356,11 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
           body: Stack(
             children: [
               RefreshIndicator(
-                onRefresh: () =>
-                    ref.read(ordersControllerProvider.notifier).refresh(),
+                color: _kGreen,
+                onRefresh: () async {
+                  await ref.read(ordersControllerProvider.notifier).refresh();
+                  await _refreshCounts();
+                },
                 child: filtered.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -505,23 +398,23 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
                               ),
-                              itemCount: filtered.length + 1,
+                              itemCount: filtered.length +
+                                  (ref.read(ordersControllerProvider.notifier).isLoadingMore
+                                      ? 1
+                                      : 0),
                               itemBuilder: (context, index) {
                                 if (index == filtered.length) {
-                                  final notifier =
-                                      ref.read(ordersControllerProvider.notifier);
-                                  if (!notifier.hasMore) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    notifier.loadNextPage();
-                                  });
                                   return const Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(12),
-                                      child: CircularProgressIndicator(
-                                        valueColor:
-                                            AlwaysStoppedAnimation(_kGreen),
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation(_kGreen),
+                                        ),
                                       ),
                                     ),
                                   );
@@ -570,23 +463,23 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             controller: _scrollController,
                             padding: const EdgeInsets.all(16),
-                            itemCount: filtered.length + 1,
+                            itemCount: filtered.length +
+                                (ref.read(ordersControllerProvider.notifier).isLoadingMore
+                                    ? 1
+                                    : 0),
                             itemBuilder: (context, index) {
                               if (index == filtered.length) {
-                                final notifier =
-                                    ref.read(ordersControllerProvider.notifier);
-                                if (!notifier.hasMore) {
-                                  return const SizedBox.shrink();
-                                }
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  notifier.loadNextPage();
-                                });
                                 return const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                   child: Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor:
-                                          AlwaysStoppedAnimation(_kGreen),
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        valueColor:
+                                            AlwaysStoppedAnimation(_kGreen),
+                                      ),
                                     ),
                                   ),
                                 );
@@ -632,7 +525,7 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                         },
                       ),
               ),
-              if (ordersAsync.isLoading)
+              if (ordersAsync.isLoading && filtered.isEmpty)
                 const Positioned(
                   top: 0,
                   left: 0,

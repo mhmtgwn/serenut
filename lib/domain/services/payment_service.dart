@@ -170,7 +170,10 @@ class PaymentService {
     required double totalAmount,
     required double paidAmount,
   }) async {
-    if (await _isDuplicateTransaction(saleId, 'cancellation')) {
+    // Sadece gerçekten tamamlanmış nihai iptal varsa mükerrerliği engelle (sipariş revizyonu hariç)
+    final existingCancellations = (await _transactionRepository.getByCustomerId(customerId))
+        .where((tx) => tx.referenceId == saleId && tx.type == 'cancellation' && tx.metadata?['reason'] != 'order_revision');
+    if (existingCancellations.isNotEmpty) {
       return; // Idempotency check: Already processed
     }
 

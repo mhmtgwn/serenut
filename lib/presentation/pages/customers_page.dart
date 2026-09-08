@@ -3,6 +3,7 @@
 // Yeşil + Sarı + Premium POS Teması
 // Generated: 21 Jun 2026 (v2)
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,6 +35,7 @@ class CustomersPage extends ConsumerStatefulWidget {
 class _CustomersPageState extends ConsumerState<CustomersPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
   bool _isSearching = false;
 
   @override
@@ -44,13 +46,18 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     _searchController.addListener(_onSearchChanged);
   }
 
-  void _onSearchChanged() {
-    ref.read(customerSearchQueryProvider.notifier).state =
-        _searchController.text.trim();
+  void _onSearchChanged([String? value]) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final text = (value ?? _searchController.text).trim();
+      ref.read(customerSearchQueryProvider.notifier).state = text;
+    });
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
@@ -78,28 +85,16 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
         setState(() {
           _isSearching = val;
           if (!val) {
+            _searchDebounce?.cancel();
             _searchController.clear();
             ref.read(customerSearchQueryProvider.notifier).state = '';
           }
         });
       },
       searchController: _searchController,
-      onSearchChanged: (val) =>
-          ref.read(customerSearchQueryProvider.notifier).state = val.trim(),
+      onSearchChanged: (val) => _onSearchChanged(val),
       searchHint: 'Müşteri adı veya telefon ile ara...',
       actions: [
-        FilledButton.icon(
-          onPressed: () => context.push('/customers/add'),
-          icon: const Icon(Icons.person_add_rounded, size: 18),
-          label: const Text('Yeni Müşteri'),
-          style: FilledButton.styleFrom(
-            backgroundColor: _kGreen,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-        const SizedBox(width: 8),
         Semantics(
           label: balanceFilter == CustomerBalanceFilter.all
               ? 'Bakiye filtresi'

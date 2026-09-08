@@ -75,7 +75,7 @@ class SaleDetailsPage extends ConsumerWidget {
                 ],
                 _buildPaymentSummaryCard(sale),
                 const SizedBox(height: 16),
-                if (sale.status != 'cancelled')
+                if (sale.status != 'cancelled' && sale.status != 'refunded')
                   _buildActionBar(context, ref, sale),
               ],
             ),
@@ -97,12 +97,16 @@ class SaleDetailsPage extends ConsumerWidget {
       'partial': [Colors.orange[50]!, Colors.orange[700]!],
       'pending': [const Color(0xFFFEF9C3), const Color(0xFFD97706)],
       'cancelled': [Colors.grey[100]!, Colors.grey[600]!],
+      'refunded': [const Color(0xFFEDE9FE), const Color(0xFF7C3AED)],
+      'partially_refunded': [const Color(0xFFFEF3C7), const Color(0xFFD97706)],
     };
     final statusLabels = {
       'completed': 'Tamamlandı',
       'partial': 'Kısmi Ödeme',
       'pending': 'Bekliyor',
       'cancelled': 'İptal Edildi',
+      'refunded': 'İade Edildi',
+      'partially_refunded': 'Kısmi İade',
     };
 
     final colors =

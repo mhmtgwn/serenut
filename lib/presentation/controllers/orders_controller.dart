@@ -61,12 +61,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     _offset = 0;
     _hasMore = true;
     _isLoadingMore = false;
-    if (state.hasValue) {
-      state = const AsyncLoading<List<OrderEntity>>().copyWithPrevious(state);
-    } else {
-      state = const AsyncValue.loading();
-    }
-    state = await AsyncValue.guard(() => _repository.findFiltered(
+    final result = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
           dateFrom: _dateFrom,
@@ -75,6 +70,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           limit: _kPageSize,
           offset: 0,
         ));
+    state = result;
     _offset = state.valueOrNull?.length ?? 0;
     _hasMore = (_offset == _kPageSize);
   }
@@ -84,12 +80,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
     _offset = 0;
     _hasMore = true;
     _isLoadingMore = false;
-    if (state.hasValue) {
-      state = const AsyncLoading<List<OrderEntity>>().copyWithPrevious(state);
-    } else {
-      state = const AsyncValue.loading();
-    }
-    state = await AsyncValue.guard(() => _repository.findFiltered(
+    final result = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
           dateFrom: _dateFrom,
@@ -98,6 +89,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           limit: _kPageSize,
           offset: 0,
         ));
+    state = result;
     _offset = state.valueOrNull?.length ?? 0;
     _hasMore = (_offset == _kPageSize);
   }
@@ -129,13 +121,20 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         limit: _kPageSize,
         offset: _offset,
       );
-      if (next.length < _kPageSize) _hasMore = false;
+      if (next.isEmpty || next.length < _kPageSize) {
+        _hasMore = false;
+      }
       _offset += next.length;
       final existingIds = current.map((e) => e.id).toSet();
       final uniqueNext =
           next.where((e) => !existingIds.contains(e.id)).toList();
-      state = AsyncValue.data([...current, ...uniqueNext]);
+      if (uniqueNext.isEmpty) {
+        _hasMore = false;
+      } else {
+        state = AsyncValue.data([...current, ...uniqueNext]);
+      }
     } catch (e, stack) {
+      _hasMore = false;
       TelemetryService().logError(
         e,
         stack,
@@ -163,12 +162,8 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
   Future<void> refresh() async {
     _offset = 0;
     _hasMore = true;
-    if (state.hasValue) {
-      state = const AsyncLoading<List<OrderEntity>>().copyWithPrevious(state);
-    } else {
-      state = const AsyncValue.loading();
-    }
-    state = await AsyncValue.guard(() => _repository.findFiltered(
+    _isLoadingMore = false;
+    final result = await AsyncValue.guard(() => _repository.findFiltered(
           status: _statusFilter,
           searchQuery: _searchQuery,
           dateFrom: _dateFrom,
@@ -177,6 +172,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           limit: _kPageSize,
           offset: 0,
         ));
+    state = result;
     _offset = state.valueOrNull?.length ?? 0;
     _hasMore = (_offset == _kPageSize);
   }
@@ -304,6 +300,22 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       {String? approvedByUserId, String? approvedByUserName}) async {
     await future;
     final order = await _repository.findById(id);
+    if (order == null) return;
+    if (order.status.toLowerCase() == 'delivered') {
+      throw StateError('Teslim edilmiş siparişler silinemez.');
+    }
+
+    // Sipariş henüz iptal edilmemişse depoya stokları iade et
+    if (order.status.toLowerCase() != 'cancelled') {
+      try {
+        final inventory = await ref.read(inventoryServiceProvider.future);
+        await inventory.increaseStock(_inventoryItems(order.items));
+      } catch (e, st) {
+        TelemetryService().logError(e, st,
+            context: 'orders_controller:deleteOrder:stockRestore', level: LogLevel.warning);
+      }
+    }
+
     await _repository.delete(id);
 
     // Optimistically update state so the deleted order vanishes immediately
@@ -319,7 +331,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       await auditService.logDelete(
         'order',
         id,
-        'Sipariş Silindi - ID: $id (Müşteri ID: ${order?.customerId ?? 'Bilinmeyen'})',
+        'Sipariş Silindi - ID: $id (Müşteri ID: ${order.customerId})',
         approvedByUserId: approvedByUserId,
         approvedByUserName: approvedByUserName,
       );
@@ -399,6 +411,14 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
           context: 'orders_controller', level: LogLevel.warning);
     }
 
+    if (state.hasValue) {
+      state = AsyncValue.data(
+        state.requireValue
+            .map((o) => o.id == id ? o.copyWith(status: status) : o)
+            .toList(),
+      );
+    }
+
     unawaited(ref.read(syncProvider.notifier).triggerSync());
     await refresh();
   }
@@ -419,6 +439,14 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
       if (order == null) continue;
       // TESLİM EDİLMİŞ SİPARİŞLER SİLİNEMEZ (KORUMA KURALI)
       if (order.status.toLowerCase() == 'delivered') continue;
+
+      // Sipariş henüz iptal edilmemişse depoya stokları iade et
+      if (order.status.toLowerCase() != 'cancelled') {
+        try {
+          final inventory = await ref.read(inventoryServiceProvider.future);
+          await inventory.increaseStock(_inventoryItems(order.items));
+        } catch (_) {}
+      }
 
       await _repository.delete(id);
       deletedCount++;

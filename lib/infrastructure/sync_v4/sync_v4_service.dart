@@ -349,17 +349,25 @@ class SyncV4Service {
         DateTime.tryParse(remote['updated_at']?.toString() ?? '');
     final remoteVersion = _syncInt(remote['version']);
 
-    final localChanged = knownVersion != null &&
-        localUpdatedAt != null &&
-        lastSyncedAt != null &&
-        localUpdatedAt.isAfter(lastSyncedAt);
+    final localChanged = (knownVersion != null &&
+            localUpdatedAt != null &&
+            lastSyncedAt != null &&
+            localUpdatedAt.isAfter(lastSyncedAt)) ||
+        (localUpdatedAt != null &&
+            remoteUpdatedAt != null &&
+            localUpdatedAt.isAfter(remoteUpdatedAt)) ||
+        (knownVersion == null &&
+            rows.first['business_name'] != null &&
+            rows.first['business_name'].toString().trim().isNotEmpty &&
+            rows.first['business_name'] != 'Serenut OS' &&
+            rows.first['business_name'] != remote['name']);
     final remoteChanged = knownVersion != null && remoteVersion > knownVersion;
 
     Map<String, dynamic> canonical = remote;
     if (localChanged &&
         (!remoteChanged ||
             remoteUpdatedAt == null ||
-            localUpdatedAt.isAfter(remoteUpdatedAt))) {
+            (localUpdatedAt != null && localUpdatedAt.isAfter(remoteUpdatedAt)))) {
       final local = rows.first;
       final logo = await _portableLogo(local['business_logo']?.toString());
       final patch = await _api.send('PATCH', '/api/v1/company', body: {

@@ -53,11 +53,13 @@ class OrderCancellationService {
       totalAmount = MathEngine.calculateMappedItemsTotal(order.items);
       final transactions =
           await _transactionRepository.getByCustomerId(order.customerId);
-      final saleTransactions = transactions.where(
-        (tx) => tx.referenceId == order.id && tx.type == 'sale',
+      final relatedTransactions = transactions.where(
+        (tx) => tx.referenceId == order.id && (tx.type == 'sale' || tx.type == 'payment'),
       );
-      paidAmount =
-          saleTransactions.isEmpty ? 0.0 : saleTransactions.last.paidAmount;
+      paidAmount = relatedTransactions.fold<double>(
+        0.0,
+        (sum, tx) => sum + tx.paidAmount,
+      );
       await _orderRepository.updateStatus(id, 'cancelled');
 
       // 2. Restore stock

@@ -152,12 +152,14 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
       SalesFlowEvent.selectCustomer: SalesFlowStatus.customerSelected,
       SalesFlowEvent.addProduct: SalesFlowStatus.productsAdded,
       SalesFlowEvent.reset: SalesFlowStatus.idle,
+      SalesFlowEvent.clearCart: SalesFlowStatus.idle,
       SalesFlowEvent.restoreSession: SalesFlowStatus.paymentPending,
     },
     SalesFlowStatus.customerSelected: {
       SalesFlowEvent.deselectCustomer: SalesFlowStatus.idle,
       SalesFlowEvent.selectCustomer: SalesFlowStatus.customerSelected,
       SalesFlowEvent.addProduct: SalesFlowStatus.productsAdded,
+      SalesFlowEvent.clearCart: SalesFlowStatus.idle,
       SalesFlowEvent.reset: SalesFlowStatus.idle,
     },
     SalesFlowStatus.productsAdded: {
@@ -167,6 +169,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
       SalesFlowEvent.removeProduct: SalesFlowStatus.productsAdded,
       SalesFlowEvent.clearCart: SalesFlowStatus.idle,
       SalesFlowEvent.proceedToPayment: SalesFlowStatus.paymentPending,
+      SalesFlowEvent.submitPayment: SalesFlowStatus.processing,
       SalesFlowEvent.reset: SalesFlowStatus.idle,
     },
     SalesFlowStatus.paymentPending: {
@@ -356,7 +359,7 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     final newQuantities = Map<String, int>.from(state.cartQuantities);
     final newProducts = Map<String, ProductEntity>.from(state.cartProducts);
 
-    if (currentQty <= 1) {
+    if (product.isWeighed || currentQty <= 1) {
       newQuantities.remove(product.id);
       newProducts.remove(product.id);
     } else {
@@ -455,7 +458,18 @@ class SalesFlowNotifier extends StateNotifier<SalesFlowState> {
     } else {
       _dispatch(SalesFlowEvent.selectCustomer);
     }
-    state = state.copyWith(selectedCustomer: () => customer);
+    final nextMethod = (customer == null && state.paymentMethod == 'debt')
+        ? 'cash'
+        : state.paymentMethod;
+    final nextPaid = (nextMethod == 'cash' || nextMethod == 'card')
+        ? state.total
+        : state.paidAmount;
+    state = state.copyWith(
+      selectedCustomer: () => customer,
+      paymentMethod: nextMethod,
+      paidAmount: nextPaid,
+      karmaDebt: customer == null ? 0.0 : state.karmaDebt,
+    );
     _persistState();
   }
 

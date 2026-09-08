@@ -43,7 +43,11 @@ class CartPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = cartQuantities.values.fold(0, (a, b) => a + b);
+    final cartCount = cartQuantities.entries.fold(
+      0,
+      (sum, entry) =>
+          sum + ((cartProducts[entry.key]?.isWeighed == true) ? 1 : entry.value),
+    );
     final newestFirstEntries =
         cartQuantities.entries.toList().reversed.toList();
 

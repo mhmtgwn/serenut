@@ -351,13 +351,18 @@ class SalesService {
     Map<String, dynamic>? terminalMetadata,
   }) async {
     _checkSecurityGate();
+    if (amount <= 0 || !amount.isFinite) {
+      throw ArgumentError.value(
+          amount, 'amount', 'Ödeme tutarı sıfırdan büyük olmalıdır.');
+    }
     final sale = await _saleRepository.findById(saleId);
     if (sale == null) {
       throw SaleNotFoundException('Sale $saleId not found');
     }
 
     final newPaidAmount = sale.paidAmount + amount;
-    final remainingDebt = (sale.totalAmount - newPaidAmount).abs();
+    final remainingDebt = sale.totalAmount - newPaidAmount;
+    final isCompleted = remainingDebt <= 0.01;
 
     if (kIsWeb) {
       // Update sale record
@@ -369,7 +374,7 @@ class SalesService {
           paidAmount: newPaidAmount,
           discountAmount: sale.discountAmount,
           paymentMethod: method,
-          status: remainingDebt == 0 ? 'completed' : 'partial',
+          status: isCompleted ? 'completed' : 'partial',
           createdAt: sale.createdAt,
           items: sale.items,
         ),
@@ -402,7 +407,7 @@ class SalesService {
           paidAmount: newPaidAmount,
           discountAmount: sale.discountAmount,
           paymentMethod: method,
-          status: remainingDebt == 0 ? 'completed' : 'partial',
+          status: isCompleted ? 'completed' : 'partial',
           createdAt: sale.createdAt,
           items: sale.items,
         ),

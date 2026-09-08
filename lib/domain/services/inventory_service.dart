@@ -67,9 +67,11 @@ class InventoryService {
       if (product == null) {
         throw ProductNotFoundException('Ürün bulunamadı: ${item.productId}');
       }
-      if (product.quantity < item.quantity) {
+      final double requiredQuantity =
+          product.isWeighed ? item.saleQuantity : item.quantity.toDouble();
+      if (product.quantity < requiredQuantity) {
         throw InsufficientStockException(
-          'Yetersiz stok: "${product.name}" için mevcut stok: ${product.quantity}, talep edilen: ${item.quantity}',
+          'Yetersiz stok: "${product.name}" için mevcut stok: ${product.quantity}, talep edilen: ${product.isWeighed ? item.saleQuantity.toStringAsFixed(3) : item.quantity}',
         );
       }
     }
@@ -79,10 +81,11 @@ class InventoryService {
   Future<void> decreaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final int effectiveQty =
-          (product != null && product.isWeighed && item.quantity >= 100)
+      final int effectiveQty = (product != null && product.isWeighed)
+          ? (item.saleQuantity >= 1.0
               ? item.saleQuantity.round()
-              : item.quantity;
+              : (item.saleQuantity > 0 ? 1 : 0))
+          : item.quantity;
       final qtyToDeduct = effectiveQty > 0 ? effectiveQty : 1;
 
       await _productRepository.decreaseStock(item.productId, qtyToDeduct);
@@ -103,10 +106,11 @@ class InventoryService {
   Future<void> increaseStock(List<SaleItemInput> items) async {
     for (final item in items) {
       final product = await _productRepository.findById(item.productId);
-      final int effectiveQty =
-          (product != null && product.isWeighed && item.quantity >= 100)
+      final int effectiveQty = (product != null && product.isWeighed)
+          ? (item.saleQuantity >= 1.0
               ? item.saleQuantity.round()
-              : (item.quantity > 0 ? item.quantity : item.saleQuantity.round());
+              : (item.saleQuantity > 0 ? 1 : 0))
+          : (item.quantity > 0 ? item.quantity : item.saleQuantity.round());
       final qtyToApply = effectiveQty > 0 ? effectiveQty : 1;
 
       await _productRepository.increaseStock(item.productId, qtyToApply);

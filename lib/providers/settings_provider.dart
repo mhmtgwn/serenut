@@ -9,6 +9,8 @@ import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart'
     show sharedPreferencesProvider;
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 /// Riverpod provider for Settings Repository
 final settingsRepositoryProvider =
     FutureProvider<ISettingsRepository>((ref) async {
@@ -59,6 +61,21 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
           final repo = await ref.read(settingsRepositoryProvider.future);
           final current = await repo.getSettings();
 
+          final prefs = await SharedPreferences.getInstance();
+          final knownVersion = prefs.getInt('sync_v4_company_version') ?? 0;
+          final remoteVersion = map['version'] is int
+              ? map['version'] as int
+              : int.tryParse(map['version']?.toString() ?? '') ?? 0;
+
+          // Prevent server from reverting user's local edits if server has same or older version
+          if (current.businessName.isNotEmpty &&
+              current.businessName != 'Serenut OS' &&
+              remoteVersion <= knownVersion &&
+              knownVersion > 0) {
+            debugPrint('[SettingsNotifier] Local company settings are current ($knownVersion >= $remoteVersion), skipping overwrite.');
+            return;
+          }
+
           final updated = current.copyWith(
             businessName: companyName,
             businessPhone: (map['phone'] as String?)?.isNotEmpty == true
@@ -107,12 +124,16 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               'currency': map['currency'] ?? '₺',
               'logo_path': map['logo_url'],
               'tax_included': 1,
-              'version': map['version'] ?? 1,
+              'version': remoteVersion,
               'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
             },
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
 
+          if (remoteVersion > 0) {
+            await prefs.setInt('sync_v4_company_version', remoteVersion);
+          }
           state = AsyncValue.data(updated);
         }
       }
@@ -138,13 +159,79 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               previous.businessDistrict != settings.businessDistrict ||
               previous.businessType != settings.businessType ||
               previous.currency != settings.currency;
+
+      // 1. Local SQLite settings update
       await repo.updateSettings(settings);
 
-      // Tenant-wide profile fields are picked up by SyncV4. Keeping this write
-      // local-first also lets image files be resized and converted into a
-      // portable logo before they are sent to the company profile endpoint.
+      // 2. Local SQLite business_profile update
       if (companyProfileChanged) {
-        debugPrint('[Settings] Company profile queued for SyncV4.');
+        try {
+          final gateway = ref.read(dbGatewayProvider);
+          await gateway.insert(
+            'business_profile',
+            {
+              'id': 1,
+              'name': settings.businessName,
+              'owner_name': settings.ownerName,
+              'type': settings.businessType,
+              'phone': settings.businessPhone,
+              'email': settings.businessEmail ?? '',
+              'tax_number': settings.businessTaxId ?? '',
+              'city': settings.businessCity,
+              'district': settings.businessDistrict,
+              'currency': settings.currency,
+              'logo_path': settings.businessLogo,
+              'tax_included': 1,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        } catch (e) {
+          debugPrint('[SettingsNotifier] business_profile update skipped: $e');
+        }
+
+        // 3. Immediate remote API update if server is reachable
+        try {
+          final apiClient = ref.read(apiClientProvider);
+          final res = await apiClient.get('/api/v1/company');
+          if (res.isSuccess && res.json != null) {
+            final remote = Map<String, dynamic>.from(res.json as Map);
+            final remoteVersion = remote['version'] is int
+                ? remote['version'] as int
+                : int.tryParse(remote['version']?.toString() ?? '1') ?? 1;
+
+            final patch = await apiClient.send('PATCH', '/api/v1/company', body: {
+              'expected_version': remoteVersion,
+              'name': settings.businessName,
+              'address': settings.businessAddress,
+              'phone': settings.businessPhone,
+              'email': settings.businessEmail,
+              'tax_number': settings.businessTaxId,
+              'owner_name': settings.ownerName,
+              'type': settings.businessType,
+              'city': settings.businessCity,
+              'district': settings.businessDistrict,
+              'currency': settings.currency,
+              'logo_url': settings.businessLogo,
+            });
+
+            if (patch.isSuccess && patch.json != null) {
+              final patched = Map<String, dynamic>.from(patch.json as Map);
+              final newVer = patched['version'] is int
+                  ? patched['version'] as int
+                  : int.tryParse(patched['version']?.toString() ?? '') ?? (remoteVersion + 1);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setInt('sync_v4_company_version', newVer);
+              await prefs.setString('sync_v4_company_synced_at', DateTime.now().toUtc().toIso8601String());
+              debugPrint('[SettingsNotifier] Successfully synced company info to server v$newVer.');
+            } else {
+              debugPrint('[SettingsNotifier] Company profile patch response: ${patch.statusCode} ${patch.body}');
+            }
+          }
+        } catch (e) {
+          debugPrint('[SettingsNotifier] Remote company update network error: $e');
+        }
       }
 
       // Reload settings to update state

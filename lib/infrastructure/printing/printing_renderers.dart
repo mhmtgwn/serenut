@@ -35,7 +35,6 @@ class LegacyRawPrintRenderer implements PrintRenderer {
 class EscPosReceiptRenderer implements PrintRenderer {
   static const _init = [
     0x1B, 0x40, // ESC @ (Initialize)
-    0x1B, 0x37, 0x07, 0xF0, 0x02, // ESC 7: Max thermal heating contrast (jet black)
     0x1B, 0x4D, 0x00, // ESC M 0: Hardware Font A
   ];
   static const _alignLeft = [0x1B, 0x61, 0x00];

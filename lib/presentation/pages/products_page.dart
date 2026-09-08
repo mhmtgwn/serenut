@@ -226,18 +226,6 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         setState(() {});
       },
       actions: [
-        FilledButton.icon(
-          onPressed: () => context.push('/products/add'),
-          icon: const Icon(Icons.add_box_rounded, size: 18),
-          label: const Text('Yeni Ürün'),
-          style: FilledButton.styleFrom(
-            backgroundColor: _kGreen,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-        const SizedBox(width: 8),
         if (_isLabelSelectionMode)
           IconButton(
             tooltip: 'Filtreye uyan tüm ürünleri seç / temizle',

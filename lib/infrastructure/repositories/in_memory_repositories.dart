@@ -441,6 +441,8 @@ class InMemoryCustomerRepository implements ICustomerRepository {
       if (tx.customerId == customerId) {
         if (tx.type == 'sale') {
           debt += tx.amount;
+        } else if (tx.type == 'manual_debt') {
+          debt += tx.debtAmount;
         } else if (tx.type == 'cancellation') {
           debt -= tx.amount;
         }
@@ -456,10 +458,8 @@ class InMemoryCustomerRepository implements ICustomerRepository {
       if (tx.customerId == customerId) {
         if (tx.type == 'sale') {
           paid += tx.paidAmount;
-        } else if (tx.type == 'payment' ||
-            tx.type == 'collection' ||
-            tx.type == 'refund') {
-          paid += tx.amount;
+        } else if (tx.type == 'payment' || tx.type == 'collection') {
+          paid += tx.paidAmount > 0 ? tx.paidAmount : tx.amount;
         } else if (tx.type == 'cancellation') {
           paid -= tx.paidAmount;
         }
@@ -1512,7 +1512,7 @@ class InMemoryDashboardRepository implements IDashboardRepository {
           o.createdAt.month == now.month &&
           o.createdAt.day == now.day) {
         todayCount++;
-        todayRevenue += o.totalAmount ?? 0.0;
+        todayRevenue += o.totalAmount;
       }
       switch (o.status.toLowerCase()) {
         case 'created':
@@ -1561,7 +1561,7 @@ class InMemoryDashboardRepository implements IDashboardRepository {
         customerName: customer?.name ?? 'Müşteri',
         customerPhone: customer?.phone ?? '',
         status: o.status,
-        totalAmount: o.totalAmount ?? 0.0,
+        totalAmount: o.totalAmount,
         itemCount: o.items.length,
         createdAt: o.createdAt,
       );

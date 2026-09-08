@@ -223,15 +223,13 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       const SizedBox(height: 12),
                       _buildFormTextField(
                         controller: taxIdCtrl,
-                        label: 'Vergi Dairesi / No *',
+                        label: 'Vergi Dairesi / No (İsteğe bağlı)',
                         icon: Icons.badge_rounded,
-                        validator: (v) =>
-                            v!.isEmpty ? 'Gerekli alan (fişe yazılır)' : null,
                       ),
                       const SizedBox(height: 12),
                       if (_citiesLoaded)
                         _buildFormDropdown<String>(
-                          label: 'Şehir *',
+                          label: 'Şehir (İsteğe bağlı)',
                           icon: Icons.location_city_rounded,
                           value: localCity,
                           items: _cities
@@ -242,7 +240,6 @@ extension _SettingsPageDialogs on _SettingsPageState {
                             localCity = v;
                             localDistrict = null;
                           }),
-                          validator: (v) => v == null ? 'Gerekli alan' : null,
                         )
                       else
                         const Text('Şehir listesi yükleniyor...',
@@ -251,7 +248,7 @@ extension _SettingsPageDialogs on _SettingsPageState {
                       const SizedBox(height: 12),
                       if (localDistricts.isNotEmpty) ...[
                         _buildFormDropdown<String>(
-                          label: 'İlçe *',
+                          label: 'İlçe (İsteğe bağlı)',
                           icon: Icons.map_outlined,
                           value: localDistrict,
                           items: localDistricts
@@ -261,7 +258,6 @@ extension _SettingsPageDialogs on _SettingsPageState {
                           onChanged: (v) => setModalState(() {
                             localDistrict = v;
                           }),
-                          validator: (v) => v == null ? 'Gerekli alan' : null,
                         ),
                         const SizedBox(height: 12),
                       ],
@@ -280,8 +276,17 @@ extension _SettingsPageDialogs on _SettingsPageState {
                         maxLines: 3,
                       ),
                       const SizedBox(height: 24),
-                      _buildModalSaveButton(onTap: () async {
-                        if (formKey.currentState!.validate()) {
+                      _buildModalSaveButton(
+                        onTap: () async {
+                          if (!formKey.currentState!.validate()) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Lütfen zorunlu alanları (İşletme Adı, Yetkili, Telefon) doldurun.'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                            return;
+                          }
                           final updated = settings.copyWith(
                             businessName: nameCtrl.text.trim(),
                             businessPhone: phoneCtrl.text.trim(),
@@ -296,13 +301,21 @@ extension _SettingsPageDialogs on _SettingsPageState {
                                 : emailCtrl.text.trim(),
                             businessCity: localCity ?? '',
                             businessDistrict: localDistrict ?? '',
-                            businessType: '',
+                            businessType: settings.businessType,
                             receiptFooterText: receiptFooterCtrl.text.trim(),
                           );
                           await _updateSettingField(updated);
-                          if (context.mounted) Navigator.pop(context);
-                        }
-                      }),
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('İşletme bilgileri başarıyla güncellendi.'),
+                                backgroundColor: _kGreen,
+                              ),
+                            );
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),

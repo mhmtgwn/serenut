@@ -82,6 +82,7 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
                COALESCE(SUM(
                  CASE 
                    WHEN ft.type = 'sale' THEN -ft.debt_amount
+                   WHEN ft.type = 'manual_debt' THEN -ft.debt_amount
                    WHEN ft.type = 'payment' THEN ft.paid_amount
                    WHEN ft.type = 'cancellation' THEN ft.debt_amount
                    WHEN ft.type = 'collection' THEN ft.paid_amount
@@ -147,6 +148,7 @@ class SqliteDatabaseHealthRepository implements IDatabaseHealthRepository {
                COALESCE(SUM(
                  CASE 
                    WHEN ft.type = 'sale' THEN -ft.debt_amount
+                   WHEN ft.type = 'manual_debt' THEN -ft.debt_amount
                    WHEN ft.type = 'payment' THEN ft.paid_amount
                    WHEN ft.type = 'cancellation' THEN ft.debt_amount
                    WHEN ft.type = 'collection' THEN ft.paid_amount

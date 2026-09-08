@@ -211,7 +211,8 @@ class CustomerDetailsPage extends ConsumerWidget {
           );
         }
 
-        final isDebt = customer.balance < 0;
+        final isClear = customer.balance.abs() < 0.01;
+        final isDebt = customer.balance < -0.009;
 
         return Scaffold(
           backgroundColor: _kSurface,
@@ -221,7 +222,9 @@ class CustomerDetailsPage extends ConsumerWidget {
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
-            backgroundColor: isDebt ? _kRed : _kGreen,
+            backgroundColor: isDebt
+                ? _kRed
+                : (isClear ? const Color(0xFF334155) : _kGreen),
             iconTheme: const IconThemeData(color: Colors.white),
             actions: [
               IconButton(
@@ -275,7 +278,9 @@ class CustomerDetailsPage extends ConsumerWidget {
                   gradient: LinearGradient(
                     colors: isDebt
                         ? [const Color(0xFFDC2626), const Color(0xFFB91C1C)]
-                        : [const Color(0xFF16A34A), const Color(0xFF15803D)],
+                        : isClear
+                            ? [const Color(0xFF334155), const Color(0xFF1E293B)]
+                            : [const Color(0xFF16A34A), const Color(0xFF15803D)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -452,19 +457,28 @@ class CustomerDetailsPage extends ConsumerWidget {
 
   Widget _buildBalanceRow(
       CustomerEntity customer, Map<String, double> details) {
-    final isDebt = customer.balance < 0;
+    final isClear = customer.balance.abs() < 0.01;
+    final isDebt = customer.balance < -0.009;
     return Row(
       children: [
         Expanded(
           child: _StatCard(
             label: 'Net Bakiye',
             value: '₺${customer.balance.abs().toStringAsFixed(2)}',
-            sub: isDebt ? 'Borçlu' : 'Alacaklı',
-            bg: isDebt ? _kRedLight : _kGreenLight,
-            fg: isDebt ? _kRed : _kGreenDark,
-            icon: isDebt
-                ? Icons.arrow_downward_rounded
-                : Icons.arrow_upward_rounded,
+            sub: isClear
+                ? 'Bakiye Yok'
+                : (isDebt ? 'Borçlu' : 'Alacaklı'),
+            bg: isClear
+                ? const Color(0xFFF1F5F9)
+                : (isDebt ? _kRedLight : _kGreenLight),
+            fg: isClear
+                ? _kTextSecondary
+                : (isDebt ? _kRed : _kGreenDark),
+            icon: isClear
+                ? Icons.check_circle_outline_rounded
+                : (isDebt
+                    ? Icons.arrow_downward_rounded
+                    : Icons.arrow_upward_rounded),
           ),
         ),
         const SizedBox(width: 10),
@@ -578,6 +592,20 @@ class CustomerDetailsPage extends ConsumerWidget {
 
   void _confirmDelete(
       BuildContext context, WidgetRef ref, CustomerEntity customer) {
+    if (customer.balance.abs() > 0.01) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            customer.balance < 0
+                ? 'Bu müşterinin borcu bulunmaktadır (${customer.balance.abs().toStringAsFixed(2)} ₺). Bakiyesi sıfırlanmadan müşteri silinemez.'
+                : 'Bu müşterinin alacağı bulunmaktadır (${customer.balance.toStringAsFixed(2)} ₺). Bakiyesi sıfırlanmadan müşteri silinemez.',
+          ),
+          backgroundColor: _kRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     requireAdminAccess(context, title: 'Müşteri Silme Yetkisi',
         onGranted: (approvedByUserId, approvedByUserName) {
       showDialog(

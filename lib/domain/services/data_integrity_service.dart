@@ -113,6 +113,10 @@ class DataIntegrityService {
         running -= tx.debtAmount;
         desc =
             '${tx.amount.toStringAsFixed(2)} TL değerinde satış yapıldı (Ödenen: ${tx.paidAmount.toStringAsFixed(2)} TL, Borç: ${tx.debtAmount.toStringAsFixed(2)} TL).';
+      } else if (tx.type == 'manual_debt') {
+        running -= tx.debtAmount;
+        desc =
+            '${tx.amount.toStringAsFixed(2)} TL tutarında elle borç kaydı eklendi.';
       } else if (tx.type == 'payment') {
         running += tx.paidAmount;
         desc = '${tx.amount.toStringAsFixed(2)} TL kısmi ödeme alındı.';
@@ -241,6 +245,8 @@ class DataIntegrityService {
 
       if (type == 'sale') {
         calculated -= debt;
+      } else if (type == 'manual_debt') {
+        calculated -= debt;
       } else if (type == 'payment') {
         calculated += paid;
       } else if (type == 'cancellation') {
@@ -265,6 +271,8 @@ class DataIntegrityService {
 
     for (final tx in chronoTxs) {
       if (tx.type == 'sale') {
+        calculated -= tx.debtAmount;
+      } else if (tx.type == 'manual_debt') {
         calculated -= tx.debtAmount;
       } else if (tx.type == 'payment') {
         calculated += tx.paidAmount;

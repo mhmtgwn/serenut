@@ -72,13 +72,16 @@ class PosHeader extends StatelessWidget {
                       if (actions != null) ...actions!,
                       if (hasSearch)
                         IconButton(
-                          tooltip:
-                              isSearching ? 'Aramayı kapat' : 'Ara ve filtrele',
+                          tooltip: isSearching
+                              ? 'Arama ve filtreyi kapat'
+                              : (filterWidget != null ? 'Ara ve Filtrele' : 'Ara'),
                           onPressed: () => onSearchToggled?.call(!isSearching),
                           icon: Icon(
                             isSearching
                                 ? Icons.close_rounded
-                                : Icons.search_rounded,
+                                : (filterWidget != null
+                                    ? Icons.filter_list_rounded
+                                    : Icons.search_rounded),
                           ),
                         ),
                       if (showRefresh && onRefresh != null)
@@ -121,8 +124,6 @@ class PosHeader extends StatelessWidget {
                     ),
                   ),
 
-                // Mobilde arama ve filtre içerik alanını kaplamaz; kullanıcı
-                // arama ikonuna dokunduğunda birlikte açılır.
                 if (isSearching) ...[
                   const SizedBox(height: AppSpacing.sm),
                   ConstrainedBox(
@@ -164,10 +165,12 @@ class PosHeader extends StatelessWidget {
                       },
                     ),
                   ),
-                  if (filterWidget != null) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    filterWidget!,
-                  ],
+                ],
+                // Ekran müsaitse (geniş ekran) filtreler hep açık kalır;
+                // ekran daralınca (compact) dikey alanı korumak için arama/filtreleme tıklandığında açılır.
+                if (filterWidget != null && (!compact || isSearching)) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  filterWidget!,
                 ],
               ],
             ),
