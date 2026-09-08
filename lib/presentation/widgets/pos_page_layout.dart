@@ -72,9 +72,8 @@ class PosHeader extends StatelessWidget {
                       if (actions != null) ...actions!,
                       if (hasSearch)
                         IconButton(
-                          tooltip: isSearching
-                              ? 'Arama ve filtreyi kapat'
-                              : (filterWidget != null ? 'Ara ve Filtrele' : 'Ara'),
+                          tooltip:
+                              isSearching ? 'Aramayı kapat' : 'Ara ve filtrele',
                           onPressed: () => onSearchToggled?.call(!isSearching),
                           icon: Icon(
                             isSearching
