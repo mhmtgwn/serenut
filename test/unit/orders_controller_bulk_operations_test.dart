@@ -79,7 +79,6 @@ class MockOrderRepo implements IOrderRepository {
 }
 
 class MockAuditRepo implements IAuditRepository {
-  @override
   Future<void> insert(dynamic event) async {}
 
   @override

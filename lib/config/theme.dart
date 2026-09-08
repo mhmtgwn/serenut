@@ -87,7 +87,7 @@ class AppTheme {
     // Masaüstü platformlarda fontları biraz daha belirgin yap
     final isDesktop =
         !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
-    final double dfs = 0.0; // Desktop font boost removed so desktop doesn't feel oversized
+    const double dfs = 0.0; // Desktop font boost removed so desktop doesn't feel oversized
 
     final baseTextTheme =
         useGoogleFonts ? GoogleFonts.interTextTheme() : const TextTheme();

@@ -50,8 +50,48 @@ final _orderDetailProvider = FutureProvider.autoDispose
 
 class OrderDetailsPage extends ConsumerWidget {
   final String orderId;
+  final bool isModal;
 
-  const OrderDetailsPage({super.key, required this.orderId});
+  const OrderDetailsPage({
+    super.key,
+    required this.orderId,
+    this.isModal = false,
+  });
+
+  /// Opens the OrderDetailsPage as a centered modal dialog on desktop
+  /// or full-screen dialog on mobile devices.
+  static Future<T?> show<T>(BuildContext context, {required String orderId}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900;
+    if (isDesktop) {
+      return showDialog<T>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogCtx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 960,
+              maxHeight: 860,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: OrderDetailsPage(orderId: orderId, isModal: true),
+            ),
+          ),
+        ),
+      );
+    } else {
+      return Navigator.push<T>(
+        context,
+        MaterialPageRoute(
+          builder: (routeCtx) => OrderDetailsPage(orderId: orderId, isModal: true),
+          fullscreenDialog: true,
+        ),
+      );
+    }
+  }
 
   // Status flow
   static const _statusFlow = ['created', 'preparing', 'ready', 'delivered'];
@@ -86,6 +126,13 @@ class OrderDetailsPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: _kSurface,
       appBar: AppBar(
+        leading: isModal
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Kapat',
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
         title: Text(
             'Sipariş Detayı #${orderVal.valueOrNull?.displayNumber ?? orderId.toShortId}'),
         backgroundColor: Colors.white,
@@ -727,14 +774,14 @@ class OrderDetailsPage extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Siparişi Sil'),
         content: const Text(
             'Bu sipariş kaydını tamamen silmek istediğinize emin misiniz?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               child: const Text('İptal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -744,7 +791,7 @@ class OrderDetailsPage extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
               // 1. Close confirmation dialog
-              Navigator.pop(context);
+              Navigator.pop(dialogCtx);
 
               // 2. Immediately pop OrderDetailsPage so it doesn't rebuild in invalid state
               if (context.mounted) {

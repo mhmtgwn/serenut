@@ -15,13 +15,13 @@ import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
 import 'package:serenutos/presentation/widgets/pos_filter_bar.dart';
 
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
+import 'package:serenutos/presentation/pages/order_details_page.dart';
 import 'package:serenutos/config/theme.dart';
 
 // ── Tema Sabitleri ────────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
 const _kGreenDark = POSColors.greenDark;
 const _kGreenLight = POSColors.greenLight;
-const _kAmber = POSColors.amber;
 const _kAmberLight = POSColors.amberLight;
 const _kAmberDark = POSColors.amberDark;
 const _kRed = POSColors.red;
@@ -48,8 +48,8 @@ _StatusMeta _statusMeta(String status) {
   switch (status.toLowerCase()) {
     case 'created':
       return const _StatusMeta(
-          color: Color(0xFF64748B),
-          bg: Color(0xFFF1F5F9),
+          color: Color(0xFF0284C7),
+          bg: Color(0xFFE0F2FE),
           icon: Icons.fiber_new_rounded,
           label: 'Yeni');
     case 'preparing':
@@ -82,6 +82,47 @@ _StatusMeta _statusMeta(String status) {
           bg: Color(0xFFF1F5F9),
           icon: Icons.help_outline_rounded,
           label: 'Bilinmiyor');
+  }
+}
+
+Color _statusCardBg(String status, bool isSelected) {
+  if (isSelected) return const Color(0xFFDCFCE7);
+  switch (status.toLowerCase()) {
+    case 'created':
+      // Yeni: Çok hafif pastel gök mavisi (ferah, asla boğuk değil)
+      return const Color(0xFFF0F9FF);
+    case 'preparing':
+      // Hazırlanıyor: Tatlı, hafif pastel amber/bal tonu
+      return const Color(0xFFFFFDF5);
+    case 'ready':
+      // Hazır: Taze, çok hafif pastel nane/yeşil
+      return const Color(0xFFF2FBF5);
+    case 'delivered':
+      // Teslim Edildi: Nötr, temiz açık gri/arduvaz
+      return const Color(0xFFF8FAFC);
+    case 'cancelled':
+      // İptal: Çok hafif, soft pastel gül/pembe
+      return const Color(0xFFFFF5F5);
+    default:
+      return Colors.white;
+  }
+}
+
+Color _statusCardBorder(String status, bool isSelected) {
+  if (isSelected) return _kGreen;
+  switch (status.toLowerCase()) {
+    case 'created':
+      return const Color(0xFFBAE6FD).withValues(alpha: 0.85);
+    case 'preparing':
+      return const Color(0xFFFDE68A).withValues(alpha: 0.85);
+    case 'ready':
+      return const Color(0xFFA7F3D0).withValues(alpha: 0.9);
+    case 'delivered':
+      return const Color(0xFFE2E8F0);
+    case 'cancelled':
+      return const Color(0xFFFECDD3).withValues(alpha: 0.85);
+    default:
+      return _kBorder;
   }
 }
 
@@ -452,8 +493,13 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                       });
                                     }
                                   },
-                                  onDetail: () =>
-                                      context.push('/orders/detail/${order.id}'),
+                                  onDetail: () {
+                                    OrderDetailsPage.show(context,
+                                            orderId: order.id)
+                                        .then((_) {
+                                      if (mounted) _refreshCounts();
+                                    });
+                                  },
                                 );
                               },
                             );
@@ -517,8 +563,13 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                     });
                                   }
                                 },
-                                onDetail: () =>
-                                    context.push('/orders/detail/${order.id}'),
+                                onDetail: () {
+                                  OrderDetailsPage.show(context,
+                                          orderId: order.id)
+                                      .then((_) {
+                                    if (mounted) _refreshCounts();
+                                  });
+                                },
                               );
                             },
                           );
@@ -899,14 +950,17 @@ class _OrderCard extends StatelessWidget {
         : subtotal;
     final itemCount = order.items.length;
 
+    final cardBg = _statusCardBg(order.status, isSelected);
+    final cardBorder = _statusCardBorder(order.status, isSelected);
+
     final card = Container(
       margin: isGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isSelected ? _kGreen : _kBorder,
-          width: isSelected ? 2 : 1,
+          color: cardBorder,
+          width: isSelected ? 2 : 1.2,
         ),
         boxShadow: [
           BoxShadow(

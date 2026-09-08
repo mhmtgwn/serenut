@@ -15,7 +15,7 @@ import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/home/fast_collection_bottom_sheet.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
-import 'package:serenutos/presentation/widgets/serenut_ui.dart';
+import 'package:serenutos/presentation/pages/order_details_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -898,7 +898,8 @@ class _OperationsFeed extends StatelessWidget {
                   final order = recentOrders[index];
                   final timeStr = DateFormat('HH:mm').format(order.createdAt);
                   return InkWell(
-                    onTap: () => context.push('/orders/detail/${order.id}'),
+                    onTap: () =>
+                        OrderDetailsPage.show(context, orderId: order.id),
                     borderRadius: BorderRadius.circular(AppRadii.sm),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),

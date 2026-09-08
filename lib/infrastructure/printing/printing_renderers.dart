@@ -396,7 +396,7 @@ class EscPosReceiptRenderer implements PrintRenderer {
     String cleanR = rLabel.trim();
     if (cleanR.endsWith(':')) {
       final p = cleanR.substring(0, cleanR.length - 1).trim();
-      cleanR = p.padRight(5) + ':';
+      cleanR = '${p.padRight(5)}:';
     }
     final rl = cleanR.padRight(8);
     final valWidth = (width - leftWidth - 8).clamp(4, 20);
@@ -414,12 +414,6 @@ class EscPosReceiptRenderer implements PrintRenderer {
     final t = total.trim().padLeft(12);
     return '$n$q$u$t';
   }
-
-  static String _dashed(int width) =>
-      List.generate((width / 2).floor(), (_) => '- ')
-          .join()
-          .padRight(width)
-          .substring(0, width);
 
   static String _columns4(
     String col1,
