@@ -370,8 +370,9 @@ class SyncV4Service {
             (localUpdatedAt != null && localUpdatedAt.isAfter(remoteUpdatedAt)))) {
       final local = rows.first;
       final logo = await _portableLogo(local['business_logo']?.toString());
-      final patch = await _api.send('PATCH', '/api/v1/company', body: {
+      var patch = await _api.send('PATCH', '/api/v1/company', body: {
         'expected_version': remoteVersion,
+        'force': true,
         'name': local['business_name'],
         'address': local['business_address'],
         'phone': local['business_phone'],
@@ -384,24 +385,60 @@ class SyncV4Service {
         'currency': local['currency'],
         'logo_url': logo,
       });
-      canonical = Map<String, dynamic>.from(patch.json as Map);
+      if (patch.statusCode == 409) {
+        final freshRes = await _api.get('/api/v1/company');
+        if (freshRes.isSuccess && freshRes.json != null) {
+          final freshRemote = Map<String, dynamic>.from(freshRes.json as Map);
+          final freshVer = _syncInt(freshRemote['version']);
+          patch = await _api.send('PATCH', '/api/v1/company', body: {
+            'expected_version': freshVer,
+            'force': true,
+            'name': local['business_name'],
+            'address': local['business_address'],
+            'phone': local['business_phone'],
+            'email': local['business_email'],
+            'tax_number': local['business_tax_id'],
+            'owner_name': local['owner_name'],
+            'type': local['business_type'],
+            'city': local['business_city'],
+            'district': local['business_district'],
+            'currency': local['currency'],
+            'logo_url': logo,
+          });
+        }
+      }
+      if (patch.isSuccess && patch.json != null) {
+        canonical = Map<String, dynamic>.from(patch.json as Map);
+      } else {
+        // If remote patch failed, do NOT overwrite local settings with old remote data!
+        return false;
+      }
     }
+
+    // Safety guard: If local has a customized business name, never overwrite it with empty or default 'Serenut OS'
+    final localName = rows.first['business_name']?.toString() ?? '';
+    final canonicalName = canonical['name']?.toString() ?? '';
+    final resolvedName = (canonicalName.isEmpty || canonicalName == 'Serenut OS') &&
+            localName.isNotEmpty &&
+            localName != 'Serenut OS'
+        ? localName
+        : (canonicalName.isNotEmpty ? canonicalName : localName);
 
     final now = DateTime.now().toUtc().toIso8601String();
     await db.update(
       'settings',
       {
-        'business_name': canonical['name'] ?? '',
-        'business_phone': canonical['phone'] ?? '',
-        'business_address': canonical['address'] ?? '',
-        'business_tax_id': canonical['tax_number'],
-        'business_logo': canonical['logo_url'],
-        'owner_name': canonical['owner_name'] ?? '',
-        'business_email': canonical['email'],
-        'business_city': canonical['city'] ?? '',
-        'business_district': canonical['district'] ?? '',
-        'business_type': canonical['type'] ?? '',
-        'currency': canonical['currency'] ?? '₺',
+        'business_name': resolvedName,
+        'business_phone': canonical['phone'] ?? rows.first['business_phone'] ?? '',
+        'business_address': canonical['address'] ?? rows.first['business_address'] ?? '',
+        'business_tax_id': canonical['tax_number'] ?? rows.first['business_tax_id'],
+        'business_logo': canonical['logo_url'] ?? rows.first['business_logo'],
+        'owner_name': canonical['owner_name'] ?? rows.first['owner_name'] ?? '',
+        'business_email': canonical['email'] ?? rows.first['business_email'],
+        'business_city': canonical['city'] ?? rows.first['business_city'] ?? '',
+        'business_district': canonical['district'] ?? rows.first['business_district'] ?? '',
+        'business_type': canonical['type'] ?? rows.first['business_type'] ?? '',
+        'currency': canonical['currency'] ?? rows.first['currency'] ?? '₺',
         'updated_at': canonical['updated_at']?.toString() ?? now,
       },
       where: 'id = ?',

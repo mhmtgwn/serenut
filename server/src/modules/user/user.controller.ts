@@ -28,6 +28,33 @@ router.get('/me', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// PATCH /me (Update own profile name / cashier display name)
+router.patch('/me', async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ error: 'validation', message: 'Geçerli bir isim gereklidir.' });
+  }
+  try {
+    const trimmed = name.trim();
+    const updateRes = await pgPool.query(
+      'UPDATE users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, email, is_active, updated_at',
+      [trimmed, user.id]
+    );
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+    return res.json({
+      ...updateRes.rows[0],
+      roles: user.roles,
+      permissions: user.permissions
+    });
+  } catch (err) {
+    console.error('Patch me error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 // GET /sessions (List active sessions)
 router.get('/sessions', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;

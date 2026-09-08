@@ -109,20 +109,29 @@ void main() async {
         deviceFingerprintService: fingerprintService,
         cacheCompanyProfile: (company) async {
           final current = await settingsRepository.getSettings();
+          final rawName = company['name']?.toString().trim();
+          final remoteName = (rawName != null && rawName.isNotEmpty) ? rawName : '';
+          final shouldKeepLocal = current.businessName.isNotEmpty &&
+              current.businessName != 'Serenut OS' &&
+              (remoteName.isEmpty || remoteName == 'Serenut OS');
+          final phone = company['phone']?.toString();
+          final address = company['address']?.toString();
+          final taxNum = company['tax_number']?.toString();
+          final owner = company['owner_name']?.toString();
+          final email = company['email']?.toString();
+          final city = company['city']?.toString();
+          final district = company['district']?.toString();
           await settingsRepository.updateSettings(current.copyWith(
-            businessName: company['name']?.toString() ?? current.businessName,
-            businessPhone:
-                company['phone']?.toString() ?? current.businessPhone,
-            businessAddress:
-                company['address']?.toString() ?? current.businessAddress,
-            businessTaxId:
-                company['tax_number']?.toString() ?? current.businessTaxId,
-            ownerName: company['owner_name']?.toString() ?? current.ownerName,
-            businessEmail:
-                company['email']?.toString() ?? current.businessEmail,
-            businessCity: company['city']?.toString() ?? current.businessCity,
-            businessDistrict:
-                company['district']?.toString() ?? current.businessDistrict,
+            businessName: shouldKeepLocal
+                ? current.businessName
+                : (remoteName.isNotEmpty ? remoteName : current.businessName),
+            businessPhone: (phone != null && phone.isNotEmpty) ? phone : current.businessPhone,
+            businessAddress: (address != null && address.isNotEmpty) ? address : current.businessAddress,
+            businessTaxId: (taxNum != null && taxNum.isNotEmpty) ? taxNum : current.businessTaxId,
+            ownerName: (owner != null && owner.isNotEmpty) ? owner : current.ownerName,
+            businessEmail: (email != null && email.isNotEmpty) ? email : current.businessEmail,
+            businessCity: (city != null && city.isNotEmpty) ? city : current.businessCity,
+            businessDistrict: (district != null && district.isNotEmpty) ? district : current.businessDistrict,
           ));
         },
       );

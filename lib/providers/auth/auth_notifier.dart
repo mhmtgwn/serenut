@@ -114,6 +114,15 @@ class AppAuthNotifier extends StateNotifier<AppState<AuthUser>> {
     }
   }
 
+  /// Update display name / cashier name
+  Future<void> updateProfileName(String newName) async {
+    await _authService.updateProfileName(newName);
+    final user = await _authService.getCurrentUser();
+    if (user != null) {
+      state = AppState.success(user);
+    }
+  }
+
   /// Check if user has a specific permission
   ///
   /// Returns: true if user is authenticated AND has permission

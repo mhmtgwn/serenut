@@ -67,12 +67,21 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               ? map['version'] as int
               : int.tryParse(map['version']?.toString() ?? '') ?? 0;
 
-          // Prevent server from reverting user's local edits if server has same or older version
+          // Prevent server from reverting user's local edits if local is customized
           if (current.businessName.isNotEmpty &&
               current.businessName != 'Serenut OS' &&
-              remoteVersion <= knownVersion &&
-              knownVersion > 0) {
-            debugPrint('[SettingsNotifier] Local company settings are current ($knownVersion >= $remoteVersion), skipping overwrite.');
+              (companyName.isEmpty ||
+                  companyName == 'Serenut OS' ||
+                  remoteVersion <= knownVersion ||
+                  current.businessName != companyName)) {
+            debugPrint(
+                '[SettingsNotifier] Preserving local company profile: "${current.businessName}" (server: "$companyName", v$remoteVersion <= v$knownVersion)');
+            if (current.businessName != companyName &&
+                companyName.isNotEmpty &&
+                remoteVersion <= knownVersion) {
+              // Remote has older name; push local to server
+              updateSettings(current);
+            }
             return;
           }
 
@@ -201,8 +210,9 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
                 ? remote['version'] as int
                 : int.tryParse(remote['version']?.toString() ?? '1') ?? 1;
 
-            final patch = await apiClient.send('PATCH', '/api/v1/company', body: {
+            var patch = await apiClient.send('PATCH', '/api/v1/company', body: {
               'expected_version': remoteVersion,
+              'force': true,
               'name': settings.businessName,
               'address': settings.businessAddress,
               'phone': settings.businessPhone,
@@ -215,6 +225,32 @@ class SettingsNotifier extends StateNotifier<AsyncValue<Settings>> {
               'currency': settings.currency,
               'logo_url': settings.businessLogo,
             });
+
+            // If 409 conflict, retry once with fresh version
+            if (patch.statusCode == 409) {
+              final retryRes = await apiClient.get('/api/v1/company');
+              if (retryRes.isSuccess && retryRes.json != null) {
+                final retryRemote = Map<String, dynamic>.from(retryRes.json as Map);
+                final retryVer = retryRemote['version'] is int
+                    ? retryRemote['version'] as int
+                    : int.tryParse(retryRemote['version']?.toString() ?? '') ?? (remoteVersion + 1);
+                patch = await apiClient.send('PATCH', '/api/v1/company', body: {
+                  'expected_version': retryVer,
+                  'force': true,
+                  'name': settings.businessName,
+                  'address': settings.businessAddress,
+                  'phone': settings.businessPhone,
+                  'email': settings.businessEmail,
+                  'tax_number': settings.businessTaxId,
+                  'owner_name': settings.ownerName,
+                  'type': settings.businessType,
+                  'city': settings.businessCity,
+                  'district': settings.businessDistrict,
+                  'currency': settings.currency,
+                  'logo_url': settings.businessLogo,
+                });
+              }
+            }
 
             if (patch.isSuccess && patch.json != null) {
               final patched = Map<String, dynamic>.from(patch.json as Map);

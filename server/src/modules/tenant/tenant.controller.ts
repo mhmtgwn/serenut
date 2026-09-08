@@ -115,17 +115,17 @@ router.get('/company', async (req: AuthenticatedRequest, res: Response) => {
 router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
 
-  // Only owner/admin/sysadmin can update company profile
-  const isOwner = user.roles?.includes('owner') || user.roles?.includes('admin') || user.roles?.includes('sysadmin');
-  if (!isOwner) {
+  // Allow owner/admin/sysadmin/manager or anyone with settings:update permission
+  const isAuthorized = user.roles?.includes('owner') ||
+                       user.roles?.includes('admin') ||
+                       user.roles?.includes('sysadmin') ||
+                       user.roles?.includes('manager') ||
+                       user.permissions?.includes('settings:update');
+  if (!isAuthorized) {
     return res.status(403).json(createError('AUTH005'));
   }
 
-  const { expected_version, name, address, phone, email, tax_number, tax_office, owner_name, type, city, district, currency, logo_url } = req.body;
-
-  if (expected_version === undefined || expected_version === null) {
-    return res.status(400).json({ error: { code: 'VALIDATION', message: 'expected_version gereklidir.' } });
-  }
+  const { expected_version, force, name, address, phone, email, tax_number, tax_office, owner_name, type, city, district, currency, logo_url } = req.body;
 
   try {
     // 1. Fetch current server version
@@ -136,8 +136,9 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
 
     const currentServerVersion = currentRes.rows[0].version;
 
-    // 2. Exact version equality check
-    if (Number(expected_version) !== Number(currentServerVersion)) {
+    // 2. Exact version equality check (if not forced and expected_version is provided)
+    const isForce = force === true || expected_version === undefined || expected_version === null;
+    if (!isForce && Number(expected_version) !== Number(currentServerVersion)) {
       return res.status(409).json({
         error: {
           code: 'CONFLICT',
@@ -145,6 +146,8 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
         }
       });
     }
+
+    const versionFilter = isForce ? currentServerVersion : expected_version;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -186,7 +189,7 @@ router.patch('/company', async (req: AuthenticatedRequest, res: Response) => {
     const companyIdIdx = idx++;
     const expectedVersionIdx = idx++;
     values.push(user.company_id);
-    values.push(expected_version);
+    values.push(versionFilter);
 
     // 3. Update atomically using version filter
     const updateRes = await pgPool.query(

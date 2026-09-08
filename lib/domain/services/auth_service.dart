@@ -563,6 +563,35 @@ class AuthService {
     await _prefs.setString(_userStorageKey, user.toJson());
   }
 
+  /// Update display name / cashier name of current user
+  Future<void> updateProfileName(String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty || _currentUser == null) return;
+
+    // 1. Update remote user profile if connected
+    if (_apiClient != null && _apiClient!.jwtToken != null) {
+      try {
+        final res = await _apiClient!.send('PATCH', '/users/me', body: {'name': trimmed});
+        debugPrint('[AuthService] Profile name updated on server: ${res.statusCode}');
+      } catch (e) {
+        debugPrint('[AuthService] Remote name update failed: $e');
+      }
+    }
+
+    // 2. Update local state, storage and SQLite user record
+    final updated = _currentUser!.copyWith(name: trimmed);
+    _currentUser = updated;
+    await _prefs.setString(_userStorageKey, updated.toJson());
+    try {
+      await _userRepository.updateUserFields(updated);
+    } catch (e) {
+      debugPrint('[AuthService] Local SQLite user update error: $e');
+    }
+    if (onUserUpdatedCallback != null) {
+      onUserUpdatedCallback!(updated);
+    }
+  }
+
   /// Check if user is authenticated
   Future<bool> isAuthenticated() async {
     final user = await getCurrentUser();

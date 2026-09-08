@@ -26,6 +26,12 @@ class AccountPage extends ConsumerWidget {
           _ProfileCard(user: user),
           const SizedBox(height: 16),
           _AccountAction(
+            icon: Icons.badge_outlined,
+            title: 'Kasiyer / Kullanıcı Adı',
+            subtitle: '${user.name} (Fişlerde ve siparişlerde görünen isim)',
+            onTap: () => _showEditNameDialog(context, ref, user.name),
+          ),
+          _AccountAction(
             icon: Icons.switch_account_rounded,
             title: 'Kullanıcı değiştir',
             subtitle: 'Başka bir çalışan hesabıyla giriş yapın',
@@ -51,15 +57,72 @@ class AccountPage extends ConsumerWidget {
       ),
     );
   }
+
+  void _showEditNameDialog(
+      BuildContext context, WidgetRef ref, String currentName) {
+    final controller = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Kasiyer / Kullanıcı İsmi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Fişlerde ve siparişlerde görünen kasiyer adı bu bilgiden alınır.',
+              style: TextStyle(fontSize: 13, color: POSColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Ad Soyad / Kasiyer İsmi',
+                hintText: 'örn: Kasa 1 veya Adınız',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person_outline_rounded),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty) return;
+              Navigator.pop(dialogCtx);
+              await ref
+                  .read(authNotifierProvider.notifier)
+                  .updateProfileName(newName);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Kasiyer ismi "$newName" olarak güncellendi.'),
+                    backgroundColor: POSColors.green,
+                  ),
+                );
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends ConsumerWidget {
   final AuthUser user;
 
   const _ProfileCard({required this.user});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SerenutSurface(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Padding(
@@ -78,9 +141,27 @@ class _ProfileCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Text(user.name,
-                style:
-                    const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    user.name,
+                    style: const TextStyle(
+                        fontSize: 19, fontWeight: FontWeight.w800),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined,
+                      size: 18, color: POSColors.green),
+                  tooltip: 'Kasiyer / Kullanıcı İsmini Değiştir',
+                  onPressed: () => (context.findAncestorWidgetOfExactType<AccountPage>() ?? const AccountPage())
+                      ._showEditNameDialog(context, ref, user.name),
+                ),
+              ],
+            ),
             Text(user.email,
                 style: const TextStyle(color: POSColors.textSecondary)),
             const SizedBox(height: 12),
