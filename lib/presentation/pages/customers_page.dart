@@ -20,10 +20,8 @@ const _kGreenLight = POSColors.greenLight;
 const _kRed = POSColors.red;
 const _kRedLight = POSColors.redLight;
 const _kAmberDark = POSColors.amberDark;
-const _kAmberLight = POSColors.amberLight;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
-const _kBorder = POSColors.border;
 
 class CustomersPage extends ConsumerStatefulWidget {
   const CustomersPage({super.key});
@@ -601,6 +599,7 @@ class _CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHighDebt = customer.balance <= -500;
     final isDebt = customer.balance < 0;
     final isClear = customer.balance == 0;
     final absBalance = customer.balance.abs();
@@ -608,41 +607,69 @@ class _CustomerCard extends StatelessWidget {
         ? customer.name.trim()[0].toUpperCase()
         : '?';
 
+    final Color cardBg;
+    final Color cardBorder;
+    final Color accentColor;
     final Color badgeBg;
     final Color badgeText;
     final String badgeLabel;
     final Color avatarBg;
     final Color avatarText;
 
-    if (isDebt) {
-      badgeBg = _kAmberLight;
-      badgeText = _kAmberDark;
+    if (isHighDebt) {
+      // Yüksek Borç: Mercan / Kırmızı
+      cardBg = const Color(0xFFFEF2F2);
+      cardBorder = const Color(0xFFFCA5A5);
+      accentColor = const Color(0xFFDC2626);
+      badgeBg = const Color(0xFFFEE2E2);
+      badgeText = const Color(0xFFDC2626);
+      badgeLabel = 'Yüksek Borç';
+      avatarBg = const Color(0xFFFEE2E2);
+      avatarText = const Color(0xFFB91C1C);
+    } else if (isDebt) {
+      // Normal Borç: Sıcak Kehribar / Sarı
+      cardBg = const Color(0xFFFFFBEB);
+      cardBorder = const Color(0xFFFCD34D);
+      accentColor = const Color(0xFFD97706);
+      badgeBg = const Color(0xFFFEF3C7);
+      badgeText = const Color(0xFFD97706);
       badgeLabel = 'Vadeli Borç';
-      avatarBg = _kAmberLight;
-      avatarText = _kAmberDark;
+      avatarBg = const Color(0xFFFEF3C7);
+      avatarText = const Color(0xFFB45309);
     } else if (isClear) {
-      badgeBg = const Color(0xFFF1F5F9);
-      badgeText = const Color(0xFF64748B);
-      badgeLabel = 'Bakiye Yok';
-      avatarBg = const Color(0xFFF1F5F9);
-      avatarText = const Color(0xFF64748B);
+      // Bakiye Yok / Hesap Dengede: Temiz Gök Mavisi
+      cardBg = const Color(0xFFF0F9FF);
+      cardBorder = const Color(0xFFBAE6FD);
+      accentColor = const Color(0xFF0284C7);
+      badgeBg = const Color(0xFFE0F2FE);
+      badgeText = const Color(0xFF0284C7);
+      badgeLabel = 'Hesap Dengede';
+      avatarBg = const Color(0xFFE0F2FE);
+      avatarText = const Color(0xFF0369A1);
     } else {
-      badgeBg = _kGreenLight;
-      badgeText = _kGreenDark;
-      badgeLabel = 'Alacak';
-      avatarBg = _kGreenLight;
-      avatarText = _kGreenDark;
+      // Alacaklı / Avans: Zümrüt Yeşili
+      cardBg = const Color(0xFFECFDF5);
+      cardBorder = const Color(0xFF6EE7B7);
+      accentColor = const Color(0xFF059669);
+      badgeBg = const Color(0xFFD1FAE5);
+      badgeText = const Color(0xFF059669);
+      badgeLabel = 'Avans / Alacak';
+      avatarBg = const Color(0xFFD1FAE5);
+      avatarText = const Color(0xFF047857);
     }
 
     return Container(
       margin: isGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorder),
+        border: Border.all(
+          color: cardBorder,
+          width: 1.4,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: accentColor.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -657,6 +684,17 @@ class _CustomerCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
+                // ── Sol Dikey Renk Vurgusu ──────────────────────────────────
+                Container(
+                  width: 4,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
+
                 // ── Sol Kısım: Avatar ─────────────────────────────────
                 Container(
                   width: 44,

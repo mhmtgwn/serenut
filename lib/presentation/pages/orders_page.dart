@@ -26,11 +26,9 @@ const _kGreenLight = POSColors.greenLight;
 const _kAmberLight = POSColors.amberLight;
 const _kAmberDark = POSColors.amberDark;
 const _kRed = POSColors.red;
-const _kRedLight = POSColors.redLight;
 const _kSurface = POSColors.surface;
 const _kText = POSColors.text;
 const _kTextSecondary = POSColors.textSecondary;
-const _kBorder = POSColors.border;
 
 // ── Durum Meta ────────────────────────────────────────────────────────────────
 class _StatusMeta {
@@ -48,41 +46,77 @@ class _StatusMeta {
 _StatusMeta _statusMeta(String status) {
   switch (status.toLowerCase()) {
     case 'created':
+    case 'pending':
+    case 'new':
       return const _StatusMeta(
           color: Color(0xFF0284C7),
           bg: Color(0xFFE0F2FE),
           icon: Icons.fiber_new_rounded,
           label: 'Yeni');
     case 'preparing':
+    case 'processing':
+    case 'in_progress':
       return const _StatusMeta(
-          color: _kAmberDark,
-          bg: _kAmberLight,
+          color: Color(0xFFD97706),
+          bg: Color(0xFFFEF3C7),
           icon: Icons.hourglass_top_rounded,
           label: 'Hazırlanıyor');
     case 'ready':
       return const _StatusMeta(
-          color: _kGreen,
-          bg: _kGreenLight,
+          color: Color(0xFF059669),
+          bg: Color(0xFFD1FAE5),
           icon: Icons.check_circle_outline_rounded,
           label: 'Hazır');
+    case 'on_way':
+    case 'shipped':
+    case 'out_for_delivery':
+    case 'kuryede':
+    case 'dagitimda':
+      return const _StatusMeta(
+          color: Color(0xFF7C3AED),
+          bg: Color(0xFFEDE9FE),
+          icon: Icons.delivery_dining_rounded,
+          label: 'Kuryede / Yolda');
     case 'delivered':
+    case 'completed':
       return const _StatusMeta(
-          color: _kGreenDark,
-          bg: _kGreenLight,
-          icon: Icons.local_shipping_rounded,
+          color: Color(0xFF0D9488),
+          bg: Color(0xFFCCFBF1),
+          icon: Icons.task_alt_rounded,
           label: 'Teslim Edildi');
-    case 'cancelled':
+    case 'paid':
       return const _StatusMeta(
-          color: _kRed,
-          bg: _kRedLight,
+          color: Color(0xFF16A34A),
+          bg: Color(0xFFDCFCE7),
+          icon: Icons.paid_outlined,
+          label: 'Ödendi');
+    case 'cancelled':
+    case 'canceled':
+      return const _StatusMeta(
+          color: Color(0xFFDC2626),
+          bg: Color(0xFFFEE2E2),
           icon: Icons.cancel_outlined,
           label: 'İptal');
+    case 'refunded':
+    case 'returned':
+      return const _StatusMeta(
+          color: Color(0xFFDB2777),
+          bg: Color(0xFFFCE7F3),
+          icon: Icons.assignment_return_outlined,
+          label: 'İade Edildi');
+    case 'unpaid':
+    case 'failed':
+      return const _StatusMeta(
+          color: Color(0xFFEA580C),
+          bg: Color(0xFFFFEDD5),
+          icon: Icons.error_outline_rounded,
+          label: 'Ödenmedi');
     default:
       return const _StatusMeta(
           color: Color(0xFF64748B),
           bg: Color(0xFFF1F5F9),
           icon: Icons.help_outline_rounded,
-          label: 'Bilinmiyor');
+          label: 'Diğer');
   }
 }
 
@@ -90,22 +124,37 @@ Color _statusCardBg(String status, bool isSelected) {
   if (isSelected) return const Color(0xFFDCFCE7);
   switch (status.toLowerCase()) {
     case 'created':
-      // Yeni: Çok hafif pastel gök mavisi (ferah, asla boğuk değil)
-      return const Color(0xFFF0F9FF);
+    case 'pending':
+    case 'new':
+      return const Color(0xFFF0F9FF); // Canlı pastel gök mavisi
     case 'preparing':
-      // Hazırlanıyor: Tatlı, hafif pastel amber/bal tonu
-      return const Color(0xFFFFFDF5);
+    case 'processing':
+    case 'in_progress':
+      return const Color(0xFFFFFBEB); // Canlı pastel amber / sarı
     case 'ready':
-      // Hazır: Taze, çok hafif pastel nane/yeşil
-      return const Color(0xFFF2FBF5);
+      return const Color(0xFFECFDF5); // Canlı pastel zümrüt yeşili
+    case 'on_way':
+    case 'shipped':
+    case 'out_for_delivery':
+    case 'kuryede':
+    case 'dagitimda':
+      return const Color(0xFFF5F3FF); // Canlı pastel lavanta / mor
     case 'delivered':
-      // Teslim Edildi: Nötr, temiz açık gri/arduvaz
-      return const Color(0xFFF8FAFC);
+    case 'completed':
+      return const Color(0xFFF0FDFA); // Canlı pastel turkuaz / teal
+    case 'paid':
+      return const Color(0xFFF0FDF4); // Canlı pastel taze nane
     case 'cancelled':
-      // İptal: Çok hafif, soft pastel gül/pembe
-      return const Color(0xFFFFF5F5);
+    case 'canceled':
+      return const Color(0xFFFEF2F2); // Canlı pastel mercan / gül
+    case 'refunded':
+    case 'returned':
+      return const Color(0xFFFDF2F8); // Canlı pastel fuşya / pembe
+    case 'unpaid':
+    case 'failed':
+      return const Color(0xFFFFF7ED); // Canlı pastel turuncu
     default:
-      return Colors.white;
+      return const Color(0xFFF8FAFC); // Açık slate gri
   }
 }
 
@@ -113,17 +162,37 @@ Color _statusCardBorder(String status, bool isSelected) {
   if (isSelected) return _kGreen;
   switch (status.toLowerCase()) {
     case 'created':
-      return const Color(0xFFBAE6FD).withValues(alpha: 0.85);
+    case 'pending':
+    case 'new':
+      return const Color(0xFF7DD3FC);
     case 'preparing':
-      return const Color(0xFFFDE68A).withValues(alpha: 0.85);
+    case 'processing':
+    case 'in_progress':
+      return const Color(0xFFFCD34D);
     case 'ready':
-      return const Color(0xFFA7F3D0).withValues(alpha: 0.9);
+      return const Color(0xFF6EE7B7);
+    case 'on_way':
+    case 'shipped':
+    case 'out_for_delivery':
+    case 'kuryede':
+    case 'dagitimda':
+      return const Color(0xFFC4B5FD);
     case 'delivered':
-      return const Color(0xFFE2E8F0);
+    case 'completed':
+      return const Color(0xFF5EEAD4);
+    case 'paid':
+      return const Color(0xFF86EFAC);
     case 'cancelled':
-      return const Color(0xFFFECDD3).withValues(alpha: 0.85);
+    case 'canceled':
+      return const Color(0xFFFCA5A5);
+    case 'refunded':
+    case 'returned':
+      return const Color(0xFFF472B6);
+    case 'unpaid':
+    case 'failed':
+      return const Color(0xFFFDBA74);
     default:
-      return _kBorder;
+      return const Color(0xFFCBD5E1);
   }
 }
 
@@ -970,11 +1039,11 @@ class _OrderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cardBorder,
-          width: isSelected ? 2 : 1.2,
+          width: isSelected ? 2 : 1.4,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: meta.color.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1032,6 +1101,17 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                 ],
+
+                // ── Sol Dikey Renk Vurgusu ──────────────────────────────────
+                Container(
+                  width: 4,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: meta.color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
 
                 // ── Sol Kısım: Durum Avatarı ─────────────────────────────────
                 Container(
