@@ -38,7 +38,7 @@ class SqliteCustomerRepository implements ICustomerRepository {
   Future<CustomerEntity?> findById(dynamic id) async {
     final rows = await _executor.query(
       'customers',
-      where: 'id = ?',
+      where: 'id = ? AND is_active = 1',
       whereArgs: [id],
     );
     if (rows.isEmpty) return null;
