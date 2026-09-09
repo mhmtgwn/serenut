@@ -53,6 +53,13 @@ class _FakePrintingRuntime implements PrintingRuntime {
   bool get isRunning => false;
 
   @override
+  Future<void> processNow() async {}
+
+  @override
+  Future<PrintRecoverySummary> start() async =>
+      const PrintRecoverySummary(safelyRequeued: 0, awaitingUserCheck: 0);
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
