@@ -179,39 +179,116 @@ class SqlitePrintingRepository implements PrintingRepository {
     }
     late PrintJobRecord job;
     await _gateway.transaction(() async {
-      final routes = await _executor.query(
+      var routes = await _executor.query(
         'printer_routes',
         where: 'kind = ?',
         whereArgs: [kind.name],
         limit: 1,
       );
       if (routes.isEmpty) {
+        // Auto-heal missing route if an enabled compatible device exists
+        final expectedLanguage = kind == PrintDocumentKind.receipt
+            ? PrinterLanguage.escPos.name
+            : PrinterLanguage.tspl.name;
+        final availableDevices = await _executor.query(
+          'printer_devices',
+          where: 'enabled = 1 AND language = ?',
+          whereArgs: [expectedLanguage],
+          limit: 1,
+        );
+        if (availableDevices.isNotEmpty) {
+          final defaultProfiles = await _executor.query(
+            'print_design_profiles',
+            where: 'kind = ? AND is_default = 1',
+            whereArgs: [kind.name],
+            limit: 1,
+          );
+          if (defaultProfiles.isNotEmpty) {
+            final autoRoute = PrinterRoute(
+              kind: kind,
+              deviceId: availableDevices.first['id'] as String,
+              designProfileId: defaultProfiles.first['id'] as String,
+              updatedAt: DateTime.now(),
+            );
+            await _executor.insert(
+              'printer_routes',
+              autoRoute.toMap(),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+            routes = [autoRoute.toMap()];
+          }
+        }
+      }
+      if (routes.isEmpty) {
         throw PrintingConfigurationException(
           '${kind.name} için yazıcı rotası tanımlanmamış.',
         );
       }
-      final route = PrinterRoute.fromMap(routes.first);
-      final devices = await _executor.query(
+      var route = PrinterRoute.fromMap(routes.first);
+      var devices = await _executor.query(
         'printer_devices',
         where: 'id = ? AND enabled = 1',
         whereArgs: [route.deviceId],
         limit: 1,
       );
       if (devices.isEmpty) {
-        throw const PrintingConfigurationException(
-          'Yazdırma rotasındaki cihaz bulunamadı veya devre dışı.',
+        // Auto-heal if device was deleted/disabled but another compatible printer exists
+        final expectedLanguage = kind == PrintDocumentKind.receipt
+            ? PrinterLanguage.escPos.name
+            : PrinterLanguage.tspl.name;
+        final fallbackDevices = await _executor.query(
+          'printer_devices',
+          where: 'enabled = 1 AND language = ?',
+          whereArgs: [expectedLanguage],
+          limit: 1,
         );
+        if (fallbackDevices.isNotEmpty) {
+          devices = fallbackDevices;
+          route = route.copyWith(
+            deviceId: fallbackDevices.first['id'] as String,
+            updatedAt: DateTime.now(),
+          );
+          await _executor.insert(
+            'printer_routes',
+            route.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        } else {
+          throw const PrintingConfigurationException(
+            'Yazdırma rotasındaki cihaz bulunamadı veya devre dışı.',
+          );
+        }
       }
-      final profiles = await _executor.query(
+      var profiles = await _executor.query(
         'print_design_profiles',
         where: 'id = ? AND kind = ?',
         whereArgs: [route.designProfileId, kind.name],
         limit: 1,
       );
       if (profiles.isEmpty) {
-        throw const PrintingConfigurationException(
-          'Yazdırma rotasındaki tasarım profili bulunamadı.',
+        // Auto-heal if the specific design profile was deleted by falling back to default
+        final fallbackProfiles = await _executor.query(
+          'print_design_profiles',
+          where: 'kind = ? AND is_default = 1',
+          whereArgs: [kind.name],
+          limit: 1,
         );
+        if (fallbackProfiles.isNotEmpty) {
+          profiles = fallbackProfiles;
+          route = route.copyWith(
+            designProfileId: fallbackProfiles.first['id'] as String,
+            updatedAt: DateTime.now(),
+          );
+          await _executor.insert(
+            'printer_routes',
+            route.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        } else {
+          throw const PrintingConfigurationException(
+            'Yazdırma rotasındaki tasarım profili bulunamadı.',
+          );
+        }
       }
       final device = PrinterDeviceProfile.fromMap(devices.first);
       final profile = PrintDesignProfile.fromMap(profiles.first);

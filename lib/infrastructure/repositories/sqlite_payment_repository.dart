@@ -5,6 +5,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
+import 'package:serenutos/config/utils.dart';
 
 class SqliteSaleRepository implements ISaleRepository {
   final DbGateway _gateway;
@@ -113,9 +114,33 @@ class SqliteSaleRepository implements ISaleRepository {
     final conditions = <String>['(is_deleted = 0 OR is_deleted IS NULL)'];
     final args = <dynamic>[];
 
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      conditions.add('id LIKE ?');
-      args.add('%$searchQuery%');
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final trimmed = searchQuery.trim();
+      final normalizedQuery = trimmed.normalizeTurkish;
+      final qPattern = '%$normalizedQuery%';
+      final rawPattern = '%$trimmed%';
+      conditions.add('''
+        (
+          id LIKE ?
+          OR ${sqliteTurkishFold('notes')} LIKE ?
+          OR customer_id IN (
+            SELECT id FROM customers 
+            WHERE ${sqliteTurkishFold('name')} LIKE ? 
+               OR phone LIKE ?
+          )
+          OR id IN (
+            SELECT sale_id FROM sale_items 
+            WHERE ${sqliteTurkishFold('product_name')} LIKE ?
+          )
+        )
+      ''');
+      args.addAll([
+        rawPattern,
+        qPattern,
+        qPattern,
+        rawPattern,
+        qPattern,
+      ]);
     }
     if (paymentMethod != null && paymentMethod.isNotEmpty) {
       conditions.add('LOWER(payment_method) = LOWER(?)');

@@ -195,6 +195,11 @@ class SalesService {
         );
         await _inventoryService.decreaseStock(items);
 
+        final isFullyPaid = finalPaidAmount >= totalAmount - 0.009;
+        final resolvedStatus = isFullyPaid
+            ? 'completed'
+            : (finalPaidAmount <= 0.009 ? 'pending' : 'partial');
+
         final completedSale = SaleEntity(
           id: sale.id,
           customerId: sale.customerId,
@@ -202,7 +207,7 @@ class SalesService {
           paidAmount: sale.paidAmount,
           discountAmount: sale.discountAmount,
           paymentMethod: sale.paymentMethod,
-          status: 'completed',
+          status: resolvedStatus,
           createdAt: sale.createdAt,
           items: sale.items,
           idempotencyKey: sale.idempotencyKey,
@@ -280,7 +285,11 @@ class SalesService {
         );
         await _inventoryService.decreaseStock(items);
 
-        // Completed!
+        final isFullyPaid = finalPaidAmount >= totalAmount - 0.009;
+        final resolvedStatus = isFullyPaid
+            ? 'completed'
+            : (finalPaidAmount <= 0.009 ? 'pending' : 'partial');
+
         final completedSale = SaleEntity(
           id: sale.id,
           customerId: sale.customerId,
@@ -288,7 +297,7 @@ class SalesService {
           paidAmount: sale.paidAmount,
           discountAmount: sale.discountAmount,
           paymentMethod: sale.paymentMethod,
-          status: 'completed',
+          status: resolvedStatus,
           createdAt: sale.createdAt,
           items: sale.items,
           idempotencyKey: sale.idempotencyKey,

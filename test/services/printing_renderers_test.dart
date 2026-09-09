@@ -169,7 +169,7 @@ void main() {
         'customerName': 'Müşteri',
         'customerPhone': '0555 111 22 33',
         'previousDebt': 245.50,
-        'paymentStatus': 'Kısmi ödendi',
+        'paymentStatus': 'Kısmi Ödeme',
         'productName': '2 Ürün / Paket',
         'quantity': 1,
         'itemsCount': 2,
@@ -204,7 +204,7 @@ void main() {
         'customerName': 'Müşteri',
         'customerPhone': '0555 111 22 33',
         'previousDebt': 245.50,
-        'paymentStatus': 'Kısmi ödendi',
+        'paymentStatus': 'Kısmi Ödeme',
         'productName': '2 Ürün / Paket',
         'quantity': 1,
         'itemsCount': 2,
@@ -229,7 +229,7 @@ void main() {
     expect(output, contains('Tel: 0555 111 22 33'));
     expect(output, contains('Brc: TL 245.50'));
     expect(output, contains('TOPLAM: TL 120.00'));
-    expect(output, contains('Odm: Kismi odendi'));
+    expect(output, contains('Odm: Kismi Odeme'));
   });
 
   test(
@@ -352,5 +352,48 @@ void main() {
     expect(output, isNot(contains('Nutopia')));
     expect(output, isNot(contains('NUTOPIA')));
     expect(output, contains('PRINT 1,1'));
+  });
+
+  test('receipt with karma payment and debt renders breakdown and Kalan Borc',
+      () async {
+    final rendered = await EscPosReceiptRenderer().render(job(
+      kind: PrintDocumentKind.receipt,
+      rendererVersion: 'escpos-v1',
+      payload: {
+        'business': {'name': 'Serenut POS'},
+        'document': {
+          'number': '2001',
+          'total': 1000.0,
+          'paid': 600.0,
+          'payment': 'Karma',
+          'paymentBreakdown': {
+            'cash_applied': 400.0,
+            'card': 200.0,
+            'debt': 400.0,
+          },
+        },
+        'items': [
+          {'name': 'Urun A', 'quantity': 1, 'unitPrice': 1000.0},
+        ],
+        'currency': 'TL',
+      },
+      design: {
+        'paperWidthMm': 80,
+        'showLogo': false,
+        'showProductDetails': true,
+      },
+      capabilities: {'paperWidthMm': 80, 'printableWidthDots': 576},
+    ));
+    final text = String.fromCharCodes(rendered.bytes);
+    expect(text, contains('Odenen (Karma):'));
+    expect(text, contains('600.00 TL'));
+    expect(text, contains('Nakit:'));
+    expect(text, contains('400.00 TL'));
+    expect(text, contains('Kart:'));
+    expect(text, contains('200.00 TL'));
+    expect(text, contains('Vadeli (Borc):'));
+    expect(text, contains('Kalan Borc:'));
+    expect(text, isNot(contains('Odendi')));
+    expect(text, isNot(contains('Ödendi')));
   });
 }

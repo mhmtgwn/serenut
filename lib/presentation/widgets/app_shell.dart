@@ -8,7 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/models/permission.dart';
+import 'package:serenutos/domain/printing/printing_engine.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
+import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/realtime/realtime_provider.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
@@ -39,15 +41,48 @@ class AppShell extends ConsumerWidget {
       }
     });
 
+    ref.listen<AsyncValue<PrintCoordinatorEvent>>(
+      printCoordinatorEventsProvider,
+      (previous, next) {
+        final event = next.valueOrNull;
+        if (event == null) return;
+        if (event.type == PrintCoordinatorEventType.failed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Yazıcı Hatası: ${event.message}'),
+              backgroundColor: Colors.red.shade700,
+              action: SnackBarAction(
+                label: 'Kuyruk',
+                textColor: Colors.white,
+                onPressed: () => context.push('/settings/print-queue'),
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        } else if (event.type == PrintCoordinatorEventType.awaitingUserCheck) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Yazıcı çıktısı kontrol edilmeli.'),
+              backgroundColor: Colors.orange.shade800,
+              action: SnackBarAction(
+                label: 'Doğrula',
+                textColor: Colors.white,
+                onPressed: () => context.push('/settings/print-queue'),
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      },
+    );
+
     final shellIndex = navigationShell.currentIndex;
     final currentUser = ref.watch(currentUserProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(activeShellIndexProvider) != shellIndex) {
         ref.read(activeShellIndexProvider.notifier).state = shellIndex;
-      }
-      // Trigger connection if already authenticated on initial build
-      if (ref.read(isAuthenticatedProvider)) {
-        ref.read(connectionManagerProvider).connect();
       }
     });
 

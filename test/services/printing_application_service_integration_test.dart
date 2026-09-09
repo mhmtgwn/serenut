@@ -194,4 +194,86 @@ void main() {
     expect(payload['productName'], '2 Ürün / Paket');
     expect(await repository.getJobs(), hasLength(1));
   });
+
+  test('order label paymentStatus never says Ödendi when remaining debt exists',
+      () async {
+    final items = <Map<String, dynamic>>[
+      {'product_name': 'Gömlek', 'quantity': 1, 'unit_price': 500},
+    ];
+    final order = OrderEntity(
+      id: 'order-123456789',
+      customerId: 'customer-1',
+      status: 'created',
+      createdAt: DateTime.utc(2026, 8, 4),
+      items: items,
+    );
+
+    // 1. Partial payment (Karma with vadeli/debt part) -> MUST NOT SAY Ödendi
+    final partialJob = await service.queueOrderLabel(
+      order,
+      items,
+      settings,
+      paidAmount: 200, // 300 remaining debt
+    );
+    final partialPayload =
+        jsonDecode(partialJob.payloadJson) as Map<String, dynamic>;
+    expect(partialPayload['paymentStatus'], 'Kısmi Ödeme');
+    expect(partialPayload['paymentStatus'], isNot(contains('Ödendi')));
+    expect(partialPayload['paymentStatus'], isNot(contains('ödendi')));
+
+    // 2. Fully vadeli (0 paid) -> Vadeli
+    final debtJob = await service.queueOrderLabel(
+      order,
+      items,
+      settings,
+      paidAmount: 0,
+    );
+    final debtPayload = jsonDecode(debtJob.payloadJson) as Map<String, dynamic>;
+    expect(debtPayload['paymentStatus'], 'Vadeli');
+    expect(debtPayload['paymentStatus'], isNot(contains('Ödendi')));
+
+    // 3. Fully paid (500 paid) -> Ödendi
+    final paidJob = await service.queueOrderLabel(
+      order,
+      items,
+      settings,
+      paidAmount: 500,
+    );
+    final paidPayload = jsonDecode(paidJob.payloadJson) as Map<String, dynamic>;
+    expect(paidPayload['paymentStatus'], 'Ödendi');
+  });
+
+  test('sale receipt preserves paymentBreakdown in document payload', () async {
+    final sale = SaleEntity(
+      id: 'sale-999',
+      customerId: 'customer-1',
+      totalAmount: 1000,
+      paidAmount: 600,
+      paymentMethod: 'karma',
+      status: 'partial',
+      createdAt: DateTime.utc(2026, 8, 4, 12, 30),
+      items: const [],
+    );
+
+    final job = await service.queueSaleReceipt(
+      sale,
+      const [
+        {'product_name': 'Paket', 'quantity': 1, 'unit_price': 1000},
+      ],
+      null,
+      settings,
+      paymentBreakdown: {
+        'cash_applied': 400.0,
+        'card': 200.0,
+        'debt': 400.0,
+      },
+    );
+
+    final payload = jsonDecode(job.payloadJson) as Map<String, dynamic>;
+    expect(payload['document']['payment'], 'Karma');
+    expect(payload['document']['paid'], 600.0);
+    expect(payload['document']['remaining'], 400.0);
+    expect(payload['document']['paymentBreakdown'], isNotNull);
+    expect(payload['document']['paymentBreakdown']['debt'], 400.0);
+  });
 }

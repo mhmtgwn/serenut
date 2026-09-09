@@ -152,6 +152,13 @@ class PrintQueueCoordinator {
           configuration: Map<String, Object?>.from(
             snapshot['config'] as Map? ?? const {},
           ),
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw const PrintTransportException(
+            code: 'transport_timeout',
+            message: 'Yazıcı yanıt vermedi (15 saniye zaman aşımı).',
+            retryable: true,
+          ),
         );
         await repository.markDelivered(job.id, observation.toJson());
         _emit(job, PrintCoordinatorEventType.delivered,
@@ -177,13 +184,29 @@ class PrintQueueCoordinator {
           );
         }
       } catch (error) {
+        final errStr = error.toString().toLowerCase();
+        final isRetryable = error is TimeoutException ||
+            errStr.contains('socketexception') ||
+            errStr.contains('timeoutexception') ||
+            errStr.contains('connection refused') ||
+            errStr.contains('connection timed out') ||
+            errStr.contains('broken pipe') ||
+            errStr.contains('os error') ||
+            errStr.contains('network') ||
+            errStr.contains('zaman aşımı');
         await repository.markAttemptFailed(
           job.id,
-          errorCode: 'render_failed',
+          errorCode: isRetryable ? 'transport_error' : 'render_failed',
           errorMessage: error.toString(),
-          retryable: false,
+          retryable: isRetryable,
         );
-        _emit(job, PrintCoordinatorEventType.failed, error.toString());
+        _emit(
+          job,
+          isRetryable
+              ? PrintCoordinatorEventType.retryScheduled
+              : PrintCoordinatorEventType.failed,
+          error.toString(),
+        );
       }
       return true;
     } finally {

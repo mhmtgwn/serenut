@@ -324,7 +324,17 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       // Print receipt automatically if checked in settings (no confirmation request)
       final settings = ref.read(settingsNotifierProvider).value;
       if (settings != null && settings.printReceipt) {
-        _printReceipt(createdSale, flowState.selectedCustomer);
+        _printReceipt(
+          createdSale,
+          flowState.selectedCustomer,
+          paymentBreakdown: flowState.paymentMethod == 'karma'
+              ? {
+                  'cash_applied': flowState.karmaCashApplied,
+                  'card': flowState.karmaCard,
+                  'debt': flowState.karmaDebt,
+                }
+              : null,
+        );
       }
 
       setState(() {
@@ -358,7 +368,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   }
 
   Future<void> _printReceipt(
-      SaleEntity sale, CustomerEntity? selectedCustomer) async {
+      SaleEntity sale, CustomerEntity? selectedCustomer,
+      {Map<String, dynamic>? paymentBreakdown}) async {
     final settingsAsync = ref.read(settingsNotifierProvider);
     final settings = settingsAsync.value;
     if (settings == null) {
@@ -369,7 +380,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       final customer = selectedCustomer ??
           CustomerEntity(
               id: '',
-              name: 'Bilinmeyen Müşteri',
+              name: 'Genel Müşteri',
               email: '',
               phone: '',
               balance: 0,
@@ -400,8 +411,9 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       await ref.read(printingApplicationServiceProvider).queueSaleReceipt(
             sale,
             receiptItems,
-            customer.id.isNotEmpty ? customer : null,
+            customer,
             settings,
+            paymentBreakdown: paymentBreakdown,
           );
 
       if (!mounted) return;

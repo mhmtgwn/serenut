@@ -52,3 +52,12 @@ extension TurkishNormalization on String {
         .trim();
   }
 }
+
+/// Generates an SQLite expression that transliterates Turkish characters
+/// and converts ASCII to lowercase, allowing case-insensitive and diacritic-insensitive
+/// matching directly inside SQLite queries without schema migrations.
+String sqliteTurkishFold(String column) {
+  final safe = 'COALESCE($column, \'\')';
+  return "LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE($safe, 'İ', 'i'), 'I', 'i'), 'ı', 'i'), 'Ş', 's'), 'ş', 's'), 'Ç', 'c'), 'ç', 'c'), 'Ğ', 'g'), 'ğ', 'g'), 'Ü', 'u'), 'ü', 'u'), 'Ö', 'o'), 'ö', 'o'))";
+}
+

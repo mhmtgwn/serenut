@@ -21,10 +21,24 @@ class SqliteCustomerRepository implements ICustomerRepository {
   }
 
   @override
+  Future<Map<String, String>> getLookupMap() async {
+    final rows = await _executor.query(
+      'customers',
+      columns: ['id', 'name'],
+      where: "id != ''",
+    );
+    return {
+      for (final r in rows)
+        if (r['id'] != null)
+          (r['id'] as String): (r['name'] as String? ?? 'Bilinmeyen Müşteri'),
+    };
+  }
+
+  @override
   Future<CustomerEntity?> findById(dynamic id) async {
     final rows = await _executor.query(
       'customers',
-      where: 'id = ? AND is_active = 1',
+      where: 'id = ?',
       whereArgs: [id],
     );
     if (rows.isEmpty) return null;

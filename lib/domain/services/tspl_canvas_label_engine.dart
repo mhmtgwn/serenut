@@ -164,6 +164,8 @@ class TsplCanvasLabelEngine {
         (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
+    final noteFontSize =
+        (isWide ? (isTall ? 28.0 : 23.0) : (isTall ? 22.0 : 19.5)) * fontScale;
 
     final dateStr = (showDate && timestamp != null)
         ? '${timestamp.day.toString().padLeft(2, '0')}.${timestamp.month.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
@@ -423,7 +425,8 @@ class TsplCanvasLabelEngine {
           text: TextSpan(
             text: 'Not: ${note.trim()}',
             style: ts(
-              fontSize: detailFontSize,
+              fontSize: noteFontSize,
+              fontWeight: FontWeight.w600,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -1025,7 +1028,8 @@ class TsplCanvasLabelEngine {
             text: TextSpan(
               text: 'Not: ${note.trim()}',
               style: ts(
-                fontSize: detailFontSize,
+                fontSize: noteFontSize,
+                fontWeight: FontWeight.w600,
                 fontStyle: FontStyle.italic,
               ),
             ),

@@ -68,26 +68,34 @@ class KarmaPaymentSummaryBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              // 3. KALAN
+              // 3. KALAN / VADELİ BORÇ
               Expanded(
                 child: _buildItem(
-                  title: 'KALAN',
+                  title: isValid
+                      ? (debt > 0.009 ? 'VADELİ BORÇ' : 'KALAN')
+                      : 'KALAN',
                   value: isValid
-                      ? '₺0.00'
+                      ? (debt > 0.009
+                          ? '₺${debt.toStringAsFixed(2)}'
+                          : '₺0.00')
                       : '₺${remaining.toStringAsFixed(2)}',
                   valueColor: isValid
-                      ? POSColors.greenDark
+                      ? (debt > 0.009 ? POSColors.amberDark : POSColors.greenDark)
                       : (remaining > 0.009 ? POSColors.red : POSColors.text),
                   backgroundColor: isValid
-                      ? POSColors.greenLight
+                      ? (debt > 0.009
+                          ? POSColors.amberLight.withValues(alpha: 0.6)
+                          : POSColors.greenLight)
                       : (remaining > 0.009
                           ? POSColors.redLight.withValues(alpha: 0.4)
                           : Colors.white),
                   icon: isValid
-                      ? Icons.check_circle_rounded
+                      ? (debt > 0.009
+                          ? Icons.account_balance_wallet_rounded
+                          : Icons.check_circle_rounded)
                       : Icons.pending_rounded,
                   statusBadge: isValid
-                      ? 'Tamam'
+                      ? (debt > 0.009 ? 'Vadeli' : 'Tamam')
                       : (remaining > 0.009 ? 'Eksik' : null),
                 ),
               ),

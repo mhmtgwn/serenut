@@ -19,7 +19,17 @@ class SaleDetailsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final saleVal = ref.watch(saleDetailProvider(saleId));
-    final customersVal = ref.watch(customersControllerProvider);
+    final sale = saleVal.valueOrNull;
+    final customerId = sale?.customerId ?? '';
+    final customerAsync = customerId.isNotEmpty
+        ? ref.watch(customerDetailProvider(customerId))
+        : null;
+    final customerLookupMap = ref.watch(customerLookupMapProvider).valueOrNull;
+    final customer = customerAsync?.valueOrNull;
+    final customerFallbackName =
+        (customerId.isNotEmpty && customerLookupMap != null)
+            ? customerLookupMap[customerId]
+            : null;
     // ── Ürün adı haritası (UUID → isim) ──
     final productsVal = ref.watch(productsControllerProvider);
     final productNameMap = productsVal.maybeWhen(
@@ -42,16 +52,11 @@ class SaleDetailsPage extends ConsumerWidget {
           if (sale == null) {
             return const Center(child: Text('Satış bulunamadı.'));
           }
-          final customerName = customersVal.maybeWhen(
-            data: (list) {
-              try {
-                return list.firstWhere((c) => c.id == sale.customerId).name;
-              } catch (_) {
-                return 'Bilinmeyen Müşteri';
-              }
-            },
-            orElse: () => '...',
-          );
+          final customerName = customer?.name ??
+              customerFallbackName ??
+              (sale.customerId.isEmpty
+                  ? 'Genel Müşteri'
+                  : 'Bilinmeyen Müşteri');
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),

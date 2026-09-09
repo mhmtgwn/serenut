@@ -223,7 +223,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         entityType: 'order',
         entityId: order.id,
         newValue:
-            'Tutar: ₺${total.toStringAsFixed(2)}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
+            'Tutar: ₺${total.toStringAsFixed(2)}, Müşteri: ${order.customerId.isEmpty ? 'Genel Müşteri' : (customer?.name ?? 'Bilinmeyen Müşteri')}',
         notes: 'Yeni sipariş oluşturuldu: ${order.id}',
       );
     } catch (e, st) {
@@ -260,7 +260,7 @@ class OrdersController extends AsyncNotifier<List<OrderEntity>> {
         entityType: 'order',
         entityId: order.id,
         newValue:
-            'Durum: ${order.status}, Müşteri: ${customer?.name ?? 'Bilinmeyen Müşteri'}',
+            'Durum: ${order.status}, Müşteri: ${order.customerId.isEmpty ? 'Genel Müşteri' : (customer?.name ?? 'Bilinmeyen Müşteri')}',
         notes: 'Sipariş güncellendi: ${order.id}',
       );
     } catch (e, st) {

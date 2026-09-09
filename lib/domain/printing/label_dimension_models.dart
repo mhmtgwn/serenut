@@ -348,6 +348,8 @@ class DynamicLabelSizeEngine {
         (isWide ? (isTall ? 26.0 : 21.0) : 18.0) * fontScale;
     final detailFontSize =
         (isWide ? (isTall ? 22.0 : 18.0) : 15.0) * fontScale;
+    final noteFontSize =
+        (isWide ? (isTall ? 28.0 : 23.0) : (isTall ? 22.0 : 19.5)) * fontScale;
     final footerTotalFontSize =
         (isWide ? (isTall ? 28.0 : 24.0) : 19.0) * fontScale;
 
@@ -710,7 +712,8 @@ class DynamicLabelSizeEngine {
         text: TextSpan(
           text: 'Not: ${note.trim()}',
           style: ts(
-            fontSize: detailFontSize,
+            fontSize: noteFontSize,
+            fontWeight: FontWeight.w600,
             fontStyle: FontStyle.italic,
           ),
         ),

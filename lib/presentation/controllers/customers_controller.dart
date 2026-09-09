@@ -252,8 +252,7 @@ final customersControllerProvider =
 /// Unfiltered global map of {customerId: customerName} for order & sales listings
 final customerLookupMapProvider = FutureProvider<Map<String, String>>((ref) async {
   final repository = await ref.watch(customerRepositoryProvider.future);
-  final customers = await repository.findAll();
-  return {for (final c in customers) c.id: c.name};
+  return repository.getLookupMap();
 });
 
 // Screen-specific Customer Search Providers
@@ -359,6 +358,7 @@ final collectionCustomersControllerProvider =
 /// Per-customer reliable unpaginated provider by ID
 final customerDetailProvider =
     FutureProvider.family<CustomerEntity?, String>((ref, customerId) async {
+  if (customerId.isEmpty) return null;
   final repo = await ref.watch(customerRepositoryProvider.future);
   return repo.findById(customerId);
 });

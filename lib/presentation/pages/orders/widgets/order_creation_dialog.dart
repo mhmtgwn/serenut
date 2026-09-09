@@ -226,20 +226,20 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       _discountAmount = order.discountAmount;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final customers = ref.read(ordersCustomersControllerProvider).value;
-        if (customers != null) {
+        CustomerEntity? cust;
+        if (order.customerId.isNotEmpty) {
+          try {
+            final repo = await ref.read(customerRepositoryProvider.future);
+            cust = await repo.findById(order.customerId);
+          } catch (_) {}
+        }
+        if (cust == null) {
+          final customers = ref.read(ordersCustomersControllerProvider).value;
+          cust = customers?.where((c) => c.id == order.customerId).firstOrNull;
+        }
+        if (mounted && cust != null) {
           setState(() {
-            _selectedCustomer = customers.firstWhere(
-              (c) => c.id == order.customerId,
-              orElse: () => CustomerEntity(
-                id: order.customerId,
-                name: 'Bilinmeyen Müşteri',
-                email: '',
-                phone: '',
-                balance: 0.0,
-                createdAt: DateTime.now(),
-              ),
-            );
+            _selectedCustomer = cust;
           });
         }
 
@@ -881,6 +881,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       final newOrder = OrderEntity(
         id: orderId,
         customerId: _selectedCustomer!.id,
+        customerName: _selectedCustomer!.name,
+        customerPhone: _selectedCustomer!.phone,
         status: isEdit ? widget.existingOrder!.status : 'created',
         createdAt: isEdit ? widget.existingOrder!.createdAt : DateTime.now(),
         expectedDeliveryDate: _expectedDelivery,
@@ -999,12 +1001,35 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   settings,
                   paidAmount: finalPaid,
                   notes: _notesController.text.trim(),
+                  paymentMethod: _paymentMethod,
+                  paymentBreakdown: _paymentMethod == 'karma'
+                      ? {
+                          'cash_applied': _karmaResult.cashApplied,
+                          'card': _karmaResult.card,
+                          'debt': _karmaResult.debt,
+                        }
+                      : null,
                   copies: _printCopies,
                 );
           }
 
           // 2. Print label stickers if label printer toggle is enabled
           if (_printLabel) {
+            final String? labelPaymentStatus;
+            if (_paymentMethod == 'debt' ||
+                (_paymentMethod == 'karma' && _karmaDebt > 0.009)) {
+              if (finalPaid <= 0.01) {
+                labelPaymentStatus = 'Vadeli';
+              } else {
+                labelPaymentStatus =
+                    'Kısmi Ödeme (Borç: ₺${_karmaDebt.toStringAsFixed(2)})';
+              }
+            } else if (finalPaid >= _totalAmount - 0.01) {
+              labelPaymentStatus = 'Ödendi';
+            } else {
+              labelPaymentStatus = 'Kısmi Ödeme';
+            }
+
             await ref.read(printingApplicationServiceProvider).queueOrderLabel(
                   newOrder,
                   receiptItems,
@@ -1012,6 +1037,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                   customer: _selectedCustomer,
                   paidAmount: finalPaid,
                   previousDebt: previousDebt,
+                  paymentStatusOverride: labelPaymentStatus,
                   copies: _labelCopies,
                 );
           }

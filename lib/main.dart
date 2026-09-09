@@ -216,6 +216,15 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _runIntegrityDiagnostics();
+    // Warm up global background providers once on startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(eventPublisherProvider);
+      ref.read(syncProvider);
+      ref.read(telemetryBridgeProvider);
+      ref.read(smsNotificationHandlerProvider);
+      ref.read(smsGatewayServiceProvider);
+    });
   }
 
   @override
@@ -510,19 +519,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     final router = ref.watch(routerProvider);
 
-    // Eagerly initialize global event publisher
-    ref.watch(eventPublisherProvider);
-
-    // Eagerly initialize sync provider so AppLifecycle observer is registered
-    // and auto-sync fires when app resumes from background.
-    ref.watch(syncProvider);
-
-    // Yerel hata/uyarı loglarını dayanıklı kuyruk üzerinden Admin telemetrisine bağla.
-    ref.watch(telemetryBridgeProvider);
-
-    // Eagerly initialize SMS notification handler to subscribe to domain events on startup
-    ref.watch(smsNotificationHandlerProvider);
-    ref.watch(smsGatewayServiceProvider);
+    // Keep background event publishers and listeners active without rebuilding
+    // the root MaterialApp on periodic sync state transitions (idle -> syncing -> idle).
+    ref.listen(eventPublisherProvider, (_, __) {});
+    ref.listen(syncProvider, (_, __) {});
+    ref.listen(telemetryBridgeProvider, (_, __) {});
+    ref.listen(smsNotificationHandlerProvider, (_, __) {});
+    ref.listen(smsGatewayServiceProvider, (_, __) {});
 
     return MaterialApp.router(
       title: 'Serenut OS',

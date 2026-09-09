@@ -461,12 +461,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                   );
                                 }
                                 final order = filtered[index];
-                                final customerName = customerMapVal.maybeWhen(
-                                  data: (map) =>
-                                      map[order.customerId] ??
-                                      'Bilinmeyen Müşteri',
-                                  orElse: () => '...',
-                                );
+                                final customerName = (order.customerName != null &&
+                                        order.customerName!.trim().isNotEmpty)
+                                    ? order.customerName!.trim()
+                                    : (order.customerId.isEmpty
+                                        ? 'Genel Müşteri'
+                                        : (customerMapVal.valueOrNull?[order.customerId] ??
+                                            (customerMapVal.isLoading
+                                                ? '...'
+                                                : 'Bilinmeyen Müşteri')));
                                 final isDelivered = order.status.toLowerCase() == 'delivered';
                                 final isSelected = _selectedIds.contains(order.id);
                                 return _OrderCard(
@@ -531,12 +534,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                                 );
                               }
                               final order = filtered[index];
-                              final customerName = customerMapVal.maybeWhen(
-                                data: (map) =>
-                                    map[order.customerId] ??
-                                    'Bilinmeyen Müşteri',
-                                orElse: () => '...',
-                              );
+                              final customerName = (order.customerName != null &&
+                                      order.customerName!.trim().isNotEmpty)
+                                  ? order.customerName!.trim()
+                                  : (order.customerId.isEmpty
+                                      ? 'Genel Müşteri'
+                                      : (customerMapVal.valueOrNull?[order.customerId] ??
+                                          (customerMapVal.isLoading
+                                              ? '...'
+                                              : 'Bilinmeyen Müşteri')));
                               final isDelivered = order.status.toLowerCase() == 'delivered';
                               final isSelected = _selectedIds.contains(order.id);
                               return _OrderCard(

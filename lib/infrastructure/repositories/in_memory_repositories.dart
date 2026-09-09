@@ -287,6 +287,11 @@ class InMemoryCustomerRepository implements ICustomerRepository {
   }
 
   @override
+  Future<Map<String, String>> getLookupMap() async {
+    return {for (final c in InMemoryDb.customers) c.id: c.name};
+  }
+
+  @override
   Future<CustomerEntity?> findById(dynamic id) async {
     try {
       return InMemoryDb.customers.firstWhere((c) => c.id == id);
@@ -861,6 +866,8 @@ class InMemoryOrderRepository implements IOrderRepository {
       id: entity.id,
       orderNumber: number,
       customerId: entity.customerId,
+      customerName: entity.customerName,
+      customerPhone: entity.customerPhone,
       status: entity.status,
       createdAt: entity.createdAt,
       expectedDeliveryDate: entity.expectedDeliveryDate,

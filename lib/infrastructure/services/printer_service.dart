@@ -1329,7 +1329,11 @@ class PrinterService with ChangeNotifier implements IPrinterService {
 
     final List<int> allBytes = [];
     final isTspl = settings.labelPrinterLanguage == 'tspl';
-    final custName = customer?.name ?? order.customerId;
+    final custName = (customer?.name != null && customer!.name.trim().isNotEmpty)
+        ? customer.name.trim()
+        : (order.customerName != null && order.customerName!.trim().isNotEmpty
+            ? order.customerName!.trim()
+            : (order.customerId.isEmpty ? 'Genel Müşteri' : order.customerId));
     final rawCustomerId = customer?.id ?? order.customerId;
     final shortCustomerId = rawCustomerId.length > 8
         ? rawCustomerId.substring(0, 8).toUpperCase()

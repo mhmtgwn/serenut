@@ -339,10 +339,33 @@ class EscPosReceiptRenderer implements PrintRenderer {
       _line(bytes,
           _columns('Odenen$payMethod:', '${paid.toStringAsFixed(2)} $currency', width),
           mode: turkishMode);
+
+      final breakdown = document['paymentBreakdown'] as Map?;
+      if (breakdown != null) {
+        final cash = _decimal(breakdown['cash_applied'] ?? breakdown['cash']);
+        final card = _decimal(breakdown['card']);
+        final debt = _decimal(breakdown['debt']);
+        if (cash > 0.009) {
+          _line(bytes,
+              _columns('  - Nakit:', '${cash.toStringAsFixed(2)} $currency', width),
+              mode: turkishMode);
+        }
+        if (card > 0.009) {
+          _line(bytes,
+              _columns('  - Kart:', '${card.toStringAsFixed(2)} $currency', width),
+              mode: turkishMode);
+        }
+        if (debt > 0.009) {
+          _line(bytes,
+              _columns('  - Vadeli (Borc):', '${debt.toStringAsFixed(2)} $currency', width),
+              mode: turkishMode);
+        }
+      }
+
       if (total - paid > 0.005) {
         _line(
             bytes,
-            _columns('Kalan:', '${(total - paid).toStringAsFixed(2)} $currency',
+            _columns('Kalan Borc:', '${(total - paid).toStringAsFixed(2)} $currency',
                 width),
             bold: true,
             mode: turkishMode);

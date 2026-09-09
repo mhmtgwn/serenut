@@ -6,6 +6,7 @@ import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/services/dataset_loader_service.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
+import 'package:serenutos/config/utils.dart';
 
 class SqliteProductRepository implements IProductRepository {
   final DbGateway _gateway;
@@ -620,11 +621,36 @@ class SqliteProductRepository implements IProductRepository {
       whereArgs.add(category);
     }
 
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      whereClauses.add('(id LIKE ? OR name LIKE ? OR description LIKE ?)');
-      whereArgs.add('%$searchQuery%');
-      whereArgs.add('%$searchQuery%');
-      whereArgs.add('%$searchQuery%');
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final trimmed = searchQuery.trim();
+      final normalizedQuery = trimmed.normalizeTurkish;
+      final qPattern = '%$normalizedQuery%';
+      final rawPattern = '%$trimmed%';
+      final candidates = BarcodeStandard.lookupCandidates(trimmed);
+      final strippedZero = trimmed.replaceFirst(RegExp(r'^0+'), '');
+      if (strippedZero.isNotEmpty && !candidates.contains(strippedZero)) {
+        candidates.add(strippedZero);
+      }
+      final barcodePlaceholders = List.filled(candidates.length, '?').join(',');
+
+      whereClauses.add('''
+        (
+          id IN ($barcodePlaceholders)
+          OR id LIKE ?
+          OR sku LIKE ?
+          OR ${sqliteTurkishFold('name')} LIKE ?
+          OR ${sqliteTurkishFold('description')} LIKE ?
+          OR ${sqliteTurkishFold('brand')} LIKE ?
+          OR ${sqliteTurkishFold('shelf_code')} LIKE ?
+        )
+      ''');
+      whereArgs.addAll(candidates);
+      whereArgs.add(rawPattern);
+      whereArgs.add(rawPattern);
+      whereArgs.add(qPattern);
+      whereArgs.add(qPattern);
+      whereArgs.add(qPattern);
+      whereArgs.add(qPattern);
     }
     if (stockFilter == 'in_stock') {
       whereClauses.add('quantity > 0');

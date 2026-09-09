@@ -104,7 +104,7 @@ class PrintingRuntime {
   }
 
   Future<void> processNow() async {
-    if (!_running || _processing) return;
+    if (_processing) return;
     _processing = true;
     _emit();
     try {
@@ -122,8 +122,16 @@ class PrintingRuntime {
 
   Future<void> _drainDevice(PrinterDeviceProfile device) async {
     // Bound one cycle so a continuously growing queue cannot starve the UI.
-    for (var processed = 0; processed < 20; processed++) {
-      if (!await coordinator.processNext(device.id)) return;
+    try {
+      for (var processed = 0; processed < 20; processed++) {
+        final processedAny = await coordinator.processNext(device.id).timeout(
+              const Duration(seconds: 20),
+              onTimeout: () => false,
+            );
+        if (!processedAny) return;
+      }
+    } catch (_) {
+      // Guard against an unexpected device failure taking down the drain loop
     }
   }
 

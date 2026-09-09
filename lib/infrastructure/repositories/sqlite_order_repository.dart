@@ -4,6 +4,7 @@ import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/database_executor.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'package:serenutos/infrastructure/sync_v4/sync_outbox.dart';
+import 'package:serenutos/config/utils.dart';
 
 class SqliteOrderRepository implements IOrderRepository {
   final DbGateway _gateway;
@@ -43,19 +44,24 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<List<OrderEntity>> findAll() async {
-    final rows = await _executor.query('orders',
-        where: 'is_deleted = 0 OR is_deleted IS NULL',
-        orderBy: 'created_at DESC');
+    final rows = await _executor.rawQuery('''
+      SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.is_deleted = 0 OR o.is_deleted IS NULL
+      ORDER BY o.created_at DESC
+    ''');
     return _enrichOrders(rows);
   }
 
   @override
   Future<OrderEntity?> findById(dynamic id) async {
-    final rows = await _executor.query(
-      'orders',
-      where: 'id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
-      whereArgs: [id],
-    );
+    final rows = await _executor.rawQuery('''
+      SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.id = ? AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
+    ''', [id]);
     if (rows.isEmpty) return null;
     final itemRows = await _executor
         .query('order_items', where: 'order_id = ?', whereArgs: [id]);
@@ -249,34 +255,37 @@ class SqliteOrderRepository implements IOrderRepository {
 
   @override
   Future<List<OrderEntity>> getByCustomerId(String customerId) async {
-    final rows = await _executor.query(
-      'orders',
-      where: 'customer_id = ?',
-      whereArgs: [customerId],
-      orderBy: 'created_at DESC',
-    );
+    final rows = await _executor.rawQuery('''
+      SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.customer_id = ? AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
+      ORDER BY o.created_at DESC
+    ''', [customerId]);
     return _enrichOrders(rows);
   }
 
   @override
   Future<List<OrderEntity>> getByStatus(String status) async {
-    final rows = await _executor.query(
-      'orders',
-      where: 'status = ?',
-      whereArgs: [status],
-      orderBy: 'created_at DESC',
-    );
+    final rows = await _executor.rawQuery('''
+      SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.status = ? AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
+      ORDER BY o.created_at DESC
+    ''', [status]);
     return _enrichOrders(rows);
   }
 
   @override
   Future<List<OrderEntity>> getPending() async {
-    final rows = await _executor.query(
-      'orders',
-      where: 'status IN (?, ?, ?)',
-      whereArgs: ['created', 'preparing', 'ready'],
-      orderBy: 'created_at DESC',
-    );
+    final rows = await _executor.rawQuery('''
+      SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.status IN ('created', 'preparing', 'ready') AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
+      ORDER BY o.created_at DESC
+    ''');
     return _enrichOrders(rows);
   }
 
@@ -337,12 +346,13 @@ class SqliteOrderRepository implements IOrderRepository {
   @override
   Future<List<OrderEntity>> getOverdue() async {
     final now = DateTime.now().toIso8601String();
-    final rows = await _executor.query(
-      'orders',
-      where: 'expected_delivery_date < ? AND status != ?',
-      whereArgs: [now, 'delivered'],
-      orderBy: 'created_at DESC',
-    );
+    final rows = await _executor.rawQuery('''
+      SELECT o.*, c.name AS customer_name, c.phone AS customer_phone
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.expected_delivery_date < ? AND o.status != 'delivered' AND (o.is_deleted = 0 OR o.is_deleted IS NULL)
+      ORDER BY o.created_at DESC
+    ''', [now]);
     return _enrichOrders(rows);
   }
 
@@ -359,37 +369,42 @@ class SqliteOrderRepository implements IOrderRepository {
     final conditions = <String>[];
     final args = <dynamic>[];
 
-    conditions.add('(is_deleted = 0 OR is_deleted IS NULL)');
+    conditions.add('(o.is_deleted = 0 OR o.is_deleted IS NULL)');
 
     final hasStatus = status != null && status != 'all' && status.isNotEmpty;
     if (hasStatus) {
-      conditions.add('status = ?');
+      conditions.add('o.status = ?');
       args.add(status);
     }
 
-    final hasSearch = searchQuery != null && searchQuery.isNotEmpty;
+    final hasSearch = searchQuery != null && searchQuery.trim().isNotEmpty;
     if (hasSearch) {
-      conditions.add('(id LIKE ? OR order_number LIKE ? OR customer_id IN '
-          '(SELECT id FROM customers WHERE name LIKE ? OR phone LIKE ?))');
+      final trimmed = searchQuery.trim();
+      final normalizedQuery = trimmed.normalizeTurkish;
+      final qPattern = '%$normalizedQuery%';
+      final rawPattern = '%$trimmed%';
+      conditions.add('(o.id LIKE ? OR o.order_number LIKE ? OR o.notes LIKE ? OR o.customer_id IN '
+          '(SELECT id FROM customers WHERE ${sqliteTurkishFold('name')} LIKE ? OR phone LIKE ?))');
       args.addAll([
-        '%$searchQuery%',
-        '%$searchQuery%',
-        '%$searchQuery%',
-        '%$searchQuery%'
+        rawPattern,
+        rawPattern,
+        qPattern,
+        qPattern,
+        rawPattern,
       ]);
     }
     if (dateFrom != null) {
-      conditions.add('created_at >= ?');
+      conditions.add('o.created_at >= ?');
       args.add(dateFrom.toIso8601String());
     }
     if (dateTo != null) {
-      conditions.add('created_at < ?');
+      conditions.add('o.created_at < ?');
       args.add(dateTo.toIso8601String());
     }
     if (overdueOnly) {
-      conditions.add('expected_delivery_date IS NOT NULL');
-      conditions.add('expected_delivery_date < ?');
-      conditions.add("status NOT IN ('delivered', 'cancelled')");
+      conditions.add('o.expected_delivery_date IS NOT NULL');
+      conditions.add('o.expected_delivery_date < ?');
+      conditions.add("o.status NOT IN ('delivered', 'cancelled')");
       args.add(DateTime.now().toIso8601String());
     }
 
@@ -397,7 +412,7 @@ class SqliteOrderRepository implements IOrderRepository {
     args.addAll([limit, offset]);
 
     final rows = await _executor.rawQuery(
-      'SELECT * FROM orders WHERE $where ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      'SELECT o.*, c.name AS customer_name, c.phone AS customer_phone FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE $where ORDER BY o.created_at DESC LIMIT ? OFFSET ?',
       args,
     );
     return _enrichOrders(rows);

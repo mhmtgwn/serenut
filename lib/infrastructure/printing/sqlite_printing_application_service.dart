@@ -12,15 +12,19 @@ import 'package:serenutos/infrastructure/printing/print_asset_encoder.dart';
 import 'package:serenutos/infrastructure/printing/printing_runtime.dart';
 import 'package:serenutos/infrastructure/repositories/report_repository.dart';
 
+typedef CustomerLookupFn = Future<CustomerEntity?> Function(String customerId);
+
 class SqlitePrintingApplicationService implements PrintingApplicationService {
   final PrintingRepository repository;
   final PrintingRuntime runtime;
   final PrintAssetEncoder assets;
+  final CustomerLookupFn? customerLookup;
 
   const SqlitePrintingApplicationService({
     required this.repository,
     required this.runtime,
     this.assets = const PrintAssetEncoder(),
+    this.customerLookup,
   });
 
   @override
@@ -28,7 +32,19 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       SaleEntity sale,
       List<Map<String, dynamic>> items,
       CustomerEntity? customer,
-      Settings settings) {
+      Settings settings,
+      {Map<String, dynamic>? paymentBreakdown}) async {
+    CustomerEntity? effectiveCustomer = customer;
+    if ((effectiveCustomer == null ||
+            effectiveCustomer.name.trim().isEmpty ||
+            effectiveCustomer.name == 'Genel Müşteri') &&
+        sale.customerId.isNotEmpty &&
+        customerLookup != null) {
+      try {
+        effectiveCustomer = await customerLookup!(sale.customerId);
+      } catch (_) {}
+    }
+
     final subtotal = items.fold<double>(
       0.0,
       (sum, item) {
@@ -40,6 +56,12 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         return sum + t;
       },
     );
+
+    final resolvedCustomerName = _resolveCustomerDisplayName(
+      effectiveCustomer?.name,
+      sale.customerId,
+    );
+
     return _receipt(
         settings,
         {
@@ -47,10 +69,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
           'number': _short(sale.id),
           'date': sale.createdAt.toIso8601String(),
           'payment': _payment(sale.paymentMethod),
+          'paymentBreakdown': paymentBreakdown,
           'cashier': sale.createdBy,
-          'customerName': customer?.name,
-          'customerPhone': customer?.phone,
-          'customerBalance': customer?.balance,
+          'customerName': resolvedCustomerName,
+          'customerPhone': effectiveCustomer?.phone,
+          'customerBalance': effectiveCustomer?.balance,
           'subtotal': subtotal > 0 ? subtotal : (sale.totalAmount + sale.discountAmount),
           'discount': sale.discountAmount,
           'total': sale.totalAmount,
@@ -70,7 +93,20 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       Settings settings,
       {double? paidAmount,
       String? notes,
-      int copies = 1}) {
+      String? paymentMethod,
+      Map<String, dynamic>? paymentBreakdown,
+      int copies = 1}) async {
+    CustomerEntity? effectiveCustomer = customer;
+    if ((effectiveCustomer == null ||
+            effectiveCustomer.name.trim().isEmpty ||
+            effectiveCustomer.name == 'Genel Müşteri') &&
+        order.customerId.isNotEmpty &&
+        customerLookup != null) {
+      try {
+        effectiveCustomer = await customerLookup!(order.customerId);
+      } catch (_) {}
+    }
+
     final subtotal = items.fold<double>(
       0.0,
       (sum, item) {
@@ -82,17 +118,24 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         return sum + t;
       },
     );
+
+    final resolvedCustomerName = _resolveCustomerDisplayName(
+      effectiveCustomer?.name ?? (order.customerName?.trim().isNotEmpty == true ? order.customerName : null),
+      order.customerId,
+    );
+
     return _receipt(
         settings,
         {
           'kind': 'order',
           'number': order.displayNumber,
           'date': order.createdAt.toIso8601String(),
-          'payment': 'Sipariş',
+          'payment': paymentMethod != null ? _payment(paymentMethod) : 'Sipariş',
+          'paymentBreakdown': paymentBreakdown,
           'cashier': order.createdBy,
-          'customerName': _resolveCustomerDisplayName(customer?.name, order.customerId),
-          'customerPhone': customer?.phone,
-          'customerBalance': customer?.balance,
+          'customerName': resolvedCustomerName,
+          'customerPhone': effectiveCustomer?.phone ?? order.customerPhone,
+          'customerBalance': effectiveCustomer?.balance,
           'subtotal': subtotal > 0 ? subtotal : order.subtotalAmount,
           'discount': order.discountAmount,
           'total': order.totalAmount,
@@ -158,29 +201,43 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       double? previousDebt,
       String? paymentStatusOverride,
       int copies = 1}) async {
+    CustomerEntity? effectiveCustomer = customer;
+    if ((effectiveCustomer == null ||
+            effectiveCustomer.name.trim().isEmpty ||
+            effectiveCustomer.name == 'Genel Müşteri') &&
+        order.customerId.isNotEmpty &&
+        customerLookup != null) {
+      try {
+        effectiveCustomer = await customerLookup!(order.customerId);
+      } catch (_) {}
+    }
+
     final first = items.firstOrNull;
     // Derive a short customer identifier from the customer id
-    final rawCustomerId = customer?.id ?? order.customerId;
+    final rawCustomerId = effectiveCustomer?.id ?? order.customerId;
     final shortCustomerId = rawCustomerId.length > 8
         ? rawCustomerId.substring(0, 8).toUpperCase()
         : rawCustomerId.toUpperCase();
-    final double effectivePaid = paidAmount ??
-        ((order.status == 'completed' || order.status == 'paid')
-            ? order.totalAmount
-            : 0.0);
+    final double? effectivePaid = paidAmount;
+    final orderUnpaid = math.max(
+        0.0,
+        order.totalAmount -
+            (effectivePaid ??
+                ((order.status == 'completed' || order.status == 'paid')
+                    ? order.totalAmount
+                    : 0.0)));
     final resolvedPaymentStatus = paymentStatusOverride ??
-        (paidAmount != null
-            ? (paidAmount >= order.totalAmount - 0.01
+        (effectivePaid != null
+            ? (orderUnpaid <= 0.01
                 ? 'Ödendi'
-                : paidAmount <= 0.01
-                    ? 'Ödenmedi'
-                    : 'Kısmi ödendi')
+                : effectivePaid <= 0.01
+                    ? 'Vadeli'
+                    : 'Kısmi Ödeme')
             : ((order.status == 'completed' || order.status == 'paid')
                 ? 'Ödendi'
-                : 'Bilinmiyor'));
-    final orderUnpaid = math.max(0.0, order.totalAmount - effectivePaid);
-    final currentDebt = (customer != null && customer.balance < 0)
-        ? customer.balance.abs()
+                : (orderUnpaid > 0.01 ? 'Kısmi Ödeme' : 'Bilinmiyor')));
+    final currentDebt = (effectiveCustomer != null && effectiveCustomer.balance < 0)
+        ? effectiveCustomer.balance.abs()
         : 0.0;
     // When re-printing an existing order whose unpaid amount has already been
     // ledgered into customer.balance, subtract this order's unpaid portion so we
@@ -209,13 +266,17 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
         (device?.transportConfig['printableWidthDots'] as num?)?.toInt() ??
         (widthMm * dpi / 25.4).round();
 
+    final resolvedCustomerName = _resolveCustomerDisplayName(
+      effectiveCustomer?.name ?? (order.customerName?.trim().isNotEmpty == true ? order.customerName : null),
+      order.customerId,
+    );
+
     return _enqueue(
         PrintDocumentKind.orderLabel,
         {
           'orderNo': order.displayNumber,
-          'customerName':
-              _resolveCustomerDisplayName(customer?.name, order.customerId),
-          'customerPhone': customer?.phone ?? '',
+          'customerName': resolvedCustomerName,
+          'customerPhone': effectiveCustomer?.phone ?? order.customerPhone ?? '',
           'customerNo': shortCustomerId,
           'previousDebt': previousDebt ?? calculatedPreviousDebt,
           'productName': items.length == 1
@@ -348,7 +409,12 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       {int copies = 1}) async {
     final job = await repository.enqueue(
         kind: kind, payloadJson: jsonEncode(payload), copies: copies);
-    if (runtime.isRunning) unawaited(runtime.processNow());
+    if (!runtime.isRunning) {
+      try {
+        await runtime.start();
+      } catch (_) {}
+    }
+    unawaited(runtime.processNow());
     return job;
   }
 
@@ -372,10 +438,11 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
   static String _short(String value) =>
       value.length > 8 ? value.substring(0, 8) : value;
   static String _date(DateTime value) => value.toString().substring(0, 16);
-  static String _payment(String value) => switch (value) {
+  static String _payment(String value) => switch (value.toLowerCase()) {
         'cash' || 'nakit' => 'Nakit',
         'card' || 'kart' => 'Kart',
         'debt' || 'vadeli' => 'Vadeli',
+        'karma' => 'Karma',
         _ => value,
       };
   static String _resolveCustomerDisplayName(String? name, String? fallbackId) {
@@ -384,6 +451,13 @@ class SqlitePrintingApplicationService implements PrintingApplicationService {
       if (!cleanName.startsWith('cust-') &&
           !RegExp(r'^[0-9a-fA-F-]{20,}$').hasMatch(cleanName)) {
         return cleanName;
+      }
+    }
+    if (fallbackId != null && fallbackId.trim().isNotEmpty) {
+      final cleanFallback = fallbackId.trim();
+      if (!cleanFallback.startsWith('cust-') &&
+          !RegExp(r'^[0-9a-fA-F-]{20,}$').hasMatch(cleanFallback)) {
+        return cleanFallback;
       }
     }
     return 'Genel Müşteri';

@@ -211,8 +211,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                         );
                       }
                       final sale = filteredSales[index];
-                      final customerName =
-                          customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri';
+                      final customerName = sale.customerId.isEmpty
+                          ? 'Genel Müşteri'
+                          : (customerMap[sale.customerId] ?? 'Bilinmeyen Müşteri');
                       final dateStr = DateFormat('dd.MM.yyyy HH:mm', 'tr_TR')
                           .format(sale.createdAt);
 

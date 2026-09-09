@@ -231,7 +231,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final currentUser = ref.watch(currentUserProvider);
 
     if (currentUser == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: _kBgColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: const Text('Ayarlar',
+              style: TextStyle(
+                  color: _kTextPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20)),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline_rounded,
+                  size: 48, color: _kTextSecondary),
+              const SizedBox(height: 16),
+              const Text('Ayarları görüntülemek için lütfen giriş yapın.',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: _kTextPrimary)),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kGreen,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => context.go(AppRoutes.login),
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('Giriş Yap'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(

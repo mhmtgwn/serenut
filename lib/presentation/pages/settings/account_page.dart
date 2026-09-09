@@ -16,7 +16,49 @@ class AccountPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     if (user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return FullScreenSettingsPage(
+        title: 'Hesabım',
+        useScrollView: false,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_circle_outlined,
+                  size: 48, color: POSColors.textSecondary),
+              const SizedBox(height: 16),
+              const Text(
+                'Aktif kullanıcı oturumu bulunamadı.',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: POSColors.text),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Lütfen tekrar giriş yapın.',
+                style: TextStyle(fontSize: 13, color: POSColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: POSColors.green,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                  context.go(AppRoutes.login);
+                },
+                icon: const Icon(Icons.login_rounded, size: 18),
+                label: const Text('Giriş Yap'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     return FullScreenSettingsPage(
       title: 'Hesabım',
@@ -36,6 +78,9 @@ class AccountPage extends ConsumerWidget {
             title: 'Kullanıcı değiştir',
             subtitle: 'Başka bir çalışan hesabıyla giriş yapın',
             onTap: () async {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
               await ref.read(authNotifierProvider.notifier).logout();
               if (context.mounted) context.go(AppRoutes.login);
             },
@@ -47,6 +92,9 @@ class AccountPage extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: () async {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
               await ref.read(authNotifierProvider.notifier).logout();
               if (context.mounted) context.go(AppRoutes.login);
             },

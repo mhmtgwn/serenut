@@ -686,8 +686,13 @@ class TsplLabelLayoutEngine {
           currentY += rowHeight;
 
           if (noteClean != null) {
-            commands.writeln(
-              'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}"',
+            commands.boldText(
+              paddingX,
+              currentY,
+              bodyFont.font,
+              1,
+              1,
+              'Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}',
             );
             currentY += rowHeight;
           }
@@ -809,8 +814,13 @@ class TsplLabelLayoutEngine {
       currentY += rowHeight;
 
       if (noteClean != null) {
-        commands.writeln(
-          'TEXT $paddingX,$currentY,"$bodyFont",0,1,1,"Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}"',
+        commands.boldText(
+          paddingX,
+          currentY,
+          bodyFont.font,
+          1,
+          1,
+          'Not: ${_fit(noteClean, (maxBodyChars - 5).clamp(4, 60))}',
         );
         currentY += rowHeight;
       }

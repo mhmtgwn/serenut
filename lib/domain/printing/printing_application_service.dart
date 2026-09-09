@@ -8,7 +8,8 @@ abstract interface class PrintingApplicationService {
       SaleEntity sale,
       List<Map<String, dynamic>> items,
       CustomerEntity? customer,
-      Settings settings);
+      Settings settings,
+      {Map<String, dynamic>? paymentBreakdown});
   Future<PrintJobRecord> queueOrderReceipt(
       OrderEntity order,
       List<Map<String, dynamic>> items,
@@ -16,6 +17,8 @@ abstract interface class PrintingApplicationService {
       Settings settings,
       {double? paidAmount,
       String? notes,
+      String? paymentMethod,
+      Map<String, dynamic>? paymentBreakdown,
       int copies = 1});
   Future<PrintJobRecord> queueCollectionReceipt(CustomerEntity customer,
       double amount, String paymentMethod, String? notes, Settings settings);

@@ -1,5 +1,6 @@
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/infrastructure/database/db_gateway.dart';
+import 'package:serenutos/config/utils.dart';
 
 class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
   final DbGateway _gateway;
@@ -8,7 +9,8 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
 
   @override
   Future<GlobalSearchResult> searchAll(String query) async {
-    if (query.trim().isEmpty) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
       return const GlobalSearchResult(
         customers: [],
         products: [],
@@ -17,15 +19,16 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
       );
     }
 
-    final searchPattern = '%${query.trim()}%';
+    final rawPattern = '%$trimmed%';
+    final qPattern = '%${trimmed.normalizeTurkish}%';
 
     // 1. Search Customers
     final customerRows = await _gateway.rawQuery('''
       SELECT * FROM customers 
       WHERE is_active = 1 
-        AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
+        AND (${sqliteTurkishFold('name')} LIKE ? OR email LIKE ? OR phone LIKE ?)
       LIMIT 50
-    ''', [searchPattern, searchPattern, searchPattern]);
+    ''', [qPattern, rawPattern, rawPattern]);
 
     final List<CustomerEntity> customers =
         customerRows.map((map) => CustomerEntity.fromMap(map)).toList();
@@ -34,14 +37,20 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
     final productRows = await _gateway.rawQuery('''
       SELECT * FROM products 
       WHERE is_active = 1 
-        AND (name LIKE ? OR category LIKE ? OR description LIKE ? OR id LIKE ? OR sku LIKE ?)
+        AND (
+          ${sqliteTurkishFold('name')} LIKE ? 
+          OR ${sqliteTurkishFold('category')} LIKE ? 
+          OR ${sqliteTurkishFold('description')} LIKE ? 
+          OR id LIKE ? 
+          OR sku LIKE ?
+        )
       LIMIT 50
     ''', [
-      searchPattern,
-      searchPattern,
-      searchPattern,
-      searchPattern,
-      searchPattern
+      qPattern,
+      qPattern,
+      qPattern,
+      rawPattern,
+      rawPattern,
     ]);
 
     final List<ProductEntity> products =
@@ -50,9 +59,16 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
     // 3. Search Sales
     final saleRows = await _gateway.rawQuery('''
       SELECT * FROM sales 
-      WHERE id LIKE ? OR customer_id LIKE ? OR payment_method LIKE ? OR status LIKE ?
+      WHERE (is_deleted = 0 OR is_deleted IS NULL)
+        AND (
+          id LIKE ? 
+          OR customer_id LIKE ?
+          OR ${sqliteTurkishFold('payment_method')} LIKE ? 
+          OR ${sqliteTurkishFold('status')} LIKE ?
+          OR ${sqliteTurkishFold('notes')} LIKE ?
+        )
       LIMIT 50
-    ''', [searchPattern, searchPattern, searchPattern, searchPattern]);
+    ''', [rawPattern, rawPattern, qPattern, qPattern, qPattern]);
 
     final List<SaleEntity> sales =
         saleRows.map((map) => SaleEntity.fromMap(map)).toList();
@@ -60,9 +76,18 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
     // 4. Search Financial Transactions
     final txRows = await _gateway.rawQuery('''
       SELECT * FROM financial_transactions 
-      WHERE id LIKE ? OR reference_id LIKE ? OR type LIKE ? OR customer_id LIKE ?
+      WHERE (COALESCE(is_deleted, 0) = 0)
+        AND (
+          id LIKE ? 
+          OR reference_id LIKE ? 
+          OR type LIKE ? 
+          OR customer_id IN (
+            SELECT id FROM customers 
+            WHERE ${sqliteTurkishFold('name')} LIKE ? OR phone LIKE ?
+          )
+        )
       LIMIT 50
-    ''', [searchPattern, searchPattern, searchPattern, searchPattern]);
+    ''', [rawPattern, rawPattern, rawPattern, qPattern, rawPattern]);
 
     final List<FinancialTransactionEntity> transactions =
         txRows.map((map) => FinancialTransactionEntity.fromMap(map)).toList();
@@ -75,3 +100,4 @@ class SqliteGlobalSearchRepository implements IGlobalSearchRepository {
     );
   }
 }
+

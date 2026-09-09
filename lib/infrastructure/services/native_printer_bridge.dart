@@ -167,7 +167,10 @@ if (-not \$success) {
 
 ''';
 
-      final res = await Process.run('powershell', ['-Command', psScript]);
+      final res = await Process.run('powershell', ['-Command', psScript])
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        return ProcessResult(0, 1, '', 'PowerShell yazdırma zaman aşımına uğradı');
+      });
       try {
         await tempFile.delete();
       } catch (_) {}

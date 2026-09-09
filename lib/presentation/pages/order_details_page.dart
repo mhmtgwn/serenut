@@ -114,7 +114,17 @@ class OrderDetailsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // ── Provider artık build() dışında ──
     final orderVal = ref.watch(_orderDetailProvider(orderId));
-    final customersVal = ref.watch(customersControllerProvider);
+    final order = orderVal.valueOrNull;
+    final customerId = order?.customerId ?? '';
+    final customerAsync = customerId.isNotEmpty
+        ? ref.watch(customerDetailProvider(customerId))
+        : null;
+    final customerLookupMap = ref.watch(customerLookupMapProvider).valueOrNull;
+    final customer = customerAsync?.valueOrNull;
+    final customerFallbackName =
+        (customerId.isNotEmpty && customerLookupMap != null)
+            ? customerLookupMap[customerId]
+            : null;
     final settingsAsync = ref.watch(settingsNotifierProvider);
     // UUID → ürün adı haritası
     final productsVal = ref.watch(productsControllerProvider);
@@ -177,19 +187,16 @@ class OrderDetailsPage extends ConsumerWidget {
 
                       try {
                         // Load customer
-                        final customer = customersVal.maybeWhen(
-                          data: (list) => list.firstWhere(
-                            (c) => c.id == order.customerId,
-                            orElse: () => CustomerEntity(
-                                id: '',
-                                name: 'Bilinmeyen Musteri',
-                                email: '',
-                                phone: '',
-                                balance: 0,
-                                createdAt: DateTime.now()),
-                          ),
-                          orElse: () => null,
-                        );
+                        CustomerEntity? customerToUse = customer;
+                        if (customerToUse == null &&
+                            order.customerId.isNotEmpty) {
+                          try {
+                            final custRepo = await ref
+                                .read(customerRepositoryProvider.future);
+                            customerToUse =
+                                await custRepo.findById(order.customerId);
+                          } catch (_) {}
+                        }
 
                         // Load products to map IDs to names
                         final products =
@@ -221,9 +228,11 @@ class OrderDetailsPage extends ConsumerWidget {
                             .queueOrderReceipt(
                               order,
                               receiptItems,
-                              customer != null && customer.id.isNotEmpty
-                                  ? customer
-                                  : null,
+                              customerToUse != null && customerToUse.id.isNotEmpty
+                                  ? customerToUse
+                                  : (customer != null && customer.id.isNotEmpty
+                                      ? customer
+                                      : null),
                               settings,
                             );
 
@@ -274,14 +283,13 @@ class OrderDetailsPage extends ConsumerWidget {
                         );
                         return;
                       }
-                      CustomerEntity? customer = customersVal.valueOrNull
-                          ?.where((value) => value.id == order.customerId)
-                          .firstOrNull;
-                      if (customer == null && order.customerId.isNotEmpty) {
+                      CustomerEntity? customerToUse = customer;
+                      if (customerToUse == null &&
+                          order.customerId.isNotEmpty) {
                         try {
                           final customerRepo =
                               await ref.read(customerRepositoryProvider.future);
-                          customer =
+                          customerToUse =
                               await customerRepo.findById(order.customerId);
                         } catch (_) {}
                       }
@@ -314,7 +322,7 @@ class OrderDetailsPage extends ConsumerWidget {
                               order,
                               items,
                               settings,
-                              customer: customer,
+                              customer: customerToUse,
                               paidAmount: totalPaid,
                             );
                         if (!context.mounted) return;
@@ -369,17 +377,6 @@ class OrderDetailsPage extends ConsumerWidget {
             return const Center(child: Text('Sipariş bulunamadı.'));
           }
 
-          final customer = customersVal.maybeWhen(
-            data: (list) {
-              try {
-                return list.firstWhere((c) => c.id == order.customerId);
-              } catch (_) {
-                return null;
-              }
-            },
-            orElse: () => null,
-          );
-
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -393,7 +390,8 @@ class OrderDetailsPage extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 // ── Order Info Card ─────────────────────────────
-                _buildOrderInfoCard(context, ref, order, customer),
+                _buildOrderInfoCard(
+                    context, ref, order, customer, customerFallbackName),
                 const SizedBox(height: 16),
 
                 // ── Order Items ─────────────────────────────────
@@ -1335,8 +1333,15 @@ class OrderDetailsPage extends ConsumerWidget {
   }
 
   Widget _buildOrderInfoCard(BuildContext context, WidgetRef ref,
-      OrderEntity order, CustomerEntity? customer) {
-    final customerName = customer?.name ?? 'Bilinmeyen Müşteri';
+      OrderEntity order, CustomerEntity? customer,
+      [String? fallbackName]) {
+    final customerName = customer?.name ??
+        fallbackName ??
+        (order.customerName != null && order.customerName!.trim().isNotEmpty
+            ? order.customerName!.trim()
+            : (order.customerId.isEmpty
+                ? 'Genel Müşteri'
+                : 'Bilinmeyen Müşteri'));
     final hasPhone = customer != null && customer.phone.isNotEmpty;
 
     return Card(
@@ -1575,20 +1580,13 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
   if (!hasPrinter) return;
 
   try {
-    final customersVal = ref.read(customersControllerProvider);
-    final customer = customersVal.maybeWhen(
-      data: (list) => list.firstWhere(
-        (c) => c.id == order.customerId,
-        orElse: () => CustomerEntity(
-            id: '',
-            name: 'Bilinmeyen Musteri',
-            email: '',
-            phone: '',
-            balance: 0,
-            createdAt: DateTime.now()),
-      ),
-      orElse: () => null,
-    );
+    CustomerEntity? customer;
+    if (order.customerId.isNotEmpty) {
+      try {
+        final custRepo = await ref.read(customerRepositoryProvider.future);
+        customer = await custRepo.findById(order.customerId);
+      } catch (_) {}
+    }
 
     final products = ref.read(productsControllerProvider).value ?? [];
     final receiptItems = order.items.map((item) {
@@ -1615,7 +1613,17 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
     await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
           order,
           receiptItems,
-          customer != null && customer.id.isNotEmpty ? customer : null,
+          customer != null && customer.id.isNotEmpty
+              ? customer
+              : (order.customerName?.isNotEmpty == true
+                  ? CustomerEntity(
+                      id: order.customerId,
+                      name: order.customerName!,
+                      email: '',
+                      phone: order.customerPhone ?? '',
+                      balance: 0,
+                      createdAt: DateTime.now())
+                  : null),
           settings,
         );
   } catch (e) {
@@ -1821,20 +1829,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                   .getRoute(PrintDocumentKind.receipt) !=
               null;
           if (hasPrinter) {
-            final customersVal = ref.read(customersControllerProvider);
-            final customer = customersVal.maybeWhen(
-              data: (list) => list.firstWhere(
-                (c) => c.id == widget.order.customerId,
-                orElse: () => CustomerEntity(
-                    id: '',
-                    name: 'Bilinmeyen Musteri',
-                    email: '',
-                    phone: '',
-                    balance: 0,
-                    createdAt: DateTime.now()),
-              ),
-              orElse: () => null,
-            );
+            CustomerEntity? customer;
+            if (widget.order.customerId.isNotEmpty) {
+              try {
+                final custRepo =
+                    await ref.read(customerRepositoryProvider.future);
+                customer = await custRepo.findById(widget.order.customerId);
+              } catch (_) {}
+            }
 
             final products = ref.read(productsControllerProvider).value ?? [];
             final receiptItems = widget.order.items.map((item) {
@@ -1872,10 +1874,28 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
                 .queueOrderReceipt(
                   widget.order,
                   receiptItems,
-                  customer != null && customer.id.isNotEmpty ? customer : null,
+                  customer != null && customer.id.isNotEmpty
+                      ? customer
+                      : (widget.order.customerName?.isNotEmpty == true
+                          ? CustomerEntity(
+                              id: widget.order.customerId,
+                              name: widget.order.customerName!,
+                              email: '',
+                              phone: widget.order.customerPhone ?? '',
+                              balance: 0,
+                              createdAt: DateTime.now())
+                          : null),
                   settings,
                   paidAmount: currentFinalPaid,
                   notes: widget.order.notes?.trim(),
+                  paymentMethod: _selectedMethod,
+                  paymentBreakdown: _selectedMethod == 'karma'
+                      ? {
+                          'cash_applied': _karmaResult.cashApplied,
+                          'card': _karmaResult.card,
+                          'debt': _karmaResult.debt,
+                        }
+                      : null,
                   copies: _printCopies,
                 );
           }
@@ -1887,20 +1907,14 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
         final settingsAsync = ref.read(settingsNotifierProvider);
         final settings = settingsAsync.value;
         if (settings != null) {
-          final customersVal = ref.read(customersControllerProvider);
-          final customer = customersVal.maybeWhen(
-            data: (list) => list.firstWhere(
-              (c) => c.id == widget.order.customerId,
-              orElse: () => CustomerEntity(
-                  id: '',
-                  name: 'Bilinmeyen Musteri',
-                  email: '',
-                  phone: '',
-                  balance: 0,
-                  createdAt: DateTime.now()),
-            ),
-            orElse: () => null,
-          );
+          CustomerEntity? customer;
+          if (widget.order.customerId.isNotEmpty) {
+            try {
+              final custRepo =
+                  await ref.read(customerRepositoryProvider.future);
+              customer = await custRepo.findById(widget.order.customerId);
+            } catch (_) {}
+          }
 
           final products = ref.read(productsControllerProvider).value ?? [];
           final receiptItems = widget.order.items.map((item) {
@@ -1924,19 +1938,38 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
             };
           }).toList();
 
+          final double finalPaidForLabel = widget.totalPaid +
+              (_selectedMethod == 'cash'
+                  ? remaining
+                  : (_selectedMethod == 'card'
+                      ? remaining
+                      : (_selectedMethod == 'karma'
+                          ? _karmaResult.paidAmount
+                          : 0.0)));
+          final double orderRemainingDebt =
+              (widget.order.totalAmount - finalPaidForLabel).clamp(0.0, double.infinity);
+          final String labelPaymentStatus;
+          if (_selectedMethod == 'debt' ||
+              (_selectedMethod == 'karma' && _karmaDebt > 0.009)) {
+            if (finalPaidForLabel <= 0.01) {
+              labelPaymentStatus = 'Vadeli';
+            } else {
+              labelPaymentStatus =
+                  'Kısmi Ödeme (Borç: ₺${orderRemainingDebt.toStringAsFixed(2)})';
+            }
+          } else if (orderRemainingDebt <= 0.01) {
+            labelPaymentStatus = 'Ödendi';
+          } else {
+            labelPaymentStatus = 'Kısmi Ödeme';
+          }
+
           await ref.read(printingApplicationServiceProvider).queueOrderLabel(
                 widget.order,
                 receiptItems,
                 settings,
                 customer: customer,
-                paidAmount: widget.totalPaid +
-                    (_selectedMethod == 'cash'
-                        ? remaining
-                        : (_selectedMethod == 'card'
-                            ? remaining
-                            : (_selectedMethod == 'karma'
-                                ? _karmaResult.paidAmount
-                                : 0.0))),
+                paidAmount: finalPaidForLabel,
+                paymentStatusOverride: labelPaymentStatus,
                 copies: _labelCopies,
               );
         }
@@ -1992,20 +2025,10 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
     final bool isActionDisabled = _selectedMethod == 'karma' && !karmaValid;
 
     // Load reactive customer details
-    final customersVal = ref.watch(customersControllerProvider);
-    final customer = customersVal.maybeWhen(
-      data: (list) => list.firstWhere(
-        (c) => c.id == widget.order.customerId,
-        orElse: () => CustomerEntity(
-            id: '',
-            name: 'Bilinmeyen Musteri',
-            email: '',
-            phone: '',
-            balance: 0.0,
-            createdAt: DateTime.now()),
-      ),
-      orElse: () => null,
-    );
+    final customerAsync = widget.order.customerId.isNotEmpty
+        ? ref.watch(customerDetailProvider(widget.order.customerId))
+        : null;
+    final customer = customerAsync?.valueOrNull;
 
     // Left column (Summary Info)
     final leftCol = Column(

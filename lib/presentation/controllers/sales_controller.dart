@@ -238,7 +238,9 @@ class SalesController extends AsyncNotifier<List<SaleEntity>> {
             sale != null ? await customerRepo.findById(sale.customerId) : null;
         await auditService.logPayment(
           sale?.customerId ?? '',
-          customer?.name ?? 'Bilinmeyen Müşteri',
+          (sale?.customerId.isEmpty ?? true)
+              ? 'Genel Müşteri'
+              : (customer?.name ?? 'Bilinmeyen Müşteri'),
           amount,
           'Kısmi Ödeme ($method) - Satış ID: $saleId',
         );

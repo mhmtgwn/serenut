@@ -13,6 +13,7 @@ import 'package:serenutos/infrastructure/printing/sqlite_printing_application_se
 import 'package:serenutos/infrastructure/repositories/sqlite_printing_repository.dart';
 import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
+import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/infrastructure/services/shared_hardware_service.dart';
 import 'package:serenutos/infrastructure/services/shared_hardware_worker.dart';
 
@@ -56,6 +57,11 @@ final printQueueCoordinatorProvider = Provider<PrintQueueCoordinator>((ref) {
   );
   ref.onDispose(() => unawaited(coordinator.dispose()));
   return coordinator;
+});
+
+final printCoordinatorEventsProvider =
+    StreamProvider<PrintCoordinatorEvent>((ref) {
+  return ref.watch(printQueueCoordinatorProvider).events;
 });
 
 final sharedHardwareWorkerProvider = Provider<SharedHardwareWorker>((ref) {
@@ -107,6 +113,14 @@ final printingApplicationServiceProvider =
   return SqlitePrintingApplicationService(
     repository: ref.watch(printingRepositoryProvider),
     runtime: ref.watch(printingRuntimeProvider),
+    customerLookup: (customerId) async {
+      try {
+        final repo = await ref.read(customerRepositoryProvider.future);
+        return await repo.findById(customerId);
+      } catch (_) {
+        return null;
+      }
+    },
   );
 });
 

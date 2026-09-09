@@ -39,6 +39,7 @@ class CollectionPage extends ConsumerStatefulWidget {
 
 final collectionCustomerDetailProvider =
     FutureProvider.family<CustomerEntity?, String>((ref, id) async {
+  if (id.isEmpty) return null;
   final repo = await ref.watch(customerRepositoryProvider.future);
   return repo.findById(id);
 });

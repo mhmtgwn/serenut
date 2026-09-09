@@ -43,7 +43,7 @@ class TcpPrintTransport implements PrintTransport {
       for (var copy = 0; copy < copies; copy++) {
         deliveryStarted = true;
         socket.add(bytes);
-        await socket.flush();
+        await socket.flush().timeout(timeout);
       }
       return PrintTransportObservation(
         transport: PrinterTransportKind.tcp.name,
@@ -65,7 +65,9 @@ class TcpPrintTransport implements PrintTransport {
         deliveryUncertain: deliveryStarted,
       );
     } finally {
-      await socket?.close();
+      try {
+        await socket?.close();
+      } catch (_) {}
     }
   }
 }

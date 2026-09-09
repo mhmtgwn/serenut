@@ -137,4 +137,91 @@ void main() {
     expect(job['state'], PrintJobState.awaitingUserCheck.name);
     expect(await repository.claimNext('receipt-a'), isNull);
   });
+
+  test('coordinator schedules retry on socket or network error instead of failing permanently',
+      () async {
+    await repository.enqueue(
+      kind: PrintDocumentKind.receipt,
+      payloadJson: '{}',
+    );
+    final coordinator = PrintQueueCoordinator(
+      repository: repository,
+      renderers: [_Renderer()],
+      transports: [_FailingSocketTransport()],
+    );
+    addTearDown(coordinator.dispose);
+
+    final eventFuture = coordinator.events
+        .firstWhere((e) => e.type == PrintCoordinatorEventType.retryScheduled);
+
+    await coordinator.processNext('receipt-a');
+    final event = await eventFuture;
+    expect(event.type, PrintCoordinatorEventType.retryScheduled);
+
+    final job = (await db.query('print_jobs')).single;
+    expect(job['state'], PrintJobState.retryWait.name);
+    expect(job['next_attempt_at'], isNotNull);
+  });
+
+  test('enqueue auto-heals when route is missing but compatible device is enabled',
+      () async {
+    // Delete existing route
+    await db.delete('printer_routes');
+    expect(await db.query('printer_routes'), isEmpty);
+
+    // Enqueue should auto-heal by finding receipt-a and saving the route
+    final job = await repository.enqueue(
+      kind: PrintDocumentKind.receipt,
+      payloadJson: '{"test": true}',
+    );
+
+    expect(job.deviceId, 'receipt-a');
+    final routes = await db.query('printer_routes');
+    expect(routes, hasLength(1));
+    expect(routes.first['device_id'], 'receipt-a');
+  });
+
+  test('enqueue auto-heals when routed device is disabled but another compatible device exists',
+      () async {
+    // Disable receipt-a
+    await db.update('printer_devices', {'enabled': 0}, where: 'id = ?', whereArgs: ['receipt-a']);
+
+    // Add a second enabled device
+    final now = DateTime.utc(2026);
+    await repository.saveDevice(PrinterDeviceProfile(
+      id: 'receipt-backup',
+      name: 'Backup Printer',
+      language: PrinterLanguage.escPos,
+      transport: PrinterTransportKind.tcp,
+      transportConfig: const {'host': '192.168.1.30', 'port': 9100},
+      capabilities: const {'paperWidthMm': 58},
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    // Enqueue should auto-heal to use receipt-backup
+    final job = await repository.enqueue(
+      kind: PrintDocumentKind.receipt,
+      payloadJson: '{"test": true}',
+    );
+
+    expect(job.deviceId, 'receipt-backup');
+    final routes = await db.query('printer_routes');
+    expect(routes.first['device_id'], 'receipt-backup');
+  });
+}
+
+class _FailingSocketTransport implements PrintTransport {
+  @override
+  bool supports(PrinterTransportKind kind) => kind == PrinterTransportKind.tcp;
+
+  @override
+  Future<PrintTransportObservation> send({
+    required Uint8List bytes,
+    required int copies,
+    required Map<String, Object?> configuration,
+  }) async {
+    throw Exception('SocketException: OS Error: Connection timed out, errno = 110');
+  }
 }

@@ -162,6 +162,19 @@ class PrinterRoute {
     required this.updatedAt,
   });
 
+  PrinterRoute copyWith({
+    PrintDocumentKind? kind,
+    String? deviceId,
+    String? designProfileId,
+    DateTime? updatedAt,
+  }) =>
+      PrinterRoute(
+        kind: kind ?? this.kind,
+        deviceId: deviceId ?? this.deviceId,
+        designProfileId: designProfileId ?? this.designProfileId,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+
   Map<String, Object?> toMap() => {
         'kind': kind.name,
         'device_id': deviceId,

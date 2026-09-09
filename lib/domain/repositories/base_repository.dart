@@ -130,6 +130,9 @@ abstract class ICustomerRepository implements BaseRepository<CustomerEntity> {
 
   /// Get total paid by customer
   Future<double> getTotalPaid(String customerId);
+
+  /// Fast lookup map of id -> name for order and sales listings
+  Future<Map<String, String>> getLookupMap();
 }
 
 /// Sale repository
@@ -619,6 +622,8 @@ class OrderEntity {
   final String id;
   final String orderNumber;
   final String customerId;
+  final String? customerName;
+  final String? customerPhone;
   final String status; // created, preparing, ready, delivered, cancelled
   final DateTime createdAt;
   final DateTime? expectedDeliveryDate;
@@ -632,6 +637,8 @@ class OrderEntity {
     required this.id,
     this.orderNumber = '',
     required this.customerId,
+    this.customerName,
+    this.customerPhone,
     required this.status,
     required this.createdAt,
     this.expectedDeliveryDate,
@@ -672,6 +679,8 @@ class OrderEntity {
         'id': id,
         'order_number': orderNumber,
         'customer_id': customerId,
+        'customer_name': customerName,
+        'customer_phone': customerPhone,
         'status': status,
         'created_at': createdAt.toIso8601String(),
         'expected_delivery_date': expectedDeliveryDate?.toIso8601String(),
@@ -685,6 +694,10 @@ class OrderEntity {
         id: (map['id'] ?? '').toString(),
         orderNumber: (map['order_number'] ?? '').toString(),
         customerId: (map['customer_id'] ?? '').toString(),
+        customerName: map['customer_name']?.toString() ??
+            map['customerName']?.toString(),
+        customerPhone: map['customer_phone']?.toString() ??
+            map['customerPhone']?.toString(),
         status: (map['status'] ?? 'created').toString(),
         createdAt: map['created_at'] != null
             ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
@@ -708,6 +721,8 @@ class OrderEntity {
     String? id,
     String? orderNumber,
     String? customerId,
+    String? customerName,
+    String? customerPhone,
     String? status,
     DateTime? createdAt,
     DateTime? expectedDeliveryDate,
@@ -721,6 +736,8 @@ class OrderEntity {
         id: id ?? this.id,
         orderNumber: orderNumber ?? this.orderNumber,
         customerId: customerId ?? this.customerId,
+        customerName: customerName ?? this.customerName,
+        customerPhone: customerPhone ?? this.customerPhone,
         status: status ?? this.status,
         createdAt: createdAt ?? this.createdAt,
         expectedDeliveryDate: expectedDeliveryDate ?? this.expectedDeliveryDate,
