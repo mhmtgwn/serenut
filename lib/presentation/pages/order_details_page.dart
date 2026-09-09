@@ -26,6 +26,7 @@ import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 
 import 'package:serenutos/domain/services/inventory_service.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 // ── POS Tema Renkleri ──────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -244,7 +245,8 @@ class OrderDetailsPage extends ConsumerWidget {
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
-                      } catch (e) {
+                      } catch (e, st) {
+                        unawaited(TelemetryService().logError(e, st, context: 'order_receipt_print'));
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -831,7 +833,8 @@ class OrderDetailsPage extends ConsumerWidget {
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
-              } catch (e) {
+              } catch (e, st) {
+                unawaited(TelemetryService().logError(e, st, context: 'order_delete'));
                 rootScaffoldMessengerKey.currentState?.showSnackBar(
                   SnackBar(
                     content: Text('Sipariş silinemedi: $e'),
@@ -1174,7 +1177,8 @@ class OrderDetailsPage extends ConsumerWidget {
                               ),
                             );
                           }
-                        } catch (e) {
+                        } catch (e, st) {
+                          unawaited(TelemetryService().logError(e, st, context: 'order_refund'));
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -1642,7 +1646,8 @@ Future<void> _triggerPrint(WidgetRef ref, OrderEntity order) async {
                   : null),
           settings,
         );
-  } catch (e) {
+  } catch (e, st) {
+    unawaited(TelemetryService().logError(e, st, context: 'order_delivery_print'));
     debugPrint('Printing error in delivery: $e');
   }
 }
@@ -2009,7 +2014,8 @@ class _CashOutSheetState extends ConsumerState<_CashOutSheet> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      unawaited(TelemetryService().logError(e, st, context: 'order_cashout_payment'));
       if (cardPayment != null) {
         await ref
             .read(physicalCardPaymentServiceProvider)

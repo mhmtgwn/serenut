@@ -82,6 +82,18 @@ class TelemetryEvent {
       correlationId: correlationId,
     );
   }
+
+  /// Convenient getter for error message if recorded in metadata
+  String? get errorMessage => metadata['error_message']?.toString();
+
+  /// Convenient getter for error type if recorded in metadata
+  String? get errorType => metadata['error_type']?.toString();
+
+  /// Convenient getter for context/module if recorded in metadata
+  String? get errorContext => metadata['context']?.toString();
+
+  /// Convenient getter for stack trace if recorded in metadata
+  String? get stackTrace => metadata['stack_trace']?.toString();
 }
 
 /// Generates a 16-character base62 correlation ID.
@@ -120,7 +132,11 @@ class TelemetryService {
 
   File? _logFile;
   final List<TelemetryEvent> _inMemoryQueue = [];
+  final _eventStreamController = StreamController<TelemetryEvent>.broadcast();
   int _writeCount = 0;
+
+  /// Broadcast stream of real-time telemetry events for live UI observability.
+  Stream<TelemetryEvent> get eventStream => _eventStreamController.stream;
 
   /// Log retention policy — configurable via constructor injection in tests.
   LogRetentionPolicy retention = const LogRetentionPolicy();
@@ -161,6 +177,7 @@ class TelemetryService {
 
   Future<void> _write(TelemetryEvent telemetryEvent) async {
     _inMemoryQueue.add(telemetryEvent);
+    _eventStreamController.add(telemetryEvent);
 
     final label = telemetryEvent.level.emoji;
     final msg = '$label [${telemetryEvent.level.label}] ${telemetryEvent.event}'
@@ -274,23 +291,30 @@ class TelemetryService {
       },
     ));
 
+    final eventName = context != null ? 'error:$context' : 'unhandled_exception';
+
     await logStructured(
-      event: 'unhandled_exception',
+      event: eventName,
       level: level,
       correlationId: correlationId,
       metadata: {
         'error_type': error.runtimeType.toString(),
         'error_message': error.toString(),
-        'stack_trace': stackTrace.toString().split('\n').take(10).join('\n'),
+        'stack_trace': stackTrace.toString().split('\n').take(25).join('\n'),
         if (context != null) 'context': context,
       },
     );
   }
 
-  /// Retrieves all logged telemetry events.
+  /// Retrieves all logged telemetry events, merging durable file logs with
+  /// in-memory queue, deduplicating, and ordering newest-first.
   Future<List<TelemetryEvent>> getEvents() async {
-    if (kIsWeb) return _inMemoryQueue;
+    if (kIsWeb) {
+      return _inMemoryQueue.reversed.toList();
+    }
     final list = <TelemetryEvent>[];
+    final seenIds = <String>{};
+
     try {
       final file = await _getLogFile();
       if (await file.exists()) {
@@ -299,11 +323,30 @@ class TelemetryService {
           if (line.trim().isEmpty) continue;
           try {
             final json = jsonDecode(line) as Map<String, dynamic>;
-            list.add(TelemetryEvent.fromJson(json));
+            final ev = TelemetryEvent.fromJson(json);
+            final key = ev.correlationId.isNotEmpty
+                ? ev.correlationId
+                : '${ev.timestamp.millisecondsSinceEpoch}_${ev.event}';
+            if (seenIds.add(key)) {
+              list.add(ev);
+            }
           } catch (_) {}
         }
       }
     } catch (_) {}
+
+    // Merge in-memory queue so newly emitted session events are always included
+    for (final ev in _inMemoryQueue) {
+      final key = ev.correlationId.isNotEmpty
+          ? ev.correlationId
+          : '${ev.timestamp.millisecondsSinceEpoch}_${ev.event}';
+      if (seenIds.add(key)) {
+        list.add(ev);
+      }
+    }
+
+    // Sort newest-first so dashboards always show current issues at the top
+    list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return list;
   }
 

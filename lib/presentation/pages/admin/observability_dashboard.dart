@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/domain/services/observability_service.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
+import 'package:serenutos/presentation/pages/admin/error_logs_page.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
@@ -510,7 +511,7 @@ class _ObservabilityDashboardState
       );
     }
 
-    final recentEvents = events.reversed.take(20).toList();
+    final recentEvents = events.take(20).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -519,58 +520,253 @@ class _ObservabilityDashboardState
         border: Border.all(color: _kBorderColor),
       ),
       child: Column(
-        children: recentEvents.asMap().entries.map((entry) {
-          final event = entry.value;
-          final isLast = entry.key == recentEvents.length - 1;
-          final levelColor = switch (event.level) {
-            LogLevel.critical => _kRed,
-            LogLevel.error => const Color(0xFFF85149),
-            LogLevel.warning => _kAmber,
-            _ => _kTextSecondary,
-          };
+        children: [
+          ...recentEvents.asMap().entries.map((entry) {
+            final event = entry.value;
+            final isLast = entry.key == recentEvents.length - 1;
+            final levelColor = switch (event.level) {
+              LogLevel.critical => _kRed,
+              LogLevel.error => const Color(0xFFF85149),
+              LogLevel.warning => _kAmber,
+              _ => _kTextSecondary,
+            };
 
-          return Column(
-            children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(event.level.emoji,
-                        style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            event.event,
-                            style: TextStyle(
-                              color: levelColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'monospace',
-                            ),
+            return Column(
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _showEventDetailsDialog(event),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(event.level.emoji,
+                            style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      event.event,
+                                      style: TextStyle(
+                                        color: levelColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                  ),
+                                  if (event.errorContext != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: _kBgColor,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: _kBorderColor),
+                                      ),
+                                      child: Text(
+                                        event.errorContext!,
+                                        style: const TextStyle(
+                                            color: _kBlue, fontSize: 9),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (event.errorMessage != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  event.errorMessage!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _kTextPrimary,
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 2),
+                              Text(
+                                DateFormat('dd.MM HH:mm:ss')
+                                    .format(event.timestamp),
+                                style: const TextStyle(
+                                  color: _kTextSecondary,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            DateFormat('dd.MM HH:mm:ss')
-                                .format(event.timestamp),
-                            style: const TextStyle(
-                              color: _kTextSecondary,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded,
+                            size: 16, color: _kTextSecondary),
+                      ],
                     ),
-                  ],
+                  ),
+                ),
+                if (!isLast) const Divider(height: 1, color: _kBorderColor),
+              ],
+            );
+          }),
+          InkWell(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ErrorLogsPage()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: _kBorderColor)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Tüm Hata & Sistem Loglarını Görüntüle',
+                    style: TextStyle(
+                      color: _kBlue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded, size: 14, color: _kBlue),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEventDetailsDialog(TelemetryEvent event) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kCardBg,
+        title: Row(
+          children: [
+            Text(event.level.emoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                event.event,
+                style: const TextStyle(
+                  color: _kTextPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              if (!isLast) const Divider(height: 1, color: _kBorderColor),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Zaman: ${DateFormat('dd.MM.yyyy HH:mm:ss').format(event.timestamp)}',
+                style: const TextStyle(color: _kTextSecondary, fontSize: 12),
+              ),
+              if (event.errorContext != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Bağlam: ${event.errorContext}',
+                  style: const TextStyle(
+                    color: _kBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (event.errorMessage != null) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Hata Mesajı:',
+                  style: TextStyle(
+                    color: _kRed,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _kBgColor,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _kBorderColor),
+                  ),
+                  child: SelectableText(
+                    event.errorMessage!,
+                    style: const TextStyle(
+                      color: _kTextPrimary,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+              if (event.stackTrace != null) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Stack Trace:',
+                  style: TextStyle(
+                    color: _kTextSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF030712),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _kBorderColor),
+                  ),
+                  child: SelectableText(
+                    event.stackTrace!,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
             ],
-          );
-        }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Kapat', style: TextStyle(color: _kTextSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _kBlue),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ErrorLogsPage()),
+              );
+            },
+            child: const Text('Log Sayfasına Git', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

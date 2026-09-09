@@ -15,6 +15,7 @@ import 'package:serenutos/providers/sync_provider.dart';
 import 'package:serenutos/presentation/pages/admin/observability_dashboard.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
+import 'package:serenutos/presentation/pages/admin/error_logs_page.dart';
 import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
@@ -157,6 +158,15 @@ class AdminPage extends ConsumerWidget {
               subtitle: 'Fiyat değişimleri, silmeler ve sistem kayıtları',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const AuditCenterPage())),
+            ),
+            const _Divider(),
+            _AdminTile(
+              icon: Icons.bug_report_rounded,
+              color: _kRed,
+              title: 'Hata & Sistem Logları',
+              subtitle: 'Uygulama çökmeleri, exception detayları ve stack trace',
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ErrorLogsPage())),
             ),
           ]),
           const SizedBox(height: 16),

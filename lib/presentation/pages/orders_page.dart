@@ -17,6 +17,7 @@ import 'package:serenutos/presentation/widgets/pos_filter_bar.dart';
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 import 'package:serenutos/presentation/pages/order_details_page.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/domain/services/telemetry_service.dart';
 
 // ── Tema Sabitleri ────────────────────────────────────────────────────────────
 const _kGreen = POSColors.green;
@@ -785,7 +786,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         _isSelecting = false;
       });
       await _refreshCounts();
-    } catch (e) {
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_page_bulk_status_update');
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
@@ -842,7 +844,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         _isSelecting = false;
       });
       await _refreshCounts();
-    } catch (e) {
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_page_bulk_cancel');
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
@@ -899,7 +902,8 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
         _isSelecting = false;
       });
       await _refreshCounts();
-    } catch (e) {
+    } catch (e, st) {
+      TelemetryService().logError(e, st, context: 'orders_page_bulk_delete');
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
