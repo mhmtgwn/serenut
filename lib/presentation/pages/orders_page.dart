@@ -4,7 +4,6 @@
 // Revized: 22 Jun 2026
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +16,7 @@ import 'package:serenutos/presentation/widgets/pos_filter_bar.dart';
 import 'package:serenutos/presentation/pages/orders/widgets/order_creation_dialog.dart';
 import 'package:serenutos/presentation/pages/order_details_page.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
 
 // ── Tema Sabitleri ────────────────────────────────────────────────────────────
@@ -204,7 +204,8 @@ class OrdersPage extends ConsumerStatefulWidget {
   ConsumerState<OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends ConsumerState<OrdersPage> {
+class _OrdersPageState extends ConsumerState<OrdersPage>
+    with BarcodeScannerMixin<OrdersPage> {
   late String _statusFilter;
   bool _isSearching = false;
   bool _isSelecting = false;
@@ -220,14 +221,11 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
     'cancelled': 0
   };
 
-  String _barcodeBuffer = '';
-  DateTime? _lastBufferTime;
-
   @override
   void initState() {
     super.initState();
     _statusFilter = widget.initialStatusFilter ?? 'all';
-    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    initBarcodeScanner();
     _scrollController.addListener(_onScroll);
     // Load initial status counts and apply filter if passed
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -260,53 +258,25 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    disposeBarcodeScanner();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  bool _handleGlobalKey(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    if (ModalRoute.of(context)?.isCurrent != true) return false;
+  @override
+  bool canHandleBarcodeScan() {
+    if (!super.canHandleBarcodeScan()) return false;
     try {
       final path = GoRouterState.of(context).uri.path;
-      if (!path.startsWith('/orders')) return false;
-    } catch (_) {}
-
-    final now = DateTime.now();
-    if (_lastBufferTime != null) {
-      final diff = now.difference(_lastBufferTime!).inMilliseconds;
-      if (diff > 80) {
-        _barcodeBuffer = '';
-      }
+      return path.startsWith('/orders');
+    } catch (_) {
+      return true;
     }
-    _lastBufferTime = now;
-
-    if (event.logicalKey == LogicalKeyboardKey.enter) {
-      if (_barcodeBuffer.length >= 3) {
-        final code = _barcodeBuffer;
-        _barcodeBuffer = '';
-        _onBarcodeScanned(code);
-        return true;
-      }
-      _barcodeBuffer = '';
-    } else {
-      String? char = event.character;
-      if (char == null) {
-        final label = event.logicalKey.keyLabel;
-        if (label.length == 1 && RegExp(r'[a-zA-Z0-9-]').hasMatch(label)) {
-          char = label;
-        }
-      }
-      if (char != null && char.length == 1) {
-        _barcodeBuffer += char;
-      }
-    }
-    return false;
   }
 
-  void _onBarcodeScanned(String barcode) {
+  @override
+  void onBarcodeScanned(String barcode) {
     var query = barcode.trim();
     if (query.startsWith('order|')) {
       final parts = query.split('|');

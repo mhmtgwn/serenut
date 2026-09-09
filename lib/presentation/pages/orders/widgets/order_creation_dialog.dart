@@ -30,6 +30,7 @@ import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 import 'package:serenutos/presentation/widgets/discount_dialog.dart';
 import 'package:serenutos/presentation/widgets/sales/product_filter_sort_dialog.dart';
 import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
+import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
@@ -97,8 +98,10 @@ class OrderCreationDialog extends ConsumerStatefulWidget {
       OrderCreationDialogState();
 }
 
-class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
+class OrderCreationDialogState extends ConsumerState<OrderCreationDialog>
+    with BarcodeScannerMixin<OrderCreationDialog> {
   int _activeStep = 0;
+
 
   // Step 1: Customer Selection
   CustomerEntity? _selectedCustomer;
@@ -131,9 +134,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   bool _isSubmitting = false;
   double _discountAmount = 0.0;
 
-  String _barcodeBuffer = '';
-  DateTime? _lastBufferTime;
-
   void updateState(VoidCallback fn) {
     if (mounted) {
       setState(fn);
@@ -144,7 +144,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   void initState() {
     super.initState();
     _productScrollController.addListener(_onProductScroll);
-    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    initBarcodeScanner();
 
     final settings = ref.read(settingsNotifierProvider).value;
     if (settings != null) {
@@ -161,45 +161,17 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     });
   }
 
-  bool _handleGlobalKey(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
+  @override
+  bool canHandleBarcodeScan() {
+    if (!super.canHandleBarcodeScan()) return false;
     if (_activeStep != 1) return false;
-    if (ModalRoute.of(context)?.isCurrent != true) return false;
     if (_productSearchFocusNode.hasFocus) return false;
-
-    final now = DateTime.now();
-    if (_lastBufferTime != null) {
-      final diff = now.difference(_lastBufferTime!).inMilliseconds;
-      if (diff > 80) {
-        _barcodeBuffer = '';
-      }
-    }
-    _lastBufferTime = now;
-
-    if (event.logicalKey == LogicalKeyboardKey.enter) {
-      if (_barcodeBuffer.length >= 3) {
-        final code = _barcodeBuffer;
-        _barcodeBuffer = '';
-        _onBarcodeScanned(code);
-        return true;
-      }
-      _barcodeBuffer = '';
-    } else {
-      String? char = event.character;
-      if (char == null) {
-        final label = event.logicalKey.keyLabel;
-        if (label.length == 1 && RegExp(r'[a-zA-Z0-9-]').hasMatch(label)) {
-          char = label;
-        }
-      }
-      if (char != null && char.length == 1) {
-        _barcodeBuffer += char;
-      }
-    }
-    return false;
+    return true;
   }
 
-  void _onBarcodeScanned(String barcode) {
+  @override
+  void onBarcodeScanned(String barcode) {
+
     _productSearchController.clear();
     ref.read(productsControllerProvider).whenData((productsList) {
       _handleBarcodeSubmit(barcode, productsList);
@@ -342,9 +314,10 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   @override
   void dispose() {
     _productScrollController.dispose();
-    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    disposeBarcodeScanner();
 
     _notesController.dispose();
+
     _cashSplitController.dispose();
     _cardSplitController.dispose();
     _debtSplitController.dispose();

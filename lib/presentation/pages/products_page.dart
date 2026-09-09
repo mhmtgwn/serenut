@@ -4,13 +4,13 @@
 // Generated: 21 Jun 2026 (v2)
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/presentation/widgets/pos_page_layout.dart';
+import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/printing_providers.dart';
 import 'package:serenutos/providers/settings_provider.dart';
@@ -38,7 +38,8 @@ class ProductsPage extends ConsumerStatefulWidget {
   ConsumerState<ProductsPage> createState() => _ProductsPageState();
 }
 
-class _ProductsPageState extends ConsumerState<ProductsPage> {
+class _ProductsPageState extends ConsumerState<ProductsPage>
+    with BarcodeScannerMixin<ProductsPage> {
   static final NumberFormat _stockFormat = NumberFormat.decimalPattern('tr_TR');
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -46,63 +47,30 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   bool _isLabelSelectionMode = false;
   final Set<String> _selectedLabelProductIds = <String>{};
 
-  String _barcodeBuffer = '';
-  DateTime? _lastBufferTime;
-
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    initBarcodeScanner();
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    disposeBarcodeScanner();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  bool _handleGlobalKey(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    if (ModalRoute.of(context)?.isCurrent != true) return false;
+  @override
+  bool canHandleBarcodeScan() {
+    if (!super.canHandleBarcodeScan()) return false;
     final activeIndex = ref.read(activeShellIndexProvider);
-    if (activeIndex != 4) return false;
-
-    final now = DateTime.now();
-    if (_lastBufferTime != null) {
-      final diff = now.difference(_lastBufferTime!).inMilliseconds;
-      if (diff > 80) {
-        _barcodeBuffer = '';
-      }
-    }
-    _lastBufferTime = now;
-
-    if (event.logicalKey == LogicalKeyboardKey.enter) {
-      if (_barcodeBuffer.length >= 3) {
-        final code = _barcodeBuffer;
-        _barcodeBuffer = '';
-        _onBarcodeScanned(code);
-        return true;
-      }
-      _barcodeBuffer = '';
-    } else {
-      String? char = event.character;
-      if (char == null) {
-        final label = event.logicalKey.keyLabel;
-        if (label.length == 1 && RegExp(r'[a-zA-Z0-9-]').hasMatch(label)) {
-          char = label;
-        }
-      }
-      if (char != null && char.length == 1) {
-        _barcodeBuffer += char;
-      }
-    }
-    return false;
+    return activeIndex == 4;
   }
 
-  void _onBarcodeScanned(String barcode) async {
+  @override
+  void onBarcodeScanned(String barcode) async {
     final cleanBarcode = barcode.trim();
     if (cleanBarcode.isEmpty) return;
 

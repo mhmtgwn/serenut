@@ -25,6 +25,7 @@ import 'package:serenutos/presentation/widgets/sales/live_scale_dialog.dart';
 import 'package:serenutos/providers/payment_terminal_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/config/theme.dart';
+import 'package:serenutos/presentation/mixins/barcode_scanner_mixin.dart';
 
 part 'sales/animated_cart_tab.dart';
 
@@ -41,7 +42,8 @@ class SalesPage extends ConsumerStatefulWidget {
   ConsumerState<SalesPage> createState() => _SalesPageState();
 }
 
-class _SalesPageState extends ConsumerState<SalesPage> {
+class _SalesPageState extends ConsumerState<SalesPage>
+    with BarcodeScannerMixin<SalesPage> {
   bool _showSuccessNotification = false;
 
   Future<void> _handleProductSelected(ProductEntity product) async {
@@ -80,18 +82,15 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocusNode = FocusNode();
 
-  String _barcodeBuffer = '';
-  DateTime? _lastBufferTime;
-
   @override
   void initState() {
     super.initState();
-    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    initBarcodeScanner();
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    disposeBarcodeScanner();
     _searchController.dispose();
     _paidController.dispose();
     _barcodeController.dispose();
@@ -99,55 +98,15 @@ class _SalesPageState extends ConsumerState<SalesPage> {
     super.dispose();
   }
 
-  bool _handleGlobalKey(KeyEvent event) {
-    if (ModalRoute.of(context)?.isCurrent != true) return false;
+  @override
+  bool canHandleBarcodeScan() {
+    if (!super.canHandleBarcodeScan()) return false;
     final activeIndex = ref.read(activeShellIndexProvider);
-    if (activeIndex != 1) return false;
-
-    final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter;
-
-    // Consume both KeyDown and KeyUp events for Enter to prevent focus activation triggers.
-    if (isEnter) {
-      if (_barcodeBuffer.length >= 3) {
-        if (event is KeyDownEvent) {
-          final code = _barcodeBuffer;
-          _barcodeBuffer = '';
-          _onBarcodeScanned(code);
-        }
-        return true; // Swallow all Enter events (down/up) when barcode is scanned
-      }
-      if (event is KeyDownEvent) {
-        _barcodeBuffer = '';
-      }
-      return false;
-    }
-
-    if (event is! KeyDownEvent) return false;
-
-    final now = DateTime.now();
-    if (_lastBufferTime != null) {
-      final diff = now.difference(_lastBufferTime!).inMilliseconds;
-      if (diff > 80) {
-        _barcodeBuffer = '';
-      }
-    }
-    _lastBufferTime = now;
-
-    String? char = event.character;
-    if (char == null) {
-      final label = event.logicalKey.keyLabel;
-      if (label.length == 1 && RegExp(r'[a-zA-Z0-9-]').hasMatch(label)) {
-        char = label;
-      }
-    }
-    if (char != null && char.length == 1) {
-      _barcodeBuffer += char;
-    }
-    return false;
+    return activeIndex == 1;
   }
 
-  void _onBarcodeScanned(String barcode) {
+  @override
+  void onBarcodeScanned(String barcode) {
     _searchController.clear();
     ref.read(salesProductSearchQueryProvider.notifier).state = '';
     _handleBarcodeSubmit(barcode, const []);
