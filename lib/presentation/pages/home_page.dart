@@ -696,11 +696,11 @@ class _QuickUtilitiesCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _UtilityTile(
-                  title: 'Etiket Kuyruğu',
-                  subtitle: 'Raf & Barkod',
-                  icon: Icons.qr_code_2_rounded,
+                  title: 'Aygıtlar & Yazıcı',
+                  subtitle: 'Donanım & Bağlantı',
+                  icon: Icons.print_outlined,
                   color: const Color(0xFFD97706),
-                  onTap: () => context.push(AppRoutes.printQueue),
+                  onTap: () => context.push(AppRoutes.hardware),
                 ),
               ),
             ],
@@ -725,16 +725,11 @@ class _QuickUtilitiesCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _UtilityTile(
-                  title: 'Finans Merkezi',
-                  subtitle: 'Nakit & Alacak',
-                  icon: Icons.account_balance_outlined,
+                  title: 'Müşteri & Cariler',
+                  subtitle: 'Borç & Bakiye Takibi',
+                  icon: Icons.people_outline_rounded,
                   color: const Color(0xFF7C3AED),
-                  onTap: () => requirePermissionAccess(
-                    context,
-                    permission: Permission.settingsFinance,
-                    title: 'Finans Yetkisi',
-                    onGranted: (_, __) => context.push(AppRoutes.finance),
-                  ),
+                  onTap: () => context.go(AppRoutes.customers),
                 ),
               ),
             ],
@@ -1146,10 +1141,15 @@ class _OrderCompactBadge extends StatelessWidget {
           const Color(0xFF7C3AED),
           const Color(0xFFF5F3FF)
         ),
+      'ready' || 'hazir' => (
+          'Hazır',
+          const Color(0xFF16A34A),
+          const Color(0xFFDCFCE7),
+        ),
       'delivered' || 'completed' || 'teslim' => (
           'Teslim Edildi',
-          POSColors.greenDark,
-          POSColors.greenLight
+          const Color(0xFF475569),
+          const Color(0xFFE2E8F0),
         ),
       'cancelled' || 'iptal' => (
           'İptal',

@@ -9,16 +9,14 @@ import 'package:serenutos/config/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/base_repository.dart';
-import 'package:serenutos/presentation/controllers/customers_controller.dart';
-import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/providers/hardware_config_provider.dart';
 import 'package:serenutos/domain/services/mixed_payment_calculator.dart';
-import 'package:uuid/uuid.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 import 'package:serenutos/presentation/widgets/discount_dialog.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'checkout/cash_dialog.dart';
+import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
 
 part 'checkout/karma_fields.dart';
 part 'checkout/pay_buttons.dart';

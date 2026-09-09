@@ -12,7 +12,6 @@ import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/dashboard_controller.dart';
 import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/widgets/export_bottom_sheet.dart';
-import 'package:serenutos/presentation/pages/customer/ledger_explainability_sheet.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -262,14 +261,6 @@ class CustomerDetailsPage extends ConsumerWidget {
                     transactions: txs,
                   );
                 },
-              ),
-              // ── Phase 4: Ledger Explainability & Verification Button ──
-              IconButton(
-                icon: const Icon(Icons.history_toggle_off_rounded,
-                    color: Colors.white),
-                tooltip: 'Bakiye Analiz & Doğrulama',
-                onPressed: () =>
-                    LedgerExplainabilitySheet.show(context, customer),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(

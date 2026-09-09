@@ -12,11 +12,8 @@ import 'package:serenutos/domain/models/auth_user.dart';
 import 'package:serenutos/domain/models/permission.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/sync_provider.dart';
-import 'package:serenutos/presentation/pages/admin/observability_dashboard.dart';
 import 'package:serenutos/presentation/pages/admin/recovery_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
-import 'package:serenutos/presentation/pages/admin/error_logs_page.dart';
-import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
 import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 
 // ── Design Constants ──────────────────────────────────────────────────────────
@@ -27,10 +24,8 @@ const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kGreen = Color(0xFF10B981);
 const _kRed = Color(0xFFEF4444);
-const _kAmber = Color(0xFFF59E0B);
 const _kBlue = Color(0xFF3B82F6);
 const _kPurple = Color(0xFF8B5CF6);
-const _kTeal = Color(0xFF0D9488);
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -121,21 +116,10 @@ class AdminPage extends ConsumerWidget {
             const SizedBox(height: 12),
           ],
 
-          // ── Section: Sistem İzleme ────────────────────────────────────────
-          _buildSectionHeader('⚡ SİSTEM İZLEME'),
+          // ── Section: Senkronizasyon ve Denetim ────────────────────────────
+          _buildSectionHeader('⚡ SİSTEM & SENKRONİZASYON'),
           const SizedBox(height: 8),
           _buildAdminCard(children: [
-            _AdminTile(
-              icon: Icons.monitor_heart_rounded,
-              color: _kGreen,
-              title: 'Sistem Sağlık Durumu',
-              subtitle: 'Drift rate, anomali, sync failure oranı',
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const ObservabilityDashboard())),
-            ),
-            const _Divider(),
             _AdminTile(
               icon: Icons.cloud_sync_rounded,
               color: hasConflict ? _kRed : _kBlue,
@@ -158,46 +142,6 @@ class AdminPage extends ConsumerWidget {
               subtitle: 'Fiyat değişimleri, silmeler ve sistem kayıtları',
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const AuditCenterPage())),
-            ),
-            const _Divider(),
-            _AdminTile(
-              icon: Icons.bug_report_rounded,
-              color: _kRed,
-              title: 'Hata & Sistem Logları',
-              subtitle: 'Uygulama çökmeleri, exception detayları ve stack trace',
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ErrorLogsPage())),
-            ),
-          ]),
-          const SizedBox(height: 16),
-
-          // ── Section: Operasyonel Araçlar ──────────────────────────────────
-          _buildSectionHeader('🔧 OPERASYONEL ARAÇLAR'),
-          const SizedBox(height: 8),
-          _buildAdminCard(children: [
-            _AdminTile(
-              icon: Icons.print_rounded,
-              color: _kTeal,
-              title: 'Yazıcı Kuyruğu',
-              subtitle: 'Bekleyen fiş işleri ve yeniden deneme',
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const PrintQueuePage())),
-            ),
-            const _Divider(),
-            _AdminTile(
-              icon: Icons.sms_rounded,
-              color: _kAmber,
-              title: 'SMS Gönderim Geçmişi',
-              subtitle: 'Gönderim durumu, başarısız SMS\'ler',
-              onTap: () => context.push('/settings/sms-history'),
-            ),
-            const _Divider(),
-            _AdminTile(
-              icon: Icons.health_and_safety_rounded,
-              color: _kPurple,
-              title: 'Veritabanı Sağlık Kontrolü',
-              subtitle: 'Yetim kayıtlar ve veri bütünlüğü',
-              onTap: () => context.push('/settings/db-health'),
             ),
           ]),
           const SizedBox(height: 16),

@@ -1,6 +1,17 @@
 // lib/infrastructure/repositories/in_memory_repositories.dart
 // Stateful In-Memory Repositories for Web fallback execution
 // Generated: 21 Jun 2026
+//
+// ⚠️  LEGACY / TEST-ONLY FILE
+// Bu dosya yalnızca iki amaçla kullanılmalıdır:
+//   1. Web platformu (kIsWeb) fallback deposu olarak — platform koşullu kodda
+//   2. Unit/widget testlerde mock repository olarak
+//
+// Production SQLite kodunda bu dosyaya yeni bağımlılık EKLEMEYIN.
+// Yeni özellikler için sqlite_*_repository.dart dosyalarına bakın.
+//
+// Dosyayı doğrudan import etmek yerine 'show InMemoryDb' kullanın.
+// ignore_for_file: avoid_classes_with_only_static_members
 
 import 'package:serenutos/domain/repositories/base_repository.dart';
 import 'package:serenutos/domain/services/barcode_standard.dart';

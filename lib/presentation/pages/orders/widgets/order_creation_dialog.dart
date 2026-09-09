@@ -4,8 +4,9 @@ import 'package:serenutos/config/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'dart:math';
 import 'dart:async';
+import 'dart:math';
+import 'package:uuid/uuid.dart';
 import 'package:serenutos/presentation/controllers/orders_controller.dart';
 import 'package:serenutos/presentation/controllers/customers_controller.dart';
 import 'package:serenutos/presentation/controllers/products_controller.dart';
@@ -28,11 +29,15 @@ import 'package:serenutos/presentation/widgets/sales/checkout/cash_dialog.dart';
 import 'package:serenutos/presentation/widgets/karma_payment_summary_bar.dart';
 import 'package:serenutos/presentation/widgets/discount_dialog.dart';
 import 'package:serenutos/presentation/widgets/sales/product_filter_sort_dialog.dart';
+import 'package:serenutos/presentation/widgets/common/customer_picker_widget.dart';
 
 part 'steps/step_customer.dart';
 part 'steps/step_product_selection.dart';
 part 'steps/step_cart.dart';
 part 'steps/step_checkout.dart';
+part 'steps/step_stepper_header.dart';
+part 'steps/step_bottom_bar.dart';
+part 'steps/step_shared_widgets.dart';
 
 // Color and layout constants
 const _kGreen = Color(0xFF16A34A);
@@ -97,16 +102,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
   // Step 1: Customer Selection
   CustomerEntity? _selectedCustomer;
-  String _customerQuery = '';
-  Timer? _customerSearchDebounce;
-  final _customerSearchController = TextEditingController();
-  final _customerSearchFocusNode = FocusNode();
-  final ScrollController _customerScrollController = ScrollController();
-  bool _isAddingCustomer = false;
-  final _addCustomerFormKey = GlobalKey<FormState>();
-  final _newCustNameController = TextEditingController();
-  final _newCustPhoneController = TextEditingController();
-  bool _isSavingCustomer = false;
+
 
   // Step 2: Product Catalog
   final Map<ProductEntity, double> _cart = {};
@@ -144,20 +140,12 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
     }
   }
 
-  void _onCustomerScroll() {
-    if (_customerScrollController.hasClients &&
-        _customerScrollController.position.pixels >=
-            _customerScrollController.position.maxScrollExtent - 400) {
-      ref.read(ordersCustomersControllerProvider.notifier).loadNextPage();
-    }
-  }
-
   @override
   void initState() {
     super.initState();
     _productScrollController.addListener(_onProductScroll);
-    _customerScrollController.addListener(_onCustomerScroll);
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+
     final settings = ref.read(settingsNotifierProvider).value;
     if (settings != null) {
       _printCopies = settings.printCopies;
@@ -354,13 +342,8 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
   @override
   void dispose() {
     _productScrollController.dispose();
-    _customerScrollController.dispose();
-    _customerSearchDebounce?.cancel();
-    _customerSearchController.dispose();
-    _customerSearchFocusNode.dispose();
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
-    _newCustNameController.dispose();
-    _newCustPhoneController.dispose();
+
     _notesController.dispose();
     _cashSplitController.dispose();
     _cardSplitController.dispose();
@@ -400,9 +383,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       initialDate: _expectedDelivery,
       firstDate: now.subtract(const Duration(days: 30)),
       lastDate: now.add(const Duration(days: 365)),
-      helpText: 'Teslimat Tarihi Seçin',
-      confirmText: 'Seç',
-      cancelText: 'İptal',
+      helpText: 'Teslimat Tarihi SeÃ§in',
+      confirmText: 'SeÃ§',
+      cancelText: 'Ä°ptal',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -513,9 +496,9 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
       });
       _barcodeController.clear();
       _barcodeFocusNode.requestFocus();
-      _showNotification('${matched.name} siparişe eklendi.');
+      _showNotification('${matched.name} sipariÅŸe eklendi.');
     } else {
-      _showNotification('Barkod ile eşleşen ürün bulunamadı: $barcode',
+      _showNotification('Barkod ile eÅŸleÅŸen Ã¼rÃ¼n bulunamadÄ±: $barcode',
           isError: true);
       _barcodeFocusNode.requestFocus();
     }
@@ -548,16 +531,18 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
                         ),
                       ),
                       Expanded(
-                        child: _buildStepperHeader(),
+                        child: buildStepperHeader(),
                       ),
+
                     ],
                   ),
                 ),
                 const Divider(height: 1, color: _kBorder),
                 // Step Body
                 Expanded(
-                  child: _buildStepBody(),
+                  child: buildStepBody(),
                 ),
+
               ],
             ),
           ),
@@ -568,7 +553,7 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
             ),
             child: SafeArea(
               top: false,
-              child: _buildBottomActionBar(),
+              child: buildBottomActionBar(),
             ),
           ),
         );
@@ -599,718 +584,6 @@ class OrderCreationDialogState extends ConsumerState<OrderCreationDialog> {
 
         return innerScaffold;
       },
-    );
-  }
-
-  Widget _buildStepperHeader() {
-    final totalQty = _cart.values.fold(0.0, (a, b) => a + b);
-
-    final steps = [
-      {'icon': Icons.person_rounded, 'label': 'Müşteri'},
-      {'icon': Icons.inventory_2_rounded, 'label': 'Ürünler'},
-      {'icon': Icons.shopping_cart_rounded, 'label': 'Sepet'},
-      {'icon': Icons.payments_rounded, 'label': 'Ödeme'},
-    ];
-
-    return Container(
-      color: _kSurface,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      width: double.infinity,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: steps.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final step = entry.value;
-          final isCompleted = idx < _activeStep;
-          final isCurrent = idx == _activeStep;
-          final isCartStep = idx == 2;
-
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Interactive Step Item
-              InkWell(
-                onTap: () {
-                  if (idx <= _activeStep) {
-                    setState(() => _activeStep = idx);
-                  } else if (idx == 1 && _selectedCustomer != null) {
-                    setState(() => _activeStep = 1);
-                  } else if (idx == 2 && _cart.isNotEmpty) {
-                    setState(() => _activeStep = 2);
-                  } else if (idx == 3 && _cart.isNotEmpty) {
-                    setState(() => _activeStep = 3);
-                  }
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 250),
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: isCurrent
-                                  ? _kGreen
-                                  : (isCompleted ? _kGreenLight : Colors.white),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isCurrent || isCompleted
-                                    ? _kGreen
-                                    : _kBorder,
-                                width: isCurrent ? 2 : 1,
-                              ),
-                            ),
-                            child: Icon(
-                              isCompleted
-                                  ? Icons.check_circle_rounded
-                                  : (step['icon'] as IconData),
-                              size: 16,
-                              color: isCurrent
-                                  ? Colors.white
-                                  : (isCompleted
-                                      ? _kGreenDark
-                                      : _kTextSecondary),
-                            ),
-                          ),
-                          if (isCartStep && _cart.isNotEmpty)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: _kGreenDark,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  _formatQuantity(totalQty),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        step['label'] as String,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              isCurrent ? FontWeight.bold : FontWeight.w600,
-                          color: isCurrent
-                              ? _kGreenDark
-                              : (isCompleted ? _kText : _kTextSecondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (idx < 3)
-                Container(
-                  width: 24,
-                  height: 2,
-                  color: isCompleted ? _kGreen : _kBorder,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                ),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildStepBody() {
-    switch (_activeStep) {
-      case 0:
-        return _buildCustomerStep();
-      case 1:
-        return _buildProductStep();
-      case 2:
-        return _buildCartStep();
-      case 3:
-        return _buildCheckoutStep();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildBottomActionBar() {
-    final nextDisabled = _isNextDisabled();
-    final totalQty = _cart.values.fold(0.0, (a, b) => a + b);
-
-    String nextButtonLabel = 'Devam Et';
-    if (_activeStep == 0) {
-      nextButtonLabel = 'Ürün Seçimine Geç';
-    } else if (_activeStep == 1) {
-      nextButtonLabel =
-          'Sepete Geç (${_formatQuantity(totalQty)} Birim)';
-    } else if (_activeStep == 2) {
-      nextButtonLabel =
-          'Ödemeye Geç (₺${_totalAmount.toStringAsFixed(2)})';
-    }
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Back button
-          _activeStep > 0
-              ? OutlinedButton.icon(
-                  onPressed: _prevStep,
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: const Text('Geri'),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
-                  ),
-                )
-              : OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
-                  ),
-                  child: const Text('Kapat'),
-                ),
-          // Next / Confirm button
-          _activeStep < 3
-              ? ElevatedButton.icon(
-                  onPressed: nextDisabled ? null : _nextStep,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGreen,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
-                  ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: Text(nextButtonLabel,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                )
-              : ElevatedButton.icon(
-                  onPressed: _isSubmitting ||
-                          _paymentMethod.isEmpty ||
-                          (_paymentMethod == 'karma' && !_karmaValid)
-                      ? null
-                      : _submitOrder,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kGreen,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
-                  ),
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.check_circle_rounded, size: 16),
-                  label: Text(
-                      widget.existingOrder != null
-                          ? 'Siparişi Güncelle'
-                          : 'Siparişi Onayla',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-        ],
-      ),
-    );
-  }
-
-  bool _isNextDisabled() {
-    if (_activeStep == 0) return _selectedCustomer == null || _isAddingCustomer;
-    if (_activeStep == 1) return _cart.isEmpty;
-    if (_activeStep == 2) return _cart.isEmpty;
-    return false;
-  }
-
-  Future<void> _submitOrder() async {
-    setState(() => _isSubmitting = true);
-
-    AuthorizedCardPayment? cardPayment;
-    try {
-      // 0. Pre-flight inventory stock verification BEFORE running card transaction or modifying state
-      final inventoryService = await ref.read(inventoryServiceProvider.future);
-      final inventoryCheckItems = _cart.entries.map((e) {
-        final rawQty = e.value;
-        final intQty =
-            rawQty >= 1.0 ? rawQty.round() : (rawQty > 0.0 ? 1 : 0);
-        return SaleItemInput(
-          productId: e.key.id,
-          productName: e.key.name,
-          quantity: intQty,
-          saleQuantity: rawQty,
-          unitPrice: e.key.price,
-        );
-      }).toList();
-      await inventoryService.verifyStockAvailability(inventoryCheckItems);
-
-      final itemsList = _cart.entries
-          .map((e) => {
-                'product_id': e.key.id,
-                'product_name': e.key.name,
-                'quantity': e.value,
-                'unit_price': e.key.price,
-                'tax': e.key.vat ?? 0.0,
-                'total_price': e.value * e.key.price,
-              })
-          .toList();
-
-      final isEdit = widget.existingOrder != null;
-      final String orderId = isEdit
-          ? widget.existingOrder!.id
-          : 'ord-${DateTime.now().microsecondsSinceEpoch}${Random().nextInt(10000).toString().padLeft(4, '0')}';
-
-      final currentUser = ref.read(currentUserProvider);
-      final cashierName = currentUser?.name ?? 'Kasiyer';
-
-      final newOrder = OrderEntity(
-        id: orderId,
-        customerId: _selectedCustomer!.id,
-        customerName: _selectedCustomer!.name,
-        customerPhone: _selectedCustomer!.phone,
-        status: isEdit ? widget.existingOrder!.status : 'created',
-        createdAt: isEdit ? widget.existingOrder!.createdAt : DateTime.now(),
-        expectedDeliveryDate: _expectedDelivery,
-        actualDeliveryDate:
-            isEdit ? widget.existingOrder!.actualDeliveryDate : null,
-        items: itemsList,
-        notes: _notesController.text.trim(),
-        createdBy: isEdit ? widget.existingOrder!.createdBy : cashierName,
-        discountAmount: _discountAmount,
-      );
-
-      // Process customer balance ledger
-      final previousDebt = max(0.0, -_selectedCustomer!.balance);
-      double finalPaid = _totalAmount;
-      if (_paymentMethod == 'debt') {
-        finalPaid = 0.0;
-      } else if (_paymentMethod == 'karma') {
-        finalPaid = _karmaResult.paidAmount;
-      }
-      final cardAmount = _paymentMethod == 'card'
-          ? _totalAmount
-          : _paymentMethod == 'karma'
-              ? _karmaCard
-              : 0.0;
-      final hasPos =
-          ref.read(hardwareConfigProvider).valueOrNull?.hasPosBridge == true;
-      if (cardAmount > 0 && hasPos) {
-        cardPayment =
-            await ref.read(physicalCardPaymentServiceProvider).authorize(
-                  amount: cardAmount,
-                  idempotencyKey: 'order-card-$orderId',
-                );
-      }
-      final cardMetadata = cardAmount <= 0
-          ? null
-          : cardPayment?.ledgerMetadata ??
-              PhysicalCardPaymentService.manualLedgerMetadata(
-                context: 'order_creation',
-              );
-      final paymentMetadata = _paymentMethod == 'karma'
-          ? <String, dynamic>{
-              'payment_breakdown': {
-                'cash_tendered': _karmaResult.cashTendered,
-                'cash_applied': _karmaResult.cashApplied,
-                'card': _karmaResult.card,
-                'debt': _karmaResult.debt,
-                'change': _karmaResult.change,
-              },
-              ...?cardMetadata,
-            }
-          : cardMetadata;
-      if (isEdit) {
-        // Save Order to Local Database
-        await ref.read(ordersControllerProvider.notifier).updateOrder(newOrder);
-
-        final paymentService = await ref.read(paymentServiceProvider.future);
-        await paymentService.reviseOrderPayment(
-          orderId: widget.existingOrder!.id,
-          oldCustomerId: widget.existingOrder!.customerId,
-          newCustomerId: _selectedCustomer!.id,
-          totalAmount: _totalAmount,
-          paidAmount: finalPaid,
-        );
-      } else {
-        // Save Order to Local Database
-        await ref.read(ordersControllerProvider.notifier).addOrder(newOrder);
-
-        final paymentService = await ref.read(paymentServiceProvider.future);
-        await paymentService.processSalePayment(
-          saleId: newOrder.id,
-          customerId: _selectedCustomer!.id,
-          totalAmount: _totalAmount,
-          paidAmount: finalPaid,
-          paymentMethod: _paymentMethod,
-          terminalMetadata: paymentMetadata,
-        );
-      }
-      if (cardPayment != null) {
-        await ref.read(physicalCardPaymentServiceProvider).markLocalCommit(
-              cardPayment,
-              contextId: newOrder.id,
-            );
-      }
-
-      // Refresh customers state so updated balance displays on screens
-      await ref.read(ordersCustomersControllerProvider.notifier).refresh();
-      ref.invalidate(customersControllerProvider);
-      ref.invalidate(salesCustomersControllerProvider);
-      ref.invalidate(customerBalanceSummaryProvider);
-      ref.invalidate(customerLookupMapProvider);
-      ref.invalidate(customerTransactionsProvider(_selectedCustomer!.id));
-      ref.invalidate(customerBalanceDetailsProvider(_selectedCustomer!.id));
-      ref.invalidate(customerDetailProvider(_selectedCustomer!.id));
-      if (isEdit && _selectedCustomer!.id != widget.existingOrder!.customerId) {
-        ref.invalidate(
-            customerTransactionsProvider(widget.existingOrder!.customerId));
-        ref.invalidate(
-            customerBalanceDetailsProvider(widget.existingOrder!.customerId));
-        ref.invalidate(
-            customerDetailProvider(widget.existingOrder!.customerId));
-      }
-
-      // Print order receipt & labels (isolated to prevent printer network errors from aborting or rolling back saved order)
-      try {
-        final settings = ref.read(settingsNotifierProvider).value;
-        if (settings != null) {
-          final receiptItems = _cart.entries
-              .map((e) => {
-                    'product_name': e.key.name,
-                    'product_id': e.key.id,
-                    'barcode': e.key.id,
-                    'quantity': e.value,
-                    'unit_price': e.key.price,
-                  })
-              .toList();
-
-          // 1. Print main receipt copies
-          if (_printReceipt) {
-            await ref.read(printingApplicationServiceProvider).queueOrderReceipt(
-                  newOrder,
-                  receiptItems,
-                  _selectedCustomer,
-                  settings,
-                  paidAmount: finalPaid,
-                  notes: _notesController.text.trim(),
-                  paymentMethod: _paymentMethod,
-                  paymentBreakdown: _paymentMethod == 'karma'
-                      ? {
-                          'cash_applied': _karmaResult.cashApplied,
-                          'card': _karmaResult.card,
-                          'debt': _karmaResult.debt,
-                        }
-                      : null,
-                  copies: _printCopies,
-                );
-          }
-
-          // 2. Print label stickers if label printer toggle is enabled
-          if (_printLabel) {
-            final String? labelPaymentStatus;
-            if (_paymentMethod == 'debt' ||
-                (_paymentMethod == 'karma' && _karmaDebt > 0.009)) {
-              if (finalPaid <= 0.01) {
-                labelPaymentStatus = 'Vadeli';
-              } else {
-                labelPaymentStatus =
-                    'Kısmi Ödeme (Borç: ₺${_karmaDebt.toStringAsFixed(2)})';
-              }
-            } else if (finalPaid >= _totalAmount - 0.01) {
-              labelPaymentStatus = 'Ödendi';
-            } else {
-              labelPaymentStatus = 'Kısmi Ödeme';
-            }
-
-            await ref.read(printingApplicationServiceProvider).queueOrderLabel(
-                  newOrder,
-                  receiptItems,
-                  settings,
-                  customer: _selectedCustomer,
-                  paidAmount: finalPaid,
-                  previousDebt: previousDebt,
-                  paymentStatusOverride: labelPaymentStatus,
-                  copies: _labelCopies,
-                );
-          }
-        }
-      } catch (printError) {
-        debugPrint('[OrderCreationDialog] Yazıcı hatası (sipariş başarıyla kaydedildi): $printError');
-      }
-
-      ref.invalidate(dashboardProvider);
-      ref.invalidate(productsControllerProvider);
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEdit
-                ? 'Sipariş başarıyla güncellendi.'
-                : 'Sipariş başarıyla oluşturuldu.'),
-            backgroundColor: _kGreen,
-          ),
-        );
-      }
-    } catch (e) {
-      if (cardPayment != null) {
-        await ref
-            .read(physicalCardPaymentServiceProvider)
-            .markUnreconciled(cardPayment, e);
-      }
-      setState(() => _isSubmitting = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Sipariş kaydedilirken hata: $e'),
-              backgroundColor: _kRed),
-        );
-      }
-    }
-  }
-}
-
-String _formatQuantity(double qty) {
-  if (qty == qty.toInt()) {
-    return qty.toInt().toString();
-  }
-  return qty.toStringAsFixed(3).replaceAll(RegExp(r'\.?0+$'), '');
-}
-
-class _InlineQuantityField extends StatefulWidget {
-  final double quantity;
-  final ValueChanged<double> onChanged;
-  final VoidCallback? onRemove;
-  final bool hasBorder;
-  const _InlineQuantityField({
-    required this.quantity,
-    required this.onChanged,
-    this.onRemove,
-    this.hasBorder = true,
-  });
-
-  @override
-  State<_InlineQuantityField> createState() => _InlineQuantityFieldState();
-}
-
-class _InlineQuantityFieldState extends State<_InlineQuantityField> {
-  late TextEditingController _controller;
-  late FocusNode _focusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: _formatQuantity(widget.quantity));
-    _focusNode = FocusNode();
-    _focusNode.addListener(_onFocusChange);
-  }
-
-  @override
-  void didUpdateWidget(_InlineQuantityField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.quantity != widget.quantity && !_focusNode.hasFocus) {
-      _controller.text = _formatQuantity(widget.quantity);
-    }
-  }
-
-  void _onFocusChange() {
-    if (_focusNode.hasFocus) {
-      _controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _controller.text.length,
-      );
-    } else {
-      _submitValue();
-    }
-  }
-
-  void _submitValue() {
-    final text = _controller.text.replaceAll(',', '.');
-    final val = double.tryParse(text);
-    if (val != null) {
-      if (val <= 0.0001) {
-        if (widget.onRemove != null) {
-          widget.onRemove!();
-        } else {
-          widget.onChanged(0.0);
-        }
-      } else {
-        widget.onChanged(val);
-      }
-    } else {
-      _controller.text = _formatQuantity(widget.quantity);
-    }
-  }
-
-  @override
-  void dispose() {
-    _focusNode.removeListener(_onFocusChange);
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: widget.hasBorder ? Border.all(color: _kBorder) : null,
-      ),
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: 13, color: _kText),
-        maxLines: 1,
-        decoration: const InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
-          border: InputBorder.none,
-        ),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
-        ],
-        onSubmitted: (_) {
-          _submitValue();
-          _focusNode.unfocus();
-        },
-      ),
-    );
-  }
-}
-
-class _InlineCopyCountField extends StatefulWidget {
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  const _InlineCopyCountField({
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  State<_InlineCopyCountField> createState() => _InlineCopyCountFieldState();
-}
-
-class _InlineCopyCountFieldState extends State<_InlineCopyCountField> {
-  late TextEditingController _controller;
-  late FocusNode _focusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.value.toString());
-    _focusNode = FocusNode();
-    _focusNode.addListener(_onFocusChange);
-  }
-
-  @override
-  void didUpdateWidget(_InlineCopyCountField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
-      _controller.text = widget.value.toString();
-    }
-  }
-
-  void _onFocusChange() {
-    if (_focusNode.hasFocus) {
-      _controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _controller.text.length,
-      );
-    } else {
-      _submitValue();
-    }
-  }
-
-  void _submitValue() {
-    final val = int.tryParse(_controller.text);
-    if (val != null && val >= 1) {
-      widget.onChanged(val);
-    } else {
-      _controller.text = widget.value.toString();
-    }
-  }
-
-  @override
-  void dispose() {
-    _focusNode.removeListener(_onFocusChange);
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const Color bgColor = Colors.white;
-    const Color borderColor = _kBorder;
-    const Color textColor = _kText;
-
-    return Container(
-      width: 36,
-      height: 34,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor),
-      ),
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        enabled: true,
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
-        maxLines: 1,
-        decoration: const InputDecoration(
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          focusedErrorBorder: InputBorder.none,
-          filled: false,
-        ),
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-        ],
-        onSubmitted: (_) {
-          _submitValue();
-          _focusNode.unfocus();
-        },
-      ),
     );
   }
 }

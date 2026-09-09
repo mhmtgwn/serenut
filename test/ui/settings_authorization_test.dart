@@ -10,7 +10,6 @@ import 'package:serenutos/presentation/pages/settings_page.dart';
 import 'package:serenutos/domain/models/settings.dart';
 import 'package:serenutos/providers/settings_provider.dart';
 import 'package:serenutos/infrastructure/repositories/in_memory_repositories.dart';
-import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 
 void main() {
   setUpAll(() async {
@@ -396,40 +395,5 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets(
-        'Action bypass protection: direct navigation to DbHealthPage without database permission blocks access',
-        (WidgetTester tester) async {
-      final mockUser = AuthUser(
-        id: 'usr-staff',
-        name: 'Restricted Staff',
-        email: 'staff@serenut.com',
-        role: UserRole.staff,
-        permissions: ['settings:view'], // has view, but not settings:database
-        createdAt: DateTime.now(),
-      );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            currentUserProvider.overrideWithValue(mockUser),
-            settingsRepositoryProvider
-                .overrideWith((ref) => InMemorySettingsRepository()),
-          ],
-          child: const MaterialApp(
-            home: Scaffold(
-              body: DbHealthPage(),
-            ),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      // Assert DbHealthPage is blocked because of missing settings:database permission
-      expect(
-          find.text('Bu sayfaya erişim yetkiniz bulunmuyor.'), findsOneWidget);
-
-      await tester.pump();
-    });
   });
 }

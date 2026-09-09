@@ -35,10 +35,6 @@ import 'package:serenutos/presentation/pages/settings/catalog_import_wizard_page
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/domain/models/permission.dart'
     show UserRole, Permission;
-import 'package:serenutos/presentation/pages/finance_hub_page.dart';
-import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
-import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
-import 'package:serenutos/presentation/pages/settings/db_health_page.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -60,11 +56,7 @@ class AppRoutes {
   static const about = '/settings/about';
   static const catalogImportWizard = '/settings/catalog-import';
   static const admin = '/admin';
-  static const finance = '/finance';
   static const hardware = '/hardware';
-  static const printQueue = '/settings/print-queue';
-  static const smsHistory = '/settings/sms-history';
-  static const dbHealth = '/settings/db-health';
   static const customerAdd = '/customers/add';
   static const productAdd = '/products/add';
 }
@@ -222,27 +214,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AdminPage(),
         redirect: _adminOnlyRedirect,
       ),
-      GoRoute(
-        path: AppRoutes.printQueue,
-        name: 'printQueue',
-        builder: (context, state) => const PrintQueuePage(),
-        redirect: (context, state) =>
-            _roleOrPermissionRedirect(context, Permission.settingsPrinter),
-      ),
-      GoRoute(
-        path: AppRoutes.smsHistory,
-        name: 'smsHistory',
-        builder: (context, state) => const SmsHistoryPage(),
-        redirect: (context, state) =>
-            _roleOrPermissionRedirect(context, Permission.settingsView),
-      ),
-      GoRoute(
-        path: AppRoutes.dbHealth,
-        name: 'dbHealth',
-        builder: (context, state) => const DbHealthPage(),
-        redirect: (context, state) =>
-            _roleOrPermissionRedirect(context, Permission.settingsDatabase),
-      ),
 
       // ── Reports (free route — no navbar tab) ─────────────────────────
       GoRoute(
@@ -251,14 +222,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ReportsPage(),
         redirect: (context, state) =>
             _roleOrPermissionRedirect(context, Permission.reportsView),
-      ),
-
-      GoRoute(
-        path: AppRoutes.finance,
-        name: 'finance',
-        builder: (context, state) => const FinanceHubPage(),
-        redirect: (context, state) =>
-            _roleOrPermissionRedirect(context, Permission.settingsFinance),
       ),
       GoRoute(
         path: AppRoutes.hardware,

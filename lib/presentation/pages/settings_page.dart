@@ -24,13 +24,10 @@ import 'package:serenutos/presentation/widgets/auth/rbac_guard.dart';
 import 'package:serenutos/presentation/pages/data_transfer_page.dart';
 import 'package:serenutos/infrastructure/services/password_hash_service.dart';
 import 'package:serenutos/presentation/pages/settings/hardware_test_page.dart';
-import 'package:serenutos/presentation/pages/settings/print_queue_page.dart';
-import 'package:serenutos/presentation/pages/settings/sms_history_page.dart';
 import 'package:serenutos/presentation/pages/settings/about_page.dart';
 import 'package:serenutos/presentation/pages/settings/account_page.dart';
 import 'package:serenutos/presentation/pages/settings/catalog_settings_page.dart';
 import 'package:serenutos/presentation/pages/settings/support_page.dart';
-import 'package:serenutos/presentation/pages/admin/audit_center_page.dart';
 import 'package:serenutos/presentation/pages/admin/admin_page.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/printing/printing_models.dart';
@@ -435,13 +432,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   // ── Gruplanmış Ayarlar Menüsü ────────────────────────────────────────────────
   List<Widget> _buildGroupedSettings(Settings settings, AuthUser? currentUser) {
     final List<Widget> groups = [];
-    // Device discovery is asynchronous and can legitimately be unavailable
-    // while the database is opening (or in widget-test/repair environments).
-    // A settings shell must remain usable in that state; the hardware screens
-    // expose the actionable repository/runtime error when opened.
-    // Grup 1: İşletme Ayarları
-    final group1 = <Widget>[];
-    final groupData = <Widget>[];
+
+    // ── GRUP 1: İŞLETME & PERSONEL ──────────────────────────────────────────
+    final groupBusiness = <Widget>[];
     if (_hasPermission(currentUser, Permission.settingsReceipt) ||
         _hasPermission(currentUser, Permission.settingsPrinter)) {
       if (_matchesQuery(
@@ -450,7 +443,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         'firma',
         settings.businessName,
       )) {
-        group1.add(
+        groupBusiness.add(
           _buildCategoryRow(
             title: 'İşletme Bilgileri',
             subtitle: settings.businessName.isNotEmpty
@@ -469,8 +462,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
     if (_hasPermission(currentUser, Permission.inventoryAdjust) &&
         _matchesQuery('ürün', 'katalog', 'kategori', 'kdv', 'birim', 'marka')) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(
+      if (groupBusiness.isNotEmpty) groupBusiness.add(const _IOSDivider());
+      groupBusiness.add(
         _buildCategoryRow(
           title: 'Ürün Kataloğu',
           subtitle: 'Kategori, varsayılan KDV ve birimleri düzenleyin',
@@ -481,26 +474,107 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
       );
-      group1.add(const _IOSDivider());
-      group1.add(
+    }
+    if (_hasPermission(currentUser, Permission.settingsUsers) &&
+        _matchesQuery('kullanıcı', 'yetki', 'çalışan', 'personel', 'user')) {
+      if (groupBusiness.isNotEmpty) groupBusiness.add(const _IOSDivider());
+      groupBusiness.add(
         _buildCategoryRow(
-          title: 'Destek Talebi Gönder',
-          subtitle: 'Sorularınız veya talepleriniz için destek ekibine ulaşın',
-          icon: Icons.support_agent_rounded,
-          color: _kBlue,
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const SupportPage())),
+          title: 'Kullanıcı Yönetimi',
+          subtitle: 'Çalışanlar ve Yetkilendirme',
+          icon: Icons.people_alt_rounded,
+          color: _kOrange,
+          onTap: () => _runGuardedAction(
+            Permission.settingsUsers,
+            () => _showUserManagementPage(),
+            title: 'Kullanıcı Yönetimi',
+          ),
         ),
       );
     }
+    if (groupBusiness.isNotEmpty) {
+      groups.add(_buildSectionHeader('İŞLETME & PERSONEL'));
+      groups.add(_buildRoundedCard(groupBusiness));
+      groups.add(const SizedBox(height: 16));
+    }
+
+    // ── GRUP 2: CİHAZLAR & BİLDİRİMLER ──────────────────────────────────────
+    final groupDevices = <Widget>[];
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery(
+          'donanım',
+          'terazi',
+          'pos',
+          'yazıcı',
+          'hardware',
+          'test',
+          'diagnostics',
+          'barkod',
+        )) {
+      groupDevices.add(_buildHardwareCenterCard(settings));
+    }
+    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
+        _matchesQuery('fiş', 'tasarım', 'yazıcı', 'logo', 'çekmece')) {
+      if (groupDevices.isNotEmpty) groupDevices.add(const _IOSDivider());
+      groupDevices.add(
+        _buildCategoryRow(
+          title: 'Fiş Tasarımı',
+          subtitle: 'Kağıt, logo, QR kod ve kasa çekmecesi ayarları',
+          icon: Icons.receipt_long_rounded,
+          color: _kBlue,
+          onTap: () => _runGuardedAction(
+            Permission.settingsPrinter,
+            () => _showReceiptSettings(settings),
+            title: 'Fiş Tasarımı',
+          ),
+        ),
+      );
+    }
+    if (_hasPermission(currentUser, Permission.settingsFinance) &&
+        _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
+      if (groupDevices.isNotEmpty) groupDevices.add(const _IOSDivider());
+      groupDevices.add(
+        _buildCategoryRow(
+          title: 'Bildirim Ayarları',
+          subtitle: 'SMS ve WhatsApp kanalları, otomatik mesaj şablonları',
+          icon: Icons.tune_rounded,
+          color: _kOrange,
+          onTap: () => _showSmsSettingsSheet(settings),
+        ),
+      );
+    }
+    if (currentUser != null &&
+        _matchesQuery('ses', 'bildirim', 'sound', 'sesli')) {
+      if (groupDevices.isNotEmpty) groupDevices.add(const _IOSDivider());
+      groupDevices.add(
+        _buildSwitchRow(
+          title: 'Satışta Sesli Bildirim',
+          subtitle: 'Satış başarıyla tamamlandığında sesli uyarı verir',
+          icon: Icons.volume_up_rounded,
+          color: _kBlue,
+          value: settings.soundNotificationEnabled,
+          onChanged: (val) async {
+            await ref.read(settingsNotifierProvider.notifier).updateSettings(
+                  settings.copyWith(soundNotificationEnabled: val),
+                );
+          },
+        ),
+      );
+    }
+    if (groupDevices.isNotEmpty) {
+      groups.add(_buildSectionHeader('CİHAZLAR & BİLDİRİMLER'));
+      groups.add(_buildRoundedCard(groupDevices));
+      groups.add(const SizedBox(height: 16));
+    }
+
+    // ── GRUP 3: VERİ VE YEDEKLEME ───────────────────────────────────────────
+    final groupData = <Widget>[];
     if (_hasPermission(currentUser, Permission.settingsDatabase) &&
-        (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek') ||
-            _matchesQuery('müşteri', 'rehber'))) {
+        (_matchesQuery('içeri', 'dışarı', 'aktar', 'katalog', 'yedek', 'müşteri', 'rehber'))) {
       groupData.add(
         _buildCategoryRow(
           title: 'Veri Aktarımı',
-          subtitle: 'Ürün ve müşteri verilerini içeri veya dışarı aktarın',
+          subtitle: 'Ürün ve müşteri verilerini Excel ile içeri veya dışarı aktarın',
           icon: Icons.import_export_rounded,
           color: _kTeal,
           onTap: () => _runGuardedAction(Permission.settingsDatabase, () {
@@ -533,60 +607,58 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       );
     }
-    if (_hasPermission(currentUser, Permission.settingsUsers) &&
-        _matchesQuery('kullanıcı', 'yetki', 'çalışan', 'personel', 'user')) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(
-        _buildCategoryRow(
-          title: 'Kullanıcı Yönetimi',
-          subtitle: 'Çalışanlar ve Yetkilendirme',
-          icon: Icons.people_alt_rounded,
-          color: _kOrange,
-          onTap: () => _runGuardedAction(
-            Permission.settingsUsers,
-            () => _showUserManagementPage(),
-            title: 'Kullanıcı Yönetimi',
-          ),
-        ),
-      );
+    if (groupData.isNotEmpty) {
+      groups.add(_buildSectionHeader('VERİ & YEDEKLEME'));
+      groups.add(_buildRoundedCard(groupData));
+      groups.add(const SizedBox(height: 16));
     }
-    final canViewAudit = currentUser != null &&
-        (currentUser.role == UserRole.sysadmin ||
-            currentUser.role == UserRole.owner ||
-            currentUser.role == UserRole.admin ||
-            currentUser.hasPermission(Permission.settingsAudit.value));
-    if (canViewAudit &&
-        _matchesQuery(
-            'denetim', 'audit', 'geçmiş', 'kim', 'işlem', 'log', 'kasiyer')) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(
+
+    // ── GRUP 4: UYGULAMA VE DESTEK ──────────────────────────────────────────
+    final groupApp = <Widget>[];
+    if (_matchesQuery('destek', 'yardım', 'iletişim', 'talep')) {
+      groupApp.add(
         _buildCategoryRow(
-          title: 'Denetim & İşlem Geçmişi',
-          subtitle:
-              'Kimin hangi satışı, siparişi veya tahsilatı yaptığını inceleyin',
-          icon: Icons.policy_rounded,
+          title: 'Destek Talebi Gönder',
+          subtitle: 'Sorularınız veya talepleriniz için destek ekibine ulaşın',
+          icon: Icons.support_agent_rounded,
           color: _kBlue,
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const AuditCenterPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const SupportPage()),
           ),
         ),
       );
     }
-    final canViewAdmin = currentUser != null &&
-        (currentUser.role == UserRole.sysadmin ||
-            currentUser.role == UserRole.owner ||
-            currentUser.role == UserRole.admin);
-    if (canViewAdmin &&
-        _matchesQuery('yönetici', 'admin', 'panel', 'kontrol', 'gözlem')) {
-      if (group1.isNotEmpty) group1.add(const _IOSDivider());
-      group1.add(
+    if (_matchesQuery(
+      'uygulama',
+      'hakkında',
+      'güncelleme',
+      'sürüm',
+      'versiyon',
+      'lisans',
+    )) {
+      if (groupApp.isNotEmpty) groupApp.add(const _IOSDivider());
+      groupApp.add(
         _buildCategoryRow(
-          title: 'Yönetici Kontrol Paneli',
-          subtitle: 'Sistem durumu, veri onarımı ve yönetim merkezi',
+          title: 'Uygulama Hakkında',
+          subtitle: 'Sürüm bilgisi ve güncelleme denetimi',
+          icon: Icons.info_outline_rounded,
+          color: _kGreen,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AboutPage()),
+          ),
+        ),
+      );
+    }
+    // Geliştirici / Sistem Yöneticisi Paneli (Yalnızca sysadmin rolü görür)
+    if (currentUser?.role == UserRole.sysadmin &&
+        _matchesQuery('yönetici', 'admin', 'panel', 'kontrol', 'gözlem', 'sistem')) {
+      if (groupApp.isNotEmpty) groupApp.add(const _IOSDivider());
+      groupApp.add(
+        _buildCategoryRow(
+          title: 'Geliştirici / Sistem Paneli',
+          subtitle: 'Sistem logları, tanı ve bakım araçları',
           icon: Icons.admin_panel_settings_rounded,
-          color: POSColors.greenDark,
+          color: _kGray,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const AdminPage(),
@@ -595,223 +667,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       );
     }
-    if (group1.isNotEmpty) {
-      groups.add(_buildSectionHeader('İŞLETME'));
-      groups.add(_buildRoundedCard(group1));
-      groups.add(const SizedBox(height: 16));
-    }
-    if (groupData.isNotEmpty) {
-      groups.add(_buildSectionHeader('VERİ YÖNETİMİ'));
-      groups.add(_buildRoundedCard(groupData));
-      groups.add(const SizedBox(height: 16));
-    }
-
-    // Grup 2: Donanım ve Bağlantılar
-    final group2 = <Widget>[];
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery(
-          'donanım',
-          'terazi',
-          'pos',
-          'yazıcı',
-          'hardware',
-          'test',
-          'diagnostics',
-          'barkod',
-        )) {
-      group2.add(_buildHardwareCenterCard(settings));
-    }
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery('fiş', 'tasarım', 'yazıcı', 'logo', 'çekmece')) {
-      if (group2.isNotEmpty) group2.add(const _IOSDivider());
-      group2.add(
-        _buildCategoryRow(
-          title: 'Fiş Tasarımı',
-          subtitle: 'Kağıt, logo, QR kod ve kasa çekmecesi ayarları',
-          icon: Icons.receipt_long_rounded,
-          color: _kBlue,
-          onTap: () => _runGuardedAction(
-            Permission.settingsPrinter,
-            () => _showReceiptSettings(settings),
-            title: 'Fiş Tasarımı',
-          ),
-        ),
-      );
-    }
-    if (_hasPermission(currentUser, Permission.settingsFinance) &&
-        _matchesQuery('sms', 'bildirim', settings.smsProvider ?? '')) {
-      if (group2.isNotEmpty) group2.add(const _IOSDivider());
-      group2.add(
-        _buildCategoryRow(
-          title: 'Bildirim Ayarları',
-          subtitle: 'SMS ve WhatsApp kanalları, otomatik mesaj şablonları',
-          icon: Icons.tune_rounded,
-          color: _kOrange,
-          onTap: () => _showSmsSettingsSheet(settings),
-        ),
-      );
-      group2.add(const _IOSDivider());
-      group2.add(
-        _buildCategoryRow(
-          title: 'Mesaj Gönder',
-          subtitle: 'Tanıtım mesajı veya bakiye hatırlatması oluşturun',
-          icon: Icons.campaign_rounded,
-          color: _kGreen,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SmsSettingsSheet(
-                settings: settings,
-                operationsOnly: true,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    if (group2.isNotEmpty) {
-      groups.add(_buildSectionHeader('CİHAZLAR VE İLETİŞİM'));
-      groups.add(_buildRoundedCard(group2));
-      groups.add(const SizedBox(height: 16));
-    }
-
-    // Grup 4: Sistem
-    final group4 = <Widget>[];
-    final groupDeveloper = <Widget>[];
-    if (currentUser?.role == UserRole.sysadmin &&
-        _matchesQuery('hata ayıklama', 'debug', 'sistem')) {
-      groupDeveloper.add(
-        _buildSwitchRow(
-          title: 'Hata Ayıklama Modu (Debug)',
-          subtitle: 'Sistem loglarını ve detayları aktif eder',
-          icon: Icons.bug_report_rounded,
-          color: _kGray,
-          value: settings.debugMode,
-          onChanged: (val) =>
-              _updateSettingField(settings.copyWith(debugMode: val)),
-        ),
-      );
-    }
-
-    if (currentUser != null &&
-        _matchesQuery('ses', 'bildirim', 'sound', 'sesli')) {
-      if (group4.isNotEmpty) group4.add(const _IOSDivider());
-      group4.add(
-        _buildSwitchRow(
-          title: 'Satışta Sesli Bildirim',
-          subtitle: 'Satış başarıyla tamamlandığında sesli uyarı verir',
-          icon: Icons.volume_up_rounded,
-          color: _kBlue,
-          value: settings.soundNotificationEnabled,
-          onChanged: (val) async {
-            await ref.read(settingsNotifierProvider.notifier).updateSettings(
-                  settings.copyWith(soundNotificationEnabled: val),
-                );
-          },
-        ),
-      );
-    }
-
-    if (group4.isNotEmpty) {
-      groups.add(_buildSectionHeader('UYGULAMA TERCİHLERİ'));
-      groups.add(_buildRoundedCard(group4));
-      groups.add(const SizedBox(height: 16));
-    }
-    if (groupDeveloper.isNotEmpty) {
-      groups.add(_buildSectionHeader('GELİŞTİRİCİ VE DESTEK'));
-      groups.add(_buildRoundedCard(groupDeveloper));
-      groups.add(const SizedBox(height: 16));
-    }
-
-    // Grup 5: Yönetim araçları
-    final group5 = <Widget>[];
-
-    if (_hasPermission(currentUser, Permission.settingsRecovery) &&
-        (currentUser?.role == UserRole.owner ||
-            currentUser?.role == UserRole.sysadmin) &&
-        _matchesQuery('tehlikeli', 'sıfırla', 'temizle', 'fabrika')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(
-        _buildCategoryRow(
-          title: 'Tehlikeli İşlemler',
-          subtitle: 'Veri temizleme ve fabrika ayarları',
-          icon: Icons.warning_amber_rounded,
-          color: _kPink,
-          onTap: () => _runGuardedAction(
-            Permission.settingsRecovery,
-            () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const DataTransferPage(
-                    mode: DataManagementMode.dangerous,
-                  ),
-                ),
-              );
-            },
-            title: 'Tehlikeli İşlemler',
-            allowedRoles: [UserRole.owner, UserRole.sysadmin],
-          ),
-        ),
-      );
-    }
-
-    if (_hasPermission(currentUser, Permission.settingsPrinter) &&
-        _matchesQuery('yazıcı', 'baskı', 'kuyruk', 'başarısız')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(
-        _buildCategoryRow(
-          title: 'Yazdırma Kuyruğu',
-          subtitle: 'Bekleyen ve başarısız baskı işlerini yönetin',
-          icon: Icons.print_rounded,
-          color: _kBlue,
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const PrintQueuePage())),
-        ),
-      );
-    }
-    if (_hasPermission(currentUser, Permission.settingsFinance) &&
-        _matchesQuery('mesaj', 'sms', 'whatsapp', 'geçmiş', 'başarısız')) {
-      if (group5.isNotEmpty) group5.add(const _IOSDivider());
-      group5.add(
-        _buildCategoryRow(
-          title: 'Mesaj Geçmişi',
-          subtitle: 'Gönderilen, bekleyen ve başarısız mesajları inceleyin',
-          icon: Icons.history_rounded,
-          color: _kTeal,
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const SmsHistoryPage())),
-        ),
-      );
-    }
-
-    if (group5.isNotEmpty) {
-      groups.add(_buildSectionHeader('YÖNETİM & İLETİŞİM'));
-      groups.add(_buildRoundedCard(group5));
-      groups.add(const SizedBox(height: 16));
-    }
-
-    if (_matchesQuery(
-      'uygulama',
-      'hakkında',
-      'güncelleme',
-      'sürüm',
-      'versiyon',
-    )) {
-      groups.add(_buildSectionHeader('UYGULAMA'));
-      groups.add(
-        _buildRoundedCard([
-          _buildCategoryRow(
-            title: 'Uygulama Hakkında',
-            subtitle: 'Sürüm bilgisi ve güncelleme denetimi',
-            icon: Icons.info_outline_rounded,
-            color: _kBlue,
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const AboutPage())),
-          ),
-        ]),
-      );
+    if (groupApp.isNotEmpty) {
+      groups.add(_buildSectionHeader('UYGULAMA VE DESTEK'));
+      groups.add(_buildRoundedCard(groupApp));
       groups.add(const SizedBox(height: 16));
     }
 

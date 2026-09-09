@@ -63,9 +63,9 @@ _StatusMeta _statusMeta(String status) {
           label: 'Hazırlanıyor');
     case 'ready':
       return const _StatusMeta(
-          color: Color(0xFF059669),
-          bg: Color(0xFFD1FAE5),
-          icon: Icons.check_circle_outline_rounded,
+          color: Color(0xFF16A34A),
+          bg: Color(0xFFDCFCE7),
+          icon: Icons.check_circle_rounded,
           label: 'Hazır');
     case 'on_way':
     case 'shipped':
@@ -80,8 +80,8 @@ _StatusMeta _statusMeta(String status) {
     case 'delivered':
     case 'completed':
       return const _StatusMeta(
-          color: Color(0xFF0D9488),
-          bg: Color(0xFFCCFBF1),
+          color: Color(0xFF475569),
+          bg: Color(0xFFE2E8F0),
           icon: Icons.task_alt_rounded,
           label: 'Teslim Edildi');
     case 'paid':
@@ -132,7 +132,7 @@ Color _statusCardBg(String status, bool isSelected) {
     case 'in_progress':
       return const Color(0xFFFFFDF5); // Dingin, soft amber / krem
     case 'ready':
-      return const Color(0xFFF2FBF5); // Ferah nane / zümrüt
+      return const Color(0xFFF0FDF4); // Ferah açık zümrüt nane
     case 'on_way':
     case 'shipped':
     case 'out_for_delivery':
@@ -141,7 +141,7 @@ Color _statusCardBg(String status, bool isSelected) {
       return const Color(0xFFF8F6FF); // Soft lavanta / lila
     case 'delivered':
     case 'completed':
-      return const Color(0xFFF4FBF9); // Soft turkuaz / teal
+      return const Color(0xFFF8FAFC); // Sakin nötr asil çelik gri (kapanmış)
     case 'paid':
       return const Color(0xFFF4FAF5); // Dingin taze nane
     case 'cancelled':
@@ -170,7 +170,7 @@ Color _statusCardBorder(String status, bool isSelected) {
     case 'in_progress':
       return const Color(0xFFFCD34D).withValues(alpha: 0.55);
     case 'ready':
-      return const Color(0xFF6EE7B7).withValues(alpha: 0.55);
+      return const Color(0xFF86EFAC).withValues(alpha: 0.65); // green-300
     case 'on_way':
     case 'shipped':
     case 'out_for_delivery':
@@ -179,7 +179,7 @@ Color _statusCardBorder(String status, bool isSelected) {
       return const Color(0xFFC4B5FD).withValues(alpha: 0.55);
     case 'delivered':
     case 'completed':
-      return const Color(0xFF5EEAD4).withValues(alpha: 0.55);
+      return const Color(0xFFCBD5E1).withValues(alpha: 0.65); // slate-300
     case 'paid':
       return const Color(0xFF86EFAC).withValues(alpha: 0.55);
     case 'cancelled':
@@ -447,15 +447,15 @@ class _OrdersPageState extends ConsumerState<OrdersPage> {
                 id: 'ready',
                 label: 'Hazır',
                 count: counts['ready'] ?? 0,
-                icon: Icons.check_circle_outline_rounded,
-                color: const Color(0xFF10B981),
+                icon: Icons.check_circle_rounded,
+                color: const Color(0xFF16A34A),
               ),
               PosFilterChipData(
                 id: 'delivered',
                 label: 'Teslim Edildi',
                 count: counts['delivered'] ?? 0,
-                icon: Icons.local_shipping_rounded,
-                color: const Color(0xFF6366F1),
+                icon: Icons.task_alt_rounded,
+                color: const Color(0xFF475569),
               ),
               PosFilterChipData(
                 id: 'cancelled',

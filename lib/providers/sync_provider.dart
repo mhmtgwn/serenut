@@ -9,10 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:serenutos/infrastructure/sync_v4/sync_v4_service.dart';
 import 'package:serenutos/domain/services/sync_state_machine.dart';
-import 'package:serenutos/domain/services/sync_trace_service.dart';
-import 'package:serenutos/domain/services/incident_repository.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
-import 'package:serenutos/domain/services/sync_replay_engine.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
 import 'package:serenutos/providers/repository_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
@@ -395,35 +392,4 @@ final syncMachineStateProvider = Provider<SyncState?>((ref) {
   return ref.watch(syncProvider);
 });
 
-/// Provides recent deduplicated incidents for the Debug Console.
-/// Auto-refreshes on each sync cycle.
-final recentIncidentsProvider = FutureProvider.autoDispose(
-  (ref) async {
-    // Invalidate when sync state changes to pick up new incidents
-    ref.watch(syncProvider);
-    final repo = IncidentRepository(
-      tracer: SyncTraceService(),
-    );
-    return repo.getDeduplicatedIncidents(hours: 48);
-  },
-);
 
-/// Provides recent sync sessions for the Debug Console timeline viewer.
-final recentSessionsProvider = FutureProvider.autoDispose(
-  (ref) async {
-    ref.watch(syncProvider);
-    final tracer = SyncTraceService();
-    return tracer.getRecentSessions(count: 20);
-  },
-);
-
-/// Provides a family provider to generate a ReplayReport for a given correlationId.
-final incidentReplayProvider =
-    FutureProvider.family.autoDispose<ReplayReport, String>(
-  (ref, correlationId) async {
-    ref.watch(syncProvider);
-    final db = kIsWeb ? null : await DatabaseManager().getDatabase();
-    final engine = SyncReplayEngine(db: db);
-    return engine.generateReport(correlationId);
-  },
-);
