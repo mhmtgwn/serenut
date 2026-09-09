@@ -731,74 +731,25 @@ class DynamicLabelSizeEngine {
       currentY += notePainter.height + 1.5;
     }
 
-    if (isWide && showItemsCount && itemsCount != null) {
-      final totalQty = itemsList.fold<double>(
-          0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0));
-      final combinedText =
-          'Ödeme: $paymentStatus  •  $itemsCount Çeşit (${totalQty.toStringAsFixed(0)} Ad.)';
-      final payPainter = TextPainter(
-        text: TextSpan(
-          text: combinedText,
-          style: ts(
-            fontSize: bodyFontSize,
-            fontWeight: FontWeight.w600,
-          ),
+    final payPainter = TextPainter(
+      text: TextSpan(
+        text: 'Ödeme: $paymentStatus',
+        style: ts(
+          fontSize: bodyFontSize,
+          fontWeight: FontWeight.w600,
         ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: textMaxW);
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: textMaxW);
 
-      boxes.add(ElementBoundingBox(
-        elementName: 'FooterPayment',
-        left: paddingLeft,
-        top: currentY,
-        width: payPainter.width,
-        height: payPainter.height,
-      ));
-      currentY += payPainter.height + 1.5;
-    } else {
-      if (showItemsCount && itemsCount != null) {
-        final itemsPainter = TextPainter(
-          text: TextSpan(
-            text:
-                'Çeşit: $itemsCount | Toplam: ${itemsList.fold<double>(0, (s, i) => s + ((i['quantity'] as num?)?.toDouble() ?? 1.0)).toStringAsFixed(0)} Ad.',
-            style: ts(
-              fontSize: detailFontSize,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: textMaxW);
-
-        boxes.add(ElementBoundingBox(
-          elementName: 'FooterItemsCount',
-          left: paddingLeft,
-          top: currentY,
-          width: itemsPainter.width,
-          height: itemsPainter.height,
-        ));
-        currentY += itemsPainter.height + 1.5;
-      }
-
-      final payPainter = TextPainter(
-        text: TextSpan(
-          text: 'Ödeme: $paymentStatus',
-          style: ts(
-            fontSize: bodyFontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: textMaxW);
-
-      boxes.add(ElementBoundingBox(
-        elementName: 'FooterPayment',
-        left: paddingLeft,
-        top: currentY,
-        width: payPainter.width,
-        height: payPainter.height,
-      ));
-      currentY += payPainter.height + 1.5;
-    }
+    boxes.add(ElementBoundingBox(
+      elementName: 'FooterPayment',
+      left: paddingLeft,
+      top: currentY,
+      width: payPainter.width,
+      height: payPainter.height,
+    ));
+    currentY += payPainter.height + 1.5;
 
     if (showTotalAmount && totalAmount != null) {
       final hasDiscount = discountAmount != null && discountAmount > 0.009;

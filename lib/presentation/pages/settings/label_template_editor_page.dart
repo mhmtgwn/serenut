@@ -782,7 +782,7 @@ class _LabelTemplateEditorPageState
               const Divider(height: 12, thickness: 0.5),
               if (_orderShowItemsCount) ...[
                 Text(
-                  'SİPARİŞ İÇERİĞİ (2 Çeşit):',
+                  'SİPARİŞ İÇERİĞİ:',
                   style: GoogleFonts.inter(
                     fontSize: (11 * scale).clamp(9.0, 16.0),
                     fontWeight: FontWeight.bold,
