@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/db_gateway.dart';
 
 // Lightweight in-house AsyncLock for serializing read-modify-write operations
 class AsyncLock {
@@ -87,10 +88,15 @@ class SyncOperation {
 
 // ── Audit Logger Service (Sprint 4: writes to SQLite audit_logs) ──
 class AuditLogger {
-  final DatabaseManager _dbManager;
+  final DbGateway _gateway;
   final _lock = AsyncLock();
 
-  AuditLogger(this._dbManager);
+  AuditLogger([dynamic gatewayOrDbManager])
+      : _gateway = gatewayOrDbManager is DbGateway
+            ? gatewayOrDbManager
+            : (gatewayOrDbManager is DatabaseManager
+                ? DbGatewayImpl(gatewayOrDbManager)
+                : DbGatewayImpl(DatabaseManager()));
 
   Future<void> logAction({
     required String action,
@@ -100,13 +106,12 @@ class AuditLogger {
   }) {
     return _lock.run(() async {
       try {
-        final db = await _dbManager.getDatabase();
         final details = jsonEncode({
           'before': beforeState,
           'after': afterState,
           'metadata': metadata,
         });
-        await db.insert('audit_logs', {
+        await _gateway.insert('audit_logs', {
           'id': const Uuid().v4(),
           'user_id': 'system',
           'user_name': 'AuditLogger',
@@ -122,8 +127,7 @@ class AuditLogger {
 
   Future<List<Map<String, dynamic>>> getLogs({int limit = 200}) async {
     try {
-      final db = await _dbManager.getDatabase();
-      final rows = await db.query(
+      final rows = await _gateway.query(
         'audit_logs',
         orderBy: 'created_at DESC',
         limit: limit,

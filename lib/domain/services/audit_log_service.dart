@@ -3,15 +3,17 @@ import 'package:uuid/uuid.dart';
 import 'package:serenutos/domain/models/audit_log.dart';
 import 'package:serenutos/domain/services/auth_service.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/db_gateway.dart';
 
 class AuditLogService {
-  final DatabaseManager _dbManager;
+  final DbGateway _gateway;
   final AuthService _authService;
 
   AuditLogService({
-    required DatabaseManager dbManager,
+    DbGateway? gateway,
+    DatabaseManager? dbManager,
     required AuthService authService,
-  })  : _dbManager = dbManager,
+  })  : _gateway = gateway ?? DbGatewayImpl(dbManager ?? DatabaseManager()),
         _authService = authService;
 
   /// Log an audit event securely to the database
@@ -24,7 +26,6 @@ class AuditLogService {
       final userId = user?.id ?? 'system';
       final userName = user?.name ?? 'System';
 
-      final db = await _dbManager.getDatabase();
       final record = AuditLog(
         id: const Uuid().v4(),
         userId: userId,
@@ -34,7 +35,7 @@ class AuditLogService {
         createdAt: DateTime.now(),
       );
 
-      await db.insert('audit_logs', record.toMap());
+      await _gateway.insert('audit_logs', record.toMap());
     } catch (_) {
       // Non-fatal fallback: do not crash active transaction if logging fails
     }
@@ -43,8 +44,7 @@ class AuditLogService {
   /// Get list of recent logs
   Future<List<AuditLog>> getRecentLogs({int limit = 100}) async {
     try {
-      final db = await _dbManager.getDatabase();
-      final rows = await db.query(
+      final rows = await _gateway.query(
         'audit_logs',
         orderBy: 'created_at DESC',
         limit: limit,
@@ -55,3 +55,4 @@ class AuditLogService {
     }
   }
 }
+

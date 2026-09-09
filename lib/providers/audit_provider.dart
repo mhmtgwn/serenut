@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:serenutos/domain/services/audit_service.dart';
 import 'package:serenutos/infrastructure/repositories/sqlite_audit_repository.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/service_providers.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 
 final auditRepositoryProvider = Provider<IAuditRepository>((ref) {
-  final dbManager = DatabaseManager();
-  return SqliteAuditRepository(dbManager);
+  final gateway = ref.watch(dbGatewayProvider);
+  return SqliteAuditRepository(gateway);
 });
 
 final auditServiceProvider = FutureProvider<AuditService>((ref) async {

@@ -32,7 +32,7 @@ import 'package:serenutos/domain/services/security_gate.dart';
 import 'package:serenutos/presentation/controllers/sales_flow_controller.dart';
 import 'package:serenutos/domain/services/audit_log_service.dart';
 import 'package:serenutos/domain/services/telemetry_service.dart';
-import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/providers/database_provider.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 
 /// Provides IBackupService instance.
@@ -194,9 +194,10 @@ final releaseManagerServiceProvider = Provider<ReleaseManagerService>((ref) {
 
 /// Provides AuditLogService instance.
 final auditLogServiceProvider = Provider<AuditLogService>((ref) {
+  final gateway = ref.watch(dbGatewayProvider);
   final authService = ref.watch(authServiceProvider);
   return AuditLogService(
-    dbManager: DatabaseManager(),
+    gateway: gateway,
     authService: authService,
   );
 });

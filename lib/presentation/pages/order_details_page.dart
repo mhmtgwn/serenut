@@ -796,6 +796,14 @@ class OrderDetailsPage extends ConsumerWidget {
                 Navigator.pop(context);
               }
 
+              rootScaffoldMessengerKey.currentState?.showSnackBar(
+                const SnackBar(
+                  content: Text('Sipariş siliniyor...'),
+                  duration: Duration(milliseconds: 1500),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+
               try {
                 final controller = ref.read(ordersControllerProvider.notifier);
                 // Only cancel uncompleted active orders; delivered or already cancelled orders must not be cancelled
@@ -1121,6 +1129,14 @@ class OrderDetailsPage extends ConsumerWidget {
                 onPressed: refundTotal > 0 && reason.isNotEmpty
                     ? () async {
                         Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('İade işlemi yapılıyor...'),
+                              duration: Duration(milliseconds: 1500),
+                            ),
+                          );
+                        }
                         try {
                           final itemsToRefund = returnItems
                               .where((ri) => (ri['returnQty'] as double) > 0)

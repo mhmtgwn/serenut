@@ -3,19 +3,22 @@ import 'package:sqflite/sqflite.dart';
 import 'package:serenutos/domain/models/audit_event.dart';
 import 'package:serenutos/domain/repositories/audit_repository.dart';
 import 'package:serenutos/infrastructure/database/database_provider.dart';
+import 'package:serenutos/infrastructure/database/db_gateway.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 class SqliteAuditRepository implements IAuditRepository {
-  final DatabaseManager _dbManager;
+  final DbGateway _gateway;
 
-  SqliteAuditRepository(this._dbManager);
+  SqliteAuditRepository(dynamic gatewayOrDbManager)
+      : _gateway = gatewayOrDbManager is DbGateway
+            ? gatewayOrDbManager
+            : DbGatewayImpl(gatewayOrDbManager as DatabaseManager);
 
   @override
   Future<AuditEvent> logEvent(AuditEvent event) async {
-    final db = await _dbManager.getDatabase();
-    return db.transaction((txn) async {
-      final previous = await txn.query(
+    return _gateway.transaction(() async {
+      final previous = await _gateway.query(
         'audit_events',
         columns: ['record_hash'],
         orderBy: 'timestamp DESC, id DESC',
@@ -43,7 +46,7 @@ class SqliteAuditRepository implements IAuditRepository {
         previousHash: previousHash,
         recordHash: recordHash,
       );
-      await txn.insert(
+      await _gateway.insert(
         'audit_events',
         chained.toMap(),
         conflictAlgorithm: ConflictAlgorithm.abort,
@@ -62,7 +65,6 @@ class SqliteAuditRepository implements IAuditRepository {
     int? limit,
     int? offset,
   }) async {
-    final db = await _dbManager.getDatabase();
     final List<String> whereClauses = [];
     final List<dynamic> whereArgs = [];
 
@@ -94,7 +96,7 @@ class SqliteAuditRepository implements IAuditRepository {
     final whereString =
         whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
 
-    final results = await db.query(
+    final results = await _gateway.query(
       'audit_events',
       where: whereString,
       whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
@@ -108,10 +110,9 @@ class SqliteAuditRepository implements IAuditRepository {
 
   @override
   Future<List<AuditEvent>> search(String query) async {
-    final db = await _dbManager.getDatabase();
     final likeQuery = '%$query%';
 
-    final results = await db.query(
+    final results = await _gateway.query(
       'audit_events',
       where:
           'user_name LIKE ? OR notes LIKE ? OR entity_id LIKE ? OR event_type LIKE ? OR entity_type LIKE ?',
@@ -124,8 +125,7 @@ class SqliteAuditRepository implements IAuditRepository {
 
   @override
   Future<bool> verifyIntegrity() async {
-    final db = await _dbManager.getDatabase();
-    final rows = await db.query(
+    final rows = await _gateway.query(
       'audit_events',
       where: "record_hash IS NOT NULL AND record_hash != ''",
       orderBy: 'timestamp ASC, id ASC',
@@ -156,3 +156,4 @@ class SqliteAuditRepository implements IAuditRepository {
     return true;
   }
 }
+
