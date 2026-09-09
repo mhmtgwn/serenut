@@ -132,28 +132,15 @@ class TrialManager {
   }
 
   int getRemainingDays() {
-    final sub = _getCache();
-    if (sub == null) {
-      return 0;
-    }
-
-    final status = sub['status'] as String?;
-    DateTime? expirationDate;
-    if (status == 'trialing') {
-      final trialEndsStr = sub['trial_ends_at'] as String?;
-      if (trialEndsStr != null) {
-        expirationDate = DateTime.tryParse(trialEndsStr);
-      }
-    } else {
-      final currentPeriodEndStr = sub['current_period_end'] as String?;
-      if (currentPeriodEndStr != null) {
-        expirationDate = DateTime.tryParse(currentPeriodEndStr);
-      }
-    }
-
+    final expirationDate = getExpiryDateSync();
     if (expirationDate == null) return 0;
 
-    final remaining = expirationDate.difference(DateTime.now().toUtc()).inDays;
+    final now = DateTime.now().toUtc();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final expiryUtc = expirationDate.toUtc();
+    final expiryDay =
+        DateTime.utc(expiryUtc.year, expiryUtc.month, expiryUtc.day);
+    final remaining = expiryDay.difference(today).inDays;
     return remaining > 0 ? remaining : 0;
   }
 
@@ -161,7 +148,7 @@ class TrialManager {
     return getRemainingDays();
   }
 
-  Future<DateTime?> getExpiryDate() async {
+  DateTime? getExpiryDateSync() {
     final sub = _getCache();
     if (sub == null) return null;
 
@@ -176,5 +163,9 @@ class TrialManager {
       }
     }
     return null;
+  }
+
+  Future<DateTime?> getExpiryDate() async {
+    return getExpiryDateSync();
   }
 }

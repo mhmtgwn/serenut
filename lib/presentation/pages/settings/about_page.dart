@@ -2,9 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:serenutos/config/theme.dart';
 import 'package:serenutos/domain/services/version_checker.dart';
 import 'package:serenutos/infrastructure/services/release_manager_service.dart';
+import 'package:serenutos/presentation/widgets/trial_banner_widget.dart';
 import 'package:serenutos/presentation/widgets/update_dialog.dart';
 import 'package:serenutos/providers/auth/auth_providers.dart';
 import 'package:serenutos/providers/service_providers.dart';
@@ -33,10 +35,13 @@ class _AboutPageState extends ConsumerState<AboutPage> {
 
   @override
   Widget build(BuildContext context) {
+    final licStatus = ref.watch(licenseStatusProvider);
     final licenseService = ref.watch(licenseServiceProvider);
     final licenseInfo = licenseService.getLicenseInfo();
-    final licenseStatus = licenseService.checkLicenseStatus();
-    final remainingDays = licenseService.getRemainingDays();
+    final licenseStatus = licStatus.status;
+    final remainingDays = licStatus.daysLeft;
+    final expiryDate = licStatus.expiryDate ?? licenseInfo?.expiryDate;
+    final tierName = licenseInfo?.tier.name ?? licStatus.tierName;
 
     return FullScreenSettingsPage(
       title: 'Uygulama Hakkında',
@@ -100,8 +105,9 @@ class _AboutPageState extends ConsumerState<AboutPage> {
                       Text(
                         _licenseDescription(
                           licenseStatus,
-                          licenseInfo?.tier.name,
+                          tierName,
                           remainingDays,
+                          expiryDate,
                         ),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
@@ -176,13 +182,32 @@ class _AboutPageState extends ConsumerState<AboutPage> {
         _ => POSColors.amberDark,
       };
 
-  String _licenseDescription(String status, String? tier, int days) {
+  String _licenseDescription(
+    String status,
+    String? tier,
+    int days,
+    DateTime? expiryDate,
+  ) {
+    final expiryFormatted = expiryDate != null
+        ? DateFormat('d MMMM yyyy', 'tr_TR').format(expiryDate.toLocal())
+        : null;
+
+    final daysText = switch (days) {
+      <= 0 => 'Son gün (Bugün sona eriyor)',
+      1 => '1 gün kaldı',
+      _ => '$days gün kaldı',
+    };
+
     return switch (status) {
-      'valid' ||
-      'active' =>
-        '${tier ?? 'Standart'} paket • $days gün kullanım süresi kaldı.',
-      'trial' => 'Deneme kullanımı aktif • $days gün kaldı.',
-      'expired' => 'Lisans süresi dolmuş. Destek ekibiyle iletişime geçin.',
+      'valid' || 'active' => expiryFormatted != null
+          ? '${tier ?? 'Standart'} Paket • $daysText (Bitiş: $expiryFormatted)'
+          : '${tier ?? 'Standart'} Paket • $daysText',
+      'trial' => expiryFormatted != null
+          ? 'Deneme Sürümü • $daysText (Bitiş: $expiryFormatted)'
+          : 'Deneme Sürümü • $daysText',
+      'expired' => expiryFormatted != null
+          ? 'Lisans süresi $expiryFormatted tarihinde doldu. Destek ekibiyle iletişime geçin.'
+          : 'Lisans süresi dolmuş. Destek ekibiyle iletişime geçin.',
       'tampered' =>
         '${tier ?? 'Mevcut'} lisans bulundu; cihaz saati yeniden doğrulanmalı.',
       _ => 'Bu cihazda doğrulanmış lisans bilgisi bulunamadı.',

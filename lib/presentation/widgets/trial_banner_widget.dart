@@ -36,7 +36,7 @@ final licenseStatusProvider = Provider<LicenseStatus>((ref) {
       status: 'trial',
       daysLeft: remainingDays,
       tierName: 'DENEME',
-      expiryDate: null,
+      expiryDate: trialManager.getExpiryDateSync(),
       deviceUuid: service.getDeviceUuid(),
     );
   }
@@ -46,7 +46,7 @@ final licenseStatusProvider = Provider<LicenseStatus>((ref) {
       status: 'active',
       daysLeft: remainingDays,
       tierName: 'TİCARİ LİSANS',
-      expiryDate: null,
+      expiryDate: trialManager.getExpiryDateSync(),
       deviceUuid: service.getDeviceUuid(),
     );
   }

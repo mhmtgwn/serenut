@@ -498,12 +498,17 @@ class LicenseService {
     return 'valid';
   }
 
-  /// Returns remaining days on active license
+  /// Returns remaining calendar days on active license
   int getRemainingDays() {
     final info = getLicenseInfo();
     if (info == null) return 0;
-    final diff = info.expiryDate.difference(DateTime.now());
-    return diff.inDays;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiryLocal = info.expiryDate.toLocal();
+    final expiryDay =
+        DateTime(expiryLocal.year, expiryLocal.month, expiryLocal.day);
+    final diffDays = expiryDay.difference(today).inDays;
+    return diffDays > 0 ? diffDays : 0;
   }
 
   Timer? _heartbeatTimer;
